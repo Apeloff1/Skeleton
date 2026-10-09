@@ -308,3 +308,25 @@ def test_frozen_game_app_builds_an_original_executable_chip8_rom_without_sdk():
     assert "$chip8Receipt.licensed_sdk_embedded" in workflow
     assert "Get-FileHash -LiteralPath $chip8First -Algorithm SHA256" in workflow
     assert "installed CHIP-8 homebrew is not a verified legal original ROM" in workflow
+
+
+def test_windows_game_can_play_original_chip8_rom_in_its_own_native_window():
+    entry = Path("packaging/windows/game_preview_entry.py").read_text("utf-8")
+    build = Path("scripts/windows/build_installer.ps1").read_text("utf-8")
+    workflow = Path(".github/workflows/windows-installer.yml").read_text("utf-8")
+    app = Path("skeleton/app/offline_chip8_preview.py").read_text("utf-8")
+
+    assert 'mode.add_argument("--chip8-demo"' in entry
+    assert "return run_native_chip8_preview()" in entry
+    assert '"skeleton.app.offline_chip8_preview"' in build
+    assert "from scripts.game.export_chip8 import (" in app
+    assert "Chip8Machine" in app
+    assert 'root.title("Skeleton - Original CHIP-8 Game")' in app
+    assert "canvas.create_rectangle(" in app
+    assert "_KEY_CODES" in app
+    assert "& $offline --chip8-demo-check --json" in workflow
+    assert "$chip8GameCheck.original_player_won" in workflow
+    assert "$chip8GameCheck.rom_sha256 -ne $chip8Receipt.rom_sha256" in workflow
+    assert "$chip8GameCheck.copyrighted_firmware_included" in workflow
+    assert "$chip8GameCheck.real_vintage_hardware_verified" in workflow
+    assert "$chip8GameCheck.native_window_was_opened" in workflow
