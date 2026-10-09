@@ -18,6 +18,8 @@ on:
       - 'skeleton/ai/webcrawler/dragon_native_save_system.py'
       - 'skeleton/ai/webcrawler/dragon_native_replay_system.py'
       - 'skeleton/ai/webcrawler/dragon_gb_platformer.py'
+      - 'skeleton/ai/webcrawler/dragon_nes_platformer.py'
+      - 'tests/test_ai_webcrawler_dragon_nes_platformer.py'
       - 'skeleton/ai/webcrawler/dragon_campaign_quests.py'
       - 'skeleton/ai/webcrawler/dragon_chip_music.py'
       - 'skeleton/ai/webcrawler/dragon_gb_sound.py'
@@ -101,7 +103,8 @@ jobs:
             tests/test_ai_webcrawler_dragon_retro_assets.py \
             tests/test_ai_webcrawler_dragon_native_c64.py \
             tests/test_ai_webcrawler_dragon_native_gbc.py \
-            tests/test_ai_webcrawler_dragon_native_platformer.py
+            tests/test_ai_webcrawler_dragon_native_platformer.py \
+            tests/test_ai_webcrawler_dragon_nes_platformer.py
       - name: Build original Game Boy ROM
         run: |
           python -m skeleton.ai.webcrawler.dragon_native_cli \
@@ -123,6 +126,12 @@ jobs:
           python -m skeleton.ai.webcrawler.dragon_native_cli \
             --target nes --out /tmp/dragon-nes --compile
           test -s /tmp/dragon-nes/build/dragon.nes
+      - name: Compile actual NES horizontal scrolling platformer cartridge
+        run: |
+          python -m skeleton.ai.webcrawler.dragon_native_cli \
+            --target nes --style side_scrolling_platformer \
+            --out /tmp/dragon-nes-platform --compile
+          test -s /tmp/dragon-nes-platform/build/dragon.nes
       - name: Publish original homebrew ROM artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -132,6 +141,7 @@ jobs:
             /tmp/dragon-nes/build/dragon.nes
             /tmp/dragon-gameboy-color/build/dragon.gbc
             /tmp/dragon-gameboy-platform/build/dragon.gb
+            /tmp/dragon-nes-platform/build/dragon.nes
           if-no-files-found: error
           retention-days: 7
 

@@ -501,7 +501,7 @@ def render_native_project(*,title:str,target_id:str,style:str,
     # Console renderers below are real CPU/SDK code, but currently provide
     # ONLY a collectible chase; do not advertise an unimplemented RPG/RTS.
     if target_id not in DESKTOP_NATIVE:
-        allowed = ("arcade_score_attack","side_scrolling_platformer") if target_id=="game_boy" else ("arcade_score_attack",)
+        allowed = ("arcade_score_attack","side_scrolling_platformer") if target_id in ("game_boy","nes") else ("arcade_score_attack",)
         if style not in allowed:
             raise ValueError("target has not implemented the requested gameplay style")
     if not isinstance(title,str) or not 2<=len(title.strip())<=80:
@@ -524,6 +524,9 @@ def render_native_project(*,title:str,target_id:str,style:str,
     if target_id=="game_boy" and style=="side_scrolling_platformer":
         from .dragon_gb_platformer import gb_platformer_source
         files=gb_platformer_source(seed)
+    elif target_id=="nes" and style=="side_scrolling_platformer":
+        from .dragon_nes_platformer import nes_platformer_source
+        files=nes_platformer_source(seed)
     elif target_id=="game_boy_color":
         from .dragon_native_gbc import color_game_boy
         files=color_game_boy(_gameboy(seed)["src/main.asm"],_gameboy(seed)["Makefile"],seed)
@@ -641,7 +644,7 @@ def render_native_project(*,title:str,target_id:str,style:str,
     if target_id in ABI_PROFILES:
         files=apply_desktop_abi(target_id,files)
     if target_id in ("game_boy","game_boy_color","nes") and not (
-        target_id=="game_boy" and style=="side_scrolling_platformer"
+        style=="side_scrolling_platformer" and target_id in ("game_boy","nes")
     ):
         from .dragon_retro_assets import (
             asset_tiles,enrich_gb_asm,enrich_nes_asm,
@@ -725,7 +728,8 @@ def render_native_project(*,title:str,target_id:str,style:str,
     files["dragon-hardware-budget.json"]=json.dumps(
         hardware,sort_keys=True,indent=2)+"\n"
     implemented={Mechanic.MOVEMENT,Mechanic.EXPLORATION}
-    if (target_id in DESKTOP_NATIVE or target_id=="xbox_original"):
+    if (target_id in DESKTOP_NATIVE or target_id=="xbox_original" or
+        (target_id=="nes" and style=="side_scrolling_platformer")):
         implemented|={Mechanic.PLATFORMING,Mechanic.PHYSICS}
     supported=tuple(sorted(m.value for m in mechanics if m in implemented))
     deferred=tuple(sorted(m.value for m in mechanics if m not in implemented))
@@ -751,10 +755,11 @@ def render_native_project(*,title:str,target_id:str,style:str,
                    else "native_timing_rhythm" if style=="rhythm_game"
                    else GENRES[style]) if target_id in DESKTOP_NATIVE
                   else "game_boy_scrolling_platformer" if target_id=="game_boy" and style=="side_scrolling_platformer"
+                  else "nes_horizontal_scroll_platformer" if target_id=="nes" and style=="side_scrolling_platformer"
                   else "original_collectible_chase"
               ),"campaign_stages": (
                   (design.stages if design is not None else 4)
-                  if target_id in DESKTOP_NATIVE
+                  if target_id in DESKTOP_NATIVE or (target_id=="nes" and style=="side_scrolling_platformer")
                   else 1
               )}
     files["dragon-native-manifest.json"]=json.dumps(manifest,sort_keys=True,indent=2)+"\n"

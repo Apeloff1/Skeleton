@@ -58,6 +58,8 @@ MILESTONES=(
                        ("game_boy",),"scrolling camera and jump physics",95,"handheld_8bit"),
   CurriculumMilestone("nes_chase","nes","arcade_score_attack",
                        ("game_boy",),"6502 CPU and NES CHR graphics",94,"cartridge_8bit"),
+  CurriculumMilestone("nes_scroll","nes","side_scrolling_platformer",
+                       ("nes",),"6502 PPU nametable scrolling, A jump and ledge physics",90,"cartridge_8bit"),
   CurriculumMilestone("gbc_palette","game_boy_color","arcade_score_attack",
                        ("game_boy",),"CGB palette RAM and color-only ROM",93,"handheld_8bit"),
   CurriculumMilestone("c64_legacy","commodore_64","arcade_score_attack",

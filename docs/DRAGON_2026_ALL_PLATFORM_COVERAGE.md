@@ -265,3 +265,30 @@ Compiler references:
 - cc65 compiler and targets: https://cc65.github.io/doc/cc65.html
 - cc65 supported 8-bit conio interfaces: https://cc65.github.io/doc/library.html
 - z88dk conio library: https://www.z88dk.org/wiki/doku.php?id=library:conio
+
+## Distinct NES NROM original side-scrolling cartridge engine
+
+The **NES now has two genuine separate gameplay modes**:
+`arcade_score_attack` and `side_scrolling_platformer`. The latter
+is **original 6502 source**, not an alias to the earlier collector.
+It creates a **vertical-mirrored iNES NROM-256 cartridge** using
+two hardware nametables, a fixed 64×30-tile original stage background,
+genuine 2bpp dragon and enemy sprites, real NMI OAM DMA, hardware
+horizontal scroll, native controller D-pad and A jumping, grounded
+gravity/ledge collision, moving enemy with damage cooldown,
+four-stage goal advancement and score tracking.
+
+The new `dragon_nes_platformer.py` owns its own 6502 game loop and
+asset encoding; the build's `nes.cfg` explicitly places its 2 KiB
+map section into PRG ROM. It does not reuse the arcade NES
+CHR-enrichment injection path. Its real ROM build step in the
+Dragon Native ROM workflow runs:
+`python -m skeleton.ai.webcrawler.dragon_native_cli --target nes
+ --style side_scrolling_platformer --out /tmp/dragon-nes-platform --compile`.
+The test inspects iNES header bits, expected PRG/CHR capacity,
+source-mode separation and native hardware register calls.
+Results remain **unverified until exact-head CI** completes,
+and no emulator or hardware certification is inferred.
+
+This increases *genre/kernel depth*, not the source-target count:
+still **55 of 169** platform identities with source emitters.
