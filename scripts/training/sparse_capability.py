@@ -71,6 +71,8 @@ def _parser() -> argparse.ArgumentParser:
                         help="maximum active samples, not an actual hardware benchmark")
     parser.add_argument("--budget", type=int, default=None,
                         help="36-72 samples; cannot exceed selected hardware profile")
+    parser.add_argument("--focus-validation", type=Path,
+                        help="validation predictions used only to prioritize additional train examples")
     operation = parser.add_mutually_exclusive_group()
     operation.add_argument("--export", type=Path,
                            help="write sparse train-only text, exclusive new file")
@@ -97,8 +99,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("sparse data budget violates selected hardware profile", file=sys.stderr)
         return 2
     try:
-        plan = build_sparse_capability_plan(args.dataset, budget=budget)
+        focus_modes = ()
+        if args.focus_validation is not None:
+            evidence = assess_heldout_capabilities(
+                args.dataset, args.focus_validation, split="validation",
+            )
+            focus_modes = tuple(sorted(
+                evidence["modes_with_observed_errors"],
+                key=lambda mode: (
+                    evidence["per_mode"][mode]["correct"], mode
+                ),
+            ))
+        plan = build_sparse_capability_plan(
+            args.dataset, budget=budget, focus_modes=focus_modes,
+        )
         report = sparse_plan_receipt(plan)
+        if args.focus_validation is not None:
+            report["adaptive_selection_source"] = "validation-only"
+            report["adaptive_selection_did_not_copy_heldout_labels"] = True
         report["hardware_profile"] = args.profile
         report["hardware_benchmark_run"] = False
         if args.export is not None:
