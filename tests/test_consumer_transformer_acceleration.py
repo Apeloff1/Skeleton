@@ -635,3 +635,85 @@ def test_partial_gpu_sgd_is_poisoned_not_silently_replayed_or_synced(monkeypatch
         accel.pin()
     with pytest.raises(RuntimeError, match="partial training update"):
         accel.sync()
+
+
+@pytest.mark.parametrize("kv_dtype", ["fp32", "fp16", "bf16"])
+def test_opt_in_kv_precision_controls_only_cache_storage(kv_dtype):
+    torch = pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = TinyTransformer(
+        vocab=("alpha", "beta", "gamma"),
+        dim=16, ctx=12, n_heads=4, n_layers=2, d_ff=24,
+        norm="rms", ffn_kind="swiglu", position_mode="rope", seed=89,
+    )
+    reference = TinyTransformer.from_snapshot(model.snapshot())
+    accel = TorchAccel(model, device="cpu", kv_dtype=kv_dtype).pin()
+    windows = [
+        (1, 2, 3), (1, 2, 3, 1), (1, 2, 3, 1, 2),
+        (2, 3, 1), (2, 3, 1, 2),
+    ]
+    expected_dtype = {
+        "fp32": torch.float32,
+        "fp16": torch.float16,
+        "bf16": torch.bfloat16,
+    }[kv_dtype]
+    max_delta = 0
+    for window in windows:
+        result = accel.logits_window(window)
+        expected = reference._logits(window)
+        max_delta = max(max_delta, max(abs(a - b) for a, b in zip(result, expected)))
+        assert result == pytest.approx(expected, rel=3e-3, abs=3e-3)
+        assert all(x.dtype == expected_dtype for x in accel._key_buffers)
+        assert all(x.dtype == expected_dtype for x in accel._value_buffers)
+    assert all(p.dtype == torch.float32 for p in accel._params())
+    assert accel.kv_reserved_bytes == sum(
+        x.numel() * x.element_size()
+        for x in accel._key_buffers + accel._value_buffers
+    )
+    assert max_delta < 3e-3
+
+
+def test_consumer_kv_fp16_halves_reserved_storage_for_same_shape():
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = _model()
+    baseline = TorchAccel(model, kv_dtype="fp32").pin()
+    compact = TorchAccel(model, kv_dtype="fp16").pin()
+    baseline.logits_window((1, 2, 3))
+    compact.logits_window((1, 2, 3))
+    assert baseline.kv_reserved_bytes == 2 * compact.kv_reserved_bytes
+    assert baseline.cached_tokens == compact.cached_tokens == (1, 2, 3)
+
+
+def test_kv_budget_bounds_peak_allocation_and_fails_closed_instead_of_cpu_fallback():
+    pytest.importorskip("torch")
+    model = TinyTransformer(
+        vocab=("alpha", "beta"), dim=8, ctx=32,
+        n_heads=2, n_layers=2, seed=77, d_ff=8,
+    )
+    model.to("torch", kv_dtype="fp16", max_kv_bytes=300)
+    assert model.resident
+    cache = KVCache(model.n_layers, model.ctx)
+    with pytest.raises(MemoryError, match="max_kv_bytes"):
+        model._logits_window((1, 2, 1, 2), cache)
+    assert cache.tokens == []
+    assert model._accel is not None  # did not switch to an unbudgeted backend
+    assert model._accel.kv_reserved_bytes <= 300
+
+
+@pytest.mark.parametrize("kv_dtype", ["invalid", "", "FP16", None])
+def test_kv_precision_rejects_unknown_formats(kv_dtype):
+    pytest.importorskip("torch")
+    model = _model()
+    with pytest.raises(ValueError, match="kv_dtype"):
+        model.to("torch", kv_dtype=kv_dtype)
+
+
+@pytest.mark.parametrize("invalid", [0, -1, True, 1.3, "1024"])
+def test_kv_budget_rejects_invalid_limits(invalid):
+    pytest.importorskip("torch")
+    model = _model()
+    with pytest.raises(ValueError, match="max_kv_bytes"):
+        model.to("torch", max_kv_bytes=invalid)
