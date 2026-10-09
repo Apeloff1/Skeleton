@@ -285,6 +285,85 @@ class GroundedOfflineReceiptTests(unittest.TestCase):
         with OfflineChatStore(legacy_path) as reopened:
             self.assertEqual(reopened.load(sid, self.model, self.token).revision, 1)
 
+    def test_migration_backfills_marker_for_existing_grounded_receipt(self):
+        import os
+        import sqlite3
+        manifest = self._snapshot()
+        self._commit(manifest)
+        legacy_path = Path(self.temp.name) / "pre-marker-grounded.sqlite3"
+        connection = sqlite3.connect(legacy_path)
+        try:
+            connection.execute(
+                "CREATE TABLE offline_sessions ("
+                "session_id TEXT PRIMARY KEY, model_digest TEXT NOT NULL,"
+                "tokenizer_digest TEXT NOT NULL, revision INTEGER NOT NULL,"
+                "transcript_json TEXT NOT NULL, updated_at INTEGER NOT NULL)"
+            )
+            connection.execute(
+                "CREATE TABLE offline_turns ("
+                "session_id TEXT NOT NULL REFERENCES offline_sessions(session_id),"
+                "request_id TEXT NOT NULL, request_digest TEXT NOT NULL,"
+                "revision INTEGER NOT NULL, text TEXT NOT NULL,"
+                "output_digest TEXT NOT NULL, prompt_tokens INTEGER NOT NULL,"
+                "generated_tokens INTEGER NOT NULL,"
+                "PRIMARY KEY (session_id, request_id),"
+                "UNIQUE (session_id, revision))"
+            )
+            connection.execute(
+                "CREATE TABLE offline_turn_evidence ("
+                "session_id TEXT NOT NULL, request_id TEXT NOT NULL,"
+                "evidence_json TEXT NOT NULL, evidence_digest TEXT NOT NULL,"
+                "PRIMARY KEY (session_id, request_id),"
+                "FOREIGN KEY (session_id, request_id) REFERENCES "
+                "offline_turns(session_id, request_id) ON DELETE CASCADE)"
+            )
+            session_row = self.store._db.execute(
+                "SELECT * FROM offline_sessions WHERE session_id=?",
+                (self.sid,),
+            ).fetchone()
+            turn_row = self.store._db.execute(
+                "SELECT session_id, request_id, request_digest, revision,"
+                "text, output_digest, prompt_tokens, generated_tokens "
+                "FROM offline_turns WHERE session_id=?", (self.sid,),
+            ).fetchone()
+            evidence_row = self.store._db.execute(
+                "SELECT * FROM offline_turn_evidence WHERE session_id=?",
+                (self.sid,),
+            ).fetchone()
+            connection.execute(
+                "INSERT INTO offline_sessions VALUES (?,?,?,?,?,?)", session_row
+            )
+            connection.execute(
+                "INSERT INTO offline_turns VALUES (?,?,?,?,?,?,?,?)", turn_row
+            )
+            connection.execute(
+                "INSERT INTO offline_turn_evidence VALUES (?,?,?,?)", evidence_row
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        if os.name != "nt":
+            legacy_path.chmod(0o600)
+        with OfflineChatStore(legacy_path) as migrated:
+            self.assertEqual(migrated.load(
+                self.sid, self.model, self.token
+            ).revision, 1)
+            grounded_flag = migrated._db.execute(
+                "SELECT grounded FROM offline_turns "
+                "WHERE session_id=? AND request_id=?",
+                (self.sid, "grounded-one"),
+            ).fetchone()[0]
+            self.assertEqual(grounded_flag, 1)
+            self.assertEqual(
+                migrated.turn_evidence(self.sid, self.model, self.token),
+                [manifest],
+            )
+        with OfflineChatStore(legacy_path) as reopened:
+            self.assertEqual(
+                reopened.turn_evidence(self.sid, self.model, self.token),
+                [manifest],
+            )
+
     def test_prepared_snapshot_equals_exact_model_supplied_prefix(self):
         original = (
             "Rasterizer pixel edge coverage uses deterministic fixed-point "
