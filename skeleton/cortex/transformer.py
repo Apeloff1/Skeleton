@@ -494,6 +494,17 @@ class TinyTransformer:
             X.append(list(self.E[idx]) if self.position_mode == "rope" else add(self.E[idx], self.P[t]))
         return X
 
+    def _sync_accelerator(self) -> None:
+        """Fail closed instead of losing trained weights on CPU fallback."""
+        if self._accel is None:
+            return
+        try:
+            self._accel.sync()
+        except Exception as exc:
+            raise RuntimeError(
+                "accelerator synchronization failed; refusing stale model weights"
+            ) from exc
+
     def to(self, device: str = "cpu") -> "TinyTransformer":
         """Bind a device. CUDA if torch can see a GPU; else CPU. Never throws.
 
@@ -502,13 +513,9 @@ class TinyTransformer:
         """
         from skeleton.cortex.device import resolve
         info = resolve(device)
+        self._sync_accelerator()
         self.requested = str(info.get("requested") or device)
         self.device = str(info.get("actual") or "cpu")
-        if self._accel is not None:
-            try:
-                self._accel.sync()
-            except Exception:
-                pass
         self._accel = None
         self.resident = False
         # A Torch projection without Mixture-of-Depths routing would silently
@@ -566,8 +573,10 @@ class TinyTransformer:
             try:
                 return list(self._accel.logits(ids))
             except Exception:
+                self._sync_accelerator()
                 self._accel = None
                 self.resident = False
+                self.device = "cpu"
         H, _ = self._forward(ids)
         y = H[-1] if H else zeros(self.dim)
         return self._unembed(y)
@@ -600,6 +609,7 @@ class TinyTransformer:
                 cache.tokens.extend(self._accel.cached_tokens)
                 return logits
             except Exception:
+                self._sync_accelerator()
                 self._accel = None
                 self.resident = False
                 self.device = "cpu"
@@ -636,17 +646,14 @@ class TinyTransformer:
         return list(seq[-1]) if seq else zeros(self.dim)
 
     def hidden_seq(self, prefix: str) -> List[List[float]]:
-        """Full residual stream. Callosum reads this, not just the last token."""
-        ids = self._ids(prefix)
-        ids = ids[-self.ctx:]
-        if self._accel is not None:
-            try:
-                h = list(self._accel.hidden(ids))
-                H, _ = self._forward(ids)
-                return [list(row) for row in H] if H else [h]
-            except Exception:
-                self._accel = None
-                self.resident = False
+        """Full residual stream for the Callosum, not just the last token.
+
+        The reference graph owns full-sequence introspection. Avoid a redundant
+        GPU forward pass (which yielded only a final state), and explicitly
+        synchronize real SGD mutations before using the Python reference.
+        """
+        ids = self._ids(prefix)[-self.ctx:]
+        self._sync_accelerator()
         H, _ = self._forward(ids)
         return [list(row) for row in H] if H else [zeros(self.dim)]
 
@@ -842,11 +849,7 @@ class TinyTransformer:
         return tuple(self.itos[i] if 0 <= i < len(self.itos) else UNK for i in out[:n])
 
     def snapshot(self) -> Dict[str, Any]:
-        if self._accel is not None:
-            try:
-                self._accel.sync()
-            except Exception:
-                pass
+        self._sync_accelerator()
         L0 = self.layers[0]
         snapshot = {
             "dim": self.dim,
