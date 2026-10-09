@@ -265,6 +265,7 @@ def compile_native_atari8(world: PlayableWorld, source: HomebrewSource, *, autho
         "target_platform": "atari_400_800",
         "hardware_envelope": "Atari 400/800 48KB-class with Atari OS text mode",
         "target_format": "atari_8bit_dos_loadable_xex",
+        "world_digest": world.digest,
         "original_world_digest": world.digest,
         "winning_reference_digest": winning.digest,
         "rights_evidence_sha256": source.evidence_sha256,
