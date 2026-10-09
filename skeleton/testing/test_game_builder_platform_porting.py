@@ -282,3 +282,28 @@ def test_native_desktop_exports_a_exact_three_level_replay_without_html() -> Non
     # Source generation is not gameplay execution, binary verification or release approval.
     assert not project.binary_verified
     assert not manifest["releasable"]
+
+
+def test_editor_distinguishes_real_native_source_generation_from_certified_binaries():
+    form = editor_platform_form()
+    assert form["native_source_project_destinations"] == [
+        "linux_desktop", "macos_modern", "windows_modern",
+    ]
+    assert form["source_export_status"] == "three_desktop_c11_source_exporters_unverified_binaries"
+    assert form["export_status"] == "no_native_target_verified"
+    native = {option["id"]: option for option in form["target_options"]}
+    for target in form["native_source_project_destinations"]:
+        option = native[target]
+        assert option["native_source_project_available"] is True
+        assert option["native_source_project_kind"] == "sdl2_c11_cmake"
+        assert option["capability_status"] == "native_source_project_only"
+        assert not option["native_binary_built"]
+        assert not option["verified_native_exporter"]
+    for target in ("nec_pc_fx", "bandai_wonderswan", "funtech_super_acan"):
+        assert native[target]["capability_status"] == "design_catalogue_only"
+        assert native[target]["native_source_project_available"] is False
+        assert native[target]["native_source_project_kind"] is None
+    route = editor_portability_context("nec_pc_fx")
+    assert route["native_source_project_destination_count"] == 3
+    assert route["native_export_destination_count"] == 0
+    assert sum(option["native_source_project_available"] for option in route["targets"]) == 3
