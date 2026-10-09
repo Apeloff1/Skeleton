@@ -28,7 +28,7 @@ _KEY_CODES = {
 class OriginalChip8Game:
     """An actual bytecode-run homebrew game, not a screenshot approximation."""
 
-    def __init__(self, *, seed: int = 42) -> None:
+    def __init__(self, *, seed: int = 1729) -> None:
         # Generates a new, original map capsule and verifies all ROM bytes
         # before using them in the actual independently implemented VM.
         self.compiled = compile_chip8_homebrew(_original_capsule(seed))
@@ -99,7 +99,7 @@ class OriginalChip8Game:
         return self.frame()
 
 
-def verify_native_chip8_player(seed: int = 42) -> dict[str, Any]:
+def verify_native_chip8_player(seed: int = 1729) -> dict[str, Any]:
     """Execute an independent GUI-equivalent controller session to a win."""
     game = OriginalChip8Game(seed=seed)
     starting = game.frame()
@@ -127,7 +127,7 @@ def verify_native_chip8_player(seed: int = 42) -> dict[str, Any]:
     }
 
 
-def run_native_chip8_preview(seed: int = 42) -> int:
+def run_native_chip8_preview(seed: int = 1729) -> int:
     """Create actual native desktop graphics; no browser or downloaded ROM."""
     game = OriginalChip8Game(seed=seed)
     try:
