@@ -272,6 +272,9 @@ def improve_local_model(
         raise OfflineImprovementError(
             "training or validation source changed during execution"
         )
+    # The bound baseline is never a training target. Check this in-memory
+    # invariant independently of on-disk source stability.
+    original.assert_identity()
     latest_parent = load_local_model_artifact(checkpoint)
     if (
         latest_parent.receipt.artifact_sha256 != loaded.receipt.artifact_sha256
