@@ -11,13 +11,13 @@ import hashlib
 import json
 import math
 import os
-from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
 from pathlib import Path
 import shutil
 import sqlite3
 import tempfile
 import time
 from typing import Any, Mapping
+from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
 
 
 SCHEMA = "skeleton.app.offline_snapshot.v1"
