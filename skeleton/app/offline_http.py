@@ -167,7 +167,7 @@ class OfflineHTTPApplication:
                                  else "llama.cpp"),
                 "model_digest": self.model_digest,
                 "tokenizer_digest": self.tokenizer_digest,
-                "saved_session_limit": 1000,
+                "session_list_limit": 100,
                 "default_output_tokens": self.default_output_tokens,
             }
         if path == "/v1/sessions":
@@ -269,6 +269,12 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
     server_version = "SkeletonLocalAI"
     sys_version = ""
 
+    def setup(self):
+        super().setup()
+        # Reject indefinitely stalled partial HTTP bodies. This protects
+        # the bounded loopback worker pool from idle socket exhaustion.
+        self.connection.settimeout(15.0)
+
     def log_message(self, format, *args):
         # Do not log conversation content, tokens or session identifiers.
         return
@@ -315,8 +321,8 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         # Duplicate Host, Content-Length, Origin, Authorization or Transfer-
         # Encoding headers are rejected before routing. No ambiguous message
         # framing, split bearer credentials or DNS rebinding.
-        for name in ("Host", "Content-Length", "Origin", "Authorization",
-                     "Transfer-Encoding"):
+        for name in ("Host", "Content-Length", "Content-Type", "Origin",
+                     "Authorization", "Transfer-Encoding"):
             if len(self.headers.get_all(name, [])) > 1:
                 raise OfflineHTTPError(400, "duplicate HTTP control header")
         expected = {f"127.0.0.1:{self.server.server_port}",
