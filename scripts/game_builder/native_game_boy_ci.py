@@ -9,6 +9,7 @@ from pathlib import Path
 from skeleton.ai.game_builder.game_boy_native_export import (
     compile_native_game_boy, export_native_game_boy,
 )
+from skeleton.ai.game_builder.game_boy_memory_replay import export_game_boy_memory_replay
 from skeleton.ai.game_builder.playable_world import GameBuildIntent, generate_playable_world
 from skeleton.ai.game_builder.port_planner import HomebrewSource
 
@@ -39,11 +40,13 @@ def build_source(directory: Path) -> dict[str, object]:
     meta = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
     assert meta["world_digest"] == world.digest
     assert meta["rom_compiled"] is False
+    export_game_boy_memory_replay(world, folder / "verification-route.json")
     return {
         "source_path": str(folder),
         "source_digest": project.content_digest,
         "world_digest": world.digest,
         "safe_reference_moves": meta["safe_reference_moves"],
+        "hardware_replay_route": str(folder / "verification-route.json"),
         "compile_claim": False,
     }
 
