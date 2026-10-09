@@ -100,6 +100,40 @@ static void walk(int dx, int dy) {
         else { ++current_level; enter_level(); }
     }
 }
+
+/* Explicit opt-in deterministic native smoke replay; no SDL/video dependency. */
+static const char *const verification_routes[LEVEL_COUNT] = {
+__REPLAY_DATA__
+};
+static const int expected_verification_steps = __REPLAY_STEPS__;
+static const int expected_verification_score = __REPLAY_SCORE__;
+static int verify_replay(void) {
+    restart_game();
+    int attempted = 0;
+    for (int level = 0; level < LEVEL_COUNT; ++level) {
+        if (current_level != level || won || lost) return 10;
+        for (const char *action = verification_routes[level]; *action; ++action) {
+            switch (*action) {
+                case 'U': walk(0, -1); break;
+                case 'D': walk(0, 1); break;
+                case 'L': walk(-1, 0); break;
+                case 'R': walk(1, 0); break;
+                default: return 11;
+            }
+            ++attempted;
+            if (lost) return 12;
+        }
+        if (level + 1 < LEVEL_COUNT && current_level != level + 1) return 13;
+    }
+    if (!won || lost || current_level != LEVEL_COUNT - 1 ||
+        found != collectible_total(current_level) ||
+        hp != initial_health || moves != expected_verification_steps ||
+        attempted != moves || score != expected_verification_score) return 14;
+    printf("SKELETON_NATIVE_REPLAY_OK levels=%d steps=%d score=%d\n",
+           LEVEL_COUNT, moves, score);
+    return 0;
+}
+
 static void fill(SDL_Renderer *renderer, int x, int y, int w, int h,
                  unsigned char r, unsigned char g, unsigned char b) {
     SDL_Rect rc = {x, y, w, h};
@@ -137,7 +171,12 @@ static void keyboard(SDL_Keycode key) {
         default: break;
     }
 }
-int main(void) {
+int main(int argc, char **argv) {
+    if (argc == 2 && strcmp(argv[1], "--verify-replay") == 0) return verify_replay();
+    if (argc != 1) {
+        fprintf(stderr, "Usage: skeleton_homebrew [--verify-replay]\n");
+        return 64;
+    }
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) != 0) {
         fprintf(stderr, "SDL initialization: %s\n", SDL_GetError());
@@ -245,6 +284,14 @@ def compile_native_desktop(
         raise NativeDesktopExportError("SDL2 exporter expects uniform validated level dimensions")
     width, height = levels[0].width, levels[0].height
     grid_data = ",\n".join("    {" + ", ".join(_c_literal(row) for row in level.rows) + "}" for level in levels)
+    replay_letters = {"up": "U", "down": "D", "left": "L", "right": "R"}
+    replay_rows = tuple(
+        "".join(replay_letters[step] for step in level.safe_solution)
+        for level in levels
+    )
+    replay_steps = sum(len(route) for route in replay_rows)
+    replay_score = len(levels) * (100 + 10 * world.intent.collectibles_per_level)
+    replay_data = ",\n".join("    " + _c_literal(route) for route in replay_rows)
     c_source = (
         _C_GAME.replace("__LEVEL_COUNT__", str(len(levels)))
         .replace("__MAP_WIDTH__", str(width))
@@ -252,6 +299,9 @@ def compile_native_desktop(
         .replace("__MAP_DATA__", grid_data)
         .replace("__TITLE__", _c_literal(world.intent.title))
         .replace("__INITIAL_HEALTH__", str(world.intent.starting_health))
+        .replace("__REPLAY_DATA__", replay_data)
+        .replace("__REPLAY_STEPS__", str(replay_steps))
+        .replace("__REPLAY_SCORE__", str(replay_score))
     ).lstrip()
     manifest = {
         "schema": "skeleton.game_builder.native_desktop_source.v1",
@@ -269,6 +319,10 @@ def compile_native_desktop(
         "executable_built": False,
         "releasable": False,
         "third_party_game_assets_embedded": False,
+        "native_headless_replay_available": True,
+        "native_headless_replay_executed": False,
+        "native_replay_expected_steps": replay_steps,
+        "native_replay_expected_score": replay_score,
     }
     manifest_json = json.dumps(manifest, sort_keys=True, indent=2) + "\n"
     content_digest = sha256((
