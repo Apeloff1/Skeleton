@@ -187,19 +187,68 @@ class OfflineKnowledgeLibrary:
                 "chunk_count": len(pieces), "reused": False,
             }
 
-    def list_documents(self) -> list[dict[str, Any]]:
+    def _verified_snapshot(self) -> tuple[list[tuple[Any, ...]], list[tuple[Any, ...]]]:
+        """Verify documents AND source chunks from one SQLite read snapshot.
+
+        Never advertise a citation unless the indexed text is provably an
+        exact slice of the stored document whose SHA-256 matches the source.
+        """
         with self.store._lock:
-            records = self.store._db.execute(
-                "SELECT document_id, title, content_digest, LENGTH(content_text), "
-                "created_ns FROM offline_documents "
-                "WHERE model_digest=? AND tokenizer_digest=? "
-                "ORDER BY created_ns DESC, document_id LIMIT ?",
-                (self.model_digest, self.tokenizer_digest, MAX_DOCUMENTS_PER_MODEL),
-            ).fetchall()
+            own_snapshot = not self.store._db.in_transaction
+            if own_snapshot:
+                self.store._db.execute("BEGIN")
+            try:
+                documents = self.store._db.execute(
+                    "SELECT document_id, title, content_digest, content_text, "
+                    "created_ns FROM offline_documents "
+                    "WHERE model_digest=? AND tokenizer_digest=? "
+                    "ORDER BY created_ns DESC, document_id",
+                    (self.model_digest, self.tokenizer_digest),
+                ).fetchall()
+                chunks = self.store._db.execute(
+                    "SELECT c.document_id, d.title, d.content_digest, "
+                    "c.ordinal, c.char_start, c.char_end, c.content "
+                    "FROM offline_documents d JOIN offline_document_chunks c "
+                    "ON d.document_id=c.document_id "
+                    "WHERE d.model_digest=? AND d.tokenizer_digest=? "
+                    "ORDER BY d.document_id, c.ordinal",
+                    (self.model_digest, self.tokenizer_digest),
+                ).fetchall()
+            finally:
+                if own_snapshot:
+                    self.store._db.execute("ROLLBACK")
+        if (len(documents) > MAX_DOCUMENTS_PER_MODEL
+                or len(chunks) > MAX_CHUNKS_PER_MODEL):
+            raise RuntimeContractError("local reference index is beyond its budget")
+        by_document: dict[str, list[tuple[Any, ...]]] = {}
+        for chunk in chunks:
+            by_document.setdefault(chunk[0], []).append(chunk)
+        for doc in documents:
+            doc_id, title, digest, source, _created = doc
+            actual = self._validate(title, source)
+            if sha256(actual).hexdigest() != _identity(digest, "document digest"):
+                raise RuntimeContractError("reference source hash mismatch")
+            expected = self._chunks(source)
+            actual_chunks = by_document.pop(doc_id, [])
+            if len(actual_chunks) != len(expected):
+                raise RuntimeContractError("reference source index is incomplete")
+            for index, (start, end, passage) in enumerate(expected):
+                row = actual_chunks[index]
+                if (type(row[3]) is not int or row[3] != index
+                        or type(row[4]) is not int or row[4] != start
+                        or type(row[5]) is not int or row[5] != end
+                        or row[6] != passage):
+                    raise RuntimeContractError("reference passage provenance mismatch")
+        if by_document:
+            raise RuntimeContractError("reference contains orphaned passages")
+        return documents, chunks
+
+    def list_documents(self) -> list[dict[str, Any]]:
+        documents, _ = self._verified_snapshot()
         return [
             {"document_id": row[0], "title": row[1], "sha256": row[2],
-             "character_count": row[3], "created_ns": row[4]}
-            for row in records
+             "character_count": len(row[3]), "created_ns": row[4]}
+            for row in documents
         ]
 
     def delete(self, document_id: str) -> None:
@@ -225,18 +274,7 @@ class OfflineKnowledgeLibrary:
         terms = _terms(query)
         if not terms:
             return []
-        with self.store._lock:
-            records = self.store._db.execute(
-                "SELECT d.document_id, d.title, d.content_digest, "
-                "c.ordinal, c.char_start, c.char_end, c.content "
-                "FROM offline_documents d JOIN offline_document_chunks c "
-                "ON d.document_id=c.document_id "
-                "WHERE d.model_digest=? AND d.tokenizer_digest=? "
-                "ORDER BY d.document_id, c.ordinal",
-                (self.model_digest, self.tokenizer_digest),
-            ).fetchall()
-        if len(records) > MAX_CHUNKS_PER_MODEL:
-            raise RuntimeContractError("local document index exceeds search budget")
+        _, records = self._verified_snapshot()
         corpus: list[tuple[tuple[Any, ...], set[str], dict[str, int]]] = []
         df = {term: 0 for term in terms}
         for row in records:
