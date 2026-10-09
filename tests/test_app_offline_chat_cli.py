@@ -23,7 +23,7 @@ class HeadlessOfflineChatTests(unittest.TestCase):
         self.database = self.directory / "model.sqlite3"
         runtime = NativeLLMRuntime(TinyTransformer(
             vocab=("system:", "user:", "assistant:", "hello", "world", "answer"),
-            dim=8, ctx=96, seed=41, n_heads=2, n_layers=2, d_ff=16,
+            dim=8, ctx=1024, seed=41, n_heads=2, n_layers=2, d_ff=16,
         ))
         self.model_digest = runtime.model_digest
         self.tokenizer_digest = runtime.tokenizer.digest
@@ -143,6 +143,64 @@ class HeadlessOfflineChatTests(unittest.TestCase):
         )
         self.assertEqual(code, 0, errors)
         self.assertEqual(json.loads(output), [])
+
+    def test_headless_grounded_chat_persists_cited_source_after_deletion(self):
+        reference = self.directory / "renderer.md"
+        source = (
+            "Fixed-point edge rasterization decides pixel coverage. "
+            "The hardware pixel pipeline applies ordered depth rejection. "
+        ) * 3
+        reference.write_text(source, encoding="utf-8")
+        status, output, errors = self._run("--add-reference", str(reference))
+        self.assertEqual(status, 0, errors)
+        document = json.loads(output)
+        status, output, errors = self._run(
+            "--grounded-message", "How does edge rasterization handle pixel coverage?",
+            "--max-output-tokens", "2", "--json",
+        )
+        self.assertEqual(status, 0, errors)
+        committed = json.loads(output)
+        sid = committed["session_id"]
+        evidence = committed["evidence"]
+        self.assertEqual(len(evidence["citations"]), 1)
+        excerpt = evidence["citations"][0]
+        self.assertEqual(excerpt["document_sha256"], document["sha256"])
+        self.assertEqual(source[excerpt["char_start"]:excerpt["char_end"]],
+                         excerpt["passage"])
+        self.assertIn(excerpt["passage"], evidence["context"])
+        status, output, errors = self._run(
+            "--delete-reference", document["document_id"]
+        )
+        self.assertEqual(status, 0, errors)
+        with OfflineChatStore(self.database) as restarted:
+            record = restarted.load(sid, self.model_digest, self.tokenizer_digest)
+            self.assertEqual(record.revision, 1)
+            self.assertEqual(record.transcript.messages[0].content,
+                             "How does edge rasterization handle pixel coverage?")
+            self.assertEqual(
+                restarted.turn_evidence(
+                    sid, self.model_digest, self.tokenizer_digest
+                ), [evidence],
+            )
+        archive = self.directory / "grounded-export.json"
+        status, output, errors = self._run(
+            "--export-session", sid, "--output", str(archive)
+        )
+        self.assertEqual(status, 0, errors)
+        self.assertEqual(json.loads(archive.read_text())["body"]["schema"],
+                         "skeleton.ai.offline-chat-bundle.v2")
+
+    def test_headless_grounded_chat_without_references_commits_no_turn(self):
+        status, output, errors = self._run(
+            "--grounded-message", "Undocumented frame interpolation?",
+            "--max-output-tokens", "2", "--json",
+        )
+        self.assertEqual(status, 1)
+        self.assertIn("no local reference", errors)
+        with OfflineChatStore(self.database) as store:
+            sessions = store.list_sessions(self.model_digest, self.tokenizer_digest)
+            self.assertTrue(sessions)
+            self.assertTrue(all(revision == 0 for _, revision in sessions))
 
     def test_headless_reference_rejects_binary_large_and_symlink_file(self):
         binary = self.directory / "binary.dat"
