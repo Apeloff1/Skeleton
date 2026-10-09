@@ -8,7 +8,7 @@ Game Boy, NES, Xbox, PlayStation or contemporary Nintendo console.**
 
 The design purpose is to close one platform's actual generation,
 execution, gameplay and provenance loop before declaring the remaining
-165 platform profiles finished. This implementation does not ship a
+158 platform profiles finished. This implementation does not ship a
 manufacturer's BIOS, console boot ROM, copyrighted Nintendo logo,
 encryption keys, copied game images, proprietary SDK or licensed art.
 
@@ -142,7 +142,7 @@ this exporter under a guess of permission.
 ## Actual release completion ledger
 
 \`\`\`sh
-# All 166 named targets, with immutable machine-readable gate keys
+# All 159 named targets, with immutable machine-readable gate keys
 # and honest completed/unfinished counts:
 python scripts/game/verify_target_completion.py
 
