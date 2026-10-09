@@ -109,7 +109,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.snapshot_to, args.restore_from, args.verify_snapshot,
         ))
         if (
-            actions != 1 or args.model or args.deployment or args.prompt
+            actions != 1 or args.qualify_model or args.model or args.deployment or args.prompt
             or args.backup_in or args.backup_out or args.workspace
             or args.doctor or args.native_smoke or library_mode
             or queue_mode or args.use_library or args.library or args.queue_db
@@ -149,7 +149,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if audit_mode:
         if (
-            args.native_smoke or args.doctor or snapshot_mode or library_mode
+            args.qualify_model or args.native_smoke or args.doctor or snapshot_mode or library_mode
             or queue_mode or args.model or args.deployment or args.prompt
             or args.backup_in or args.backup_out or args.workspace
             or args.library or args.use_library or args.queue_db
