@@ -335,6 +335,7 @@ class DurableOfflineAISession(OfflineAISession):
             )
             if persisted_history != previous_history or persisted_instruction != self.instructions:
                 raise OfflineAIError("conversation changed on disk; reload before retry")
+            self.store.ensure_can_append(saved)
             # super().ask() deliberately shrinks inference context. The
             # persisted transcript MUST instead extend the complete prior
             # SQLite history, not the model's shortened context window.
