@@ -96,3 +96,34 @@ jobs:
           tests/flgb/test_desktop_offline_ai.py
           tests/test_consumer_transformer_acceleration.py
           tests/test_consumer_llama_budget.py
+
+  consumer-transformer-cpu-torch:
+    # Verify the optimized numerical path on commodity CPU-only hardware.
+    # CUDA and Metal require their respective hardware runners for admission.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      OPENAI_API_KEY: ""
+      XAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install CPU PyTorch for reference parity
+        run: |
+          python -m pip install --disable-pip-version-check "pytest>=8,<9" "numpy==2.4.6" "pydantic==2.13.5" "pydantic-settings==2.15.0" "fastapi>=0.141.1"
+          python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu "torch==2.8.0"
+      - name: Run numerical parity and incremental KV cache tests
+        run: >-
+          python -m pytest -q
+          tests/test_consumer_transformer_acceleration.py
+          tests/test_consumer_llama_budget.py
