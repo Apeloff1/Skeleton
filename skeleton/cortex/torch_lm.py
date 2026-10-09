@@ -3,7 +3,7 @@
 Lazy import. GameForge CI never loads this file unless someone
 calls TinyTransformer.to() and torch is installed.
 
-TorchAccel: same TinyTransformer weights, pinned on cpu|cuda,
+TorchAccel: same TinyTransformer weights, pinned on cpu|cuda|mps,
 autograd SGD through stacked Pre-LN blocks. Python lists catch
 up on sync() / snapshot(). GPU is a harness, not a rewrite.
 
@@ -29,12 +29,14 @@ class TorchAccel:
 
     def __init__(self, lm: Any, device: str = "cpu") -> None:
         torch = _torch()
-        if device == "cuda" and not torch.cuda.is_available():
-            device = "cpu"
+        if device in {"cuda", "gpu"}:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        elif device == "mps":
+            device = "mps" if getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available() else "cpu"
         self.torch = torch
         self.lm = lm
         self.device = torch.device(device)
-        self.device_name = "cuda" if self.device.type == "cuda" else "cpu"
+        self.device_name = self.device.type
         self.resident = False
         self._E = self._P = self._Wout = self._bout = None
         self._layers: List[Dict[str, Any]] = []
@@ -50,7 +52,7 @@ class TorchAccel:
         lm = self.lm
         self._E = self._t2(lm.E)
         self._P = self._t2(lm.P)
-        self._Wout = self._t2(lm.Wout)
+        self._Wout = self._E if getattr(lm, "tied", False) else self._t2(lm.Wout)
         self._bout = self._t1(lm.bout)
         self._layers = []
         blocks = getattr(lm, "layers", None) or []
@@ -62,13 +64,17 @@ class TorchAccel:
                 "Wv": self._t2(L.Wv), "Wo": self._t2(L.Wo),
                 "ln1_g": self._t1(getattr(L, "ln1_g", [1.0] * lm.dim)),
                 "ln1_b": self._t1(getattr(L, "ln1_b", [0.0] * lm.dim)),
-                "W1": None, "b1": None, "W2": None, "b2": None,
+                "W1": None, "b1": None, "Wu": None, "bu": None,
+                "W2": None, "b2": None,
                 "ln2_g": None, "ln2_b": None,
             }
             W1 = getattr(L, "W1", None)
             if W1:
                 blob["W1"] = self._t2(W1)
                 blob["b1"] = self._t1(getattr(L, "b1", [0.0] * len(W1)))
+                if getattr(L, "ffn_kind", "gelu") == "swiglu":
+                    blob["Wu"] = self._t2(L.Wu)
+                    blob["bu"] = self._t1(L.bu)
                 blob["W2"] = self._t2(L.W2)
                 blob["b2"] = self._t1(getattr(L, "b2", [0.0] * lm.dim))
                 blob["ln2_g"] = self._t1(getattr(L, "ln2_g", [1.0] * lm.dim))
@@ -80,14 +86,17 @@ class TorchAccel:
         return self
 
     def _params(self):
-        yield self._E
-        yield self._P
-        yield self._Wout
-        yield self._bout
-        for L in self._layers:
-            for v in L.values():
-                if v is not None:
-                    yield v
+        # Weight tying shares a tensor; never apply SGD to it twice.
+        seen = set()
+        for value in (self._E, self._P, self._Wout, self._bout):
+            if id(value) not in seen:
+                seen.add(id(value))
+                yield value
+        for layer in self._layers:
+            for value in layer.values():
+                if value is not None and id(value) not in seen:
+                    seen.add(id(value))
+                    yield value
 
     def sync(self) -> None:
         """Python lists catch up. Snapshot / to() / fallback call this."""
@@ -96,7 +105,7 @@ class TorchAccel:
         lm = self.lm
         lm.E = self._E.detach().cpu().tolist()
         lm.P = self._P.detach().cpu().tolist()
-        lm.Wout = self._Wout.detach().cpu().tolist()
+        lm.Wout = lm.E if getattr(lm, "tied", False) else self._Wout.detach().cpu().tolist()
         lm.bout = self._bout.detach().cpu().tolist()
         blocks = getattr(lm, "layers", None) or []
         for i, blob in enumerate(self._layers):
@@ -111,11 +120,45 @@ class TorchAccel:
             if blob.get("W1") is not None:
                 target.W1 = blob["W1"].detach().cpu().tolist()
                 target.b1 = blob["b1"].detach().cpu().tolist()
+                if blob.get("Wu") is not None:
+                    target.Wu = blob["Wu"].detach().cpu().tolist()
+                    target.bu = blob["bu"].detach().cpu().tolist()
                 target.W2 = blob["W2"].detach().cpu().tolist()
                 target.b2 = blob["b2"].detach().cpu().tolist()
                 if hasattr(target, "ln2_g") and blob.get("ln2_g") is not None:
                     target.ln2_g = blob["ln2_g"].detach().cpu().tolist()
                     target.ln2_b = blob["ln2_b"].detach().cpu().tolist()
+
+    def _normalize(self, x, layer, prefix: str):
+        torch = self.torch
+        weight = layer[prefix + "_g"]
+        if getattr(self.lm, "norm", "ln") == "rms":
+            # Match the reference path's epsilon and RMS definition.
+            return x * torch.rsqrt(x.square().mean(dim=-1, keepdim=True) + 1e-5) * weight
+        return torch.nn.functional.layer_norm(
+            x, (int(self.lm.dim),), weight, layer[prefix + "_b"], eps=1e-5
+        )
+
+    def _attention(self, q, k, v, *, heads: int, head_dim: int):
+        """Delegate kernel choice to SDPA: Flash/memory-efficient/math where supported."""
+        torch = self.torch
+        functional = torch.nn.functional
+        length = q.size(0)
+        shape = (1, heads, length, head_dim)
+        qh = q.reshape(length, heads, head_dim).transpose(0, 1).unsqueeze(0)
+        kh = k.reshape(length, heads, head_dim).transpose(0, 1).unsqueeze(0)
+        vh = v.reshape(length, heads, head_dim).transpose(0, 1).unsqueeze(0)
+        if hasattr(functional, "scaled_dot_product_attention"):
+            # Use the backend's native kernel dispatcher; do not force an
+            # unsupported Flash kernel or allocate an explicit T x T mask.
+            output = functional.scaled_dot_product_attention(
+                qh, kh, vh, dropout_p=0.0, is_causal=True
+            )
+        else:
+            scores = (qh @ kh.transpose(-2, -1)) * (head_dim ** -0.5)
+            mask = torch.ones(length, length, dtype=torch.bool, device=q.device).triu(1)
+            output = torch.softmax(scores.masked_fill(mask, float("-inf")), dim=-1) @ vh
+        return output.squeeze(0).transpose(0, 1).contiguous().reshape(length, heads * head_dim)
 
     def _forward_ids(self, ids: Sequence[int]):
         torch = self.torch
@@ -127,29 +170,21 @@ class TorchAccel:
         X = self._E[idx] + self._P[pos]
         D = int(lm.dim)
         heads = max(1, int(lm.n_heads))
-        dh = max(1, D // heads)
-        T = X.size(0)
+        dh = D // heads
         for blob in self._layers:
-            Xn = torch.nn.functional.layer_norm(X, (D,), blob["ln1_g"], blob["ln1_b"])
+            Xn = self._normalize(X, blob, "ln1")
             Q, K, V = Xn @ blob["Wq"].T, Xn @ blob["Wk"].T, Xn @ blob["Wv"].T
             Q, K = self._rope(Q), self._rope(K)
-            chunks = []
-            for h in range(heads):
-                Qh = Q[:, h * dh:(h + 1) * dh]
-                Kh = K[:, h * dh:(h + 1) * dh]
-                Vh = V[:, h * dh:(h + 1) * dh]
-                scale = dh ** -0.5
-                scores = Qh @ Kh.T * scale
-                mask = torch.triu(torch.ones(T, T, device=self.device), diagonal=1).bool()
-                scores = scores.masked_fill(mask, float("-inf"))
-                A = torch.softmax(scores, dim=-1)
-                chunks.append(A @ Vh)
-            C = torch.cat(chunks, dim=-1) if chunks else V
+            C = self._attention(Q, K, V, heads=heads, head_dim=dh)
             X = X + C @ blob["Wo"].T
             if blob.get("W1") is not None:
-                Un = torch.nn.functional.layer_norm(X, (D,), blob["ln2_g"], blob["ln2_b"])
-                hid = Un @ blob["W1"].T + blob["b1"]
-                z = self._gelu(hid)
+                Un = self._normalize(X, blob, "ln2")
+                gate = Un @ blob["W1"].T + blob["b1"]
+                if blob.get("Wu") is not None:
+                    up = Un @ blob["Wu"].T + blob["bu"]
+                    z = torch.nn.functional.silu(gate) * up
+                else:
+                    z = self._gelu(gate)
                 X = X + z @ blob["W2"].T + blob["b2"]
         return X[-1] @ self._Wout.T + self._bout, X[-1]
 
@@ -245,11 +280,13 @@ class TorchTransformer:
         device: str = "cpu",
     ) -> None:
         torch = _torch()
-        if device == "cuda" and not torch.cuda.is_available():
-            device = "cpu"
+        if device in {"cuda", "gpu"}:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        elif device == "mps":
+            device = "mps" if getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available() else "cpu"
         self.torch = torch
         self.device_obj = torch.device(device)
-        self.device = "cuda" if self.device_obj.type == "cuda" else "cpu"
+        self.device = self.device_obj.type
         self.requested = device
         self.resident = True
         itos = [UNK] + sorted({str(t) for t in (vocab or ()) if t and t != UNK})
@@ -274,16 +311,21 @@ class TorchTransformer:
 
     def to(self, device: str = "cpu") -> "TorchTransformer":
         torch = self.torch
-        if device in {"cuda", "gpu"} and not torch.cuda.is_available():
-            self.requested = "cuda"
-            self.device = "cpu"
-            self.device_obj = torch.device("cpu")
-            self.net.to(self.device_obj)
-            return self
-        want = "cuda" if device in {"cuda", "gpu"} else "cpu"
-        self.requested = want
-        self.device = want if (want != "cuda" or torch.cuda.is_available()) else "cpu"
-        self.device_obj = torch.device(self.device)
+        requested = "cuda" if device in {"cuda", "gpu"} else device
+        if requested not in {"cuda", "mps", "cpu"}:
+            requested = "cpu"
+        if requested == "cuda" and not torch.cuda.is_available():
+            actual = "cpu"
+        elif requested == "mps" and not (
+            getattr(torch.backends, "mps", None) is not None
+            and torch.backends.mps.is_available()
+        ):
+            actual = "cpu"
+        else:
+            actual = requested
+        self.requested = requested
+        self.device = actual
+        self.device_obj = torch.device(actual)
         self.net.to(self.device_obj)
         return self
 
