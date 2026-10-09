@@ -41,6 +41,14 @@ def _required_text(value: object, label: str) -> str:
     return value.strip()
 
 
+def _sha256(value: object, label: str) -> str:
+    if not isinstance(value, str) or len(value) != 64 or any(
+        char not in "0123456789abcdef" for char in value
+    ):
+        raise ResearchError(f"{label} must be lowercase sha256 hex")
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class ResearchQuestion:
     question_id: str
@@ -68,6 +76,7 @@ class EvidenceNode:
     def __post_init__(self) -> None:
         for label in ("evidence_id", "source_id", "source_digest", "method"):
             _required_text(getattr(self, label), label)
+        _sha256(self.source_digest, "source_digest")
         if not isinstance(self.claim_ids, tuple) or not self.claim_ids:
             raise ResearchError("claim_ids must be a non-empty tuple")
         if any(not isinstance(x, str) or not x.strip() for x in self.claim_ids):
@@ -147,6 +156,8 @@ class ReproductionRecord:
     def __post_init__(self) -> None:
         for label in ("reproduction_id", "evidence_digest", "experiment_digest"):
             _required_text(getattr(self, label), label)
+        _sha256(self.evidence_digest, "evidence_digest")
+        _sha256(self.experiment_digest, "experiment_digest")
         if not isinstance(self.metrics, tuple) or not self.metrics:
             raise ResearchError("reproduction metrics are required")
         names: set[str] = set()
@@ -158,8 +169,14 @@ class ReproductionRecord:
             if name in names:
                 raise ResearchError("duplicate reproduction metric")
             names.add(name)
-            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
-                raise ValueError("metric values must be finite numbers")
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ResearchError("metric values must be finite numbers")
+            try:
+                finite = math.isfinite(float(value))
+            except (OverflowError, ValueError):
+                finite = False
+            if not finite:
+                raise ResearchError("metric values must be finite numbers")
         if not isinstance(self.outcome, Outcome):
             raise ResearchError("Outcome enum required")
         if isinstance(self.trials, bool) or not isinstance(self.trials, int) or self.trials < 1:
@@ -205,6 +222,8 @@ class ResearchConclusion:
             raise ResearchError("conclusion must bind each outcome to evidence")
         if any(not isinstance(x, Outcome) for x in self.outcomes):
             raise ResearchError("conclusion outcomes must be Outcome enums")
+        for digest in self.evidence_digests:
+            _sha256(digest, "evidence_digest")
         if not self.limitations or any(not isinstance(x, str) or not x.strip() for x in self.limitations):
             raise ResearchError("conclusion limitations must be explicit")
         if any(x in {Outcome.NEGATIVE, Outcome.CONTRADICTS} for x in self.outcomes):
