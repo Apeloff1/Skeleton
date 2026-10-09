@@ -220,13 +220,31 @@ class NativeLLMRuntime:
 
     def _bind_device(self, policy: DevicePolicy) -> DeviceReceipt:
         requested = policy.requested
+        wants_kv_policy = (
+            policy.kv_dtype != "fp32" or policy.kv_limit_bytes is not None
+        )
+        if policy.kv_limit_bytes is not None and (
+            policy.kv_limit_bytes > self.limits.max_kv_bytes
+        ):
+            raise RuntimeContractError(
+                "device KV allocation ceiling exceeds native runtime policy"
+            )
+        if requested == "cpu" and wants_kv_policy:
+            raise RuntimeContractError(
+                "KV compression/budget requires a Torch execution device"
+            )
         current = str(getattr(self.model, "device", "cpu") or "cpu")
-        if requested == "cpu" and current == "cpu":
+        was_resident = bool(getattr(self.model, "resident", False))
+        if requested == "cpu" and current == "cpu" and not was_resident:
             actual = "cpu"
-            resident = bool(getattr(self.model, "resident", False))
+            resident = False
         else:
             try:
-                self.model.to(requested)
+                self.model.to(
+                    requested,
+                    kv_dtype=policy.kv_dtype,
+                    max_kv_bytes=policy.kv_limit_bytes,
+                )
             except Exception as exc:
                 raise RuntimeContractError("device binding failed") from exc
             actual = str(getattr(self.model, "device", "cpu") or "cpu")
@@ -239,11 +257,21 @@ class NativeLLMRuntime:
             degraded = not resident
         else:
             degraded = False
+        # Explicitly configured compact caches must be implemented by the
+        # selected execution backend, regardless of general fallback policy.
+        if wants_kv_policy and not resident:
+            raise RuntimeContractError(
+                "requested KV precision/budget not admitted on this device"
+            )
         if degraded and not policy.allow_fallback:
             raise RuntimeContractError(
                 "requested device unavailable and fallback is disabled"
             )
-        return DeviceReceipt(requested, actual, resident, degraded)
+        return DeviceReceipt(
+            requested, actual, resident, degraded,
+            policy.kv_dtype if resident else "fp32",
+            policy.kv_limit_bytes if resident else None,
+        )
 
     def bind_device(self, policy: DevicePolicy) -> DeviceReceipt:
         if not isinstance(policy, DevicePolicy):
