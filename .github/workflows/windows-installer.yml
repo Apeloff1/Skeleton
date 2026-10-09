@@ -169,6 +169,38 @@ jobs:
             throw "installed Skeleton.exe native multi-category benchmark smoke exited $($benchmarkSmoke.ExitCode)"
           }
 
+          # Public frozen native CLI: use actual operator syntax to train and
+          # inspect a local model, without Docker or a system Python runtime.
+          $cliDir = Join-Path $env:TEMP ("skeleton-native-cli-" + [guid]::NewGuid().ToString("N"))
+          New-Item -ItemType Directory -Force -Path $cliDir | Out-Null
+          try {
+            $cliSource = Join-Path $cliDir "train.txt"
+            $cliModel = Join-Path $cliDir "checkpoint.json"
+            Set-Content -LiteralPath $cliSource -Value @(
+              "user hello assistant world",
+              "user world assistant hello"
+            ) -Encoding utf8
+            $cliTrain = Start-Process -FilePath $launcher -ArgumentList @(
+              "--offline-command", "local-ai",
+              "--train-corpus", ('"' + $cliSource + '"'),
+              "--output-model", ('"' + $cliModel + '"'),
+              "--epochs", "1", "--json"
+            ) -Wait -PassThru
+            if ($cliTrain.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $cliModel)) {
+              throw "installed Skeleton.exe offline command training failed"
+            }
+            $cliInspect = Start-Process -FilePath $launcher -ArgumentList @(
+              "--offline-command", "local-ai",
+              "--model", ('"' + $cliModel + '"'),
+              "--inspect-model", "--json"
+            ) -Wait -PassThru
+            if ($cliInspect.ExitCode -ne 0) {
+              throw "installed Skeleton.exe offline model inspection failed"
+            }
+          } finally {
+            Remove-Item -LiteralPath $cliDir -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
           $uninstaller = Join-Path $installDir "unins000.exe"
           if (-not (Test-Path -LiteralPath $uninstaller)) {
             throw "uninstaller missing"
