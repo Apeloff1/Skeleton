@@ -232,40 +232,53 @@ class TorchAccel:
             self._sync_unlocked()
 
     def _sync_unlocked(self) -> None:
-        """Python lists catch up. Snapshot / to() / fallback call this."""
+        """Stage the entire device-to-canonical copy before writing CPU state.
+
+        Partial .cpu().tolist() failures must not publish a mixed checkpoint
+        containing some new parameters and some parameters from the old step.
+        """
         self._assert_training_integrity()
         if not self.resident or self._E is None or not self._weights_modified:
             return
-        # CPU Python weights are the canonical admission and checkpoint
-        # identity. A float32 device pin is not a training mutation: avoid
-        # silently rounding the canonical snapshot and uploading weights on
-        # every per-token identity check.
         lm = self.lm
-        lm.E = self._E.detach().cpu().tolist()
-        lm.P = self._P.detach().cpu().tolist()
-        lm.Wout = lm.E if getattr(lm, "tied", False) else self._Wout.detach().cpu().tolist()
-        lm.bout = self._bout.detach().cpu().tolist()
-        blocks = getattr(lm, "layers", None) or []
-        for i, blob in enumerate(self._layers):
-            target = blocks[i] if i < len(blocks) else lm
-            target.Wq = blob["Wq"].detach().cpu().tolist()
-            target.Wk = blob["Wk"].detach().cpu().tolist()
-            target.Wv = blob["Wv"].detach().cpu().tolist()
-            target.Wo = blob["Wo"].detach().cpu().tolist()
-            if hasattr(target, "ln1_g"):
-                target.ln1_g = blob["ln1_g"].detach().cpu().tolist()
-                target.ln1_b = blob["ln1_b"].detach().cpu().tolist()
+        # Download *everything* first. Device/host transfers, especially
+        # asynchronous GPU execution, can fail long after an SGD kernel.
+        embeddings = self._E.detach().cpu().tolist()
+        positions = self._P.detach().cpu().tolist()
+        projection = embeddings if getattr(lm, "tied", False) else self._Wout.detach().cpu().tolist()
+        bias = self._bout.detach().cpu().tolist()
+        staged_layers: List[Dict[str, Any]] = []
+        for blob in self._layers:
+            staged: Dict[str, Any] = {
+                "Wq": blob["Wq"].detach().cpu().tolist(),
+                "Wk": blob["Wk"].detach().cpu().tolist(),
+                "Wv": blob["Wv"].detach().cpu().tolist(),
+                "Wo": blob["Wo"].detach().cpu().tolist(),
+            }
+            if blob.get("ln1_g") is not None:
+                staged["ln1_g"] = blob["ln1_g"].detach().cpu().tolist()
+                staged["ln1_b"] = blob["ln1_b"].detach().cpu().tolist()
             if blob.get("W1") is not None:
-                target.W1 = blob["W1"].detach().cpu().tolist()
-                target.b1 = blob["b1"].detach().cpu().tolist()
+                for key in ("W1", "b1", "W2", "b2"):
+                    staged[key] = blob[key].detach().cpu().tolist()
                 if blob.get("Wu") is not None:
-                    target.Wu = blob["Wu"].detach().cpu().tolist()
-                    target.bu = blob["bu"].detach().cpu().tolist()
-                target.W2 = blob["W2"].detach().cpu().tolist()
-                target.b2 = blob["b2"].detach().cpu().tolist()
-                if hasattr(target, "ln2_g") and blob.get("ln2_g") is not None:
-                    target.ln2_g = blob["ln2_g"].detach().cpu().tolist()
-                    target.ln2_b = blob["ln2_b"].detach().cpu().tolist()
+                    staged["Wu"] = blob["Wu"].detach().cpu().tolist()
+                    staged["bu"] = blob["bu"].detach().cpu().tolist()
+                if blob.get("ln2_g") is not None:
+                    staged["ln2_g"] = blob["ln2_g"].detach().cpu().tolist()
+                    staged["ln2_b"] = blob["ln2_b"].detach().cpu().tolist()
+            staged_layers.append(staged)
+        # Publication begins only after every CPU copy succeeds. The Torch
+        # tensors and canonical architecture are internal mutable objects;
+        # state is serialized under _state_lock to prevent concurrent use.
+        lm.E, lm.P, lm.Wout, lm.bout = embeddings, positions, projection, bias
+        blocks = getattr(lm, "layers", None) or []
+        for i, blob in enumerate(staged_layers):
+            target = blocks[i] if i < len(blocks) else lm
+            for name, value in blob.items():
+                if name.startswith("ln") and not hasattr(target, name):
+                    continue
+                setattr(target, name, value)
         self._weights_modified = False
 
     def _normalize(self, x, layer, prefix: str):
