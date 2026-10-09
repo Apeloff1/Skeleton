@@ -127,6 +127,25 @@ class OfflineKnowledgeLibraryTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeContractError, "hash mismatch"):
             self.library.list_documents()
 
+    def test_duplicate_reingest_refuses_to_launder_poisoned_reference(self):
+        content = "Fixed function pipelines dispatch vertices deterministically."
+        item = self.library.add_text("Original", content)
+        with self.store._transaction():
+            self.store._db.execute(
+                "UPDATE offline_document_chunks SET content=? "
+                "WHERE document_id=? AND ordinal=0",
+                ("attacker substituted passage", item["document_id"]),
+            )
+        with self.assertRaisesRegex(RuntimeContractError, "provenance mismatch"):
+            self.library.add_text("Re-ingested original", content)
+        with self.assertRaisesRegex(RuntimeContractError, "provenance mismatch"):
+            self.library.add_text(
+                "Unrelated new document", "Audio synthesis uses square wave channels."
+            )
+        self.assertEqual(self.store._db.execute(
+            "SELECT COUNT(*) FROM offline_documents"
+        ).fetchone()[0], 1)
+
     def test_altered_passage_and_offsets_cannot_forge_valid_citation(self):
         item = self.library.add_text(
             "Source offsets", "The temporal frame interpolation is exact."
