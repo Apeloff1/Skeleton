@@ -9,7 +9,6 @@ import argparse
 import asyncio
 import json
 from pathlib import Path
-import sqlite3
 import sys
 
 from skeleton.ai.model_runtime.offline_chat import (
@@ -17,7 +16,6 @@ from skeleton.ai.model_runtime.offline_chat import (
 )
 from skeleton.app.local_ai import (
     DurableOfflineAISession,
-    OfflineAIError,
     load_gguf_deployment,
     load_native_checkpoint,
     private_desktop_database,
