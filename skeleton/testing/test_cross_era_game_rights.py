@@ -380,7 +380,7 @@ def test_game_cli_rejects_duplicate_keys_symlinks_and_wrong_formats(
         '"required_features":["tile2d"]}', encoding="utf-8",
     )
     assert game_cli(["--plan", str(original)]) == 1
-    assert "duplicate" in capsys.readouterr().err
+    assert "malformed" in capsys.readouterr().err
     symlink = tmp_path / "symlink.json"
     try:
         symlink.symlink_to(original)
