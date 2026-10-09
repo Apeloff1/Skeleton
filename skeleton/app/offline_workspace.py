@@ -167,7 +167,10 @@ class _Session(Protocol):
     def model_digest(self) -> str: ...
     @property
     def max_interactive_tokens(self) -> int: ...
-    async def ask(self, prompt: str, *, max_output_tokens: int = 32) -> Any: ...
+    async def ask(
+        self, prompt: str, *, max_output_tokens: int = 32,
+        inference_prompt: str | None = None,
+    ) -> Any: ...
     def save_history_backup(self, path: str | Path) -> str: ...
     def restore_history_backup(self, path: str | Path) -> int: ...
 
@@ -227,9 +230,15 @@ class DurableOfflineSession:
         self.revision = next_revision
         return turns
 
-    async def ask(self, prompt: str, *, max_output_tokens: int = 32) -> Any:
+    async def ask(
+        self, prompt: str, *, max_output_tokens: int = 32,
+        inference_prompt: str | None = None,
+    ) -> Any:
         before = self.session.history
-        answer = await self.session.ask(prompt, max_output_tokens=max_output_tokens)
+        answer = await self.session.ask(
+            prompt, max_output_tokens=max_output_tokens,
+            inference_prompt=inference_prompt,
+        )
         try:
             next_revision = self.store.save(
                 self.session_id, self.model_digest, self.revision, self.session.history,
