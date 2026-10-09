@@ -179,7 +179,7 @@ def verify_snapshot(folder: str | Path) -> dict[str, Any]:
     if base.is_symlink() or not base.is_dir():
         raise OfflineSnapshotError("snapshot must be a regular local directory")
     manifest_file = base / "manifest.json"
-     if manifest_file.is_symlink() or not manifest_file.is_file():
+    if manifest_file.is_symlink() or not manifest_file.is_file():
         raise OfflineSnapshotError("snapshot manifest is missing or symlinked")
     if manifest_file.stat().st_size > MAX_MANIFEST_BYTES:
         raise OfflineSnapshotError("snapshot manifest exceeds limit")
