@@ -266,6 +266,11 @@ class OfflineChatStore:
                 "SELECT model_digest, tokenizer_digest, revision, transcript_json "
                 "FROM offline_sessions WHERE session_id=?", (sid,)
             ).fetchone()
+            rows = self._db.execute(
+                "SELECT request_id, request_digest, revision, text, output_digest, "
+                "prompt_tokens, generated_tokens FROM offline_turns "
+                "WHERE session_id=? ORDER BY revision", (sid,),
+            ).fetchall()
         if row is None:
             raise RuntimeContractError("unknown offline conversation")
         if row[0] != model_digest or row[1] != tokenizer_digest:
@@ -280,12 +285,6 @@ class OfflineChatStore:
         # The revision number is not itself evidence that every saved turn
         # survived. Verify all receipts against the full authoritative
         # transcript on *every* read, not only when exporting a backup.
-        with self._lock:
-            rows = self._db.execute(
-                "SELECT request_id, request_digest, revision, text, output_digest, "
-                "prompt_tokens, generated_tokens FROM offline_turns "
-                "WHERE session_id=? ORDER BY revision", (sid,),
-            ).fetchall()
         if len(rows) != revision:
             raise RuntimeContractError("stored conversation is missing turn receipts")
         turns: list[dict[str, Any]] = []
