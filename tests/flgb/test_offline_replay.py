@@ -13,13 +13,32 @@ from skeleton.app.local_ai_improvement import improve_local_model
 from skeleton.app.local_ai_replay import (
     MAX_RECEIPT_BYTES, OfflineReplayError, replay_local_improvement,
 )
-from tests.flgb.test_offline_model_improvement import TestEvaluatedOfflineImprovement
+from skeleton.ai.model_runtime import NativeLLMRuntime
+from skeleton.ai.runtime.inference.artifact import write_local_model_artifact
+from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
+from skeleton.cortex.transformer import TinyTransformer
 
 
 class TestOfflineReplay(unittest.TestCase):
     def _accepted(self, directory: str):
-        helper = TestEvaluatedOfflineImprovement()
-        parent, training, heldout, candidate = helper._fixture(directory)
+        root = Path(directory)
+        parent = root / "base.json"
+        training = root / "train.txt"
+        heldout = root / "heldout.txt"
+        candidate = root / "candidate.json"
+        model = TinyTransformer(
+            vocab=("user", "assistant", "hello", "world", "alpha", "beta"),
+            dim=8, ctx=96, seed=37, n_heads=2, n_layers=2, d_ff=16,
+        )
+        write_local_model_artifact(
+            NativeRuntimeLocalModel(NativeLLMRuntime(model)), parent,
+        )
+        training.write_text(
+            "user hello assistant world alpha\n" * 4, encoding="utf-8",
+        )
+        heldout.write_text(
+            "user hello assistant world beta\n", encoding="utf-8",
+        )
         with patch(
             "skeleton.app.local_ai_improvement._token_weighted_perplexity",
             side_effect=[4.0, 3.0, 3.0],
