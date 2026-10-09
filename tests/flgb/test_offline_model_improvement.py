@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
@@ -18,6 +19,7 @@ from skeleton.app.local_ai_improvement import (
     OfflineImprovementError,
     compare_local_models,
     improve_local_model,
+    _token_weighted_perplexity,
 )
 from skeleton.cortex.transformer import TinyTransformer
 
@@ -201,7 +203,10 @@ class TestEvaluatedOfflineImprovement(unittest.TestCase):
             write_local_model_artifact(
                 NativeRuntimeLocalModel(NativeLLMRuntime(native)), dest,
             )
-            with patch.object(TinyTransformer, "perplexity", side_effect=[2.0, 3.0]):
+            with patch.object(
+                TinyTransformer, "logprob",
+                side_effect=[-math.log(2.0), -math.log(3.0)],
+            ):
                 with redirect_stdout(out := StringIO()):
                     code = run_app_cli([
                         "local-ai", "--compare-model", str(source),
@@ -237,6 +242,29 @@ class TestEvaluatedOfflineImprovement(unittest.TestCase):
             self.assertEqual(receipt.model_digest, restored.model_digest)
             self.assertEqual(restored.model_digest, model.model_digest)
             self.assertEqual(list(Path(directory).glob(".skeleton-native-stage-*")), [])
+
+    def test_heldout_perplexity_weights_prediction_tokens_not_lines(self) -> None:
+        model = TinyTransformer(
+            vocab=("hello", "world", "alpha", "beta"),
+            dim=8, ctx=32, seed=31, n_heads=2, n_layers=1, d_ff=16,
+        )
+        short = "hello world alpha"
+        long = "hello world alpha beta world"
+        short_count = len(model._ids(short)) - 1
+        long_count = len(model._ids(long)) - 1
+        self.assertNotEqual(short_count, long_count)
+        with patch.object(
+            TinyTransformer, "logprob",
+            side_effect=[-math.log(2.0), -math.log(4.0)],
+        ):
+            measured = _token_weighted_perplexity(model, [short, long])
+        expected = math.exp(
+            (short_count * math.log(2.0) + long_count * math.log(4.0))
+            / (short_count + long_count)
+        )
+        self.assertAlmostEqual(measured, expected)
+        # Taking an unweighted mean of line scores is not equivalent.
+        self.assertNotAlmostEqual(measured, math.sqrt(2.0 * 4.0))
 
     def test_cli_cannot_skip_independent_evaluation(self) -> None:
         from skeleton.app.cli import run_app_cli
