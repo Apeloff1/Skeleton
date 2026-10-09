@@ -129,3 +129,52 @@ def test_original_author_strings_and_url_provenance_are_bounded():
     with pytest.raises(CreditsError):
         compile_game_credits("my-original-game","windows_modern",materials=(own(),),
                              third_party=(), original_authors=("same","same"))
+
+
+
+def test_guarded_native_game_source_embeds_original_author_notices(tmp_path):
+    from skeleton.ai.game_builder.playable_world import GameBuildIntent, generate_playable_world
+    from skeleton.ai.game_builder.port_planner import HomebrewSource
+    from skeleton.ai.game_builder.legal_paths import (
+        CreativeMode, HardwareAccessFacts, HomebrewLegalRequest, Jurisdiction,
+    )
+    from skeleton.ai.game_builder.legal_native_export import (
+        ClearedSourceExportError, compile_rights_aware_desktop,
+        export_rights_aware_desktop,
+    )
+    world = generate_playable_world(GameBuildIntent(
+        project_id="my-original-game", title="Fresh Handheld Quest",
+        subtitle="New original IP", seed=4567, width=11, height=11,
+        levels=1, collectibles_per_level=1, hazards_per_level=0,
+    ), authorized=True)
+    source = HomebrewSource(
+        "my-original-game", "sega_dreamcast", "project_owned",
+        "a"*64, ("independent protagonist", "custom platform physics"),
+    )
+    rights = HomebrewLegalRequest(
+        project_id="my-original-game", source_platform_id="sega_dreamcast",
+        target_platform_id="windows_modern", mode=CreativeMode.ORIGINAL,
+        jurisdictions=(Jurisdiction.NO, Jurisdiction.EU_EEA),
+        materials=(own(),), hardware=HardwareAccessFacts(),
+        rights_packet_sha256="a"*64,
+    )
+    credits = generate(materials=(own(),), credits=())
+    package = compile_rights_aware_desktop(world, source, rights,
+                                           credits=credits, authorized=True)
+    assert package.legal_receipt()["attribution_bundle_sha256"] == credits.bundle_sha256
+    assert package.legal_receipt()["attribution_notices_embedded"] is True
+    assert package.legal_receipt()["release_authorized"] is False
+    path = export_rights_aware_desktop(package, tmp_path/"native", authorized=True)
+    assert (path/"rights"/"CREDITS.md").is_file()
+    assert (path/"rights"/"THIRD_PARTY_NOTICES.txt").is_file()
+    assert (path/"rights"/"material_inventory.json").is_file()
+    assert json.loads((path/"legal_review.json").read_text())["attribution_notices_embedded"] is True
+    with pytest.raises(ClearedSourceExportError):
+        compile_rights_aware_desktop(
+            world, source, rights, credits=replace(credits, project_id="unrelated"),
+            authorized=True,
+        )
+    with pytest.raises(ClearedSourceExportError):
+        compile_rights_aware_desktop(
+            world, source, rights, credits=generate(), authorized=True,
+        )
