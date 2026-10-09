@@ -171,3 +171,47 @@ def test_library_cli_rejects_invalid_mixed_authority(tmp_path: Path, capsys) -> 
     ]) == 2
     assert offline_main(["--model", "fake", "--prompt", "hi", "--use-library"]) == 2
     assert capsys.readouterr().out == ""
+
+
+def test_total_library_limit_is_atomic_across_multiple_import_roots(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    import skeleton.app.offline_library as mod
+
+    first = tmp_path / "source1"
+    second = tmp_path / "source2"
+    first.mkdir()
+    second.mkdir()
+    (first / "alpha.md").write_text("local alpha knowledge", encoding="utf-8")
+    (second / "beta.md").write_text("local beta knowledge", encoding="utf-8")
+    db = tmp_path / "knowledge.sqlite"
+    monkeypatch.setattr(mod, "MAX_LIBRARY_FILES", 1)
+    with OfflineDocumentLibrary(db) as library:
+        library.index_directory(first)
+        with pytest.raises(OfflineLibraryError, match="aggregate"):
+            library.index_directory(second)
+        assert library.count() == 1
+        assert library.search("alpha")
+        assert library.search("beta") == ()
+    with OfflineDocumentLibrary(db) as reopened:
+        assert reopened.count() == 1
+
+
+def test_aggregate_size_cap_rolls_back_a_second_library_import(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    import skeleton.app.offline_library as mod
+
+    root1 = tmp_path / "r1"
+    root2 = tmp_path / "r2"
+    root1.mkdir()
+    root2.mkdir()
+    (root1 / "one.md").write_text("one local knowledge", encoding="utf-8")
+    (root2 / "two.md").write_text("two local knowledge", encoding="utf-8")
+    db = tmp_path / "local.sqlite"
+    with OfflineDocumentLibrary(db) as library:
+        assert library.index_directory(root1)["indexed_files"] == 1
+        monkeypatch.setattr(mod, "MAX_LIBRARY_BYTES", 20)
+        with pytest.raises(OfflineLibraryError, match="aggregate"):
+            library.index_directory(root2)
+        assert library.count() == 1
