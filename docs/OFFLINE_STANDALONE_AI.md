@@ -6,6 +6,52 @@ artifacts are installed. This is a local-inference feature, **not** a claim
 that the entire crawler, autonomous builder, or all enterprise subsystems
 are offline-complete.
 
+## Build a portable offline installation kit
+
+Build an application wheelhouse on a **connected build machine** matching the
+destination operating system, architecture, and Python minor version:
+
+```sh
+python -m pip wheel --wheel-dir ./offline-wheels ".[local-inference]"
+python scripts/offline_kit.py pack --wheels ./offline-wheels \
+    --destination ./Skeleton-Offline-Kit
+python scripts/offline_kit.py verify --kit ./Skeleton-Offline-Kit
+```
+
+To include a separately licensed GGUF model and a locally trusted llama.cpp
+CLI binary, add `--gguf ./weights.gguf --llama ./llama-cli --model-id my-local-model`
+to the `pack` command. The kit copies and hashes both artifacts, and
+generates the runtime deployment manifest. It does **not** download models
+or pretend a synthetic fixture is a trained AI.
+
+Move the verified kit using trusted local media. On the **disconnected**
+destination with a compatible Python 3 interpreter, run:
+
+```sh
+python offline_kit.py verify --kit .
+python offline_kit.py install --kit . --destination ../Skeleton-Offline
+../Skeleton-Offline/bin/python -m skeleton app local-ai
+```
+
+On Windows, replace `bin/python` with `Scriptspython.exe`. The installer creates
+a Python virtual environment, resolves packages strictly from the wheelhouse
+using `pip --isolated install --no-index --only-binary`, and does not
+fetch packages or weights. If model artifacts are included, the model manifest
+will be at `../Skeleton-Offline/offline_model/model/deployment.json`.
+Select that manifest in the desktop window or use
+`--deployment` in the headless CLI.
+
+**Important limits:** This is a genuinely no-index installation workflow,
+not yet a self-contained Windows executable for the *whole* product. Python,
+OS runtimes (such as Windows DLLs or GPU drivers), and the installed local
+model's native library dependencies must be available on the machine in
+advance. A wheelhouse produced for Linux will not work on Windows; a wheel
+set for one Python version is not automatically portable to another.
+The manifest provides SHA-256 corruption detection, **not a cryptographic
+release signature or provenance guarantee**. Independently verify the
+distribution source before using it.
+
+
 ## Two supported models
 
 - **Native checkpoint:** `python -m skeleton app local-ai --model ./checkpoint.json
@@ -109,7 +155,7 @@ auto-update or offline system-completion attestation.
 ## Acceptance
 
 ```sh
-python -m pytest skeleton/testing/test_app_offline_gguf.py skeleton/testing/test_offline_history_backup.py -q
+python -m pytest skeleton/testing/test_app_offline_gguf.py skeleton/testing/test_offline_history_backup.py skeleton/testing/test_offline_kit.py -q
 python -m pytest skeleton/testing/test_local_model_deployment.py -q
 python scripts/check_architecture_map.py
 python scripts/check_ai_app_construction.py
