@@ -267,7 +267,13 @@ def test_all_launcher_paths_converge_on_product_shell():
     assert "router.replace('/product')" in launch
     assert "router.replace('/product')" in welcome
     assert "router.replace('/product')" in safe_mode
-    assert "Enter Product" in launch
+    # The cascade uses a localized button; requiring literal English
+    # implementation text would make accessibility/i18n a false failure.
+    # Verify the exact same translation key drives both the visible label
+    # and the accessible control, and that all routes reach the product shell.
+    assert "t('launcher.enter_product')" in launch
+    assert "accessibleButtonProps(t('launcher.enter_product'))" in launch
+    assert "onEnter={enterProduct}" in launch
     assert "Enter Product" in welcome
 
 
