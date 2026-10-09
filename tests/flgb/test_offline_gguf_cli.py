@@ -136,6 +136,39 @@ class TestPublicGGUFCLI(unittest.TestCase):
             with self.assertRaises((OSError, ValueError, RuntimeError)):
                 OfflineGGUFSession(Path(directory) / "missing", weights)
 
+    def test_gguf_desktop_disables_native_only_actions(self):
+        from skeleton.app.local_ai import OfflineAIWindow
+
+        class Button:
+            def __init__(self):
+                self.state = ""
+
+            def configure(self, **options):
+                self.state = options["state"]
+
+        with tempfile.TemporaryDirectory() as directory:
+            llama, model = self._fixtures(Path(directory))
+            window = OfflineAIWindow.__new__(OfflineAIWindow)
+            window.session = OfflineGGUFSession(llama, model)
+            window.active = False
+            for name in (
+                "load_button", "gguf_button", "train_button",
+                "improve_button", "benchmark_button", "send_button",
+                "clear_button", "cancel_button", "open_history_button",
+                "save_history_button",
+            ):
+                setattr(window, name, Button())
+            window._refresh()
+            for name in (
+                "improve_button", "benchmark_button",
+                "open_history_button", "save_history_button",
+            ):
+                with self.subTest(button=name):
+                    self.assertEqual(getattr(window, name).state, "disabled")
+            self.assertEqual(window.send_button.state, "normal")
+            self.assertEqual(window.clear_button.state, "normal")
+            self.assertEqual(window.gguf_button.state, "normal")
+
     def test_explicit_model_runtime_and_prompt_are_all_required(self):
         missing = (
             ["--gguf-model", "x.gguf", "--prompt", "hello"],
