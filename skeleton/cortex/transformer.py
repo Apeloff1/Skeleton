@@ -603,11 +603,11 @@ class TinyTransformer:
             # reference Python float-list cache with another device.
             cache.reset()
             try:
-                logits = list(self._accel.logits_window(window))
-                # Serving budgets and replay receipts inspect the canonical
-                # cache token count. Mirror occupancy, not the GPU tensors.
-                cache.tokens.extend(self._accel.cached_tokens)
-                return logits
+                # Snapshot logits and cache occupancy in the same locked
+                # accelerator transition; separate reads can cross requests.
+                logits, resident_ids = self._accel.logits_window_with_cache(window)
+                cache.tokens.extend(resident_ids)
+                return list(logits)
             except Exception:
                 self._sync_accelerator()
                 self._accel = None
