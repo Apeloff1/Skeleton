@@ -567,3 +567,39 @@ def test_training_serializes_against_resident_kv_decode(monkeypatch):
     assert not errors
     assert training_done.is_set()
     assert accel.cached_tokens == ()  # SGD invalidates the prior KV bank
+
+
+def test_accelerated_logits_and_cache_receipt_are_from_one_state():
+    pytest.importorskip("torch")
+    from concurrent.futures import ThreadPoolExecutor
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = TinyTransformer(
+        vocab=("alpha", "beta", "gamma"), dim=8, ctx=6, seed=9,
+        n_heads=2, n_layers=2, d_ff=12,
+    )
+    accel = TorchAccel(model, device="cpu").pin()
+    inputs = [
+        (1, 2, 3), (3, 1), (2, 1, 2, 3),
+        (2, 3, 1, 2, 3), (1,), (1, 1, 1, 1),
+    ] * 3
+
+    def run(ids):
+        return accel.logits_window_with_cache(ids)
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        outputs = list(pool.map(run, inputs))
+    for ids, (logits, admitted_tokens) in zip(inputs, outputs):
+        assert admitted_tokens == ids
+        assert logits == pytest.approx(model._logits(ids), abs=2e-5)
+
+    # The standalone compatibility path returns only logits, while resource
+    # accounting must use the atomic (logits, occupancy) interface.
+    model._accel = accel
+    model.resident = True
+    model.device = "cpu"
+    from skeleton.cortex.transformer import KVCache
+    cache = KVCache(model.n_layers, model.ctx)
+    output = model._logits_window((1, 2, 3), cache)
+    assert output == pytest.approx(model._logits((1, 2, 3)), abs=2e-5)
+    assert cache.tokens == [1, 2, 3]
