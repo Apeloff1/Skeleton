@@ -97,6 +97,14 @@ A *fan-made* or *free* game does **not** gain a blanket exception by being nonco
     assert proposal.design_stage_admitted
     assert not proposal.release_certified
 
+## Guarded native-source export
+
+For a real generated original `PlayableWorld`, use `compile_rights_aware_desktop(world, homebrew_source, legal_facts, authorized=True)`. It cross-checks project identity, source platform, stable rights packet reference, the jurisdiction-aware policy assessment and technical port profile. This **refuses** source generation if a third-party game is copied, an unlicensed expressive asset is present, franchise marks/similarity remain unresolved, or a proprietary console-access exception has not been reviewed.
+
+`export_rights_aware_desktop` writes the native SDL2/CMake project plus a `legal_review.json` provenance manifest with legal references and explicit **false** values for binary validation, release authority and legal certification. A rights-policy-admissible source game is therefore not silently marked as ready for commercial distribution.
+
+This pathway does not automatically verify the truth of user-supplied authorship, licences, code hashes or regulatory claims: **external evidence review and human legal signoff are still required**. The underlying low-level game/source generator remains available as a non-release-authoritative technical primitive; applications publishing games should use the guarded entrypoint.
+
 ## Gates before a commercial build
 
 The project must supply independently verifiable material provenance and the applicable licence texts. Next, reviewer(s) must check jurisdiction, expression, characters, musical/audio rights, brands, trade dress, SDK, patents, technology measures and distribution terms. Only after a separate native export/build on the requested target, acceptance replay, malware/keys scan, actual game publication authorization and any platform approvals can that artifact be considered for a product release.
