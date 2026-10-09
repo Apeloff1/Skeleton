@@ -13,6 +13,7 @@ import sys
 from typing import Sequence
 
 from .offline_workspace import DurableOfflineSession
+from .offline_readiness import inspect_local_readiness
 from .local_ai import (
     OfflineAISession,
     OfflineGGUFSession,
@@ -36,6 +37,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--workspace", help="local SQLite file for automatically durable conversations")
     parser.add_argument("--session-id", default="default", help="revisioned conversation id inside the workspace")
     parser.add_argument("--json", action="store_true", dest="json_output")
+    parser.add_argument("--doctor", action="store_true", help="verify local artifacts without generating text")
     parser.add_argument(
         "--native-smoke", action="store_true",
         help="run a small locally constructed test model (NOT a trained assistant)",
@@ -45,6 +47,9 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    if args.native_smoke and args.doctor:
+        print("--native-smoke and --doctor are mutually exclusive", file=sys.stderr)
+        return 2
     if args.native_smoke:
         if (
             args.model or args.deployment or args.prompt or
@@ -59,6 +64,27 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 1
         print("Native inference graph: PASS" if ok else "Native inference graph: FAIL")
         return 0 if ok else 1
+
+    if args.doctor:
+        if (
+            not (args.model or args.deployment) or args.prompt or
+            args.backup_in or args.backup_out or args.workspace
+        ):
+            print("--doctor requires one local model without generation or storage options", file=sys.stderr)
+            return 2
+        try:
+            report = inspect_local_readiness(model=args.model, deployment=args.deployment)
+        except (ValueError, RuntimeError, OSError, TypeError) as exc:
+            print(f"offline readiness rejected: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 1
+        if args.json_output:
+            print(json.dumps(report, sort_keys=True, ensure_ascii=False))
+        else:
+            print(
+                "Local artifact: VERIFIED; inference/network isolation: NOT TESTED; "
+                "model " + report["model_digest"][:16]
+            )
+        return 0
 
     if not (args.model or args.deployment) or not args.prompt:
         print("local inference requires --prompt and either --model or --deployment", file=sys.stderr)
