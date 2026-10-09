@@ -79,6 +79,36 @@ class HeadlessOfflineChatTests(unittest.TestCase):
             json.loads(output), [{"session_id": imported_sid, "revision": 2}]
         )
 
+    def test_headless_fork_branches_without_reexecuting_parent(self):
+        code, output, errors = self._run(
+            "--message", "hello", "--max-output-tokens", "2", "--json"
+        )
+        self.assertEqual(code, 0, errors)
+        parent = json.loads(output)["session_id"]
+        code, output, errors = self._run(
+            "--fork-session", parent, "--fork-after-turn", "0"
+        )
+        self.assertEqual(code, 0, errors)
+        fork = json.loads(output)["forked_session_id"]
+        self.assertNotEqual(parent, fork)
+        code, output, errors = self._run("--list", "--json")
+        self.assertEqual(code, 0, errors)
+        self.assertEqual(
+            {x["session_id"]: x["revision"] for x in json.loads(output)},
+            {parent: 1, fork: 0},
+        )
+        code, output, errors = self._run(
+            "--session", fork, "--message", "world",
+            "--max-output-tokens", "2", "--json"
+        )
+        self.assertEqual(code, 0, errors)
+        code, output, errors = self._run("--list", "--json")
+        self.assertEqual(code, 0, errors)
+        self.assertEqual(
+            {x["session_id"]: x["revision"] for x in json.loads(output)},
+            {parent: 1, fork: 1},
+        )
+
     def test_listing_empty_store_does_not_create_phantom_session(self):
         code, output, errors = self._run("--list", "--json")
         self.assertEqual(code, 0, errors)
