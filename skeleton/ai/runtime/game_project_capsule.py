@@ -150,6 +150,9 @@ def make_game_capsule(
         "tilemap": list(final_tiles),
         "scene": scene,
         "target_plan": plan,
+        # Keep the exact, bounded provenance statements for repeatable review.
+        # A receipt digest without its referenced evidence is insufficient.
+        "rights_manifest": json.loads(_canonical(rights_manifest)),
         "rights_receipt": admitted_rights,
         "modifications": list(edits),
         "action": action,
@@ -189,7 +192,7 @@ def verify_game_capsule(capsule: Mapping[str, Any]) -> dict[str, Any]:
     if set(capsule) != {
         "schema_version", "project_id", "source_tile_sha256",
         "edited_tile_sha256", "source_tilemap", "tilemap", "scene", "target_plan",
-        "rights_receipt", "modifications", "action", "jurisdiction",
+        "rights_manifest", "rights_receipt", "modifications", "action", "jurisdiction",
         "playability", "output_kind", "game_data_provenance_attested",
         "legal_release_authorized",
         "external_binary_or_licensed_sdk_embedded",
@@ -249,7 +252,35 @@ def verify_game_capsule(capsule: Mapping[str, Any]) -> dict[str, Any]:
         }
     ):
         raise GameCapsuleError("capsule controller-playability evidence changed")
+    # Independently re-admit the embedded rights evidence and require the
+    # specific source tilemap to remain content-identical. Re-signing JSON
+    # cannot erase denied uses, downgrade third-party source kinds, or
+    # quietly substitute a different "licensed" input.
+    evidence = capsule["rights_manifest"]
+    if not isinstance(evidence, dict):
+        raise GameCapsuleError("capsule lacks inspectable rights provenance")
+    try:
+        fresh_rights = admit_game_rights(
+            evidence, action=capsule["action"],
+            jurisdiction=capsule["jurisdiction"],
+        )
+        source_assets = evidence["assets"]
+        matching = [
+            item for item in source_assets
+            if item.get("asset_id") == "tilemap"
+        ]
+        if (
+            len(matching) != 1
+            or matching[0]["sha256"] != source["tile_digest"]
+        ):
+            raise GameCapsuleError(
+                "embedded rights provenance does not identify this exact source"
+            )
+    except (GameRightsError, KeyError, TypeError, AttributeError) as exc:
+        raise GameCapsuleError("capsule rights could not be re-admitted") from exc
     receipt = capsule["rights_receipt"]
+    if receipt != fresh_rights:
+        raise GameCapsuleError("capsule rights receipt differs from source evidence")
     if (
         not isinstance(receipt, dict)
         or receipt.get("project_id") != capsule["project_id"]
