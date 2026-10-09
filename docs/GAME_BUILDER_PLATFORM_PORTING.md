@@ -260,3 +260,36 @@ machine-specific compiler adapter and acceptance process are implemented.
 The existing archive and original-game rights controls apply to
 these additions. Neither platform inspiration nor a binary header
 constitutes a right to redistribute copyrighted commercial games.
+
+## Historical DOS 8086 native game architecture
+
+The builder has a seventh genuine, original native-source target:
+`dos_native_export.py` targets a **real Intel 8086-compatible DOS .COM
+program** and produces NASM `bits 16`/origin `0100h` source, not a
+desktop emulator, HTML page, renamed EXE or hypothetical port plan.
+
+The engine is independently adapted to IBM PC-compatible hardware conventions:
+text mode 3 via BIOS interrupt 10h, genuine segment-addressed text video
+memory at B800:0000, keyboard scan codes through BIOS interrupt 16h,
+native real-mode CPU instructions, and DOS interrupt 21h for clean exit.
+Runtime logic tracks all authored level maps separately from immutable
+level source data, applies wall collisions, collectible clearing,
+health and hazard damage, retains progression through all stages,
+and displays a changing level/GEMS/HP/score HUD. It uses original
+ASCII/text-mode aesthetics, preserves the world digest and reference-winning
+route, and emits a reproducible `Makefile` invoking real NASM.
+
+`Game Builder Native DOS 8086 COM` assembles the actual `.com` file
+and checks its startup instruction bytes, BIOS and DOS calls,
+video-memory setup, bounded image size and SHA-256. Emulator execution
+and physical hardware are independent follow-up gates, not implied by
+successful compilation or a valid DOS program signature.
+
+The public `native_game_cli.py` and historical
+`native_evolution_cli.py` now include DOS-native source output,
+and `editor_platforms.py` identifies the
+`nasm_8086_pc_textmode_com_source` capability. Thus the seven
+available native-source destinations currently cover three modern
+desktop operating systems, two different classic cartridge formats,
+Commodore 64 and 8086 DOS. The broader archive still remains research/
+design-only wherever a true machine-specific backend is absent.
