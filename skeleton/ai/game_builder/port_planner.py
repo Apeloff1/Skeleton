@@ -12,7 +12,7 @@ from hashlib import sha256
 import json
 import re
 
-from .platform_registry import PlatformProfile, PlatformRegistry, default_registry
+from .platform_registry import PlatformProfile, PlatformRegistry, PlatformRegistryError, default_registry
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _VALID_RIGHTS = frozenset({"project_owned", "licensed_homebrew", "public_domain_homebrew"})
@@ -165,8 +165,11 @@ def compile_port(request: PortRequest, registry: PlatformRegistry | None = None)
     registry = default_registry() if registry is None else registry
     if not isinstance(registry, PlatformRegistry):
         raise PortPlanningError("registry must be a validated PlatformRegistry")
-    target = registry.get(request.target_platform_id)
-    source_profiles = tuple(registry.get(s.platform_id) for s in request.sources)
+    try:
+        target = registry.get(request.target_platform_id)
+        source_profiles = tuple(registry.get(s.platform_id) for s in request.sources)
+    except PlatformRegistryError as exc:
+        raise PortPlanningError("unknown platform in port plan") from exc
     creative = tuple(dict.fromkeys(term for s in request.sources for term in s.creative_identity))
     steps = _actions(target, source_profiles, request.mode)
     probes = (
