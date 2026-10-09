@@ -154,3 +154,11 @@ def test_native_game_entrypoint_routes_to_original_chip8_mode_without_web_browse
                         lambda: called.append("chip8") or 0)
     assert entry.main(["--chip8-demo"]) == 0
     assert called == ["chip8"]
+
+
+def test_default_native_chip8_seed_matches_installed_original_rom_exporter():
+    from scripts.game.export_chip8 import _original_capsule, compile_chip8_homebrew
+    expected = compile_chip8_homebrew(_original_capsule(1729))
+    native = verify_native_chip8_player()
+    assert native["rom_sha256"] == expected["rom_sha256"]
+    assert OriginalChip8Game().compiled["rom_sha256"] == expected["rom_sha256"]
