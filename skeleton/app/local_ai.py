@@ -290,3 +290,20 @@ class OfflineAIWindow:
 
 def open_offline_ai(parent: Any) -> OfflineAIWindow:
     return OfflineAIWindow(parent)
+
+
+def run_offline_ai() -> int:
+    """Start the local-only AI desktop surface on any Tk-capable host."""
+    import tkinter as tk
+
+    root = tk.Tk()
+    root.withdraw()
+    window = open_offline_ai(root)
+
+    def finish() -> None:
+        window.close()
+        root.destroy()
+
+    window.window.protocol("WM_DELETE_WINDOW", finish)
+    root.mainloop()
+    return 0
