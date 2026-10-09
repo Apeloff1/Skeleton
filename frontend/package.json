@@ -24,7 +24,12 @@
     "test:product-projection": "node --test scripts/test-product-projection.mjs",
     "test:accessibility": "node --test scripts/test-accessibility-contract.mjs",
     "test:localization": "node --test scripts/test-localization-contract.mjs",
-    "test:dragon-wire": "node scripts/test-dragon-canonical-wire.cjs"
+    "test:dragon-wire": "node scripts/test-dragon-canonical-wire.cjs",
+    "test:product-journeys": "node --test scripts/test-product-journeys.mjs",
+    "test:build-lifecycle": "node --test scripts/test-build-job-lifecycle.mjs",
+    "test:knowledge-experience": "node --test scripts/test-knowledge-experience.mjs",
+    "test:world-workbench": "node --test scripts/test-world-workbench.mjs",
+    "test:design-review": "node --test scripts/test-design-review.mjs"
   },
   "engines": {
     "node": ">=24"
