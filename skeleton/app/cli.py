@@ -71,6 +71,7 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--llama-executable", help="explicit local llama.cpp executable (not downloaded)")
 
     local_ai.add_argument("--inspect-model", action="store_true", help="validate model weights and report offline runtime limits")
+    local_ai.add_argument("--self-check", action="store_true", help="verify bundled offline native inference, CPU training and benchmarking")
     local_ai.add_argument("--train-corpus", help="train a bounded CPU native checkpoint from a local UTF-8 text file")
     local_ai.add_argument("--improve-model", help="previous native checkpoint for independent held-out improvement")
     local_ai.add_argument("--compare-model", help="baseline checkpoint for read-only held-out comparison")
@@ -233,6 +234,30 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
 
     if command == "local-ai":
         from skeleton.app.local_ai import OfflineAISession, inspect_local_model, load_native_checkpoint, run_offline_ai
+
+        if args.self_check:
+            if any((
+                args.model, args.gguf_model, args.llama_executable,
+                args.inspect_model, args.train_corpus, args.improve_model,
+                args.compare_model, args.candidate_model, args.eval_corpus,
+                args.benchmark_suite, args.exclude_train_corpus, args.protect_suite,
+                args.replay_improvement, args.output_model, args.prompt,
+                args.load_chat, args.save_chat,
+                args.epochs is not None, args.max_output_tokens is not None,
+            )):
+                print("local-ai --self-check does not accept model, dataset or training options")
+                return 2
+            from skeleton.app.local_ai_acceptance import run_offline_acceptance
+
+            result = run_offline_acceptance()
+            if args.as_json:
+                print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+            else:
+                for check in result["checks"]:
+                    print(("[PASS] " if check["passed"] else "[FAIL] ") + str(check["name"]))
+                print("Offline native self-check: " + ("PASS" if result["passed"] else "FAIL"))
+                print("Model quality, GGUF weights and enterprise release: not certified")
+            return 0 if result["passed"] else 1
 
         if args.gguf_model or args.llama_executable:
             if (
