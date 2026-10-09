@@ -175,11 +175,13 @@ class TorchAccel:
             output = torch.softmax(scores.masked_fill(mask, float("-inf")), dim=-1) @ vh
         return output.squeeze(0).transpose(0, 1).contiguous().reshape(length, heads * head_dim)
 
-    def _forward_ids(self, ids: Sequence[int]):
+    def _forward_ids(self, ids: Sequence[int], *, fill_cache: bool = False):
         torch = self.torch
         lm = self.lm
         if not self.resident:
             self.pin()
+        if fill_cache:
+            self.reset_decode_cache()
         idx = torch.tensor(list(ids), dtype=torch.long, device=self.device)
         pos = torch.arange(len(ids), device=self.device).clamp(max=lm.ctx - 1)
         X = self._E[idx] if getattr(lm, "position_mode", "learned_rope") == "rope" else self._E[idx] + self._P[pos]
@@ -190,6 +192,14 @@ class TorchAccel:
             Xn = self._normalize(X, blob, "ln1")
             Q, K, V = Xn @ blob["Wq"].T, Xn @ blob["Wk"].T, Xn @ blob["Wv"].T
             Q, K = self._rope(Q), self._rope(K)
+            if fill_cache:
+                length = K.size(0)
+                self._cached_keys.append(
+                    K.reshape(length, heads, dh).transpose(0, 1).unsqueeze(0)
+                )
+                self._cached_values.append(
+                    V.reshape(length, heads, dh).transpose(0, 1).unsqueeze(0)
+                )
             C = self._attention(Q, K, V, heads=heads, head_dim=dh)
             X = X + C @ blob["Wo"].T
             if blob.get("W1") is not None:
@@ -201,6 +211,9 @@ class TorchAccel:
                 else:
                     z = self._gelu(gate)
                 X = X + z @ blob["W2"].T + blob["b2"]
+        if fill_cache:
+            self._cached_ids = list(ids)
+            self._cached_next_position = len(ids)
         return X[-1] @ self._Wout.T + self._bout, X[-1]
 
     def _rope(self, X, *, position_offset: int = 0):
@@ -304,9 +317,9 @@ class TorchAccel:
                 del self._cached_ids[0]
                 result = self._cached_step(window[-1])
             else:
-                self.reset_decode_cache()
-                for idx in window:
-                    result = self._cached_step(idx)
+                # Batched fused causal prefill; one-token loops are only used
+                # for decode. Avoid O(context) Python/GPU launches on prompts.
+                result, _ = self._forward_ids(window, fill_cache=True)
             return result.detach().cpu().tolist()
 
     def logits(self, ids: Sequence[int]) -> List[float]:
