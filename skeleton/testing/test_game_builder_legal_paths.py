@@ -331,3 +331,57 @@ def test_guarded_export_fails_closed_on_illegal_assets_and_other_project():
         )
     with pytest.raises(PermissionError):
         compile_rights_aware_desktop(_original_world(), owned_source(), request(), authorized=False)
+
+
+
+def _originality_for_legal_policy(*, plagiarized: bool = False):
+    from skeleton.ai.game_builder.plagiarism_guard import (
+        AssetDeclaration, AssetDisposition, AttributionStatus, ExpressionSample,
+        UseBasis, audit_game_originality,
+    )
+    src = "a newly invented game story written about an amber observatory with ten unique telescopes"
+    reference = src if plagiarized else "another independently invented narrative about tiny ships and frozen gardens"
+    modes = ("source_code", "artwork", "music_audio", "characters", "story_dialogue",
+             "level_maps", "interface_appearance", "marketing_brand")
+    assets = tuple(
+        AssetDeclaration(
+            m, AssetDisposition.INCLUDED if m == "story_dialogue" else AssetDisposition.NOT_USED,
+            basis=UseBasis.OWN_CREATION if m == "story_dialogue" else None,
+            provenance_sha256="b"*64 if m == "story_dialogue" else None,
+            author_identity="new creator" if m == "story_dialogue" else None,
+            attribution=AttributionStatus.NOT_REQUIRED,
+        ) for m in modes
+    )
+    return audit_game_originality(
+        "authored-next-age-game", assets=assets,
+        candidate_samples=(ExpressionSample("mine", "story_dialogue", src, "b"*64),),
+        references=(ExpressionSample("prior", "story_dialogue", reference),),
+    )
+
+
+def test_plagiarism_audit_escalates_through_general_homebrew_legal_assessment():
+    safe = _originality_for_legal_policy()
+    assert safe.design_admissible
+    reviewed = assess_homebrew(replace(request(), originality_report=safe))
+    assert reviewed.design_admissible
+    assert reviewed.assessment_digest != assess_homebrew(request()).assessment_digest
+    copied = _originality_for_legal_policy(plagiarized=True)
+    assert not copied.design_admissible
+    assessment = assess_homebrew(replace(request(), originality_report=copied))
+    assert assessment.disposition is LegalDisposition.REVIEW_REQUIRED
+    assert "ORIGINALITY_UNRESOLVED_SIMILARITY_OR_CREDIT_REVIEW" in assessment.issues
+    proposal = propose_rights_aware_port(owned_source(), replace(request(), originality_report=copied))
+    assert proposal.design_stage_admitted is False
+    assert proposal.technical_blueprint is None
+
+
+def test_plagiarism_audit_cannot_be_attached_to_unrelated_project():
+    scanned = _originality_for_legal_policy()
+    with pytest.raises(HomebrewPolicyError):
+        replace(request(), project_id="some-other-game", originality_report=scanned)
+
+
+def test_releasing_without_plagiarism_audit_is_explicitly_unverified():
+    assessment = assess_homebrew(request(release_requested=True))
+    assert "ORIGINALITY_SCREEN_NOT_ATTACHED_TO_RELEASE_REQUEST" in assessment.issues
+    assert assessment.release_authorized is False
