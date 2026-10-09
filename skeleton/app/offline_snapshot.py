@@ -80,6 +80,16 @@ def _verify_database(path: Path, kind: str) -> None:
             conn.close()
     except sqlite3.Error as exc:
         raise OfflineSnapshotError("cannot verify offline SQLite database") from exc
+    # SQLite integrity alone cannot detect forged, internally inconsistent
+    # app data. Semantic inspection also checks transcript checksum/order,
+    # FTS row mappings and valid durable queue receipts.
+    from .offline_audit import OfflineAuditError, audit_database
+    try:
+        audit_database(path, kind)
+    except OfflineAuditError as exc:
+        raise OfflineSnapshotError(
+            "offline SQLite semantic integrity check failed: " + str(exc)
+        ) from exc
 
 
 def _online_backup(source: Path, destination: Path, kind: str) -> None:
