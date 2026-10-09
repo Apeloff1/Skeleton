@@ -4,9 +4,199 @@
   "evidence_sources": [
     "https://commons.wikimedia.org/wiki/Home_game_consoles_by_generation",
     "https://www.videogameconsolelibrary.com/console-generations-guide/",
-    "https://docs.mamedev.org/initialsetup/mameintro.html"
+    "https://docs.mamedev.org/initialsetup/mameintro.html",
+    "https://www.bnl.gov/about/history/firstvideo.php"
   ],
   "nodes": [
+    {
+      "platform_id": "gottlieb_baffle_ball",
+      "first_year": 1931,
+      "lineage": "pinball",
+      "predecessor": null,
+      "design_signals": [
+        "ball_ramp_geometry",
+        "aim_and_release"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "crt_amusement_device_1947",
+      "first_year": 1947,
+      "lineage": "foundational_analog",
+      "predecessor": null,
+      "design_signals": [
+        "electronic_screen_targets",
+        "physical_overlay"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "gottlieb_humpty_dumpty",
+      "first_year": 1947,
+      "lineage": "pinball",
+      "predecessor": "gottlieb_baffle_ball",
+      "design_signals": [
+        "player_controlled_flippers",
+        "physical_ball_physics"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "cambridge_edsac",
+      "first_year": 1949,
+      "lineage": "early_computer_games",
+      "predecessor": null,
+      "design_signals": [
+        "general_purpose_machine_games"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "ferranti_nimrod",
+      "first_year": 1951,
+      "lineage": "early_computer_games",
+      "predecessor": null,
+      "design_signals": [
+        "logic_strategy",
+        "indicator_display"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "donner_model30_tennis",
+      "first_year": 1958,
+      "lineage": "foundational_analog",
+      "predecessor": null,
+      "design_signals": [
+        "analog_ballistics",
+        "oscilloscope_display",
+        "two_player_input"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "dec_pdp1",
+      "first_year": 1960,
+      "lineage": "early_computer_games",
+      "predecessor": null,
+      "design_signals": [
+        "vector_screen",
+        "interactive_computer"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "namco_periscope_em",
+      "first_year": 1965,
+      "lineage": "electromechanical_arcade",
+      "predecessor": null,
+      "design_signals": [
+        "optical_depth",
+        "physical_tracking"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "sega_periscope_em",
+      "first_year": 1966,
+      "lineage": "electromechanical_arcade",
+      "predecessor": null,
+      "design_signals": [
+        "mirror_projection",
+        "timed_targets"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "midway_sea_raider_em",
+      "first_year": 1969,
+      "lineage": "electromechanical_arcade",
+      "predecessor": null,
+      "design_signals": [
+        "timed_shots",
+        "moving_physical_targets"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nutting_computer_space",
+      "first_year": 1971,
+      "lineage": "early_video_arcade",
+      "predecessor": null,
+      "design_signals": [
+        "dedicated_analog_arcade"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "stanford_galaxy_game",
+      "first_year": 1971,
+      "lineage": "early_video_arcade",
+      "predecessor": null,
+      "design_signals": [
+        "computer_arcade_experience"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "atari_arcade_pong",
+      "first_year": 1972,
+      "lineage": "atari_pong",
+      "predecessor": null,
+      "design_signals": [
+        "realtime_ball_rally",
+        "arcade_paddle"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "magnavox_odyssey",
+      "first_year": 1972,
+      "lineage": "home_concept",
+      "predecessor": null,
+      "design_signals": [
+        "overlay_video",
+        "analog_scorekeeping"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "atari_home_pong",
+      "first_year": 1975,
+      "lineage": "atari_pong",
+      "predecessor": "atari_arcade_pong",
+      "design_signals": [
+        "household_video_paddle",
+        "dedicated_soc"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "fairchild_channel_f",
+      "first_year": 1976,
+      "lineage": "home_cartridges",
+      "predecessor": null,
+      "design_signals": [
+        "programmable_cartridge_console"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
     {
       "platform_id": "atari_2600",
       "first_year": 1977,
