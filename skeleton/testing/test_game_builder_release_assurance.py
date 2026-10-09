@@ -74,6 +74,7 @@ def base_evidence():
         rights_evidence_sha256=digest("rights-file"),
         legal_assessment_sha256=legal.assessment_digest,
         originality_screen_sha256=originality.screen_digest,
+        credits_bundle_sha256=digest("reviewed-license-notices"),
         channel=ReleaseChannel.DIRECT_DOWNLOAD,
         jurisdictions=("NO", "EU_EEA"),
         author_ids=("game-author",), builder_ids=("build-agent",),
@@ -170,6 +171,7 @@ def test_changed_game_binary_invalidates_every_prior_review_signature():
 @pytest.mark.parametrize("change", [
     {"native_source_sha256":digest("new-source")},
     {"rights_evidence_sha256":digest("changed-rights")},
+    {"credits_bundle_sha256":digest("updated-credits")},
     {"native_gameplay_evidence_sha256":digest("new-replay")},
     {"jurisdictions":("NO",)},
     {"channel":ReleaseChannel.PRIVATE_HOMEBREW},
