@@ -66,7 +66,7 @@ def fingerprint_image(media_id: str, data: bytes) -> MediaFingerprint:
             im = ImageOps.exif_transpose(original)
             im.load()
             gray = im.convert("L").resize((9, 8), resample=Image.Resampling.LANCZOS)
-            pixels = list(gray.getdata())
+            pixels = list(gray.tobytes())
     except (OSError, ValueError, Image.DecompressionBombError) as exc:
         raise MediaScreenError("unreadable or oversized visual evidence") from exc
     bitfield = 0
