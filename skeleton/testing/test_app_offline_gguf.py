@@ -210,3 +210,50 @@ def test_corrupt_gguf_backup_is_rejected_before_inference(
         "--prompt", "Do not run", "--backup-in", str(backup),
     ]) == 1
     assert "request rejected" in capsys.readouterr().out
+
+
+def test_headless_gguf_uses_local_index_without_persisting_source_in_chat(
+    local_deployment: tuple[Path, Path, Path], tmp_path: Path, capsys
+) -> None:
+    from skeleton.app.offline_library import OfflineDocumentLibrary
+    from skeleton.app.offline_workspace import OfflineWorkspace
+
+    library_path = tmp_path / "knowledge.sqlite"
+    docs = tmp_path / "local-docs"
+    docs.mkdir()
+    (docs / "game.md").write_text(
+        "Physics engine replay checksum and deterministic game simulation.",
+        encoding="utf-8",
+    )
+    with OfflineDocumentLibrary(library_path) as library:
+        library.index_directory(docs)
+    history_path = tmp_path / "transcript.sqlite"
+    manifest, _, model = local_deployment
+    assert run_app_cli([
+        "local-ai", "--deployment", str(manifest), "--prompt", "physics engine",
+        "--library", str(library_path), "--use-library",
+        "--workspace", str(history_path), "--max-output-tokens", "8",
+        "--json",
+    ]) == 0
+    response = json.loads(capsys.readouterr().out)
+    assert response["text"] == "offline GGUF desktop answer"
+    assert response["retrieved_sources"][0]["relative_path"] == "game.md"
+    with OfflineWorkspace(history_path) as workspace:
+        revision, messages = workspace.open("default", _sha(model))
+        assert revision == 1
+        assert messages[0] == ("user", "physics engine")
+        assert "Physics engine replay" not in messages[0][1]
+        assert messages[1][1] == response["text"]
+
+
+@pytest.mark.asyncio
+async def test_gguf_transient_context_does_not_replace_user_question(
+    local_deployment: tuple[Path, Path, Path],
+) -> None:
+    session = OfflineGGUFSession(local_deployment[0])
+    result = await session.ask(
+        "actual question", max_output_tokens=8,
+        inference_prompt="UNTRUSTED source: facts about game physics. User question: actual question",
+    )
+    assert result.text == "offline GGUF desktop answer"
+    assert session.history[0] == ("user", "actual question")
