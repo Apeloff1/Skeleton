@@ -155,8 +155,22 @@ class OfflineAISession:
                 raise OfflineAIError("message exceeds native model context; shorten it or reduce the output budget")
             history = history[2:]
 
-    async def ask(self, prompt: str, *, max_output_tokens: int = 32) -> OfflineAnswer:
-        request, retained_history = self._request(prompt, max_output_tokens)
+    async def ask(self, prompt: str, *, max_output_tokens: int = 32,
+                  grounding_context: str | None = None) -> OfflineAnswer:
+        # The evidence goes only into the untrusted *user* prompt passed to
+        # the local model, never instructions/system authority or durable user
+        # message. The archived transcript retains the actual user question.
+        if grounding_context is not None:
+            if (not isinstance(grounding_context, str)
+                    or not grounding_context.strip()
+                    or len(grounding_context.encode("utf-8")) > 4_096):
+                raise OfflineAIError("invalid bounded source context")
+            inference_prompt = prompt.strip() + "\n\n" + grounding_context
+        else:
+            inference_prompt = prompt
+        request, retained_history = self._request(
+            inference_prompt, max_output_tokens
+        )
         result: LocalInferenceResult = await self.engine.generate(request)
         if (
             not isinstance(result.text, str)
@@ -193,7 +207,7 @@ class OfflineAISession:
         # Only commit a complete, verified local inference result.
         self.history = (
             retained_history
-            + (("user", request.prompt), ("assistant", result.text))
+            + (("user", prompt.strip()), ("assistant", result.text))
         )[-MAX_HISTORY_MESSAGES:]
         return OfflineAnswer(
             text=result.text,
@@ -315,7 +329,8 @@ class DurableOfflineAISession(OfflineAISession):
             self.create_conversation()
 
     async def ask(self, prompt: str, *, max_output_tokens: int = 32,
-                  request_id: str | None = None) -> OfflineAnswer:
+                  request_id: str | None = None,
+                  evidence_manifest: dict[str, Any] | None = None) -> OfflineAnswer:
         rid = (_identifier("request id", request_id)
                if request_id is not None else secrets.token_urlsafe(18))
         with self._busy_lock:
@@ -339,10 +354,26 @@ class DurableOfflineAISession(OfflineAISession):
             if persisted_history != previous_history or persisted_instruction != self.instructions:
                 raise OfflineAIError("conversation changed on disk; reload before retry")
             self.store.ensure_can_append(saved)
+            config = GenerationConfig(max_new_tokens=max_output_tokens)
+            request_digest = _digest_request(prompt.strip(), config)
+            grounding_context = None
+            if evidence_manifest is not None:
+                from skeleton.app.offline_grounding import (
+                    grounded_request_digest, validate_evidence,
+                )
+                request_digest = grounded_request_digest(request_digest)
+                validate_evidence(
+                    evidence_manifest, prompt.strip(), request_digest,
+                    self.backend.model_digest, self.tokenizer_digest,
+                )
+                grounding_context = evidence_manifest["context"]
             # super().ask() deliberately shrinks inference context. The
             # persisted transcript MUST instead extend the complete prior
             # SQLite history, not the model's shortened context window.
-            answer = await super().ask(prompt, max_output_tokens=max_output_tokens)
+            answer = await super().ask(
+                prompt, max_output_tokens=max_output_tokens,
+                grounding_context=grounding_context,
+            )
             transcript = saved.transcript.append("user", prompt.strip()).append(
                 "assistant", answer.text
             )
@@ -352,16 +383,16 @@ class DurableOfflineAISession(OfflineAISession):
             text_digest = sha256(answer.text.encode("utf-8")).hexdigest()
             # GenerationConfig matches the actual local request's seed and
             # bounded output budget; random IDs avoid accidental replay.
-            config = GenerationConfig(max_new_tokens=max_output_tokens)
             self.store.commit(
                 session=saved,
                 request_id=rid,
-                request_digest=_digest_request(prompt.strip(), config),
+                request_digest=request_digest,
                 transcript=transcript,
                 text=answer.text,
                 output_digest=text_digest,
                 prompt_tokens=answer.input_tokens,
                 generated_tokens=answer.output_tokens,
+                evidence_manifest=evidence_manifest,
             )
             # Keep the full durable state available to the desktop while the
             # inference adapter independently limits prompt context per turn.
