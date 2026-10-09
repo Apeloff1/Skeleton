@@ -335,6 +335,13 @@ class WindowsLauncher:
 
 
 def _headless(args: argparse.Namespace, root: Path) -> int:
+    if args.local_ai_smoke:
+        from skeleton.app.local_ai import smoke_offline_native_inference
+
+        try:
+            return 0 if smoke_offline_native_inference() else 1
+        except Exception:
+            return 1
     if args.check:
         report = check_host(root)
         if not args.quiet:
@@ -375,6 +382,7 @@ def parser() -> argparse.ArgumentParser:
     mode.add_argument("--stop", action="store_true")
     mode.add_argument("--open", action="store_true")
     mode.add_argument("--local-ai", action="store_true", help="open Docker-free native AI conversation")
+    mode.add_argument("--local-ai-smoke", action="store_true", help="verify bundled native CPU inference without Docker")
     result.add_argument(
         "--development",
         action="store_true",
