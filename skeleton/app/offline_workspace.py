@@ -17,6 +17,7 @@ import sqlite3
 import threading
 from typing import Any, Protocol
 
+from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
 from .offline_history import _history, _canonical, _model_digest, MAX_BACKUP_BYTES
 
 
@@ -73,6 +74,10 @@ class OfflineWorkspace:
             raise OfflineWorkspaceError("workspace requires a non-symlink local file path")
         if target.exists() and not target.is_file():
             raise OfflineWorkspaceError("workspace path must be a regular file")
+        try:
+            check_sqlite_companion_paths(target)
+        except UnsafeOfflineSqlitePath as exc:
+            raise OfflineWorkspaceError(str(exc)) from exc
         self.path = target
         self._lock = threading.RLock()
         was_present = target.exists()
