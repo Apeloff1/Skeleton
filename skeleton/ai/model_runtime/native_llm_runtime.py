@@ -176,6 +176,10 @@ class NativeLLMRuntime:
         if self.estimate_kv_bytes(self.limits.max_context) > self.limits.max_kv_bytes:
             raise RuntimeContractError("configured context exceeds KV memory budget")
         self.device = self._bind_device(self.device_policy)
+        self.model._strict_device_request = (
+            not self.device_policy.allow_fallback
+            and self.device_policy.requested in {"torch", "torch-cpu", "cuda", "gpu", "mps"}
+        )
 
     def _architecture(self) -> RuntimeArchitecture:
         return RuntimeArchitecture(
@@ -285,6 +289,10 @@ class NativeLLMRuntime:
         receipt = self._bind_device(policy)
         self.device_policy = policy
         self.device = receipt
+        self.model._strict_device_request = (
+            not policy.allow_fallback
+            and policy.requested in {"torch", "torch-cpu", "cuda", "gpu", "mps"}
+        )
         return receipt
 
     def _current_model_digest(self) -> str:
