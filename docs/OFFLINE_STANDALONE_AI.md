@@ -186,6 +186,36 @@ database files can forge it. Independently authenticate and protect
 backups on trusted media. Restored transcripts remain context, not
 execution authorizations or canonical production conversation state.
 
+## Opt-in Windows outbound blocking
+
+An optional local script manages narrowly scoped Windows Defender Firewall
+outbound-block rules for the installed offline console and, optionally,
+the separately installed llama.cpp executable. It is **never invoked
+automatically during installation** and does not change the machine's
+global firewall profile.
+
+Run an elevated PowerShell console only after independently verifying the
+executable paths and source of the policy script:
+
+```powershell
+.\\scripts\\windows\\offline_network_policy.ps1 -Mode Apply -OfflineExe "C:\\Path\\SkeletonOffline.exe" -LlamaCli "C:\\Models\\llama-cli.exe"
+.\\scripts\\windows\\offline_network_policy.ps1 -Mode Status -OfflineExe "C:\\Path\\SkeletonOffline.exe" -LlamaCli "C:\\Models\\llama-cli.exe"
+.\\scripts\\windows\\offline_network_policy.ps1 -Mode Remove -OfflineExe "C:\\Path\\SkeletonOffline.exe" -LlamaCli "C:\\Models\\llama-cli.exe"
+```
+
+The script uses path-derived rule identifiers, refuses preexisting rules
+associated with a different application path, and removes only the exact
+selected rules when expressly requested. `Status` is read-only and
+returns a nonzero exit code when any selected application block is missing.
+The status JSON explicitly records `host_isolation_proven: false`.
+
+**Limitations:** These Windows Firewall rules restrict outgoing traffic
+for the named executables. They do not air-gap the host, isolate separate
+programs, block all IPC or protect against privileged malware or operating
+system compromise. Other processes and any additional spawned binaries
+must be governed separately. For a truly disconnected acceptance test,
+use an independent OS policy or physically isolated test machine.
+
 ## Offline readiness doctor
 
 Use `--doctor` with one preinstalled local artifact before running it:
