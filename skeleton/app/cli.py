@@ -68,6 +68,10 @@ def _parser() -> argparse.ArgumentParser:
     local_ai = sub.add_parser("local-ai", help="run native AI locally, without Docker or provider credentials")
     local_ai.add_argument("--model", help="native content-addressed checkpoint for headless inference")
     local_ai.add_argument("--inspect-model", action="store_true", help="validate model weights and report offline runtime limits")
+    local_ai.add_argument("--prepare-dataset", help="flat folder of explicit UTF-8 .txt documents")
+    local_ai.add_argument("--dataset-output", help="new directory for disjoint train/validation and identity manifest")
+    local_ai.add_argument("--validation-percent", type=int, default=25, help="source-document validation split percent (10–50)")
+    local_ai.add_argument("--split-seed", type=int, default=41, help="reproducible source-document split seed")
     local_ai.add_argument("--train-corpus", help="train a bounded CPU native checkpoint from a local UTF-8 text file")
     local_ai.add_argument("--improve-model", help="previous native checkpoint for independent held-out improvement")
     local_ai.add_argument("--compare-model", help="baseline checkpoint for read-only held-out comparison")
@@ -230,6 +234,44 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
 
     if command == "local-ai":
         from skeleton.app.local_ai import OfflineAISession, inspect_local_model, load_native_checkpoint, run_offline_ai
+
+        if args.prepare_dataset or args.dataset_output:
+            if (
+                not args.prepare_dataset or not args.dataset_output
+                or args.model or args.prompt or args.inspect_model
+                or args.train_corpus or args.output_model or args.improve_model
+                or args.compare_model or args.candidate_model or args.eval_corpus
+                or args.benchmark_suite or args.exclude_train_corpus
+                or args.protect_suite or args.replay_improvement
+                or args.load_chat or args.save_chat
+                or args.epochs != 1 or args.max_output_tokens != 8
+            ):
+                print("local-ai dataset preparation requires only --prepare-dataset, --dataset-output and optional split controls")
+                return 2
+            from skeleton.app.local_ai_dataset import prepare_native_dataset
+
+            try:
+                dataset = prepare_native_dataset(
+                    args.prepare_dataset, args.dataset_output,
+                    validation_percent=args.validation_percent,
+                    seed=args.split_seed,
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local-ai dataset rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(dataset, ensure_ascii=False, sort_keys=True))
+            else:
+                print("Prepared native train/validation corpus in: " + str(dataset["output_directory"]))
+                print("Source documents: " + str(dataset["source_count"]))
+                print("Training/validation tokens: "
+                      + str(dataset["training_tokens"]) + "/" + str(dataset["validation_tokens"]))
+                print("Dataset ID: " + str(dataset["dataset_id"]))
+                print("Quality: not independently certified")
+            return 0
+        if args.validation_percent != 25 or args.split_seed != 41:
+            print("--validation-percent and --split-seed require --prepare-dataset")
+            return 2
 
         # Never accept tuning switches that a mode would silently ignore.
         # A replay always uses epochs pinned inside its original receipt;
