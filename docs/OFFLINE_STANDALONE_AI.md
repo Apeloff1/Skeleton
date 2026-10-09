@@ -153,6 +153,39 @@ Operators can inspect `--queue-status`, cancel an unstarted job with
 `--retry-queue-job <id>`. If a host requires recurring scans, use its
 trusted operating-system scheduler to invoke a bounded queue run.
 
+## Deep local state integrity audit
+
+Use the standalone console to inspect the semantic correctness of local
+chat, knowledge and queue databases without invoking a model, network
+access or repairing the data implicitly:
+
+```sh
+skeleton-offline --audit-workspace ./chat.sqlite \
+  --audit-library ./knowledge.sqlite \
+  --audit-queue ./index-jobs.sqlite --json
+```
+
+The desktop also offers **Audit local state**, which verifies an attached
+conversation workspace and/or local knowledge index on a background worker.
+The audit checks transcript checksums and complete turns, source text hash
+and FTS5 projection consistency, and indexing job leases and result records.
+It is read-only and requires existing database paths. It intentionally does
+not treat a valid checksum as authentication or a trustworthy model answer.
+
+A damaged search index is not silently promoted into a valid backup. After
+verifying that the original source folder is trustworthy and unchanged,
+explicitly run **Index text folder…** or
+`skeleton-offline --library ./knowledge.sqlite --index-dir ./notes`
+to rebuild mismatched FTS5 entries and prune orphaned search rows. Then
+rerun the audit. Chat transcript corruption or forged queue results must
+be recovered from independently verified snapshots; do not automatically
+fabricate missing turns or signed evidence.
+
+New local chat and document databases use owner-only permissions on POSIX
+systems. Existing database permissions are left unchanged. On Windows,
+configure NTFS access control and encryption according to the device's
+security policy.
+
 ## Portable database recovery
 
 Conversation workspaces, local document libraries and indexing queues can
@@ -369,7 +402,7 @@ and offline system-completion attestation are not yet provided.
 ## Acceptance
 
 ```sh
-python -m pytest skeleton/testing/test_app_offline_gguf.py skeleton/testing/test_offline_history_backup.py skeleton/testing/test_offline_kit.py skeleton/testing/test_offline_console.py skeleton/testing/test_offline_workspace.py skeleton/testing/test_offline_readiness.py skeleton/testing/test_offline_library.py skeleton/testing/test_offline_index_queue.py skeleton/testing/test_offline_snapshot.py -q
+python -m pytest skeleton/testing/test_app_offline_gguf.py skeleton/testing/test_offline_history_backup.py skeleton/testing/test_offline_kit.py skeleton/testing/test_offline_console.py skeleton/testing/test_offline_workspace.py skeleton/testing/test_offline_readiness.py skeleton/testing/test_offline_library.py skeleton/testing/test_offline_index_queue.py skeleton/testing/test_offline_snapshot.py skeleton/testing/test_offline_audit.py -q
 python -m pytest skeleton/testing/test_local_model_deployment.py -q
 python scripts/check_architecture_map.py
 python scripts/check_ai_app_construction.py
