@@ -41,14 +41,14 @@ mechanics, genre conventions or gameplay principles with entirely new
 original expression. They cannot be guaranteed noninfringing by
 automatic palette swaps, character renaming or source-file hashes.
 
-## 166 design targets across eight eras
+## 159 design targets across eight eras
 
 The catalog covers 1950s/1960s laboratory software and early computer
 games, 1970s home computers/arcades, 1980s 8/16-bit consoles and
 computers, 1990s 2D/3D systems, 2000s consoles/handheld/PC/mobile,
 2010s and 2020s modern consoles, PC, mobile, fantasy and XR.
 
-These are planning identities, NOT 166 actual binary exporters.
+These are planning identities, NOT 159 actual binary exporters.
 
 | Output | Code generator | Executed runtime | Independent release |
 | --- | --- | --- | --- |
