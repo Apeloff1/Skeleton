@@ -15,7 +15,7 @@ import sqlite3
 import threading
 from typing import Any, Mapping
 
-from .offline_foundations import SyntheticCurriculumError, validate_curriculum
+from .offline_foundations import validate_curriculum
 from .sparse_capability import CAPABILITIES, assess_heldout_capabilities
 
 SCHEMA = "skeleton.offline_capability_ledger.v1"
