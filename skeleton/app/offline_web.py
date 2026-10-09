@@ -65,6 +65,7 @@ HTML = r"""<!doctype html>
       <label for="prompt">Message to local model</label>
       <textarea id="prompt" rows="3" placeholder="Enter a message..." maxlength="4096"></textarea>
       <div class="inline bottom">
+        <label for="grounded"><input id="grounded" type="checkbox"> Include local evidence</label>
         <label for="budget">Output tokens <input id="budget" type="number" min="1" max="8192" value="32"></label>
         <span id="revision">No conversation selected</span>
         <button id="send" class="primary">Generate locally ↗</button>
@@ -82,6 +83,9 @@ CSS = r"""*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family
 .knowledge-section label{color:#c2cbe2}.knowledge-section input[type=search]{width:100%;border:1px solid #35425c;border-radius:8px;padding:9px;background:#101521;color:#fff}.knowledge-section input[type=file]{width:100%;max-width:100%;font-size:10px;color:#a3b4d2}
 .knowledge-documents,.knowledge-hits{display:grid;gap:7px}.knowledge-record,.knowledge-hit{border:1px solid #34415d;border-radius:8px;padding:8px;background:#1c2638;overflow-wrap:anywhere}
 .knowledge-record{display:flex;align-items:center;justify-content:space-between;gap:4px}.knowledge-record button{flex-shrink:0;font-size:10px;padding:5px}.knowledge-hit strong{display:block;color:#b4c8ff}.knowledge-hit p{white-space:pre-wrap;color:#e0e8f8;max-height:190px;overflow:auto}.knowledge-hit small{color:#a7bcdb;overflow-wrap:anywhere}
+
+.source-custody-label{display:block;margin-top:12px;color:#adc2e8;font-size:10px;font-weight:700}
+.source-custody-item{white-space:pre-wrap;font-size:11px;margin-top:7px;color:#d0d9ed;background:#1e2d42;border:1px solid #344a68;border-radius:7px;padding:9px;max-height:180px;overflow:auto}
 """
 
 
@@ -97,10 +101,11 @@ JAVASCRIPT = r"""'use strict';
       get(id).disabled = busy;
     });
   };
-  const showMessages = messages => {
+  const showMessages = (messages, evidence = []) => {
     const list = get('messages');
     list.replaceChildren();
     get('intro').hidden = messages.length > 0;
+    let completedTurn = 0;
     messages.forEach(message => {
       const card = document.createElement('article');
       card.className = 'message ' + (message.role === 'user' ? 'user' : 'assistant');
@@ -110,6 +115,22 @@ JAVASCRIPT = r"""'use strict';
       const content = document.createElement('div');
       content.textContent = message.content;
       card.append(header, content);
+      if (message.role === 'assistant') {
+        const supplied = evidence[completedTurn++];
+        if (supplied && Array.isArray(supplied.citations)) {
+          const label = document.createElement('small');
+          label.textContent = 'Evidence supplied to model; answer accuracy not verified';
+          label.className = 'source-custody-label';
+          card.appendChild(label);
+          supplied.citations.forEach(item => {
+            const note = document.createElement('div');
+            note.className = 'source-custody-item';
+            note.textContent = item.title + ' · ' + item.citation +
+              '\nSource excerpt: ' + item.passage;
+            card.appendChild(note);
+          });
+        }
+      }
       list.appendChild(card);
     });
     list.scrollTop = list.scrollHeight;
@@ -148,7 +169,7 @@ JAVASCRIPT = r"""'use strict';
     state.session = result.session_id;
     state.revision = result.revision;
     get('revision').textContent = 'Saved turns: ' + result.revision;
-    showMessages(result.messages);
+    showMessages(result.messages, result.evidence || []);
     await loadSessions();
     status('Loaded session ' + id.slice(0, 18) + '…');
   }
@@ -262,12 +283,14 @@ JAVASCRIPT = r"""'use strict';
     // Preserve the EXACT request identity across an ambiguous network loss.
     // A response may have committed even when fetch() reports failure.
     // Changing the prompt, budget or session intentionally creates a new turn.
+    const grounded = get('grounded').checked;
     const same = state.pending &&
       state.pending.session === state.session &&
       state.pending.prompt === prompt &&
-      state.pending.budget === budget;
+      state.pending.budget === budget &&
+      state.pending.grounded === grounded;
     if (!same) state.pending = {
-      session: state.session, prompt, budget,
+      session: state.session, prompt, budget, grounded,
       id: crypto.randomUUID().replace(/-/g, '')
     };
     const attempted = state.pending;
@@ -275,7 +298,7 @@ JAVASCRIPT = r"""'use strict';
     try {
       await api('POST', '/v1/sessions/' + attempted.session + '/turn', {
         message: attempted.prompt, max_output_tokens: attempted.budget,
-        request_id: attempted.id
+        request_id: attempted.id, grounded: attempted.grounded
       });
       state.pending = null;
       get('prompt').value = '';
