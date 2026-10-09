@@ -472,7 +472,11 @@ def main(argv: list[str] | None = None) -> int:
             print("Skeleton offline AI:", f"http://127.0.0.1:{server.server_port}/")
             print("Private bearer token file:", args.token_file)
             print("Model digest:", app.model_digest)
-            sys.stdout.flush()
+            # PyInstaller's --windowed Windows launcher may deliberately set
+            # stdout/stderr to None. Never make local serving contingent on
+            # an attached terminal.
+            if sys.stdout is not None:
+                sys.stdout.flush()
             server.serve_forever(poll_interval=0.25)
         return 0
     except KeyboardInterrupt:
