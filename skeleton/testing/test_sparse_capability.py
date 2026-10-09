@@ -235,3 +235,97 @@ def test_cli_refuses_writing_into_verified_dataset(tmp_path: Path, capsys) -> No
         "--dataset", str(local), "--register-db", str(local / "bad.sqlite"),
     ]) == 1
     assert not (local / "bad.sqlite").exists()
+
+
+def test_validation_focus_preserves_every_mode_and_reorders_second_samples() -> None:
+    weak = "offline_authority:network_request_denial"
+    normal = build_sparse_capability_plan(SOURCE, budget=48)
+    focused = build_sparse_capability_plan(SOURCE, budget=48, focus_modes=[weak])
+    assert focused["focus_modes"] == [weak]
+    assert focused["adaptive_focus_requested"] is True
+    assert focused["selected_sample_ids"][:36] == normal["selected_sample_ids"][:36]
+    assert focused["active_rows"][36]["capability_id"] == weak
+    assert normal["active_rows"][36]["capability_id"] != weak
+    assert focused["active_training_rows"] == normal["active_training_rows"] == 48
+    assert focused["heldout_rows_selected"] == 0
+    assert focused["training_text_sha256"] != normal["training_text_sha256"]
+
+
+def test_adaptive_plan_registers_distinct_version_without_overwriting_baseline() -> None:
+    normal = build_sparse_capability_plan(SOURCE, budget=48)
+    focused = build_sparse_capability_plan(
+        SOURCE, budget=48, focus_modes=["offline_authority:network_request_denial"]
+    )
+    with closing(DatasetRegistry(":memory:")) as registry:
+        normal_digest = register_sparse_capability_plan(SOURCE, normal, registry)
+        focus_digest = register_sparse_capability_plan(SOURCE, focused, registry)
+        assert normal_digest != focus_digest
+        assert registry.dataset(normal_digest).version != registry.dataset(focus_digest).version
+        assert registry.require_training_ready(normal_digest).splits[0].record_count == 48
+        assert registry.require_training_ready(focus_digest).splits[0].record_count == 48
+
+
+@pytest.mark.parametrize("focus", [
+    ["not-a-valid-capability"],
+    ["offline_authority:network_request_denial"] * 2,
+    "offline_authority:network_request_denial",
+    [None],
+])
+def test_adaptive_focus_rejects_unknown_duplicate_or_nonsequence_modes(focus) -> None:
+    with pytest.raises(SyntheticCurriculumError, match="focus"):
+        build_sparse_capability_plan(SOURCE, budget=48, focus_modes=focus)
+
+
+def test_training_byte_budget_is_strict_even_for_workspace_profile(tmp_path: Path) -> None:
+    from scripts.training.sparse_capability import main
+    from skeleton.ai.training.sparse_capability import (
+        HARDWARE_CORPUS_BYTE_BUDGETS,
+        MAX_CORPUS_BYTES,
+    )
+    assert HARDWARE_CORPUS_BYTE_BUDGETS == {
+        "low-memory": 8192, "consumer": 12288, "workstation": 16384,
+    }
+    assert MAX_CORPUS_BYTES == 16384
+    for profile, count in HARDWARE_BUDGETS.items():
+        plan = build_sparse_capability_plan(SOURCE, budget=count)
+        assert plan["active_training_bytes"] <= HARDWARE_CORPUS_BYTE_BUDGETS[profile]
+        assert plan["absolute_training_byte_cap"] == MAX_CORPUS_BYTES
+        assert main([
+            "--dataset", str(SOURCE), "--profile", profile,
+            "--export", str(tmp_path / (profile + ".txt")),
+        ]) == 0
+
+
+def test_validation_signal_prioritizes_errors_without_copying_answers(
+    tmp_path: Path, capsys,
+) -> None:
+    from scripts.training.sparse_capability import main
+
+    predictions = tmp_path / "val.jsonl"
+    _write_predictions(predictions, "validation")
+    rows = [json.loads(x) for x in predictions.read_text("utf-8").splitlines()]
+    target = next(x for x in rows if x["id"].startswith("ofv1-offline_authority-"))
+    target["prediction"] = "incorrect"
+    predictions.write_text("".join(json.dumps(x) + "\n" for x in rows), "utf-8")
+    path = tmp_path / "focused.txt"
+    assert main([
+        "--dataset", str(SOURCE), "--profile", "consumer",
+        "--focus-validation", str(predictions), "--export", str(path),
+    ]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["adaptive_selection_source"] == "validation-only"
+    assert report["adaptive_selection_did_not_copy_heldout_labels"] is True
+    assert report["heldout_rows_selected"] == 0
+    assert report["active_training_rows"] == 48
+    expected_focus = "offline_authority:" + {
+        "0": "authorized_local_read",
+        "1": "network_request_denial",
+        "2": "executable_launch_denial",
+    }[target["id"].rsplit("-", 1)[1]]
+    assert report["focus_modes"] == [expected_focus]
+    assert not any(x["id"] in report["selected_sample_ids"] for x in rows)
+    assert b"ofv1-offline_authority-14" not in path.read_bytes()
+    assert main([
+        "--dataset", str(SOURCE), "--profile", "consumer",
+        "--focus-validation", str(predictions), "--evaluate", str(predictions),
+    ]) == 2
