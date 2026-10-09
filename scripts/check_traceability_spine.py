@@ -87,7 +87,14 @@ def _binding(
     if binding.get("title") != volume.get("title"):
         raise TraceSpineError(f"{volume_ref} binding title drift")
     required = binding.get("required_gap_texts")
-    if not isinstance(required, list) or not required:
+    if not isinstance(required, list):
+        raise TraceSpineError(f"{volume_ref} required_gap_texts must be a list")
+    closed = volume.get("implementation_status") == "verified" and not volume.get("gaps")
+    if closed:
+        if required:
+            raise TraceSpineError(f"{volume_ref} closed volume must not retain required gaps")
+        return
+    if not required:
         raise TraceSpineError(f"{volume_ref} required_gap_texts must be non-empty")
     if set(required) != set(gaps):
         raise TraceSpineError(

@@ -21,12 +21,12 @@
     },
     {
       "path": "machine/architecture_ownership.json",
-      "git_blob_sha": "a40faf5fc7ec9ef4f6ad2e73a9f9cb076a9c53a6",
+      "git_blob_sha": "429282f802fb49d83a8885f7dd913aaf576fd37b",
       "role": "canonical physical/semantic ownership"
     },
     {
       "path": "machine/master_traceability.json",
-      "git_blob_sha": "7c3e78d9853a268d689892a68f6dea6c54b3bb2d",
+      "git_blob_sha": "24497202bb7fc16733e18e46e95a1eb99b0fab94",
       "role": "requirement/capability change-impact authority"
     }
   ],
