@@ -199,6 +199,8 @@ class OfflineAIWindow:
         toolbar.pack(fill="x")
         self.load_button = ttk.Button(toolbar, text="Load checkpoint…", command=self.choose_model)
         self.load_button.pack(side="left")
+        self.train_button = ttk.Button(toolbar, text="Train small local model…", command=self.train_model)
+        self.train_button.pack(side="left", padx=4)
         self.clear_button = ttk.Button(toolbar, text="New conversation", command=self.clear)
         self.clear_button.pack(side="left", padx=8)
         self.open_history_button = ttk.Button(toolbar, text="Open chat…", command=self.open_history)
@@ -221,6 +223,7 @@ class OfflineAIWindow:
 
     def _refresh(self) -> None:
         self.load_button.configure(state="disabled" if self.active else "normal")
+        self.train_button.configure(state="disabled" if self.active else "normal")
         self.send_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.clear_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.cancel_button.configure(state="normal" if self.active else "disabled")
@@ -255,6 +258,54 @@ class OfflineAIWindow:
                 self.events.put(("error", str(exc)))
 
         threading.Thread(target=work, name="skeleton-local-model-load", daemon=True).start()
+
+    def train_model(self) -> None:
+        """Bootstrap one genuine, tiny CPU checkpoint from user-chosen text.
+
+        This is an educational/experimental local transformer, not
+        production-trained LLM weights. Never train on startup without consent.
+        """
+        if self.active:
+            return
+        from tkinter import messagebox
+
+        if not messagebox.askyesno(
+            "Experimental CPU model training",
+            "Train a small transformer only on the local text you choose? "
+            "The output is experimental and not comparable to a trained "
+            "foundation language model. No data is uploaded.",
+            parent=self.window,
+        ):
+            return
+        source = self.filedialog.askopenfilename(
+            parent=self.window, title="Choose UTF-8 local training text",
+            filetypes=[("UTF-8 text", "*.txt"), ("All files", "*.*")],
+        )
+        if not source:
+            return
+        destination = self.filedialog.asksaveasfilename(
+            parent=self.window, title="Save new experimental native checkpoint",
+            defaultextension=".json", filetypes=[("Native checkpoint", "*.json")],
+        )
+        if not destination:
+            return
+        self.active = True
+        self.status.set("Training a bounded native CPU transformer locally…")
+        self._refresh()
+
+        def work() -> None:
+            try:
+                from skeleton.app.local_ai_training import train_local_text
+
+                receipt = train_local_text(source, destination)
+                session = OfflineAISession(load_native_checkpoint(destination))
+                self.events.put(("trained", (session, receipt.training_steps)))
+            except Exception as exc:
+                self.events.put(("error", str(exc)))
+
+        threading.Thread(
+            target=work, daemon=True, name="skeleton-native-cpu-training",
+        ).start()
 
     def clear(self) -> None:
         if self.active or self.session is None:
@@ -353,7 +404,14 @@ class OfflineAIWindow:
             while True:
                 kind, value = self.events.get_nowait()
                 self.active = False
-                if kind == "loaded":
+                if kind == "trained":
+                    self.session, steps = value  # type: ignore[misc]
+                    self.clear()
+                    self.status.set(
+                        "Experimental CPU checkpoint ready · "
+                        + str(steps) + " training steps · not quality certified"
+                    )
+                elif kind == "loaded":
                     self.session = value  # type: ignore[assignment]
                     self.clear()
                     info = inspect_local_model(self.session.backend)
