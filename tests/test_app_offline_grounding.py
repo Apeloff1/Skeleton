@@ -244,9 +244,15 @@ class GroundedOfflineReceiptTests(unittest.TestCase):
         try:
             connection.execute(
                 "CREATE TABLE offline_turns ("
-                "session_id TEXT, request_id TEXT, request_digest TEXT,"
-                "revision INTEGER, text TEXT, output_digest TEXT,"
-                "prompt_tokens INTEGER, generated_tokens INTEGER)"
+                "session_id TEXT NOT NULL,"
+                "request_id TEXT NOT NULL,"
+                "request_digest TEXT NOT NULL,"
+                "revision INTEGER NOT NULL CHECK (revision >= 1),"
+                "text TEXT NOT NULL, output_digest TEXT NOT NULL,"
+                "prompt_tokens INTEGER NOT NULL CHECK (prompt_tokens >= 0),"
+                "generated_tokens INTEGER NOT NULL CHECK (generated_tokens >= 0),"
+                "PRIMARY KEY (session_id, request_id),"
+                "UNIQUE (session_id, revision))"
             )
             connection.commit()
         finally:
