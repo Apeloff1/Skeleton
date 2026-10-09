@@ -18,7 +18,8 @@ from skeleton.ai.model_runtime.runtime_contracts import (
     GenerationConfig, RuntimeContractError,
 )
 from skeleton.app.offline_grounding import (
-    grounded_request_digest, prepare_evidence, validate_evidence,
+    audit_answer_citations, grounded_request_digest,
+    prepare_evidence, validate_evidence,
 )
 from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary
 
@@ -307,6 +308,37 @@ class GroundedOfflineReceiptTests(unittest.TestCase):
                 manifest, self.question, self.digest, self.model, self.token
             )), manifest,
         )
+
+    def test_recognized_citation_identifier_is_not_claimed_as_factual_support(self):
+        manifest = self._snapshot()
+        valid = manifest["citations"][0]["citation"]
+        audit = audit_answer_citations(
+            "The output refers to [" + valid + "].", manifest
+        )
+        self.assertEqual(audit["status"], "recognized_identifiers")
+        self.assertEqual(audit["recognized"], [valid])
+        self.assertEqual(audit["unknown"], [])
+        self.assertEqual(
+            audit["interpretation"],
+            "source_identifier_check_only_not_factual_verification",
+        )
+        no_use = audit_answer_citations(
+            "A plausible model answer that cites nothing.", manifest
+        )
+        self.assertEqual(no_use["status"], "no_identifiers")
+
+    def test_hallucinated_citations_are_reported_not_silently_accepted(self):
+        manifest = self._snapshot()
+        valid = manifest["citations"][0]["citation"]
+        invented = "local:unknown-reference:99:abcdef0123456789"
+        audit = audit_answer_citations(
+            f"[{valid}] and [{invented}]", manifest
+        )
+        self.assertEqual(audit["status"], "unknown_identifiers")
+        self.assertEqual(audit["recognized"], [valid])
+        self.assertEqual(audit["unknown"], [invented])
+        mangled = audit_answer_citations("[" + valid + "extra]", manifest)
+        self.assertEqual(mangled["recognized"], [])
 
     def test_mode_separation_prevents_same_id_plain_reuse(self):
         self._commit(self._snapshot())
