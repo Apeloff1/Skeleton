@@ -139,3 +139,46 @@ def test_existing_nonworkspace_file_and_symlink_are_rejected(tmp_path: Path) -> 
         pytest.skip("symlink unsupported")
     with pytest.raises(OfflineWorkspaceError, match="non-symlink"):
         OfflineWorkspace(link)
+
+
+@pytest.mark.asyncio
+async def test_desktop_workspace_backup_clear_restore_remains_consistent(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "workspace.db"
+    backup = tmp_path / "chat.json"
+    session = DurableOfflineSession(_native(), path)
+    await session.ask("hello", max_output_tokens=2)
+    assert session.max_interactive_tokens > 0
+    checksum = session.save_history_backup(backup)
+    assert len(checksum) == 64
+    original = session.history
+    session.clear()
+    assert session.history == ()
+    assert session.restore_history_backup(backup) == 1
+    assert session.history == original
+    assert session.revision == 3
+    session.close()
+
+
+@pytest.mark.asyncio
+async def test_workspace_persistence_from_worker_thread(tmp_path: Path) -> None:
+    session = DurableOfflineSession(_native(), tmp_path / "thread.db")
+    await asyncio.to_thread(
+        lambda: asyncio.run(session.ask("hello", max_output_tokens=2))
+    )
+    assert session.revision == 1
+    assert len(session.history) == 2
+    session.close()
+
+
+def test_workspace_rejects_wrong_model_at_attach_without_history_leak(
+    tmp_path: Path,
+) -> None:
+    store = tmp_path / "workspace.db"
+    first = DurableOfflineSession(_native(), store)
+    first.close()
+    other = _native(seed=52)
+    with pytest.raises(OfflineWorkspaceError, match="different model"):
+        DurableOfflineSession(other, store)
+    assert other.history == ()
