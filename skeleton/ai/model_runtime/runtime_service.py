@@ -284,7 +284,9 @@ class NativeModelService:
             # A cancelled or failed streaming request must not retain a live
             # generator, attention cache or mutable model execution frame.
             if stream is not None:
-                stream.close()
+                close = getattr(stream, "close", None)
+                if close is not None:
+                    close()
 
         receipt = LocalModelReceipt(
             operation_id=request.operation_id,
