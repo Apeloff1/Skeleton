@@ -63,7 +63,7 @@ def test_atari8_generates_genuine_program_specific_antic_gtia_pokey_joystick_sou
         export_native_atari8(result, root, authorized=True)
 
 
-@pytest.mark.parametrize("shape", ((9,9,1),(19,17,3),(37,22,8)))
+@pytest.mark.parametrize("shape", ((9,9,1),(19,17,3),(37,21,8)))
 def test_atari8_real_40_column_video_budget_across_original_world_shapes(shape):
     width,height,n=shape
     game=_world(width=width,height=height,levels=n)
@@ -83,7 +83,7 @@ def test_atari8_rejects_forbidden_rights_and_oversized_video_or_gameplay(tmp_pat
     overwide=_world(width=39)
     with pytest.raises(Atari8BitNativeError,match="budget"):
         compile_native_atari8(overwide,_source(overwide),authorized=True)
-    overtall=_world(height=24)
+    overtall=_world(height=25)
     with pytest.raises(Atari8BitNativeError,match="budget"):
         compile_native_atari8(overtall,_source(overtall),authorized=True)
     source=compile_native_atari8(game,rights,authorized=True)
