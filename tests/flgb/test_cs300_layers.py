@@ -1,6 +1,6 @@
 import pytest
 
-from skeleton.cs300.layers import LayerReject, admit, layer_ids, stratum_of
+from skeleton.cs300.layer_runner import LayerReject, admit, layer_ids, stratum_of
 
 
 def _card(layer_id: str) -> dict:
