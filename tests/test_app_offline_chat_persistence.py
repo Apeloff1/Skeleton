@@ -126,6 +126,47 @@ class OfflineDesktopPersistenceTests(unittest.TestCase):
                 drifted, database=self.database, session_id=old_id
             )
 
+    def test_offline_desktop_export_and_reimport_full_history(self):
+        chat = self._session()
+        asyncio.run(chat.ask("hello", max_output_tokens=2))
+        old_id = chat.session_id
+        old_history = chat.history
+        bundle = chat.export_conversation(old_id)
+        new_id = chat.import_conversation(bundle)
+        self.assertNotEqual(new_id, old_id)
+        self.assertEqual(chat.session_id, new_id)
+        self.assertEqual(chat.history, old_history)
+        self.assertEqual(chat.store.load(
+            new_id, self.backend.model_digest, self.backend.tokenizer_digest
+        ).revision, 1)
+        chat.close()
+
+    def test_import_system_instruction_is_preserved_for_next_native_request(self):
+        from skeleton.ai.model_runtime.offline_chat import OfflineChatStore
+        with OfflineChatStore(self.database) as store:
+            sid = store.create(
+                self.backend.model_digest, self.backend.tokenizer_digest,
+                system="Follow the local operator's instructions.",
+            )
+            bundle = store.export_bundle(
+                sid, self.backend.model_digest, self.backend.tokenizer_digest
+            )
+        chat = self._session()
+        restored = chat.import_conversation(bundle)
+        self.assertEqual(restored, chat.session_id)
+        self.assertEqual(
+            chat.instructions, "Follow the local operator's instructions."
+        )
+        self.assertEqual(chat.history, ())
+        answer = asyncio.run(chat.ask("hello", max_output_tokens=2))
+        self.assertEqual(answer.model_digest, self.backend.model_digest)
+        saved = chat.store.load(
+            restored, self.backend.model_digest, self.backend.tokenizer_digest
+        )
+        self.assertEqual(saved.transcript.messages[0].role, "system")
+        self.assertEqual(saved.transcript.messages[1].content, "hello")
+        chat.close()
+
     def test_private_database_directory_is_model_bound(self):
         with patch("pathlib.Path.home", return_value=Path(self.temp.name)):
             p = private_desktop_database(self.backend.model_digest)
