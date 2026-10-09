@@ -307,3 +307,26 @@ def run_offline_ai() -> int:
     window.window.protocol("WM_DELETE_WINDOW", finish)
     root.mainloop()
     return 0
+
+
+def smoke_offline_native_inference() -> bool:
+    """Exercise the native inference graph in an isolated tiny fixture.
+
+    Used solely to confirm frozen app bundle integrity. This untrained model
+    is never offered to users or represented as a usable AI checkpoint.
+    """
+    from skeleton.ai.model_runtime import NativeLLMRuntime
+    from skeleton.cortex.transformer import TinyTransformer
+
+    runtime = NativeLLMRuntime(TinyTransformer(
+        vocab=("system:", "user:", "assistant:", "hello", "world", "answer"),
+        dim=8, ctx=48, seed=41, n_heads=2, n_layers=2, d_ff=16,
+    ))
+    session = OfflineAISession(NativeRuntimeLocalModel(runtime))
+    answer = asyncio.run(session.ask("hello", max_output_tokens=2))
+    return (
+        bool(answer.text)
+        and answer.model_digest == runtime.model_digest
+        and len(answer.execution_receipt_digest) == 64
+        and len(session.history) == 2
+    )
