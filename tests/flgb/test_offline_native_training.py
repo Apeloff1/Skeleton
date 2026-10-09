@@ -94,6 +94,43 @@ class TestOfflineNativeTraining(unittest.TestCase):
             with self.assertRaisesRegex(OfflineTrainingError, "UTF-8"):
                 train_local_text(source, output)
 
+    def test_installed_windows_exe_route_executes_real_local_ai_cli(self) -> None:
+        # This command path must work without invoking Docker, Python scripts,
+        # desktop Tk or the Windows-only graphical launcher on a Linux runner.
+        from skeleton.app.windows_launcher import main as exe_main
+
+        with tempfile.TemporaryDirectory() as directory:
+            corpus = Path(directory) / "notes.txt"
+            checkpoint = Path(directory) / "checkpoint.json"
+            corpus.write_text(
+                "user hello assistant world\n"
+                "user world assistant hello\n",
+                encoding="utf-8",
+            )
+            output = StringIO()
+            with redirect_stdout(output):
+                status = exe_main([
+                    "--offline-command", "local-ai",
+                    "--train-corpus", str(corpus),
+                    "--output-model", str(checkpoint), "--json",
+                ])
+            self.assertEqual(status, 0, output.getvalue())
+            self.assertTrue(checkpoint.is_file())
+            self.assertGreater(json.loads(output.getvalue())["training_steps"], 0)
+            output = StringIO()
+            with redirect_stdout(output):
+                status = exe_main([
+                    "--offline-command", "local-ai",
+                    "--model", str(checkpoint), "--inspect-model", "--json",
+                ])
+            self.assertEqual(status, 0, output.getvalue())
+            self.assertTrue(json.loads(output.getvalue())["model_digest"])
+            with redirect_stdout(StringIO()):
+                self.assertEqual(exe_main([
+                    "--offline-command", "status",
+                ]), 2)
+                self.assertEqual(exe_main(["--offline-command"]), 2)
+
     def test_training_is_explicit_never_implicit_and_requires_output_path(self) -> None:
         from skeleton.app.cli import run_app_cli
 
