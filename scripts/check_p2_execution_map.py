@@ -225,6 +225,9 @@ def validate(root: Path) -> dict:
         "contracts",
         "risks",
         "gaps",
+        "implementation_paths",
+        "tests",
+        "evaluations",
     )
     for task in tasks:
         refs = task.get("primary_volume_refs", [])
@@ -255,9 +258,17 @@ def validate(root: Path) -> dict:
                     raise P2ValidationError(
                         f"task {task['task_id']} narrows/drifts masterplan {ref}.{field}"
                     )
-            if canonical.get("completion_checkbox") is not False:
+            # A masterplan volume may be independently verified while the broader
+            # P2 task remains unpromoted. Preserve that source authority rather
+            # than forcing a stale false checkbox into the inherited snapshot.
+            if canonical.get("completion_checkbox") is True:
+                if canonical.get("implementation_status") != "verified" or not canonical.get("evidence"):
+                    raise P2ValidationError(
+                        f"scheduled masterplan volume {ref} claims completion without verified implementation and evidence"
+                    )
+            elif canonical.get("completion_checkbox") is not False:
                 raise P2ValidationError(
-                    f"scheduled masterplan volume {ref} is already completion-checked"
+                    f"scheduled masterplan volume {ref} has invalid completion checkbox"
                 )
             if canonical.get("signing_required") is not True:
                 raise P2ValidationError(

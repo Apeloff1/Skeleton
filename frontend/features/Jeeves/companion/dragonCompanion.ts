@@ -14,10 +14,10 @@ export function companionFromCrawler(kind:DragonEventKind,payload:Record<string,
   case'policy_rejected':return state('snuggle','Not for us','That source was left alone. Looking for another path.',1,{snuggly:true});
   case'acquisition_accepted':return state('burning','Fire ready','High-value evidence accepted. Preparing to burn it into structured memory.',.64,{fire:true,embers:true});
   case'burn_started':return state('burning','Burning to memory','Turning acquired material into glowing knowledge embers.',.74,{fire:true,embers:true});
-  case'burn_chunk':return state('burning','Making knowledge embers',String(payload.ordinal??'')+' · extracting a durable memory chunk.',.84,{fire:true,embers:true});
+  case'burn_chunk':return state('burning','Making knowledge embers',String(payload.ordinal??'')+' · extracting a structured evidence chunk.',.84,{fire:true,embers:true});
   case'burn_complete':return state('distilling','Nerd mode activated','Distilling facts, entities, relations, timelines and provenance.',.92,{glasses:true,bandage:true,embers:true,knowledgePulse:1});
   case'retry_wait':return state('snuggle','Tiny smoke break','Waiting politely before trying again.',.24,{snuggly:true});
-  case'crawl_complete':return state('celebrating','Knowledge acquired!','Memory updated. Ready to curl back into the egg.',1,{snuggly:true,knowledgePulse:1});
+  case'crawl_complete':return state('celebrating','Crawl finished!','Source gathering finished. Promoting knowledge still needs verification and approval.',1,{snuggly:true,knowledgePulse:1});
  }
 }
 export function companionForConversation(text:string):DragonCompanionState{

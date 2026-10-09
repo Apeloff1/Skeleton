@@ -12,10 +12,10 @@ _MAP={
  "fetch_started":("pounce","wind","Acquiring",.38),
  "fetch_received":("hold","glow","Payload received",.50),
  "policy_rejected":("turn_away","fizzle","Rejected",1.),
- "acquisition_accepted":("charge","embers","Verified",.62),
+ "acquisition_accepted":("charge","embers","Acquisition accepted",.62),
  "burn_started":("breath","fire","Burning into knowledge",.72),
  "burn_chunk":("breath","ember_stream","Extracting chunks",.85),
- "burn_complete":("proud","ash_to_stars","Indexed",1.),
+ "burn_complete":("proud","ash_to_stars","Extraction complete",1.),
  "retry_wait":("curl","smoke","Waiting politely",.25),
  "crawl_complete":("sleep","warm_embers","Crawl complete",1.),
 }
