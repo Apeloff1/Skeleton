@@ -113,6 +113,8 @@ def test_windows_launcher_is_bundled_runtime_control_surface():
     assert "shell=True" not in source
     assert "shell=False" in source
     assert "CREATE_NO_WINDOW" in source
+    assert '"--offline-command"' in source
+    assert 'arguments[0] != "local-ai"' in source
 
 
 def test_windows_build_is_pinned_and_hashes_installer():
@@ -188,6 +190,8 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert "Smoke install generated Setup.exe" in source
     assert '@("--local-ai-training-smoke")' in source
     assert '@("--local-ai-benchmark-smoke")' in source
+    assert '"--offline-command", "local-ai"' in source
+    assert '"--inspect-model", "--json"' in source
     assert '@("--local-ai-smoke")' in source
     assert '"/VERYSILENT"' in source
     assert 'Start-Process -FilePath $launcher -ArgumentList @("--help") -Wait -PassThru' in source
