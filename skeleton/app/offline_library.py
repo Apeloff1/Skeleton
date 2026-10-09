@@ -138,11 +138,14 @@ class OfflineDocumentLibrary:
         ):
             raise OfflineLibraryError("library must be a regular local SQLite file")
         self._lock = threading.RLock()
+        was_present = db_path.exists()
         try:
             self._db = sqlite3.connect(
                 str(db_path), check_same_thread=False,
                 timeout=10.0, isolation_level=None,
             )
+            if not was_present and os.name == "posix":
+                os.chmod(db_path, 0o600)
             self._db.execute("PRAGMA busy_timeout=10000")
             self._db.execute("PRAGMA journal_mode=WAL")
             self._db.execute("PRAGMA synchronous=FULL")
