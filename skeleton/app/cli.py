@@ -219,7 +219,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         if (args.model and args.deployment) or (
             bool(args.prompt) != bool(args.model or args.deployment)
         ):
-            print("local-ai requires --prompt and exactly one of --model or --deployment")
+            print("local-ai requires both --prompt and exactly one of --model or --deployment")
             return 2
         if args.model or args.deployment:
             import asyncio
