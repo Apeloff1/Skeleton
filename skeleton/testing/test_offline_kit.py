@@ -108,3 +108,75 @@ def test_install_rejects_existing_destination(tmp_path: Path) -> None:
     existing.mkdir()
     with pytest.raises(OfflineKitError, match="already exists"):
         install(target, existing)
+
+
+def _fake_installer(monkeypatch, *, fail: bool = False, mutate=None):
+    import os
+    import subprocess
+    import scripts.offline_kit as kit
+
+    class Builder:
+        def __init__(self, **kwargs):
+            assert kwargs["with_pip"] is True
+
+        def create(self, target):
+            root = Path(target)
+            interpreter = root / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+            interpreter.parent.mkdir(parents=True)
+            interpreter.write_text("installed", encoding="utf-8")
+
+    commands = []
+
+    def fake_run(args, **kwargs):
+        commands.append((args, kwargs))
+        if mutate is not None:
+            mutate()
+        if fail:
+            raise subprocess.CalledProcessError(1, args)
+        return subprocess.CompletedProcess(args, 0)
+
+    monkeypatch.setattr(kit.venv, "EnvBuilder", Builder)
+    monkeypatch.setattr(kit.subprocess, "run", fake_run)
+    return commands
+
+
+def test_successful_offline_install_never_uses_index_and_keeps_runtime(
+    tmp_path: Path, monkeypatch
+) -> None:
+    bundle = pack(_wheels(tmp_path), tmp_path / "output")
+    recorded = _fake_installer(monkeypatch)
+    target = install(bundle, tmp_path / "installed")
+    assert (target / ("Scripts/python.exe" if __import__("os").name == "nt" else "bin/python")).is_file()
+    args, kwargs = recorded[0]
+    assert "--no-index" in args
+    assert "--no-input" in args
+    assert "--no-cache-dir" in args
+    assert "--only-binary=:all:" in args
+    assert "skeleton[local-inference]==16.0.0" in args
+    assert kwargs["shell"] is False
+    assert kwargs["env"]["PIP_NO_INDEX"] == "1"
+
+
+def test_pip_failure_removes_new_install_and_preserves_kit(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import subprocess
+    bundle = pack(_wheels(tmp_path), tmp_path / "output")
+    _fake_installer(monkeypatch, fail=True)
+    target = tmp_path / "installed"
+    with pytest.raises(subprocess.CalledProcessError):
+        install(bundle, target)
+    assert not target.exists()
+    assert verify(bundle)["version"] == "16.0.0"
+
+
+def test_kit_mutated_during_install_fails_and_rolls_back(
+    tmp_path: Path, monkeypatch
+) -> None:
+    bundle = pack(_wheels(tmp_path), tmp_path / "output")
+    wheel = bundle / "wheelhouse" / "example_dep-1.0.0-py3-none-any.whl"
+    _fake_installer(monkeypatch, mutate=lambda: wheel.write_bytes(b"replaced"))
+    target = tmp_path / "installed"
+    with pytest.raises(OfflineKitError, match="pinned manifest"):
+        install(bundle, target)
+    assert not target.exists()
