@@ -81,6 +81,8 @@ def _parser() -> argparse.ArgumentParser:
     capability.add_argument("--capability-file", help="execute an admitted deterministic local JSON task")
     capability.add_argument("--capability-graph-file", help="execute a bounded chain of deterministic local tasks")
     capability.add_argument("--capability-list", action="store_true", help="list model-free deterministic operations")
+    capability.add_argument("--game-preview", action="store_true", help="open native offline playable game window")
+    local_ai.add_argument("--game-seed", type=int, help="optional explicit offline game preview seed")
     local_ai.add_argument("--library", help="local SQLite document index")
     local_ai.add_argument("--index-dir", help="index an explicitly selected local text folder")
     local_ai.add_argument("--search", help="search local indexed documents without a model")
@@ -245,7 +247,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
 
     if command == "local-ai":
         if (
-            args.capability_file or args.capability_graph_file or args.capability_list or args.qualify_model or args.index_dir or args.search or args.use_library or args.enqueue_dir
+            args.capability_file or args.capability_graph_file or args.capability_list or args.game_preview or args.game_seed is not None or args.qualify_model or args.index_dir or args.search or args.use_library or args.enqueue_dir
             or args.run_queue or args.queue_status or args.cancel_queue_job
             or args.retry_queue_job or args.snapshot_to
             or args.restore_from or args.verify_snapshot
@@ -282,6 +284,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 ("--audit-queue", args.audit_queue),
                 ("--capability-file", args.capability_file),
                 ("--capability-graph-file", args.capability_graph_file),
+                ("--game-seed", args.game_seed),
             ):
                 if value is not None:
                     local_args.extend((option, str(value)))
@@ -298,6 +301,8 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 local_args.append("--qualify-model")
             if args.capability_list:
                 local_args.append("--capability-list")
+            if args.game_preview:
+                local_args.append("--game-preview")
             if args.as_json:
                 local_args.append("--json")
             return run_offline_console(local_args)
