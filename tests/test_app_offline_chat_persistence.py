@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from types import SimpleNamespace
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
@@ -166,6 +167,111 @@ class OfflineDesktopPersistenceTests(unittest.TestCase):
         self.assertEqual(saved.transcript.messages[0].role, "system")
         self.assertEqual(saved.transcript.messages[1].content, "hello")
         chat.close()
+
+    def test_long_conversation_persists_all_messages_after_context_eviction(self):
+        from skeleton.ai.runtime.inference.local import LocalInferenceResult
+        chat = self._session()
+        sid = chat.session_id
+        def reply(request):
+            return LocalInferenceResult(
+                text="stored-response",
+                model_id=self.backend.model_id,
+                model_digest=self.backend.model_digest,
+                input_tokens=7,
+                output_tokens=2,
+                execution_receipt_digest="f" * 64,
+            )
+        with patch.object(chat.engine, "generate", side_effect=reply):
+            for n in range(11):
+                asyncio.run(chat.ask(f"hello {n}", max_output_tokens=2))
+        self.assertEqual(len(chat.history), 22)
+        self.assertEqual(chat.history[0][1], "hello 0")
+        self.assertEqual(chat.history[-2][1], "hello 10")
+        self.assertEqual(chat.store.load(
+            sid, chat.backend.model_digest, chat.tokenizer_digest
+        ).revision, 11)
+        bundle = chat.export_conversation(sid)
+        restored_id = chat.import_conversation(bundle)
+        self.assertEqual(len(chat.history), 22)
+        self.assertEqual(chat.history[0][1], "hello 0")
+        chat.close()
+        reopened = self._session(restored_id)
+        self.assertEqual(len(reopened.history), 22)
+        reopened.close()
+
+    def test_gguf_backend_persists_local_model_bound_answer_and_restarts(self):
+        from skeleton.ai.runtime.inference.llama_cpp import LlamaCppModel
+        from skeleton.ai.runtime.inference.local import LocalInferenceResult
+        gguf = object.__new__(LlamaCppModel)
+        gguf.config = SimpleNamespace(context_size=1024)
+        gguf.model_id = "test-gguf"
+        gguf._model = SimpleNamespace(sha256="c" * 64)
+        gguf._runtime = SimpleNamespace(sha256="d" * 64)
+
+        def fake_gguf(request, cancel):
+            return LocalInferenceResult(
+                text="offline-open-weight-sample",
+                model_id=gguf.model_id,
+                model_digest=gguf.model_digest,
+                input_tokens=12,
+                output_tokens=4,
+                response_id=(
+                    "local:llama:" + gguf.runtime_digest + ":"
+                    + gguf.model_digest + ":" + "e" * 32
+                ),
+            )
+        with (
+            patch.object(LlamaCppModel, "_assert_artifacts_stable"),
+            patch.object(LlamaCppModel, "infer", side_effect=fake_gguf),
+        ):
+            chat = DurableOfflineAISession(gguf, database=self.database)
+            initial = asyncio.run(chat.ask("hello", max_output_tokens=4))
+            self.assertEqual(initial.text, "offline-open-weight-sample")
+            self.assertEqual(len(initial.execution_receipt_digest), 64)
+            self.assertEqual(chat.list_conversations()[0][1], 1)
+            sid = chat.session_id
+            token_identity = chat.tokenizer_digest
+            chat.close()
+            restored = DurableOfflineAISession(
+                gguf, database=self.database, session_id=sid
+            )
+            self.assertEqual(restored.history, (
+                ("user", "hello"),
+                ("assistant", "offline-open-weight-sample"),
+            ))
+            self.assertEqual(restored.tokenizer_digest, token_identity)
+            with self.assertRaisesRegex(RuntimeContractError, "different model"):
+                restored.store.load(sid, self.backend.model_digest,
+                                    self.backend.tokenizer_digest)
+            restored.close()
+
+    def test_gguf_missing_process_receipt_is_rejected_and_not_committed(self):
+        from skeleton.ai.runtime.inference.llama_cpp import LlamaCppModel
+        from skeleton.ai.runtime.inference.local import LocalInferenceResult
+        gguf = object.__new__(LlamaCppModel)
+        gguf.config = SimpleNamespace(context_size=1024)
+        gguf.model_id = "test-gguf"
+        gguf._model = SimpleNamespace(sha256="c" * 64)
+        gguf._runtime = SimpleNamespace(sha256="d" * 64)
+        def forged(request, cancel):
+            return LocalInferenceResult(
+                text="not bound to subprocess",
+                model_id=gguf.model_id,
+                model_digest=gguf.model_digest,
+                input_tokens=2,
+                output_tokens=3,
+                response_id="unverified",
+            )
+        with (
+            patch.object(LlamaCppModel, "_assert_artifacts_stable"),
+            patch.object(LlamaCppModel, "infer", side_effect=forged),
+        ):
+            chat = DurableOfflineAISession(gguf, database=self.database)
+            with self.assertRaisesRegex(OfflineAIError, "bound identity"):
+                asyncio.run(chat.ask("hello", max_output_tokens=4))
+            self.assertEqual(chat.history, ())
+            self.assertEqual(chat.list_conversations()[0][1], 0)
+            chat.close()
 
     def test_private_database_directory_is_model_bound(self):
         with patch("pathlib.Path.home", return_value=Path(self.temp.name)):
