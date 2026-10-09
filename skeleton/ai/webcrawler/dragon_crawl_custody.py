@@ -65,6 +65,7 @@ class CrawlCustodyBundle:
     evidence: tuple[EvidencePass, ...]
     document_fingerprints: tuple[tuple[str, str], ...]
     custody_fingerprint: str
+    acquisition_fingerprints: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -104,6 +105,11 @@ def _document(
     if not isinstance(doc.canonical_url, str) or not crawl_policy.admits(doc.canonical_url):
         raise ValueError("untrusted document URL")
     parts = urlsplit(doc.canonical_url)
+    host = (parts.hostname or "").lower().rstrip(".")
+    if ("." not in host or host.endswith(
+        (".localhost", ".local", ".internal", ".test", ".invalid")
+    )):
+        raise ValueError("untrusted document URL")
     if parts.username is not None or parts.password is not None:
         raise ValueError("credentialed document URL")
     if canonicalize_url(doc.canonical_url) != doc.canonical_url:
@@ -113,6 +119,11 @@ def _document(
     if not crawl_policy.admits(doc.fetched_url):
         raise ValueError("untrusted fetched URL")
     fetched = urlsplit(doc.fetched_url)
+    fetched_host = (fetched.hostname or "").lower().rstrip(".")
+    if ("." not in fetched_host or fetched_host.endswith(
+        (".localhost", ".local", ".internal", ".test", ".invalid")
+    )):
+        raise ValueError("untrusted fetched URL")
     if fetched.username is not None or fetched.password is not None:
         raise ValueError("credentialed fetched URL")
     if not isinstance(doc.text, str) or not doc.text.strip():
@@ -122,11 +133,15 @@ def _document(
         raise ValueError("captured document byte budget exceeded")
     if not isinstance(doc.content_hash, str) or sha256(raw).hexdigest() != doc.content_hash:
         raise ValueError("captured content hash mismatch")
-    if not isinstance(doc.source_score, (float, int)) or not isfinite(doc.source_score):
+    if isinstance(doc.source_score, bool) or not isinstance(
+        doc.source_score, (float, int)
+    ) or not isfinite(doc.source_score):
         raise ValueError("invalid crawler score")
     if not 0 <= doc.source_score <= 1:
         raise ValueError("invalid crawler score")
-    if not isinstance(doc.fetched_at, (float, int)) or not isfinite(doc.fetched_at):
+    if isinstance(doc.fetched_at, bool) or not isinstance(
+        doc.fetched_at, (float, int)
+    ) or not isfinite(doc.fetched_at):
         raise ValueError("invalid crawl timestamp")
     if doc.fetched_at < 0:
         raise ValueError("invalid crawl timestamp")
@@ -255,6 +270,19 @@ def bind_crawl_evidence(
         bound, key=lambda x: (x.source_id, x.pass_id),
     ))
     fingerprints = tuple((s.source_id, s.content_digest) for s in ordered_sources)
+    # This is the capture *receipt*, not just the normalized content digest.
+    # A re-fetch with identical text but different delivery/timestamp/metadata
+    # must not inherit the same audit identity. Revalidation may nevertheless
+    # decide that its exact text spans remain reusable after checking custody.
+    acquisition_fingerprints = tuple(
+        (source.source_id, _canonical_hash({
+            "fetched_url": docs[source.source_id].fetched_url,
+            "fetched_at": docs[source.source_id].fetched_at,
+            "content_type": docs[source.source_id].content_type,
+            "source_score": docs[source.source_id].source_score,
+            "provenance": dict(docs[source.source_id].provenance),
+        })) for source in ordered_sources
+    )
     receipt = _canonical_hash({
         "schema": "skeleton.crawler.captured_custody.v1",
         "claim_id": claim_id,
@@ -263,6 +291,7 @@ def bind_crawl_evidence(
              sorted(s.parent_source_ids), sorted(s.lineage_tokens))
             for s in ordered_sources
         ],
+        "acquisition": acquisition_fingerprints,
         "readings": [
             (r.source_id, r.source_revision, r.pass_id, r.claim_id,
              r.supports, r.confidence, r.reliability,
@@ -272,6 +301,7 @@ def bind_crawl_evidence(
     })
     return CrawlCustodyBundle(
         claim_id, ordered_sources, ordered_evidence, fingerprints, receipt,
+        acquisition_fingerprints,
     )
 
 
