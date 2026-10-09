@@ -392,9 +392,9 @@ def main(argv: list[str] | None = None) -> int:
         if os.name != "nt":
             print("Skeleton Windows launcher requires Windows.")
             return 2
-        launcher = WindowsLauncher(root)
-        launcher.local_ai()
-        return launcher.run()
+        from skeleton.app.local_ai import run_offline_ai
+
+        return run_offline_ai()
     headless = _headless(args, root)
     if headless >= 0:
         return headless
