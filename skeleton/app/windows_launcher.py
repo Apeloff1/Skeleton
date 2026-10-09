@@ -501,6 +501,12 @@ class WindowsLauncher:
 
 
 def _headless(args: argparse.Namespace, root: Path) -> int:
+    if args.local_http_smoke:
+        from skeleton.app.offline_http import smoke_offline_http_inference
+        try:
+            return 0 if smoke_offline_http_inference() else 1
+        except Exception:
+            return 1
     if args.local_ai_smoke:
         from skeleton.app.local_ai import smoke_offline_native_inference
 
@@ -562,6 +568,8 @@ def parser() -> argparse.ArgumentParser:
     mode.add_argument("--open", action="store_true")
     mode.add_argument("--local-ai", action="store_true", help="open Docker-free native AI conversation")
     mode.add_argument("--local-ai-smoke", action="store_true", help="verify bundled native CPU inference without Docker")
+    mode.add_argument("--local-http-smoke", action="store_true",
+                      help="test installed loopback AI auth, generation, retries, and SQLite recovery")
     mode.add_argument("--local-gguf-smoke", metavar="MANIFEST", type=Path,
                       help="execute operator GGUF/llama.cpp model and verify offline durable resume")
     mode.add_argument("--local-http", action="store_true",
