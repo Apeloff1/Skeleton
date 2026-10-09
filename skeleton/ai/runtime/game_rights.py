@@ -244,4 +244,74 @@ def admit_game_rights(
     }
 
 
-__all__ = ["SCHEMA", "GameRightsError", "admit_game_rights"]
+# This is an enforceable scope restriction for the *creative toolchain*,
+# not a claim that all homebrew distribution is automatically lawful.
+# Reference material may be studied separately; executable editors,
+# importers, native previews and exporters MUST call this shared gate.
+HOMEBREW_ACTIONS = frozenset({"original_game", "independent_mechanics"})
+HOMEBREW_SOURCE = "original"
+
+
+def admit_homebrew_project(
+    manifest: Mapping[str, Any], *, action: str, jurisdiction: str,
+) -> dict[str, Any]:
+    """Permit only wholly original game content through creative outputs.
+
+    Licenses, attribution, source hashes, claimed author ownership, and
+    historical exemptions never turn extracted commercial game material
+    into homebrew. This explicitly excludes authorized modification of
+    *someone else's game* from the homebrew-only production path.
+    """
+    if action not in HOMEBREW_ACTIONS:
+        raise GameRightsError(
+            "game production is homebrew-only: no modification, copying, "
+            "repackaging, reproduction, distribution of imported titles, "
+            "interoperability data, or asset training"
+        )
+    if not isinstance(manifest, dict):
+        raise GameRightsError("homebrew production requires an original rights manifest")
+    if manifest.get("source_game_reference") is not None:
+        raise GameRightsError(
+            "homebrew project must not depend on an existing source game"
+        )
+    if manifest.get("sdk_authorization") is not None:
+        raise GameRightsError(
+            "homebrew asset creation is independent of SDK contracts; "
+            "target-specific SDK access is reviewed separately"
+        )
+    assets = manifest.get("assets")
+    if not isinstance(assets, list) or not assets:
+        raise GameRightsError("homebrew requires explicit original asset identities")
+    for asset in assets:
+        if not isinstance(asset, dict):
+            raise GameRightsError("invalid homebrew asset")
+        if asset.get("source_kind") != HOMEBREW_SOURCE:
+            raise GameRightsError(
+                "homebrew-only production refuses third-party, licensed, "
+                "open-licensed, derived, imported and research assets"
+            )
+        if any(asset.get(key) is not False for key in (
+            "contains_third_party_content", "contains_trademarks",
+            "contains_technological_protection",
+        )):
+            raise GameRightsError(
+                "homebrew assets cannot contain third-party expression, "
+                "trademarks or technical-protection content"
+            )
+    receipt = admit_game_rights(
+        manifest, action=action, jurisdiction=jurisdiction,
+    )
+    if receipt["source_kind_summary"] != ["original"]:
+        raise GameRightsError("homebrew provenance classification changed")
+    return {
+        **receipt,
+        "homebrew_only": True,
+        "existing_game_reproduction_allowed": False,
+        "asset_import_from_commercial_games_allowed": False,
+        "derived_commercial_game_allowed": False,
+        "license_verified_by_cryptographic_hash": False,
+        "originality_independently_verified": False,
+    }
+
+
+__all__ = ["SCHEMA", "GameRightsError", "admit_game_rights", "admit_homebrew_project", "HOMEBREW_ACTIONS"]
