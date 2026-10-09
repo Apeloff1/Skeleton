@@ -77,6 +77,9 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--json", action="store_true", dest="as_json", help="print a bound inference receipt")
     local_ai.add_argument("--doctor", action="store_true", help="verify local artifacts without running inference")
     local_ai.add_argument("--qualify-model", action="store_true", help="execute and verify two persisted on-device inference turns")
+    capability = local_ai.add_mutually_exclusive_group()
+    capability.add_argument("--capability-file", help="execute an admitted deterministic local JSON task")
+    capability.add_argument("--capability-list", action="store_true", help="list model-free deterministic operations")
     local_ai.add_argument("--library", help="local SQLite document index")
     local_ai.add_argument("--index-dir", help="index an explicitly selected local text folder")
     local_ai.add_argument("--search", help="search local indexed documents without a model")
@@ -241,7 +244,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
 
     if command == "local-ai":
         if (
-            args.qualify_model or args.index_dir or args.search or args.use_library or args.enqueue_dir
+            args.capability_file or args.capability_list or args.qualify_model or args.index_dir or args.search or args.use_library or args.enqueue_dir
             or args.run_queue or args.queue_status or args.cancel_queue_job
             or args.retry_queue_job or args.snapshot_to
             or args.restore_from or args.verify_snapshot
@@ -276,6 +279,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 ("--audit-workspace", args.audit_workspace),
                 ("--audit-library", args.audit_library),
                 ("--audit-queue", args.audit_queue),
+                ("--capability-file", args.capability_file),
             ):
                 if value is not None:
                     local_args.extend((option, str(value)))
@@ -290,6 +294,8 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 local_args.append("--use-library")
             if args.qualify_model:
                 local_args.append("--qualify-model")
+            if args.capability_list:
+                local_args.append("--capability-list")
             if args.as_json:
                 local_args.append("--json")
             return run_offline_console(local_args)
