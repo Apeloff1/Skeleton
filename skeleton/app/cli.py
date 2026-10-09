@@ -67,7 +67,8 @@ def _parser() -> argparse.ArgumentParser:
 
     local_ai = sub.add_parser("local-ai", help="run native AI locally, without Docker or provider credentials")
     local_ai.add_argument("--model", help="native content-addressed checkpoint for headless inference")
-    local_ai.add_argument("--prompt", help="headless text request (requires --model)")
+    local_ai.add_argument("--deployment", help="digest-pinned local GGUF/llama.cpp deployment manifest")
+    local_ai.add_argument("--prompt", help="headless text request (requires --model or --deployment)")
     local_ai.add_argument("--max-output-tokens", type=int, default=8)
     local_ai.add_argument("--json", action="store_true", dest="as_json", help="print a bound inference receipt")
     sub.add_parser("down", help="stop the assembled application")
@@ -211,16 +212,24 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if command == "local-ai":
-        from skeleton.app.local_ai import OfflineAISession, load_native_checkpoint, run_offline_ai
+        from skeleton.app.local_ai import (
+            OfflineAISession, OfflineGGUFSession, load_native_checkpoint, run_offline_ai,
+        )
 
-        if bool(args.model) != bool(args.prompt):
-            print("local-ai headless inference requires both --model and --prompt")
+        if (args.model and args.deployment) or (
+            bool(args.prompt) != bool(args.model or args.deployment)
+        ):
+            print("local-ai requires --prompt and exactly one of --model or --deployment")
             return 2
-        if args.model:
+        if args.model or args.deployment:
             import asyncio
 
             try:
-                session = OfflineAISession(load_native_checkpoint(args.model))
+                session = (
+                    OfflineGGUFSession(args.deployment)
+                    if args.deployment
+                    else OfflineAISession(load_native_checkpoint(args.model))
+                )
                 answer = asyncio.run(session.ask(args.prompt, max_output_tokens=args.max_output_tokens))
             except (ValueError, RuntimeError, OSError) as exc:
                 print("local-ai request rejected: " + type(exc).__name__ + ": " + str(exc))
