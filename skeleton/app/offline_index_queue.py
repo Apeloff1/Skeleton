@@ -19,6 +19,7 @@ import threading
 import time
 from typing import Any
 
+from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
 from .offline_library import OfflineDocumentLibrary, _root
 
 
@@ -77,6 +78,10 @@ def _local_db(path: str | Path) -> Path:
         p.exists() and not p.is_file()
     ):
         raise OfflineQueueError("queue or index must be a regular local SQLite path")
+    try:
+        check_sqlite_companion_paths(p)
+    except UnsafeOfflineSqlitePath as exc:
+        raise OfflineQueueError(str(exc)) from exc
     return Path(os.path.abspath(p))
 
 
