@@ -174,7 +174,7 @@ class WindowsLauncher:
         self.window.geometry("820x610")
         self.window.minsize(720, 520)
 
-        self.status = tk.StringVar(value="Checking system…")
+        self.status = tk.StringVar(value="Local AI runs offline; System Check is for Docker-backed services.")
         self._buttons: list[ttk.Button] = []
 
         outer = ttk.Frame(self.window, padding=20)
@@ -210,7 +210,7 @@ class WindowsLauncher:
         helper.pack(fill="x", pady=(0, 10))
         ttk.Label(
             helper,
-            text="Docker Desktop with Docker Compose is required to run the assembled services.",
+            text="Local AI runs without Docker. Compose is only for the full service profile.",
             font=("Segoe UI", 9),
         ).pack(side="left")
         ttk.Button(helper, text="Get Docker Desktop", command=self.open_docker).pack(side="right")
@@ -233,7 +233,7 @@ class WindowsLauncher:
         )
         footer.pack(anchor="w", pady=(10, 0))
 
-        self.window.after(200, self.system_check)
+        # Service-profile Docker checks are opt-in; local native AI needs no Docker.
 
     def _add_button(self, parent, text: str, command) -> None:
         button = self.ttk.Button(parent, text=text, command=command)
