@@ -117,3 +117,60 @@ def test_console_rejects_workspace_and_backup_import_conflict(
         "--backup-in", str(tmp_path / "chat.json"),
     ]) == 2
     assert "cannot be combined" in capsys.readouterr().err
+
+
+def test_two_turn_qualification_executes_local_model_and_restores_context(
+    tmp_path: Path, capsys,
+) -> None:
+    checkpoint = _checkpoint(tmp_path / "native.json")
+    assert main([
+        "--model", str(checkpoint), "--qualify-model",
+        "--max-output-tokens", "2", "--json",
+    ]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["schema_version"] == "skeleton.app.offline_functional_qualification.v1"
+    assert report["artifacts_verified_before_and_after"] is True
+    assert report["two_real_generation_calls_completed"] is True
+    assert report["session_reopened_between_turns"] is True
+    assert report["sqlite_context_restored_and_verified"] is True
+    assert report["turns_completed"] == 2
+    assert len(report["receipts"]) == 2
+    assert all(len(item["execution_receipt_digest"]) == 64 for item in report["receipts"])
+    assert report["network_isolation_verified"] is False
+    assert report["trained_model_quality_verified"] is False
+    assert report["release_signed"] is False
+
+
+def test_model_qualification_rejects_fake_approval_and_conflicting_modes(
+    tmp_path: Path, capsys,
+) -> None:
+    fake = tmp_path / "missing.json"
+    assert main(["--model", str(fake), "--qualify-model", "--json"]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "rejected" in captured.err
+    assert main(["--qualify-model", "--json"]) == 2
+    assert main([
+        "--model", str(fake), "--qualify-model", "--prompt", "conflict",
+    ]) == 2
+    assert main([
+        "--model", str(fake), "--qualify-model", "--doctor",
+    ]) == 2
+    assert main([
+        "--model", str(fake), "--qualify-model",
+        "--max-output-tokens", "999",
+    ]) == 1
+
+
+def test_unified_app_cli_exposes_same_real_local_model_qualification(
+    tmp_path: Path, capsys,
+) -> None:
+    from skeleton.app.cli import run_app_cli
+    checkpoint = _checkpoint(tmp_path / "weights.json")
+    assert run_app_cli([
+        "local-ai", "--model", str(checkpoint), "--qualify-model",
+        "--max-output-tokens", "2", "--json",
+    ]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["turns_completed"] == 2
+    assert len(report["model_digest"]) == 64
