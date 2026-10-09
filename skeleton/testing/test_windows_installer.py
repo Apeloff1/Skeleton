@@ -270,8 +270,10 @@ def test_installer_contains_dedicated_one_click_offline_game_executable():
     assert 'Join-Path $PayloadDir "SkeletonGame.exe"' in build
     assert 'Filename: "{app}\\SkeletonGame.exe"' in inno
     assert "Skeleton Game Preview" in inno
-    assert "from skeleton.app.offline_game_preview import run_game_preview" in entry
+    assert "from skeleton.app.offline_game_preview import (" in entry
+    assert "load_game_project, run_game_preview" in entry
     assert "return run_game_preview()" in entry
+    assert "run_game_preview(project_tiles=load_game_project(args.project))" in entry
     assert "installed SkeletonGame.exe native game is missing" in workflow
     assert "installed native SkeletonGame.exe looks truncated" in workflow
     assert "& $offline --game-preview-check --game-seed 1729 --json" in workflow
