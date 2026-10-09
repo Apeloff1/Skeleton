@@ -7,7 +7,7 @@
 
 Every catalogued system can be selected as a **creative basis**, as a **destination for a porting plan**, or both. Production discontinuation is *not* a reason to drop it. PC, game console, handheld, arcade board, calculator, mobile runtime, toy and hobbyist microcontroller histories all contain valuable gameplay and interaction designs.
 
-The maintained registry currently includes 504 entries and 26 approximate capability presets; this is an **interim curation corpus**, not a complete worldwide platform census. It deliberately tracks the unusual, regional, transitional and failed commercial systems alongside mainstream machines. Examples: Fairchild Channel F, Interton VC 4000, Super Cassette Vision, Watara Supervision, Gamate, Mega Duck, WonderSwan and SwanCrystal, Neo Geo Pocket, PC-FX, FM Towns Marty, CD-i, CD32, Pippin, Nuon, Jaguar CD, Gizmondo, Tapwave Zodiac, Atari ST, RISC OS, ZX80/81, Thomson MO5, MSX, PC-88/98, X68000, Sega Model 2/3 arcade, Konami GX, Sega NAOMI, TI/HP calculators, Palm OS, BREW, J2ME, Arduboy and RP2040.
+The maintained registry currently includes 524 entries and 30 approximate capability presets; this is an **interim curation corpus**, not a complete worldwide platform census. It deliberately tracks the unusual, regional, transitional and failed commercial systems alongside mainstream machines. Examples: Fairchild Channel F, Interton VC 4000, Super Cassette Vision, Watara Supervision, Gamate, Mega Duck, WonderSwan and SwanCrystal, Neo Geo Pocket, PC-FX, FM Towns Marty, CD-i, CD32, Pippin, Nuon, Jaguar CD, Gizmondo, Tapwave Zodiac, Atari ST, RISC OS, ZX80/81, Thomson MO5, MSX, PC-88/98, X68000, Sega Model 2/3 arcade, Konami GX, Sega NAOMI, TI/HP calculators, Palm OS, BREW, J2ME, Arduboy and RP2040.
 
 The UI-neutral selector in `editor_platforms.py` exposes every catalogued system as browsable source/destination options, with search, family/type filters and a full target-directed design graph. It never presents an unverified native exporter as available. Connect the selector through the product API and actual editor surface in a subsequent integration step.
 
@@ -106,7 +106,7 @@ Licensing and trademark policy is fail-closed. "Clone", hybridization and decomp
 
 The hardware catalog now includes first-generation fixed-game Pong-style consoles and regional models, portable variants and peripherals, 8-bit regional computers, Japanese microcomputers, classic workstations, modern devices, and arcade board generations. None of this implies exact game cartridge interchangeability or executable support.
 
-The separate `evolution_lineages.json` records **78 dated design milestones across 18 reference lineages**. It is a bounded *illustrative design-succession DAG*, not a proof of backwards compatibility. `evolution_archive.py` rejects unknown machines, duplicate identifiers, reversed chronological parent edges and fictitious source verification. Its report lists all curated platforms currently missing timeline and lineage records. `evolution_practice.py` turns any authorized dated progression into a set of generated, deterministic **playable original puzzle worlds** with reproducible winning replays. Exercises are target-inspired, not native builds for those consoles.
+The separate `evolution_lineages.json` records **94 dated design milestones across 23 reference lineages**. It is a bounded *illustrative design-succession DAG*, not a proof of backwards compatibility. `evolution_archive.py` rejects unknown machines, duplicate identifiers, reversed chronological parent edges and fictitious source verification. Its report lists all curated platforms currently missing timeline and lineage records. `evolution_practice.py` turns any authorized dated progression into a set of generated, deterministic **playable original puzzle worlds** with reproducible winning replays. Exercises are target-inspired, not native builds for those consoles.
 
 An operator can inspect all gaps without a database or network:
 
@@ -133,3 +133,21 @@ A global archival completeness percentage **cannot** be claimed while the worldw
 Future archival closure is by tracked evidence, not arbitrary line or platform quotas: identify primary sources and dated hardware revisions, reconcile manufacturer/region/rebrand/board-family identities, ingest external metadata as candidate records, separate peripherals and software environments from independent systems, verify machine-specific constraints with lawful source references, implement real native homebrew toolchains, and validate against representative hardware.
 
 The exact-head `Homebrew Historical Archive` GitHub Action checks the maintained catalog, lineage validation, rights-safe MAME metadata ingest and generated evolution-game replay regressions. Passing the Action means these **code contracts** passed, not that every historical machine is known.
+
+
+## Foundational games before the home console
+
+The archive now extends to **1931** for early pinball and to **1947** for the cathode-ray tube amusement-device patent. It also catalogues Ferranti Nimrod, EDSAC, a Tennis for Two analog apparatus, PDP-1/PDP-8 computing contexts, Computer Space, Galaxy Game, Atari arcade Pong, and analog/electro-mechanical arcade hardware including Periscope, Rifleman, Sea Raider, and other pre-video experiences.
+
+Preserve these distinctions:
+
+- `mechanical` = physical balls, playfields, levers, springs and friction; output is a simulation or independently qualified mechanical build, not a console ROM.
+- `electromechanical` = motorized illusions, lamps, mirrors, reels and sound mechanisms with their own timing, safety and maintenance.
+- `precursor` = patents, one-off experimental computers, installations, or analog apparatus, potentially never sold or broadly reproducible. A patent concept is not a shipping machine.
+- `arcade`, `computer`, `console` and `handheld` continue to mean different hardware/media and input arrangements. Historical inspiration does not imply artifact-format compatibility.
+
+The timeline uses **candidate years**, not independently confirmed primary-source dates. Its `predecessor` edges denote curated design succession, not binary lineage; no arbitrary cross-vendor ancestry is fabricated.
+
+Historical reading material for review includes [Brookhaven National Laboratory's early game history](https://www.bnl.gov/about/history/firstvideo.php), [MAME's machine-history introduction](https://docs.mamedev.org/initialsetup/mameintro.html), [MAME's historical layouts](https://docs.mamedev.org/techspecs/layout_files.html), [Wikimedia Commons' generational gallery](https://commons.wikimedia.org/wiki/Home_game_consoles_by_generation) and the [Video Game History Foundation research library](https://library.gamehistory.org/). These are references for future item-by-item audits, **not blanket provenance attestations**.
+
+Even after this expansion, full worldwide hardware/clone/revision coverage, machine-specific verified graphics/audio limits, and native homebrew executable support are substantially incomplete.
