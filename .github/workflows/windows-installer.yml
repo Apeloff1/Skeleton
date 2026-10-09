@@ -535,7 +535,7 @@ jobs:
           # actively combine platformer, collectibles, keyquest, speedrun,
           # exploration and combo; preserve the exact source physics route.
           $windowsPort = Join-Path $env:RUNNER_TEMP "SkeletonOriginalEnhancedWindowsPort.json"
-          $windowsPortRaw = & python scripts/game/port_homebrew.py --capsule $authoredGame --output $windowsPort --creative-mode hybrid_original --art-direction neon_noir --quality cinematic --hybrids collectathon,keyquest,speedrun,exploration,combo --seed 42 --scale 40 --decor-budget 36 --high-contrast
+          $windowsPortRaw = & python scripts/game/port_homebrew.py --capsule $authoredGame --output $windowsPort --creative-mode hybrid_original --art-direction neon_noir --quality cinematic --hybrids "collectathon,keyquest,speedrun,exploration,combo" --seed 42 --scale 40 --decor-budget 36 --high-contrast
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $windowsPort)) {
             throw "could not compose enhanced Windows-native original homebrew"
           }
