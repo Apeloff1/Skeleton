@@ -146,11 +146,11 @@ def run_native_chip8_preview(seed: int = 42) -> int:
         background="#0d141c", highlightthickness=0,
     )
     canvas.pack()
-    pixels = game.machine.pixels
-
     def render() -> None:
+        # Read the current machine every redraw. A reset replaces the VM,
+        # so retaining its old pixel buffer would render stale graphics.
         canvas.delete("all")
-        for index, filled in enumerate(pixels):
+        for index, filled in enumerate(game.machine.pixels):
             if not filled:
                 continue
             x, y = index % DISPLAY_W, index // DISPLAY_W
