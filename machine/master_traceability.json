@@ -4,7 +4,7 @@
   "status": "active",
   "source": {
     "master_plan": "machine/ai_master_plan.json",
-    "plan_version": "1.6.0",
+    "plan_version": "2.6.0",
     "volume_count": 421
   },
   "masterplan_binding": {
