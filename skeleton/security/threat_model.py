@@ -77,6 +77,10 @@ class ThreatModel:
         trigger_ids=[item.trigger_id for item in triggers]
         if len(trigger_ids)!=len(set(trigger_ids)):
             raise SecurityContractError("duplicate threat impact trigger id")
+        covered_domains=set().union(*(set(item.domains) for item in triggers)) if triggers else set()
+        uncovered=_TRIGGER_DOMAINS-covered_domains
+        if uncovered:
+            raise SecurityContractError("missing threat impact trigger coverage: "+",".join(sorted(uncovered)))
         object.__setattr__(self,"threats",tuple(sorted(self.threats,key=lambda item:item.threat_id)))
         object.__setattr__(self,"impact_triggers",tuple(sorted(triggers,key=lambda item:item.trigger_id)))
         object.__setattr__(self,"model_version",_text("model_version",self.model_version))
