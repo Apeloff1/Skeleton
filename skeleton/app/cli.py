@@ -89,6 +89,12 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--cancel-queue-job", help="cancel queued job by ID")
     local_ai.add_argument("--retry-queue-job", help="retry terminal failed job by ID")
     local_ai.add_argument("--drain-limit", type=int, default=5, help="maximum jobs processed per invocation")
+    local_ai.add_argument("--snapshot-to", help="create verified local state recovery bundle")
+    local_ai.add_argument("--restore-from", help="restore verified local recovery bundle")
+    local_ai.add_argument("--verify-snapshot", help="verify a local recovery bundle")
+    local_ai.add_argument("--snapshot-workspace", help="conversation SQLite state file")
+    local_ai.add_argument("--snapshot-library", help="document knowledge SQLite state file")
+    local_ai.add_argument("--snapshot-queue", help="indexing job SQLite state file")
     sub.add_parser("down", help="stop the assembled application")
     sub.add_parser("ps", help="show assembled service state")
 
@@ -233,7 +239,8 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         if (
             args.index_dir or args.search or args.use_library or args.enqueue_dir
             or args.run_queue or args.queue_status or args.cancel_queue_job
-            or args.retry_queue_job
+            or args.retry_queue_job or args.snapshot_to
+            or args.restore_from or args.verify_snapshot
         ):
             # A single command implementation ensures the GUI's CLI and the
             # frozen console use identical offline document safety policies.
@@ -255,6 +262,12 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 ("--queue-library", args.queue_library),
                 ("--cancel-queue-job", args.cancel_queue_job),
                 ("--retry-queue-job", args.retry_queue_job),
+                ("--snapshot-to", args.snapshot_to),
+                ("--restore-from", args.restore_from),
+                ("--verify-snapshot", args.verify_snapshot),
+                ("--snapshot-workspace", args.snapshot_workspace),
+                ("--snapshot-library", args.snapshot_library),
+                ("--snapshot-queue", args.snapshot_queue),
             ):
                 if value is not None:
                     local_args.extend((option, str(value)))
