@@ -15,6 +15,7 @@ import re
 from typing import Any, Callable, Mapping
 
 from .gameplay_capabilities import GAMEPLAY_OPERATIONS, GameplayError
+from .game_playability import check_game_playability
 
 SCHEMA = "skeleton.offline_deterministic_capabilities.v1"
 MAX_INPUT_BYTES = 8192
@@ -343,6 +344,7 @@ OPERATIONS: dict[str, Callable[[dict[str, Any]], Any]] = {
     "evidence.lookup": _fact,
     "content.sha256": _hash_text,
     **GAMEPLAY_OPERATIONS,
+    "game.playability_check": check_game_playability,
 }
 
 
