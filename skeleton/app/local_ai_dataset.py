@@ -177,10 +177,27 @@ def _write_exclusive(path: Path, data: bytes) -> None:
         os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0),
         0o600,
     )
-    with os.fdopen(fd, "wb") as handle:
-        handle.write(data)
-        handle.flush()
-        os.fsync(handle.fileno())
+    created = os.fstat(fd)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except BaseException:
+        # A short/failed write can occur before the caller records the path
+        # as published. Only unlink the exact inode this invocation created,
+        # never a file substituted at that name by a competing writer.
+        try:
+            current = path.lstat()
+            if (
+                current.st_dev == created.st_dev
+                and current.st_ino == created.st_ino
+                and stat.S_ISREG(current.st_mode)
+            ):
+                path.unlink()
+        except OSError:
+            pass
+        raise
 
 
 def prepare_native_dataset(
