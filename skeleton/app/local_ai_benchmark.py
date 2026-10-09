@@ -341,3 +341,49 @@ def benchmark_native_models(
     report["overall_improves"] = improves
     report["passes_local_regression_gate"] = improves and safe_categories
     return report
+
+
+def smoke_offline_native_benchmark() -> bool:
+    """Exercise real weight-backed category evaluation inside the frozen app."""
+    import tempfile
+
+    from skeleton.ai.model_runtime import NativeLLMRuntime
+    from skeleton.ai.runtime.inference.artifact import write_local_model_artifact
+    from skeleton.cortex.transformer import TinyTransformer
+
+    with tempfile.TemporaryDirectory(prefix="skeleton-local-benchmark-") as directory:
+        root = Path(directory)
+        base = root / "baseline.json"
+        other = root / "candidate.json"
+        suite = root / "suite.json"
+        vocabulary = ("user", "assistant", "hello", "world", "alpha", "beta")
+        for seed, target in ((31, base), (53, other)):
+            model = TinyTransformer(
+                vocab=vocabulary, dim=8, ctx=48, seed=seed,
+                n_heads=2, n_layers=1, d_ff=16,
+            )
+            from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
+
+            write_local_model_artifact(
+                NativeRuntimeLocalModel(NativeLLMRuntime(model)), target,
+            )
+        suite.write_text(json.dumps({
+            "schema": SCHEMA,
+            "cases": [
+                {"id": "dialog-1", "category": "dialog", "text": "user hello assistant world"},
+                {"id": "dialog-2", "category": "dialog", "text": "hello assistant world user"},
+                {"id": "reason-1", "category": "reason", "text": "hello alpha beta"},
+                {"id": "reason-2", "category": "reason", "text": "beta alpha world"},
+            ],
+        }), encoding="utf-8")
+        result = benchmark_native_models(suite, baseline=base, candidate=other)
+        return bool(
+            result["case_count"] == 4
+            and result["category_count"] == 2
+            and result["candidate"] is not None
+            and isinstance(result["passes_local_regression_gate"], bool)
+            and len(result["suite_digest"]) == 64
+            and result["baseline"]["overall_perplexity"] > 0
+            and result["candidate"]["overall_perplexity"] > 0
+            and result["candidate_promoted"] is False
+        )
