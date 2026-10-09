@@ -56,6 +56,23 @@ class TestOfflineNativeTraining(unittest.TestCase):
             self.assertTrue(reply.text)
             self.assertEqual(reply.model_digest, receipt["model_digest"])
 
+    def test_native_role_vocabulary_matches_actual_chat_tokenizer(self) -> None:
+        from skeleton.cortex.port import tokens
+
+        with tempfile.TemporaryDirectory() as directory:
+            corpus = Path(directory) / "notes.txt"
+            artifact = Path(directory) / "native.json"
+            corpus.write_text("hello world\n", encoding="utf-8")
+            receipt = train_local_text(corpus, artifact, epochs=1)
+            model = load_native_checkpoint(artifact).runtime.model
+            self.assertGreater(receipt.training_steps, 0)
+            for label in ("user", "assistant", "system"):
+                with self.subTest(role=label):
+                    self.assertEqual(tokens(label + ":"), (label,))
+                    self.assertIn(label, model.stoi)
+                    self.assertNotEqual(model.stoi[label], model.unk)
+                    self.assertNotIn(label + ":", model.stoi)
+
     def test_rejects_missing_corpus_bad_epochs_and_checkpoint_overwrite(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "corpus.txt"
