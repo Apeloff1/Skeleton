@@ -11,7 +11,7 @@ def test_matrix_accurately_counts_source_emitters_per_style():
     catalog=target_catalog()
     assert len(rows)==len(STYLES)
     assert len(catalog)==len(TARGETS)
-    assert len(EMITTERS)==24
+    assert len(EMITTERS)==45
     for row in rows:
         style=row["style"]
         correct=tuple(t["id"] for t in catalog
@@ -23,7 +23,7 @@ def test_matrix_accurately_counts_source_emitters_per_style():
         assert row["remaining_adapter_work"]==(len(correct)!=len(TARGETS))
         assert row["coverage_claim"]=="source_supported_not_compiled"
     by_name={entry["style"]:entry for entry in rows}
-    assert by_name["arcade_score_attack"]["supported_hardware_count"]==24
+    assert by_name["arcade_score_attack"]["supported_hardware_count"]==45
     assert "nes" in by_name["arcade_score_attack"]["native_emitters"]
     assert by_name["fixed_screen_puzzle"]["supported_hardware_count"]==4
     assert by_name["first_person_shooter"]["supported_hardware_count"]==4

@@ -64,7 +64,8 @@ LIMITS={
     "nintendo_ds":("Nintendo","ARM9/ARM7",656384,131072,4194304,16384,128,128,8192),
     "psp":("Sony","Allegrex",2097152,524288,33554432,65536,1024,1024,8192),
 }
-PC=("pc_linux","pc_windows","pc_macos","steam_deck")
+from .dragon_desktop_abi import DESKTOP_NATIVE
+PC=DESKTOP_NATIVE
 ATLAS_LAYOUT={
     "game_boy":"interleaved_2bpp",
     "game_boy_color":"interleaved_2bpp",

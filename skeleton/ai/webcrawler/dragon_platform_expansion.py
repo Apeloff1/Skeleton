@@ -115,30 +115,30 @@ windows_2000|Microsoft|WinNT|2000|x86|GDI / DirectX|DirectSound|keyboard|MSVC Wi
 windows_vista|Microsoft|WinNT|2007|x86-64|D3D10|WASAPI|keyboard|MSVC / Windows SDK|exe|toolchain_adapter
 windows_7|Microsoft|WinNT|2009|x86-64|D3D11|WASAPI|XInput|MSVC / Windows SDK|exe|toolchain_adapter
 windows_8|Microsoft|WinNT|2012|x86-64|D3D11|WASAPI|XInput|MSVC / Windows SDK|exe|toolchain_adapter
-windows_10|Microsoft|modern WinNT|2015|x86-64|D3D12|WASAPI|XInput|MSVC / SDL2|exe|toolchain_adapter
-windows_11|Microsoft|modern WinNT|2021|x86-64 / ARM64|D3D12|WASAPI|XInput|MSVC / SDL2|exe|toolchain_adapter
-windows_arm64|Microsoft|modern WinNT ARM|2020|ARM64|D3D12|WASAPI|gamepad|MSVC ARM64|exe|toolchain_adapter
+windows_10|Microsoft|modern WinNT|2015|x86-64|D3D12|WASAPI|XInput|MSVC / SDL2|exe|native_source
+windows_11|Microsoft|modern WinNT|2021|x86-64 / ARM64|D3D12|WASAPI|XInput|MSVC / SDL2|exe|native_source
+windows_arm64|Microsoft|modern WinNT ARM|2020|ARM64|D3D12|WASAPI|gamepad|MSVC ARM64|exe|native_source
 windows_xp_x64|Microsoft|WinNT 64-bit|2005|x86-64|D3D9|DirectSound|DirectInput|MSVC legacy|exe|toolchain_adapter
 dos_cga|IBM PC compatible|early PC CGA|1981|8088 / 8086|CGA mode 4|PC speaker|keyboard|OpenWatcom 16-bit|exe|toolchain_adapter
 dos_ega|IBM PC compatible|DOS EGA|1984|286|EGA mode 0Dh|PC speaker|keyboard|OpenWatcom 16-bit|exe|toolchain_adapter
 dos_vesa|IBM PC compatible|DOS VESA|1990|386|VESA VBE|Sound Blaster|keyboard|DJGPP|exe|toolchain_adapter
 os2_warp|IBM|OS/2|1994|x86|Presentation Manager|MMPM|keyboard|OpenWatcom OS/2|exe|toolchain_adapter
 reactos|ReactOS|Win32 compatible OS|1998|x86-64|GDI / DirectX subset|WinMM|keyboard|MinGW Win32|exe|toolchain_adapter
-freebsd_amd64|FreeBSD|modern Unix desktop|2026|x86-64|SDL2/OpenGL|OSS|keyboard/gamepad|Clang/CMake SDL2|elf|toolchain_adapter
-freebsd_arm64|FreeBSD|modern Unix ARM|2026|ARM64|SDL2/OpenGL|OSS|keyboard/gamepad|Clang/CMake SDL2|elf|toolchain_adapter
-openbsd_amd64|OpenBSD|Unix desktop|2026|x86-64|SDL2/OpenGL|sndio|keyboard/gamepad|Clang/CMake SDL2|elf|toolchain_adapter
-netbsd_amd64|NetBSD|Unix desktop|2026|x86-64|SDL2/OpenGL|audio|keyboard/gamepad|Clang/CMake SDL2|elf|toolchain_adapter
-linux_arm64|Linux|modern ARM desktop|2026|ARM64|SDL2/Vulkan|PipeWire|keyboard/gamepad|GCC/CMake SDL2|elf|toolchain_adapter
-linux_riscv64|Linux|RISC-V desktop|2026|RV64|SDL2/Vulkan|PipeWire|keyboard/gamepad|GCC/CMake SDL2|elf|toolchain_adapter
-linux_x86_32|Linux|legacy PC desktop|2000|i686|SDL2/OpenGL|ALSA|keyboard|GCC/CMake SDL2|elf|toolchain_adapter
-raspberry_pi_4|Raspberry Pi|ARM single board computer|2019|Cortex-A72|VideoCore VI|ALSA|USB controller|GCC SDL2|elf|toolchain_adapter
-raspberry_pi_5|Raspberry Pi|ARM single board computer|2023|Cortex-A76|VideoCore VII|ALSA|USB controller|GCC SDL2|elf|toolchain_adapter
-chromeos_x86|Google|ChromeOS desktop|2026|x86-64|Linux OpenGL via Crostini|audio|gamepad|Linux container SDL2|elf|toolchain_adapter
-chromeos_arm|Google|ChromeOS ARM|2026|ARM64|Linux GPU compatibility|audio|gamepad|Linux container SDL2|elf|toolchain_adapter
+freebsd_amd64|FreeBSD|modern Unix desktop|2026|x86-64|SDL2/OpenGL|OSS|keyboard/gamepad|Clang/CMake SDL2|elf|native_source
+freebsd_arm64|FreeBSD|modern Unix ARM|2026|ARM64|SDL2/OpenGL|OSS|keyboard/gamepad|Clang/CMake SDL2|elf|native_source
+openbsd_amd64|OpenBSD|Unix desktop|2026|x86-64|SDL2/OpenGL|sndio|keyboard/gamepad|Clang/CMake SDL2|elf|native_source
+netbsd_amd64|NetBSD|Unix desktop|2026|x86-64|SDL2/OpenGL|audio|keyboard/gamepad|Clang/CMake SDL2|elf|native_source
+linux_arm64|Linux|modern ARM desktop|2026|ARM64|SDL2/Vulkan|PipeWire|keyboard/gamepad|GCC/CMake SDL2|elf|native_source
+linux_riscv64|Linux|RISC-V desktop|2026|RV64|SDL2/Vulkan|PipeWire|keyboard/gamepad|GCC/CMake SDL2|elf|native_source
+linux_x86_32|Linux|legacy PC desktop|2000|i686|SDL2/OpenGL|ALSA|keyboard|GCC/CMake SDL2|elf|native_source
+raspberry_pi_4|Raspberry Pi|ARM single board computer|2019|Cortex-A72|VideoCore VI|ALSA|USB controller|GCC SDL2|elf|native_source
+raspberry_pi_5|Raspberry Pi|ARM single board computer|2023|Cortex-A76|VideoCore VII|ALSA|USB controller|GCC SDL2|elf|native_source
+chromeos_x86|Google|ChromeOS desktop|2026|x86-64|Linux OpenGL via Crostini|audio|gamepad|Linux container SDL2|elf|native_source
+chromeos_arm|Google|ChromeOS ARM|2026|ARM64|Linux GPU compatibility|audio|gamepad|Linux container SDL2|elf|native_source
 mac_os_9|Apple Mac|Classic Mac OS|1999|PowerPC|QuickDraw|Sound Manager|ADB|CodeWarrior|app|toolchain_adapter
 mac_os_x_powerpc|Apple Mac|Mac OS X PPC|2001|PowerPC G3/G4|Quartz|CoreAudio|HID|legacy Xcode|app|toolchain_adapter
-macos_intel|Apple Mac|modern Mac Intel|2026|x86-64|Metal/OpenGL|CoreAudio|HID|Xcode CMake SDL2|app|toolchain_adapter
-macos_apple_silicon|Apple Mac|modern Mac ARM|2026|ARM64|Metal|CoreAudio|HID|Xcode CMake SDL2|app|toolchain_adapter
+macos_intel|Apple Mac|modern Mac Intel|2026|x86-64|Metal/OpenGL|CoreAudio|HID|Xcode CMake SDL2|app|native_source
+macos_apple_silicon|Apple Mac|modern Mac ARM|2026|ARM64|Metal|CoreAudio|HID|Xcode CMake SDL2|app|native_source
 android_arm64|Android|mobile ARM|2026|ARM64|Vulkan/OpenGL ES|AAudio|touch/controller|Android NDK SDL2|apk|toolchain_adapter
 android_x86_64|Android|Android emulator ABI|2026|x86-64|Vulkan/OpenGL ES|AAudio|touch|Android NDK SDL2|apk|toolchain_adapter
 android_tv|Android|TV console-like device|2026|ARM64|Vulkan/OpenGL ES|AAudio|TV remote/controller|Android NDK SDL2|apk|toolchain_adapter
@@ -146,11 +146,11 @@ ios_iphone|Apple iOS|mobile touchscreen|2026|ARM64|Metal|CoreAudio|touch/control
 ipados|Apple iPadOS|tablet|2026|ARM64|Metal|CoreAudio|touch/controller|Xcode SDL2 iOS|ipa|toolchain_adapter
 tvos|Apple tvOS|TV console-like device|2026|ARM64|Metal|CoreAudio|Siri Remote/gamepad|Xcode tvOS|ipa|toolchain_adapter
 visionos|Apple visionOS|spatial device|2026|ARM64|RealityKit/Metal|spatial audio|spatial input|Xcode visionOS|ipa|toolchain_adapter
-steam_machine|Valve|SteamOS PC console|2026|x86-64|Vulkan|PipeWire|Steam Input|Linux CMake SDL2|elf|toolchain_adapter
-asus_rog_ally|ASUS|Windows handheld PC|2023|x86-64|RDNA|WASAPI|gamepad|Windows SDL2|exe|toolchain_adapter
-lenovo_legion_go|Lenovo|Windows handheld PC|2023|x86-64|RDNA|WASAPI|gamepad|Windows SDL2|exe|toolchain_adapter
-msi_claw|MSI|Windows handheld PC|2024|x86-64|Intel Arc|WASAPI|gamepad|Windows SDL2|exe|toolchain_adapter
-gpd_win|GPD|Windows handheld PC|2016|x86-64|integrated GPU|WASAPI|gamepad|Windows SDL2|exe|toolchain_adapter
+steam_machine|Valve|SteamOS PC console|2026|x86-64|Vulkan|PipeWire|Steam Input|Linux CMake SDL2|elf|native_source
+asus_rog_ally|ASUS|Windows handheld PC|2023|x86-64|RDNA|WASAPI|gamepad|Windows SDL2|exe|native_source
+lenovo_legion_go|Lenovo|Windows handheld PC|2023|x86-64|RDNA|WASAPI|gamepad|Windows SDL2|exe|native_source
+msi_claw|MSI|Windows handheld PC|2024|x86-64|Intel Arc|WASAPI|gamepad|Windows SDL2|exe|native_source
+gpd_win|GPD|Windows handheld PC|2016|x86-64|integrated GPU|WASAPI|gamepad|Windows SDL2|exe|native_source
 """
 def supplemental_targets()->tuple[SupplementalHardware,...]:
     rows=[]
@@ -165,7 +165,7 @@ def supplemental_targets()->tuple[SupplementalHardware,...]:
         if target_id in seen:
             raise RuntimeError("duplicate supplemental hardware identity")
         if not target_id.replace("_","").isalnum() or status not in (
-            "toolchain_adapter","licensed_sdk","historical_reference"
+            "toolchain_adapter","licensed_sdk","historical_reference","native_source"
         ):
             raise RuntimeError("invalid supplemental hardware spec")
         seen.add(target_id)

@@ -6,7 +6,7 @@ The game academy previously mapped **47** major platform targets and implemented
 **19 original native source backends**. This change adds 122 concrete historic,
 consumer, handheld, computer OS/ABI and modern mobile targets, bringing the
 curated inventory to **169 distinct target identities**. It additionally implements
-five independent native source backends, bringing source production to **24/169**.
+five independent legacy native backends plus 21 ABI-aware desktop variants, bringing source production to **45/169**.
 
 This is not every model or board ever manufactured, and 169 catalog entries
 do NOT mean 169 working console games. No compiler/emulator or device test is
@@ -29,7 +29,7 @@ listed system.
 | Gate | Meaning | What this change demonstrates |
 | --- | --- | --- |
 | Hardware identified | CPU/graphics/sound/inputs/SDK/ABI recorded | 169 targets |
-| Original native source | Per-hardware implementation and build recipe exist | 24 targets |
+| Original native source | Per-hardware implementation and build recipe exist | 45 targets |
 | Compiler passed | Exact source built by target-specific toolchain | Not inferred |
 | Emulator passed | Repeated native input, video, audio and state trace | Not inferred |
 | Physical device passed | Hardware-verified timing and controls | Not inferred |
@@ -117,3 +117,35 @@ CI only proves outcomes of checks that actually pass on the exact head.
 - cc65 Apple II: https://cc65.github.io/doc/apple2.html
 - OpenWatcom: https://openwatcom.org
 - DASM: https://github.com/dasm-assembler/dasm
+
+## Consumer-grade and alternative-ABI PC integration
+
+The desktop ABI layer adds 21 genuine PC-class C99/SDL2 source project
+profiles without duplicating the game's gameplay mechanics. It covers
+Linux ARM64, RISC-V and i686; FreeBSD x86/ARM64, OpenBSD and NetBSD;
+Apple Silicon and Intel macOS; Windows 10, Windows 11 and Windows ARM64;
+Raspberry Pi 4/5 ARM64; ChromeOS Linux containers; SteamOS-style x86 PC
+consoles; and the Windows handheld gamepad platforms GPD Win, MSI Claw,
+ASUS ROG Ally and Lenovo Legion Go.
+
+Each source archive includes an exact OS and CPU architecture contract,
+native SDL2 controller assumptions, an isolated machine-readable ABI
+intent, and a CMake configure-time check that fails for wrong-system and
+wrong-architecture builds. This *does not* certify a Windows ARM64,
+BSD, RISC-V, Raspberry Pi or macOS Intel binary has actually compiled or
+been executed; CI must provision those runners and collect true binary
+format/architecture and controller performance evidence.
+
+A CMake game source targeting ChromeOS here means the documented Linux
+Crostini container, not a ChromeOS signed native app. Gaming handheld
+input/battery/display certification is future work.
+
+### Revised source coverage
+
+169 cataloged platform identities; **45 native source generators**
+(19 prior + 5 new original legacy SDK backends + 21 PC ABI-targeted
+source builds); **124** without an implemented native source producer.
+The expanded denominator makes percentage-based readiness
+**45/169 = 26.6% for source generation only**, not a gameplay or overall
+application completion estimate. No platform is awarded a compiled or
+hardware-verified status from source generation.

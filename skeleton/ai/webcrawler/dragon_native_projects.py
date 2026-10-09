@@ -7,8 +7,10 @@ import json
 import re
 from .dragon_game_mechanics import Mechanic
 from .dragon_native_targets import demand_target, STYLES
+from .dragon_desktop_abi import DESKTOP_NATIVE,ABI_PROFILES,apply_desktop_abi
 
 EMITTERS=frozenset({"game_boy","game_boy_color","nes","dos_vga","master_system","game_gear","snes","commodore_64","genesis","game_boy_advance","nintendo_64","nintendo_ds","psp","ps1","xbox_original","atari_2600","apple_ii","zx_spectrum","dos_8086","windows_95","pc_linux","pc_windows","pc_macos","steam_deck"})
+EMITTERS=EMITTERS|DESKTOP_NATIVE
 
 @dataclass(frozen=True)
 class NativeProject:
@@ -498,7 +500,7 @@ def render_native_project(*,title:str,target_id:str,style:str,
     if style not in STYLES:raise ValueError("unknown game style")
     # Console renderers below are real CPU/SDK code, but currently provide
     # ONLY a collectible chase; do not advertise an unimplemented RPG/RTS.
-    if target_id not in ("pc_linux","pc_windows","pc_macos","steam_deck"):
+    if target_id not in DESKTOP_NATIVE:
         allowed = ("arcade_score_attack","side_scrolling_platformer") if target_id=="game_boy" else ("arcade_score_attack",)
         if style not in allowed:
             raise ValueError("target has not implemented the requested gameplay style")
@@ -551,7 +553,7 @@ def render_native_project(*,title:str,target_id:str,style:str,
             ps1_source(seed) if target_id=="ps1" else
             xbox_original_source(seed,style)
         )
-    elif target_id in ("pc_linux","pc_windows","pc_macos","steam_deck"):
+    elif target_id in DESKTOP_NATIVE:
         from .dragon_game_blueprints import GENRES, campaign_dict
         from .dragon_game_fitness import choose_campaign,selection_report
         from .dragon_native_arcade_runtime import render_sdl_campaign
@@ -624,6 +626,8 @@ def render_native_project(*,title:str,target_id:str,style:str,
         files=(_gameboy(seed) if target_id=="game_boy" else
                _nes(seed) if target_id=="nes" else
                _dos(seed) if target_id=="dos_vga" else _desktop(seed,style))
+    if target_id in ABI_PROFILES:
+        files=apply_desktop_abi(target_id,files)
     if target_id in ("game_boy","game_boy_color","nes") and not (
         target_id=="game_boy" and style=="side_scrolling_platformer"
     ):
@@ -709,7 +713,7 @@ def render_native_project(*,title:str,target_id:str,style:str,
     files["dragon-hardware-budget.json"]=json.dumps(
         hardware,sort_keys=True,indent=2)+"\n"
     implemented={Mechanic.MOVEMENT,Mechanic.EXPLORATION}
-    if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck","xbox_original"):
+    if (target_id in DESKTOP_NATIVE or target_id=="xbox_original"):
         implemented|={Mechanic.PLATFORMING,Mechanic.PHYSICS}
     supported=tuple(sorted(m.value for m in mechanics if m in implemented))
     deferred=tuple(sorted(m.value for m in mechanics if m not in implemented))
@@ -733,12 +737,12 @@ def render_native_project(*,title:str,target_id:str,style:str,
                    else "native_turn_based_rpg" if style=="turn_based_rpg"
                    else "native_original_sokoban" if style=="fixed_screen_puzzle"
                    else "native_timing_rhythm" if style=="rhythm_game"
-                   else GENRES[style]) if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck")
+                   else GENRES[style]) if target_id in DESKTOP_NATIVE
                   else "game_boy_scrolling_platformer" if target_id=="game_boy" and style=="side_scrolling_platformer"
                   else "original_collectible_chase"
               ),"campaign_stages": (
                   (design.stages if design is not None else 4)
-                  if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck")
+                  if target_id in DESKTOP_NATIVE
                   else 1
               )}
     files["dragon-native-manifest.json"]=json.dumps(manifest,sort_keys=True,indent=2)+"\n"

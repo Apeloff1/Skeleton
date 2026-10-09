@@ -40,6 +40,8 @@ SOURCE_RENDERERS={
   "pc_macos":"C99/SDL2 native game",
   "steam_deck":"C99/SDL2 Linux native game",
 }
+from .dragon_desktop_abi import ABI_PROFILES
+SOURCE_RENDERERS.update({key:"C99/SDL2 "+p.system+" "+p.arch for key,p in ABI_PROFILES.items()})
 assert set(SOURCE_RENDERERS)==EMITTERS
 
 @dataclass(frozen=True)
