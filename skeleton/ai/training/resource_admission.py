@@ -68,7 +68,7 @@ def _positive(value: object) -> int | None:
 def _read_linux_meminfo(read_text: Callable[[str], str]) -> tuple[int | None, int | None]:
     try:
         lines = read_text("/proc/meminfo")
-    except (OSError, UnicodeError):
+    except (OSError, UnicodeError, KeyError):
         return None, None
     values: dict[str, int] = {}
     for line in lines.splitlines():
@@ -101,7 +101,7 @@ def _read_cgroup_free(read_text: Callable[[str], str]) -> int | None:
         try:
             max_text = read_text(limit_path).strip()
             used_text = read_text(used_path).strip()
-        except (OSError, UnicodeError):
+        except (OSError, UnicodeError, KeyError):
             continue
         if max_text == "max":
             continue
@@ -166,7 +166,7 @@ def _linux_effective_cpus(
     for path in ("/sys/fs/cgroup/cpu.max",):
         try:
             parts = read_text(path).strip().split()
-        except (OSError, UnicodeError):
+        except (OSError, UnicodeError, KeyError):
             continue
         if len(parts) != 2 or parts[0] == "max":
             continue
