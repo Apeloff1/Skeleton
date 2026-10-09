@@ -55,6 +55,7 @@ def _parser() -> argparse.ArgumentParser:
     capabilities.add_argument("--game-preview", action="store_true", help="open native Tk offline playable game preview")
     capabilities.add_argument("--game-preview-check", action="store_true", help="verify 32 frames of native game logic without opening desktop")
     capabilities.add_argument("--chip8-demo-output", help="new original legal CHIP-8 homebrew ROM output file")
+    capabilities.add_argument("--chip8-demo-check", action="store_true", help="execute native CHIP-8 homebrew through a winning controller replay")
     capabilities.add_argument("--chip8-export-capsule", help="rights-attested original 5-8 tile capsule for CHIP-8")
     parser.add_argument("--chip8-rom-output", help="unused output .ch8 filename for --chip8-export-capsule")
     parser.add_argument("--game-seed", type=int, help="deterministic seed for explicit native game preview")
@@ -107,6 +108,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     chip8_mode = (
         args.chip8_demo_output is not None
         or args.chip8_export_capsule is not None
+        or args.chip8_demo_check
     )
     if args.chip8_rom_output and args.chip8_export_capsule is None:
         print("--chip8-rom-output requires --chip8-export-capsule", file=sys.stderr)
@@ -128,6 +130,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("original CHIP-8 ROM export cannot combine with model, state or game preview",
                   file=sys.stderr)
             return 2
+        if args.chip8_demo_check:
+            from .offline_chip8_preview import verify_native_chip8_player
+            try:
+                report = verify_native_chip8_player()
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("native CHIP-8 game check rejected: " + str(exc), file=sys.stderr)
+                return 1
+            if args.json_output:
+                print(json.dumps(report, sort_keys=True))
+            else:
+                print("Original CHIP-8 ROM: actually executed to WIN on built-in VM")
+            return 0
         from scripts.game.export_chip8 import main as export_chip8
         flags = (
             ["--demo-rom", "--output", args.chip8_demo_output]
