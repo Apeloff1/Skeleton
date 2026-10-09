@@ -603,3 +603,35 @@ def test_accelerated_logits_and_cache_receipt_are_from_one_state():
     output = model._logits_window((1, 2, 3), cache)
     assert output == pytest.approx(model._logits((1, 2, 3)), abs=2e-5)
     assert cache.tokens == [1, 2, 3]
+
+
+def test_partial_gpu_sgd_is_poisoned_not_silently_replayed_or_synced(monkeypatch):
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = _model()
+    accel = TorchAccel(model, device="cpu").pin()
+    real = accel._E
+
+    class FailedLaterParameter:
+        @property
+        def grad(self):
+            return real.grad
+
+        def add_(self, grad, *, alpha):
+            raise RuntimeError("injected failure after first parameter update")
+
+    fake = FailedLaterParameter()
+    monkeypatch.setattr(accel, "_params", lambda: iter((real, fake)))
+    with pytest.raises(RuntimeError, match="injected failure"):
+        accel.sgd((1, 2), target=1, lr=0.01)
+    assert accel._training_failed and accel._weights_modified
+    assert accel.cached_tokens == ()
+    with pytest.raises(RuntimeError, match="partial training update"):
+        accel.logits_window((1, 2, 3))
+    with pytest.raises(RuntimeError, match="partial training update"):
+        accel.logits((1, 2))
+    with pytest.raises(RuntimeError, match="partial training update"):
+        accel.pin()
+    with pytest.raises(RuntimeError, match="partial training update"):
+        accel.sync()
