@@ -279,6 +279,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 or args.benchmark_suite or args.exclude_train_corpus
                 or args.protect_suite or args.replay_improvement
                 or args.load_chat or args.save_chat
+                or args.verify_dataset or args.verify_sources
                 or args.epochs != 1 or args.max_output_tokens != 8
             ):
                 print("local-ai dataset preparation requires only --prepare-dataset, --dataset-output and optional split controls")
