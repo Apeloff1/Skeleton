@@ -16,7 +16,8 @@ from typing import Any, Mapping
 
 from .offline_foundations import (
     DATASET_ID, FAMILIES, ORACLES, SyntheticCurriculumError,
-    _read_bytes, _split_rows, _strict_json, validate_curriculum,
+    _json_equal, _read_bytes, _split_rows, _strict_json, validate_curriculum,
+    evaluate_predictions,
 )
 
 SCHEMA = "skeleton.offline_sparse_capability.v1"
@@ -185,6 +186,85 @@ def sparse_plan_receipt(plan: Mapping[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in plan.items() if key not in excluded}
 
 
+def assess_heldout_capabilities(
+    directory: str | Path,
+    prediction_file: str | Path,
+    *,
+    split: str = "validation",
+) -> dict[str, Any]:
+    """Evidence-based 36-mode scorecard. Does not train or leak test answers.
+
+    Held-out predictions are checked by the existing strict scorer before
+    deriving the per-mode breakdown. Missing/duplicate/unknown answers fail.
+    Scoring never changes which training samples are selected.
+    """
+    if split not in ("validation", "test"):
+        raise SyntheticCurriculumError("capability proficiency requires held-out split")
+    result = evaluate_predictions(directory, prediction_file, split=split)
+    manifest = _strict_json(
+        _read_bytes(Path(directory) / "manifest.json").decode("utf-8")
+    )
+    rows = _split_rows(Path(directory), manifest, split)
+    raw = _read_bytes(Path(prediction_file))
+    try:
+        lines = raw.decode("utf-8", "strict").splitlines()
+    except UnicodeError as exc:
+        raise SyntheticCurriculumError("capability predictions must be UTF-8") from exc
+    predictions: dict[str, str] = {}
+    for line in lines:
+        candidate = _strict_json(line)
+        if (
+            not isinstance(candidate, dict)
+            or set(candidate) != {"id", "prediction"}
+            or not isinstance(candidate["id"], str)
+            or not isinstance(candidate["prediction"], str)
+            or candidate["id"] in predictions
+        ):
+            raise SyntheticCurriculumError("invalid held-out capability prediction")
+        predictions[candidate["id"]] = candidate["prediction"].strip()
+    by_mode: dict[str, dict[str, int]] = {
+        family + ":" + label: {"correct": 0, "total": 0}
+        for family, modes in CAPABILITIES.items() for label in modes
+    }
+    for row in rows:
+        variant = int(row["id"].rsplit("-", 1)[1])
+        key = row["family"] + ":" + CAPABILITIES[row["family"]][variant]
+        prediction = predictions[row["id"]]
+        if row["oracle"] in ("exact_json", "inventory_oracle", "json_exact"):
+            try:
+                accurate = _json_equal(prediction, _strict_json(row["response"]))
+            except (ValueError, SyntheticCurriculumError):
+                accurate = False
+        else:
+            accurate = prediction == row["response"]
+        by_mode[key]["correct"] += int(accurate)
+        by_mode[key]["total"] += 1
+    if (
+        len(by_mode) != 36 or any(value["total"] != 3 for value in by_mode.values())
+        or sum(value["correct"] for value in by_mode.values()) != result["correct"]
+    ):
+        raise SyntheticCurriculumError("held-out capability scoring contract drift")
+    weakest = sorted(
+        key for key, value in by_mode.items()
+        if value["correct"] != value["total"]
+    )
+    return {
+        "schema_version": "skeleton.offline_sparse_capability.evaluation.v1",
+        "source_split": split,
+        "prediction_sha256": result["predictions_sha256"],
+        "available_modes": 36,
+        "evaluated_modes": 36,
+        "modes_perfect_on_heldout": 36 - len(weakest),
+        "modes_with_observed_errors": weakest,
+        "heldout_correct": result["correct"],
+        "heldout_total": result["total"],
+        "per_mode": by_mode,
+        "training_data_modified": False,
+        "promotion_authorized": False,
+        "real_world_generalization_proven": False,
+    }
+
+
 def register_sparse_capability_plan(
     directory: str | Path, plan: Mapping[str, Any], registry: Any,
 ) -> str:
@@ -283,5 +363,5 @@ __all__ = [
     "SCHEMA", "DEFAULT_BUDGET", "MAX_BUDGET", "HARDWARE_BUDGETS",
     "CAPABILITIES", "SparseCapabilityExample", "SyntheticCurriculumError",
     "build_sparse_capability_plan", "sparse_plan_receipt",
-    "register_sparse_capability_plan",
+    "assess_heldout_capabilities", "register_sparse_capability_plan",
 ]
