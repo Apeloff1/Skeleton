@@ -261,3 +261,23 @@ def test_expired_unreclaimed_worker_does_not_publish_document_index(
         assert completed.result is None
         with OfflineDocumentLibrary(index_path) as documents:
             assert documents.count() == 0
+
+
+def test_queue_enforces_global_job_limit_without_losing_existing_jobs(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    import skeleton.app.offline_index_queue as module
+
+    source = _root(tmp_path)
+    library = tmp_path / "knowledge.sqlite"
+    queuefile = tmp_path / "queue.sqlite"
+    monkeypatch.setattr(module, "MAX_STORED_JOBS", 1)
+    with OfflineIndexQueue(queuefile) as queue:
+        original = queue.enqueue(source, library)
+        # Deduping existing accepted work is still allowed at the quota.
+        assert queue.enqueue(source, library).job_id == original.job_id
+        queue.cancel(original.job_id)
+        with pytest.raises(OfflineQueueError, match="quota"):
+            queue.enqueue(source, library)
+        assert len(queue.list_jobs()) == 1
+        assert queue.get(original.job_id).state == "cancelled"
