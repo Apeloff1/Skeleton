@@ -112,7 +112,8 @@ The importer reads only regular UTF-8 text files with these extensions:
 `.txt`, `.md`, `.markdown`, `.rst`, `.py`, `.json`,
 `.jsonl`, `.csv`, `.toml`, `.yaml`, `.yml`.
 It rejects symlinks, embedded NUL bytes and files over 128 KiB. Each batch
-is bounded to 2,000 files and 32 MiB. Indexing is transactional, supports
+is bounded to 2,000 files and 32 MiB. The accumulated knowledge
+index is bounded to 10,000 documents and 128 MiB of source text. Indexing is transactional, supports
 incremental replacement and prunes deleted files **within the selected
 directory**, without deleting content from other indexed roots. Search
 identifiers are parameterized and all returned text is checked against its
@@ -152,6 +153,12 @@ Operators can inspect `--queue-status`, cancel an unstarted job with
 `--cancel-queue-job <id>`, or explicitly requeue a terminal failure with
 `--retry-queue-job <id>`. If a host requires recurring scans, use its
 trusted operating-system scheduler to invoke a bounded queue run.
+
+For the detailed finding-by-finding threat review, repaired attack paths,
+regression mapping and release-signoff conditions, see
+[Offline Standalone Adversarial Review](OFFLINE_STANDALONE_ADVERSARIAL_REVIEW.md).
+It is a review ledger, **not** a claim that exact-head CI or air-gapped
+real-model acceptance has passed.
 
 ## Deep local state integrity audit
 
