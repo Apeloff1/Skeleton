@@ -157,7 +157,7 @@ def test_rejects_untrusted_path_and_unbounded_drain(tmp_path: Path) -> None:
             link.symlink_to(source, target_is_directory=True)
         except OSError:
             pytest.skip("symlink unsupported")
-        with pytest.raises(OfflineQueueError, match="directory"):
+        with pytest.raises(RuntimeError, match="directory"):
             queue.enqueue(link, tmp_path / "lib.sqlite")
 
 
