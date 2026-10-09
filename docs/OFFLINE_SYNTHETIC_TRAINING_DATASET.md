@@ -194,6 +194,93 @@ secret benchmark**. Human-reviewed tasks and real game-engine/AI observations
 must be collected separately with explicit source rights, temporal fences,
 independent oracles and held-out leakage controls before production training.
 
+## Sparse capability mode: breadth without dataset growth
+
+For consumer computers, use the **sparse active curriculum** instead of
+training on the complete 504-row reference train split. Its policy selects
+examples from **verified train rows only**. Validation and test remain
+evaluation-only and are never concatenated into model training text.
+
+| Profile | Max active records | Text-byte ceiling | Capability modes covered |
+| --- | ---: | ---: | ---: |
+| Low-memory (default) | 36 | 8 KiB | 36 |
+| Consumer | 48 | 12 KiB | 36 |
+| Workstation | 72 | 16 KiB | 36 |
+
+These are strict operator policy limits, not detection of installed RAM,
+GPU VRAM, M-series hardware or actual model-training throughput. The reference
+bank remains 720 rows; **no additional records are materialized** by sparse
+planning. There are 36 deliberately named task modes (three per family).
+Every mode receives one train example before any mode can receive a second.
+For larger budgets, additional source train examples are selected from
+different scenario groups, with a maximum of two per mode.
+
+\`\`\`sh
+# Read-only default: 36 modes, 36 actual training examples.
+PYTHONPATH=. python scripts/training/sparse_capability.py --profile low-memory
+
+# An explicit, small, train-only text export for local model experimentation.
+PYTHONPATH=. python scripts/training/sparse_capability.py \
+  --profile consumer --export ./sparse-consumer-train.txt
+
+# Strictly rights-governed registration of that selected subset, not all 720.
+PYTHONPATH=. python scripts/training/sparse_capability.py \
+  --profile low-memory --register-db ./sparse-training-registry.sqlite
+\`\`\`
+
+Training does **not** begin on planning or registration; nor is any model
+promoted. The command outputs a content-addressed selection receipt, mode
+identities, source dataset digest and budget evidence without dumping the
+answers into the status response.
+
+### Adapt selection only from validation errors
+
+If an external model produces one valid prediction per held-out validation
+identity, its weaker task modes can be **prioritized for the limited second
+example slots**, without ever copying held-out answers into training.
+First-example coverage for all 36 modes remains unchanged:
+
+\`\`\`sh
+PYTHONPATH=. python scripts/training/sparse_capability.py \
+  --profile consumer \
+  --focus-validation ./validation-predictions.jsonl \
+  --export ./validation-focused-training.txt
+\`\`\`
+
+A different selection yields a different content-addressed registry version,
+so one sparse plan cannot silently overwrite another plan at the same nominal
+hardware budget. Using validation feedback is model-selection activity:
+repeated adaptivity can overfit validation. Keep the **test split** untouched
+until final evaluation, and use genuinely unseen tasks for generalization.
+
+### Generate procedural capability probes without expanding train data
+
+\`scripts/training/probe_sparse_capabilities.py\` creates fresh, deterministic,
+**prompt-only** evaluation cases for every mode, from scenario IDs outside
+the pinned 0-19 reference groups:
+
+\`\`\`sh
+PYTHONPATH=. python scripts/training/probe_sparse_capabilities.py \
+  --seed 1729 --per-mode 1 --export-prompts ./fresh-capability-questions.jsonl
+
+# Once a model has produced matching {"id": ..., "prediction": ...} records:
+PYTHONPATH=. python scripts/training/probe_sparse_capabilities.py \
+  --seed 1729 --per-mode 1 --score ./fresh-capability-answers.jsonl
+\`\`\`
+
+From 1 to 12 questions per mode are supported (36-432 per invocation);
+generated expected answers are kept in the local scoring process, not the
+prompt-only export. The independent oracle checks each generated task before
+a score is accepted. These challenges **never enter the training corpus** and
+are not automatically saved as train rows. They are deterministic and
+inspectable, not an adversary-resistant secret benchmark or proof of external
+generalization.
+
+The 36-mode scorecard reports observed correctness. **Covered in a training
+plan** does not mean **learned**, and receiving three correct examples does
+not mean real-world mastery. A useful model still needs genuine training,
+ablation studies and independent test tasks.
+
 ## Next training-data expansions
 
 The v1 corpus is a **foundation**, not the whole training set. Next
