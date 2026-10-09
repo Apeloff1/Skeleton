@@ -41,7 +41,6 @@ opt-in, not proof of an isolated host.
 | F11: Index projection drift | Unchanged source digest hides damaged FTS records | Explicit reindex verifies both stored body and FTS row, repairs divergence and prunes orphans | `test_offline_audit.py` |
 | F12: Insufficient snapshot admission | SQLite `integrity_check` passes when transcript checksum, FTS references or job receipts are inconsistent | Additional read-only semantic audit required before admitting a snapshot source and restored copy | `test_offline_audit.py` forged/corrupt state |
 | F13: Weak local privacy defaults | New local conversation/document databases are created with broad filesystem permissions | POSIX new-files set to 0600; existing ACLs remain operator-controlled | `test_offline_audit.py` |
-
 | F14: SQLite companion redirection | Selected database has a symlinked `-wal`, `-shm` or `-journal` companion that points outside the intended directory | Shared SQLite path admission rejects symlink/special-file companions before opening offline workspace, library, queue, snapshots and audits | `test_offline_sqlite_safety.py` |
 | F15: Incomplete release qualification | Syntax defects or a frozen EXE missing local queue/recovery code escape review | Exact-head P2 pipeline now parse-checks offline Python before dependency installation; Windows installer smoke exercises queue completion, restored job quarantine, and semantic re-audit | P2 Local Inference + Windows Installer; exact-head verdict pending |
 
