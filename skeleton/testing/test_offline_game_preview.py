@@ -1,9 +1,6 @@
 """Headless regression verification for real stdlib desktop game preview."""
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import pytest
 
 from skeleton.ai.runtime.gameplay_capabilities import (
