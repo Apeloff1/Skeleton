@@ -88,7 +88,27 @@
             "transitional roots becoming accidental owners",
             "cyclic dependency growth"
           ],
-          "gaps": []
+          "gaps": [],
+          "implementation_paths": [
+            "machine/architecture.json",
+            "docs/ARCHITECTURE_MAP.md",
+            "scripts/check_architecture_map.py",
+            ".github/workflows/vol002-architecture-fitness.yml"
+          ],
+          "tests": [
+            "skeleton/testing/test_architecture_map.py",
+            "tests/test_architecture_boundaries.py",
+            "skeleton/testing/test_architecture_map.py::test_component_fitness_covers_all_runtime_planes_and_ai_mappings",
+            "skeleton/testing/test_architecture_map.py::test_owner_lookup_resolves_future_path_without_materialization",
+            "tests/test_vol002_architecture_independent_verifier.py"
+          ],
+          "evaluations": [
+            ".github/workflows/vol002-architecture-fitness.yml",
+            "scripts/check_architecture_map.py --json",
+            "skeleton/testing/test_architecture_map.py",
+            "tests/test_architecture_boundaries.py",
+            "scripts/verify_vol002_architecture_fitness.py"
+          ]
         },
         {
           "volume_ref": "VOL-003",
@@ -111,6 +131,30 @@
           ],
           "gaps": [
             "independent exact-head VOL-003 Contract Conformance Closure qualification remains pending"
+          ],
+          "implementation_paths": [
+            "skeleton/contracts",
+            "machine/ai_runtime_schemas.json",
+            "machine/capability_interfaces.json",
+            "skeleton/contracts/canonical.py",
+            "skeleton/ai/runtime/contracts/canonical.py",
+            "scripts/check_architecture_contract_conformance.py",
+            "machine/contract_conformance.json",
+            "scripts/verify_vol003_contract_conformance.py",
+            ".github/workflows/vol003-contract-conformance.yml"
+          ],
+          "tests": [
+            "skeleton/testing/test_contract_serialization_edges.py",
+            "skeleton/testing/test_contract_compatibility.py",
+            "skeleton/testing/test_contract_unicode_edges.py",
+            "tests/test_architecture_contract_conformance.py",
+            "tests/test_vol003_contract_conformance_independent.py"
+          ],
+          "evaluations": [
+            "scripts/check_architecture_contract_conformance.py --json",
+            "tests/test_architecture_contract_conformance.py",
+            ".github/workflows/vol003-contract-conformance.yml",
+            "scripts/verify_vol003_contract_conformance.py"
           ]
         },
         {
@@ -134,6 +178,49 @@
           ],
           "gaps": [
             "independent exact-head VOL-004 Runtime Supervision Closure qualification remains pending"
+          ],
+          "implementation_paths": [
+            "skeleton/app",
+            "skeleton/persistence/operation_runtime.py",
+            "skeleton/api/server.py",
+            "machine/manifest.json",
+            "machine/runtime_supervision.json",
+            "scripts/check_architecture_runtime_supervision.py",
+            "skeleton/kernel/runtime_supervision.py",
+            "skeleton/ai/runtime/kernel/runtime_supervision.py",
+            "skeleton/automation/free_model.py",
+            "skeleton/automation/shift_supervisor/model_gateway.py",
+            "skeleton/automation/chatgpt_adapter.py",
+            ".github/workflows/vol004-runtime-supervision.yml",
+            "backend/server.py",
+            "backend/core/engine_client.py",
+            "skeleton/api/engine_runtime.py",
+            "skeleton/api/engine_service.py",
+            "skeleton/provider_runtime.py",
+            "machine/ai_app_construction.json",
+            "docs/architecture/RUNTIME_SUPERVISION.md",
+            "scripts/verify_vol004_runtime_supervision.py"
+          ],
+          "tests": [
+            "skeleton/testing/test_app_assembly.py",
+            "skeleton/testing/test_operation_runtime.py",
+            "skeleton/testing/test_operation_server_binding.py",
+            "tests/test_architecture_runtime_supervision.py",
+            "skeleton/testing/test_vol004_runtime_supervision_v2.py",
+            "skeleton/testing/test_kernel_supervisor_cancellation.py",
+            "backend/tests/test_engine_cross_service_closure.py::test_cross_service_cancel_fences_late_provider_result",
+            "backend/tests/test_engine_cross_service_closure.py::test_stale_task_callback_cannot_release_newer_generation_lease",
+            "backend/tests/test_engine_cross_service_closure.py::test_engine_lifecycle_draining_fences_new_execution_and_drains_lease",
+            "tests/test_vol004_runtime_supervision_independent.py"
+          ],
+          "evaluations": [
+            "python scripts/check_architecture_runtime_supervision.py --json",
+            ".github/workflows/vol004-runtime-supervision.yml",
+            "skeleton/testing/test_vol004_runtime_supervision_v2.py",
+            "backend/tests/test_engine_cross_service_closure.py::test_cross_service_cancel_fences_late_provider_result",
+            "backend/tests/test_engine_cross_service_closure.py::test_stale_task_callback_cannot_release_newer_generation_lease",
+            "backend/tests/test_engine_cross_service_closure.py::test_engine_lifecycle_draining_fences_new_execution_and_drains_lease",
+            "scripts/verify_vol004_runtime_supervision.py"
           ]
         },
         {
@@ -157,6 +244,19 @@
           "gaps": [
             "bind all AI roots to one ownership graph",
             "materialize relocation parity gate"
+          ],
+          "implementation_paths": [
+            "machine/architecture.json",
+            "machine/ai_file_tree.json",
+            "scripts"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_repository_architecture.py",
+            "planned:skeleton/testing/test_ai_file_tree_ownership.py"
+          ],
+          "evaluations": [
+            "planned:cycle/ownership violation suite",
+            "planned:legacy-mirror drift evaluation"
           ]
         },
         {
@@ -180,6 +280,19 @@
           "gaps": [
             "define package layer manifest",
             "add import graph fitness test"
+          ],
+          "implementation_paths": [
+            "skeleton",
+            "scripts",
+            "pyproject.toml"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_python_layering.py",
+            "planned:skeleton/testing/test_import_side_effects.py"
+          ],
+          "evaluations": [
+            "planned:dependency-cycle scan",
+            "planned:cold-import determinism evaluation"
           ]
         },
         {
@@ -203,6 +316,19 @@
           "gaps": [
             "remove remaining path hacks",
             "materialize packaged-wheel import test"
+          ],
+          "implementation_paths": [
+            "skeleton",
+            "scripts",
+            "pyproject.toml"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_import_roots.py",
+            "planned:skeleton/testing/test_optional_imports.py"
+          ],
+          "evaluations": [
+            "planned:packaged-vs-source import matrix",
+            "planned:module shadowing evaluation"
           ]
         },
         {
@@ -225,6 +351,20 @@
           ],
           "gaps": [
             "independent manifest-reference drift, schema-downgrade, and doc-digest verification remains pending"
+          ],
+          "implementation_paths": [
+            "machine/manifest_reference_policy.json",
+            "machine/architecture_rule_registry.json",
+            "docs/architecture/MANIFEST_REFERENCE_INTEGRITY.md",
+            "scripts/check_architecture_manifest_references.py"
+          ],
+          "tests": [
+            "tests/test_architecture_manifest_references.py",
+            "tests/test_architecture_rule_registry.py"
+          ],
+          "evaluations": [
+            "planned:manifest drift injection suite",
+            "planned:stale-reference evaluation"
           ]
         },
         {
@@ -248,6 +388,19 @@
           "gaps": [
             "define rule registry",
             "add waiver expiry enforcement"
+          ],
+          "implementation_paths": [
+            "scripts",
+            "machine",
+            "skeleton/testing"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_architecture_linter.py",
+            "planned:skeleton/testing/test_architecture_waivers.py"
+          ],
+          "evaluations": [
+            "planned:mutation suite for architecture violations",
+            "planned:false-positive regression corpus"
           ]
         },
         {
@@ -271,6 +424,19 @@
           "gaps": [
             "create canonical ADR index schema",
             "bind cross-cutting changes to ADR check"
+          ],
+          "implementation_paths": [
+            "docs/adr",
+            "docs/plan",
+            "machine"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_adr_index.py",
+            "planned:skeleton/testing/test_adr_references.py"
+          ],
+          "evaluations": [
+            "planned:orphan-decision audit",
+            "planned:supersession consistency evaluation"
           ]
         },
         {
@@ -293,6 +459,20 @@
           ],
           "gaps": [
             "independent architecture-rule and waiver verification remains pending"
+          ],
+          "implementation_paths": [
+            "skeleton/contracts/architecture_fitness.py",
+            "skeleton/automation/architecture_fitness.py",
+            "skeleton/ai/runtime/contracts/architecture_fitness.py",
+            "skeleton/ai/build/automation/architecture_fitness.py",
+            "machine/ai_file_tree.json"
+          ],
+          "tests": [
+            "skeleton/testing/test_architecture_fitness.py"
+          ],
+          "evaluations": [
+            "planned:mutation-of-architecture evaluation",
+            "planned:waiver expiry audit"
           ]
         }
       ]
@@ -360,6 +540,20 @@
           "gaps": [
             "repository-wide trace population remains separate",
             "independent completeness audit remains pending"
+          ],
+          "implementation_paths": [
+            "skeleton/contracts/traceability.py",
+            "skeleton/automation/traceability.py",
+            "skeleton/ai/runtime/contracts/traceability.py",
+            "skeleton/ai/build/automation/traceability.py",
+            "machine/ai_file_tree.json"
+          ],
+          "tests": [
+            "skeleton/testing/test_master_traceability.py"
+          ],
+          "evaluations": [
+            "planned:change-impact replay",
+            "planned:trace completeness audit"
           ]
         },
         {
@@ -383,6 +577,18 @@
           "gaps": [
             "repository-wide capability descriptor/evidence population remains separate",
             "independent capability maturity verification remains pending"
+          ],
+          "implementation_paths": [
+            "skeleton/ai/capability_map.py",
+            "skeleton/ai/__init__.py",
+            "machine/ai_file_tree.json"
+          ],
+          "tests": [
+            "skeleton/testing/test_capability_map.py"
+          ],
+          "evaluations": [
+            "planned:degraded-capability evaluation",
+            "planned:planned-vs-live audit"
           ]
         },
         {
@@ -405,6 +611,16 @@
           "gaps": [
             "materialize canonical requirement IDs",
             "bind requirements to tests/evidence"
+          ],
+          "implementation_paths": [
+            "machine",
+            "docs/plan"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_requirement_registry.py"
+          ],
+          "evaluations": [
+            "planned:requirement ambiguity review"
           ]
         },
         {
@@ -427,6 +643,16 @@
           "gaps": [
             "bind all production claims to NFR IDs",
             "materialize measurement harnesses"
+          ],
+          "implementation_paths": [
+            "machine/ai_engineering_pass.json",
+            "benchmarks"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_nfr_registry.py"
+          ],
+          "evaluations": [
+            "planned:NFR workload reproducibility"
           ]
         },
         {
@@ -449,6 +675,16 @@
           "gaps": [
             "normalize capability naming",
             "map all volumes to capability classes"
+          ],
+          "implementation_paths": [
+            "machine/capability_interfaces.json",
+            "machine"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_capability_taxonomy.py"
+          ],
+          "evaluations": [
+            "planned:taxonomy orphan audit"
           ]
         },
         {
@@ -471,6 +707,16 @@
           "gaps": [
             "bind maturity to evidence digests",
             "add automatic invalidation triggers"
+          ],
+          "implementation_paths": [
+            "machine/ai_master_plan.json",
+            "machine/ai_build_accountability.json"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_capability_maturity.py"
+          ],
+          "evaluations": [
+            "planned:stale-evidence downgrade evaluation"
           ]
         },
         {
@@ -493,6 +739,16 @@
           "gaps": [
             "define scenario schema",
             "bind behaviors to requirement IDs"
+          ],
+          "implementation_paths": [
+            "machine",
+            "skeleton/testing"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_behavior_specs.py"
+          ],
+          "evaluations": [
+            "planned:scenario coverage audit"
           ]
         },
         {
@@ -515,6 +771,16 @@
           "gaps": [
             "extract existing lifecycle machines",
             "bind transition tests"
+          ],
+          "implementation_paths": [
+            "machine/state_topology.json",
+            "skeleton"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_state_machine_catalogue.py"
+          ],
+          "evaluations": [
+            "planned:transition mutation testing"
           ]
         },
         {
@@ -537,6 +803,16 @@
           "gaps": [
             "codify interface lint rules",
             "bind public contracts to schema registry"
+          ],
+          "implementation_paths": [
+            "machine/capability_interfaces.json",
+            "docs"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_interface_standard.py"
+          ],
+          "evaluations": [
+            "planned:cross-interface consistency audit"
           ]
         },
         {
@@ -559,6 +835,16 @@
           "gaps": [
             "inventory serialized contracts",
             "materialize compatibility checker"
+          ],
+          "implementation_paths": [
+            "machine",
+            "skeleton/contracts"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_schema_registry.py"
+          ],
+          "evaluations": [
+            "planned:schema evolution matrix"
           ]
         },
         {
@@ -581,6 +867,16 @@
           "gaps": [
             "bind schema/API versions to matrix",
             "define support window policy"
+          ],
+          "implementation_paths": [
+            "machine",
+            "docs/plan"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_compatibility_model.py"
+          ],
+          "evaluations": [
+            "planned:mixed-version fleet evaluation"
           ]
         },
         {
@@ -603,6 +899,16 @@
           "gaps": [
             "unify protocol envelopes",
             "bind protocols to tracing"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "skeleton/network"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_internal_protocols.py"
+          ],
+          "evaluations": [
+            "planned:delay/reorder protocol faults"
           ]
         }
       ]
@@ -670,6 +976,20 @@
           ],
           "gaps": [
             "independent cross-language repository-graph, ownership/test impact, and change-planner verification remains pending"
+          ],
+          "implementation_paths": [
+            "skeleton/repo_intelligence/repository_graph.py",
+            "skeleton/repo_intelligence/change_planner.py",
+            "skeleton/repo_intelligence/source_extraction.py"
+          ],
+          "tests": [
+            "skeleton/testing/test_repo_intelligence_git_index.py",
+            "skeleton/testing/test_vol021_repository_graph.py",
+            "skeleton/testing/test_vol021_source_extraction.py"
+          ],
+          "evaluations": [
+            "planned:impact-prediction precision/recall eval",
+            "planned:cross-language symbol resolution eval"
           ]
         },
         {
@@ -692,7 +1012,19 @@
             "merge races",
             "self-review bias"
           ],
-          "gaps": []
+          "gaps": [],
+          "implementation_paths": [
+            "skeleton/automation/transactional_workspace.py",
+            "skeleton/automation/independent_review.py"
+          ],
+          "tests": [
+            "skeleton/testing/test_vol022_transactional_workspace.py",
+            "skeleton/testing/test_vol022_independent_review.py"
+          ],
+          "evaluations": [
+            "planned:repair success without regression benchmark",
+            "planned:concurrent-edit collision suite"
+          ]
         },
         {
           "volume_ref": "VOL-092",
@@ -715,7 +1047,22 @@
             "bot churn",
             "orphan ownership"
           ],
-          "gaps": []
+          "gaps": [],
+          "implementation_paths": [
+            "skeleton/repo_machine/maintenance.py",
+            "skeleton/repo_machine/__init__.py",
+            "skeleton/ai/build/repo_machine/maintenance.py",
+            "skeleton/ai/build/repo_machine/__init__.py",
+            "scripts/plan_repository_maintenance.py",
+            "machine/ai_file_tree.json"
+          ],
+          "tests": [
+            "skeleton/testing/test_vol092_repository_maintenance.py"
+          ],
+          "evaluations": [
+            "skeleton/testing/test_vol092_repository_maintenance.py",
+            "scripts/plan_repository_maintenance.py"
+          ]
         },
         {
           "volume_ref": "VOL-093",
@@ -737,6 +1084,18 @@
           ],
           "gaps": [
             "independent backlog coverage, deduplication, and stale-state verification remains pending"
+          ],
+          "implementation_paths": [
+            "skeleton/automation/backlog_control.py",
+            "machine/repository_engineering_control.json",
+            "scripts/check_p2_repository_engineering.py"
+          ],
+          "tests": [
+            "tests/test_p2_repository_engineering.py"
+          ],
+          "evaluations": [
+            "planned:stale-task reconciliation",
+            "planned:duplicate-task pressure evaluation"
           ]
         },
         {
@@ -757,7 +1116,16 @@
             "metric gaming",
             "oscillating priorities"
           ],
-          "gaps": []
+          "gaps": [],
+          "implementation_paths": [
+            "skeleton/automation/priority_engine.py"
+          ],
+          "tests": [
+            "skeleton/testing/test_priority_engine.py"
+          ],
+          "evaluations": [
+            "skeleton/testing/test_priority_engine.py"
+          ]
         },
         {
           "volume_ref": "VOL-095",
@@ -777,7 +1145,16 @@
             "hidden dependency",
             "manual completion claim"
           ],
-          "gaps": []
+          "gaps": [],
+          "implementation_paths": [
+            "skeleton/automation/work_packages.py"
+          ],
+          "tests": [
+            "skeleton/testing/test_work_package_integrity.py"
+          ],
+          "evaluations": [
+            "skeleton/testing/test_work_package_integrity.py"
+          ]
         },
         {
           "volume_ref": "VOL-108",
@@ -799,6 +1176,16 @@
           ],
           "gaps": [
             "independent anti-pattern detector and exception-expiry verification remains pending"
+          ],
+          "implementation_paths": [
+            "skeleton/eval/antipatterns.py"
+          ],
+          "tests": [
+            "skeleton/testing/test_anti_pattern_registry.py"
+          ],
+          "evaluations": [
+            "planned:known-bad fixture evaluation",
+            "planned:exception expiry audit"
           ]
         },
         {
@@ -821,6 +1208,16 @@
           ],
           "gaps": [
             "independent construction-DAG cycle and blocked-state verification remains pending"
+          ],
+          "implementation_paths": [
+            "skeleton/automation/build_order.py"
+          ],
+          "tests": [
+            "skeleton/testing/test_build_order.py"
+          ],
+          "evaluations": [
+            "planned:dependency-cycle evaluation",
+            "planned:parallel-prototype handoff audit"
           ]
         },
         {
@@ -845,7 +1242,22 @@
             "evidence omission",
             "scope-dependent requirement lost"
           ],
-          "gaps": []
+          "gaps": [],
+          "implementation_paths": [
+            "skeleton/contracts/definition_of_done.py",
+            "skeleton/contracts/__init__.py",
+            "skeleton/ai/runtime/contracts/definition_of_done.py",
+            "skeleton/ai/runtime/contracts/__init__.py",
+            "skeleton/automation/definition_of_done.py",
+            "machine/ai_file_tree.json"
+          ],
+          "tests": [
+            "skeleton/testing/test_vol110_definition_of_done.py",
+            "skeleton/testing/test_definition_of_done.py"
+          ],
+          "evaluations": [
+            "skeleton/testing/test_vol110_definition_of_done.py"
+          ]
         },
         {
           "volume_ref": "VOL-115",
@@ -867,6 +1279,22 @@
           ],
           "gaps": [
             "independent cleanup-compatibility evaluation remains pending"
+          ],
+          "implementation_paths": [
+            "skeleton/contracts/technical_debt.py",
+            "skeleton/automation/technical_debt.py",
+            "skeleton/ai/runtime/contracts/technical_debt.py",
+            "skeleton/ai/build/automation/technical_debt.py",
+            "skeleton/repo_machine",
+            "skeleton/ai/build/repo_machine",
+            "machine/ai_file_tree.json"
+          ],
+          "tests": [
+            "skeleton/testing/test_technical_debt_ledger.py"
+          ],
+          "evaluations": [
+            "planned:debt-interest review",
+            "planned:cleanup compatibility evaluation"
           ]
         },
         {
@@ -889,6 +1317,22 @@
           ],
           "gaps": [
             "independent roadmap-control verification remains pending"
+          ],
+          "implementation_paths": [
+            "skeleton/contracts/roadmap_control.py",
+            "skeleton/automation/roadmap_control.py",
+            "skeleton/ai/runtime/contracts/roadmap_control.py",
+            "skeleton/ai/build/automation/roadmap_control.py",
+            "skeleton/repo_machine",
+            "skeleton/ai/build/repo_machine",
+            "machine/ai_file_tree.json"
+          ],
+          "tests": [
+            "skeleton/testing/test_roadmap_control.py"
+          ],
+          "evaluations": [
+            "planned:blocker-driven replan simulation",
+            "planned:scope-creep challenge"
           ]
         },
         {
@@ -912,6 +1356,20 @@
           "gaps": [
             "independent stale-signoff evaluation remains pending",
             "independent critical-blocker evaluation remains pending"
+          ],
+          "implementation_paths": [
+            "skeleton/automation/completion_model.py",
+            "skeleton/ai/build/automation/completion_model.py",
+            "skeleton/repo_machine",
+            "skeleton/ai/build/repo_machine",
+            "machine/ai_file_tree.json"
+          ],
+          "tests": [
+            "skeleton/testing/test_completion_model.py"
+          ],
+          "evaluations": [
+            "planned:critical-blocker aggregation test",
+            "planned:stale-signoff invalidation evaluation"
           ]
         }
       ]
@@ -969,6 +1427,19 @@
           ],
           "gaps": [
             "independent quality-vector threshold and non-compensable-failure verification remains pending"
+          ],
+          "implementation_paths": [
+            "skeleton/eval/quality_vector.py",
+            "skeleton/ai/evaluation/quality_vector.py",
+            "machine/ai_quality_vector.json",
+            "scripts/check_vol070_quality_vector.py"
+          ],
+          "tests": [
+            "tests/test_vol070_quality_vector.py"
+          ],
+          "evaluations": [
+            "planned:metric-gaming evaluation",
+            "planned:hard-failure masking test"
           ]
         },
         {
@@ -998,7 +1469,26 @@
             "state explosion",
             "proof overclaim"
           ],
-          "gaps": []
+          "gaps": [],
+          "implementation_paths": [
+            "skeleton/contracts/formal_methods.py",
+            "skeleton/contracts/formal_targets.py",
+            "skeleton/contracts/__init__.py",
+            "skeleton/ai/runtime/contracts/formal_methods.py",
+            "skeleton/ai/runtime/contracts/formal_targets.py",
+            "skeleton/ai/runtime/contracts/__init__.py",
+            "skeleton/contracts/operation.py",
+            "skeleton/contracts/protocol.py",
+            "machine/ai_file_tree.json"
+          ],
+          "tests": [
+            "skeleton/testing/test_vol081_formal_methods.py"
+          ],
+          "evaluations": [
+            "skeleton/testing/test_vol081_formal_methods.py",
+            "P0.OPERATION.LIFECYCLE",
+            "P0.PROTOCOL.REPLAY"
+          ]
         },
         {
           "volume_ref": "VOL-117",
@@ -1020,6 +1510,20 @@
           ],
           "gaps": [
             "independent metric-provenance verification remains pending"
+          ],
+          "implementation_paths": [
+            "skeleton/contracts/project_metrics.py",
+            "skeleton/observability/project_metrics.py",
+            "skeleton/ai/runtime/contracts/project_metrics.py",
+            "skeleton/ai/runtime/observability/project_metrics.py",
+            "machine/ai_file_tree.json"
+          ],
+          "tests": [
+            "skeleton/testing/test_project_metrics.py"
+          ],
+          "evaluations": [
+            "planned:Goodhart/adversarial metric review",
+            "planned:metric drift evaluation"
           ]
         },
         {
@@ -1043,6 +1547,17 @@
           "gaps": [
             "independent final-assembly verification remains pending",
             "P2-QUAL-01 release-qualification dependencies remain external to this bounded implementation"
+          ],
+          "implementation_paths": [
+            "skeleton/app/final_assembly.py",
+            "skeleton/testing/test_final_assembly.py"
+          ],
+          "tests": [
+            "skeleton/testing/test_final_assembly.py"
+          ],
+          "evaluations": [
+            "planned:VS-000..VS-007 qualification",
+            "planned:compound-fault final campaign"
           ]
         }
       ]
@@ -1096,7 +1611,18 @@
             "generated overwrite",
             "broken references"
           ],
-          "gaps": []
+          "gaps": [],
+          "implementation_paths": [
+            "skeleton/documentation/runtime.py",
+            "scripts/generate_documentation.py",
+            "docs/generated/README.md"
+          ],
+          "tests": [
+            "skeleton/testing/test_vol089_090_documentation_engine.py"
+          ],
+          "evaluations": [
+            "skeleton/testing/test_vol089_090_documentation_engine.py"
+          ]
         },
         {
           "volume_ref": "VOL-090",
@@ -1116,7 +1642,18 @@
             "review noise",
             "manual derived edits"
           ],
-          "gaps": []
+          "gaps": [],
+          "implementation_paths": [
+            "skeleton/documentation/runtime.py",
+            "scripts/generate_documentation.py",
+            "docs/generated/README.md"
+          ],
+          "tests": [
+            "skeleton/testing/test_vol089_090_documentation_engine.py"
+          ],
+          "evaluations": [
+            "skeleton/testing/test_vol089_090_documentation_engine.py"
+          ]
         }
       ]
     },
@@ -1171,7 +1708,29 @@
             "native crash corrupts process",
             "silent numerical divergence"
           ],
-          "gaps": []
+          "gaps": [],
+          "implementation_paths": [
+            "skeleton/native",
+            "java-accelerators",
+            "skeleton/native/isolation.py",
+            "skeleton/native/selection.py",
+            "skeleton/ai/runtime/native/isolation.py",
+            "skeleton/ai/runtime/native/selection.py",
+            "scripts/profile_p2_acceleration.py",
+            "scripts/record_p2_acceleration_profile.py"
+          ],
+          "tests": [
+            "skeleton/testing/test_native_abi.py",
+            "skeleton/testing/test_native_fallback.py",
+            "tests/test_p2_acceleration_receipts.py",
+            "tests/test_p2_acceleration_isolation.py",
+            "tests/test_p2_acceleration_benchmarks.py"
+          ],
+          "evaluations": [
+            ".github/workflows/p2-profile-gated-acceleration.yml",
+            "scripts/profile_p2_acceleration.py",
+            "scripts/record_p2_acceleration_profile.py"
+          ]
         },
         {
           "volume_ref": "VOL-033",
@@ -1198,6 +1757,32 @@
           ],
           "gaps": [
             "exact-head VOL-033 gate and independent accountability verification pending"
+          ],
+          "implementation_paths": [
+            "java-accelerators",
+            "skeleton/native/jvm_protocol.py",
+            "skeleton/native/jvm_registry.py",
+            "skeleton/memory/jvm_vector_accelerator.py",
+            "skeleton/observability/jvm_accelerator.py",
+            "skeleton/simulation/physics/jvm_broadphase_accelerator.py",
+            "skeleton/ai/runtime/native/jvm_protocol.py",
+            "skeleton/ai/runtime/native/jvm_registry.py",
+            "skeleton/ai/runtime/memory/jvm_vector_accelerator.py",
+            "skeleton/ai/runtime/observability/jvm_accelerator.py"
+          ],
+          "tests": [
+            "skeleton/testing/test_vol033_jvm_protocol.py",
+            "skeleton/testing/test_jvm_accelerator_registry.py",
+            "skeleton/testing/test_jvm_accelerator_runtime_status.py",
+            "skeleton/testing/test_jvm_observability_accelerator.py",
+            "skeleton/testing/test_jvm_vector_accelerator.py",
+            "skeleton/testing/test_jvm_physics_broadphase_accelerator.py",
+            "tests/test_ci_java_accelerator_dependencies.py",
+            "tests/test_jvm_registry_namespace_migration.py"
+          ],
+          "evaluations": [
+            "scripts/benchmark_java_accelerators.py",
+            ".github/workflows/vol033-jvm-protocol.yml"
           ]
         }
       ]
