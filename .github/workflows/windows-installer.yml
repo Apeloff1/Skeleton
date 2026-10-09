@@ -214,6 +214,31 @@ jobs:
           if ($null -eq $queueStatus.jobs) {
             throw "offline indexing queue returned no jobs envelope"
           }
+          $enqueueJson = & $offline --queue-db $offlineQueue --enqueue-dir $offlineNotes --queue-library $offlineIndex --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "frozen offline queue did not accept explicit local directory"
+          }
+          $queued = $enqueueJson | ConvertFrom-Json
+          if ($queued.enqueued.state -ne "queued") {
+            throw "frozen offline queue did not return a queued receipt"
+          }
+          $drainJson = & $offline --queue-db $offlineQueue --run-queue --queue-status --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "frozen offline queue did not complete admitted work"
+          }
+          $drained = $drainJson | ConvertFrom-Json
+          if ($drained.processed.Count -ne 1 -or $drained.processed[0].state -ne "completed") {
+            throw "frozen offline queue did not commit its index receipt"
+          }
+          $pendingJson = & $offline --queue-db $offlineQueue --enqueue-dir $offlineNotes --queue-library $offlineIndex --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "frozen offline queue cannot enqueue followup work"
+          }
+          $pending = $pendingJson | ConvertFrom-Json
+          if ($pending.enqueued.state -ne "queued") {
+            throw "followup indexing job is not pending for recovery test"
+          }
+
           $auditJson = & $offline --audit-library $offlineIndex --audit-queue $offlineQueue --json
           if ($LASTEXITCODE -ne 0) {
             throw "offline standalone semantic integrity audit failed"
@@ -237,6 +262,22 @@ jobs:
           & $offline --restore-from $offlineSnapshot --snapshot-library $recoveredKnowledge --snapshot-queue $recoveredQueue --json | Out-Null
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $recoveredKnowledge)) {
             throw "offline SQLite snapshot restore failed"
+          }
+
+          $restoredQueueJson = & $offline --queue-db $recoveredQueue --queue-status --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "recovered queue cannot be opened"
+          }
+          $restoredQueue = $restoredQueueJson | ConvertFrom-Json
+          $quarantined = @($restoredQueue.jobs | Where-Object {
+            $_.job_id -eq $pending.enqueued.job_id -and $_.state -eq "cancelled"
+          })
+          if ($quarantined.Count -ne 1) {
+            throw "restored queue did not quarantine stale-path pending work"
+          }
+          $recoveredAuditJson = & $offline --audit-library $recoveredKnowledge --audit-queue $recoveredQueue --json
+          if ($LASTEXITCODE -ne 0 -or -not ($recoveredAuditJson | ConvertFrom-Json).ok) {
+            throw "recovered local knowledge or job queue failed semantic audit"
           }
 
           $uninstaller = Join-Path $installDir "unins000.exe"
