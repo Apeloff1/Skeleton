@@ -1,0 +1,11 @@
+{
+  "stimuli": 64,
+  "catalog": 48,
+  "cards": 3072,
+  "hits": {
+    "1": 2944,
+    "0": 128
+  },
+  "final_hit": 46,
+  "key_len": 64
+}

@@ -86,7 +86,9 @@ class CapabilityBody:
             return {"hit": 1, "law": "pointer", "n": len(clauses), "clauses": clauses}
         def clipped(_stimulus: str) -> dict:
             state.g = state.g.step(0.2, 0.5)
-            return state.g.card()
+            card = state.g.card()
+            card["hit"] = 1
+            return card
         def memory(stimulus: str) -> dict:
             card = state.memory.absorb(stimulus)
             state.roots.append(card["root"])
@@ -152,6 +154,7 @@ class CapabilityBody:
                 g = g.step(0.1, 0.5)
             card = g.card()
             card["absorb_steps"] = 4
+            card["hit"] = 1
             return card
         def multimodal(_stimulus: str) -> dict:
             return bind_frame(b"frame-bytes", False)
@@ -162,7 +165,8 @@ class CapabilityBody:
         def evidence(_stimulus: str) -> dict:
             return {"hit": 0, "law": "evidence", "availability": "unavailable"}
         def coordination(_stimulus: str) -> dict:
-            return tournament(state.roots or ["r1", "r1", "r2"])
+            window = (state.roots or ["r1", "r1", "r2"])[-8:]
+            return tournament(window)
         def chamber(stimulus: str) -> dict:
             return Chamber().walk(stimulus)
         handlers = {
