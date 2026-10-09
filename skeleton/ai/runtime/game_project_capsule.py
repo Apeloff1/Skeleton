@@ -12,13 +12,13 @@ import hashlib
 import json
 from typing import Any, Mapping
 
-from .game_rights import GameRightsError, admit_game_rights
+from .game_rights import GameRightsError, admit_homebrew_project
 from .game_platform_catalog import GamePlatformError, plan_game_targets
 from .gameplay_capabilities import GameplayError, compile_level, compile_native_scene
 from .game_playability import check_game_playability
 
 SCHEMA = "skeleton.game.portable_capsule.v1"
-MAX_EDITS = 64
+MAX_EDITS = 1024
 MAX_PACKAGE_BYTES = 96 * 1024
 
 
@@ -41,7 +41,7 @@ def _admit_edits(
     edits: list[dict[str, Any]],
 ) -> list[str]:
     if not isinstance(edits, list) or len(edits) > MAX_EDITS:
-        raise GameCapsuleError("tile modifications exceed 64-transaction budget")
+        raise GameCapsuleError("tile modifications exceed 1024-cell budget")
     if not edits:
         return tiles[:]
     grid = [list(row) for row in tiles]
@@ -107,20 +107,14 @@ def make_game_capsule(
             raise GameCapsuleError(
                 "tilemap rights record must match original source content digest"
             )
-        admitted_rights = admit_game_rights(
+        admitted_rights = admit_homebrew_project(
             rights_manifest, action=action, jurisdiction=jurisdiction,
         )
-        if action == "interoperability_study":
-            raise GameCapsuleError(
-                "interoperability observations are segregated from game project exports"
-            )
-        if edits and action not in (
-            "original_game", "independent_mechanics",
-            "modify_authorized", "private_reproduction",
-        ):
-            raise GameCapsuleError("edits require an authored/authorized modification action")
-        if not edits and action == "train_on_assets":
-            raise GameCapsuleError("training requests cannot be treated as game project exports")
+        # The production path is original-homebrew ONLY. Editing another
+        # author's licensed game, even with a user-provided license reference,
+        # is not part of this pipeline. SDK access is independently scoped.
+        if action not in ("original_game", "independent_mechanics"):
+            raise GameCapsuleError("game creation and editing are homebrew-only")
         final_tiles = _admit_edits(source_tiles, edits)
         updated = compile_level({"tiles": final_tiles})
         if not updated["goal_reachable"]:
@@ -170,6 +164,8 @@ def make_game_capsule(
         },
         "output_kind": "engine_neutral_json_project",
         "game_data_provenance_attested": True,
+        "homebrew_only": True,
+        "third_party_game_porting_supported": False,
         "legal_release_authorized": False,
         "external_binary_or_licensed_sdk_embedded": False,
         "console_rom_or_native_export_generated": False,
@@ -194,6 +190,7 @@ def verify_game_capsule(capsule: Mapping[str, Any]) -> dict[str, Any]:
         "edited_tile_sha256", "source_tilemap", "tilemap", "scene", "target_plan",
         "rights_manifest", "rights_receipt", "modifications", "action", "jurisdiction",
         "playability", "output_kind", "game_data_provenance_attested",
+        "homebrew_only", "third_party_game_porting_supported",
         "legal_release_authorized",
         "external_binary_or_licensed_sdk_embedded",
         "console_rom_or_native_export_generated", "training_examples_added",
@@ -216,6 +213,8 @@ def verify_game_capsule(capsule: Mapping[str, Any]) -> dict[str, Any]:
         or capsule["external_binary_or_licensed_sdk_embedded"] is not False
         or capsule["console_rom_or_native_export_generated"] is not False
         or capsule["training_examples_added"] != 0
+        or capsule["homebrew_only"] is not True
+        or capsule["third_party_game_porting_supported"] is not False
     ):
         raise GameCapsuleError("game capsule attempted to claim unverified release")
     try:
@@ -260,7 +259,7 @@ def verify_game_capsule(capsule: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(evidence, dict):
         raise GameCapsuleError("capsule lacks inspectable rights provenance")
     try:
-        fresh_rights = admit_game_rights(
+        fresh_rights = admit_homebrew_project(
             evidence, action=capsule["action"],
             jurisdiction=capsule["jurisdiction"],
         )
@@ -335,6 +334,7 @@ def verify_game_capsule(capsule: Mapping[str, Any]) -> dict[str, Any]:
         "target_native_binaries_built": 0,
         "legal_publication_approved": False,
         "training_examples_added": 0,
+        "homebrew_only": True,
     }
 
 
