@@ -187,6 +187,11 @@ class NativeLLMRuntime:
             feed_forward=self.model.d_ff,
             norm=self.model.norm,
             ffn_kind=self.model.ffn_kind,
+            positional=(
+                "rope-only"
+                if getattr(self.model, "position_mode", "learned_rope") == "rope"
+                else "learned-position-embedding+rope-attention"
+            ),
         )
 
     @property
