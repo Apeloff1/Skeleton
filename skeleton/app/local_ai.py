@@ -16,6 +16,7 @@ from typing import Any
 from skeleton.ai.runtime.inference.artifact import load_local_model_artifact
 from skeleton.ai.runtime.inference.local import LocalInferenceRequest, LocalInferenceResult, LocalInferenceEngine
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
+from skeleton.app.local_ai_transcript import load_transcript, save_transcript
 
 
 MAX_USER_CHARS = 4096
@@ -66,6 +67,24 @@ class OfflineAISession:
     @property
     def model_digest(self) -> str:
         return self.backend.model_digest
+
+    def export_transcript(self, path: str | Path) -> str:
+        """User-requested offline snapshot; not the durable assistant authority."""
+        self.backend.assert_identity()
+        return save_transcript(
+            path, model_digest=self.backend.model_digest,
+            tokenizer_digest=self.backend.tokenizer_digest, history=self.history,
+        )
+
+    def import_transcript(self, path: str | Path) -> int:
+        """Restore only fully verified turns bound to this exact native model."""
+        self.backend.assert_identity()
+        restored = load_transcript(
+            path, model_digest=self.backend.model_digest,
+            tokenizer_digest=self.backend.tokenizer_digest,
+        )
+        self.history = restored  # commit only after all checks pass
+        return len(restored) // 2
 
     def _request(self, prompt: str, max_output_tokens: int) -> tuple[LocalInferenceRequest, tuple[tuple[str, str], ...]]:
         if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_USER_CHARS:
@@ -157,6 +176,10 @@ class OfflineAIWindow:
         self.load_button.pack(side="left")
         self.clear_button = ttk.Button(toolbar, text="New conversation", command=self.clear)
         self.clear_button.pack(side="left", padx=8)
+        self.open_history_button = ttk.Button(toolbar, text="Open chat…", command=self.open_history)
+        self.open_history_button.pack(side="left", padx=4)
+        self.save_history_button = ttk.Button(toolbar, text="Save chat…", command=self.save_history)
+        self.save_history_button.pack(side="left", padx=4)
         self.cancel_button = ttk.Button(toolbar, text="Cancel generation", command=self.cancel)
         self.cancel_button.pack(side="left")
         self.status = tk.StringVar(value="Choose a local native model checkpoint to begin.")
@@ -176,6 +199,8 @@ class OfflineAIWindow:
         self.send_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.clear_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.cancel_button.configure(state="normal" if self.active else "disabled")
+        self.open_history_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
+        self.save_history_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
 
     def _append(self, speaker: str, text: str) -> None:
         self.transcript.configure(state="normal")
@@ -214,6 +239,45 @@ class OfflineAIWindow:
         self.transcript.delete("1.0", "end")
         self.transcript.configure(state="disabled")
         self.status.set("Conversation reset in memory.")
+
+    def open_history(self) -> None:
+        """Import is explicit and never modifies the session on bad input."""
+        if self.active or self.session is None:
+            return
+        selected = self.filedialog.askopenfilename(
+            parent=self.window, title="Open an offline Skeleton chat",
+            filetypes=[("Skeleton chat", "*.json"), ("All files", "*.*")],
+        )
+        if not selected:
+            return
+        try:
+            turns = self.session.import_transcript(selected)
+        except (ValueError, OSError) as exc:
+            self.status.set("Chat not opened: " + str(exc))
+            return
+        self.transcript.configure(state="normal")
+        self.transcript.delete("1.0", "end")
+        self.transcript.configure(state="disabled")
+        for role, text in self.session.history:
+            self._append("You" if role == "user" else "Skeleton · Local", text)
+        self.status.set(f"Restored {turns} complete offline turns for this model.")
+
+    def save_history(self) -> None:
+        """The chosen file is readable local plaintext; no background upload."""
+        if self.active or self.session is None:
+            return
+        selected = self.filedialog.asksaveasfilename(
+            parent=self.window, title="Save offline chat as plaintext JSON",
+            defaultextension=".json", filetypes=[("Skeleton chat", "*.json")],
+        )
+        if not selected:
+            return
+        try:
+            digest = self.session.export_transcript(selected)
+        except (ValueError, OSError) as exc:
+            self.status.set("Chat not saved: " + str(exc))
+            return
+        self.status.set("Saved local chat · SHA-256 " + digest[:16] + "… · file is plaintext.")
 
     def send(self) -> None:
         if self.active or self.session is None:
