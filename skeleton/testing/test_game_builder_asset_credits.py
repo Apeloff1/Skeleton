@@ -178,3 +178,20 @@ def test_guarded_native_game_source_embeds_original_author_notices(tmp_path):
         compile_rights_aware_desktop(
             world, source, rights, credits=generate(), authorized=True,
         )
+
+
+
+def test_attribution_notices_are_immutable_and_cannot_fake_license_clearance():
+    original = generate(materials=(own(),), credits=())
+    with pytest.raises(CreditsError):
+        replace(original, credits_md=original.credits_md + "\nnew, unreviewed author claim")
+    with pytest.raises(CreditsError):
+        replace(original, third_party_notices_txt="tampered")
+    with pytest.raises(CreditsError):
+        replace(original, bundle_sha256="f"*64)
+    with pytest.raises(CreditsError):
+        replace(original, release_authorized=True)
+    with pytest.raises(CreditsError):
+        replace(original, licensed_material_independently_cleared=True)
+    with pytest.raises(CreditsError):
+        replace(original, target_platform_id="sega_dreamcast")
