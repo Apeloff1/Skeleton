@@ -20,6 +20,7 @@ from .legal_paths import (
 )
 from .legal_port_bridge import propose_rights_aware_port
 from .plagiarism_guard import OriginalityReport, OriginalityDisposition
+from .asset_credits import CreditsBundle, export_game_credits
 from .platform_registry import default_registry
 from .port_planner import HomebrewSource, PortMode
 from .playable_world import PlayableWorld
@@ -36,6 +37,7 @@ class LegalNativeDesktopSource:
     evidence_sha256: str
     package_content_sha256: str
     originality: OriginalityReport | None = None
+    credits: CreditsBundle | None = None
     native_executable_compiled: bool = False
     release_authorized: bool = False
     legal_advice_or_certificate: bool = False
@@ -52,6 +54,8 @@ class LegalNativeDesktopSource:
             "combined_sha256": self.package_content_sha256,
             "game_content_and_assets_independently_verified": False,
             "real_toolchain_run_verified": False,
+            "attribution_notices_embedded": self.credits is not None,
+            "attribution_bundle_sha256": self.credits.bundle_sha256 if self.credits else None,
             "plagiarism_screened": self.originality is not None,
             "originality_screen_digest": self.originality.screen_digest if self.originality else None,
             "originality_artifact_bound": (
@@ -70,6 +74,7 @@ def compile_rights_aware_desktop(
     world: PlayableWorld, source: HomebrewSource, request: HomebrewLegalRequest,
     *, authorized: bool,
     originality: OriginalityReport | None = None,
+    credits: CreditsBundle | None = None,
 ) -> LegalNativeDesktopSource:
     """Refuse review holds and prohibited reuse before emitting source code."""
     if type(authorized) is not bool or not authorized:
@@ -89,6 +94,13 @@ def compile_rights_aware_desktop(
             originality.disposition is not OriginalityDisposition.DESIGN_ADMISSIBLE_NOT_LEGAL_CLEARANCE
         ):
             raise ClearedSourceExportError("potential plagiarism or missing provenance requires review")
+    if credits is not None:
+        if not isinstance(credits, CreditsBundle):
+            raise ClearedSourceExportError("typed attribution and credit bundle required")
+        if credits.project_id != request.project_id or credits.target_platform_id != request.target_platform_id:
+            raise ClearedSourceExportError("attribution package does not belong to exact destination game")
+        if credits.review_issues:
+            raise ClearedSourceExportError("unresolved asset/notice licence concerns prevent guarded export")
     proposal = propose_rights_aware_port(source, request, mode=PortMode.ENHANCED)
     if not proposal.design_stage_admitted or proposal.technical_blueprint is None:
         raise ClearedSourceExportError(
@@ -100,19 +112,21 @@ def compile_rights_aware_desktop(
         world, source, request.target_platform_id, authorized=True,
     )
     combined = sha256((
-        output.content_digest + ":" + proposal.legal.assessment_digest
+        output.content_digest + ":" + proposal.legal.assessment_digest +
+        ":" + (credits.bundle_sha256 if credits else "")
     ).encode("ascii")).hexdigest()
     return LegalNativeDesktopSource(
         project=output, assessment=proposal.legal,
         evidence_sha256=source.evidence_sha256,
         package_content_sha256=combined,
-        originality=originality,
+        originality=originality, credits=credits,
     )
 
 
 def compile_originality_gated_desktop(
     world: PlayableWorld, source: HomebrewSource, request: HomebrewLegalRequest,
     *, originality: OriginalityReport, authorized: bool,
+    credits: CreditsBundle | None = None,
 ) -> LegalNativeDesktopSource:
     """Required originality screen for release-bound native prototype workflows.
 
@@ -122,7 +136,7 @@ def compile_originality_gated_desktop(
     if not isinstance(originality, OriginalityReport):
         raise ClearedSourceExportError("mandatory comprehensive originality screen absent")
     return compile_rights_aware_desktop(
-        world, source, request, originality=originality, authorized=authorized,
+        world, source, request, originality=originality, credits=credits, authorized=authorized,
     )
 
 
@@ -136,6 +150,8 @@ def export_rights_aware_desktop(
     if not isinstance(bundle, LegalNativeDesktopSource):
         raise ClearedSourceExportError("typed guarded source bundle required")
     path = export_native_desktop_source(bundle.project, destination, authorized=True)
+    if bundle.credits is not None:
+        export_game_credits(bundle.credits, path / "rights", authorized=True)
     receipt = bundle.legal_receipt()
     with (path / "legal_review.json").open("x", encoding="utf-8", newline="\n") as stream:
         stream.write(json.dumps(receipt, sort_keys=True, indent=2) + "\n")
