@@ -1,20 +1,10 @@
-from .chat_workspace import NativeChatWorkspace, WorkspaceRecord, WorkspaceEvent
-from .chat_engine import NativeChatEngine, ChatTurnResult
-from .chat_protocol import ChatMessage, ChatTranscript
-"""Provider-neutral FLGB-02 model-runtime and native execution contracts."""
-from .admission_scheduler import AdmissionDecision, AdmissionLimits, RuntimeAdmissionScheduler, ScheduledRequest
-from .runtime_signals import DEFAULT_RUNTIME_SIGNALS, RuntimeSignal, RuntimeSignalRegistry, SignalMaturity
-from .runtime_policy import DEFAULT_RUNTIME_POLICY_COMPILER, RuntimePolicy, RuntimePolicyCompiler
-from .runtime_epochs import DEFAULT_RUNTIME_EPOCHS, EpochStatus, RuntimeEpoch, RuntimeEpochRegistry
-from .temporal_policy import DEFAULT_TEMPORAL_RUNTIME_POLICY_COMPILER, TemporalRuntimePolicy, TemporalRuntimePolicyCompiler
-from .serving_policy import PolicyAwareServingPlanner, ServiceClass, ServingPlan, ServingRequest
-from .slo_planner import ResourcePlan, RuntimeEstimate, SLOResourcePlanner, SLOTarget
-from .serving_telemetry import RequestTelemetry, ServingTelemetryWindow
-from .runtime_feedback import DeterministicRuntimeEstimator, FeedbackLimits, FeedbackReceipt
-from .closed_loop_serving import ClosedLoopServingController, ControlDecision
-from .iteration_scheduler import InferencePhase, IterationPlan, IterationScheduler, IterationSlice, IterationWork
-from .execution_telemetry import ExecutionTiming
-from .admission_checkpoint import restore_admission_scheduler
+"""Provider-neutral FLGB-02 runtime contracts. Optional subsystems load lazily.
+
+Importing a stdlib-only model contract must never initialize the whole
+Cortex, provider integrations, desktop stack or machine-specific backends.
+"""
+from __future__ import annotations
+
 from .flgb_model_runtime import (
     ALLOWED_TRANSITIONS,
     BatchRequest,
@@ -39,24 +29,6 @@ from .flgb_model_runtime import (
     plan_kv_admission,
     route_request,
 )
-from .conversation_persistence import DurableConversationCoordinator, PersistenceBinding
-from .conversation_store import ConversationStore, StoredConversation
-from .conversation_service import NativeConversationService, SessionRecord, ServingReceipt
-from .native_llm_runtime import (
-    BatchGenerationResult,
-    GenerationResult,
-    GenerationStream,
-    InferenceResult,
-    NativeLLMRuntime,
-    NativeConversationSession,
-)
-from .runtime_checkpoint import validate_model_snapshot
-from .runtime_service import (
-    CancellationToken,
-    NativeModelService,
-    NativeServiceError,
-    NativeServiceResult,
-)
 from .runtime_contracts import (
     BatchGenerationRequest,
     DevicePolicy,
@@ -76,6 +48,21 @@ from .runtime_contracts import (
 from importlib import import_module
 
 _LAZY_EXPORTS = {
+    "NativeConversationSession": ".native_llm_runtime",
+    "ServingReceipt": ".conversation_service",
+    "SessionRecord": ".conversation_service",
+    "NativeConversationService": ".conversation_service",
+    "StoredConversation": ".conversation_store",
+    "ConversationStore": ".conversation_store",
+    "PersistenceBinding": ".conversation_persistence",
+    "DurableConversationCoordinator": ".conversation_persistence",
+    "ChatTranscript": ".chat_protocol",
+    "ChatMessage": ".chat_protocol",
+    "ChatTurnResult": ".chat_engine",
+    "NativeChatEngine": ".chat_engine",
+    "WorkspaceEvent": ".chat_workspace",
+    "WorkspaceRecord": ".chat_workspace",
+    "NativeChatWorkspace": ".chat_workspace",
     "BatchGenerationResult": ".native_llm_runtime",
     "GenerationResult": ".native_llm_runtime",
     "GenerationStream": ".native_llm_runtime",
