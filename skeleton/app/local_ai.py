@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from hashlib import sha256
+import json
 from pathlib import Path
 from queue import Empty, Queue
 import secrets
@@ -161,10 +162,31 @@ class OfflineAISession:
             not isinstance(result.text, str)
             or not result.text.strip()
             or result.tool_calls
-            or not result.execution_receipt_digest
             or result.model_digest != self.backend.model_digest
         ):
-            raise OfflineAIError("native model did not return a bound, text-only answer")
+            raise OfflineAIError("local model did not return a bound, text-only answer")
+        receipt_digest = result.execution_receipt_digest
+        if isinstance(self.backend, LlamaCppModel) and not receipt_digest:
+            # llama.cpp returns a concrete request-bound process response ID
+            # rather than the native transformer receipt. Derive a local
+            # response digest from its admitted binary/model identity, full
+            # request, and exact output. This is NOT remote attestation.
+            prefix = ("local:llama:" + self.backend.runtime_digest + ":"
+                      + self.backend.model_digest + ":")
+            if not isinstance(result.response_id, str) or not result.response_id.startswith(prefix):
+                raise OfflineAIError("GGUF subprocess response lacks bound identity")
+            receipt_digest = sha256(json.dumps({
+                "schema": "skeleton.offline-gguf-receipt.v1",
+                "response_id": result.response_id,
+                "request_digest": request.digest,
+                "model": result.model_digest,
+                "runtime": self.backend.runtime_digest,
+                "output_sha256": sha256(result.text.encode("utf-8")).hexdigest(),
+                "input_tokens": result.input_tokens,
+                "output_tokens": result.output_tokens,
+            }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+        if not isinstance(receipt_digest, str) or len(receipt_digest) != 64:
+            raise OfflineAIError("offline inference has no bound execution receipt")
         # Only commit a complete, verified local inference result.
         self.history = (
             retained_history
@@ -173,7 +195,7 @@ class OfflineAISession:
         return OfflineAnswer(
             text=result.text,
             model_digest=result.model_digest,
-            execution_receipt_digest=result.execution_receipt_digest,
+            execution_receipt_digest=receipt_digest,
             input_tokens=result.input_tokens,
             output_tokens=result.output_tokens,
         )
@@ -393,8 +415,14 @@ class OfflineAIWindow:
         ).pack(anchor="w", pady=(4, 10))
         toolbar = ttk.Frame(frame)
         toolbar.pack(fill="x")
-        self.load_button = ttk.Button(toolbar, text="Load checkpoint…", command=self.choose_model)
+        self.load_button = ttk.Button(toolbar, text="Load native checkpoint…",
+                                      command=self.choose_model)
         self.load_button.pack(side="left")
+        self.load_gguf_button = ttk.Button(
+            toolbar, text="Load local GGUF…",
+            command=lambda: self.choose_model("gguf")
+        )
+        self.load_gguf_button.pack(side="left", padx=5)
         self.clear_button = ttk.Button(toolbar, text="New conversation", command=self.clear)
         self.clear_button.pack(side="left", padx=8)
         self.cancel_button = ttk.Button(toolbar, text="Cancel generation", command=self.cancel)
@@ -435,6 +463,7 @@ class OfflineAIWindow:
 
     def _refresh(self) -> None:
         self.load_button.configure(state="disabled" if self.active else "normal")
+        self.load_gguf_button.configure(state="disabled" if self.active else "normal")
         self.send_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.clear_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.cancel_button.configure(state="normal" if self.active else "disabled")
@@ -546,29 +575,37 @@ class OfflineAIWindow:
         self.transcript.see("end")
         self.transcript.configure(state="disabled")
 
-    def choose_model(self) -> None:
+    def choose_model(self, kind: str = "native") -> None:
         if self.active:
             return
+        is_gguf = kind == "gguf"
         selected = self.filedialog.askopenfilename(
             parent=self.window,
-            title="Select a Skeleton native model checkpoint",
-            filetypes=[("JSON checkpoint", "*.json"), ("All files", "*.*")],
+            title=("Select digest-pinned local GGUF deployment manifest"
+                   if is_gguf else "Select a Skeleton native model checkpoint"),
+            filetypes=[("JSON manifest/checkpoint", "*.json"), ("All files", "*.*")],
         )
         if not selected:
             return
         self.active = True
-        self.status.set("Validating the checkpoint and native model weights…")
+        self.status.set("Validating offline GGUF executable/model…" if is_gguf
+                        else "Validating the native model checkpoint…")
         self._refresh()
 
         def work() -> None:
             try:
-                backend = load_native_checkpoint(selected)
+                backend = (load_gguf_deployment(selected)
+                           if is_gguf else load_native_checkpoint(selected))
                 session = DurableOfflineAISession(
                     backend, database=private_desktop_database(backend.model_digest)
                 )
+                if self.closed:
+                    session.close()
+                    return
                 self.events.put(("loaded", session))
             except Exception as exc:
-                self.events.put(("error", str(exc)))
+                if not self.closed:
+                    self.events.put(("error", str(exc)))
 
         threading.Thread(target=work, name="skeleton-local-model-load", daemon=True).start()
 
@@ -605,7 +642,9 @@ class OfflineAIWindow:
 
         def work() -> None:
             async def generate() -> OfflineAnswer:
-                task = asyncio.create_task(session.ask(prompt, max_output_tokens=min(32, session.backend.runtime.limits.max_new_tokens, max(1, session.backend.runtime.limits.max_context // 4))))
+                task = asyncio.create_task(session.ask(
+                    prompt, max_output_tokens=session.preferred_output_tokens
+                ))
                 with self.worker_lock:
                     self.worker_loop = asyncio.get_running_loop()
                     self.worker_task = task
@@ -645,8 +684,10 @@ class OfflineAIWindow:
                     self.session = value  # type: ignore[assignment]
                     self._display_history()
                     self._update_sessions()
+                    kind = ("GGUF / llama.cpp" if isinstance(self.session.backend, LlamaCppModel)
+                            else "Native transformer")
                     self.status.set(
-                        "Native model loaded offline: "
+                        kind + " loaded offline: "
                         + self.session.model_digest[:16] + "… · saved locally"
                     )
                 elif kind == "answer":
