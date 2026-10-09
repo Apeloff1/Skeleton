@@ -15,7 +15,7 @@ from typing import Sequence
 
 from skeleton.ai.training.offline_foundations import SyntheticCurriculumError
 from skeleton.ai.training.sparse_capability import (
-    DEFAULT_BUDGET, HARDWARE_BUDGETS,
+    DEFAULT_BUDGET, HARDWARE_BUDGETS, HARDWARE_CORPUS_BYTE_BUDGETS,
     assess_heldout_capabilities, build_sparse_capability_plan,
     register_sparse_capability_plan, sparse_plan_receipt,
 )
@@ -91,6 +91,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.split is not None and args.evaluate is None:
         print("--split requires --evaluate", file=sys.stderr)
         return 2
+    if args.focus_validation is not None and args.evaluate is not None:
+        print("--focus-validation is for sparse selection, not held-out scoring", file=sys.stderr)
+        return 2
     budget = HARDWARE_BUDGETS[args.profile] if args.budget is None else args.budget
     if (
         type(budget) is not int or budget < DEFAULT_BUDGET
@@ -114,6 +117,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.dataset, budget=budget, focus_modes=focus_modes,
         )
         report = sparse_plan_receipt(plan)
+        limit_bytes = HARDWARE_CORPUS_BYTE_BUDGETS[args.profile]
+        if plan["active_training_bytes"] > limit_bytes:
+            raise SyntheticCurriculumError(
+                "sparse training text exceeds selected hardware profile byte budget"
+            )
+        report["hardware_profile_training_byte_cap"] = limit_bytes
         if args.focus_validation is not None:
             report["adaptive_selection_source"] = "validation-only"
             report["adaptive_selection_did_not_copy_heldout_labels"] = True
