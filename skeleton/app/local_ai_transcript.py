@@ -137,9 +137,19 @@ def load_transcript(
         flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
         fd = os.open(target, flags)
         with os.fdopen(fd, "rb") as stream:
-            if os.fstat(stream.fileno()).st_size > MAX_TRANSCRIPT_BYTES:
-                raise LocalTranscriptError("transcript grew beyond its byte budget")
+            opened = os.fstat(stream.fileno())
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or opened.st_size > MAX_TRANSCRIPT_BYTES
+                or (opened.st_dev, opened.st_ino) != (info.st_dev, info.st_ino)
+            ):
+                raise LocalTranscriptError("transcript changed during secure open")
             raw = stream.read(MAX_TRANSCRIPT_BYTES + 1)
+            if (
+                len(raw) != opened.st_size
+                or os.fstat(stream.fileno()).st_size != opened.st_size
+            ):
+                raise LocalTranscriptError("transcript changed while reading")
     except OSError as exc:
         raise LocalTranscriptError("cannot read local transcript") from exc
     return decode_transcript(raw, model_digest=model_digest, tokenizer_digest=tokenizer_digest)
