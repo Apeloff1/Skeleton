@@ -535,50 +535,50 @@ Completion requires implementation sign-off plus independent verification sign-o
 
 ## P1 Trustworthy-Production Tasks
 
-- [ ] `ACC-P1-EVID-01` — P1-EVID-01 Canonical evidence identity — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-EVID-02` — P1-EVID-02 Maturity reconciliation engine — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-EVID-03` — P1-EVID-03 Required-gate authority map — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-EVID-04` — P1-EVID-04 Risk/gap evidence binding — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-EVID-05` — P1-EVID-05 Reproducibility bundle — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-EVID-06` — P1-EVID-06 Scope-freeze and ADR enforcement — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-INTEL-01` — P1-INTEL-01 Quality measurement and routing/context receipt spine — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-INTEL-02` — P1-INTEL-02 Memory, retrieval and knowledge quality authority — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-INTEL-03` — P1-INTEL-03 Reasoning, search and stopping policy registry — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-INTEL-04` — P1-INTEL-04 Answer and artifact quality pipeline — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-INTEL-05` — P1-INTEL-05 Plan verifier and static analysis — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-INTEL-06` — P1-INTEL-06 Core intelligence qualification bundle — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-AUTO-01` — P1-AUTO-01 Canonical privileged tool transaction and sandbox — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-AUTO-02` — P1-AUTO-02 Agent identity, handoff and delegation budgets — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-AUTO-03` — P1-AUTO-03 Autonomy levels and de-escalation state machine — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-AUTO-04` — P1-AUTO-04 Human override, interrupt and approval receipts — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-AUTO-05` — P1-AUTO-05 Blast radius, reversibility and adversarial alignment — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-AUTO-06` — P1-AUTO-06 Safe autonomy qualification bundle — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-PROD-01` — P1-PROD-01 API schema and compatibility registry — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-PROD-02` — P1-PROD-02 Streaming projection authority — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-PROD-03` — P1-PROD-03 Workspace and product projection contract — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-PROD-04` — P1-PROD-04 Operator controls projection — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-PROD-05` — P1-PROD-05 Web/desktop tenant and storage boundary — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-LEARN-01` — P1-LEARN-01 Experiment registry — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-LEARN-02` — P1-LEARN-02 Benchmark registry and contamination controls — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-LEARN-03` — P1-LEARN-03 Candidate and champion/challenger registry — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-LEARN-04` — P1-LEARN-04 Shadow traffic isolation — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-LEARN-05` — P1-LEARN-05 Specification and reasoning regression corpus — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-LEARN-06` — P1-LEARN-06 Failure knowledge pipeline — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-REL-01` — P1-REL-01 Release evidence bundle — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-REL-02` — P1-REL-02 Installer/update/repair lifecycle — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-REL-03` — P1-REL-03 Migration and rollback compatibility — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-REL-04` — P1-REL-04 Backup and restore qualification — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-REL-05` — P1-REL-05 Disaster recovery and incident feedback — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-REL-06` — P1-REL-06 Attribution and release notices — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-DIST-01` — P1-DIST-01 Remote execution and worker trust — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-DIST-02` — P1-DIST-02 Topology-aware model placement and warming — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-DIST-03` — P1-DIST-03 Batching and autoscaling controller — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-DIST-04` — P1-DIST-04 Load and capacity qualification — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-DIST-05` — P1-DIST-05 Quota and budget accounting ledger — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-DIST-06` — P1-DIST-06 Forecasting and cost anomaly loop — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-PROM-01` — P1-PROM-01 Aggregate exact-head P1 evidence — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-PROM-02` — P1-PROM-02 Terminal failure-journey qualification — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-PROM-03` — P1-PROM-03 Independent signed P1 promotion decision — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-P1-EVID-01` — P1-EVID-01 Canonical evidence identity — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-EVID-02` — P1-EVID-02 Maturity reconciliation engine — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-EVID-03` — P1-EVID-03 Required-gate authority map — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-EVID-04` — P1-EVID-04 Risk/gap evidence binding — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-EVID-05` — P1-EVID-05 Reproducibility bundle — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-EVID-06` — P1-EVID-06 Scope-freeze and ADR enforcement — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-INTEL-01` — P1-INTEL-01 Quality measurement and routing/context receipt spine — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-INTEL-02` — P1-INTEL-02 Memory, retrieval and knowledge quality authority — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-INTEL-03` — P1-INTEL-03 Reasoning, search and stopping policy registry — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-INTEL-04` — P1-INTEL-04 Answer and artifact quality pipeline — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-INTEL-05` — P1-INTEL-05 Plan verifier and static analysis — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-INTEL-06` — P1-INTEL-06 Core intelligence qualification bundle — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-AUTO-01` — P1-AUTO-01 Canonical privileged tool transaction and sandbox — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-AUTO-02` — P1-AUTO-02 Agent identity, handoff and delegation budgets — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-AUTO-03` — P1-AUTO-03 Autonomy levels and de-escalation state machine — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-AUTO-04` — P1-AUTO-04 Human override, interrupt and approval receipts — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-AUTO-05` — P1-AUTO-05 Blast radius, reversibility and adversarial alignment — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-AUTO-06` — P1-AUTO-06 Safe autonomy qualification bundle — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-PROD-01` — P1-PROD-01 API schema and compatibility registry — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-PROD-02` — P1-PROD-02 Streaming projection authority — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-PROD-03` — P1-PROD-03 Workspace and product projection contract — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-PROD-04` — P1-PROD-04 Operator controls projection — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-PROD-05` — P1-PROD-05 Web/desktop tenant and storage boundary — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-LEARN-01` — P1-LEARN-01 Experiment registry — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-LEARN-02` — P1-LEARN-02 Benchmark registry and contamination controls — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-LEARN-03` — P1-LEARN-03 Candidate and champion/challenger registry — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-LEARN-04` — P1-LEARN-04 Shadow traffic isolation — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-LEARN-05` — P1-LEARN-05 Specification and reasoning regression corpus — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-LEARN-06` — P1-LEARN-06 Failure knowledge pipeline — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-REL-01` — P1-REL-01 Release evidence bundle — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-REL-02` — P1-REL-02 Installer/update/repair lifecycle — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-REL-03` — P1-REL-03 Migration and rollback compatibility — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-REL-04` — P1-REL-04 Backup and restore qualification — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-REL-05` — P1-REL-05 Disaster recovery and incident feedback — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-REL-06` — P1-REL-06 Attribution and release notices — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-DIST-01` — P1-DIST-01 Remote execution and worker trust — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-DIST-02` — P1-DIST-02 Topology-aware model placement and warming — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-DIST-03` — P1-DIST-03 Batching and autoscaling controller — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-DIST-04` — P1-DIST-04 Load and capacity qualification — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-DIST-05` — P1-DIST-05 Quota and budget accounting ledger — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-DIST-06` — P1-DIST-06 Forecasting and cost anomaly loop — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-PROM-01` — P1-PROM-01 Aggregate exact-head P1 evidence — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-PROM-02` — P1-PROM-02 Terminal failure-journey qualification — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-P1-PROM-03` — P1-PROM-03 Independent signed P1 promotion decision — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
 
 ## Vertical Slices
 
@@ -593,246 +593,246 @@ Completion requires implementation sign-off plus independent verification sign-o
 
 ## Historical / Edge / Obscure Catalogue
 
-- [ ] `ACC-HIST-AI-001` — HIST-AI-001 General Problem Solver — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-002` — HIST-AI-002 STRIPS planning — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-003` — HIST-AI-003 SHRDLU — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-004` — HIST-AI-004 DENDRAL — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-005` — HIST-AI-005 MYCIN — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-006` — HIST-AI-006 HEARSAY-II blackboard — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-007` — HIST-AI-007 Rete networks — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-008` — HIST-AI-008 Truth Maintenance Systems — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-009` — HIST-AI-009 SOAR — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-010` — HIST-AI-010 ACT-R — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-011` — HIST-AI-011 Subsumption architecture — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-012` — HIST-AI-012 Behavior trees — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-013` — HIST-AI-013 Contract Net Protocol — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-014` — HIST-AI-014 BDI agents — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-015` — HIST-AI-015 Society of Mind — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-016` — HIST-AI-016 Cyc — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-017` — HIST-AI-017 Case-based reasoning — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-018` — HIST-AI-018 Genetic algorithms — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-019` — HIST-AI-019 Genetic programming — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-020` — HIST-AI-020 Hopfield networks — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-021` — HIST-AI-021 Boltzmann machines — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-022` — HIST-AI-022 Reservoir computing — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-023` — HIST-AI-023 LSTM/GRU — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-024` — HIST-AI-024 Attention before Transformers — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-025` — HIST-AI-025 Transformer architecture — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-026` — HIST-AI-026 Mixture of Experts — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-027` — HIST-AI-027 Memory Networks — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-028` — HIST-AI-028 Neural Turing Machine — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-029` — HIST-AI-029 Differentiable Neural Computer — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-030` — HIST-AI-030 Information retrieval lineage — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-031` — HIST-AI-031 Latent Semantic Analysis — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-032` — HIST-AI-032 PageRank — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-033` — HIST-AI-033 Blackboard architectures — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-034` — HIST-AI-034 Pandemonium architecture — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-035` — HIST-AI-035 Stigmergy — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-036` — HIST-AI-036 Ant Colony Optimization — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-037` — HIST-AI-037 Monte Carlo Tree Search — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-038` — HIST-AI-038 Alpha-beta search — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-039` — HIST-AI-039 A* search — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-AI-040` — HIST-AI-040 Constraint satisfaction — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-001` — HIST-SYS-001 Actor model — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-002` — HIST-SYS-002 Communicating Sequential Processes — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-003` — HIST-SYS-003 Petri nets — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-004` — HIST-SYS-004 Linda tuple spaces — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-005` — HIST-SYS-005 Erlang supervision trees — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-006` — HIST-SYS-006 Tandem NonStop — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-007` — HIST-SYS-007 Write-ahead logging — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-008` — HIST-SYS-008 MVCC — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-009` — HIST-SYS-009 Two-phase commit — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-010` — HIST-SYS-010 Sagas — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-011` — HIST-SYS-011 Lamport clocks — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-012` — HIST-SYS-012 Vector clocks — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-013` — HIST-SYS-013 Chandy-Lamport snapshots — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-014` — HIST-SYS-014 Paxos — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-015` — HIST-SYS-015 Raft — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-016` — HIST-SYS-016 FLP impossibility — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-017` — HIST-SYS-017 CAP theorem — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-018` — HIST-SYS-018 End-to-end principle — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-019` — HIST-SYS-019 Capability security — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-020` — HIST-SYS-020 Saltzer–Schroeder principles — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-021` — HIST-SYS-021 Bell-LaPadula / Biba — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-022` — HIST-SYS-022 Microkernels — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-023` — HIST-SYS-023 Unix pipes — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-024` — HIST-SYS-024 Plan 9 namespaces — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-025` — HIST-SYS-025 Smalltalk image persistence — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-026` — HIST-SYS-026 MapReduce — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-027` — HIST-SYS-027 Google File System lineage — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-028` — HIST-SYS-028 Dynamo-style systems — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-029` — HIST-SYS-029 Bigtable lineage — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-HIST-SYS-030` — HIST-SYS-030 Borg-style cluster scheduling — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-001` — EDGE-CONTRACT-001 Duplicate JSON object keys — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-002` — EDGE-CONTRACT-002 Missing versus explicit null — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-003` — EDGE-CONTRACT-003 Unknown enum value after rolling upgrade — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-004` — EDGE-CONTRACT-004 Unknown fields stripped then reserialized — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-005` — EDGE-CONTRACT-005 NaN and Infinity in JSON-adjacent stacks — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-006` — EDGE-CONTRACT-006 Negative zero — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-007` — EDGE-CONTRACT-007 Integer precision above JavaScript safe range — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-008` — EDGE-CONTRACT-008 Unicode normalization mismatch — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-009` — EDGE-CONTRACT-009 Bidirectional control characters — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-010` — EDGE-CONTRACT-010 Zero-width and confusable characters — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-011` — EDGE-CONTRACT-011 Case folding differences — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-012` — EDGE-CONTRACT-012 Trailing whitespace/control characters — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-013` — EDGE-CONTRACT-013 Locale-sensitive casing — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-014` — EDGE-CONTRACT-014 Timezone offset ambiguity — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-015` — EDGE-CONTRACT-015 DST fold/gap — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-016` — EDGE-CONTRACT-016 Leap-second / clock-step assumptions — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-017` — EDGE-CONTRACT-017 Extremely long IDs/strings — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-018` — EDGE-CONTRACT-018 Empty collection semantics — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-019` — EDGE-CONTRACT-019 Map ordering assumptions — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-CONTRACT-020` — EDGE-CONTRACT-020 Canonicalization before signing — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-001` — EDGE-DIST-001 Lost acknowledgement after successful commit — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-002` — EDGE-DIST-002 Duplicate event delivery — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-003` — EDGE-DIST-003 Out-of-order events — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-004` — EDGE-DIST-004 Event gap during reconnect — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-005` — EDGE-DIST-005 Terminal event emitted before durable final result — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-006` — EDGE-DIST-006 Process crash after external side effect but before receipt — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-007` — EDGE-DIST-007 Stale lease holder resumes — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-008` — EDGE-DIST-008 Lease expires during long syscall — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-009` — EDGE-DIST-009 ABA state change — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-010` — EDGE-DIST-010 Split brain — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-011` — EDGE-DIST-011 Network partition with healthy processes — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-012` — EDGE-DIST-012 Retry storm — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-013` — EDGE-DIST-013 Reconnect storm — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-014` — EDGE-DIST-014 Thundering herd on cache miss — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-015` — EDGE-DIST-015 Cache stampede after TTL boundary — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-016` — EDGE-DIST-016 Poison message — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-017` — EDGE-DIST-017 Head-of-line blocking — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-018` — EDGE-DIST-018 Priority inversion — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-019` — EDGE-DIST-019 Starvation — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-020` — EDGE-DIST-020 Livelock — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-021` — EDGE-DIST-021 Deadlock — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-022` — EDGE-DIST-022 Clock skew invalidates lease math — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-023` — EDGE-DIST-023 Read-after-write not guaranteed — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-024` — EDGE-DIST-024 Write skew under snapshot isolation — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-025` — EDGE-DIST-025 Partial multi-store update — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-026` — EDGE-DIST-026 Outbox row committed but publisher dies — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-027` — EDGE-DIST-027 Consumer commits side effect before inbox marker — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-028` — EDGE-DIST-028 Queue invisibility timeout too short — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-029` — EDGE-DIST-029 Backpressure ignored by producer — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DIST-030` — EDGE-DIST-030 Cancellation races with completion — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-001` — EDGE-AI-001 Indirect prompt injection in retrieved document — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-002` — EDGE-AI-002 Instruction laundering through tool output — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-003` — EDGE-AI-003 Memory poisoning — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-004` — EDGE-AI-004 Stale memory overrides current user intent — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-005` — EDGE-AI-005 Retrieval citation laundering — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-006` — EDGE-AI-006 Semantic duplicate evidence — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-007` — EDGE-AI-007 Chunk boundary severs qualifier — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-008` — EDGE-AI-008 Wrong temporal scope — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-009` — EDGE-AI-009 Wrong population/domain scope — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-010` — EDGE-AI-010 Embedding-model mismatch — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-011` — EDGE-AI-011 Stale vector index after source deletion — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-012` — EDGE-AI-012 Context compression drops exception — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-013` — EDGE-AI-013 Policy trimmed from long context — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-014` — EDGE-AI-014 Tool schema version race — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-015` — EDGE-AI-015 Duplicate model tool-call IDs — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-016` — EDGE-AI-016 Malformed partial structured output — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-017` — EDGE-AI-017 Provider finishes stream without terminal usage — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-018` — EDGE-AI-018 Provider alias silently changes model revision — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-019` — EDGE-AI-019 Tokenizer changes under same model family — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-020` — EDGE-AI-020 Fallback model lacks required modality/tool support — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-021` — EDGE-AI-021 Fallback changes privacy boundary — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-022` — EDGE-AI-022 Model repeats same failing tool forever — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-023` — EDGE-AI-023 Verifier shares same correlated error — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-024` — EDGE-AI-024 False consensus among agents — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-025` — EDGE-AI-025 Judge position/order bias — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-026` — EDGE-AI-026 Benchmark contamination — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-027` — EDGE-AI-027 Hidden test leakage through tool/search access — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-028` — EDGE-AI-028 Reward hacking / specification gaming — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-029` — EDGE-AI-029 Sycophancy overrides evidence — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-030` — EDGE-AI-030 Hallucinated authorization — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-031` — EDGE-AI-031 Approval becomes stale after argument edit — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-032` — EDGE-AI-032 Approval expires while queued — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-033` — EDGE-AI-033 Memory feedback loop — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-034` — EDGE-AI-034 Retrieval feedback loop — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-035` — EDGE-AI-035 Self-improvement evaluator overfits candidate — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-036` — EDGE-AI-036 Long-horizon goal drift — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-037` — EDGE-AI-037 Tool result too large for context — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-038` — EDGE-AI-038 Model refusal semantics differ by provider — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-039` — EDGE-AI-039 Partial tool success — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-AI-040` — EDGE-AI-040 Unknown external effect after timeout — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-001` — EDGE-SEC-001 TOCTOU authorization race — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-002` — EDGE-SEC-002 Symlink escape — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-003` — EDGE-SEC-003 Hardlink aliasing — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-004` — EDGE-SEC-004 Path traversal after decoding — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-005` — EDGE-SEC-005 Zip Slip — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-006` — EDGE-SEC-006 Tarbomb / decompression bomb — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-007` — EDGE-SEC-007 Archive symlink chain — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-008` — EDGE-SEC-008 Windows reserved device names — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-009` — EDGE-SEC-009 Alternate data streams — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-010` — EDGE-SEC-010 Case-insensitive path collision — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-011` — EDGE-SEC-011 DNS rebinding — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-012` — EDGE-SEC-012 Redirect crosses egress boundary — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-013` — EDGE-SEC-013 Metadata-service SSRF — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-014` — EDGE-SEC-014 IPv4-mapped IPv6 bypass — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-015` — EDGE-SEC-015 Secret in exception/log payload — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-016` — EDGE-SEC-016 Environment-variable inheritance — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-017` — EDGE-SEC-017 Temporary-file race — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-018` — EDGE-SEC-018 Shell quoting divergence — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-019` — EDGE-SEC-019 Executable shadowing via PATH — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-SEC-020` — EDGE-SEC-020 Stale credential after revocation — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DATA-001` — EDGE-DATA-001 Tombstone resurrection — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DATA-002` — EDGE-DATA-002 Orphaned blob after metadata rollback — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DATA-003` — EDGE-DATA-003 Metadata points to missing blob — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DATA-004` — EDGE-DATA-004 Hash collision assumption — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DATA-005` — EDGE-DATA-005 Corrupt backup discovered only during restore — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DATA-006` — EDGE-DATA-006 Migration partially applied — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DATA-007` — EDGE-DATA-007 Rollback code cannot read new data shape — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DATA-008` — EDGE-DATA-008 Index built from inconsistent source snapshot — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DATA-009` — EDGE-DATA-009 Data retention applies to source but not derived embedding — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-DATA-010` — EDGE-DATA-010 Backup retains deleted sensitive data — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-HW-001` — EDGE-HW-001 Disk full during atomic write — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-HW-002` — EDGE-HW-002 Inode exhaustion with free bytes — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-HW-003` — EDGE-HW-003 GPU reset mid-inference — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-HW-004` — EDGE-HW-004 VRAM fragmentation — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-HW-005` — EDGE-HW-005 Mixed-precision overflow/underflow — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-HW-006` — EDGE-HW-006 Nondeterministic GPU kernels — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-HW-007` — EDGE-HW-007 Thermal throttling — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-HW-008` — EDGE-HW-008 NUMA remote-memory penalty — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-HW-009` — EDGE-HW-009 Suspend/resume invalidates timers/connections — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-HW-010` — EDGE-HW-010 Driver/runtime version mismatch — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-UX-001` — EDGE-UX-001 Double-submit across tabs — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-UX-002` — EDGE-UX-002 Browser refresh during running operation — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-UX-003` — EDGE-UX-003 Offline draft later submitted twice — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-UX-004` — EDGE-UX-004 Cancel clicked after server completed — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-UX-005` — EDGE-UX-005 Stale optimistic update — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-UX-006` — EDGE-UX-006 Huge streaming output freezes UI — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-UX-007` — EDGE-UX-007 Screen reader misses streaming status — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-UX-008` — EDGE-UX-008 Locale changes numeric meaning — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-UX-009` — EDGE-UX-009 User clock wildly wrong — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-EDGE-UX-010` — EDGE-UX-010 Multi-device concurrent conversation append — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-001` — OBSCURE-001 Failure detectors are suspicion, not truth — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-002` — OBSCURE-002 Exactly-once is usually an end-to-end property — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-003` — OBSCURE-003 Fencing is stronger than locks alone — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-004` — OBSCURE-004 Cancellation is a protocol — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-005` — OBSCURE-005 Timeout means unknown, not failed — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-006` — OBSCURE-006 Derived indexes are disposable only if source truth is complete — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-007` — OBSCURE-007 Garbage collection is part of data architecture — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-008` — OBSCURE-008 Negative caching can preserve outages — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-009` — OBSCURE-009 Jitter is a correctness aid under correlated retry — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-010` — OBSCURE-010 Read repair can resurrect stale data — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-011` — OBSCURE-011 Checksums verify bytes, not meaning — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-012` — OBSCURE-012 Schema validation is not semantic validation — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-013` — OBSCURE-013 A successful process exit is not proof of intended effect — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-014` — OBSCURE-014 Backups are write-only until restoration is proven — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-015` — OBSCURE-015 Metrics can lie by omission — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-016` — OBSCURE-016 Average latency hides queue collapse — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-017` — OBSCURE-017 Fair scheduling can reduce throughput — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-018` — OBSCURE-018 Compression changes trust geometry — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-019` — OBSCURE-019 Consensus among correlated models is not independent evidence — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-020` — OBSCURE-020 Abstention is a valid successful outcome — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-021` — OBSCURE-021 Unknown usage must stay unknown — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-022` — OBSCURE-022 Policy version belongs in receipts — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-023` — OBSCURE-023 Model version belongs in evidence lineage — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-024` — OBSCURE-024 Tool description is attacker-controlled context unless curated — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-025` — OBSCURE-025 Capability discovery can become privilege discovery — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-026` — OBSCURE-026 Silence is not agreement in multi-agent systems — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-027` — OBSCURE-027 A lease is not ownership history — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-028` — OBSCURE-028 Wall-clock timestamps cannot prove causality — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-029` — OBSCURE-029 Hash-based CAS still needs metadata migrations — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-OBSCURE-030` — OBSCURE-030 Reproducibility and repeatability differ — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-HIST-AI-001` — HIST-AI-001 General Problem Solver — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-002` — HIST-AI-002 STRIPS planning — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-003` — HIST-AI-003 SHRDLU — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-004` — HIST-AI-004 DENDRAL — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-005` — HIST-AI-005 MYCIN — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-006` — HIST-AI-006 HEARSAY-II blackboard — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-007` — HIST-AI-007 Rete networks — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-008` — HIST-AI-008 Truth Maintenance Systems — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-009` — HIST-AI-009 SOAR — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-010` — HIST-AI-010 ACT-R — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-011` — HIST-AI-011 Subsumption architecture — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-012` — HIST-AI-012 Behavior trees — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-013` — HIST-AI-013 Contract Net Protocol — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-014` — HIST-AI-014 BDI agents — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-015` — HIST-AI-015 Society of Mind — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-016` — HIST-AI-016 Cyc — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-017` — HIST-AI-017 Case-based reasoning — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-018` — HIST-AI-018 Genetic algorithms — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-019` — HIST-AI-019 Genetic programming — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-020` — HIST-AI-020 Hopfield networks — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-021` — HIST-AI-021 Boltzmann machines — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-022` — HIST-AI-022 Reservoir computing — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-023` — HIST-AI-023 LSTM/GRU — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-024` — HIST-AI-024 Attention before Transformers — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-025` — HIST-AI-025 Transformer architecture — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-026` — HIST-AI-026 Mixture of Experts — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-027` — HIST-AI-027 Memory Networks — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-028` — HIST-AI-028 Neural Turing Machine — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-029` — HIST-AI-029 Differentiable Neural Computer — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-030` — HIST-AI-030 Information retrieval lineage — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-031` — HIST-AI-031 Latent Semantic Analysis — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-032` — HIST-AI-032 PageRank — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-033` — HIST-AI-033 Blackboard architectures — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-034` — HIST-AI-034 Pandemonium architecture — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-035` — HIST-AI-035 Stigmergy — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-036` — HIST-AI-036 Ant Colony Optimization — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-037` — HIST-AI-037 Monte Carlo Tree Search — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-038` — HIST-AI-038 Alpha-beta search — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-039` — HIST-AI-039 A* search — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-AI-040` — HIST-AI-040 Constraint satisfaction — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-001` — HIST-SYS-001 Actor model — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-002` — HIST-SYS-002 Communicating Sequential Processes — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-003` — HIST-SYS-003 Petri nets — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-004` — HIST-SYS-004 Linda tuple spaces — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-005` — HIST-SYS-005 Erlang supervision trees — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-006` — HIST-SYS-006 Tandem NonStop — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-007` — HIST-SYS-007 Write-ahead logging — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-008` — HIST-SYS-008 MVCC — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-009` — HIST-SYS-009 Two-phase commit — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-010` — HIST-SYS-010 Sagas — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-011` — HIST-SYS-011 Lamport clocks — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-012` — HIST-SYS-012 Vector clocks — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-013` — HIST-SYS-013 Chandy-Lamport snapshots — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-014` — HIST-SYS-014 Paxos — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-015` — HIST-SYS-015 Raft — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-016` — HIST-SYS-016 FLP impossibility — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-017` — HIST-SYS-017 CAP theorem — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-018` — HIST-SYS-018 End-to-end principle — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-019` — HIST-SYS-019 Capability security — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-020` — HIST-SYS-020 Saltzer–Schroeder principles — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-021` — HIST-SYS-021 Bell-LaPadula / Biba — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-022` — HIST-SYS-022 Microkernels — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-023` — HIST-SYS-023 Unix pipes — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-024` — HIST-SYS-024 Plan 9 namespaces — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-025` — HIST-SYS-025 Smalltalk image persistence — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-026` — HIST-SYS-026 MapReduce — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-027` — HIST-SYS-027 Google File System lineage — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-028` — HIST-SYS-028 Dynamo-style systems — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-029` — HIST-SYS-029 Bigtable lineage — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-HIST-SYS-030` — HIST-SYS-030 Borg-style cluster scheduling — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-001` — EDGE-CONTRACT-001 Duplicate JSON object keys — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-002` — EDGE-CONTRACT-002 Missing versus explicit null — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-003` — EDGE-CONTRACT-003 Unknown enum value after rolling upgrade — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-004` — EDGE-CONTRACT-004 Unknown fields stripped then reserialized — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-005` — EDGE-CONTRACT-005 NaN and Infinity in JSON-adjacent stacks — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-006` — EDGE-CONTRACT-006 Negative zero — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-007` — EDGE-CONTRACT-007 Integer precision above JavaScript safe range — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-008` — EDGE-CONTRACT-008 Unicode normalization mismatch — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-009` — EDGE-CONTRACT-009 Bidirectional control characters — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-010` — EDGE-CONTRACT-010 Zero-width and confusable characters — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-011` — EDGE-CONTRACT-011 Case folding differences — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-012` — EDGE-CONTRACT-012 Trailing whitespace/control characters — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-013` — EDGE-CONTRACT-013 Locale-sensitive casing — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-014` — EDGE-CONTRACT-014 Timezone offset ambiguity — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-015` — EDGE-CONTRACT-015 DST fold/gap — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-016` — EDGE-CONTRACT-016 Leap-second / clock-step assumptions — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-017` — EDGE-CONTRACT-017 Extremely long IDs/strings — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-018` — EDGE-CONTRACT-018 Empty collection semantics — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-019` — EDGE-CONTRACT-019 Map ordering assumptions — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-CONTRACT-020` — EDGE-CONTRACT-020 Canonicalization before signing — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-001` — EDGE-DIST-001 Lost acknowledgement after successful commit — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-002` — EDGE-DIST-002 Duplicate event delivery — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-003` — EDGE-DIST-003 Out-of-order events — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-004` — EDGE-DIST-004 Event gap during reconnect — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-005` — EDGE-DIST-005 Terminal event emitted before durable final result — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-006` — EDGE-DIST-006 Process crash after external side effect but before receipt — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-007` — EDGE-DIST-007 Stale lease holder resumes — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-008` — EDGE-DIST-008 Lease expires during long syscall — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-009` — EDGE-DIST-009 ABA state change — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-010` — EDGE-DIST-010 Split brain — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-011` — EDGE-DIST-011 Network partition with healthy processes — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-012` — EDGE-DIST-012 Retry storm — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-013` — EDGE-DIST-013 Reconnect storm — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-014` — EDGE-DIST-014 Thundering herd on cache miss — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-015` — EDGE-DIST-015 Cache stampede after TTL boundary — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-016` — EDGE-DIST-016 Poison message — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-017` — EDGE-DIST-017 Head-of-line blocking — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-018` — EDGE-DIST-018 Priority inversion — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-019` — EDGE-DIST-019 Starvation — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-020` — EDGE-DIST-020 Livelock — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-021` — EDGE-DIST-021 Deadlock — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-022` — EDGE-DIST-022 Clock skew invalidates lease math — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-023` — EDGE-DIST-023 Read-after-write not guaranteed — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-024` — EDGE-DIST-024 Write skew under snapshot isolation — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-025` — EDGE-DIST-025 Partial multi-store update — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-026` — EDGE-DIST-026 Outbox row committed but publisher dies — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-027` — EDGE-DIST-027 Consumer commits side effect before inbox marker — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-028` — EDGE-DIST-028 Queue invisibility timeout too short — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-029` — EDGE-DIST-029 Backpressure ignored by producer — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DIST-030` — EDGE-DIST-030 Cancellation races with completion — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-001` — EDGE-AI-001 Indirect prompt injection in retrieved document — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-002` — EDGE-AI-002 Instruction laundering through tool output — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-003` — EDGE-AI-003 Memory poisoning — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-004` — EDGE-AI-004 Stale memory overrides current user intent — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-005` — EDGE-AI-005 Retrieval citation laundering — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-006` — EDGE-AI-006 Semantic duplicate evidence — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-007` — EDGE-AI-007 Chunk boundary severs qualifier — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-008` — EDGE-AI-008 Wrong temporal scope — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-009` — EDGE-AI-009 Wrong population/domain scope — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-010` — EDGE-AI-010 Embedding-model mismatch — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-011` — EDGE-AI-011 Stale vector index after source deletion — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-012` — EDGE-AI-012 Context compression drops exception — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-013` — EDGE-AI-013 Policy trimmed from long context — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-014` — EDGE-AI-014 Tool schema version race — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-015` — EDGE-AI-015 Duplicate model tool-call IDs — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-016` — EDGE-AI-016 Malformed partial structured output — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-017` — EDGE-AI-017 Provider finishes stream without terminal usage — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-018` — EDGE-AI-018 Provider alias silently changes model revision — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-019` — EDGE-AI-019 Tokenizer changes under same model family — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-020` — EDGE-AI-020 Fallback model lacks required modality/tool support — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-021` — EDGE-AI-021 Fallback changes privacy boundary — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-022` — EDGE-AI-022 Model repeats same failing tool forever — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-023` — EDGE-AI-023 Verifier shares same correlated error — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-024` — EDGE-AI-024 False consensus among agents — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-025` — EDGE-AI-025 Judge position/order bias — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-026` — EDGE-AI-026 Benchmark contamination — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-027` — EDGE-AI-027 Hidden test leakage through tool/search access — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-028` — EDGE-AI-028 Reward hacking / specification gaming — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-029` — EDGE-AI-029 Sycophancy overrides evidence — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-030` — EDGE-AI-030 Hallucinated authorization — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-031` — EDGE-AI-031 Approval becomes stale after argument edit — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-032` — EDGE-AI-032 Approval expires while queued — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-033` — EDGE-AI-033 Memory feedback loop — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-034` — EDGE-AI-034 Retrieval feedback loop — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-035` — EDGE-AI-035 Self-improvement evaluator overfits candidate — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-036` — EDGE-AI-036 Long-horizon goal drift — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-037` — EDGE-AI-037 Tool result too large for context — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-038` — EDGE-AI-038 Model refusal semantics differ by provider — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-039` — EDGE-AI-039 Partial tool success — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-AI-040` — EDGE-AI-040 Unknown external effect after timeout — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-001` — EDGE-SEC-001 TOCTOU authorization race — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-002` — EDGE-SEC-002 Symlink escape — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-003` — EDGE-SEC-003 Hardlink aliasing — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-004` — EDGE-SEC-004 Path traversal after decoding — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-005` — EDGE-SEC-005 Zip Slip — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-006` — EDGE-SEC-006 Tarbomb / decompression bomb — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-007` — EDGE-SEC-007 Archive symlink chain — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-008` — EDGE-SEC-008 Windows reserved device names — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-009` — EDGE-SEC-009 Alternate data streams — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-010` — EDGE-SEC-010 Case-insensitive path collision — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-011` — EDGE-SEC-011 DNS rebinding — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-012` — EDGE-SEC-012 Redirect crosses egress boundary — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-013` — EDGE-SEC-013 Metadata-service SSRF — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-014` — EDGE-SEC-014 IPv4-mapped IPv6 bypass — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-015` — EDGE-SEC-015 Secret in exception/log payload — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-016` — EDGE-SEC-016 Environment-variable inheritance — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-017` — EDGE-SEC-017 Temporary-file race — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-018` — EDGE-SEC-018 Shell quoting divergence — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-019` — EDGE-SEC-019 Executable shadowing via PATH — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-SEC-020` — EDGE-SEC-020 Stale credential after revocation — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DATA-001` — EDGE-DATA-001 Tombstone resurrection — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DATA-002` — EDGE-DATA-002 Orphaned blob after metadata rollback — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DATA-003` — EDGE-DATA-003 Metadata points to missing blob — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DATA-004` — EDGE-DATA-004 Hash collision assumption — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DATA-005` — EDGE-DATA-005 Corrupt backup discovered only during restore — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DATA-006` — EDGE-DATA-006 Migration partially applied — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DATA-007` — EDGE-DATA-007 Rollback code cannot read new data shape — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DATA-008` — EDGE-DATA-008 Index built from inconsistent source snapshot — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DATA-009` — EDGE-DATA-009 Data retention applies to source but not derived embedding — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-DATA-010` — EDGE-DATA-010 Backup retains deleted sensitive data — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-HW-001` — EDGE-HW-001 Disk full during atomic write — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-HW-002` — EDGE-HW-002 Inode exhaustion with free bytes — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-HW-003` — EDGE-HW-003 GPU reset mid-inference — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-HW-004` — EDGE-HW-004 VRAM fragmentation — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-HW-005` — EDGE-HW-005 Mixed-precision overflow/underflow — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-HW-006` — EDGE-HW-006 Nondeterministic GPU kernels — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-HW-007` — EDGE-HW-007 Thermal throttling — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-HW-008` — EDGE-HW-008 NUMA remote-memory penalty — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-HW-009` — EDGE-HW-009 Suspend/resume invalidates timers/connections — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-HW-010` — EDGE-HW-010 Driver/runtime version mismatch — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-UX-001` — EDGE-UX-001 Double-submit across tabs — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-UX-002` — EDGE-UX-002 Browser refresh during running operation — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-UX-003` — EDGE-UX-003 Offline draft later submitted twice — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-UX-004` — EDGE-UX-004 Cancel clicked after server completed — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-UX-005` — EDGE-UX-005 Stale optimistic update — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-UX-006` — EDGE-UX-006 Huge streaming output freezes UI — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-UX-007` — EDGE-UX-007 Screen reader misses streaming status — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-UX-008` — EDGE-UX-008 Locale changes numeric meaning — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-UX-009` — EDGE-UX-009 User clock wildly wrong — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-EDGE-UX-010` — EDGE-UX-010 Multi-device concurrent conversation append — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-001` — OBSCURE-001 Failure detectors are suspicion, not truth — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-002` — OBSCURE-002 Exactly-once is usually an end-to-end property — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-003` — OBSCURE-003 Fencing is stronger than locks alone — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-004` — OBSCURE-004 Cancellation is a protocol — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-005` — OBSCURE-005 Timeout means unknown, not failed — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-006` — OBSCURE-006 Derived indexes are disposable only if source truth is complete — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-007` — OBSCURE-007 Garbage collection is part of data architecture — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-008` — OBSCURE-008 Negative caching can preserve outages — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-009` — OBSCURE-009 Jitter is a correctness aid under correlated retry — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-010` — OBSCURE-010 Read repair can resurrect stale data — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-011` — OBSCURE-011 Checksums verify bytes, not meaning — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-012` — OBSCURE-012 Schema validation is not semantic validation — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-013` — OBSCURE-013 A successful process exit is not proof of intended effect — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-014` — OBSCURE-014 Backups are write-only until restoration is proven — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-015` — OBSCURE-015 Metrics can lie by omission — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-016` — OBSCURE-016 Average latency hides queue collapse — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-017` — OBSCURE-017 Fair scheduling can reduce throughput — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-018` — OBSCURE-018 Compression changes trust geometry — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-019` — OBSCURE-019 Consensus among correlated models is not independent evidence — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-020` — OBSCURE-020 Abstention is a valid successful outcome — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-021` — OBSCURE-021 Unknown usage must stay unknown — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-022` — OBSCURE-022 Policy version belongs in receipts — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-023` — OBSCURE-023 Model version belongs in evidence lineage — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-024` — OBSCURE-024 Tool description is attacker-controlled context unless curated — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-025` — OBSCURE-025 Capability discovery can become privilege discovery — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-026` — OBSCURE-026 Silence is not agreement in multi-agent systems — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-027` — OBSCURE-027 A lease is not ownership history — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-028` — OBSCURE-028 Wall-clock timestamps cannot prove causality — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-029` — OBSCURE-029 Hash-based CAS still needs metadata migrations — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
+- [x] `ACC-OBSCURE-030` — OBSCURE-030 Reproducibility and repeatability differ — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:33:00Z`
 
 ## Audit and correction rule
 
