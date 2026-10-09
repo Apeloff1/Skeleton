@@ -307,6 +307,7 @@ class StreamingTextFeed:
         self._chunks: list[str] = []
         self._chars = 0
         self._closed = False
+        self._bound_digest: str | None = None
 
     @property
     def closed(self) -> bool:
@@ -339,11 +340,23 @@ class StreamingTextFeed:
         self._chunks = []
         return "".join(chunks)
 
+    def bind_identity(self, digest: str) -> None:
+        if self._closed:
+            raise TokenizerContractError("text feed already finalized")
+        if not isinstance(digest, str) or len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+            raise TokenizerContractError("invalid tokenizer identity digest")
+        if self._bound_digest is not None and self._bound_digest != digest:
+            raise TokenizerContractError("tokenizer identity drift")
+        self._bound_digest = digest
+
     def finalize(self, tokenizer: NativeTokenizer) -> TokenSequence:
         if self._closed:
             raise TokenizerContractError("text feed already finalized")
         if not isinstance(tokenizer, NativeTokenizer):
             raise TokenizerContractError("NativeTokenizer required")
+        tokenizer.assert_unchanged()
+        if self._bound_digest is not None and tokenizer.digest != self._bound_digest:
+            raise TokenizerContractError("tokenizer identity drift")
         return tokenizer.encode_sequence(self.consume_text())
 
 

@@ -204,7 +204,10 @@ class NativeModelService:
         if config.max_new_tokens > request.max_output_tokens:
             raise NativeServiceError("generation exceeds local request output-token budget")
         self.runtime.assert_model_unchanged()
-        self.runtime.tokenizer.assert_unchanged()
+        try:
+            self.runtime.tokenizer.assert_unchanged()
+        except TokenizerContractError as exc:
+            raise NativeServiceError("tokenizer identity changed after admission") from exc
         self._validate_identity(self.identity)
 
     def execute(
@@ -226,9 +229,9 @@ class NativeModelService:
         start_ns = self._now_ns()
         deadline_ns = start_ns + request.deadline_ms * 1_000_000
         self._validate_request(request, prompt, config)
-        token = cancellation or CancellationToken()
-        if not isinstance(token, CancellationToken):
+        if cancellation is not None and not isinstance(cancellation, CancellationToken):
             raise NativeServiceError("CancellationToken required")
+        token = cancellation if cancellation is not None else CancellationToken()
 
         events: list[RuntimeEvent] = []
         if token.cancelled:
@@ -268,7 +271,7 @@ class NativeModelService:
             generation = stream.result
             if generation is None:
                 raise NativeServiceError("native runtime completed without generation result")
-        except RuntimeContractError:
+        except (RuntimeContractError, TokenizerContractError):
             return self._terminal(
                 request,
                 prompt=prompt,
