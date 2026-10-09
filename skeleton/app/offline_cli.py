@@ -53,6 +53,7 @@ def _parser() -> argparse.ArgumentParser:
     capabilities.add_argument("--capability-graph-file", help="execute a bounded local graph of deterministic capability operations")
     capabilities.add_argument("--capability-list", action="store_true", help="list available model-free deterministic operations")
     capabilities.add_argument("--game-preview", action="store_true", help="open native Tk offline playable game preview")
+    capabilities.add_argument("--game-preview-check", action="store_true", help="verify 32 frames of native game logic without opening desktop")
     parser.add_argument("--game-seed", type=int, help="deterministic seed for explicit native game preview")
     parser.add_argument("--library", help="user-owned local SQLite document search index")
     parser.add_argument("--index-dir", help="index an explicitly selected local text directory")
@@ -99,9 +100,44 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.enqueue_dir or args.run_queue or args.queue_status
         or args.cancel_queue_job or args.retry_queue_job
     )
-    if args.game_seed is not None and not args.game_preview:
-        print("--game-seed requires --game-preview", file=sys.stderr)
+    if args.game_seed is not None and not (args.game_preview or args.game_preview_check):
+        print("--game-seed requires --game-preview or --game-preview-check", file=sys.stderr)
         return 2
+    if args.game_preview_check:
+        if (
+            args.model or args.deployment or args.prompt or args.backup_in
+            or args.backup_out or args.workspace or args.native_smoke
+            or args.doctor or args.qualify_model or args.library
+            or args.use_library or library_mode or queue_mode or snapshot_mode
+            or audit_mode or args.queue_db or args.queue_library
+            or args.snapshot_workspace or args.snapshot_library
+            or args.snapshot_queue
+        ):
+            print("headless game check cannot combine with model or state actions",
+                  file=sys.stderr)
+            return 2
+        from .offline_game_preview import DEFAULT_SEED, verify_game_preview
+        try:
+            report = verify_game_preview(
+                seed=DEFAULT_SEED if args.game_seed is None else args.game_seed
+            )
+        except (ValueError, RuntimeError, OSError, TypeError) as exc:
+            print(
+                "native game replay verification rejected: "
+                + type(exc).__name__ + ": " + str(exc),
+                file=sys.stderr,
+            )
+            return 1
+        if args.json_output:
+            print(json.dumps(report, sort_keys=True, ensure_ascii=False))
+        else:
+            print(
+                "Native gameplay replay VERIFIED: "
+                + str(report["frames_verified"]) + " frames; "
+                "desktop rendering NOT verified"
+            )
+        return 0
+
     if args.game_preview:
         if (
             args.model or args.deployment or args.prompt or args.backup_in
