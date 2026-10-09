@@ -256,6 +256,42 @@ system compromise. Other processes and any additional spawned binaries
 must be governed separately. For a truly disconnected acceptance test,
 use an independent OS policy or physically isolated test machine.
 
+## Cross-era game authoring, legal modification and portable C
+
+The game-development system now has **165 explicit hardware-era design
+profiles** covering eight decades, plus a rights-aware project compiler.
+It can create an original game, apply licensed/authorized tile edits,
+recompute physics/controller playability, and reopen the modified
+project in the native 2D preview.
+
+\`\`\`sh
+PYTHONPATH=. python scripts/game/game_project.py --catalog
+PYTHONPATH=. python scripts/game/game_project.py \
+  --demo-project ./original-game.json \
+  --targets game-boy,super-nintendo-snes,windows-11
+PYTHONPATH=. python scripts/game/game_project.py \
+  --verify-capsule ./original-game.json
+PYTHONPATH=. python scripts/game/export_portable_c89.py \
+  --capsule ./original-game.json --output ./original-game.c
+\`\`\`
+
+\`original-game.c\` is actual portable turn-based ISO C89 source, which
+can be compiled on a compatible C toolchain. It is not a licensed
+PlayStation/Xbox/Nintendo build or an emulated ROM. All listed console
+targets remain **planning-only** until actual legal SDK/toolchain,
+exporters, target tests and distribution review are completed.
+
+For a genuine portable capsule with a proven winning controller
+sequence, use \`SkeletonOffline.exe --game-preview-check --game-project
+original-game.json --json\` or open the game window using
+\`SkeletonGame.exe --project original-game.json\`.
+
+See [Cross-Era Game Rights and Capabilities](CROSS_ERA_GAME_RIGHTS_AND_CAPABILITIES.md)
+for the exact rights protocol, legal limitations, target readiness and
+genuine build outputs. The pipeline never imports ROM keys, firmware,
+pirated games or proprietary SDK material. No model training data was
+added for these capabilities.
+
 ## One-click native offline game
 
 The Windows installer now includes a **third native executable**:
