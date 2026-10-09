@@ -796,3 +796,73 @@ def test_native_runtime_rejects_kv_ceiling_above_authorized_limit():
     policy = DevicePolicy(requested="torch", kv_limit_bytes=4096)
     with pytest.raises(RuntimeContractError, match="exceeds native runtime"):
         NativeLLMRuntime(model, limits=limits, device_policy=policy)
+
+
+def test_identical_prompt_reuses_logits_without_duplicate_device_forward(monkeypatch):
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = _model(norm="rms", ffn_kind="swiglu")
+    accel = TorchAccel(model).pin()
+    tokens = (1, 2, 3)
+    first = accel.logits_window(tokens)
+    assert accel._cached_logits is not None
+
+    def should_not_run(*args, **kwargs):
+        raise AssertionError("repeated input should reuse admitted KV logits")
+
+    monkeypatch.setattr(accel, "_cached_step", should_not_run)
+    monkeypatch.setattr(accel, "_forward_ids", should_not_run)
+    second = accel.logits_window(tokens)
+    assert second == first
+    second[0] += 100.0  # defensive list copy: no cached mutable result
+    assert accel.logits_window(tokens) == first
+    accel.reset_decode_cache()
+    assert accel._cached_logits is None
+
+
+def test_short_prompt_extension_reuses_prefix_kv_without_full_prefill(monkeypatch):
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = TinyTransformer(
+        vocab=("alpha", "beta", "gamma"), dim=8, ctx=16,
+        n_heads=2, n_layers=2, d_ff=12, norm="rms",
+        ffn_kind="swiglu", seed=103,
+    )
+    accel = TorchAccel(model).pin()
+    assert accel.logits_window((1, 2)) == pytest.approx(model._logits((1, 2)), abs=2e-5)
+    original = accel._cached_step
+    visited = []
+
+    def visited_step(token):
+        visited.append(token)
+        return original(token)
+
+    def no_prefill(*args, **kwargs):
+        raise AssertionError("continuation unexpectedly triggered full prefill")
+
+    monkeypatch.setattr(accel, "_cached_step", visited_step)
+    monkeypatch.setattr(accel, "_forward_ids", no_prefill)
+    expected = (1, 2, 3, 1, 2)
+    assert accel.logits_window(expected) == pytest.approx(
+        model._logits(expected), abs=2e-5, rel=2e-5,
+    )
+    assert visited == [3, 1, 2]
+    assert accel.cached_tokens == expected
+
+
+def test_prompt_memoization_is_invalidated_on_sgd():
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = _model()
+    accel = TorchAccel(model).pin()
+    prompt = (1, 2, 3)
+    old_logits = accel.logits_window(prompt)
+    accel.sgd((1, 2), target=1, lr=0.03)
+    assert accel._cached_logits is None
+    assert accel.cached_tokens == ()
+    new_logits = accel.logits_window(prompt)
+    assert new_logits != old_logits
+    assert new_logits == pytest.approx(accel.logits(prompt), abs=2e-5)
