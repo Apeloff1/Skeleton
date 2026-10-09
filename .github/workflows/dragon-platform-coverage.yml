@@ -7,12 +7,14 @@ on:
       - 'skeleton/ai/webcrawler/dragon_platform_readiness.py'
       - 'skeleton/ai/webcrawler/dragon_native_legacy_expansion.py'
       - 'skeleton/ai/webcrawler/dragon_native_nintendo_ppc_3ds.py'
+      - 'skeleton/ai/webcrawler/dragon_native_dreamcast_ps2.py'
       - 'skeleton/ai/webcrawler/dragon_desktop_abi.py'
       - 'skeleton/ai/webcrawler/dragon_native_targets.py'
       - 'skeleton/ai/webcrawler/dragon_native_projects.py'
       - 'skeleton/ai/webcrawler/dragon_hardware_budget.py'
       - 'tests/test_ai_webcrawler_dragon_all_platforms.py'
       - 'tests/test_ai_webcrawler_dragon_native_nintendo_ppc_3ds.py'
+      - 'tests/test_ai_webcrawler_dragon_native_dreamcast_ps2.py'
       - 'tests/test_ai_webcrawler_dragon_desktop_abi.py'
       - 'tests/test_ai_webcrawler_dragon_platform_matrix.py'
       - 'tests/test_ai_webcrawler_dragon_native_projects.py'
@@ -48,6 +50,7 @@ jobs:
           python -m pytest -q \
             tests/test_ai_webcrawler_dragon_all_platforms.py \
             tests/test_ai_webcrawler_dragon_native_nintendo_ppc_3ds.py \
+            tests/test_ai_webcrawler_dragon_native_dreamcast_ps2.py \
             tests/test_ai_webcrawler_dragon_desktop_abi.py \
             tests/test_ai_webcrawler_dragon_platform_matrix.py
       - name: Export machine-readable hardware readiness evidence
@@ -61,7 +64,7 @@ jobs:
           path.write_text(readiness_json(),encoding="utf-8")
           result=json.loads(path.read_text())
           assert result["coverage"]["catalog_count"]==169
-          assert result["coverage"]["native_source_count"]==48
+          assert result["coverage"]["native_source_count"]==50
           assert len(result["targets"])==169
           assert all(not t["compiler_verified"] for t in result["targets"])
           print("DRAGON_PLATFORM_COVERAGE_PASS",result["coverage"]["digest"])

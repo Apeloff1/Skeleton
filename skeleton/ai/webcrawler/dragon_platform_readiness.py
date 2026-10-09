@@ -47,6 +47,10 @@ SOURCE_RENDERERS.update({
     "wii":"PowerPC libogc Wii XFB console and WPAD",
     "nintendo_3ds":"ARM11 libctru/citro2d hardware top display",
 })
+SOURCE_RENDERERS.update({
+    "dreamcast":"KallistiOS SH-4 RGB565 VRAM / Maple controller",
+    "ps2":"PS2SDK MIPS EE gsKit GS / PAD RPC",
+})
 assert set(SOURCE_RENDERERS)==EMITTERS
 
 @dataclass(frozen=True)

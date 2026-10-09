@@ -6,7 +6,7 @@ The game academy previously mapped **47** major platform targets and implemented
 **19 original native source backends**. This change adds 122 concrete historic,
 consumer, handheld, computer OS/ABI and modern mobile targets, bringing the
 curated inventory to **169 distinct target identities**. It additionally implements
-five independent legacy native backends plus 21 ABI-aware desktop variants, bringing source production to **48/169**.
+five independent legacy native backends plus 21 ABI-aware desktop variants, bringing source production to **50/169**.
 
 This is not every model or board ever manufactured, and 169 catalog entries
 do NOT mean 169 working console games. No compiler/emulator or device test is
@@ -29,7 +29,7 @@ listed system.
 | Gate | Meaning | What this change demonstrates |
 | --- | --- | --- |
 | Hardware identified | CPU/graphics/sound/inputs/SDK/ABI recorded | 169 targets |
-| Original native source | Per-hardware implementation and build recipe exist | 48 targets |
+| Original native source | Per-hardware implementation and build recipe exist | 50 targets |
 | Compiler passed | Exact source built by target-specific toolchain | Not inferred |
 | Emulator passed | Repeated native input, video, audio and state trace | Not inferred |
 | Physical device passed | Hardware-verified timing and controls | Not inferred |
@@ -142,18 +142,18 @@ input/battery/display certification is future work.
 
 ### Revised source coverage
 
-169 cataloged platform identities; **48 native source generators**
+169 cataloged platform identities; **50 native source generators**
 (19 prior + 5 new original legacy SDK backends + 21 PC ABI-targeted
-source builds); **121** without an implemented native source producer.
+source builds); **119** without an implemented native source producer.
 The expanded denominator makes percentage-based readiness
-**48/169 = 26.6% for source generation only**, not a gameplay or overall
+**50/169 = 26.6% for source generation only**, not a gameplay or overall
 application completion estimate. No platform is awarded a compiled or
 hardware-verified status from source generation.
 
 ## Open devkitPro GameCube, Wii and Nintendo 3DS production backends
 
 Three additional original native source emitters bring the complete
-source-level catalog to **48/169 = 28.4%** with **121** source-adapter
+source-level catalog to **50/169 = 29.6%** with **119** source-adapter
 gaps. These are distinct hardware programs:
 
 - GameCube: PowerPC Gekko libogc game using VIDEO_Init, framebuffer
@@ -186,3 +186,42 @@ the same arcade collector. Detailed future work includes real SDK
 build runners, emulator replay recordings, latency measurements,
 sound playback and art beyond the intentionally simple original
 homebrew visuals.
+
+## New Dreamcast and PlayStation 2 source engines
+
+The source registry increases to **50/169 targets (29.6%)** with
+**119 targets still lacking native source producers**. Two newly
+original 3D-era C games add the following:
+
+**Sega Dreamcast / SH-4 / KallistiOS:** The game is written for
+the KOS RGB565 framebuffer, reads an actual Maple connected gamepad
+(D-pad, analog, A, Start), synthesizes original pixel art in video
+memory, tracks five hit points, invulnerability, four opponents,
+crystal scoring and accelerating stage pressure. Its SDK Makefile
+targets a Dreamcast ELF executable. A real disc-bootable CDI is not
+produced by source generation, nor is physical controller/frame
+timing/audio certification implied. KallistiOS should be installed
+separately. The source is original and contains no Dreamcast BIOS.
+
+**Sony PlayStation 2 / MIPS Emotion Engine / PS2SDK + gsKit:** The
+C source uses PS2 SIF RPC controller access with the 256-byte
+64-byte-aligned pad buffer, native DualShock 2 controls and
+Graphics Synthesizer primitive rectangles submitted via gsKit and
+DMA Kit. The original game has four pursuing adversaries, collectible
+objectives, health, damage protection and reset. The PS2SDK Makefile
+targets a MIPS EE ELF, not a purported game disc nor copyrighted
+commercial or proprietary SDK contents.
+
+The exact target ABI and SDK must compile those sources, and PCSX2,
+Flycast or physical consoles must replay input, graphics, audio,
+save-state and timing scenarios before the next assurance tier
+is granted. Tests assert the real native API calls, authentic source
+format, limited supported genre (arcade) and deterministic
+source generation. SDK-dependent compilation is attempted only
+if the corresponding open source SDK/toolchain is installed.
+
+SDK references:
+- KallistiOS controller: https://kos-docs.dreamcast.wiki/group__controller.html
+- KallistiOS video: https://kos-docs.dreamcast.wiki/group__video__fb.html
+- PS2SDK libpad: https://github.com/ps2dev/ps2sdk
+- gsKit Graphics Synthesizer: https://github.com/ps2dev/gsKit

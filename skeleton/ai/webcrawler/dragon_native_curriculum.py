@@ -94,6 +94,10 @@ MILESTONES=(
                        ("nes","game_boy_color"),"Allegrex PSPSDK analog controller and LCD",57,"handheld_3d"),
   CurriculumMilestone("ps1_gpu","ps1","arcade_score_attack",
                        ("nes","game_boy_color"),"MIPS PS1 homebrew rendering",54,"console_32bit"),
+  CurriculumMilestone("dreamcast_maple","dreamcast","arcade_score_attack",
+                       ("nes","game_boy_color"),"SH-4 Maple controller and KOS framebuffer",53,"console_128bit"),
+  CurriculumMilestone("ps2_gs","ps2","arcade_score_attack",
+                       ("nes","game_boy_color"),"MIPS EE gsKit graphics and SIF controller RPC",52,"console_128bit"),
   CurriculumMilestone("xbox_gamepad","xbox_original","arcade_score_attack",
                        ("nes","game_boy_color"),"nxdk gamepad and GPU SDK source",53,"console_pc_hybrid"),
 )
