@@ -48,7 +48,7 @@ def test_c64_native_source_is_actual_6510_io_game_not_html(tmp_path):
     assert "runtime_map[index] = T_FLOOR" in code
     assert "if (health == 0) lost = 1" in code
     assert "if ((u8)(level + 1) == LEVELS)" in code
-    assert "LEVELS 3" not in code  # macro, not decorative prose
+    assert "__LEVELS__" not in code  # no unresolved hardware compile placeholders
     assert "#define LEVELS 3" in code
     assert "__WIDTH__" not in code and "__MAPS__" not in code
     assert "<html" not in code
