@@ -55,6 +55,9 @@ def _parser() -> argparse.ArgumentParser:
     capabilities.add_argument("--game-preview", action="store_true", help="open native Tk offline playable game preview")
     capabilities.add_argument("--game-preview-check", action="store_true", help="verify 32 frames of native game logic without opening desktop")
     capabilities.add_argument("--homebrew-editor", help="open native visual editor for a verified ORIGINAL homebrew capsule")
+    capabilities.add_argument("--homebrew-port-check", action="store_true", help="verify original Windows hybrid port replay without a desktop")
+    parser.add_argument("--homebrew-port-project", help="original homebrew capsule for destination-port acceptance")
+    parser.add_argument("--homebrew-port-blueprint", help="rights-bound Windows port blueprint for acceptance")
     parser.add_argument("--homebrew-editor-output", help="unused Save As path for native homebrew editor")
     capabilities.add_argument("--chip8-demo-output", help="new original legal CHIP-8 homebrew ROM output file")
     capabilities.add_argument("--chip8-demo-check", action="store_true", help="execute native CHIP-8 homebrew through a winning controller replay")
@@ -107,6 +110,39 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.enqueue_dir or args.run_queue or args.queue_status
         or args.cancel_queue_job or args.retry_queue_job
     )
+    if args.homebrew_port_check:
+        if (
+            not args.homebrew_port_project or not args.homebrew_port_blueprint
+            or args.homebrew_editor_output or args.game_seed is not None
+            or args.game_project is not None
+            or args.model or args.deployment or args.prompt
+            or args.workspace or args.backup_in or args.backup_out
+            or args.native_smoke or args.doctor or args.qualify_model
+            or args.library or args.use_library or library_mode
+            or queue_mode or snapshot_mode or audit_mode
+        ):
+            print("destination port check requires only an original project and blueprint",
+                  file=sys.stderr)
+            return 2
+        from scripts.game.game_project import _read_json
+        from .offline_game_preview import GameplayError
+        from skeleton.ai.runtime.homebrew_porting import verify_port_gameplay
+        try:
+            source = _read_json(Path(args.homebrew_port_project))
+            blueprint = _read_json(Path(args.homebrew_port_blueprint))
+            report = verify_port_gameplay(source, blueprint)
+            if args.json_output:
+                print(json.dumps(report, sort_keys=True))
+            else:
+                print("Original Windows port: actually replayed hybrid game to WIN")
+            return 0
+        except (ValueError, TypeError, OSError, KeyError) as exc:
+            print("Windows homebrew port check rejected: " + str(exc), file=sys.stderr)
+            return 1
+    if args.homebrew_port_project or args.homebrew_port_blueprint:
+        print("both --homebrew-port-project and --homebrew-port-blueprint require --homebrew-port-check",
+              file=sys.stderr)
+        return 2
     if args.homebrew_editor_output and args.homebrew_editor is None:
         print("--homebrew-editor-output requires --homebrew-editor",
               file=sys.stderr)
