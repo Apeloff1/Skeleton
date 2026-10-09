@@ -3,10 +3,10 @@
   "kind": "ai-masterplan-parse-index",
   "sources": {
     "machine/ai_master_plan.json": {
-      "git_blob_sha": "64a68f16383b7219e771e44c52de0c13851f5b99"
+      "git_blob_sha": "4b9ebcf2bc97ebcbac32b6c312c500d17f500f38"
     },
     "machine/ai_build_accountability.json": {
-      "git_blob_sha": "e2b71660c273e5d81e3c6c65b474a2d3d5394b32"
+      "git_blob_sha": "ca65810b759e5935b728fc77c77117a9149e1684"
     }
   },
   "policy": {
@@ -18,7 +18,7 @@
   "volume_summary": {
     "total": 421,
     "implementation_signed": 280,
-    "verification_signed": 49,
+    "verification_signed": 178,
     "complete": 49,
     "implementation_signed_open": 231,
     "gap_free_waiting_verification": 7,
@@ -301,11 +301,11 @@
     "volume": {
       "total": 421,
       "implementation_signed": 280,
-      "verification_signed": 49,
+      "verification_signed": 178,
       "complete": 49,
       "status_counts": {
-        "verified": 42,
-        "implemented": 231,
+        "verified": 171,
+        "implemented": 102,
         "hardened": 7,
         "unverified": 141
       }
