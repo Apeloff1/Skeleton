@@ -62,7 +62,9 @@ class TorchAccel:
         return self.torch.tensor(row, dtype=self.torch.float32, device=self.device, requires_grad=grad)
 
     def pin(self) -> "TorchAccel":
-        """Upload python weights once. Subsequent SGD stays on-device."""
+        """Upload canonical Python weights, saving trained device changes first."""
+        if self._weights_modified:
+            self.sync()
         lm = self.lm
         if getattr(lm, "use_mod", False):
             raise ValueError("accelerator does not implement Mixture of Depths routing")
