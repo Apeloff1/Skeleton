@@ -17,6 +17,7 @@ import sqlite3
 import tempfile
 import time
 from typing import Any, Mapping
+
 from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
 
 
