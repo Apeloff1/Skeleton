@@ -265,3 +265,24 @@ def test_mixture_of_depths_model_never_executes_unimplemented_torch_graph():
     model.to("torch")
     assert model.device == "cpu" and not model.resident
     assert model._accel is None
+
+
+def test_native_serving_accounts_for_resident_torch_kv_cache():
+    pytest.importorskip("torch")
+    from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig
+
+    model = _model(norm="rms", ffn_kind="swiglu")
+    runtime = NativeLLMRuntime(
+        model, device_policy=DevicePolicy(requested="torch", allow_fallback=False)
+    )
+    seq = runtime.encode("alpha beta gamma")
+    result = runtime.infer_sequence(seq, use_cache=True)
+    assert result.cache_tokens == len(seq.token_ids)
+    assert model._accel is not None
+    assert model._accel.cached_tokens == seq.token_ids
+    generation = runtime.generate(
+        "alpha beta",
+        GenerationConfig(max_new_tokens=2, temperature=0.0, use_cache=True),
+    )
+    assert generation.usage.kv_peak_bytes >= runtime.estimate_kv_bytes(1)
+    assert any(event.cache_tokens > 0 for event in generation.events if event.kind == "token")
