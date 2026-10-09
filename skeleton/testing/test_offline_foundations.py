@@ -334,3 +334,42 @@ def test_training_dataset_export_never_clobbers_or_writes_into_source(
         "--dataset", str(data), "--output", str(data / "subfolder"),
     ]) == 1
     assert not (data / "subfolder").exists()
+
+
+def test_rights_or_split_policy_cannot_be_silently_redeclared(
+    tmp_path: Path,
+) -> None:
+    root = _copy(tmp_path)
+    manifest_file = root / "manifest.json"
+    manifest = json.loads(manifest_file.read_text("utf-8"))
+    manifest["rights"]["independent_legal_review_performed"] = True
+    manifest_file.write_text(json.dumps(manifest, indent=2) + "\n", "utf-8")
+    with pytest.raises(SyntheticCurriculumError, match="manifest"):
+        validate_curriculum(root)
+    manifest["rights"]["independent_legal_review_performed"] = False
+    manifest["split_protocol"]["template_overlap_across_splits"] = False
+    manifest_file.write_text(json.dumps(manifest, indent=2) + "\n", "utf-8")
+    with pytest.raises(SyntheticCurriculumError, match="manifest"):
+        validate_curriculum(root)
+
+
+def test_extra_manifest_authority_and_duplicate_json_fields_fail_closed(
+    tmp_path: Path,
+) -> None:
+    root = _copy(tmp_path)
+    path = root / "manifest.json"
+    manifest = json.loads(path.read_text("utf-8"))
+    manifest["production_weights_promoted"] = True
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(SyntheticCurriculumError, match="manifest"):
+        validate_curriculum(root)
+
+    manifest.pop("production_weights_promoted")
+    raw = json.dumps(manifest)
+    raw = raw.replace(
+        '"seed": 1729', '"seed": 1729, "seed": 1729', 1,
+    )
+    assert raw.count('"seed":') == 2
+    path.write_text(raw, encoding="utf-8")
+    with pytest.raises(SyntheticCurriculumError, match="duplicate"):
+        validate_curriculum(root)
