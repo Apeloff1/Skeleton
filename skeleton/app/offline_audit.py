@@ -12,13 +12,13 @@ import hashlib
 import json
 import math
 import os
-from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
 from pathlib import Path
 import re
 import sqlite3
 from typing import Any
 
 from .offline_snapshot import KINDS, MAX_DATABASE_BYTES
+from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
 
 
 AUDIT_SCHEMA = "skeleton.app.offline_state_audit.v1"
