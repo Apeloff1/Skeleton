@@ -155,3 +155,53 @@ def test_mps_snapshot_is_portable_and_not_falsely_resident():
     assert restored.requested == "mps"
     assert restored.resident is False
     assert restored._accel is None
+
+
+@pytest.mark.parametrize("layers", [1, 2])
+def test_rotary_only_sliding_cache_is_reference_equivalent(layers):
+    model = TinyTransformer(
+        vocab=("alpha", "beta", "gamma"), dim=8, ctx=4,
+        seed=101, n_heads=2, n_layers=layers, d_ff=12,
+        position_mode="rope", norm="rms", ffn_kind="swiglu",
+    )
+    cache = KVCache(layers, model.ctx)
+    windows = [(1, 2), (1, 2, 3), (1, 2, 3, 1),
+               (2, 3, 1, 2), (3, 1, 2, 3), (1, 2, 3, 1)]
+    for window in windows:
+        assert model._logits_window(window, cache) == pytest.approx(
+            model._logits_window(window, None), abs=1e-8, rel=1e-8
+        )
+        assert cache.tokens == list(window)
+    # Single-layer RoPE-only K/V are history-independent: eviction preserves
+    # cache positions. Deeper layers need a re-prime for reference parity.
+    assert cache.next_position == (7 if layers == 1 else 4)
+    snapshot = model.snapshot()
+    assert snapshot["position_mode"] == "rope"
+    restored = TinyTransformer.from_snapshot(snapshot)
+    assert restored.position_mode == "rope"
+    assert restored._logits((1, 2, 3)) == pytest.approx(model._logits((1, 2, 3)))
+    assert NativeLLMRuntime(model).architecture.positional == "rope-only"
+
+
+def test_rotary_only_training_does_not_update_unused_absolute_positions():
+    model = TinyTransformer(vocab=("x", "y"), dim=8, ctx=4, n_heads=2,
+                            seed=27, position_mode="rope")
+    before = [row[:] for row in model.P]
+    assert model._sgd([1, 2], target=1, lr=0.01) > 0
+    assert model.P == before
+
+
+def test_rotary_only_torch_and_reference_parity():
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = TinyTransformer(
+        vocab=("alpha", "beta", "gamma"), dim=8, ctx=4,
+        n_heads=2, n_layers=2, d_ff=12, seed=101,
+        position_mode="rope", norm="rms", ffn_kind="swiglu",
+    )
+    cpu_logits = model._logits((1, 2, 3))
+    accel = TorchAccel(model, device="cpu").pin()
+    assert accel.logits((1, 2, 3)) == pytest.approx(
+        cpu_logits, rel=2e-5, abs=2e-5
+    )
