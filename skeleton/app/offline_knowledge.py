@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from hashlib import sha256
 import math
 import re
-import sqlite3
 import unicodedata
 from typing import Any
 
