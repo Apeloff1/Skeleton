@@ -2309,212 +2309,212 @@ Simulation unit-0013: boot tick 152, ready tick 158, checkpoint tick 161. Which 
 checkpoint
 <end>
 <user>
-Normalize synthetic log "SCENE_0, Entity_0; EVENT_0!". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "SCENE_0, Entity_0; EVENT_0!". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_0 entity_0 event_0
 <end>
 <user>
-Normalize synthetic log "  SCENE_0 Entity_0  EVENT_0  ". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "  SCENE_0 Entity_0  EVENT_0  ". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_0 entity_0 event_0
 <end>
 <user>
-Normalize synthetic log "EVENT_0 / SCENE_0 / Entity_0". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "EVENT_0 / SCENE_0 / Entity_0". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 event_0 scene_0 entity_0
 <end>
 <user>
-Normalize synthetic log "SCENE_1, Entity_1; EVENT_1!". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "SCENE_1, Entity_1; EVENT_1!". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_1 entity_1 event_1
 <end>
 <user>
-Normalize synthetic log "  SCENE_1 Entity_1  EVENT_1  ". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "  SCENE_1 Entity_1  EVENT_1  ". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_1 entity_1 event_1
 <end>
 <user>
-Normalize synthetic log "EVENT_1 / SCENE_1 / Entity_1". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "EVENT_1 / SCENE_1 / Entity_1". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 event_1 scene_1 entity_1
 <end>
 <user>
-Normalize synthetic log "SCENE_2, Entity_2; EVENT_2!". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "SCENE_2, Entity_2; EVENT_2!". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_2 entity_2 event_2
 <end>
 <user>
-Normalize synthetic log "  SCENE_2 Entity_2  EVENT_2  ". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "  SCENE_2 Entity_2  EVENT_2  ". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_2 entity_2 event_2
 <end>
 <user>
-Normalize synthetic log "EVENT_2 / SCENE_2 / Entity_2". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "EVENT_2 / SCENE_2 / Entity_2". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 event_2 scene_2 entity_2
 <end>
 <user>
-Normalize synthetic log "SCENE_3, Entity_3; EVENT_3!". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "SCENE_3, Entity_3; EVENT_3!". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_3 entity_3 event_3
 <end>
 <user>
-Normalize synthetic log "  SCENE_3 Entity_3  EVENT_3  ". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "  SCENE_3 Entity_3  EVENT_3  ". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_3 entity_3 event_3
 <end>
 <user>
-Normalize synthetic log "EVENT_3 / SCENE_3 / Entity_3". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "EVENT_3 / SCENE_3 / Entity_3". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 event_3 scene_3 entity_3
 <end>
 <user>
-Normalize synthetic log "SCENE_4, Entity_4; EVENT_4!". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "SCENE_4, Entity_4; EVENT_4!". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_4 entity_4 event_4
 <end>
 <user>
-Normalize synthetic log "  SCENE_4 Entity_4  EVENT_4  ". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "  SCENE_4 Entity_4  EVENT_4  ". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_4 entity_4 event_4
 <end>
 <user>
-Normalize synthetic log "EVENT_4 / SCENE_4 / Entity_4". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "EVENT_4 / SCENE_4 / Entity_4". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 event_4 scene_4 entity_4
 <end>
 <user>
-Normalize synthetic log "SCENE_5, Entity_5; EVENT_5!". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "SCENE_5, Entity_5; EVENT_5!". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_5 entity_5 event_5
 <end>
 <user>
-Normalize synthetic log "  SCENE_5 Entity_5  EVENT_5  ". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "  SCENE_5 Entity_5  EVENT_5  ". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_5 entity_5 event_5
 <end>
 <user>
-Normalize synthetic log "EVENT_5 / SCENE_5 / Entity_5". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "EVENT_5 / SCENE_5 / Entity_5". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 event_5 scene_5 entity_5
 <end>
 <user>
-Normalize synthetic log "SCENE_6, Entity_6; EVENT_6!". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "SCENE_6, Entity_6; EVENT_6!". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_6 entity_6 event_6
 <end>
 <user>
-Normalize synthetic log "  SCENE_6 Entity_6  EVENT_6  ". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "  SCENE_6 Entity_6  EVENT_6  ". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_6 entity_6 event_6
 <end>
 <user>
-Normalize synthetic log "EVENT_6 / SCENE_6 / Entity_6". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "EVENT_6 / SCENE_6 / Entity_6". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 event_6 scene_6 entity_6
 <end>
 <user>
-Normalize synthetic log "SCENE_7, Entity_7; EVENT_7!". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "SCENE_7, Entity_7; EVENT_7!". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_7 entity_7 event_7
 <end>
 <user>
-Normalize synthetic log "  SCENE_7 Entity_7  EVENT_7  ". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "  SCENE_7 Entity_7  EVENT_7  ". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_7 entity_7 event_7
 <end>
 <user>
-Normalize synthetic log "EVENT_7 / SCENE_7 / Entity_7". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "EVENT_7 / SCENE_7 / Entity_7". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 event_7 scene_7 entity_7
 <end>
 <user>
-Normalize synthetic log "SCENE_8, Entity_8; EVENT_8!". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "SCENE_8, Entity_8; EVENT_8!". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_8 entity_8 event_8
 <end>
 <user>
-Normalize synthetic log "  SCENE_8 Entity_8  EVENT_8  ". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "  SCENE_8 Entity_8  EVENT_8  ". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_8 entity_8 event_8
 <end>
 <user>
-Normalize synthetic log "EVENT_8 / SCENE_8 / Entity_8". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "EVENT_8 / SCENE_8 / Entity_8". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 event_8 scene_8 entity_8
 <end>
 <user>
-Normalize synthetic log "SCENE_9, Entity_9; EVENT_9!". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "SCENE_9, Entity_9; EVENT_9!". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_9 entity_9 event_9
 <end>
 <user>
-Normalize synthetic log "  SCENE_9 Entity_9  EVENT_9  ". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "  SCENE_9 Entity_9  EVENT_9  ". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_9 entity_9 event_9
 <end>
 <user>
-Normalize synthetic log "EVENT_9 / SCENE_9 / Entity_9". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "EVENT_9 / SCENE_9 / Entity_9". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 event_9 scene_9 entity_9
 <end>
 <user>
-Normalize synthetic log "SCENE_10, Entity_10; EVENT_10!". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "SCENE_10, Entity_10; EVENT_10!". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_10 entity_10 event_10
 <end>
 <user>
-Normalize synthetic log "  SCENE_10 Entity_10  EVENT_10  ". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "  SCENE_10 Entity_10  EVENT_10  ". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_10 entity_10 event_10
 <end>
 <user>
-Normalize synthetic log "EVENT_10 / SCENE_10 / Entity_10". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "EVENT_10 / SCENE_10 / Entity_10". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 event_10 scene_10 entity_10
 <end>
 <user>
-Normalize synthetic log "SCENE_11, Entity_11; EVENT_0!". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "SCENE_11, Entity_11; EVENT_0!". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_11 entity_11 event_0
 <end>
 <user>
-Normalize synthetic log "  SCENE_11 Entity_11  EVENT_0  ". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "  SCENE_11 Entity_11  EVENT_0  ". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_11 entity_11 event_0
 <end>
 <user>
-Normalize synthetic log "EVENT_0 / SCENE_11 / Entity_11". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "EVENT_0 / SCENE_11 / Entity_11". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 event_0 scene_11 entity_11
 <end>
 <user>
-Normalize synthetic log "SCENE_12, Entity_12; EVENT_1!". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "SCENE_12, Entity_12; EVENT_1!". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_12 entity_12 event_1
 <end>
 <user>
-Normalize synthetic log "  SCENE_12 Entity_12  EVENT_1  ". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "  SCENE_12 Entity_12  EVENT_1  ". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_12 entity_12 event_1
 <end>
 <user>
-Normalize synthetic log "EVENT_1 / SCENE_12 / Entity_12". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "EVENT_1 / SCENE_12 / Entity_12". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 event_1 scene_12 entity_12
 <end>
 <user>
-Normalize synthetic log "SCENE_13, Entity_13; EVENT_2!". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "SCENE_13, Entity_13; EVENT_2!". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_13 entity_13 event_2
 <end>
 <user>
-Normalize synthetic log "  SCENE_13 Entity_13  EVENT_2  ". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "  SCENE_13 Entity_13  EVENT_2  ". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 scene_13 entity_13 event_2
 <end>
 <user>
-Normalize synthetic log "EVENT_2 / SCENE_13 / Entity_13". Lowercase ASCII; replace punctuation with spaces; collapse whitespace to single spaces. Return text only.
+Normalize synthetic log "EVENT_2 / SCENE_13 / Entity_13". Lowercase ASCII; replace commas, semicolons, exclamation marks and slashes with spaces; preserve underscores in identifiers; collapse whitespace to single spaces. Return text only.
 <assistant>
 event_2 scene_13 entity_13
 <end>
