@@ -109,6 +109,63 @@ class HeadlessOfflineChatTests(unittest.TestCase):
             {parent: 1, fork: 1},
         )
 
+    def test_headless_reference_ingest_search_delete_without_phantom_chat(self):
+        document = self.directory / "console-notes.md"
+        document.write_text(
+            "Deterministic sprite rasterization uses a pixel priority table. "
+            "Mapper bank selection switches ROM addresses.",
+            encoding="utf-8",
+        )
+        code, output, errors = self._run("--add-reference", str(document))
+        self.assertEqual(code, 0, errors)
+        created = json.loads(output)
+        self.assertEqual(len(created["sha256"]), 64)
+        code, output, errors = self._run("--list-references")
+        self.assertEqual(code, 0, errors)
+        self.assertEqual(len(json.loads(output)), 1)
+        code, output, errors = self._run(
+            "--search-reference", "sprite pixel priority", "--search-limit", "2"
+        )
+        self.assertEqual(code, 0, errors)
+        hits = json.loads(output)
+        self.assertGreater(len(hits), 0)
+        self.assertEqual(hits[0]["document_id"], created["document_id"])
+        self.assertTrue(hits[0]["citation"].startswith("local:"))
+        code, output, errors = self._run("--list", "--json")
+        self.assertEqual(code, 0, errors)
+        self.assertEqual(json.loads(output), [])
+        code, output, errors = self._run(
+            "--delete-reference", created["document_id"]
+        )
+        self.assertEqual(code, 0, errors)
+        code, output, errors = self._run(
+            "--search-reference", "rasterization"
+        )
+        self.assertEqual(code, 0, errors)
+        self.assertEqual(json.loads(output), [])
+
+    def test_headless_reference_rejects_binary_large_and_symlink_file(self):
+        binary = self.directory / "binary.dat"
+        binary.write_bytes(b"shader\x00binary")
+        code, output, error = self._run("--add-reference", str(binary))
+        self.assertEqual(code, 1)
+        oversized = self.directory / "oversized.txt"
+        oversized.write_bytes(b"shaders " * 12_000)
+        code, output, error = self._run("--add-reference", str(oversized))
+        self.assertEqual(code, 1)
+        good = self.directory / "trusted.txt"
+        good.write_text("Hardware emulation pipeline.", encoding="utf-8")
+        symlink = self.directory / "alias.txt"
+        try:
+            symlink.symlink_to(good)
+        except OSError:
+            self.skipTest("symlinks unavailable on this platform")
+        code, output, error = self._run("--add-reference", str(symlink))
+        self.assertEqual(code, 1)
+        code, output, errors = self._run("--list-references")
+        self.assertEqual(code, 0, errors)
+        self.assertEqual(json.loads(output), [])
+
     def test_listing_empty_store_does_not_create_phantom_session(self):
         code, output, errors = self._run("--list", "--json")
         self.assertEqual(code, 0, errors)
