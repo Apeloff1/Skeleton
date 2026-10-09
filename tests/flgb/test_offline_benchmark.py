@@ -271,6 +271,41 @@ class TestOfflineBenchmark(unittest.TestCase):
                 ])
             self.assertEqual(status, 2)
 
+    def test_next_token_objective_uses_finite_native_context_window(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent, _, suite = self._setup(directory)
+            long_prompt = " ".join(["hello", "world"] * 48)
+            manifest = {
+                "schema": SCHEMA,
+                "cases": [{
+                    "id": "long-window",
+                    "category": "context",
+                    "text": long_prompt,
+                    "expected_next": "hello",
+                }],
+            }
+            suite.write_text(json.dumps(manifest), encoding="utf-8")
+            backend = load_native_checkpoint(parent)
+            self.assertGreater(len(backend.runtime.model._ids(long_prompt)), backend.runtime.model.ctx)
+
+            seen = []
+            def observe(self, ids):
+                seen.append(tuple(ids))
+                assert 1 <= len(ids) <= self.ctx
+                result = [0.0] * len(self.itos)
+                result[self.stoi["hello"]] = 1.0
+                return result
+
+            with patch.object(
+                TinyTransformer, "logprob", return_value=-math.log(2.0),
+            ), patch.object(TinyTransformer, "_logits", new=observe):
+                report = benchmark_native_models(suite, baseline=parent)
+            self.assertEqual(len(seen), 1)
+            self.assertEqual(len(seen[0]), backend.runtime.model.ctx)
+            self.assertEqual(
+                report["baseline"]["category_scores"]["context"]["next_token_correct"], 1,
+            )
+
     def test_candidate_must_use_exact_tokenizer(self):
         with tempfile.TemporaryDirectory() as directory:
             parent, candidate, suite = self._setup(directory)
