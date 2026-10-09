@@ -174,3 +174,54 @@ def test_unified_app_cli_exposes_same_real_local_model_qualification(
     report = json.loads(capsys.readouterr().out)
     assert report["turns_completed"] == 2
     assert len(report["model_digest"]) == 64
+
+
+def test_qualification_never_reports_success_if_second_inference_fails(
+    tmp_path: Path, monkeypatch, capsys,
+) -> None:
+    from skeleton.app import offline_qualification
+
+    model = _checkpoint(tmp_path / "checkpoint.json")
+    original = offline_qualification.OfflineAISession.ask
+    attempts = {"count": 0}
+
+    async def fail_on_second(self, prompt, *, max_output_tokens=32, inference_prompt=None):
+        attempts["count"] += 1
+        if attempts["count"] == 2:
+            raise RuntimeError("injected second-turn model crash")
+        return await original(
+            self, prompt,
+            max_output_tokens=max_output_tokens,
+            inference_prompt=inference_prompt,
+        )
+
+    monkeypatch.setattr(
+        offline_qualification.OfflineAISession, "ask", fail_on_second,
+    )
+    assert main([
+        "--model", str(model), "--qualify-model",
+        "--max-output-tokens", "2", "--json",
+    ]) == 1
+    captured = capsys.readouterr()
+    assert attempts["count"] == 2
+    assert captured.out == ""
+    assert "second-turn model crash" in captured.err
+
+
+def test_qualification_does_not_ignore_state_management_flags(
+    tmp_path: Path, capsys,
+) -> None:
+    checkpoint = _checkpoint(tmp_path / "checkpoint.json")
+    assert main([
+        "--model", str(checkpoint), "--qualify-model",
+        "--audit-workspace", str(tmp_path / "missing.sqlite"),
+    ]) == 2
+    assert main([
+        "--model", str(checkpoint), "--qualify-model",
+        "--snapshot-to", str(tmp_path / "snapshot"),
+    ]) == 2
+    assert main([
+        "--model", str(checkpoint), "--qualify-model",
+        "--queue-db", str(tmp_path / "queue.sqlite"), "--run-queue",
+    ]) == 2
+    assert capsys.readouterr().out == ""
