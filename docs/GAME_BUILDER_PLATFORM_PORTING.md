@@ -391,3 +391,44 @@ The platform editor, public rights-bound CLI and game evolution compiler
 now expose **ten native source destinations**. The archive of 524
 candidate historical systems continues to distinguish native code
 generation from independent emulation and release rights.
+
+## One-command original game portfolio — every implemented machine
+
+The portfolio builder, `native_portfolio_cli.py`, produces the *same*
+source-authored, provably winnable homebrew game for every implemented
+machine target, with each port assembled as a **separate real source
+project**. It is not a collection of falsely renamed executables or HTML
+renderings. For example:
+
+```bash
+python -m skeleton.ai.game_builder.native_portfolio_cli \
+  --basis bandai_wonderswan --project-id star-voyage \
+  --title 'Original Star Voyage' --seed 1986 \
+  --rights-evidence ./my-original-work.txt \
+  --identity 'original constellation puzzles' \
+  --identity 'own distinctive artwork' \
+  --out ./all-original-native-ports \
+  --authorize-original-homebrew
+```
+
+The command creates machine-specific source subdirectories for the genuine
+Game Boy, Game Boy Color, NES/Famicom, Commodore 64, Atari 400/800, IBM DOS
+8086, Apple II, Windows, Linux, and macOS engines. Every target manifest
+is checked against the **same game-world digest**, winning-replay digest,
+author-supplied evidence hash and exact source-content digest.
+
+The all-platform source portfolio is constructed in a temporary sibling
+folder and atomically promoted to the requested **new, non-overwritten
+destination** only after every requested machine has succeeded. Any target
+with an incompatible hardware constraint aborts and removes staging output.
+The resulting `portfolio-manifest.json` uses relative source paths and
+a reproducible cryptographic digest, independent of the destination folder
+name. A subset may be selected with repeated `--target` options.
+
+`Game Builder All-Native Homebrew Portfolio` performs a real full-port
+generation in GitHub CI and uploads the resultant hardware-specific
+source projects for download. This is original **source export**: it
+does not falsely certify compiled ROMs, executable installation, emulator
+runs, original hardware, independent copyright clearance, or release
+approval. Those remain separately measured acceptance gates, and copied
+third-party game assets continue to be refused.
