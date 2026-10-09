@@ -329,3 +329,81 @@ def test_validation_signal_prioritizes_errors_without_copying_answers(
         "--dataset", str(SOURCE), "--profile", "consumer",
         "--focus-validation", str(predictions), "--evaluate", str(predictions),
     ]) == 2
+
+
+def test_aggregate_ledger_reuses_validation_priority_without_raw_predictions(
+    tmp_path: Path, capsys,
+) -> None:
+    from scripts.training.sparse_capability import main
+    from skeleton.ai.training.capability_ledger import (
+        OfflineCapabilityLedger, make_capability_receipt,
+    )
+
+    predictions = tmp_path / "validation.jsonl"
+    _write_predictions(predictions, "validation")
+    rows = [json.loads(line) for line in predictions.read_text("utf-8").splitlines()]
+    target = next(
+        x for x in rows if x["id"].startswith("ofv1-offline_authority-")
+        and x["id"].endswith("-1")
+    )
+    target["prediction"] = "INTENTIONALLY WRONG"
+    predictions.write_text(
+        "".join(json.dumps(x) + "\n" for x in rows), "utf-8",
+    )
+    ledgerfile = tmp_path / "scorecard.sqlite"
+    with OfflineCapabilityLedger(ledgerfile) as ledger:
+        evidence = make_capability_receipt(
+            SOURCE, predictions, model_tag="sparse-fixture",
+        )
+        ledger.record(evidence)
+    # Remove raw prediction file to prove it is no longer needed.
+    predictions.unlink()
+    args = [
+        "--dataset", str(SOURCE), "--profile", "consumer",
+        "--focus-ledger", str(ledgerfile), "--model-tag", "sparse-fixture",
+    ]
+    output = tmp_path / "focused-small.txt"
+    assert main([*args, "--export", str(output)]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["adaptive_selection_source"] == "aggregate-validation-ledger"
+    assert report["adaptive_selection_feedback_sha256"] == evidence["prediction_sha256"]
+    assert report["raw_predictions_loaded"] is False
+    assert report["adaptive_selection_did_not_copy_heldout_labels"] is True
+    assert report["active_training_rows"] == 48
+    assert report["heldout_rows_selected"] == 0
+    assert report["focus_modes"] == ["offline_authority:network_request_denial"]
+    assert output.read_bytes().count(b"<user>\n") == 48
+    assert b"INTENTIONALLY WRONG" not in output.read_bytes()
+
+
+def test_ledger_focus_requires_existing_dataset_bound_receipts(
+    tmp_path: Path, capsys,
+) -> None:
+    from scripts.training.sparse_capability import main
+    from skeleton.ai.training.capability_ledger import (
+        OfflineCapabilityLedger, make_capability_receipt,
+    )
+
+    missing = tmp_path / "missing-ledger.sqlite"
+    common = [
+        "--dataset", str(SOURCE), "--profile", "consumer",
+        "--focus-ledger", str(missing), "--model-tag", "unseen-model",
+    ]
+    assert main(common) == 1
+    assert not missing.exists()
+    capsys.readouterr()
+
+    pred = tmp_path / "predictions.jsonl"
+    _write_predictions(pred, "validation")
+    with OfflineCapabilityLedger(missing) as ledger:
+        ledger.record(make_capability_receipt(
+            SOURCE, pred, model_tag="another-model",
+        ))
+    assert main(common) == 1
+    assert "no admitted aggregate" in capsys.readouterr().err
+    assert main([
+        "--dataset", str(SOURCE), "--focus-ledger", str(missing),
+    ]) == 2
+    assert main([
+        "--dataset", str(SOURCE), "--model-tag", "unseen-model",
+    ]) == 2
