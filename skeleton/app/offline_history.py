@@ -161,6 +161,8 @@ def restore_history(
         raise OfflineHistoryError("offline backup exceeds maximum file size")
     try:
         record = json.loads(raw.decode("utf-8"), object_pairs_hook=_object_no_duplicates)
+    except OfflineHistoryError:
+        raise
     except (ValueError, UnicodeError) as exc:
         raise OfflineHistoryError("offline history backup is not valid UTF-8 JSON") from exc
     if not isinstance(record, dict) or set(record) != {"payload", "sha256"}:
