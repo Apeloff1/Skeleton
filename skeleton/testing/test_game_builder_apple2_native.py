@@ -98,17 +98,17 @@ def test_apple_single_parser_rejects_nonapple_files_duplicate_forks_and_truncati
     path=tmp_path/"synthetic.applesingle"
     # Synthetic structural fixture only, NOT native binary gameplay certification.
     header=bytes.fromhex("00051600 00020000")+b"\x00"*16+pack(">H",1)
-    table=pack(">III",1,38,200)
-    path.write_bytes(header+table+b"\xAA"*200)
+    table=pack(">III",1,38,1000)
+    path.write_bytes(header+table+b"\xAA"*1000)
     proof=verify(path)
     assert proof["applesingle_header_verified"] is True
     assert proof["file_entry_count"]==1
     assert proof["apple_ii_emulator_playthrough_verified"] is False
     for payload in (
         b"MZ"+b"\0"*300,
-        header+pack(">III",1,38,201)+b"\xAA"*200,
-        header+pack(">III",2,38,200)+b"\xAA"*200,
-        header+pack(">III",1,9999,200)+b"\xAA"*200,
+        header+pack(">III",1,38,1001)+b"\xAA"*1000,
+        header+pack(">III",2,38,1000)+b"\xAA"*1000,
+        header+pack(">III",1,9999,1000)+b"\xAA"*1000,
     ):
         path.write_bytes(payload)
         with pytest.raises(ValueError):
