@@ -25,6 +25,7 @@ The review candidate includes content-specific bindings to:
 - Exact generated world SHA-256 (original homebrew game state);
 - Exact native source bundle and compiled native binary digests;
 - Legal rights packet and legal assessment digests;
+- Deterministic author credits and third-party legal-notice bundle SHA-256 (any edit invalidates signatures);
 - Originality/anti-plagiarism review digest;
 - Actual build and gameplay/replay evidence references;
 - Source author IDs, native builders/operators, output machine identity;
