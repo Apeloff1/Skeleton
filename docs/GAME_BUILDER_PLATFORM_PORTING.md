@@ -57,6 +57,20 @@ Portability is a directed **planning graph**. The same source project may have m
         "windows_modern", "sega_dreamcast", "nec_pc_fx", "arduboy",
     ))
 
+
+## First implemented native-source adapter: desktop SDL2
+
+The original, deterministically solvable `PlayableWorld` can now produce an **actual C11 SDL2 game source project**, independently of HTML: `desktop_native_export.compile_native_desktop(world, homebrew_rights, target_platform_id, authorized=True)`. The supported source-project targets are `windows_modern`, `linux_desktop` and `macos_modern`.
+
+The artifact includes working map, collectibles, hazards, health, level transitions, win/loss, keyboard and gamepad movement, a basic animated pixel renderer, CMake, and a manifest containing the world, replay and rights-evidence hashes. `export_native_desktop_source` writes a new standalone source directory; it neither installs dependencies nor runs arbitrary commands. SDL2 development libraries and a C compiler are required to build; hardware-dependent native binaries are **not built or verified by this PR**. Title strings and map rows are escaped into C literals. The exporter rejects a non-matching project ID, unsupported console targets, absent authorization and unverified gameplay worlds.
+
+A typical desktop build, after selecting the platform's legal SDL2 toolchain:
+
+    cmake -S generated-project -B build
+    cmake --build build --config Release
+
+On Windows, the resulting artifact can be a genuine `.exe`; its actual runtime behavior, SDL2 distribution, installer creation and signing still require target-specific CI and hardware testing. This route deliberately does **not** masquerade as a Game Boy / PlayStation / Xbox exporter.
+
 ## Build adapter qualification still required
 
 1. Confirm **independent homebrew source authority** through the existing game-builder rights ledger, source inventory, license/attribution rules and legal review where needed.
