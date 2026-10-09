@@ -359,3 +359,35 @@ historical Game & Watch → Game Boy → Game Boy Color evolution exporter now
 support **nine native-source targets**, including both separately playable
 handheld generations. Unsupported systems remain explicit design-only
 candidates rather than fake binary output.
+
+## Apple II+/IIe native original homebrew games
+
+`apple2_native_export.py` generates genuinely new **Apple II 6502**
+games using the Apple II-specific cc65 runtime, not a Windows game
+masquerading as an Apple program. The interactive engine targets genuine
+40×24 text hardware through the Apple II conio driver, waits on the
+Apple II keyboard through `cgetc()`, recognizes I/J/K/L and W/A/S/D
+for original maze movement, and synthesizes short original sound events
+by toggling the genuine Apple II $C030 speaker soft-switch. Its tilemaps,
+positions, scoring, damage, health, unique game progression and victory
+come directly from a solved, individually authored `PlayableWorld`.
+The 6502 program is compiled using `cl65 -t apple2` into the native
+**AppleSingle** file format used for DOS 3.3/ProDOS transfers.
+
+The `Game Builder Native Apple II 6502` workflow builds an actual
+AppleSingle native executable, validates the format/header version,
+bounded data-fork entries and SHA-256, and runs source authority tests.
+This is **not** an automated Apple II disk-image boot, AppleWin emulator
+playthrough or physical-machine certification, and it does not bundle
+Apple system ROMs or third-party DOS 3.3 disks.
+
+Compatibility applies to an Apple II+/IIe style machine with a
+compatible cc65 runtime and Language Card configuration; the original
+unexpanded 1977 integer-BASIC Apple II is *not automatically certified*
+by this backend. More recent Apple IIGS and other Apple systems remain
+distinct research/port candidates until their own acceptance gates pass.
+
+The platform editor, public rights-bound CLI and game evolution compiler
+now expose **ten native source destinations**. The archive of 524
+candidate historical systems continues to distinguish native code
+generation from independent emulation and release rights.
