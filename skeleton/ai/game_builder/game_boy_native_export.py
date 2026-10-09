@@ -384,7 +384,7 @@ build/skeleton.o: main.asm
 \tmkdir -p build
 \t$(RGBASM) -o $@ $<
 build/skeleton-original.gb: build/skeleton.o
-\t$(RGBLINK) -o $@ $<
+\t$(RGBLINK) -n build/skeleton.sym -o $@ $<
 \t$(RGBFIX) -v -p 0 -t SKELORIG $@
 clean:
 \trm -rf build
