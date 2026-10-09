@@ -327,3 +327,35 @@ game exporters.
 Game Boy, NES, Commodore 64, IBM DOS 8086 and Atari 400/800
 native-source adapters. These are eight authored targets, not
 eight legally approved commercial cartridge reissues.
+
+## Game Boy Color — real hardware-accelerated authored RGB555 port
+
+The dedicated `game_boy_color_native_export.py` compiles a different native
+hardware target from the monochrome Game Boy: **CGB-only** RGBDS assembly with
+an authentic cartridge flag `$0143=$C0`, independently authored 15-bit
+RGB555 art palettes, FF68/FF69 background palette memory, FF6A/FF6B sprite
+palette memory, FF4F VRAM bank selection, and 576 background-map color
+attributes per stage stored in video RAM bank 1. Bank 0 is restored before
+the monochrome-compatible deterministic collision/gameplay engine reads tile
+data. None of this relies on downloaded Nintendo game characters, textures,
+commercial ROMs, or firmware images.
+
+Unlike a static screen-color filter, the native CGB program colors floor,
+walls, collectible gems, hazards, and exits independently using five distinct
+background palettes. The original sprite palette is also initialized in
+the physical CGB OBJ palette memory. Real RGBDS builds use `rgbfix -C`;
+the color-only flag is checked in the compiled cartridge header rather than
+being inferred from the filename.
+
+The standalone `Game Builder Native Game Boy Color ROM` workflow builds
+an actual CGB-only cartridge, runs its authored gameplay in **true PyBoy
+Game Boy Color mode**, checks linker-symbol-bound guest WRAM on every D-pad
+move, and uploads the source/ROM/symbols/CPU evidence. A source project
+does not claim that cartridge compilation, emulator execution, a physical
+Game Boy Color test, or distribution rights were automatically approved.
+
+The standalone homebrew editor, command-line game creation pipeline and
+historical Game & Watch → Game Boy → Game Boy Color evolution exporter now
+support **nine native-source targets**, including both separately playable
+handheld generations. Unsupported systems remain explicit design-only
+candidates rather than fake binary output.
