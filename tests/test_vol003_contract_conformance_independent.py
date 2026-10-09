@@ -54,7 +54,7 @@ def test_independent_vol003_accepts_current_pending_closure(
     assert receipt["errors"] == []
     assert receipt["head_sha"] == "vol003-head"
     assert receipt["volume"] == "VOL-003"
-    assert receipt["contract_count"] == 36
+    assert receipt["contract_count"] == 40
     assert receipt["override_count"] == 3
     assert receipt["executed_vector_count"] == 18
     assert len(receipt["vector_ids"]) == 18
