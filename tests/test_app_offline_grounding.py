@@ -201,6 +201,107 @@ class GroundedOfflineReceiptTests(unittest.TestCase):
             "SELECT COUNT(*) FROM offline_turn_evidence"
         ).fetchone()[0], 0)
 
+    def test_missing_grounded_receipt_evidence_is_never_silently_downgraded(self):
+        self._commit(self._snapshot())
+        with self.store._transaction():
+            self.store._db.execute(
+                "DELETE FROM offline_turn_evidence WHERE session_id=?",
+                (self.sid,),
+            )
+        with self.assertRaisesRegex(RuntimeContractError, "evidence missing"):
+            self.store.load(self.sid, self.model, self.token)
+        with self.assertRaises(RuntimeContractError):
+            self.store.export_bundle(self.sid, self.model, self.token)
+        with self.assertRaises(RuntimeContractError):
+            self.store.turn_evidence(self.sid, self.model, self.token)
+
+    def test_plain_receipt_cannot_claim_unexpected_grounding(self):
+        plain = self.store.create(self.model, self.token)
+        saved = self.store.load(plain, self.model, self.token)
+        words = saved.transcript.append("user", "hello").append(
+            "assistant", "local result"
+        )
+        self.store.commit(
+            session=saved, request_id="plain-1", request_digest="a" * 64,
+            transcript=words, text="local result",
+            output_digest=sha256(b"local result").hexdigest(),
+            prompt_tokens=1, generated_tokens=1,
+        )
+        with self.store._transaction():
+            self.store._db.execute(
+                "UPDATE offline_turns SET grounded=1 "
+                "WHERE session_id=? AND request_id=?",
+                (plain, "plain-1"),
+            )
+        with self.assertRaisesRegex(RuntimeContractError, "evidence missing"):
+            self.store.load(plain, self.model, self.token)
+
+    def test_pre_grounding_database_schema_is_upgraded_without_losing_plain_turns(self):
+        import os
+        import sqlite3
+        legacy_path = Path(self.temp.name) / "legacy-schema.sqlite3"
+        connection = sqlite3.connect(legacy_path)
+        try:
+            connection.execute(
+                "CREATE TABLE offline_turns ("
+                "session_id TEXT, request_id TEXT, request_digest TEXT,"
+                "revision INTEGER, text TEXT, output_digest TEXT,"
+                "prompt_tokens INTEGER, generated_tokens INTEGER)"
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        if os.name != "nt":
+            legacy_path.chmod(0o600)
+        with OfflineChatStore(legacy_path) as upgraded:
+            fields = [
+                row[1] for row in upgraded._db.execute(
+                    "PRAGMA table_info(offline_turns)"
+                ).fetchall()
+            ]
+            self.assertIn("grounded", fields)
+            sid = upgraded.create(self.model, self.token)
+            snap = upgraded.load(sid, self.model, self.token)
+            conversation = snap.transcript.append("user", "hi").append(
+                "assistant", "response"
+            )
+            upgraded.commit(
+                session=snap, request_id="legacy-plain",
+                request_digest="a" * 64,
+                transcript=conversation, text="response",
+                output_digest=sha256(b"response").hexdigest(),
+                prompt_tokens=1, generated_tokens=1,
+            )
+            self.assertEqual(
+                upgraded.turn_evidence(sid, self.model, self.token), [None]
+            )
+        with OfflineChatStore(legacy_path) as reopened:
+            self.assertEqual(reopened.load(sid, self.model, self.token).revision, 1)
+
+    def test_prepared_snapshot_equals_exact_model_supplied_prefix(self):
+        original = (
+            "Rasterizer pixel edge coverage uses deterministic fixed-point "
+            "arithmetic. " * 7
+        )
+        indexed = self.refs.add_text("Long exact excerpt", original)
+        hits = self.refs.search("rasterizer pixel edge coverage", limit=1)
+        self.assertEqual(hits[0]["document_id"], indexed["document_id"])
+        manifest = prepare_evidence(
+            self.question, self.digest, hits, self.model, self.token
+        )
+        sent = manifest["citations"][0]
+        self.assertEqual(
+            original[sent["char_start"]:sent["char_end"]], sent["passage"]
+        )
+        self.assertLessEqual(len(sent["passage"]), 220)
+        self.assertIn(sent["passage"], manifest["context"])
+        self.assertNotIn(hits[0]["passage"], manifest["context"])
+        self.assertEqual(
+            json.loads(validate_evidence(
+                manifest, self.question, self.digest, self.model, self.token
+            )), manifest,
+        )
+
     def test_mode_separation_prevents_same_id_plain_reuse(self):
         self._commit(self._snapshot())
         with self.assertRaisesRegex(RuntimeContractError, "request id reused"):
