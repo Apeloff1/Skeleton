@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from skeleton.ai.model_runtime import NativeLLMRuntime
-from skeleton.ai.runtime.inference.artifact import load_local_model_artifact, write_local_model_artifact
+from skeleton.ai.runtime.inference.artifact import load_local_model_artifact
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
 from skeleton.app.local_ai import load_native_checkpoint
 from skeleton.app.local_ai_training import (
@@ -24,6 +24,7 @@ from skeleton.app.local_ai_training import (
     MAX_TRAINING_TOKENS,
     OfflineTrainingError,
     _read_corpus,
+    publish_native_checkpoint_no_replace,
 )
 from skeleton.cortex.port import tokens
 from skeleton.cortex.transformer import TinyTransformer
@@ -180,7 +181,7 @@ def improve_local_model(
     independently_rechecked = trained.perplexity(heldout_lines)
     if not math.isclose(independently_rechecked, best_score, abs_tol=1e-9, rel_tol=1e-9):
         raise OfflineImprovementError("candidate replay differs from selected held-out epoch")
-    written = write_local_model_artifact(candidate, output)
+    written = publish_native_checkpoint_no_replace(candidate, output)
     restored = load_native_checkpoint(output)
     if (
         restored.model_digest != candidate.model_digest
