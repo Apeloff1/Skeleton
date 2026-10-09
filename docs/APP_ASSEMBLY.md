@@ -93,6 +93,22 @@ python -m skeleton app local-ai --improve-model ./my-native.json \
   --output-model ./my-native-v2.json --epochs 3 --json
 ```
 
+After saving a candidate, run a **read-only comparative evaluation** using the
+same separate held-out file. This returns exit code 0 only when the candidate
+beats the parent on bounded token perplexity, and exit code 1 on a regression.
+It does not change either checkpoint or grant release-promotion authority.
+
+```bash
+python -m skeleton app local-ai --compare-model ./my-native.json \
+  --candidate-model ./my-native-v2.json \
+  --eval-corpus ./heldout.txt --json
+```
+
+Both model identities and tokenizer consistency are verified before scoring;
+the receipt records validation source identity, measured perplexity for both
+models, and the Boolean result. If you edit the validation source, the digest
+changes and previous scores cannot be silently treated as comparable.
+
 The JSON receipt binds the original/candidate model digests, tokenizer identity,
 both source digests, original/new artifact hashes, CPU training steps, best epoch,
 and baseline/accepted held-out perplexity. Keep the input artifact to roll back.
