@@ -92,12 +92,16 @@ def build_parser() -> argparse.ArgumentParser:
                        help="list conversations for the selected exact model")
     modes.add_argument("--delete-session", metavar="SESSION_ID",
                        help="delete a stored conversation and all retry receipts")
+    modes.add_argument("--fork-session", metavar="SESSION_ID",
+                       help="branch a saved conversation without modifying the parent")
     modes.add_argument("--export-session", metavar="SESSION_ID",
                        help="create a private portable backup of one conversation")
     modes.add_argument("--import-bundle", metavar="PATH", type=Path,
                        help="import a valid same-model portable conversation backup")
     parser.add_argument("--output", type=Path,
                         help="new backup destination; required for --export-session")
+    parser.add_argument("--fork-after-turn", type=int,
+                        help="with --fork-session, copy history only through this turn")
     parser.add_argument("--max-output-tokens", type=int,
                         help="per-turn model completion-token budget")
     parser.add_argument("--json", action="store_true",
@@ -109,13 +113,15 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     manage = bool(args.list or args.delete_session or args.export_session
-                  or args.import_bundle)
+                  or args.import_bundle or args.fork_session)
     if args.output is not None and args.export_session is None:
         parser.error("--output is valid only with --export-session")
     if args.export_session and args.output is None:
         parser.error("--export-session requires --output")
     if args.session and manage:
         parser.error("--session only applies to --message or --interactive")
+    if args.fork_after_turn is not None and not args.fork_session:
+        parser.error("--fork-after-turn requires --fork-session")
     if args.max_output_tokens is not None and (
         type(args.max_output_tokens) is not int or args.max_output_tokens < 1
     ):
@@ -147,6 +153,14 @@ def main(argv: list[str] | None = None) -> int:
                 if args.delete_session:
                     store.delete(args.delete_session, model_digest, token_digest)
                     print(json.dumps({"deleted_session_id": args.delete_session}))
+                    return 0
+                if args.fork_session:
+                    branch_id = store.fork(
+                        args.fork_session, model_digest, token_digest,
+                        after_turn=args.fork_after_turn,
+                    )
+                    print(json.dumps({"source_session_id": args.fork_session,
+                                      "forked_session_id": branch_id}))
                     return 0
                 if args.export_session:
                     payload = store.export_bundle(
