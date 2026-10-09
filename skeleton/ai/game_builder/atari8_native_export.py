@@ -70,7 +70,7 @@ static void wait_frame(void) {
 
 static void draw_hud(void) {
     gotoxy(0, 0);
-    cputs("ORIGINAL ATARI HOME BREW LVL:");
+    cputs("ORIGINAL ATARI HOMEBREW LVL:");
     cputc((char)('0' + level + 1));
     cputs("  G:");
     cputc((char)('0' + gems_left));
