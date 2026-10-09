@@ -169,6 +169,14 @@ jobs:
             throw "installed Skeleton.exe native multi-category benchmark smoke exited $($benchmarkSmoke.ExitCode)"
           }
 
+          # Freeze and install the real multi-document offline corpus tool:
+          # materialize an exact dataset manifest, independently revalidate
+          # original sources and train a real native checkpoint from its split.
+          $datasetSmoke = Start-Process -FilePath $launcher -ArgumentList @("--local-ai-dataset-smoke") -Wait -PassThru
+          if ($datasetSmoke.ExitCode -ne 0) {
+            throw "installed Skeleton.exe native dataset curation / training smoke failed"
+          }
+
           # Public frozen native CLI: use actual operator syntax to train and
           # inspect a local model, without Docker or a system Python runtime.
           $cliDir = Join-Path $env:TEMP ("skeleton-native-cli-" + [guid]::NewGuid().ToString("N"))
