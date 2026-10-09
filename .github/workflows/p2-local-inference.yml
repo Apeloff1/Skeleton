@@ -8,8 +8,10 @@ on:
       - "tests/flgb/test_desktop_offline_ai.py"
       - "tests/flgb/test_offline_chat_transcript.py"
       - "tests/flgb/test_offline_native_training.py"
+      - "tests/flgb/test_offline_model_improvement.py"
       - "skeleton/app/local_ai_transcript.py"
       - "skeleton/app/local_ai_training.py"
+      - "skeleton/app/local_ai_improvement.py"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_native_neural_lm.py"
       - "skeleton/testing/test_native_runtime_local_provider.py"
@@ -30,8 +32,10 @@ on:
       - "tests/flgb/test_desktop_offline_ai.py"
       - "tests/flgb/test_offline_chat_transcript.py"
       - "tests/flgb/test_offline_native_training.py"
+      - "tests/flgb/test_offline_model_improvement.py"
       - "skeleton/app/local_ai_transcript.py"
       - "skeleton/app/local_ai_training.py"
+      - "skeleton/app/local_ai_improvement.py"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_llama_cpp_local_inference.py"
       - "skeleton/testing/test_native_runtime_local_provider.py"
@@ -92,3 +96,4 @@ jobs:
           tests/flgb/test_desktop_offline_ai.py
           tests/flgb/test_offline_chat_transcript.py
           tests/flgb/test_offline_native_training.py
+          tests/flgb/test_offline_model_improvement.py
