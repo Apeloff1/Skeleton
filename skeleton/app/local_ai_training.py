@@ -13,6 +13,7 @@ import math
 import os
 from pathlib import Path
 import stat
+import tempfile
 
 from skeleton.ai.model_runtime import NativeLLMRuntime
 from skeleton.ai.runtime.inference.artifact import write_local_model_artifact
@@ -95,6 +96,38 @@ def _read_corpus(path: str | Path) -> tuple[bytes, str]:
     return data, content
 
 
+def publish_native_checkpoint_no_replace(
+    model: object, destination: str | Path,
+):
+    """Stage, validate and atomically create a checkpoint without clobber.
+
+    The canonical artifact owner still serializes/validates the weights.
+    Hard-linking within the destination directory atomically fails if a
+    concurrent process created the selected name; it never replaces it.
+    Unsupported filesystems fail closed rather than silently overwriting.
+    """
+    target = Path(destination)
+    if target.exists() or target.is_symlink():
+        raise OfflineTrainingError("checkpoint destination already exists")
+    if not target.parent.is_dir():
+        raise OfflineTrainingError("checkpoint destination parent directory unavailable")
+    try:
+        with tempfile.TemporaryDirectory(
+            prefix=".skeleton-native-stage-", dir=str(target.parent),
+        ) as folder:
+            staged = Path(folder) / "verified-checkpoint.json"
+            record = write_local_model_artifact(model, staged)
+            try:
+                os.link(staged, target)
+            except FileExistsError as exc:
+                raise OfflineTrainingError("checkpoint destination already exists") from exc
+            except OSError as exc:
+                raise OfflineTrainingError("atomic no-replace checkpoint publication unsupported") from exc
+    except OSError as exc:
+        raise OfflineTrainingError("could not stage native checkpoint safely") from exc
+    return record
+
+
 def train_local_text(
     source: str | Path,
     checkpoint: str | Path,
@@ -147,7 +180,7 @@ def train_local_text(
     from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
 
     backend = NativeRuntimeLocalModel(native)
-    record = write_local_model_artifact(backend, output)
+    record = publish_native_checkpoint_no_replace(backend, output)
     restored = load_native_checkpoint(output)
     if (
         restored.model_digest != backend.model_digest
