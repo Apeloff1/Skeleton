@@ -353,7 +353,10 @@ class OfflineNativeChatTests(unittest.TestCase):
                 (1024, transcript.to_json(), sid),
             )
             self.store._db.executemany(
-                "INSERT INTO offline_turns VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO offline_turns "
+                "(session_id, request_id, request_digest, revision, text, "
+                "output_digest, prompt_tokens, generated_tokens) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 [(sid, f"turn-{i}", "a" * 64, i + 1,
                   f"answer-{i}", "b" * 64, 3, 1)
                  for i in range(1024)],
