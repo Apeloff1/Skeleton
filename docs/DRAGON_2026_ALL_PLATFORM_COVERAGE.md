@@ -6,7 +6,7 @@ The game academy previously mapped **47** major platform targets and implemented
 **19 original native source backends**. This change adds 122 concrete historic,
 consumer, handheld, computer OS/ABI and modern mobile targets, bringing the
 curated inventory to **169 distinct target identities**. It additionally implements
-five independent legacy native backends plus 21 ABI-aware desktop variants, bringing source production to **50/169**.
+five independent legacy native backends plus 21 ABI-aware desktop variants, bringing source production to **55/169**.
 
 This is not every model or board ever manufactured, and 169 catalog entries
 do NOT mean 169 working console games. No compiler/emulator or device test is
@@ -144,16 +144,16 @@ input/battery/display certification is future work.
 
 169 cataloged platform identities; **50 native source generators**
 (19 prior + 5 new original legacy SDK backends + 21 PC ABI-targeted
-source builds); **119** without an implemented native source producer.
+source builds); **114** without an implemented native source producer.
 The expanded denominator makes percentage-based readiness
-**50/169 = 26.6% for source generation only**, not a gameplay or overall
+**55/169 = 26.6% for source generation only**, not a gameplay or overall
 application completion estimate. No platform is awarded a compiled or
 hardware-verified status from source generation.
 
 ## Open devkitPro GameCube, Wii and Nintendo 3DS production backends
 
 Three additional original native source emitters bring the complete
-source-level catalog to **50/169 = 29.6%** with **119** source-adapter
+source-level catalog to **55/169 = 32.5%** with **114** source-adapter
 gaps. These are distinct hardware programs:
 
 - GameCube: PowerPC Gekko libogc game using VIDEO_Init, framebuffer
@@ -189,8 +189,8 @@ homebrew visuals.
 
 ## New Dreamcast and PlayStation 2 source engines
 
-The source registry increases to **50/169 targets (29.6%)** with
-**119 targets still lacking native source producers**. Two newly
+The source registry increases to **55/169 targets (32.5%)** with
+**114 targets still lacking native source producers**. Two newly
 original 3D-era C games add the following:
 
 **Sega Dreamcast / SH-4 / KallistiOS:** The game is written for
@@ -225,3 +225,43 @@ SDK references:
 - KallistiOS video: https://kos-docs.dreamcast.wiki/group__video__fb.html
 - PS2SDK libpad: https://github.com/ps2dev/ps2sdk
 - gsKit Graphics Synthesizer: https://github.com/ps2dev/gsKit
+
+## Additional real 8-bit computer sources
+
+Five further original game backends increase source-target coverage to
+**55 of 169 named platforms (32.5%)**, leaving **114** without an
+implemented native source generator.
+
+The new machines are Commodore VIC-20 (cc65 6502, native VIC-I
+registers and 20-column display), Commodore 128 (cc65 8502 40-column
+VIC-II and SID registers), Atari 400/800 (cc65 6502 ANTIC/GTIA
+shadow color and POKEY registers), MSX1 (z88dk Z80 BIOS text
+interface), and Amstrad CPC (z88dk Z80 firmware color/text).
+
+The games provide actual W/A/S/D keyboard control, deterministic
+enemy pursuit, gem collection, damage invulnerability, hit points,
+level escalation, reset and live rendering. These are original
+software designs and include platform-relevant memory-mapped
+hardware controls, not ROM renamings or game-genre-only labels.
+
+The C compiler targets are exactly `vic20`, `c128` and `atari`.
+The z88dk SDK targets are `+msx` and `+cpc`. The Amstrad/MSX
+source packaging uses an explicit intermediate binary intent rather
+than falsely declaring a runnable disk/tape/ROM ready for users.
+
+In `dragon-platform-coverage.yml`, cc65 is installed and the
+8-bit test invokes the C compiler for those three machines.
+The z88dk cross-compilation tests run only when its legitimate
+toolchain is installed. An actual program binary build needs
+independent emulator and controller testing before the game is
+accepted as playable on the intended original computer. The
+VIC-20 unexpanded memory limit is particularly important and
+must be checked on the exact software/CRT target.
+
+No copyrighted commercial games, source copies, proprietary SDKs,
+boot firmware, encryption keys or unlicensed disc assets are included.
+
+Compiler references:
+- cc65 compiler and targets: https://cc65.github.io/doc/cc65.html
+- cc65 supported 8-bit conio interfaces: https://cc65.github.io/doc/library.html
+- z88dk conio library: https://www.z88dk.org/wiki/doku.php?id=library:conio

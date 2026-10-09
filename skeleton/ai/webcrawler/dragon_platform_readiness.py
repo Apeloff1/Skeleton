@@ -51,6 +51,13 @@ SOURCE_RENDERERS.update({
     "dreamcast":"KallistiOS SH-4 RGB565 VRAM / Maple controller",
     "ps2":"PS2SDK MIPS EE gsKit GS / PAD RPC",
 })
+SOURCE_RENDERERS.update({
+    "commodore_vic20":"6502 VIC-I color/sound and conio text",
+    "commodore_128":"8502 VIC-II/SID and native 40-column text",
+    "atari_400_800":"6502 ANTIC/GTIA/POKEY conio",
+    "msx1":"Z80 MSX1 BIOS and VDP conio",
+    "amstrad_cpc":"Z80 CPC firmware text/ink",
+})
 assert set(SOURCE_RENDERERS)==EMITTERS
 
 @dataclass(frozen=True)

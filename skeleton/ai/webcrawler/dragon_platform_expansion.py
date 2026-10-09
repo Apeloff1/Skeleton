@@ -62,15 +62,15 @@ zx81|Sinclair|8-bit home computer|1981|Z80|monochrome ULA|beeper|keyboard|z88dk 
 zx_spectrum_next|Sinclair lineage|enhanced Z80 home computer|2017|Z80N|Layer 2 / sprites|AY|keyboard/gamepad|z88dk +zxn|nex|toolchain_adapter
 bbc_micro|Acorn|8-bit home computer|1981|6502|6845 CRTC|SN76489|keyboard|cc65 bbc|ssd|toolchain_adapter
 acorn_electron|Acorn|8-bit home computer|1983|6502|ULA|SN76489|keyboard|cc65 / BeebAsm|uef|toolchain_adapter
-amstrad_cpc|Amstrad|8-bit home computer|1984|Z80|6845 gate array|AY-3-8912|keyboard|z88dk +cpc|dsk|toolchain_adapter
-msx1|MSX|8-bit home computer|1983|Z80|TMS9918|AY-3-8910|keyboard|z88dk +msx|rom|toolchain_adapter
+amstrad_cpc|Amstrad|8-bit home computer|1984|Z80|6845 gate array|AY-3-8912|keyboard|z88dk +cpc|bin|native_source
+msx1|MSX|8-bit home computer|1983|Z80|TMS9918|AY-3-8910|keyboard|z88dk +msx|bin|native_source
 msx2|MSX|8-bit home computer|1985|Z80|V9938|AY-3-8910|keyboard|z88dk / SDCC|rom|toolchain_adapter
 msx_turbo_r|MSX|16-bit home computer|1990|R800|V9958|YM2413|keyboard|z88dk +msx|rom|toolchain_adapter
-commodore_vic20|Commodore|8-bit home computer|1980|6502|VIC|VIC audio|keyboard|cc65 vic20|prg|toolchain_adapter
-commodore_128|Commodore|8-bit home computer|1985|8502 / Z80|VIC-II|SID|keyboard|cc65 c128|prg|toolchain_adapter
+commodore_vic20|Commodore|8-bit home computer|1980|6502|VIC|VIC audio|keyboard|cc65 vic20|prg|native_source
+commodore_128|Commodore|8-bit home computer|1985|8502 / Z80|VIC-II|SID|keyboard|cc65 c128|prg|native_source
 commodore_plus4|Commodore|8-bit home computer|1984|7501|TED|TED|keyboard|cc65 plus4|prg|toolchain_adapter
 commodore_pet|Commodore|8-bit home computer|1977|6502|text VDU|beeper|keyboard|cc65 pet|prg|toolchain_adapter
-atari_400_800|Atari|8-bit computer|1979|6502|ANTIC / GTIA|POKEY|joystick|cc65 atari|xex|toolchain_adapter
+atari_400_800|Atari|8-bit computer|1979|6502|ANTIC / GTIA|POKEY|joystick|cc65 atari|xex|native_source
 atari_130xe|Atari|8-bit computer|1985|6502C|ANTIC / GTIA|POKEY|joystick|cc65 atari|xex|toolchain_adapter
 apple_iigs|Apple|16-bit computer|1986|65816|Super Hi-Res|Ensoniq|keyboard|ORCA / cc65|sys|toolchain_adapter
 trs80_model_i|Tandy|8-bit computer|1977|Z80|text video|mono|keyboard|z88dk trs80|cmd|toolchain_adapter
