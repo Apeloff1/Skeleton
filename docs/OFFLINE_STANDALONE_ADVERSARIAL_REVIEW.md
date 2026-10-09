@@ -48,6 +48,12 @@ opt-in, not proof of an isolated host.
 | F17: Ambiguous GGUF configuration | Duplicate JSON members, NaN constants, giant manifests or symlinked manifest files confuse runtime admission | Strict duplicate-key and nonfinite rejection; bounded UTF-8 manifest read and direct symlink guard | `test_local_model_deployment.py` |
 | F18: Misleading qualification success | A first turn succeeds but the second generation fails while tooling still prints a successful receipt | Qualification emits success only after both model turns, persisted state and final artifact revalidation; injected second-call fault must return error with no success JSON | `test_offline_console.py` |
 
+| F19: Model-only capability bottleneck | Small local models cannot reliably perform exact game arithmetic and simulation based on a tiny corpus | Added 24 bounded deterministic local operations and a SHA-256 result receipt, with no model inference or training data growth | `test_deterministic_capabilities.py` |
+| F20: Tool-composition ambiguity | Prompt-generated plans use forward references, unbounded cycles or implicitly execute unauthorized actions | Added strictly preceding-node references, 32-node graph cap, typed subfield selectors and fail-closed path checks; no filesystem/network/shell actions | `test_capability_graph.py` |
+| F21: Resource overconfidence | Large physical RAM or host CPU count is mistaken for free machine capacity within containers or on macOS | Constrain by actual available RAM, Linux cgroup memory/CPU quotas and affinity, native Windows available memory, and conservative fallbacks | `test_resource_admission.py` |
+| F22: Frozen feature mismatch | Model-free operations pass source tests but are absent or broken in the installed EXE | Bundle operation/graph modules and run positive/negative installed Windows smoke on pathfinding, gameplay DAG, duplicate JSON and self-reference | `test_windows_installer.py`, Windows Installer workflow |
+
+
 ## Invariants checked by acceptance tests
 
 1. Document indexing never fetches a URL or executes indexed source text.
@@ -136,3 +142,24 @@ symlinks. These are admission safeguards, not publisher authentication.
 **No release signed:** The exact-head P2, Windows Installer, App Assembly,
 Backend Quality and Merge Readiness jobs must pass, and device-specific
 runtime/provenance/network checks must be completed independently.
+
+## Model-free capability and sparse hardware review (October 2026)
+
+The optional deterministic execution plane and its typed graph are
+described in `docs/OFFLINE_DETERMINISTIC_CAPABILITIES.md`. They
+increase explicit functionality, not learned language-model intelligence.
+All allowed calculations are read-only and preserve an ungranted
+executor-authority boundary; the caller's claimed operator-selected
+flag is only a policy input, not an OS security credential.
+
+The sparse-training hardware auto mode considers available—not merely
+installed—memory. When available headroom is unknown on macOS or other
+platforms, it chooses 36 records. Native Windows RAM probing and Linux
+cgroup/affinity caps are included, but actual model memory/throughput,
+heat, battery drain, acceleration and trained-model quality are **not**
+verified. The original data bank is unchanged; the active subset remains
+36 by default (up to 72 by explicit policy).
+
+**Release decision remains unsigned.** P2 Local Inference and Windows
+Installer must produce successful exact-head results, with genuine
+model/device acceptance separately established. 
