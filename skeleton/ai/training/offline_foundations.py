@@ -44,6 +44,32 @@ FIELDS = {"id", "family", "group_id", "split", "instruction", "response", "oracl
 FILES = ("train.jsonl", "validation.jsonl", "test.jsonl", "train_corpus.txt")
 MAX_INPUT_BYTES = 2_000_000
 MAX_LINE_BYTES = 4096
+EXPECTED_SOURCE_DESCRIPTION = (
+    "Original algorithmically generated game/simulation, document-grounding, "
+    "text-processing and offline-authority examples. No scraped, private or "
+    "external corpus has been ingested."
+)
+EXPECTED_RIGHTS = {
+    "declaration": "Original AI-generated synthetic examples; no third-party source corpus included.",
+    "permitted_uses": ["training", "evaluation"],
+    "license_id": None,
+    "independent_legal_review_performed": False,
+}
+EXPECTED_SPLIT_PROTOCOL = {
+    "method": "group-disjoint-scenarios",
+    "groups_per_family": 20,
+    "variants_per_group": 3,
+    "train_groups": "00-13",
+    "validation_groups": "14-16",
+    "test_groups": "17-19",
+    "template_overlap_across_splits": True,
+}
+MANIFEST_KEYS = {
+    "schema_version", "dataset_id", "version", "seed", "source_kind",
+    "source_description", "rights", "split_protocol", "families",
+    "files", "record_fields", "record_count", "family_record_count",
+    "limitations",
+}
 
 
 class SyntheticCurriculumError(ValueError):
@@ -298,6 +324,13 @@ def validate_curriculum(directory: str | Path) -> dict[str, Any]:
     manifest = _strict_json(_read_bytes(root / "manifest.json").decode("utf-8", "strict"))
     if (
         not isinstance(manifest, dict)
+        or set(manifest) != MANIFEST_KEYS
+        or manifest.get("source_description") != EXPECTED_SOURCE_DESCRIPTION
+        or manifest.get("rights") != EXPECTED_RIGHTS
+        or manifest.get("split_protocol") != EXPECTED_SPLIT_PROTOCOL
+        or not isinstance(manifest.get("limitations"), list)
+        or len(manifest["limitations"]) != 6
+        or not all(isinstance(x, str) and x for x in manifest["limitations"])
         or manifest.get("schema_version") != SCHEMA
         or manifest.get("dataset_id") != DATASET_ID
         or manifest.get("version") != VERSION
