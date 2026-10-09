@@ -301,3 +301,87 @@ def test_editor_fails_closed_on_unauthorized_attempts_to_convert_licensed_game()
     bad["rights_manifest"]["assets"][0]["contains_third_party_content"] = True
     with pytest.raises(HomebrewEditorError):
         HomebrewEditor(bad)
+
+
+def test_procedural_candidate_is_exactly_reproducible_through_native_noise_tool():
+    e = session()
+    before = e.tiles[:]
+    candidates = e.variants(seeds=[3, 10, 75], wall_percent=30)
+    chosen = next(item for item in candidates if item["seed"] == 10)
+    e.apply([{
+        "op": "noise", "seed": 10, "wall_percent": 30,
+        "x0": 1, "y0": 1,
+        "x1": len(before[0]) - 2, "y1": len(before) - 2,
+    }], expected_tile_sha256=e.tile_sha256, require_grid_route=False)
+    assert e.tiles == chosen["tiles"]
+    assert e.source["tilemap"] == before
+
+
+def test_end_to_end_original_7x7_editor_to_genuine_executable_chip8_rom():
+    from scripts.game.export_chip8 import (
+        compile_chip8_homebrew, verify_chip8_executable,
+    )
+    original_small = _demo(
+        42, ["chip8-vip", "game-boy"], "NO",
+        width=7, height=7,
+    )
+    editor = HomebrewEditor(original_small)
+    # Keep guaranteed original route open while editing one side chamber.
+    editor.apply([
+        {"op": "paint", "x": 2, "y": 2, "tile": "."},
+    ], expected_tile_sha256=editor.tile_sha256, require_grid_route=True)
+    capsule = editor.export_capsule()
+    assert capsule["homebrew_only"] is True
+    assert capsule["source_tilemap"] != capsule["tilemap"]
+    assert verify_game_capsule(capsule)["homebrew_only"] is True
+    machine_code = compile_chip8_homebrew(capsule)
+    proof = verify_chip8_executable(machine_code)
+    assert proof["win_state_reached"] is True
+    assert machine_code["original_homebrew_only"] is True
+    assert machine_code["licensed_sdk_embedded"] is False
+    assert machine_code["real_1970s_hardware_tested"] is False
+    assert capsule["legal_release_authorized"] is False
+    assert capsule["training_examples_added"] == 0
+
+
+def test_original_demo_accepts_explicit_canvas_dimensions_for_homebrew_exports(
+    tmp_path: Path, capsys,
+):
+    from scripts.game.game_project import main as game_project_cli
+    path = tmp_path / "new-chip8-original.json"
+    assert game_project_cli([
+        "--demo-project", str(path), "--seed", "42",
+        "--width", "7", "--height", "7",
+        "--targets", "chip8-vip",
+    ]) == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["scene_recomputed"] is True
+    created = json.loads(path.read_text("utf-8"))
+    assert created["homebrew_only"] is True
+    assert len(created["tilemap"]) == 7
+    assert len(created["tilemap"][0]) == 7
+    assert created["target_plan"]["targets"][0]["native_export_implemented"] is True
+    assert game_project_cli(["--catalog", "--width", "7"]) == 2
+
+
+def test_native_visual_editor_is_exclusive_homebrew_without_gui_in_headless_environment(
+    tmp_path: Path, monkeypatch,
+):
+    import sys
+    from types import SimpleNamespace
+    from skeleton.app.homebrew_editor_ui import open_homebrew_editor
+    from skeleton.app.offline_cli import main as offline_console
+    source = tmp_path / "original.json"
+    source.write_text(json.dumps(original()), encoding="utf-8")
+    class NoDisplay(Exception):
+        pass
+    def reject_desktop():
+        raise NoDisplay("no display")
+    monkeypatch.setitem(sys.modules, "tkinter", SimpleNamespace(
+        Tk=reject_desktop, TclError=NoDisplay,
+    ))
+    with pytest.raises(HomebrewEditorError, match="display"):
+        open_homebrew_editor(source)
+    assert offline_console(["--homebrew-editor", str(source), "--json"]) == 2
+    assert offline_console(["--homebrew-editor-output", "x.json"]) == 2
+    assert offline_console(["--homebrew-editor", str(source)]) == 1
