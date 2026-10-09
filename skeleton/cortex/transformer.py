@@ -511,6 +511,11 @@ class TinyTransformer:
                 pass
         self._accel = None
         self.resident = False
+        # A Torch projection without Mixture-of-Depths routing would silently
+        # execute a different model. Keep the exact Python graph instead.
+        if self.use_mod:
+            self.device = "cpu"
+            return self
         pin = bool(info.get("torch")) and self.requested != "cpu"
         if pin:
             try:
@@ -580,13 +585,22 @@ class TinyTransformer:
 
     def _logits_window(self, ids: Sequence[int], cache: Optional[KVCache] = None) -> List[float]:
         window = list(ids[-self.ctx:] or [self.unk])
-        # Incremental steps implement the dense CPU graph only. MoD routing and
-        # accelerated backends must execute their full graph until equivalent
-        # incremental implementations are available.
-        if cache is None or self.use_mod or self._accel is not None:
+        if cache is None or self.use_mod:
             if cache is not None:
                 cache.reset()
             return self._logits(window)
+        if self._accel is not None:
+            # Accelerator owns its own resident KV tensors; never reuse the
+            # reference Python float-list cache with another device.
+            cache.reset()
+            try:
+                return list(self._accel.logits_window(window))
+            except Exception:
+                self._accel = None
+                self.resident = False
+                self.device = "cpu"
+                # Exact reference fallback on unsupported kernels/devices.
+                return self._logits(window)
         if cache.primed_for(window):
             return self._step(window[-1], cache)
         # In a single-layer pure rotary model, K/V are independent of
