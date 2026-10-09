@@ -342,6 +342,19 @@ def _headless(args: argparse.Namespace, root: Path) -> int:
             return 0 if smoke_offline_native_inference() else 1
         except Exception:
             return 1
+    if args.local_gguf_smoke is not None:
+        from skeleton.app.local_ai import smoke_offline_gguf_deployment
+
+        try:
+            ready = smoke_offline_gguf_deployment(args.local_gguf_smoke)
+            if not args.quiet:
+                print("GGUF offline inference + restart: " +
+                      ("PASS" if ready else "FAIL"))
+            return 0 if ready else 1
+        except Exception as exc:
+            if not args.quiet:
+                print("GGUF local acceptance failed: " + str(exc))
+            return 1
     if args.check:
         report = check_host(root)
         if not args.quiet:
@@ -383,6 +396,8 @@ def parser() -> argparse.ArgumentParser:
     mode.add_argument("--open", action="store_true")
     mode.add_argument("--local-ai", action="store_true", help="open Docker-free native AI conversation")
     mode.add_argument("--local-ai-smoke", action="store_true", help="verify bundled native CPU inference without Docker")
+    mode.add_argument("--local-gguf-smoke", metavar="MANIFEST", type=Path,
+                      help="execute operator GGUF/llama.cpp model and verify offline durable resume")
     result.add_argument(
         "--development",
         action="store_true",
