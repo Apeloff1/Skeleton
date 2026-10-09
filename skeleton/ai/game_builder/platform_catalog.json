@@ -313,6 +313,57 @@
         "offline asset caching",
         "accessible input and platform variance"
       ]
+    },
+    "analog_game": {
+      "tier": 0,
+      "render": "analog_oscilloscope_or_crt",
+      "sound": "discrete_or_none",
+      "input": "analog_controllers",
+      "artifact": "original_analog_hardware_replica_design",
+      "constraints": [
+        "analog timing and voltages",
+        "physical display characteristics",
+        "operational safety",
+        "design-only unless independently qualified"
+      ]
+    },
+    "em_arcade": {
+      "tier": 0,
+      "render": "lamps_mirrors_projection_mechanisms",
+      "sound": "mechanical_discrete_audio",
+      "input": "physical_levers_buttons_wheels",
+      "artifact": "original_em_mechatronics_design",
+      "constraints": [
+        "mechanical tolerances and wear",
+        "coin and operator handling",
+        "movement and lamp synchronization",
+        "physical safety"
+      ]
+    },
+    "early_computer": {
+      "tier": 0,
+      "render": "crt_led_terminal_or_oscilloscope",
+      "sound": "beeper_or_none",
+      "input": "physical_switches_terminal_analog",
+      "artifact": "original_program_or_machine_description",
+      "constraints": [
+        "very limited memory",
+        "research-only hardware access",
+        "no direct modern SDK assumption"
+      ]
+    },
+    "pinball_em": {
+      "tier": 0,
+      "render": "ball_lamps_playfield",
+      "sound": "chimes_reels",
+      "input": "flippers_plunger",
+      "artifact": "original_playfield_simulation_or_hardware_design",
+      "constraints": [
+        "ball and flipper physics",
+        "safety",
+        "coil and actuator timing",
+        "physical playfield and play duration"
+      ]
     }
   },
   "platforms": [
@@ -1574,6 +1625,18 @@
       "toolchain_status": "unverified"
     },
     {
+      "id": "atari_arcade_pong",
+      "name": "Atari Pong arcade cabinet",
+      "kind": "arcade",
+      "family": "foundational_game_technology",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1972,
+      "archive_disposition": "arcade_system"
+    },
+    {
       "id": "atari_falcon",
       "name": "Atari Falcon",
       "kind": "computer",
@@ -1975,6 +2038,18 @@
       "toolchain_status": "unverified"
     },
     {
+      "id": "cambridge_edsac",
+      "name": "Cambridge EDSAC (OXO computing context)",
+      "kind": "precursor",
+      "family": "foundational_game_technology",
+      "preset": "early_computer",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1949,
+      "archive_disposition": "historical_computer"
+    },
+    {
       "id": "capcom_cps_changer",
       "name": "Capcom CPS Changer",
       "kind": "console",
@@ -2033,6 +2108,18 @@
       "lifecycle": "legacy",
       "research_status": "catalogued",
       "toolchain_status": "unverified"
+    },
+    {
+      "id": "chicago_coin_speedway_em",
+      "name": "Chicago Coin Speedway electro-mechanical arcade",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "em_arcade",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1969,
+      "archive_disposition": "electromechanical_machine"
     },
     {
       "id": "chip8_virtual",
@@ -2260,6 +2347,18 @@
       "archive_disposition": "model_or_product_family"
     },
     {
+      "id": "crt_amusement_device_1947",
+      "name": "Cathode-ray tube amusement device (patent)",
+      "kind": "precursor",
+      "family": "foundational_game_technology",
+      "preset": "analog_game",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1947,
+      "archive_disposition": "patent_concept"
+    },
+    {
       "id": "cybiko",
       "name": "Cybiko",
       "kind": "mobile",
@@ -2301,6 +2400,30 @@
       "archive_disposition": "model_or_product_family"
     },
     {
+      "id": "dec_pdp1",
+      "name": "DEC PDP-1 (Spacewar! computing context)",
+      "kind": "precursor",
+      "family": "foundational_game_technology",
+      "preset": "early_computer",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1960,
+      "archive_disposition": "historical_computer"
+    },
+    {
+      "id": "dec_pdp8",
+      "name": "DEC PDP-8 computer",
+      "kind": "precursor",
+      "family": "foundational_game_technology",
+      "preset": "early_computer",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1965,
+      "archive_disposition": "historical_computer"
+    },
+    {
       "id": "dina_2in1",
       "name": "Dina 2-in-1",
       "kind": "console",
@@ -2319,6 +2442,18 @@
       "lifecycle": "legacy",
       "research_status": "catalogued",
       "toolchain_status": "unverified"
+    },
+    {
+      "id": "donner_model30_tennis",
+      "name": "Donner analog computer Tennis for Two apparatus",
+      "kind": "precursor",
+      "family": "foundational_game_technology",
+      "preset": "analog_game",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1958,
+      "archive_disposition": "demonstration_apparatus"
     },
     {
       "id": "dos_ega",
@@ -2511,6 +2646,18 @@
       "toolchain_status": "unverified"
     },
     {
+      "id": "ferranti_nimrod",
+      "name": "Ferranti Nimrod",
+      "kind": "precursor",
+      "family": "foundational_game_technology",
+      "preset": "early_computer",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1951,
+      "archive_disposition": "exhibited_hardware"
+    },
+    {
       "id": "firefox_os",
       "name": "Firefox OS",
       "kind": "mobile",
@@ -2699,6 +2846,30 @@
       "lifecycle": "legacy",
       "research_status": "catalogued",
       "toolchain_status": "unverified"
+    },
+    {
+      "id": "gottlieb_baffle_ball",
+      "name": "Gottlieb Baffle Ball early pinball",
+      "kind": "mechanical",
+      "family": "foundational_game_technology",
+      "preset": "pinball_em",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1931,
+      "archive_disposition": "mechanical_machine"
+    },
+    {
+      "id": "gottlieb_humpty_dumpty",
+      "name": "Gottlieb Humpty Dumpty pinball",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "pinball_em",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1947,
+      "archive_disposition": "electromechanical_machine"
     },
     {
       "id": "gpd_win",
@@ -2923,6 +3094,18 @@
       "lifecycle": "legacy",
       "research_status": "catalogued",
       "toolchain_status": "unverified"
+    },
+    {
+      "id": "kasco_indy500_em",
+      "name": "Kasco Indy 500 electro-mechanical game",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "em_arcade",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1968,
+      "archive_disposition": "electromechanical_machine"
     },
     {
       "id": "kaypro_ii",
@@ -3210,6 +3393,30 @@
       "toolchain_status": "unverified"
     },
     {
+      "id": "midway_sami_em",
+      "name": "Midway S.A.M.I. electro-mechanical arcade",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "em_arcade",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1970,
+      "archive_disposition": "electromechanical_machine"
+    },
+    {
+      "id": "midway_sea_raider_em",
+      "name": "Midway Sea Raider electro-mechanical arcade",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "em_arcade",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1969,
+      "archive_disposition": "electromechanical_machine"
+    },
+    {
       "id": "milton_bradley_microvision",
       "name": "Milton Bradley Microvision",
       "kind": "handheld",
@@ -3268,6 +3475,18 @@
       "lifecycle": "legacy",
       "research_status": "catalogued",
       "toolchain_status": "unverified"
+    },
+    {
+      "id": "namco_periscope_em",
+      "name": "Nakamura Periscope electro-mechanical arcade",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "em_arcade",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1965,
+      "archive_disposition": "electromechanical_machine"
     },
     {
       "id": "nec_cd_rom2",
@@ -3791,6 +4010,18 @@
       "toolchain_status": "unverified"
     },
     {
+      "id": "nutting_computer_space",
+      "name": "Nutting Associates Computer Space arcade",
+      "kind": "arcade",
+      "family": "foundational_game_technology",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1971,
+      "archive_disposition": "arcade_system"
+    },
+    {
       "id": "nvidia_shield",
       "name": "NVIDIA Shield",
       "kind": "console",
@@ -4212,6 +4443,18 @@
       "toolchain_status": "unverified"
     },
     {
+      "id": "sega_drivemobile_em",
+      "name": "Sega Drivemobile electro-mechanical arcade",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "em_arcade",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1968,
+      "archive_disposition": "electromechanical_machine"
+    },
+    {
       "id": "sega_g80_vector",
       "name": "Sega G80 vector arcade",
       "kind": "arcade",
@@ -4230,6 +4473,18 @@
       "lifecycle": "legacy",
       "research_status": "catalogued",
       "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_jet_rocket_em",
+      "name": "Sega Jet Rocket electro-mechanical arcade",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "em_arcade",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1970,
+      "archive_disposition": "electromechanical_machine"
     },
     {
       "id": "sega_mark_iii",
@@ -4302,6 +4557,18 @@
       "toolchain_status": "unverified"
     },
     {
+      "id": "sega_periscope_em",
+      "name": "Sega Periscope electro-mechanical arcade",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "em_arcade",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1966,
+      "archive_disposition": "electromechanical_machine"
+    },
+    {
       "id": "sega_pico",
       "name": "Sega Pico",
       "kind": "console",
@@ -4310,6 +4577,18 @@
       "lifecycle": "legacy",
       "research_status": "catalogued",
       "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_rifleman_em",
+      "name": "Sega Rifleman electro-mechanical arcade",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "em_arcade",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1967,
+      "archive_disposition": "electromechanical_machine"
     },
     {
       "id": "sega_saturn",
@@ -4881,6 +5160,18 @@
       "research_status": "catalogued",
       "toolchain_status": "unverified",
       "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "stanford_galaxy_game",
+      "name": "Stanford Galaxy Game arcade installation",
+      "kind": "precursor",
+      "family": "foundational_game_technology",
+      "preset": "early_computer",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1971,
+      "archive_disposition": "research_arcade_installation"
     },
     {
       "id": "steam_deck",
