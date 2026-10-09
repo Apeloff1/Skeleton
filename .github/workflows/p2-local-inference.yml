@@ -6,6 +6,8 @@ on:
       - "skeleton/ai/runtime/inference/**"
       - "skeleton/app/local_ai.py"
       - "tests/flgb/test_desktop_offline_ai.py"
+      - "tests/flgb/test_offline_chat_transcript.py"
+      - "skeleton/app/local_ai_transcript.py"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_native_neural_lm.py"
       - "skeleton/testing/test_native_runtime_local_provider.py"
@@ -24,6 +26,8 @@ on:
       - "skeleton/ai/runtime/inference/**"
       - "skeleton/app/local_ai.py"
       - "tests/flgb/test_desktop_offline_ai.py"
+      - "tests/flgb/test_offline_chat_transcript.py"
+      - "skeleton/app/local_ai_transcript.py"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_llama_cpp_local_inference.py"
       - "skeleton/testing/test_native_runtime_local_provider.py"
@@ -82,3 +86,4 @@ jobs:
           skeleton/testing/test_llama_cpp_local_inference.py
           skeleton/testing/test_local_model_deployment.py
           tests/flgb/test_desktop_offline_ai.py
+          tests/flgb/test_offline_chat_transcript.py
