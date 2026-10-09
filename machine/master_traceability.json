@@ -20,10 +20,10 @@
     "impact_rule": "Changed repository paths resolve through implementation_path nodes using exact/prefix/glob matching."
   },
   "summary": {
-    "node_count": 10036,
-    "edge_count": 30583,
+    "node_count": 10089,
+    "edge_count": 34407,
     "requirement_count": 963,
-    "requirements_without_evidence": 432,
+    "requirements_without_evidence": 373,
     "shard_count": 11
   },
   "shards": [
@@ -31,78 +31,78 @@
       "depth_pass": "DP-000-040",
       "path": "machine/traceability/DP-000-040.json",
       "volume_count": 41,
-      "node_count": 1820,
-      "edge_count": 8037
+      "node_count": 1814,
+      "edge_count": 8299
     },
     {
       "depth_pass": "DP-041-080",
       "path": "machine/traceability/DP-041-080.json",
       "volume_count": 40,
-      "node_count": 1338,
-      "edge_count": 4741
+      "node_count": 1321,
+      "edge_count": 5029
     },
     {
       "depth_pass": "DP-081-120",
       "path": "machine/traceability/DP-081-120.json",
       "volume_count": 40,
-      "node_count": 997,
-      "edge_count": 3014
+      "node_count": 995,
+      "edge_count": 3275
     },
     {
       "depth_pass": "DP-121-160",
       "path": "machine/traceability/DP-121-160.json",
       "volume_count": 40,
-      "node_count": 673,
-      "edge_count": 1415
+      "node_count": 697,
+      "edge_count": 1701
     },
     {
       "depth_pass": "DP-161-200",
       "path": "machine/traceability/DP-161-200.json",
       "volume_count": 40,
-      "node_count": 813,
-      "edge_count": 2163
+      "node_count": 844,
+      "edge_count": 2638
     },
     {
       "depth_pass": "DP-201-240",
       "path": "machine/traceability/DP-201-240.json",
       "volume_count": 40,
-      "node_count": 757,
-      "edge_count": 1889
+      "node_count": 769,
+      "edge_count": 2292
     },
     {
       "depth_pass": "DP-241-280",
       "path": "machine/traceability/DP-241-280.json",
       "volume_count": 40,
-      "node_count": 834,
-      "edge_count": 2144
+      "node_count": 804,
+      "edge_count": 2351
     },
     {
       "depth_pass": "DP-281-320",
       "path": "machine/traceability/DP-281-320.json",
       "volume_count": 40,
-      "node_count": 702,
-      "edge_count": 1506
+      "node_count": 700,
+      "edge_count": 1866
     },
     {
       "depth_pass": "DP-321-360",
       "path": "machine/traceability/DP-321-360.json",
       "volume_count": 40,
-      "node_count": 761,
-      "edge_count": 1887
+      "node_count": 791,
+      "edge_count": 2468
     },
     {
       "depth_pass": "DP-361-400",
       "path": "machine/traceability/DP-361-400.json",
       "volume_count": 40,
-      "node_count": 895,
-      "edge_count": 2630
+      "node_count": 901,
+      "edge_count": 3103
     },
     {
       "depth_pass": "DP-401-420",
       "path": "machine/traceability/DP-401-420.json",
       "volume_count": 20,
-      "node_count": 446,
-      "edge_count": 1157
+      "node_count": 453,
+      "edge_count": 1385
     }
   ]
 }
