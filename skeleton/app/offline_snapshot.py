@@ -114,6 +114,14 @@ def _online_backup(source: Path, destination: Path, kind: str) -> None:
                 target_db.close()
         finally:
             source_db.close()
+        # A WAL-mode source can propagate its journal setting through the
+        # online backup. Normalize the isolated snapshot to a single-file
+        # rollback-journal DB before digesting/publishing. This also avoids
+        # dangling -wal/-shm files in the portable snapshot directory.
+        with sqlite3.connect(str(destination), timeout=15.0) as compact:
+            mode = compact.execute("PRAGMA journal_mode=DELETE").fetchone()
+            if mode is None or mode[0].lower() != "delete":
+                raise OfflineSnapshotError("cannot normalize snapshot journal mode")
         if os.name == "posix":
             os.chmod(destination, 0o600)
         _verify_database(destination, kind)
