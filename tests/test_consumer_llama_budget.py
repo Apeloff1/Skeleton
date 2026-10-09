@@ -178,3 +178,61 @@ def test_grouped_query_rejects_inconsistent_head_geometry(kv_heads):
             layers=8, query_heads=32, kv_heads=kv_heads,
             key_head_dim=128, value_head_dim=128,
         )
+
+
+def test_offline_gguf_cli_produces_model_specific_plan_without_inference(
+    tmp_path, capsys
+):
+    import json
+    import struct
+    from scripts.plan_consumer_gguf import main
+
+    model = tmp_path / "verified.gguf"
+    model.write_bytes(struct.pack("<4sIQQ", b"GGUF", 3, 1, 0) + bytes(4096))
+    argv = [
+        "--model", str(model), "--layers", "16",
+        "--query-heads", "16", "--kv-heads", "4",
+        "--key-head-dim", "64", "--value-head-dim", "64",
+        "--key-bytes", "2", "--value-bytes", "2",
+        "--context", "512", "--cpu-cores", "8", "--ram-mib", "4096",
+        "--reserve-mib", "8", "--scratch-mib", "8",
+        "--prefill-batch", "128", "--max-threads", "4",
+    ]
+    assert main(argv) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["schema"] == "skeleton.consumer-gguf-plan.v1"
+    assert data["model"]["gguf_version"] == 3
+    assert data["model"]["kv_bytes_per_token"] == 16 * 4 * (64 * 2 + 64 * 2)
+    assert data["admission"]["context_tokens"] == 512
+    assert data["admission"]["decode_threads"] <= 4
+    assert data["admission"]["prefill_batch_tokens"] == 128
+    assert data["admission"]["estimated_total_bytes"] <= (
+        data["hardware"]["available_ram_bytes"]
+    )
+
+
+def test_offline_gguf_cli_fails_on_untrusted_artifact_and_ram_limits(tmp_path):
+    import struct
+    from scripts.plan_consumer_gguf import build_parser, plan_from_args
+
+    model = tmp_path / "local.gguf"
+    model.write_bytes(struct.pack("<4sIQQ", b"GGUF", 3, 1, 0) + bytes(4096))
+    argv = [
+        "--model", str(model), "--layers", "32",
+        "--query-heads", "32", "--kv-heads", "8",
+        "--key-head-dim", "128", "--value-head-dim", "128",
+        "--ram-mib", "1", "--cpu-cores", "4",
+        "--reserve-mib", "0", "--scratch-mib", "0",
+    ]
+    with pytest.raises(LlamaCppRuntimeError, match="RAM budget"):
+        plan_from_args(build_parser().parse_args(argv))
+
+    model.write_bytes(b"not a model" * 5)
+    with pytest.raises(LlamaCppRuntimeError, match="GGUF"):
+        plan_from_args(build_parser().parse_args(argv))
+
+    target = tmp_path / "symlink.gguf"
+    target.symlink_to(model)
+    argv[1] = str(target)
+    with pytest.raises(LlamaCppRuntimeError, match="symlink"):
+        plan_from_args(build_parser().parse_args(argv))
