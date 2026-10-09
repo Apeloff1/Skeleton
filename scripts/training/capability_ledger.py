@@ -14,9 +14,7 @@ from typing import Sequence
 from skeleton.ai.training.capability_ledger import (
     CapabilityLedgerError, OfflineCapabilityLedger, make_capability_receipt,
 )
-from skeleton.ai.training.offline_foundations import (
-    SyntheticCurriculumError, validate_curriculum,
-)
+from skeleton.ai.training.offline_foundations import validate_curriculum
 
 
 DATASET = (
