@@ -4,10 +4,8 @@ No provider credentials, network calls, or external model dependencies.
 """
 from __future__ import annotations
 
-from hashlib import sha256
 import json
 from pathlib import Path
-import sqlite3
 from tempfile import TemporaryDirectory
 import unittest
 
@@ -37,7 +35,7 @@ class OfflineNativeChatTests(unittest.TestCase):
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name)
         self.store = OfflineChatStore(self.root / "chat.sqlite")
-        self.addCleanup(self.store.close)
+        self.addCleanup(lambda: self.store.close())
         self.engine = _native()
         self.product = OfflineChatProduct(self.engine, self.store)
         self.config = GenerationConfig(max_new_tokens=2, seed=2, top_k=1)
@@ -122,11 +120,12 @@ class OfflineNativeChatTests(unittest.TestCase):
                          self.engine.runtime.model_digest)
         self.assertEqual(reopened.runtime.tokenizer.digest,
                          self.engine.runtime.tokenizer.digest)
-        self.assertEqual(reopened.generate(
+        response = reopened.generate(
             self.store.load(self.product.create(), self.product.model_digest,
                             self.product.tokenizer_digest).transcript.append("user", "hello"),
             self.config,
-        ).generation.finish_reason in {"length", "stop", "eos"}, True)
+        )
+        self.assertEqual(len(response.generation.generated_ids), 2)
 
     def test_corrupt_checkpoint_is_rejected_before_inference(self):
         p = self.root / "model.json"
