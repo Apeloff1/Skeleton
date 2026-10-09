@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from contextlib import closing
 import math
 import os
 from pathlib import Path
@@ -118,7 +119,7 @@ def _online_backup(source: Path, destination: Path, kind: str) -> None:
         # online backup. Normalize the isolated snapshot to a single-file
         # rollback-journal DB before digesting/publishing. This also avoids
         # dangling -wal/-shm files in the portable snapshot directory.
-        with sqlite3.connect(str(destination), timeout=15.0) as compact:
+        with closing(sqlite3.connect(str(destination), timeout=15.0)) as compact:
             mode = compact.execute("PRAGMA journal_mode=DELETE").fetchone()
             if mode is None or mode[0].lower() != "delete":
                 raise OfflineSnapshotError("cannot normalize snapshot journal mode")
@@ -286,7 +287,7 @@ def _quarantine_restored_queue(path: Path) -> None:
     must explicitly enqueue fresh work against the new local paths.
     """
     try:
-        with sqlite3.connect(str(path), isolation_level=None, timeout=10) as conn:
+        with closing(sqlite3.connect(str(path), isolation_level=None, timeout=10)) as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 conn.execute(
