@@ -49,7 +49,7 @@ def test_handheld_design_evolution_emits_game_boy_machine_source_and_keeps_unbui
     assert not (args["output"] / "stage-02-nintendo_game_boy_color").exists()
     assert receipt["stage_dispositions"][0]["source_kind"] == "game_boy_dmg_rgbds_source"
     assert receipt["stage_dispositions"][1]["status"] == "design_only"
-    assert all(stage["hardware_verified"] is False for stage in receipt["stage_dispositions"])
+    assert all(stage["emulator_or_hardware_played"] is False for stage in receipt["stage_dispositions"])
 
 
 def test_native_evolution_rejects_unauthorized_cross_project_unknown_or_reused_output(tmp_path):
