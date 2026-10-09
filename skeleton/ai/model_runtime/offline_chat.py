@@ -42,9 +42,11 @@ def _identifier(name: str, raw: str) -> str:
 
 
 def _digest_request(message: str, config: GenerationConfig) -> str:
-    if not isinstance(message, str) or not message or len(message.encode("utf-8")) > MAX_TURN_BYTES:
+    if not isinstance(message, str) or not message:
         raise RuntimeContractError("invalid or oversized chat message")
     try:
+        if len(message.encode("utf-8", errors="strict")) > MAX_TURN_BYTES:
+            raise RuntimeContractError("invalid or oversized chat message")
         raw = json.dumps({"message": message, "config": config.to_dict()},
                          sort_keys=True, separators=(",", ":"), ensure_ascii=False,
                          allow_nan=False).encode("utf-8")
@@ -320,7 +322,8 @@ class OfflineChatProduct:
              *, request_id: str | None = None) -> OfflineTurnReceipt:
         if not isinstance(config, GenerationConfig):
             raise RuntimeContractError("generation configuration required")
-        rid = _identifier("request id", request_id or secrets.token_urlsafe(18))
+        rid = _identifier("request id", request_id if request_id is not None
+                          else secrets.token_urlsafe(18))
         request_digest = _digest_request(message, config)
         session = self.store.load(session_id, self.model_digest, self.tokenizer_digest)
         old = self.store.replay(session_id, rid, request_digest)
