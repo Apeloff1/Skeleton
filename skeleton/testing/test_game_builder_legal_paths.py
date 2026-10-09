@@ -15,6 +15,7 @@ from skeleton.ai.game_builder.legal_paths import (
     MaterialRecord, assess_homebrew, hardware_rights_matrix, legal_authorities,
 )
 from skeleton.ai.game_builder.legal_port_bridge import propose_rights_aware_port
+from skeleton.ai.game_builder.legal_census import catalog_rights_census
 from skeleton.ai.game_builder.port_planner import HomebrewSource, PortMode
 
 
@@ -246,3 +247,23 @@ def test_proprietary_adaptation_never_certifies_release_even_if_assertions_are_p
     assert not result.release_authorized
     assert not result.toolchain_qualified
     assert "HUMAN_LEGAL_AND_RELEASE_SIGNOFF_REQUIRED" in result.issues
+
+
+def test_every_catalogued_historical_system_has_a_legal_review_profile():
+    census = catalog_rights_census()
+    summary = census.summary()
+    assert summary["catalogued_record_count"] >= 524
+    assert summary["dated_sample_records"] >= 94
+    assert summary["claim_of_global_archive_completeness"] is False
+    assert summary["target_specific_legal_reviews_completed"] == 0
+    assert summary["legal_release_certifications"] == 0
+    assert len(census.records) == sum(summary["categories"].values())
+    assert len(census.select(kind="mechanical")) >= 1
+    assert len(census.select(kind="electromechanical")) >= 1
+    assert all(x.design_inspiration_available for x in census.records.values())
+    assert all(x.distribution_cleared is False for x in census.records.values())
+    assert all(x.native_toolchain_status == "unverified" for x in census.records.values())
+    assert all(x.legal_release_status == "unreviewed_requires_case_specific_authority"
+               for x in census.records.values())
+    assert all("jurisdiction_and_current_statutory_exceptions" in x.review_questions
+               for x in census.records.values())
