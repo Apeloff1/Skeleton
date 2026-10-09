@@ -658,6 +658,7 @@ class TinyTransformer:
         return [list(row) for row in H] if H else [zeros(self.dim)]
 
     def weights_last(self, prefix: str) -> List[float]:
+        self._sync_accelerator()
         ids = self._ids(prefix)
         ids = ids[-self.ctx:]
         _H, caches = self._forward(ids)
@@ -677,8 +678,15 @@ class TinyTransformer:
             try:
                 return float(self._accel.sgd(ids, target, lr))
             except Exception:
+                # A partially applied GPU SGD must not be silently replaced
+                # with a second CPU update using stale canonical parameters.
+                self._sync_accelerator()
                 self._accel = None
                 self.resident = False
+                self.device = "cpu"
+                raise RuntimeError(
+                    "accelerated SGD failed; synchronized state requires explicit retry"
+                )
         n = len(ids)
         D = self.dim
         H, caches = self._forward(ids)
