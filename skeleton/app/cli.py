@@ -81,6 +81,14 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--search", help="search local indexed documents without a model")
     local_ai.add_argument("--use-library", action="store_true", help="include bounded local excerpts as untrusted context")
     local_ai.add_argument("--context-limit", type=int, default=3, help="local document hit budget")
+    local_ai.add_argument("--queue-db", help="SQLite indexing work queue")
+    local_ai.add_argument("--enqueue-dir", help="queue explicit local document scan")
+    local_ai.add_argument("--queue-library", help="local SQLite FTS5 index for queued scan")
+    local_ai.add_argument("--run-queue", action="store_true", help="run bounded queued indexing work")
+    local_ai.add_argument("--queue-status", action="store_true", help="list locally queued indexing jobs")
+    local_ai.add_argument("--cancel-queue-job", help="cancel queued job by ID")
+    local_ai.add_argument("--retry-queue-job", help="retry terminal failed job by ID")
+    local_ai.add_argument("--drain-limit", type=int, default=5, help="maximum jobs processed per invocation")
     sub.add_parser("down", help="stop the assembled application")
     sub.add_parser("ps", help="show assembled service state")
 
@@ -222,7 +230,11 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if command == "local-ai":
-        if args.index_dir or args.search or args.use_library:
+        if (
+            args.index_dir or args.search or args.use_library or args.enqueue_dir
+            or args.run_queue or args.queue_status or args.cancel_queue_job
+            or args.retry_queue_job
+        ):
             # A single command implementation ensures the GUI's CLI and the
             # frozen console use identical offline document safety policies.
             from skeleton.app.offline_cli import main as run_offline_console
@@ -238,11 +250,21 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 ("--library", args.library),
                 ("--index-dir", args.index_dir),
                 ("--search", args.search),
+                ("--queue-db", args.queue_db),
+                ("--enqueue-dir", args.enqueue_dir),
+                ("--queue-library", args.queue_library),
+                ("--cancel-queue-job", args.cancel_queue_job),
+                ("--retry-queue-job", args.retry_queue_job),
             ):
                 if value is not None:
                     local_args.extend((option, str(value)))
             local_args.extend(("--max-output-tokens", str(args.max_output_tokens)))
             local_args.extend(("--context-limit", str(args.context_limit)))
+            local_args.extend(("--drain-limit", str(args.drain_limit)))
+            if args.run_queue:
+                local_args.append("--run-queue")
+            if args.queue_status:
+                local_args.append("--queue-status")
             if args.use_library:
                 local_args.append("--use-library")
             if args.as_json:
