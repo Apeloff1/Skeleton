@@ -94,9 +94,10 @@ def _write_new(path: Path, result: dict[str, Any]) -> str:
     return str(target)
 
 
-def _demo(seed: int, target_ids: list[str], jurisdiction: str) -> dict[str, Any]:
+def _demo(seed: int, target_ids: list[str], jurisdiction: str,
+          *, width: int = 12, height: int = 9) -> dict[str, Any]:
     generated = generate_level({
-        "seed": seed, "width": 12, "height": 9, "wall_percent": 30,
+        "seed": seed, "width": width, "height": height, "wall_percent": 30,
     })
     level = compile_level({"tiles": generated["tiles"]})
     rights = {
@@ -144,6 +145,10 @@ def _parser() -> argparse.ArgumentParser:
                         help="exclusive new file for --compose")
     parser.add_argument("--seed", type=int, default=1729,
                         help="bounded seed for original procedural demo only")
+    parser.add_argument("--width", type=int, default=12,
+                        help="original game map width 5-32; 5-8 for CHIP-8")
+    parser.add_argument("--height", type=int, default=9,
+                        help="original game map height 5-32; 5-8 for CHIP-8")
     parser.add_argument("--targets", default="nes-famicom,game-boy,playstation-5,windows-11",
                         help="comma-separated era targets for demo only")
     parser.add_argument("--jurisdiction", default="NO",
@@ -158,6 +163,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     if args.compose is not None and args.output is None:
         print("--compose requires --output for a durable new project", file=sys.stderr)
+        return 2
+    if (args.width != 12 or args.height != 9) and args.demo_project is None:
+        print("--width and --height are only for --demo-project", file=sys.stderr)
         return 2
     if args.seed != 1729 and args.demo_project is None:
         print("--seed is only for --demo-project", file=sys.stderr)
@@ -202,7 +210,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             }
         elif args.demo_project:
             selected = args.targets.split(",")
-            project = _demo(args.seed, selected, args.jurisdiction)
+            project = _demo(args.seed, selected, args.jurisdiction,
+                            width=args.width, height=args.height)
             checked = verify_game_capsule(project)
             report = {
                 **checked, "output_path": _write_new(args.demo_project, project),
