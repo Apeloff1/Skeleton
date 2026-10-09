@@ -1,7 +1,7 @@
 # Skeleton game capabilities: every era, verifiable rights and real artifacts
 
 **Status:** Cross-era architecture and portable game composition built on PR
-#3593. **165 named design-target profiles**, from 1950s computer/analog
+#3593. **166 named design-target profiles**, from 1950s computer/analog
 experiments to 2020s PC, console, handheld, mobile and XR systems.
 
 **Critical distinction:** A target profile is **not** a working hardware
@@ -36,6 +36,8 @@ claims, historical availability, abandoned servers or tools found online
 as a legal exemption.
 
 ## 2. Coverage inventory
+
+The checked-in catalog now includes original 1970s CHIP-8 VM homebrew alongside other historical systems. A real `.ch8` ROM generator and in-memory emulator are implemented for that one target, with hardware/legal signoff still pending.
 
 The checked-in catalog at
 \`skeleton/ai/runtime/game_platform_catalog.py\` spans:
@@ -146,7 +148,7 @@ uses.
 From the repository root (Python with \`PYTHONPATH=.\`):
 
 \`\`\`sh
-# View the 165-target multi-era planning catalog.
+# View the 166-target multi-era planning catalog.
 python scripts/game/game_project.py --catalog
 
 # Author original procedural content; plan four distinct eras.
@@ -213,6 +215,8 @@ The 96-frame real-controller search distinguishes
 \`inconclusive_*\` budget statuses. Grid connectivity alone does not
 establish player reachability, and even successful simulation does
 not establish quality on every real console/renderer.
+
+For the first working vintage homebrew adapter, see [Original CHIP-8 ROM Export](CHIP8_HOMEBREW_EXPORT.md). It executes original bytecode and verifies a win in Skeleton's VM; it does not use proprietary console assets, nor does it establish real vintage-machine timing or official release clearance.
 
 ## 5. Release evidence and unimplemented planes
 
