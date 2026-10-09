@@ -158,7 +158,7 @@ jobs:
               raise SystemExit("contract verifier bound wrong masterplan volume")
           if receipt.get("valid") is not True or receipt.get("errors"):
               raise SystemExit("independent VOL-003 verification failed")
-          if receipt.get("contract_count") != 36:
+          if receipt.get("contract_count") != 40:
               raise SystemExit("VOL-003 contract inventory coverage is incomplete")
           if receipt.get("override_count") != 3:
               raise SystemExit("VOL-003 reviewed override count drifted")
