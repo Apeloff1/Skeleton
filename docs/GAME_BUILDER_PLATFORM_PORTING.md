@@ -1,6 +1,6 @@
 # Cross-era homebrew platform registry and port planning
 
-**Owner:** `skeleton/ai/game_builder` (canonical AI-native game builder).  
+**Owner:** `skeleton/ai/game_builder` (canonical AI-native game builder).
 **Status:** candidate platform coverage and deterministic port blueprints, **not** native game compilation, tooling certification, or release approval.
 
 ## Why discontinued and obscure platforms matter
