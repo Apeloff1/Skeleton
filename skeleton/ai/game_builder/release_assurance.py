@@ -314,6 +314,8 @@ def evaluate_independent_review(
         blockers.add("MISMATCHED_PROJECT_IDENTITY")
     if candidate.target_platform_id != legal.target_platform_id:
         blockers.add("TARGET_HARDWARE_CHANGED")
+    if candidate.jurisdictions != legal.jurisdictions:
+        blockers.add("RELEASE_JURISDICTIONS_NOT_IN_LEGAL_ASSESSMENT")
     try:
         default_registry().get(candidate.target_platform_id)
     except PlatformRegistryError:
