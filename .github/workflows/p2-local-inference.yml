@@ -11,11 +11,13 @@ on:
       - "tests/flgb/test_offline_model_improvement.py"
       - "tests/flgb/test_offline_benchmark.py"
       - "tests/flgb/test_offline_replay.py"
+      - "tests/flgb/test_offline_gguf_cli.py"
       - "skeleton/app/local_ai_transcript.py"
       - "skeleton/app/local_ai_training.py"
       - "skeleton/app/local_ai_improvement.py"
       - "skeleton/app/local_ai_benchmark.py"
       - "skeleton/app/local_ai_replay.py"
+      - "skeleton/app/local_ai_gguf.py"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_native_neural_lm.py"
       - "skeleton/testing/test_native_runtime_local_provider.py"
@@ -39,11 +41,13 @@ on:
       - "tests/flgb/test_offline_model_improvement.py"
       - "tests/flgb/test_offline_benchmark.py"
       - "tests/flgb/test_offline_replay.py"
+      - "tests/flgb/test_offline_gguf_cli.py"
       - "skeleton/app/local_ai_transcript.py"
       - "skeleton/app/local_ai_training.py"
       - "skeleton/app/local_ai_improvement.py"
       - "skeleton/app/local_ai_benchmark.py"
       - "skeleton/app/local_ai_replay.py"
+      - "skeleton/app/local_ai_gguf.py"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_llama_cpp_local_inference.py"
       - "skeleton/testing/test_native_runtime_local_provider.py"
@@ -107,3 +111,4 @@ jobs:
           tests/flgb/test_offline_model_improvement.py
           tests/flgb/test_offline_benchmark.py
           tests/flgb/test_offline_replay.py
+          tests/flgb/test_offline_gguf_cli.py
