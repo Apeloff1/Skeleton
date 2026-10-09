@@ -79,6 +79,22 @@ for matching operating systems and Python versions. A Windows frozen console
 does **not** include arbitrary local GGUF weights or automatically install
 GPU drivers or the llama.cpp executable.
 
+## Offline readiness doctor
+
+Use `--doctor` with one preinstalled local artifact before running it:
+
+```sh
+skeleton-offline --deployment ./model/deployment.json --doctor --json
+python -m skeleton app local-ai --model ./checkpoint.json --doctor --json
+```
+
+The doctor checks the exact local checkpoint identity or the SHA-256-pinned
+GGUF plus llama.cpp executable and reports the inspected hashes. It does not
+run a model, contact a provider, prove device library compatibility, evaluate
+model intelligence, or attest to operating-system egress isolation. These
+distinct statuses appear explicitly in its JSON response to prevent false
+standalone qualification.
+
 ## Local SQLite conversation workspace
 
 In the desktop app, load a native checkpoint or GGUF deployment, then
@@ -216,7 +232,7 @@ and offline system-completion attestation are not yet provided.
 ## Acceptance
 
 ```sh
-python -m pytest skeleton/testing/test_app_offline_gguf.py skeleton/testing/test_offline_history_backup.py skeleton/testing/test_offline_kit.py skeleton/testing/test_offline_console.py skeleton/testing/test_offline_workspace.py -q
+python -m pytest skeleton/testing/test_app_offline_gguf.py skeleton/testing/test_offline_history_backup.py skeleton/testing/test_offline_kit.py skeleton/testing/test_offline_console.py skeleton/testing/test_offline_workspace.py skeleton/testing/test_offline_readiness.py -q
 python -m pytest skeleton/testing/test_local_model_deployment.py -q
 python scripts/check_architecture_map.py
 python scripts/check_ai_app_construction.py
