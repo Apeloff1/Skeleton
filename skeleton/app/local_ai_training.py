@@ -166,3 +166,31 @@ def train_local_text(
         initial_perplexity=initial_perplexity,
         final_perplexity=final_perplexity,
     )
+
+
+def smoke_offline_native_training() -> bool:
+    """Exercise actual CPU gradient updates and verified weights in a frozen exe."""
+    import asyncio
+    import tempfile
+
+    from skeleton.app.local_ai import OfflineAISession
+
+    with tempfile.TemporaryDirectory(prefix="skeleton-training-smoke-") as folder:
+        source = Path(folder) / "training.txt"
+        checkpoint = Path(folder) / "trained.json"
+        source.write_text(
+            "user: hello assistant: world\n"
+            "user: world assistant: hello\n",
+            encoding="utf-8",
+        )
+        receipt = train_local_text(source, checkpoint)
+        session = OfflineAISession(load_native_checkpoint(checkpoint))
+        answer = asyncio.run(session.ask("user: hello", max_output_tokens=2))
+        return bool(
+            receipt.training_steps > 0
+            and receipt.initial_perplexity > 0
+            and receipt.final_perplexity > 0
+            and answer.text
+            and answer.model_digest == receipt.model_digest
+            and len(answer.execution_receipt_digest) == 64
+        )
