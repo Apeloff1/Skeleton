@@ -185,8 +185,19 @@ def sparse_plan_receipt(plan: Mapping[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in plan.items() if key not in excluded}
 
 
-def register_sparse_capability_plan(plan: Mapping[str, Any], registry: Any) -> str:
-    """Register ONLY the sparse active training corpus (not the 720-row bank)."""
+def register_sparse_capability_plan(
+    directory: str | Path, plan: Mapping[str, Any], registry: Any,
+) -> str:
+    """Rebuild and verify the sparse plan BEFORE registry mutation.
+
+    A caller-crafted plan cannot substitute alternate answer text, rights or
+    held-out rows by simply recomputing its own SHA-256 digest.
+    """
+    if not isinstance(plan, Mapping):
+        raise SyntheticCurriculumError("invalid sparse plan mapping")
+    expected = build_sparse_capability_plan(directory, budget=plan.get("sample_budget"))
+    if dict(plan) != expected:
+        raise SyntheticCurriculumError("sparse plan differs from verified source training pool")
     from skeleton.ai.runtime.training.data import (
         DataQualityReport, DataQualityRule, DatasetManifest,
         DatasetSplit, IngestEnvelope, SyntheticDataReceipt,
