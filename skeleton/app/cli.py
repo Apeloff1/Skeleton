@@ -84,6 +84,9 @@ def _parser() -> argparse.ArgumentParser:
     capability.add_argument("--game-preview", action="store_true", help="open native offline playable game window")
     capability.add_argument("--game-preview-check", action="store_true", help="verify deterministic native game replay without desktop")
     capability.add_argument("--homebrew-editor", help="visual editor for a rights-checked original homebrew project")
+    capability.add_argument("--homebrew-port-check", action="store_true", help="verify original Windows port aesthetics/hybrid gameplay")
+    local_ai.add_argument("--homebrew-port-project", help="original project to verify Windows destination port")
+    local_ai.add_argument("--homebrew-port-blueprint", help="Windows port blueprint to verify")
     local_ai.add_argument("--homebrew-editor-output", help="new project output for visual editor Save As")
     capability.add_argument("--chip8-demo-output", help="write a genuine original CHIP-8 homebrew ROM")
     capability.add_argument("--chip8-demo-check", action="store_true", help="verify a native original CHIP-8 game through actual machine instructions")
@@ -255,7 +258,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
 
     if command == "local-ai":
         if (
-            args.capability_file or args.capability_graph_file or args.capability_list or args.game_preview or args.game_preview_check or args.game_seed is not None or args.game_project or args.homebrew_editor or args.homebrew_editor_output or args.chip8_demo_output or args.chip8_demo_check or args.chip8_export_capsule or args.chip8_rom_output or args.qualify_model or args.index_dir or args.search or args.use_library or args.enqueue_dir
+            args.capability_file or args.capability_graph_file or args.capability_list or args.game_preview or args.game_preview_check or args.game_seed is not None or args.game_project or args.homebrew_editor or args.homebrew_editor_output or args.homebrew_port_check or args.homebrew_port_project or args.homebrew_port_blueprint or args.chip8_demo_output or args.chip8_demo_check or args.chip8_export_capsule or args.chip8_rom_output or args.qualify_model or args.index_dir or args.search or args.use_library or args.enqueue_dir
             or args.run_queue or args.queue_status or args.cancel_queue_job
             or args.retry_queue_job or args.snapshot_to
             or args.restore_from or args.verify_snapshot
@@ -296,6 +299,8 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 ("--game-project", args.game_project),
                 ("--homebrew-editor", args.homebrew_editor),
                 ("--homebrew-editor-output", args.homebrew_editor_output),
+                ("--homebrew-port-project", args.homebrew_port_project),
+                ("--homebrew-port-blueprint", args.homebrew_port_blueprint),
                 ("--chip8-demo-output", args.chip8_demo_output),
                 ("--chip8-export-capsule", args.chip8_export_capsule),
                 ("--chip8-rom-output", args.chip8_rom_output),
@@ -321,6 +326,8 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 local_args.append("--game-preview-check")
             if args.chip8_demo_check:
                 local_args.append("--chip8-demo-check")
+            if args.homebrew_port_check:
+                local_args.append("--homebrew-port-check")
             if args.as_json:
                 local_args.append("--json")
             return run_offline_console(local_args)
