@@ -282,3 +282,55 @@ def test_generator_detects_template_drift_despite_recomputed_hashes(
     assert validate_curriculum(root)["oracle_verified_rows"] == 720
     with pytest.raises(SyntheticCurriculumError, match="does not reproduce"):
         verify_regeneration(root)
+
+
+def test_dataset_operator_cli_checks_rights_and_nonclobber_exports(
+    tmp_path: Path, capsys,
+) -> None:
+    from scripts.training.verify_offline_foundations import main
+
+    assert main(["--dataset", str(SOURCE)]) == 0
+    assert json.loads(capsys.readouterr().out)["oracle_verified_rows"] == 720
+    output = tmp_path / "train-only.txt"
+    assert main([
+        "--dataset", str(SOURCE), "--export-train", str(output),
+    ]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["held_out_examples_exported"] == 0
+    assert output.read_bytes() == (SOURCE / "train_corpus.txt").read_bytes()
+    assert main([
+        "--dataset", str(SOURCE), "--export-train", str(output),
+    ]) == 1
+    assert output.read_bytes() == (SOURCE / "train_corpus.txt").read_bytes()
+    assert "requires a new local file" in capsys.readouterr().err
+    assert main(["--dataset", str(SOURCE), "--split", "test"]) == 2
+    assert main([
+        "--dataset", str(SOURCE), "--register-db", str(tmp_path / "training.sqlite"),
+    ]) == 0
+    receipt = json.loads(capsys.readouterr().out)
+    assert receipt["governed_training_ready"] is True
+    assert receipt["trained_weights_promoted"] is False
+    assert len(receipt["registered_dataset_digest"]) == 64
+
+
+def test_training_dataset_export_never_clobbers_or_writes_into_source(
+    tmp_path: Path, capsys,
+) -> None:
+    from scripts.training.verify_offline_foundations import main
+    from scripts.training.generate_offline_foundations import main as generator
+
+    data = _copy(tmp_path)
+    assert main([
+        "--dataset", str(data),
+        "--export-train", str(data / "outside.txt"),
+    ]) == 1
+    assert not (data / "outside.txt").exists()
+    assert main([
+        "--dataset", str(data),
+        "--register-db", str(data / "new-registry.sqlite"),
+    ]) == 1
+    assert not (data / "new-registry.sqlite").exists()
+    assert generator([
+        "--dataset", str(data), "--output", str(data / "subfolder"),
+    ]) == 1
+    assert not (data / "subfolder").exists()
