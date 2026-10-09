@@ -137,6 +137,7 @@ class OfflineDocumentLibrary:
             db_path.exists() and not db_path.is_file()
         ):
             raise OfflineLibraryError("library must be a regular local SQLite file")
+        self.path = Path(os.path.abspath(db_path))
         self._lock = threading.RLock()
         was_present = db_path.exists()
         try:
