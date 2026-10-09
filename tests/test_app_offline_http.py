@@ -204,6 +204,86 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(state["sessions"], [])
 
+    def test_local_reference_http_ingest_search_delete_and_model_binding(self):
+        # Exercise actual localhost HTTP parsing, authentication, local DB,
+        # search ranking and text provenance, not mocked dispatch objects.
+        text = (
+            "Nintendo mapper bankswitch architecture stores cartridge "
+            "ROM in pages. CPU memory mapping stays deterministic. "
+        ) * 12
+        endpoint = "/v1/knowledge/documents"
+        status, result, _ = self._request(
+            "POST", endpoint,
+            {"title": "Console architecture notes", "text": text},
+        )
+        self.assertEqual(status, 201)
+        doc_id = result["document_id"]
+        self.assertEqual(len(result["sha256"]), 64)
+        status, again, _ = self._request(
+            "POST", endpoint,
+            {"title": "Same content from another source", "text": text},
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(again["reused"])
+        self.assertEqual(again["document_id"], doc_id)
+        status, index, _ = self._request("GET", endpoint)
+        self.assertEqual(status, 200)
+        self.assertEqual(len(index["documents"]), 1)
+        status, matches, _ = self._request(
+            "POST", "/v1/knowledge/search",
+            {"query": "Nintendo bankswitch cartridge ROM", "limit": 3},
+        )
+        self.assertEqual(status, 200)
+        self.assertGreater(len(matches["hits"]), 0)
+        self.assertLessEqual(len(matches["hits"]), 3)
+        for passage in matches["hits"]:
+            self.assertEqual(passage["document_id"], doc_id)
+            self.assertEqual(
+                text[passage["char_start"]:passage["char_end"]],
+                passage["passage"],
+            )
+            self.assertEqual(passage["document_sha256"], result["sha256"])
+        # Ingesting reference text never creates a conversation or silently
+        # grants retrieval results a model-generated assistant identity.
+        status, sessions, _ = self._request("GET", "/v1/sessions")
+        self.assertEqual(status, 200)
+        self.assertEqual(sessions, {"sessions": []})
+        status, deleted, _ = self._request(
+            "DELETE", endpoint + "/" + doc_id
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(deleted["deleted_document_id"], doc_id)
+        status, empty, _ = self._request(
+            "POST", "/v1/knowledge/search",
+            {"query": "bankswitch memory"},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(empty["hits"], [])
+
+    def test_reference_ingestion_rejects_unauthorized_and_malformed_inputs(self):
+        status, denied, _ = self._request(
+            "POST", "/v1/knowledge/documents",
+            {"title": "Private", "text": "Shader code"},
+            authorized=False,
+        )
+        self.assertEqual(status, 401)
+        status, bad, _ = self._request(
+            "POST", "/v1/knowledge/documents",
+            {"title": "Private", "text": "Shader code", "execute": True},
+        )
+        self.assertEqual(status, 400)
+        status, bad, _ = self._request(
+            "POST", "/v1/knowledge/search", {"query": 52}
+        )
+        self.assertEqual(status, 400)
+        status, missing, _ = self._request(
+            "DELETE", "/v1/knowledge/documents/invalid-id"
+        )
+        self.assertEqual(status, 400)
+        status, index, _ = self._request("GET", "/v1/knowledge/documents")
+        self.assertEqual(status, 200)
+        self.assertEqual(index["documents"], [])
+
     def test_concurrent_same_request_id_runs_only_once(self) -> None:
         _, created, _ = self._request("POST", "/v1/sessions", {})
         sid = created["session_id"]
