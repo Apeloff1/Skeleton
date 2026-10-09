@@ -16,7 +16,7 @@ are deterministic algorithms, **not** generative-language proficiency.
    deployments generate text and require separate model/runtime trust,
    context persistence and target-hardware qualification.
 2. **Deterministic capability execution:** Strict JSON task dispatch to an
-   explicit allowlist of 24 operations, each with closed-form or bounded
+   explicit allowlist of 29 operations, each with closed-form or bounded
    calculations, no model dependency and a SHA-256 result receipt.
 
 A model may *propose* a JSON task, but its text is never sufficient
