@@ -14,6 +14,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import threading
 import unittest
+from unittest.mock import patch
 
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
@@ -283,6 +284,213 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         status, index, _ = self._request("GET", "/v1/knowledge/documents")
         self.assertEqual(status, 200)
         self.assertEqual(index["documents"], [])
+
+    def _grounded_fixture(self):
+        source = (
+            "The deterministic rasterizer uses fixed-point edge equations "
+            "to find pixel coverage and classify triangle boundaries. "
+        ) * 3
+        st, document, _ = self._request(
+            "POST", "/v1/knowledge/documents",
+            {"title": "Private rendering notes", "text": source},
+        )
+        self.assertEqual(st, 201)
+        st, created, _ = self._request("POST", "/v1/sessions", {})
+        self.assertEqual(st, 201)
+        return source, document, created["session_id"]
+
+    def test_grounded_turn_retains_exact_source_snapshot_and_user_question(self):
+        source, document, sid = self._grounded_fixture()
+        payload = {
+            "message": "How does the rasterizer determine pixel coverage?",
+            "request_id": "grounded-first", "max_output_tokens": 2,
+            "grounded": True,
+        }
+        status, answer, _ = self._request(
+            "POST", "/v1/sessions/" + sid + "/turn", payload,
+        )
+        self.assertEqual(status, 200, answer)
+        self.assertFalse(answer["replayed"])
+        self.assertEqual(answer["revision"], 1)
+        manifest = answer["evidence"]
+        self.assertEqual(
+            manifest["claim"], "source_passages_supplied_not_answer_verification",
+        )
+        self.assertEqual(len(manifest["citations"]), 1)
+        source_ref = manifest["citations"][0]
+        self.assertEqual(source_ref["document_sha256"], document["sha256"])
+        self.assertEqual(source_ref["title"], "Private rendering notes")
+        self.assertEqual(
+            source[source_ref["char_start"]:source_ref["char_end"]],
+            source_ref["passage"],
+        )
+        # The source chunk is longer, but the receipt must never overstate
+        # which exact characters were sent to the model.
+        self.assertLessEqual(len(source_ref["passage"]), 220)
+        self.assertIn(source_ref["passage"], manifest["context"])
+        self.assertIn(source_ref["citation"], manifest["context"])
+        self.assertNotIn(source_ref["passage"] + "NOT_SENT_CANARY", manifest["context"])
+        status, conversation, _ = self._request(
+            "GET", "/v1/sessions/" + sid,
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            conversation["messages"][0]["content"], payload["message"],
+        )
+        self.assertEqual(conversation["evidence"][0], manifest)
+        self.assertEqual(conversation["messages"][1]["content"], answer["text"])
+
+    def test_grounded_retry_after_reference_deletion_preserves_original_receipt(self):
+        _source, document, sid = self._grounded_fixture()
+        endpoint = "/v1/sessions/" + sid + "/turn"
+        payload = {
+            "message": "Explain fixed-point rasterizer edge equations",
+            "request_id": "stable-grounded-1",
+            "max_output_tokens": 2, "grounded": True,
+        }
+        status, first, _ = self._request("POST", endpoint, payload)
+        self.assertEqual(status, 200, first)
+        status, deleted, _ = self._request(
+            "DELETE", "/v1/knowledge/documents/" + document["document_id"],
+        )
+        self.assertEqual(status, 200)
+        status, repeated, _ = self._request("POST", endpoint, payload)
+        self.assertEqual(status, 200, repeated)
+        self.assertTrue(repeated["replayed"])
+        self.assertEqual(repeated["output_digest"], first["output_digest"])
+        self.assertEqual(repeated["evidence"], first["evidence"])
+        self.assertEqual(repeated["revision"], first["revision"])
+        status, conflict, _ = self._request(
+            "POST", endpoint, {**payload, "grounded": False},
+        )
+        self.assertEqual(status, 409)
+        self.assertIn("request id reused", conflict["error"])
+
+    def test_grounded_backup_import_and_fork_preserve_original_source_custody(self):
+        _source, _doc, sid = self._grounded_fixture()
+        st, done, _ = self._request(
+            "POST", "/v1/sessions/" + sid + "/turn", {
+                "message": "What does the rasterizer use for pixel coverage?",
+                "request_id": "grounded-v2", "max_output_tokens": 2,
+                "grounded": True,
+            },
+        )
+        self.assertEqual(st, 200, done)
+        st, bundle, _ = self._request("GET", "/v1/sessions/" + sid + "/export")
+        self.assertEqual(st, 200)
+        self.assertEqual(bundle["body"]["schema"],
+                         "skeleton.ai.offline-chat-bundle.v2")
+        self.assertEqual(bundle["body"]["evidence"], [done["evidence"]])
+        st, imported, _ = self._request(
+            "POST", "/v1/sessions/import", bundle,
+        )
+        self.assertEqual(st, 201, imported)
+        st, fork, _ = self._request(
+            "POST", "/v1/sessions/" + sid + "/fork", {"after_turn": 1},
+        )
+        self.assertEqual(st, 201, fork)
+        for restored_sid in (imported["session_id"], fork["session_id"]):
+            st, conversation, _ = self._request(
+                "GET", "/v1/sessions/" + restored_sid,
+            )
+            self.assertEqual(st, 200)
+            self.assertEqual(conversation["revision"], 1)
+            self.assertEqual(conversation["evidence"], [done["evidence"]])
+        # Tamper with stored evidence while recomputing only the unkeyed
+        # outer bundle SHA-256: internal source provenance still rejects it.
+        import hashlib
+        forged = json.loads(json.dumps(bundle))
+        forged["body"]["evidence"][0]["citations"][0]["passage"] = "forged"
+        canonical = json.dumps(
+            forged["body"], sort_keys=True,
+            ensure_ascii=False, separators=(",", ":"),
+        ).encode("utf-8")
+        forged["sha256"] = hashlib.sha256(canonical).hexdigest()
+        st, rejected, _ = self._request(
+            "POST", "/v1/sessions/import", forged,
+        )
+        self.assertEqual(st, 400)
+        self.assertIn("grounding", rejected["error"])
+
+    def test_grounded_requires_matching_local_evidence_no_empty_commit(self):
+        st, created, _ = self._request("POST", "/v1/sessions", {})
+        self.assertEqual(st, 201)
+        sid = created["session_id"]
+        endpoint = "/v1/sessions/" + sid + "/turn"
+        payload = {
+            "message": "Where is the missing cartridge header documented?",
+            "request_id": "missing-evidence", "max_output_tokens": 2,
+            "grounded": True,
+        }
+        st, rejected, _ = self._request("POST", endpoint, payload)
+        self.assertEqual(st, 422)
+        self.assertIn("no local reference", rejected["error"])
+        st, stored, _ = self._request("GET", "/v1/sessions/" + sid)
+        self.assertEqual(st, 200)
+        self.assertEqual(stored["revision"], 0)
+        self.assertEqual(stored["evidence"], [])
+
+    def test_grounding_remains_untrusted_user_input_not_system_instruction(self):
+        from skeleton.ai.runtime.inference.local import LocalInferenceEngine
+        _source, _doc, sid = self._grounded_fixture()
+        original = LocalInferenceEngine.generate
+        captured = []
+
+        async def observing(engine, request):
+            captured.append(request)
+            return await original(engine, request)
+
+        with patch.object(LocalInferenceEngine, "generate", observing):
+            st, response, _ = self._request(
+                "POST", "/v1/sessions/" + sid + "/turn", {
+                    "message": "How does rasterizer fixed-point edge coverage work?",
+                    "request_id": "user-context-only", "max_output_tokens": 2,
+                    "grounded": True,
+                },
+            )
+        self.assertEqual(st, 200, response)
+        self.assertEqual(len(captured), 1)
+        self.assertEqual(captured[0].instructions, "")
+        self.assertTrue(
+            captured[0].prompt.startswith(
+                "How does rasterizer fixed-point edge coverage work?\n\n"
+            )
+        )
+        self.assertIn("UNTRUSTED LOCAL REFERENCES", captured[0].prompt)
+        self.assertEqual(
+            captured[0].prompt.split("UNTRUSTED LOCAL REFERENCES", 1)[1],
+            response["evidence"]["context"].split(
+                "UNTRUSTED LOCAL REFERENCES", 1
+            )[1],
+        )
+
+    def test_corrupted_saved_grounding_prevents_replay_or_export(self):
+        _source, _doc, sid = self._grounded_fixture()
+        st, answer, _ = self._request(
+            "POST", "/v1/sessions/" + sid + "/turn", {
+                "message": "Explain pixel coverage in the rasterizer",
+                "request_id": "corruption-check", "max_output_tokens": 2,
+                "grounded": True,
+            },
+        )
+        self.assertEqual(st, 200, answer)
+        with self.app._store._transaction():
+            self.app._store._db.execute(
+                "UPDATE offline_turn_evidence SET evidence_json=? "
+                "WHERE session_id=? AND request_id=?",
+                ('{"schema":"forged"}', sid, "corruption-check"),
+            )
+        st, denied, _ = self._request("GET", "/v1/sessions/" + sid)
+        self.assertEqual(st, 400)
+        self.assertIn("grounding", denied["error"])
+        st, denied, _ = self._request(
+            "POST", "/v1/sessions/" + sid + "/turn", {
+                "message": "Explain pixel coverage in the rasterizer",
+                "request_id": "corruption-check", "max_output_tokens": 2,
+                "grounded": True,
+            },
+        )
+        self.assertEqual(st, 400)
 
     def test_concurrent_same_request_id_runs_only_once(self) -> None:
         _, created, _ = self._request("POST", "/v1/sessions", {})
