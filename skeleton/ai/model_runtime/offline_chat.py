@@ -257,7 +257,15 @@ class OfflineChatStore:
                 self._db.execute("ROLLBACK")
                 raise
             else:
-                self._db.execute("COMMIT")
+                try:
+                    self._db.execute("COMMIT")
+                except BaseException:
+                    # Disk-full and I/O failures may leave the transaction
+                    # active after COMMIT fails. Release any pending writes
+                    # before another request can observe the same connection.
+                    if self._db.in_transaction:
+                        self._db.execute("ROLLBACK")
+                    raise
 
     def close(self) -> None:
         with self._lock:
