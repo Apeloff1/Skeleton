@@ -151,3 +151,65 @@ The timeline uses **candidate years**, not independently confirmed primary-sourc
 Historical reading material for review includes [Brookhaven National Laboratory's early game history](https://www.bnl.gov/about/history/firstvideo.php), [MAME's machine-history introduction](https://docs.mamedev.org/initialsetup/mameintro.html), [MAME's historical layouts](https://docs.mamedev.org/techspecs/layout_files.html), [Wikimedia Commons' generational gallery](https://commons.wikimedia.org/wiki/Home_game_consoles_by_generation) and the [Video Game History Foundation research library](https://library.gamehistory.org/). These are references for future item-by-item audits, **not blanket provenance attestations**.
 
 Even after this expansion, full worldwide hardware/clone/revision coverage, machine-specific verified graphics/audio limits, and native homebrew executable support are substantially incomplete.
+
+
+## Native original console engines: genuine Game Boy and NES cartridge source
+
+The platform registry and evolution-games plane now have **two independent,
+world-derived console assemblers**, not just porting advice or a reskinned
+desktop game. Both consume the exact validated `PlayableWorld`, preserve its
+cryptographic digest and safe-winning replay, use procedurally authored original
+2bpp pixel art, and emit compiler-ready source projects without copying any
+commercial cartridge content.
+
+| Stage target | Source producer | Native binary format | Toolchain | Gameplay implemented |
+| --- | --- | --- | --- | --- |
+| Game Boy DMG | `game_boy_native_export.py` | `.gb` ROM-only cartridge | RGBDS 1.0 (`rgbasm`, `rgblink`, `rgbfix`) | Hardware LCD/VRAM/OAM, 32-column tilemap, D-pad, walls, crystals, hazards, health, multi-level victory |
+| NES / Famicom | `nes_native_export.py` | iNES NROM-256 Mapper 0 `.nes` | cc65 (`ca65`, `ld65`) | 6502, PPU nametable and 2bpp CHR, sprite DMA, controller, walls, crystals, hazards, health, multi-level victory |
+
+These are **actual console-specific machine-code source projects**. They
+are not HTML exports, emulator applications, JavaScript wrappers or general
+C files renamed to game-console extensions. Both use their corresponding
+machine architecture and graphics-memory layout. Console artwork is original.
+
+The Game Boy adapter bounds the playable source grid to **19×17 tiles** and
+uses a 32×18 tilemap. The NES adapter bounds source levels to **31×29 tiles**
+and maintains a 32×30 CPU-RAM-backed PPU nametable. Overflow is rejected,
+not silently truncated into an unplayable cartridge. Compiling a game
+does not establish frame-perfect emulation, physical-console qualification,
+third-party distribution permissions, or runtime replay certification.
+
+CI jobs:
+- `Game Builder Native DMG ROM`: installs RGBDS, generates a deterministic
+  original three-stage game, assembles/links `.gb`, checks cartridge size,
+  entry point, Nintendo-defined hardware header and checksum, and records SHA-256.
+- `Game Builder Native NES ROM`: uses real cc65, emits a three-level
+  original NROM cartridge, checks complete PRG/CHR layout, Mapper 0,
+  reset vector, original generated tile data and SHA-256.
+- `Game Builder Native Desktop Executable`: builds genuine SDL2/C11
+  native game executables on Windows, macOS and Linux, then runs the embedded
+  three-level deterministic gameplay replay on each native host.
+
+**Important:** Above are validation *steps to run*, not passing-certification
+claims for any unchecked Git commit. The ROM workflows do not currently
+provide complete emulator-controlled gameplay playback; release
+certification remains independently gated. Source manifests deliberately
+continue to say `rom_compiled=false` or `cartridge_built=false`, because
+a generated project is not itself a compiled and verified ROM.
+
+### Evolution-game bridge: history lessons become native original games
+
+`evolution_native_sources.py` now consumes the playable per-era
+`EvolutionPracticePack` and materializes real stage-specific sources:
+authentic Game Boy ROM projects, NES ROM projects and SDL2 desktop games
+where the stage hardware permits it. Every other archival system remains
+an explicit `design_only` stage. A historical practice map that exceeds a
+console's display envelope becomes `budget_incompatible`, not a fake game
+or silently clipped level. Each stage retains its source-world digest,
+winning-gameplay-replay digest, authorship reference, target and build
+qualification status.
+
+This is the executable bridge between the dated game history archive,
+the platform selector, the playable-world engine, the rights-gated
+porting system and actual native-machine game sources. New archive
+entries cannot inflate the count of qualified native backends.
