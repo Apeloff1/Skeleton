@@ -9,14 +9,15 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from skeleton.ai.model_runtime import NativeLLMRuntime
 from skeleton.ai.runtime.inference.artifact import write_local_model_artifact
+from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
 from skeleton.app.local_ai import load_native_checkpoint
 from skeleton.app.local_ai_improvement import (
     OfflineImprovementError,
     improve_local_model,
 )
 from skeleton.cortex.transformer import TinyTransformer
-from tests.flgb.test_desktop_offline_ai import backend
 
 
 class TestEvaluatedOfflineImprovement(unittest.TestCase):
@@ -26,7 +27,13 @@ class TestEvaluatedOfflineImprovement(unittest.TestCase):
         train = root / "train.txt"
         heldout = root / "heldout.txt"
         dest = root / "candidate.json"
-        write_local_model_artifact(backend(), source)
+        # Use the same normalized role vocabulary admitted by the real
+        # CPU corpus trainer. `user:` tokenizes to `user`, not `user:`.
+        native = TinyTransformer(
+            vocab=("user", "assistant", "hello", "world", "alpha", "beta"),
+            dim=8, ctx=96, seed=37, n_heads=2, n_layers=2, d_ff=16,
+        )
+        write_local_model_artifact(NativeRuntimeLocalModel(NativeLLMRuntime(native)), source)
         train.write_text(
             ("user: hello assistant: world alpha\n" * 4),
             encoding="utf-8",
