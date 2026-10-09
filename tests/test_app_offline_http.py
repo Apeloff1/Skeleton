@@ -104,6 +104,8 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         status, session, _ = self._request("GET", "/v1/sessions/" + sid)
         self.assertEqual(status, 200)
         self.assertEqual(session["revision"], 1)
+        self.assertEqual(session["evidence"], [None])
+        self.assertEqual(session["citation_audits"], [None])
         self.assertEqual(
             [m["role"] for m in session["messages"]],
             ["system", "user", "assistant"],
@@ -314,6 +316,14 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertEqual(answer["revision"], 1)
         manifest = answer["evidence"]
         self.assertEqual(
+            answer["citation_audit"]["interpretation"],
+            "source_identifier_check_only_not_factual_verification",
+        )
+        self.assertIn(
+            answer["citation_audit"]["status"],
+            {"no_identifiers", "recognized_identifiers", "unknown_identifiers"},
+        )
+        self.assertEqual(
             manifest["claim"], "source_passages_supplied_not_answer_verification",
         )
         self.assertEqual(len(manifest["citations"]), 1)
@@ -338,6 +348,8 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
             conversation["messages"][0]["content"], payload["message"],
         )
         self.assertEqual(conversation["evidence"][0], manifest)
+        self.assertEqual(conversation["citation_audits"][0],
+                         answer["citation_audit"])
         self.assertEqual(conversation["messages"][1]["content"], answer["text"])
 
     def test_grounded_retry_after_reference_deletion_preserves_original_receipt(self):
@@ -359,6 +371,7 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertTrue(repeated["replayed"])
         self.assertEqual(repeated["output_digest"], first["output_digest"])
         self.assertEqual(repeated["evidence"], first["evidence"])
+        self.assertEqual(repeated["citation_audit"], first["citation_audit"])
         self.assertEqual(repeated["revision"], first["revision"])
         status, conflict, _ = self._request(
             "POST", endpoint, {**payload, "grounded": False},
