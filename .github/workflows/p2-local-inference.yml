@@ -11,6 +11,8 @@ on:
       - "skeleton/app/offline_history.py"
       - "scripts/offline_kit.py"
       - "skeleton/testing/test_offline_kit.py"
+      - "skeleton/app/offline_cli.py"
+      - "skeleton/testing/test_offline_console.py"
       - "tests/flgb/test_desktop_offline_ai.py"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_native_neural_lm.py"
@@ -35,6 +37,8 @@ on:
       - "skeleton/app/offline_history.py"
       - "scripts/offline_kit.py"
       - "skeleton/testing/test_offline_kit.py"
+      - "skeleton/app/offline_cli.py"
+      - "skeleton/testing/test_offline_console.py"
       - "tests/flgb/test_desktop_offline_ai.py"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_llama_cpp_local_inference.py"
@@ -96,4 +100,5 @@ jobs:
           skeleton/testing/test_app_offline_gguf.py
           skeleton/testing/test_offline_history_backup.py
           skeleton/testing/test_offline_kit.py
+          skeleton/testing/test_offline_console.py
           tests/flgb/test_desktop_offline_ai.py
