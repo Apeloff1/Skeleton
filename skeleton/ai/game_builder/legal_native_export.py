@@ -42,6 +42,51 @@ class LegalNativeDesktopSource:
     release_authorized: bool = False
     legal_advice_or_certificate: bool = False
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.project, NativeDesktopSourceProject) or not isinstance(
+            self.assessment, HomebrewLegalAssessment
+        ):
+            raise ClearedSourceExportError("typed game source and rights assessment required")
+        if any(getattr(self, f) is not False for f in (
+            "native_executable_compiled", "release_authorized",
+            "legal_advice_or_certificate",
+        )):
+            raise ClearedSourceExportError("native source cannot fabricate execution or release")
+        expected_source = sha256((
+            self.project.game_c + "\0" + self.project.cmake_lists + "\0" +
+            self.project.manifest_json
+        ).encode("utf-8")).hexdigest()
+        if expected_source != self.project.content_digest:
+            raise ClearedSourceExportError("native game source changed after compilation")
+        try:
+            manifest = json.loads(self.project.manifest_json)
+        except (TypeError, ValueError) as exc:
+            raise ClearedSourceExportError("invalid native source manifest") from exc
+        if (manifest.get("source_project_id") != self.assessment.project_id or
+            manifest.get("target_platform_id") != self.assessment.target_platform_id or
+            manifest.get("source_rights_evidence_sha256") != self.evidence_sha256 or
+            manifest.get("executable_built") is not False or
+            manifest.get("releasable") is not False):
+            raise ClearedSourceExportError("native package and licensing evidence mismatch")
+        if self.originality is not None:
+            if (not isinstance(self.originality, OriginalityReport) or
+                self.originality.project_id != self.assessment.project_id or
+                self.originality.artifact_sha256 != manifest.get("world_digest") or
+                not self.originality.design_admissible):
+                raise ClearedSourceExportError("originality evidence invalid or stale")
+        if self.credits is not None:
+            if (not isinstance(self.credits, CreditsBundle) or
+                self.credits.project_id != self.assessment.project_id or
+                self.credits.target_platform_id != self.assessment.target_platform_id or
+                self.credits.review_issues):
+                raise ClearedSourceExportError("credit licence evidence invalid or stale")
+        combined = sha256((
+            self.project.content_digest + ":" + self.assessment.assessment_digest +
+            ":" + (self.credits.bundle_sha256 if self.credits else "")
+        ).encode("ascii")).hexdigest()
+        if combined != self.package_content_sha256:
+            raise ClearedSourceExportError("game package changed after legal/credit review")
+
     def legal_receipt(self) -> dict[str, object]:
         return {
             "schema": "skeleton.game_builder.legal_native_source.v1",
