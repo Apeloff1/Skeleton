@@ -41,14 +41,22 @@ tests, rollback evidence, App Assembly, and signed accountability are explicit.
 Relocation alone never completes an AIQ task or work package.
 
 
-## Standalone native chat entry point
+## Standalone offline AI chat entry points
 
-`model_runtime/offline_chat.py` is the canonical provider-free local chat
-interface for an admitted native-transformer checkpoint. It supports an
-interactive terminal, SQLite conversations, replay-safe turn IDs, restart
-recovery, list and delete. It does not download models or grant tools or
-network access. See [Offline Native Chat](../../docs/ai/OFFLINE_NATIVE_CHAT.md)
-for commands, model requirements and scope limits.
+`model_runtime/offline_chat.py` owns the native-transformer checkpoint chat
+product and the model-identified SQLite conversation authority. It implements
+durable full-history preservation, exact-model/tokenizer identity, stable retry
+receipts, transactional turn commits, exact-turn forks, portable backups and
+restart recovery.
+
+`skeleton/app/local_ai.py` and `skeleton/app/offline_chat_cli.py` expose
+that same offline SQLite authority through the existing installed desktop UI
+and a headless interface. Both support native checkpoints and explicitly
+operator-installed GGUF/llama.cpp deployments. Only the model context
+*projection* is trimmed; the full committed conversation remains durable.
+No weights are downloaded, tools are not granted, and there is no hosted-model
+fallback. See [Offline Native Chat](../../docs/ai/OFFLINE_NATIVE_CHAT.md)
+for runnable commands, release smoke, model requirements and limitations.
 
 ## Planned-path disposition
 
