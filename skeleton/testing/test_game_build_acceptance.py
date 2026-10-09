@@ -15,7 +15,7 @@ def test_all_implemented_game_outputs_are_executed_not_just_generated():
         pytest.fail("P2 build-closure gate requires a real C89 compiler")
     one = acceptance.execute_all_available_game_acceptance()
     assert one["schema_version"] == "skeleton.game.executed_acceptance.v1"
-    assert len(one["accepted_execution_targets"]) == 3
+    assert len(one["accepted_execution_targets"]) == 4
     assert one["portable_c89"]["compiled_and_actually_won"] is True
     assert len(one["portable_c89"]["compiled_binary_sha256"]) == 64
     assert one["chip8_original_rom"]["win_state_reached"] is True
@@ -23,6 +23,10 @@ def test_all_implemented_game_outputs_are_executed_not_just_generated():
     assert one["chip8_original_rom"]["rom_bytes"] > 64
     assert one["native_preview"]["terminal_won"] is True
     assert one["native_preview"]["frames_verified"] >= 16
+    assert one["windows_homebrew_port"]["real_hybrid_win_replayed"] is True
+    assert one["windows_homebrew_port"]["original_gameplay_preserved"] is True
+    assert one["windows_homebrew_port"]["remaining_keys_at_win"] == 0
+    assert one["windows_homebrew_port"]["legal_distribution_approved"] is False
     assert one["all_implemented_gameplay_outputs_executed"] is True
     assert one["all_platform_releases_completed"] is False
     assert one["full_legal_publication_signoff"] is False
@@ -59,6 +63,7 @@ def test_aggregate_game_acceptance_cli_emits_only_passed_receipts(capsys):
     assert report["portable_c89"]["compiled_and_actually_won"] is True
     assert report["chip8_original_rom"]["win_state_reached"] is True
     assert report["native_preview"]["terminal_won"] is True
+    assert report["windows_homebrew_port"]["real_hybrid_win_replayed"] is True
     assert report["all_platform_releases_completed"] is False
 
 
