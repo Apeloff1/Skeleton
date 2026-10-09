@@ -70,6 +70,9 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--prompt", help="headless text request (requires --model)")
     local_ai.add_argument("--max-output-tokens", type=int, default=8)
     local_ai.add_argument("--json", action="store_true", dest="as_json", help="print a bound inference receipt")
+    local_ai.add_argument("--load-chat", help="restore verified turns from explicit model-bound local transcript")
+    local_ai.add_argument("--save-chat", help="atomically export model-bound local transcript after inference")
+
     sub.add_parser("down", help="stop the assembled application")
     sub.add_parser("ps", help="show assembled service state")
 
@@ -216,12 +219,18 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         if bool(args.model) != bool(args.prompt):
             print("local-ai headless inference requires both --model and --prompt")
             return 2
+        if (args.load_chat or args.save_chat) and not args.model:
+            print("local-ai chat import/export requires --model and --prompt")
+            return 2
         if args.model:
             import asyncio
 
             try:
                 session = OfflineAISession(load_native_checkpoint(args.model))
+                if args.load_chat:
+                    session.import_transcript(args.load_chat)
                 answer = asyncio.run(session.ask(args.prompt, max_output_tokens=args.max_output_tokens))
+                chat_digest = session.export_transcript(args.save_chat) if args.save_chat else None
             except (ValueError, RuntimeError, OSError) as exc:
                 print("local-ai request rejected: " + type(exc).__name__ + ": " + str(exc))
                 return 1
@@ -233,6 +242,8 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                     "execution_receipt_digest": answer.execution_receipt_digest,
                     "input_tokens": answer.input_tokens,
                     "output_tokens": answer.output_tokens,
+                    "conversation_turns": len(session.history) // 2,
+                    "chat_sha256": chat_digest,
                 }, ensure_ascii=False, sort_keys=True))
             else:
                 print(answer.text)
