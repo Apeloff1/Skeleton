@@ -1,8 +1,8 @@
-"""Docker-free, provider-free desktop conversation over the canonical native model.
+"""Docker-free, provider-free desktop conversations over local model runtimes.
 
-This is an app-shell adapter, not a new AI runtime, transcript authority,
-model trainer, or provider. Only a locally selected, integrity-checked native
-checkpoint can be executed. No checkpoint or demo response is bundled.
+The app shell is neither a model owner nor a production conversation authority.
+Operator-controlled file backups are portable data, not verified execution
+evidence. Real native or GGUF model weights must be supplied locally.
 """
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from skeleton.ai.runtime.inference.deployment import LocalModelDeployment
 from skeleton.ai.runtime.inference.llama_cpp import LlamaCppModel
 from skeleton.ai.runtime.inference.local import LocalInferenceRequest, LocalInferenceResult, LocalInferenceEngine
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
+from skeleton.app.offline_history import backup_history, restore_history
 
 
 MAX_USER_CHARS = 4096
@@ -46,12 +47,31 @@ class OfflineAnswer:
     output_tokens: int
 
 
-class OfflineAISession:
-    """Ephemeral conversation; all model work uses the canonical inference plane.
+class _PortableOfflineHistory:
+    """Opt-in portable transcript copies without taking conversation authority."""
 
-    The desktop shell intentionally does not fabricate persistence or a
-    system-completion verdict. For durable production chat use the governed
-    assistant/workspace and terminal-turn authority instead.
+    history: tuple[tuple[str, str], ...]
+
+    @property
+    def model_digest(self) -> str:
+        raise NotImplementedError
+
+    def save_history_backup(self, path: str | Path) -> str:
+        return backup_history(path, self.model_digest, self.history)
+
+    def restore_history_backup(self, path: str | Path) -> int:
+        if self.history:
+            raise OfflineAIError("start a new conversation before restoring a backup")
+        recovered = restore_history(path, self.model_digest)
+        self.history = recovered
+        return len(recovered) // 2
+
+
+class OfflineAISession(_PortableOfflineHistory):
+    """Ephemeral canonical-native conversation with opt-in portable backups.
+
+    This shell creates no production durable terminal/chat authority. Restored
+    history is untrusted context and never a replay or verification receipt.
     """
 
     def __init__(self, backend: NativeRuntimeLocalModel) -> None:
@@ -130,7 +150,7 @@ class OfflineAISession:
 
 
 
-class OfflineGGUFSession:
+class OfflineGGUFSession(_PortableOfflineHistory):
     """Desktop/headless chat over the already-governed offline llama.cpp owner.
 
     A manifest pins both a local executable and the operator-supplied GGUF by
@@ -251,6 +271,16 @@ class OfflineAIWindow:
         self.clear_button.pack(side="left", padx=8)
         self.cancel_button = ttk.Button(toolbar, text="Cancel generation", command=self.cancel)
         self.cancel_button.pack(side="left")
+        backup_toolbar = ttk.Frame(frame)
+        backup_toolbar.pack(fill="x", pady=(7, 0))
+        self.save_history_button = ttk.Button(
+            backup_toolbar, text="Back up conversation…", command=self.save_backup
+        )
+        self.save_history_button.pack(side="left")
+        self.restore_history_button = ttk.Button(
+            backup_toolbar, text="Restore conversation…", command=self.restore_backup
+        )
+        self.restore_history_button.pack(side="left", padx=8)
         self.status = tk.StringVar(value="Choose a local native model checkpoint to begin.")
         ttk.Label(frame, textvariable=self.status, wraplength=790).pack(anchor="w", pady=8)
         self.transcript = scrolledtext.ScrolledText(frame, state="disabled", wrap="word", height=18, font=("Segoe UI", 10))
@@ -266,6 +296,12 @@ class OfflineAIWindow:
     def _refresh(self) -> None:
         self.load_button.configure(state="disabled" if self.active else "normal")
         self.deployment_button.configure(state="disabled" if self.active else "normal")
+        self.save_history_button.configure(
+            state="normal" if self.session is not None and not self.active else "disabled"
+        )
+        self.restore_history_button.configure(
+            state="normal" if self.session is not None and not self.active else "disabled"
+        )
         self.send_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.clear_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.cancel_button.configure(state="normal" if self.active else "disabled")
@@ -275,6 +311,50 @@ class OfflineAIWindow:
         self.transcript.insert("end", speaker + "\n" + text + "\n\n")
         self.transcript.see("end")
         self.transcript.configure(state="disabled")
+
+    def _redraw_history(self) -> None:
+        self.transcript.configure(state="normal")
+        self.transcript.delete("1.0", "end")
+        self.transcript.configure(state="disabled")
+        if self.session is not None:
+            for role, content in self.session.history:
+                self._append("You" if role == "user" else "Skeleton · Local", content)
+
+    def save_backup(self) -> None:
+        if self.session is None or self.active:
+            return
+        destination = self.filedialog.asksaveasfilename(
+            parent=self.window,
+            title="Back up local conversation (unencrypted plaintext)",
+            defaultextension=".json",
+            filetypes=[("JSON backup", "*.json")],
+        )
+        if not destination:
+            return
+        try:
+            checksum = self.session.save_history_backup(destination)
+        except (ValueError, OSError) as exc:
+            self.status.set("Backup rejected: " + str(exc))
+        else:
+            self.status.set("Local transcript backup saved · checksum " + checksum[:12])
+
+    def restore_backup(self) -> None:
+        if self.session is None or self.active:
+            return
+        source = self.filedialog.askopenfilename(
+            parent=self.window,
+            title="Restore model-matched offline transcript",
+            filetypes=[("JSON backup", "*.json"), ("All files", "*.*")],
+        )
+        if not source:
+            return
+        try:
+            turns = self.session.restore_history_backup(source)
+        except (ValueError, OSError) as exc:
+            self.status.set("Restore rejected: " + str(exc))
+        else:
+            self._redraw_history()
+            self.status.set("Restored " + str(turns) + " local turns as untrusted context")
 
     def choose_model(self) -> None:
         if self.active:
@@ -325,10 +405,8 @@ class OfflineAIWindow:
         if self.active or self.session is None:
             return
         self.session.clear()
-        self.transcript.configure(state="normal")
-        self.transcript.delete("1.0", "end")
-        self.transcript.configure(state="disabled")
-        self.status.set("Conversation reset in memory.")
+        self._redraw_history()
+        self.status.set("Conversation reset in memory; existing backups are unchanged.")
 
     def send(self) -> None:
         if self.active or self.session is None:
@@ -390,8 +468,10 @@ class OfflineAIWindow:
                         "Completed · " + str(answer.input_tokens) + " input / " + str(answer.output_tokens) + " output tokens · receipt " + answer.execution_receipt_digest[:12]  # type: ignore[attr-defined]
                     )
                 else:
-                    self._append("Local runtime", "Request rejected: " + str(value))
-                    self.status.set("Local model unavailable or request rejected.")
+                    # A failed invocation did not commit a turn. Discard its
+                    # provisional visible user message as well.
+                    self._redraw_history()
+                    self.status.set("Local runtime rejected the request: " + str(value))
                 self._refresh()
         except Empty:
             pass
