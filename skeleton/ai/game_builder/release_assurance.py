@@ -157,10 +157,12 @@ class ReleaseCandidate:
             "OTHER" in self.jurisdictions
         ):
             raise ReleaseReviewError("unknown/global jurisdictions are not automatically cleared")
+        if len({j.casefold() for j in self.jurisdictions}) != len(self.jurisdictions):
+            raise ReleaseReviewError("ambiguous jurisdictions")
         for name in ("author_ids", "builder_ids"):
             identities = getattr(self, name)
             if not isinstance(identities, tuple) or not identities or (
-                len(set(identities)) != len(identities)
+                len({i.casefold() for i in identities}) != len(identities)
             ) or any(not _is_ident(i) for i in identities):
                 raise ReleaseReviewError("explicit human author/build operators required")
 
@@ -334,8 +336,10 @@ def evaluate_independent_review(
     reviewers = {r.key_id:r for r in trust_registry if isinstance(r, TrustedReviewer)}
     if len(reviewers) != len(trust_registry):
         raise ReleaseReviewError("duplicate or malformed external trust keys")
-    if len(set(r.reviewer_id for r in trust_registry)) != len(trust_registry):
+    if len({r.reviewer_id.casefold() for r in trust_registry}) != len(trust_registry):
         raise ReleaseReviewError("multiple keys for one reviewer require separate key rotation")
+    if len({r.public_key_hex for r in trust_registry}) != len(trust_registry):
+        raise ReleaseReviewError("one Ed25519 private key cannot represent multiple independent reviewers")
     seen_domains: set[ReviewDomain] = set()
     approved_domains: set[ReviewDomain] = set()
     covered_roles: set[ReviewRole] = set()
@@ -357,8 +361,9 @@ def evaluate_independent_review(
         if reviewer.revoked:
             blockers.add("REVOKED_REVIEWER_KEY:" + att.domain.value)
             continue
-        if (reviewer.reviewer_id in candidate.author_ids
-            or reviewer.reviewer_id in candidate.builder_ids):
+        if (reviewer.reviewer_id.casefold() in {
+            person.casefold() for person in (*candidate.author_ids, *candidate.builder_ids)
+        }):
             blockers.add("NON_INDEPENDENT_SELF_REVIEW:" + att.domain.value)
             continue
         if att.domain not in reviewer.allowed_domains or _ROLE_BY_DOMAIN[att.domain] != reviewer.role:
