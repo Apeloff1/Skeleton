@@ -82,6 +82,7 @@ def _parser() -> argparse.ArgumentParser:
     capability.add_argument("--capability-graph-file", help="execute a bounded chain of deterministic local tasks")
     capability.add_argument("--capability-list", action="store_true", help="list model-free deterministic operations")
     capability.add_argument("--game-preview", action="store_true", help="open native offline playable game window")
+    capability.add_argument("--game-preview-check", action="store_true", help="verify deterministic native game replay without desktop")
     local_ai.add_argument("--game-seed", type=int, help="optional explicit offline game preview seed")
     local_ai.add_argument("--library", help="local SQLite document index")
     local_ai.add_argument("--index-dir", help="index an explicitly selected local text folder")
@@ -247,7 +248,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
 
     if command == "local-ai":
         if (
-            args.capability_file or args.capability_graph_file or args.capability_list or args.game_preview or args.game_seed is not None or args.qualify_model or args.index_dir or args.search or args.use_library or args.enqueue_dir
+            args.capability_file or args.capability_graph_file or args.capability_list or args.game_preview or args.game_preview_check or args.game_seed is not None or args.qualify_model or args.index_dir or args.search or args.use_library or args.enqueue_dir
             or args.run_queue or args.queue_status or args.cancel_queue_job
             or args.retry_queue_job or args.snapshot_to
             or args.restore_from or args.verify_snapshot
@@ -303,6 +304,8 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 local_args.append("--capability-list")
             if args.game_preview:
                 local_args.append("--game-preview")
+            if args.game_preview_check:
+                local_args.append("--game-preview-check")
             if args.as_json:
                 local_args.append("--json")
             return run_offline_console(local_args)
