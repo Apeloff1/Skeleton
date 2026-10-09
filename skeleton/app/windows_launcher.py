@@ -414,6 +414,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     root = installation_root()
     if args.offline_command is not None:
+        if args.full or args.development or args.quiet:
+            print("offline native AI commands cannot request service-profile flags")
+            return 2
         # Explicitly constrain the frozen-command boundary to the app's
         # credential-free native AI plane; never invoke generic shell,
         # arbitrary Python modules or Docker/service commands here.
