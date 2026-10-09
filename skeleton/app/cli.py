@@ -83,6 +83,9 @@ def _parser() -> argparse.ArgumentParser:
     capability.add_argument("--capability-list", action="store_true", help="list model-free deterministic operations")
     capability.add_argument("--game-preview", action="store_true", help="open native offline playable game window")
     capability.add_argument("--game-preview-check", action="store_true", help="verify deterministic native game replay without desktop")
+    capability.add_argument("--chip8-demo-output", help="write a genuine original CHIP-8 homebrew ROM")
+    capability.add_argument("--chip8-export-capsule", help="legal-source authored capsule for CHIP-8 export")
+    local_ai.add_argument("--chip8-rom-output", help="new ROM output path for CHIP-8 capsule export")
     local_ai.add_argument("--game-seed", type=int, help="optional explicit offline game preview seed")
     local_ai.add_argument("--game-project", help="verified portable game project file for native preview")
     local_ai.add_argument("--library", help="local SQLite document index")
@@ -249,7 +252,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
 
     if command == "local-ai":
         if (
-            args.capability_file or args.capability_graph_file or args.capability_list or args.game_preview or args.game_preview_check or args.game_seed is not None or args.game_project or args.qualify_model or args.index_dir or args.search or args.use_library or args.enqueue_dir
+            args.capability_file or args.capability_graph_file or args.capability_list or args.game_preview or args.game_preview_check or args.game_seed is not None or args.game_project or args.chip8_demo_output or args.chip8_export_capsule or args.chip8_rom_output or args.qualify_model or args.index_dir or args.search or args.use_library or args.enqueue_dir
             or args.run_queue or args.queue_status or args.cancel_queue_job
             or args.retry_queue_job or args.snapshot_to
             or args.restore_from or args.verify_snapshot
@@ -288,6 +291,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 ("--capability-graph-file", args.capability_graph_file),
                 ("--game-seed", args.game_seed),
                 ("--game-project", args.game_project),
+                ("--chip8-demo-output", args.chip8_demo_output),
+                ("--chip8-export-capsule", args.chip8_export_capsule),
+                ("--chip8-rom-output", args.chip8_rom_output),
             ):
                 if value is not None:
                     local_args.extend((option, str(value)))
