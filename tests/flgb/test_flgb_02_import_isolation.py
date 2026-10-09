@@ -30,13 +30,13 @@ class TestContractImportIsolation(unittest.TestCase):
 
     def test_stdlib_only_device_and_runtime_contracts_are_lazy(self) -> None:
         script = (
-            "import sys\\n"
-            "from skeleton.ai.model_runtime import DevicePolicy, RuntimeContractError\\n"
-            "from skeleton.ai.model_runtime.runtime_contracts import RuntimeLimits\\n"
-            "assert DevicePolicy(requested='cpu').requested == 'cpu'\\n"
-            "assert RuntimeLimits(max_context=4, max_new_tokens=2, max_total_tokens=8)\\n"
-            "assert 'pydantic' not in sys.modules\\n"
-            "assert 'torch' not in sys.modules\\n"
+            "import sys\n"
+            "from skeleton.ai.model_runtime import DevicePolicy, RuntimeContractError\n"
+            "from skeleton.ai.model_runtime.runtime_contracts import RuntimeLimits\n"
+            "assert DevicePolicy(requested='cpu').requested == 'cpu'\n"
+            "assert RuntimeLimits(max_context=4, max_new_tokens=2, max_total_tokens=8)\n"
+            "assert 'pydantic' not in sys.modules\n"
+            "assert 'torch' not in sys.modules\n"
         )
         result = subprocess.run(
             [sys.executable, "-S", "-c", script],
