@@ -55,6 +55,13 @@ jobs:
           assert report["real_hardware_verified"] is False
           print("ORIGINAL_C64_PRG_COMPILED", report["prg_sha256"])
           PY
+      - name: Validate C64 hardware-specific source and rights regression
+        env:
+          PYTHONPATH: .
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+        run: |
+          python -m pip install --disable-pip-version-check "pytest>=8.4,<9"
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_c64_native.py
       - name: Upload original C64 game and source provenance
         uses: actions/upload-artifact@v4
         with:
