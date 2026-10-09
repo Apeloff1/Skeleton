@@ -67,6 +67,7 @@ def _parser() -> argparse.ArgumentParser:
 
     local_ai = sub.add_parser("local-ai", help="run native AI locally, without Docker or provider credentials")
     local_ai.add_argument("--model", help="native content-addressed checkpoint for headless inference")
+    local_ai.add_argument("--inspect-model", action="store_true", help="validate model weights and report offline runtime limits")
     local_ai.add_argument("--prompt", help="headless text request (requires --model)")
     local_ai.add_argument("--max-output-tokens", type=int, default=8)
     local_ai.add_argument("--json", action="store_true", dest="as_json", help="print a bound inference receipt")
@@ -214,8 +215,27 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if command == "local-ai":
-        from skeleton.app.local_ai import OfflineAISession, load_native_checkpoint, run_offline_ai
+        from skeleton.app.local_ai import OfflineAISession, inspect_local_model, load_native_checkpoint, run_offline_ai
 
+        if args.inspect_model:
+            if not args.model or args.prompt or args.load_chat or args.save_chat:
+                print("local-ai --inspect-model requires only --model")
+                return 2
+            try:
+                report = inspect_local_model(load_native_checkpoint(args.model))
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local-ai model rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(report, ensure_ascii=False, sort_keys=True))
+            else:
+                print("model: " + str(report["model_id"]))
+                print("digest: " + str(report["model_digest"]))
+                print("context: " + str(report["max_context_tokens"]) + " tokens")
+                print("output limit: " + str(report["max_output_tokens"]) + " tokens")
+                print("native model bytes: " + str(report["model_bytes"]))
+                print("model quality: not independently certified")
+            return 0
         if bool(args.model) != bool(args.prompt):
             print("local-ai headless inference requires both --model and --prompt")
             return 2
