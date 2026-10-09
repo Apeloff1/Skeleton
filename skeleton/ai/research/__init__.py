@@ -1,18 +1,5 @@
 """Research evidence and historical lineage; this namespace grants no production authority."""
 
-from .contracts import (
-    EvidenceGraph,
-    EvidenceNode,
-    ExperimentPlan,
-    Outcome,
-    ReproductionRecord,
-    ResearchConclusion,
-    ResearchError,
-    ResearchQuestion,
-    synthesize,
-    validate_reproduction,
-)
-
 from .source_lineage import (
     CitationEdge,
     CitationGraphReport,
@@ -32,16 +19,6 @@ from .source_lineage import (
 )
 
 __all__ = [
-    "EvidenceGraph",
-    "EvidenceNode",
-    "ExperimentPlan",
-    "Outcome",
-    "ReproductionRecord",
-    "ResearchConclusion",
-    "ResearchError",
-    "ResearchQuestion",
-    "synthesize",
-    "validate_reproduction",
     "CitationEdge",
     "CitationGraphReport",
     "CitationRelation",
