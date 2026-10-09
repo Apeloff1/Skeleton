@@ -151,6 +151,10 @@ class OfflineKnowledgeLibrary:
         if not any(_terms(piece[2]) for piece in pieces):
             raise RuntimeContractError("reference document has no searchable terms")
         with self.store._transaction():
+            # Duplicate admissions must not launder a corrupted stored source
+            # into an apparently verified result. Validate all existing
+            # source/offset/hash records before changing or reusing the index.
+            self._verified_snapshot()
             row = self.store._db.execute(
                 "SELECT document_id, title FROM offline_documents "
                 "WHERE model_digest=? AND tokenizer_digest=? AND content_digest=?",
