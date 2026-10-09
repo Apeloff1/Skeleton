@@ -329,3 +329,92 @@ def test_unverified_plagiarism_input_cannot_self_certify_complete_source_search(
     assert baseline.public_receipt()["external_sources_exhaustively_searched"] is False
     with pytest.raises(OriginalityError):
         run(candidates=(ExpressionSample("bad", "story_dialogue", "", PROOF),))
+
+
+
+def _manifest_for_workspace(root, *, unsafe_reference_path=None):
+    from skeleton.ai.game_builder.plagiarism_cli import scan_manifest
+    import json
+    root.mkdir()
+    (root / "candidate.txt").write_text(SYNTHETIC_TEXT, encoding="utf-8")
+    (root / "reference.txt").write_text(SYNTHETIC_OTHER, encoding="utf-8")
+    document = {
+        "schema": "skeleton.originality_input.v1",
+        "project_id": "lawful-evolution-game",
+        "artifact_sha256": "a"*64,
+        "assets": [
+            {
+                "modality": row.modality,
+                "disposition": row.disposition.value,
+                "basis": row.basis.value if row.basis else None,
+                "provenance_sha256": row.provenance_sha256,
+                "author_identity": row.author_identity,
+                "attribution": row.attribution.value,
+            } for row in make_assets()
+        ],
+        "candidates": [
+            {"work_id": "mine", "modality": "story_dialogue",
+             "relative_path": "candidate.txt", "evidence_sha256": PROOF},
+        ],
+        "references": [
+            {"work_id": "prior", "modality": "story_dialogue",
+             "relative_path": unsafe_reference_path or "reference.txt"},
+        ],
+    }
+    manifest = root / "manifest.json"
+    manifest.write_text(json.dumps(document), encoding="utf-8")
+    return manifest
+
+
+def test_local_cli_scanner_produces_no_source_text_or_released_certificate(tmp_path):
+    from skeleton.ai.game_builder.plagiarism_cli import scan_manifest, main
+    root = tmp_path / "review"
+    manifest = _manifest_for_workspace(root)
+    report = scan_manifest(manifest, root)
+    assert report["disposition"] == "design_admissible_not_legal_clearance"
+    assert report["artifact_sha256"] == "a"*64
+    assert SYNTHETIC_TEXT not in str(report)
+    assert SYNTHETIC_OTHER not in str(report)
+    out = tmp_path / "receipt.json"
+    assert main(["scan", "--manifest", str(manifest), "--root", str(root),
+                 "--receipt", str(out)]) == 0
+    assert __import__("json").loads(out.read_text()) == report
+    with pytest.raises(FileExistsError):
+        main(["scan", "--manifest", str(manifest), "--root", str(root),
+              "--receipt", str(out)])
+
+
+@pytest.mark.parametrize("attack", ["../outside.txt", "/etc/passwd"])
+def test_local_scan_refuses_directory_escape(tmp_path, attack):
+    from skeleton.ai.game_builder.plagiarism_cli import scan_manifest
+    root = tmp_path / "review"
+    manifest = _manifest_for_workspace(root, unsafe_reference_path=attack)
+    with pytest.raises(OriginalityError):
+        scan_manifest(manifest, root)
+
+
+def test_local_scan_refuses_symlinked_reference_and_binary_input(tmp_path):
+    from skeleton.ai.game_builder.plagiarism_cli import scan_manifest
+    root = tmp_path / "review"
+    manifest = _manifest_for_workspace(root)
+    reference = root / "reference.txt"
+    reference.unlink()
+    reference.symlink_to(root / "candidate.txt")
+    with pytest.raises(OriginalityError):
+        scan_manifest(manifest, root)
+    reference.unlink()
+    reference.write_bytes(b"hello\\x00world")
+    with pytest.raises(OriginalityError):
+        scan_manifest(manifest, root)
+
+
+def test_local_scan_refuses_incomplete_disclosures(tmp_path):
+    from skeleton.ai.game_builder.plagiarism_cli import scan_manifest
+    import json
+    root = tmp_path / "review"
+    manifest = _manifest_for_workspace(root)
+    document = json.loads(manifest.read_text())
+    document["assets"].pop()
+    manifest.write_text(json.dumps(document))
+    with pytest.raises(OriginalityError):
+        scan_manifest(manifest, root)
