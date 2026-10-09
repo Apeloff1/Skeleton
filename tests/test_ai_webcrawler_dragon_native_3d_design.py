@@ -70,7 +70,7 @@ def test_native_3d_source_has_dda_projection_depth_enemy_and_controller():
     assert "DRAGON_RAYCAST_SMOKE" in source
     assert "distanceX<distanceY" in source
     assert "float depth=" in source
-    assert "depths[col]" in source
+    assert "depths[c]" in source
     assert "ty<depths[col/2]" in source
     assert "SDL_GameControllerGetButton" in source
     assert "SDL_SCANCODE_RIGHT" in source

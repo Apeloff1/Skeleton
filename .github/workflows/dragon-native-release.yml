@@ -29,9 +29,18 @@ jobs:
       matrix:
         host: [ubuntu-24.04, windows-2025, macos-15]
     steps:
+      # The monorepo contains unrelated legacy Windows paths longer than
+      # MAX_PATH.  Checkout only the original game's local Python sources;
+      # other hardware/AI trees are not dependencies of this release lane.
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          sparse-checkout: |
+            /skeleton/__init__.py
+            /skeleton/ai/__init__.py
+            /skeleton/ai/webcrawler/__init__.py
+            /skeleton/ai/webcrawler/dragon_*.py
+          sparse-checkout-cone-mode: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

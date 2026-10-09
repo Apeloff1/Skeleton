@@ -36,7 +36,7 @@ def test_scrolling_platformer_has_real_ppu_camera_timing_collision_and_jump():
     assert "CollectStar:" in src
     assert "HasGroundSupport:" in src
     assert "    ld a,72 ; first platform, y104" in src
-    assert "    ld [OAM+6],a" in src
+    assert "    ld [DRAGON_OAM+6],a" in src
     assert "PlayerWorldX: ds 1" in src
     assert "PlatformTilesEnd:" in src
     assert "CMakeLists.txt" not in p.files
