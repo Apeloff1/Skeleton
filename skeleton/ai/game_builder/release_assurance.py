@@ -312,8 +312,7 @@ def evaluate_independent_review(
         blockers.add("MISMATCHED_PROJECT_IDENTITY")
     if candidate.target_platform_id != legal.target_platform_id:
         blockers.add("TARGET_HARDWARE_CHANGED")
-    if (candidate.rights_evidence_sha256 != candidate.rights_evidence_sha256 or
-        candidate.legal_assessment_sha256 != legal.assessment_digest or
+    if (candidate.legal_assessment_sha256 != legal.assessment_digest or
         candidate.originality_screen_sha256 != originality.screen_digest or
         candidate.world_sha256 != originality.artifact_sha256):
         blockers.add("REVIEW_EVIDENCE_DOES_NOT_BIND_TO_BUILT_GAME")
@@ -329,6 +328,7 @@ def evaluate_independent_review(
     if len(set(r.reviewer_id for r in trust_registry)) != len(trust_registry):
         raise ReleaseReviewError("multiple keys for one reviewer require separate key rotation")
     seen_domains: set[ReviewDomain] = set()
+    approved_domains: set[ReviewDomain] = set()
     covered_roles: set[ReviewRole] = set()
     valid_signers: set[str] = set()
     for att in attestations:
@@ -380,12 +380,7 @@ def evaluate_independent_review(
             continue
         covered_roles.add(reviewer.role)
         valid_signers.add(reviewer.reviewer_id)
-    approved_domains = {
-        a.domain for a in attestations
-        if a.domain in seen_domains and a.decision is ReviewDecision.ACCEPTED and
-        # Exclusion from blockers/pending is enough for one entry per domain.
-        not any(a.domain.value in b for b in blockers | pending)
-    }
+        approved_domains.add(att.domain)
     missing = set(ReviewDomain) - approved_domains
     if missing:
         pending.add("INDEPENDENT_DOMAIN_REVIEW_INCOMPLETE")
