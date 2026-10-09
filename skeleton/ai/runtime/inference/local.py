@@ -582,12 +582,23 @@ class LocalInferenceEngine:
             result = await asyncio.shield(worker)
         except asyncio.CancelledError:
             cancel.set()
-            try:
-                # Drain the still-live worker after cooperative cancellation.
-                # A cancelled result is never returned to the caller or cache.
-                await asyncio.shield(worker)
-            except (asyncio.CancelledError, Exception):
-                pass
+            # Cancellation is advisory to the worker, not a license to detach
+            # it. Repeated task.cancel() calls must not cut short cleanup.
+            # Drain until the underlying OS worker has actually terminated.
+            while not worker.done():
+                try:
+                    await asyncio.shield(worker)
+                except asyncio.CancelledError:
+                    # The UI may send a second cancellation while the model
+                    # process is terminating. Keep waiting for the real worker.
+                    continue
+                except Exception:
+                    break
+            if worker.done():
+                try:
+                    worker.result()
+                except (asyncio.CancelledError, Exception):
+                    pass
             raise
 
         if result.model_digest != self.model.model_digest:
