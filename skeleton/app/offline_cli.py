@@ -15,6 +15,7 @@ from typing import Sequence
 from .offline_workspace import DurableOfflineSession
 from .offline_library import OfflineDocumentLibrary, OfflineLibraryError, render_local_context
 from .offline_readiness import inspect_local_readiness
+from .offline_index_queue import OfflineIndexQueue
 from .local_ai import (
     OfflineAISession,
     OfflineGGUFSession,
@@ -44,6 +45,14 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--search", help="search indexed local documents without any model")
     parser.add_argument("--use-library", action="store_true", help="include bounded retrieved excerpts in local model request")
     parser.add_argument("--context-limit", type=int, default=3, help="maximum local excerpts for contextual inference")
+    parser.add_argument("--queue-db", help="durable local SQLite indexing job queue")
+    parser.add_argument("--enqueue-dir", help="enqueue explicit local document directory")
+    parser.add_argument("--queue-library", help="target local FTS5 SQLite index for queued work")
+    parser.add_argument("--run-queue", action="store_true", help="process queued local indexing jobs synchronously")
+    parser.add_argument("--queue-status", action="store_true", help="show durable local index jobs")
+    parser.add_argument("--cancel-queue-job", help="cancel a queued indexing job by id")
+    parser.add_argument("--retry-queue-job", help="retry a terminal failed indexing job by id")
+    parser.add_argument("--drain-limit", type=int, default=5, help="maximum queued indexing jobs per invocation")
     parser.add_argument(
         "--native-smoke", action="store_true",
         help="run a small locally constructed test model (NOT a trained assistant)",
@@ -54,14 +63,66 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     library_mode = args.index_dir is not None or args.search is not None
+    queue_mode = bool(
+        args.enqueue_dir or args.run_queue or args.queue_status
+        or args.cancel_queue_job or args.retry_queue_job
+    )
     if args.native_smoke and args.doctor:
         print("--native-smoke and --doctor are mutually exclusive", file=sys.stderr)
         return 2
+    if queue_mode:
+        if (
+            not args.queue_db or args.model or args.deployment or args.prompt
+            or args.backup_in or args.backup_out or args.workspace
+            or args.doctor or args.native_smoke or library_mode
+            or args.use_library or args.library
+            or (bool(args.enqueue_dir) != bool(args.queue_library))
+            or (args.cancel_queue_job and args.retry_queue_job)
+            or (args.cancel_queue_job and (args.enqueue_dir or args.run_queue))
+            or (args.retry_queue_job and (args.enqueue_dir or args.run_queue))
+            or type(args.drain_limit) is not int
+            or not 1 <= args.drain_limit <= 20
+        ):
+            print("invalid offline queue arguments; select explicit local queue and index paths", file=sys.stderr)
+            return 2
+        try:
+            with OfflineIndexQueue(args.queue_db) as queue:
+                enqueued = (
+                    queue.enqueue(args.enqueue_dir, args.queue_library)
+                    if args.enqueue_dir else None
+                )
+                changed = (
+                    queue.cancel(args.cancel_queue_job)
+                    if args.cancel_queue_job else
+                    queue.retry(args.retry_queue_job)
+                    if args.retry_queue_job else None
+                )
+                processed = queue.drain(limit=args.drain_limit) if args.run_queue else ()
+                jobs = queue.list_jobs() if args.queue_status else ()
+        except (ValueError, RuntimeError, OSError) as exc:
+            print(f"offline indexing queue rejected: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 1
+        output = {
+            "schema_version": "skeleton.app.offline_index_queue.command.v1",
+            "enqueued": enqueued.to_dict() if enqueued else None,
+            "updated": changed.to_dict() if changed else None,
+            "processed": [job.to_dict() for job in processed],
+            "jobs": [job.to_dict() for job in jobs],
+        }
+        if args.json_output:
+            print(json.dumps(output, sort_keys=True, ensure_ascii=False))
+        else:
+            print(f"Offline queue: {len(processed)} processed, {len(jobs)} listed")
+            for job in processed:
+                print(f"{job.job_id}: {job.state}, attempt {job.attempts}")
+        return 0 if all(job.state == "completed" for job in processed) else 1
+
     if library_mode:
         if (
             args.doctor or args.native_smoke or args.model or args.deployment
             or args.prompt or args.backup_in or args.backup_out
             or args.workspace or args.use_library or not args.library
+            or args.queue_db or args.queue_library
         ):
             print("library indexing/search requires --library, without model or inference options", file=sys.stderr)
             return 2
@@ -91,7 +152,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if (
             args.model or args.deployment or args.prompt or
             args.backup_in or args.backup_out or args.workspace or
-            args.library or args.use_library
+            args.library or args.use_library or args.queue_db
         ):
             print("native smoke does not accept model, prompt or backup parameters", file=sys.stderr)
             return 2
@@ -107,7 +168,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if (
             not (args.model or args.deployment) or args.prompt or
             args.backup_in or args.backup_out or args.workspace or
-            args.library or args.use_library
+            args.library or args.use_library or args.queue_db
         ):
             print("--doctor requires one local model without generation or storage options", file=sys.stderr)
             return 2
@@ -125,6 +186,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         return 0
 
+    if args.queue_db or args.queue_library:
+        print("model inference cannot use local queue management flags", file=sys.stderr)
+        return 2
     if not (args.model or args.deployment) or not args.prompt:
         print("local inference requires --prompt and either --model or --deployment", file=sys.stderr)
         return 2
