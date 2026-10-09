@@ -11,6 +11,7 @@ from skeleton.ai.game_builder.native_game_cli import build_game
 
 @pytest.mark.parametrize("target,files", [
     ("commodore_64", {"game.c", "Makefile", "manifest.json"}),
+    ("apple_ii", {"game.c", "Makefile", "manifest.json"}),
     ("atari_400_800", {"game.c", "Makefile", "manifest.json"}),
     ("dos_vga", {"game.asm", "Makefile", "manifest.json"}),
     ("nintendo_game_boy", {"main.asm", "Makefile", "manifest.json"}),
