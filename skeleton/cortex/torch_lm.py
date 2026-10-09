@@ -28,8 +28,23 @@ def _torch():
 class TorchAccel:
     """Run TinyTransformer steps with autograd. Weights live on the device."""
 
-    def __init__(self, lm: Any, device: str = "cpu") -> None:
+    def __init__(
+        self,
+        lm: Any,
+        device: str = "cpu",
+        *,
+        kv_dtype: str = "fp32",
+        max_kv_bytes: int | None = None,
+    ) -> None:
         torch = _torch()
+        if kv_dtype not in {"fp32", "fp16", "bf16"}:
+            raise ValueError("kv_dtype must be fp32, fp16 or bf16")
+        if max_kv_bytes is not None and (
+            isinstance(max_kv_bytes, bool)
+            or not isinstance(max_kv_bytes, int)
+            or max_kv_bytes <= 0
+        ):
+            raise ValueError("max_kv_bytes must be a positive integer or None")
         if device in {"cuda", "gpu"}:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         elif device == "mps":
@@ -38,6 +53,13 @@ class TorchAccel:
         self.lm = lm
         self.device = torch.device(device)
         self.device_name = self.device.type
+        self.kv_dtype_name = kv_dtype
+        self.kv_dtype = {
+            "fp32": torch.float32,
+            "fp16": torch.float16,
+            "bf16": torch.bfloat16,
+        }[kv_dtype]
+        self.max_kv_bytes = max_kv_bytes
         self.resident = False
         self._E = self._P = self._Wout = self._bout = None
         self._layers: List[Dict[str, Any]] = []
@@ -66,6 +88,15 @@ class TorchAccel:
         self._value_buffers: List[Any] = []
         self._cached_next_position = 0
 
+    @property
+    def kv_reserved_bytes(self) -> int:
+        """Actual reserved resident K+V storage across layers, not logical occupancy."""
+        with self._state_lock:
+            return sum(
+                bank.numel() * bank.element_size()
+                for bank in self._key_buffers + self._value_buffers
+            )
+
     def _reserve_kv(self, layer: int, needed: int, heads: int, head_dim: int) -> None:
         """Amortized resident KV allocation, bounded by the model context.
 
@@ -85,8 +116,19 @@ class TorchAccel:
             old_cap = old_used = 0
         new_cap = min(self.lm.ctx, max(needed, 16, old_cap * 2))
         shape = (1, heads, new_cap, head_dim)
-        new_keys = torch.empty(shape, dtype=self._E.dtype, device=self.device)
-        new_values = torch.empty(shape, dtype=self._E.dtype, device=self.device)
+        new_bank_bytes = 2 * heads * new_cap * head_dim * (
+            torch.empty((), dtype=self.kv_dtype).element_size()
+        )
+        if self.max_kv_bytes is not None:
+            # Account for the old bank and the new allocation coexisting
+            # during growth, not just the smaller final resident footprint.
+            # This is a KV-specific allocation cap, not an overall GPU OOM
+            # guarantee (activations, kernels and model weights are separate).
+            temporary_peak = self.kv_reserved_bytes + new_bank_bytes
+            if temporary_peak > self.max_kv_bytes:
+                raise MemoryError("KV cache allocation exceeds max_kv_bytes budget")
+        new_keys = torch.empty(shape, dtype=self.kv_dtype, device=self.device)
+        new_values = torch.empty(shape, dtype=self.kv_dtype, device=self.device)
         if old_used:
             new_keys[:, :, :old_used, :].copy_(self._cached_keys[layer])
             new_values[:, :, :old_used, :].copy_(self._cached_values[layer])
@@ -353,15 +395,20 @@ class TorchAccel:
             else:
                 self._cached_keys.append(kh)
                 self._cached_values.append(vh)
+            # Compact storage is opt-in; attention math remains fp32 and
+            # dispatches through the same SDPA kernels as the full cache.
+            # Never silently cast the entire transformer to lower precision.
+            kh_compute = kh.to(qh.dtype)
+            vh_compute = vh.to(qh.dtype)
             # A single query attends to all preceding keys, including its
             # own; is_causal=True would mask almost the entire key history.
             if hasattr(torch.nn.functional, "scaled_dot_product_attention"):
                 context = torch.nn.functional.scaled_dot_product_attention(
-                    qh, kh, vh, dropout_p=0.0, is_causal=False
+                    qh, kh_compute, vh_compute, dropout_p=0.0, is_causal=False
                 )
             else:
-                scores = qh @ kh.transpose(-2, -1) * (hd ** -0.5)
-                context = torch.softmax(scores, dim=-1) @ vh
+                scores = qh @ kh_compute.transpose(-2, -1) * (hd ** -0.5)
+                context = torch.softmax(scores, dim=-1) @ vh_compute
             x = x + context.squeeze(0).transpose(0, 1).reshape(lm.dim) @ blob["Wo"].T
             if blob.get("W1") is not None:
                 un = self._normalize(x, blob, "ln2")
