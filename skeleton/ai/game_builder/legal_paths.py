@@ -201,6 +201,7 @@ class HomebrewLegalAssessment:
     authority_ids: tuple[str, ...]
     policy_controls: tuple[str, ...]
     assessment_digest: str
+    rights_packet_sha256: str | None = None
     legal_conclusion: bool = False
     toolchain_qualified: bool = False
     release_authorized: bool = False
@@ -360,6 +361,7 @@ def assess_homebrew(
         disposition=disposition, issues=issues, blocking_issues=tuple(sorted(blocked)),
         review_issues=tuple(sorted(review)), authority_ids=authority_ids,
         policy_controls=controls, assessment_digest=_digest(canonical),
+        rights_packet_sha256=request.rights_packet_sha256,
     )
 
 
