@@ -194,6 +194,12 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert '"--gguf-model"' in source
     assert '"--llama-executable"' in source
     assert "GGUF command did not fail closed" in source
+    assert '"--prompt", "offline", "--json"' in source
+    assert '"offline must fail closed"' not in source
+    assert '"local GGUF request rejected:"' in source
+    assert "-RedirectStandardOutput $ggufStdout" in source
+    assert "-RedirectStandardError $ggufStderr" in source
+    assert '$missingGguf.ExitCode -ne 1' in source
     assert '"--inspect-model", "--json"' in source
     assert '@("--local-ai-smoke")' in source
     assert '"/VERYSILENT"' in source
