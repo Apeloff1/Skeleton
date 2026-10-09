@@ -15,6 +15,7 @@ from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
 from skeleton.app.local_ai import load_native_checkpoint
 from skeleton.app.local_ai_improvement import (
     OfflineImprovementError,
+    compare_local_models,
     improve_local_model,
 )
 from skeleton.cortex.transformer import TinyTransformer
@@ -124,6 +125,75 @@ class TestEvaluatedOfflineImprovement(unittest.TestCase):
             report = json.loads(output.getvalue())
             self.assertLess(report["accepted_perplexity"], report["baseline_perplexity"])
             self.assertEqual(load_native_checkpoint(dest).model_digest, report["candidate_model_digest"])
+
+    def test_heldout_comparison_reports_actual_verified_model_gain(self) -> None:
+        from skeleton.app.cli import run_app_cli
+
+        with tempfile.TemporaryDirectory() as d:
+            source, train, heldout, dest = self._fixture(d)
+            receipt = improve_local_model(source, train, heldout, dest, epochs=3)
+            comparison = compare_local_models(source, dest, heldout)
+            self.assertTrue(comparison.improves)
+            self.assertEqual(comparison.baseline_model_digest, receipt.parent_model_digest)
+            self.assertEqual(comparison.candidate_model_digest, receipt.candidate_model_digest)
+            self.assertEqual(comparison.validation_source_sha256, receipt.validation_source_sha256)
+            self.assertEqual(comparison.tokenizer_digest, receipt.tokenizer_digest)
+            self.assertFalse(comparison.to_dict()["candidate_promoted"])
+            self.assertAlmostEqual(comparison.baseline_perplexity, receipt.baseline_perplexity)
+            self.assertAlmostEqual(comparison.candidate_perplexity, receipt.accepted_perplexity)
+            output = StringIO()
+            with redirect_stdout(output):
+                code = run_app_cli([
+                    "local-ai", "--compare-model", str(source),
+                    "--candidate-model", str(dest),
+                    "--eval-corpus", str(heldout), "--json",
+                ])
+            self.assertEqual(code, 0, output.getvalue())
+            self.assertTrue(json.loads(output.getvalue())["improves"])
+
+    def test_comparison_rejects_identical_checkpoint_and_bad_vocabulary(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            source, train, heldout, dest = self._fixture(d)
+            with self.assertRaisesRegex(OfflineImprovementError, "distinct"):
+                compare_local_models(source, source, heldout)
+            heldout.write_text("outofvocabulary words unknown\n", encoding="utf-8")
+            native = TinyTransformer(
+                vocab=("user", "assistant", "hello", "world", "alpha", "beta"),
+                dim=8, ctx=96, seed=47, n_heads=2, n_layers=2, d_ff=16,
+            )
+            write_local_model_artifact(
+                NativeRuntimeLocalModel(NativeLLMRuntime(native)), dest,
+            )
+            with self.assertRaisesRegex(OfflineImprovementError, "missing"):
+                compare_local_models(source, dest, heldout)
+
+    def test_cli_comparison_rejects_missing_candidate_and_reports_regression(self) -> None:
+        from skeleton.app.cli import run_app_cli
+
+        with tempfile.TemporaryDirectory() as d:
+            source, train, heldout, dest = self._fixture(d)
+            out = StringIO()
+            with redirect_stdout(out):
+                self.assertEqual(run_app_cli([
+                    "local-ai", "--compare-model", str(source),
+                    "--eval-corpus", str(heldout),
+                ]), 2)
+            native = TinyTransformer(
+                vocab=("user", "assistant", "hello", "world", "alpha", "beta"),
+                dim=8, ctx=96, seed=47, n_heads=2, n_layers=2, d_ff=16,
+            )
+            write_local_model_artifact(
+                NativeRuntimeLocalModel(NativeLLMRuntime(native)), dest,
+            )
+            with patch.object(TinyTransformer, "perplexity", side_effect=[2.0, 3.0]):
+                with redirect_stdout(out := StringIO()):
+                    code = run_app_cli([
+                        "local-ai", "--compare-model", str(source),
+                        "--candidate-model", str(dest),
+                        "--eval-corpus", str(heldout), "--json",
+                    ])
+            self.assertEqual(code, 1)
+            self.assertFalse(json.loads(out.getvalue())["improves"])
 
     def test_cli_cannot_skip_independent_evaluation(self) -> None:
         from skeleton.app.cli import run_app_cli
