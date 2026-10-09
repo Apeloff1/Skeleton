@@ -22,7 +22,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from skeleton.ai.model_runtime.offline_chat import (
-    MAX_BUNDLE_BYTES, OfflineChatStore, _digest_request, _identifier,
+    OfflineChatStore, _digest_request, _identifier,
     _strict_pairs, _reject_constant,
 )
 from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig, RuntimeContractError
@@ -573,6 +573,7 @@ def main(argv: list[str] | None = None) -> int:
                         help="localhost TCP port, default: OS-assigned ephemeral port")
     args = parser.parse_args(argv)
     app = None
+    token_created = False
     try:
         backend = (load_native_checkpoint(args.native_checkpoint)
                    if args.native_checkpoint is not None
@@ -584,6 +585,7 @@ def main(argv: list[str] | None = None) -> int:
         # not leave behind an unused secret file on the user's disk.
         with LocalOnlyHTTPServer(app, port=args.port) as server:
             create_token_file(args.token_file, token=token)
+            token_created = True
             url = f"http://127.0.0.1:{server.server_port}/"
             # Windows PyInstaller --windowed sets sys.stdout/sys.stderr to
             # None. The HTTP service must work without a console. Open the
@@ -611,6 +613,11 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         if app is not None:
             app.close()
+        if token_created:
+            # Tokens are short-lived process credentials, not persistent
+            # account keys. Remove only the file this run actually created;
+            # pre-existing paths are never removed or replaced.
+            args.token_file.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
