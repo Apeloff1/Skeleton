@@ -506,10 +506,10 @@ class TinyTransformer:
             ) from exc
 
     def to(self, device: str = "cpu") -> "TinyTransformer":
-        """Bind a device. CUDA if torch can see a GPU; else CPU. Never throws.
+        """Bind CPU, CUDA, or Metal, with optional Torch residency.
 
-        When torch exists the weights pin on the bound device (GPU-resident
-        if cuda, otherwise torch-cpu). Python lists catch up on snapshot().
+        Preserve the canonical Python weights until training modifies them.
+        Refuse device transition if syncing trained weights fails.
         """
         from skeleton.cortex.device import resolve
         info = resolve(device)
