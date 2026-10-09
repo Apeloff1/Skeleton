@@ -152,6 +152,33 @@ class OfflineTurnReceipt:
         }
 
 
+def _validate_private_sqlite_path(path: Path, *, main: bool) -> None:
+    """Validate the SQLite database or its existing WAL/SHM sidecar.
+
+    A private main file is not sufficient if another user can read or
+    redirect write-ahead log pages containing plaintext conversation data.
+    """
+    if path.is_symlink():
+        raise RuntimeContractError("offline database or journal symlinks are not allowed")
+    try:
+        details = path.stat()
+    except FileNotFoundError:
+        if main:
+            raise RuntimeContractError("offline database file is missing")
+        return
+    if not stat.S_ISREG(details.st_mode):
+        raise RuntimeContractError("offline database or journal must be a regular file")
+    if os.name != "nt":
+        if details.st_mode & 0o077:
+            raise RuntimeContractError(
+                "offline database and journal must have owner-only permissions (chmod 600)"
+            )
+        if details.st_nlink != 1:
+            raise RuntimeContractError("offline database or journal must not be hard-linked")
+        if hasattr(os, "getuid") and details.st_uid != os.getuid():
+            raise RuntimeContractError("offline database or journal must be owned by the user")
+
+
 class OfflineChatStore:
     """Local SQLite authority for model-pinned chat and replay-safe turn commits."""
 
@@ -171,21 +198,15 @@ class OfflineChatStore:
                     os.close(descriptor)
                 except FileExistsError:
                     pass
-            # Do not silently use an existing database with unsafe owner,
-            # permissions, type or hard-link count. The write transaction
-            # would otherwise expose sensitive prompts to another account.
-            details = p.stat()
-            if not stat.S_ISREG(details.st_mode):
-                raise RuntimeContractError("offline database must be a regular file")
-            if os.name != "nt":
-                if details.st_mode & 0o077:
-                    raise RuntimeContractError(
-                        "offline database must have owner-only permissions (chmod 600)"
-                    )
-                if details.st_nlink != 1:
-                    raise RuntimeContractError("offline database must not be hard-linked")
-                if hasattr(os, "getuid") and details.st_uid != os.getuid():
-                    raise RuntimeContractError("offline database must be owned by the user")
+            # SQLite WAL and shared-memory sidecars may contain plaintext
+            # prompts. Reject unsafe *existing* sidecars before SQLite opens
+            # them, rather than checking only the main database.
+            for candidate, required in (
+                (p, True), (Path(filename + "-wal"), False),
+                (Path(filename + "-shm"), False),
+                (Path(filename + "-journal"), False),
+            ):
+                _validate_private_sqlite_path(candidate, main=required)
         self._lock = threading.RLock()
         self._db = sqlite3.connect(filename, isolation_level=None,
                                    check_same_thread=False, timeout=10.0)
