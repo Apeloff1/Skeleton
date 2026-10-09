@@ -192,7 +192,23 @@ class OfflineDocumentLibrary:
                 for relative, digest, body, size in staged:
                     old = previous.get(relative)
                     if old is not None and old[1] == digest:
-                        continue
+                        # A digest match alone is insufficient after a
+                        # damaged/partially rewritten index. Admit the fast
+                        # path only when both the document and FTS projection
+                        # still match the user-selected source bytes.
+                        stored = self._db.execute(
+                            "SELECT body, size_bytes FROM offline_documents WHERE id=?",
+                            (old[0],),
+                        ).fetchone()
+                        projection = self._db.execute(
+                            "SELECT body FROM offline_document_fts WHERE rowid=?",
+                            (old[0],),
+                        ).fetchone()
+                        if (
+                            stored == (body, size)
+                            and projection == (body,)
+                        ):
+                            continue
                     if old is None:
                         docid = self._db.execute(
                             "INSERT INTO offline_documents "
