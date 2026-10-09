@@ -187,3 +187,28 @@ def test_explicit_scan_removes_orphan_fts_rows(tmp_path: Path) -> None:
         assert outcome["repaired_orphan_fts_rows"] == 1
         assert index.search("orphan") == ()
     assert audit_database(library, "library")["documents"] == 1
+
+
+def test_semantic_audit_rejects_bounded_memory_exhaustion(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    import skeleton.app.offline_audit as module
+
+    workspace, _, _ = _fixtures(tmp_path)
+    # A small test bound simulates attacker-controlled oversized text rows.
+    monkeypatch.setattr(module, "MAX_AUDIT_BYTES", 16)
+    with pytest.raises(OfflineAuditError, match="memory budget"):
+        audit_database(workspace, "workspace")
+
+
+def test_semantic_audit_rejects_nul_in_document_identity(
+    tmp_path: Path,
+) -> None:
+    _, library, _ = _fixtures(tmp_path)
+    _change(
+        library,
+        "UPDATE offline_documents SET relative_path=?",
+        ("folder\x00hidden.md",),
+    )
+    with pytest.raises(OfflineAuditError, match="invalid fields"):
+        audit_database(library, "library")
