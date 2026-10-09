@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from hashlib import sha256
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import hmac
 import json
@@ -395,9 +394,11 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         self._handle("DELETE")
 
 
-def create_token_file(path: str | Path) -> str:
+def create_token_file(path: str | Path, *, token: str | None = None) -> str:
     """One-time owner-only secret file; a preexisting path is never overwritten."""
-    token = secrets.token_urlsafe(48)
+    token = secrets.token_urlsafe(48) if token is None else token
+    if not isinstance(token, str) or len(token) < 32:
+        raise OfflineHTTPError(400, "invalid local API secret")
     target = Path(path).expanduser()
     fd = os.open(str(target), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     try:
@@ -430,9 +431,12 @@ def main(argv: list[str] | None = None) -> int:
                    if args.native_checkpoint is not None
                    else load_gguf_deployment(args.gguf_deployment))
         db = args.database or private_desktop_database(backend.model_digest)
-        token = create_token_file(args.token_file)
+        token = secrets.token_urlsafe(48)
         app = OfflineHTTPApplication(backend, db, token=token)
+        # Bind before creating private credentials: a conflicting port must
+        # not leave behind an unused secret file on the user's disk.
         with LocalOnlyHTTPServer(app, port=args.port) as server:
+            create_token_file(args.token_file, token=token)
             print("Skeleton offline AI:", f"http://127.0.0.1:{server.server_port}/")
             print("Private bearer token file:", args.token_file)
             print("Model digest:", app.model_digest)
