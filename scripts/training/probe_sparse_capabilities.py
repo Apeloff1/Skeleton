@@ -15,8 +15,8 @@ from pathlib import Path
 import sys
 from typing import Any, Sequence
 
-from scripts.training.generate_offline_foundations import generate_example
-from skeleton.ai.training.offline_foundations import FAMILIES, _json_equal, _strict_json
+from scripts.training.generate_offline_foundations import ROOT, generate_example
+from skeleton.ai.training.offline_foundations import FAMILIES, _json_equal, _strict_json, _oracle
 from skeleton.ai.training.sparse_capability import CAPABILITIES
 
 
@@ -54,6 +54,8 @@ def challenge_cases(*, seed: int = 1729, probes_per_mode: int = 1) -> tuple[dict
                     raise ChallengeError("procedural challenge repeated scenario group")
                 groups.add((family, group))
                 instruction, expected, oracle = generate_example(family, group, variant)
+                if not _oracle(family, instruction, expected):
+                    raise ChallengeError("generated challenge failed independent answer oracle")
                 identity = f"challenge-{family}-{group:05}-{variant}"
                 if identity in seen_ids:
                     raise ChallengeError("challenge identities are not unique")
@@ -197,7 +199,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         receipt = challenge_receipt(seed=args.seed, probes_per_mode=args.per_mode)
         if args.export_prompts is not None:
             target = args.export_prompts.expanduser().absolute()
-            if target.is_symlink() or target.exists() or not target.parent.is_dir():
+            if (
+                target.is_symlink() or target.exists()
+                or not target.parent.is_dir()
+                or target.is_relative_to(ROOT.resolve())
+            ):
                 raise ChallengeError("challenge export must be an exclusive new local file")
             fd = os.open(
                 target,
