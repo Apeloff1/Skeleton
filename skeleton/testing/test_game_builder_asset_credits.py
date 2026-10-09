@@ -164,6 +164,16 @@ def test_guarded_native_game_source_embeds_original_author_notices(tmp_path):
     assert package.legal_receipt()["attribution_bundle_sha256"] == credits.bundle_sha256
     assert package.legal_receipt()["attribution_notices_embedded"] is True
     assert package.legal_receipt()["release_authorized"] is False
+    with pytest.raises(ClearedSourceExportError):
+        replace(package, project=replace(package.project, game_c=package.project.game_c + "/* stolen payload */"))
+    with pytest.raises(ClearedSourceExportError):
+        replace(package, project=replace(package.project, cmake_lists="evil custom build"))
+    with pytest.raises(ClearedSourceExportError):
+        replace(package, release_authorized=True)
+    with pytest.raises(ClearedSourceExportError):
+        replace(package, native_executable_compiled=True)
+    with pytest.raises(ClearedSourceExportError):
+        replace(package, package_content_sha256="f"*64)
     path = export_rights_aware_desktop(package, tmp_path/"native", authorized=True)
     assert (path/"rights"/"CREDITS.md").is_file()
     assert (path/"rights"/"THIRD_PARTY_NOTICES.txt").is_file()
