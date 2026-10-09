@@ -214,6 +214,15 @@ jobs:
           if ($null -eq $queueStatus.jobs) {
             throw "offline indexing queue returned no jobs envelope"
           }
+          $auditJson = & $offline --audit-library $offlineIndex --audit-queue $offlineQueue --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "offline standalone semantic integrity audit failed"
+          }
+          $auditReport = $auditJson | ConvertFrom-Json
+          if (-not $auditReport.ok -or -not $auditReport.reports.library.ok -or
+              -not $auditReport.reports.queue.ok) {
+            throw "offline semantic audit returned an invalid status envelope"
+          }
           $offlineSnapshot = Join-Path $env:RUNNER_TEMP "SkeletonOfflineRecovery"
           & $offline --snapshot-to $offlineSnapshot --snapshot-library $offlineIndex --snapshot-queue $offlineQueue --json | Out-Null
           if ($LASTEXITCODE -ne 0) {
