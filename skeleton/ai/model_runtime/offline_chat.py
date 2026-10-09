@@ -485,6 +485,14 @@ class OfflineChatProduct:
     def delete(self, session_id: str) -> None:
         self.store.delete(session_id, self.model_digest, self.tokenizer_digest)
 
+    def export_session(self, session_id: str) -> bytes:
+        return self.store.export_bundle(session_id, self.model_digest,
+                                        self.tokenizer_digest)
+
+    def import_session(self, payload: bytes) -> str:
+        return self.store.import_bundle(payload, self.model_digest,
+                                        self.tokenizer_digest)
+
     def turn(self, session_id: str, message: str, config: GenerationConfig,
              *, request_id: str | None = None) -> OfflineTurnReceipt:
         if not isinstance(config, GenerationConfig):
@@ -526,6 +534,42 @@ def load_offline_engine(path: str | Path) -> NativeChatEngine:
     return NativeChatEngine(runtime)
 
 
+def save_private_bundle(path: str | Path, payload: bytes) -> None:
+    """Create-only, owner-readable backup. Refuse accidental overwrites."""
+    if not isinstance(payload, bytes) or not 1 <= len(payload) <= MAX_BUNDLE_BYTES:
+        raise RuntimeContractError("invalid export payload budget")
+    target = Path(path)
+    if target.is_symlink():
+        raise RuntimeContractError("refusing conversation export to symlink")
+    created = False
+    try:
+        fd = os.open(str(target), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        created = True
+        with os.fdopen(fd, "wb") as writer:
+            writer.write(payload)
+            writer.flush()
+            os.fsync(writer.fileno())
+    except BaseException:
+        if created:
+            target.unlink(missing_ok=True)
+        raise
+
+
+def load_private_bundle(path: str | Path) -> bytes:
+    source = Path(path)
+    if source.is_symlink():
+        raise RuntimeContractError("refusing conversation import from symlink")
+    if not source.is_file():
+        raise RuntimeContractError("offline conversation backup is not a file")
+    if not 1 <= source.stat().st_size <= MAX_BUNDLE_BYTES:
+        raise RuntimeContractError("conversation backup exceeds byte budget")
+    with source.open("rb") as reader:
+        data = reader.read(MAX_BUNDLE_BYTES + 1)
+    if not 1 <= len(data) <= MAX_BUNDLE_BYTES:
+        raise RuntimeContractError("conversation backup changed or exceeds byte budget")
+    return data
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Offline native-transformer chat; never contacts model providers"
@@ -543,7 +587,13 @@ def main(argv: list[str] | None = None) -> int:
                       help="list locally saved conversations for this model")
     mode.add_argument("--delete-session", metavar="ID",
                       help="delete a saved conversation and its turn receipts")
+    mode.add_argument("--export-session", metavar="ID",
+                      help="export one local conversation, with its retry receipts")
+    mode.add_argument("--import-bundle", metavar="FILE", type=Path,
+                      help="import a portable offline conversation backup")
     parser.add_argument("--request-id", help="stable idempotency id for safe retries")
+    parser.add_argument("--output", type=Path,
+                        help="create-only output file for --export-session")
     parser.add_argument("--max-new-tokens", type=int, default=32)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--temperature", type=float, default=1.0)
@@ -553,10 +603,12 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--system only applies to new conversations")
     if args.request_id and args.interactive:
         parser.error("--request-id applies to one-shot --message only")
-    if (args.list or args.delete_session) and (
+    if (args.list or args.delete_session or args.export_session or args.import_bundle) and (
         args.system is not None or args.session is not None or args.request_id is not None
     ):
-        parser.error("session creation and turn arguments are invalid for list/delete")
+        parser.error("session creation and turn arguments are invalid for management")
+    if bool(args.output) != bool(args.export_session):
+        parser.error("--output is required exclusively for --export-session")
     try:
         engine = load_offline_engine(args.checkpoint)
         config = GenerationConfig(max_new_tokens=args.max_new_tokens,
@@ -578,6 +630,19 @@ def main(argv: list[str] | None = None) -> int:
                     print(json.dumps({"deleted": args.delete_session}))
                 else:
                     print("Deleted:", args.delete_session)
+                return 0
+            if args.export_session:
+                save_private_bundle(args.output, product.export_session(
+                    args.export_session
+                ))
+                print(json.dumps({"exported": args.export_session,
+                                  "path": str(args.output)}))
+                return 0
+            if args.import_bundle:
+                restored_id = product.import_session(load_private_bundle(
+                    args.import_bundle
+                ))
+                print(json.dumps({"imported_session_id": restored_id}))
                 return 0
 
             session = args.session or product.create(system=args.system)
@@ -623,5 +688,6 @@ if __name__ == "__main__":
 
 __all__ = [
     "OfflineChatProduct", "OfflineChatStore", "OfflineTurnReceipt",
-    "StoredChat", "load_offline_engine", "main",
+    "StoredChat", "load_offline_engine", "load_private_bundle",
+    "save_private_bundle", "main",
 ]
