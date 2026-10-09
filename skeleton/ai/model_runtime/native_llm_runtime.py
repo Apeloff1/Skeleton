@@ -279,6 +279,28 @@ class NativeLLMRuntime:
         # Compute the digest before mutating admission state. An identity
         # refresh is atomic: failed validation never partially commits it.
         digest = snapshot_digest(snapshot)
+        accelerator = getattr(self.model, "_accel", None)
+        if accelerator is not None:
+            # Canonical Python weights may have been edited after the model
+            # was pinned. Invalidate stale GPU tensors and cached K/V before
+            # accepting a new model identity, not merely the new digest.
+            try:
+                accelerator.pin()
+                refreshed = portable_model_snapshot(self.model)
+                if not hmac.compare_digest(snapshot_digest(refreshed), digest):
+                    raise RuntimeContractError(
+                        "model changed while rebinding accelerator"
+                    )
+            except Exception as exc:
+                # Never serve a hybrid of new canonical weights and old GPU
+                # tensors. Keep prior admission identity so future inference
+                # continues to fail closed until explicitly recovered.
+                self.model._accel = None
+                self.model.resident = False
+                self.model.device = "cpu"
+                raise RuntimeContractError(
+                    "accelerator rebind failed during model identity refresh"
+                ) from exc
         self._model_snapshot = snapshot
         self._model_digest = digest
         self._model_bytes = size
@@ -316,56 +338,6 @@ class NativeLLMRuntime:
             return self.tokenizer.decode_ids(token_ids)
         except TokenizerContractError as exc:
             raise RuntimeContractError("native tokenizer decode failed") from exc
-
-    def infer_sequence(
-        self,
-        sequence: TokenSequence,
-        *,
-        use_cache: bool = True,
-    ) -> InferenceResult:
-        """Run embeddings → position/RoPE → transformer blocks → LM head.
-
-        This exposes the executable inference graph independently of decoding so
-        loaders, portability checks, and samplers can validate identical model
-        state against a canonical pre-tokenized input.
-        """
-        if not isinstance(sequence, TokenSequence):
-            raise RuntimeContractError("TokenSequence required")
-        if not isinstance(use_cache, bool):
-            raise RuntimeContractError("use_cache must be boolean")
-        if not hmac.compare_digest(sequence.tokenizer_digest, self.tokenizer.digest):
-            raise RuntimeContractError("token sequence tokenizer identity mismatch")
-        if not sequence.token_ids:
-            raise RuntimeContractError("token sequence must not be empty")
-        if len(sequence.token_ids) > self.limits.max_context:
-            raise RuntimeContractError("prompt exceeds context budget")
-        if any(token_id >= self.tokenizer.vocab_size for token_id in sequence.token_ids):
-            raise RuntimeContractError("token sequence contains id outside vocabulary")
-        self.assert_model_unchanged()
-        try:
-            self.tokenizer.assert_unchanged()
-        except TokenizerContractError as exc:
-            raise RuntimeContractError("native tokenizer drift during inference") from exc
-        if use_cache and self.estimate_kv_bytes(len(sequence.token_ids)) > self.limits.max_kv_bytes:
-            raise RuntimeContractError("inference exceeds KV memory budget")
-        window = sequence.token_ids[-self.limits.max_context:]
-        cache = KVCache(self.model.n_layers, self.limits.max_context) if use_cache else None
-        logits = tuple(float(value) for value in self.model._logits_window(window, cache))
-        if len(logits) != self.tokenizer.vocab_size:
-            raise RuntimeContractError("inference graph emitted invalid logits shape")
-        if any(value != value or value in (float("inf"), float("-inf")) for value in logits):
-            raise RuntimeContractError("inference graph emitted non-finite logits")
-        return InferenceResult(
-            prompt_sequence=sequence,
-            logits=logits,
-            cache_tokens=len(cache.tokens) if cache is not None else 0,
-            model_digest=self.model_digest,
-            architecture_digest=self.architecture.digest,
-        )
-
-    def infer_text(self, text: str, *, use_cache: bool = True) -> InferenceResult:
-        """Tokenize text and execute one next-token inference graph pass."""
-        return self.infer_sequence(self.encode(text), use_cache=use_cache)
 
     def infer_sequence(
         self,
