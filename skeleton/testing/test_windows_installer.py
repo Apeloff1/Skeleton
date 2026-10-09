@@ -131,6 +131,7 @@ def test_windows_build_is_pinned_and_hashes_installer():
     assert "& git @ArchiveArgs" in source
     assert "Get-FileHash -Algorithm SHA256" in source
     assert "Skeleton-Setup-*-windows-x64.exe" in source
+    assert '"--hidden-import", "skeleton.app.local_ai_acceptance",' in source
     assert "ISCC.exe" in source
 
 
@@ -201,6 +202,11 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert "-RedirectStandardError $ggufStderr" in source
     assert '$missingGguf.ExitCode -ne 1' in source
     assert '"--inspect-model", "--json"' in source
+    assert '"--offline-command", "local-ai", "--self-check", "--json"' in source
+    assert 'skeleton.app.local_ai.acceptance.v1' in source
+    assert 'general_model_quality_certified -ne $false' in source
+    assert 'enterprise_release_qualified -ne $false' in source
+    assert 'gguf_model_qualified -ne $false' in source
     assert '@("--local-ai-smoke")' in source
     assert '"/VERYSILENT"' in source
     assert 'Start-Process -FilePath $launcher -ArgumentList @("--help") -Wait -PassThru' in source
