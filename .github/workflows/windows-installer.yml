@@ -155,6 +155,14 @@ jobs:
             throw "installed Skeleton.exe native offline inference smoke exited $($nativeSmoke.ExitCode)"
           }
 
+          # Real installed frozen executable: actual localhost socket, bearer
+          # authentication, native model execution, durable transaction, and
+          # identical-request replay. This is not a Python import-only test.
+          $httpSmoke = Start-Process -FilePath $launcher -ArgumentList @("--local-http-smoke") -Wait -PassThru
+          if ($httpSmoke.ExitCode -ne 0) {
+            throw "installed Skeleton.exe localhost AI acceptance exited $($httpSmoke.ExitCode)"
+          }
+
           $uninstaller = Join-Path $installDir "unins000.exe"
           if (-not (Test-Path -LiteralPath $uninstaller)) {
             throw "uninstaller missing"
