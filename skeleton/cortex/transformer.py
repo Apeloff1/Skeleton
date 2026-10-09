@@ -511,6 +511,7 @@ class TinyTransformer:
         *,
         kv_dtype: str = "fp32",
         max_kv_bytes: int | None = None,
+        prefill_query_chunk: int | None = None,
     ) -> "TinyTransformer":
         """Bind CPU, CUDA or Metal with optional bounded reduced-precision KV.
 
@@ -526,6 +527,12 @@ class TinyTransformer:
             or max_kv_bytes <= 0
         ):
             raise ValueError("max_kv_bytes must be a positive integer or None")
+        if prefill_query_chunk is not None and (
+            isinstance(prefill_query_chunk, bool)
+            or not isinstance(prefill_query_chunk, int)
+            or not 1 <= prefill_query_chunk <= self.ctx
+        ):
+            raise ValueError("prefill_query_chunk must be between 1 and context length")
         from skeleton.cortex.device import resolve
         info = resolve(device)
         self._sync_accelerator()
@@ -545,6 +552,7 @@ class TinyTransformer:
                 self._accel = TorchAccel(
                     self, device=self.device, kv_dtype=kv_dtype,
                     max_kv_bytes=max_kv_bytes,
+                    prefill_query_chunk=prefill_query_chunk,
                 )
                 self._accel.pin()
                 self.device = self._accel.device_name
