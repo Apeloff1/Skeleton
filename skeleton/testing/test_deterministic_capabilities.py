@@ -32,7 +32,7 @@ def run(operation: str, **kwargs):
 
 
 def test_all_24_capabilities_are_reachable_without_training_or_model_inference():
-    assert len(OPERATIONS) == 24
+    assert len(OPERATIONS) == 29
     assert set(OPERATIONS) == {
         "math.add", "math.multiply", "math.sum", "grid.move",
         "grid.neighbors", "grid.manhattan", "grid.shortest_path",
@@ -43,6 +43,8 @@ def test_all_24_capabilities_are_reachable_without_training_or_model_inference()
         "events.order", "events.elapsed", "json.select",
         "text.normalize", "policy.local_action", "evidence.lookup",
         "content.sha256",
+        "game.level_generate", "game.level_compile", "game.platformer_step",
+        "game.platformer_replay", "game.tile_line_of_sight",
     }
 
 
@@ -268,7 +270,7 @@ def test_frozen_console_and_unified_cli_expose_model_free_capabilities(
 
     assert console(["--capability-list", "--json"]) == 0
     catalog = json.loads(capsys.readouterr().out)
-    assert len(catalog["operations"]) == 24
+    assert len(catalog["operations"]) == 29
     assert catalog["training_examples_required"] == 0
     task = tmp_path / "task.json"
     task.write_text(json.dumps({
