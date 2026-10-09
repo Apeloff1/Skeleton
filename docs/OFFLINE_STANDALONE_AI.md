@@ -282,7 +282,7 @@ the CI runner's headless check does not prove Tk rendered a window.
 
 ## Deterministic local capabilities and game dataflows
 
-Skeleton now exposes **30 bounded model-free capabilities**, including
+Skeleton now exposes **31 bounded model-free capabilities**, including
 grid search, integer-tick physics, collision checks, game state logic,
 inventories, event chronology, exact JSON selection, source-fact lookups
 and offline policy recommendations. Each produces a deterministic
