@@ -2,8 +2,8 @@
 
 ## New execution-plane boundary
 
-**Module:** `skeleton/ai/game_builder/native_release_intake.py`  
-**Regression suite:** `skeleton/testing/test_game_builder_native_release_intake.py`  
+**Module:** `skeleton/ai/game_builder/native_release_intake.py`
+**Regression suite:** `skeleton/testing/test_game_builder_native_release_intake.py`
 **First supported scope:** independently authored Windows, Linux and macOS SDL2/C source projects generated through `compile_originality_gated_desktop` and `export_rights_aware_desktop`.
 
 The existing `release_assurance.py` checks whether independent reviewers signed the **declared** game source, executable, provenance, rights, license notices and machine destination. An assertion about a file's hash is insufficient if no one reads the actual bytes. The new byte-intake gate adds this missing concrete step.
