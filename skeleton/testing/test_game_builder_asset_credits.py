@@ -179,11 +179,10 @@ def test_guarded_native_game_source_embeds_original_author_notices(tmp_path):
     assert (path/"rights"/"THIRD_PARTY_NOTICES.txt").is_file()
     assert (path/"rights"/"material_inventory.json").is_file()
     assert json.loads((path/"legal_review.json").read_text())["attribution_notices_embedded"] is True
-    with pytest.raises(ClearedSourceExportError):
-        compile_rights_aware_desktop(
-            world, source, rights, credits=replace(credits, project_id="unrelated"),
-            authorized=True,
-        )
+    # The immutable credit provenance object rejects this forgery at creation,
+    # before the guarded exporter can ever receive it.
+    with pytest.raises(CreditsError):
+        replace(credits, project_id="unrelated")
     with pytest.raises(ClearedSourceExportError):
         compile_rights_aware_desktop(
             world, source, rights, credits=generate(), authorized=True,
