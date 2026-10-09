@@ -591,6 +591,10 @@ class TinyTransformer:
             try:
                 return list(self._accel.logits(ids))
             except Exception as exc:
+                if getattr(self, "_strict_device_request", False):
+                    raise RuntimeError(
+                        "strict accelerator policy forbids silent CPU fallback"
+                    ) from exc
                 if (
                     self._accel.kv_dtype_name != "fp32"
                     or self._accel.max_kv_bytes is not None
@@ -639,6 +643,10 @@ class TinyTransformer:
                 cache.reset()
                 raise
             except Exception as exc:
+                if getattr(self, "_strict_device_request", False):
+                    raise RuntimeError(
+                        "strict accelerator policy forbids silent CPU fallback"
+                    ) from exc
                 if (
                     self._accel.kv_dtype_name != "fp32"
                     or self._accel.max_kv_bytes is not None
