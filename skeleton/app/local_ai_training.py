@@ -128,6 +128,38 @@ def publish_native_checkpoint_no_replace(
     return record
 
 
+def token_weighted_training_perplexity(
+    model: TinyTransformer,
+    corpus: list[str],
+) -> float:
+    """Bounded per-predicted-token NLL, consistent with held-out scoring.
+
+    Model.perplexity averages line-level means, so a one-token example would
+    otherwise carry the same weight as a long sequence. This diagnostic
+    weights each line by the actual number of predicted target tokens.
+    """
+    total_targets = 0
+    log_probability = 0.0
+    for line in corpus:
+        count = len(model._ids(line)) - 1
+        if count < 1:
+            raise OfflineTrainingError("training line lacks predictable tokens")
+        value = model.logprob(line)
+        if not math.isfinite(value) or value > 1e-9:
+            raise OfflineTrainingError("non-finite or positive native token log likelihood")
+        total_targets += count
+        log_probability += count * value
+    if total_targets < 1 or not math.isfinite(log_probability):
+        raise OfflineTrainingError("training loss has no valid token totals")
+    try:
+        score = math.exp(-log_probability / total_targets)
+    except OverflowError as exc:
+        raise OfflineTrainingError("training loss exponent overflow") from exc
+    if not math.isfinite(score) or score <= 0:
+        raise OfflineTrainingError("training perplexity is not finite and positive")
+    return score
+
+
 def train_local_text(
     source: str | Path,
     checkpoint: str | Path,
@@ -178,11 +210,11 @@ def train_local_text(
         vocab=vocabulary, dim=16, ctx=96, seed=seed, n_heads=2,
         n_layers=1, d_ff=32,
     )
-    initial_perplexity = model.perplexity(corpus)
+    initial_perplexity = token_weighted_training_perplexity(model, corpus)
     steps = 0
     for _ in range(epochs):
         steps += model.fit(corpus, lr=0.025, schedule="cosine")
-    final_perplexity = model.perplexity(corpus)
+    final_perplexity = token_weighted_training_perplexity(model, corpus)
     if not math.isfinite(initial_perplexity) or not math.isfinite(final_perplexity):
         raise OfflineTrainingError("native training produced non-finite quality diagnostics")
     if steps < 1:
