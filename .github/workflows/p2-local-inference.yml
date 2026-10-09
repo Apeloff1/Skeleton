@@ -139,3 +139,10 @@ jobs:
           --device torch --dim 8 --heads 2 --layers 1 --ffn 12
           --context 16 --prefill 4 --decode 2 --warmup 0 --runs 1
           --assert-parity
+      - name: Verify compact BF16 KV storage and parity without a discrete GPU
+        run: >-
+          python scripts/benchmark_consumer_transformer.py
+          --device torch --kv-dtype bf16 --kv-limit-mib 1
+          --dim 8 --heads 2 --layers 1 --ffn 12
+          --context 16 --prefill 4 --decode 2 --warmup 0 --runs 1
+          --assert-parity
