@@ -53,7 +53,40 @@ class TorchAccel:
         self._cached_ids: List[int] = []
         self._cached_keys: List[Any] = []
         self._cached_values: List[Any] = []
+        self._key_buffers: List[Any] = []
+        self._value_buffers: List[Any] = []
         self._cached_next_position = 0
+
+    def _reserve_kv(self, layer: int, needed: int, heads: int, head_dim: int) -> None:
+        """Amortized resident KV allocation, bounded by the model context.
+
+        Append within existing capacity never concatenates/copies history.
+        Geometric expansion copies only on capacity transitions, while short
+        prompts avoid allocating for the entire maximum context up front.
+        """
+        torch = self.torch
+        if not 1 <= needed <= self.lm.ctx:
+            raise ValueError("requested KV cache capacity outside model context")
+        if layer < len(self._key_buffers):
+            old_cap = self._key_buffers[layer].shape[-2]
+            if old_cap >= needed:
+                return
+            old_used = self._cached_keys[layer].shape[-2]
+        else:
+            old_cap = old_used = 0
+        new_cap = min(self.lm.ctx, max(needed, 16, old_cap * 2))
+        shape = (1, heads, new_cap, head_dim)
+        new_keys = torch.empty(shape, dtype=self._E.dtype, device=self.device)
+        new_values = torch.empty(shape, dtype=self._E.dtype, device=self.device)
+        if old_used:
+            new_keys[:, :, :old_used, :].copy_(self._cached_keys[layer])
+            new_values[:, :, :old_used, :].copy_(self._cached_values[layer])
+        if layer < len(self._key_buffers):
+            self._key_buffers[layer] = new_keys
+            self._value_buffers[layer] = new_values
+        else:
+            self._key_buffers.append(new_keys)
+            self._value_buffers.append(new_values)
 
     def _t2(self, rows: List[List[float]], grad: bool = True):
         return self.torch.tensor(rows, dtype=self.torch.float32, device=self.device, requires_grad=grad)
@@ -203,12 +236,16 @@ class TorchAccel:
             Q, K = self._rope(Q), self._rope(K)
             if fill_cache:
                 length = K.size(0)
-                self._cached_keys.append(
+                self._reserve_kv(len(self._cached_keys), length, heads, dh)
+                li = len(self._cached_keys)
+                self._key_buffers[li][:, :, :length, :].copy_(
                     K.reshape(length, heads, dh).transpose(0, 1).unsqueeze(0)
                 )
-                self._cached_values.append(
+                self._value_buffers[li][:, :, :length, :].copy_(
                     V.reshape(length, heads, dh).transpose(0, 1).unsqueeze(0)
                 )
+                self._cached_keys.append(self._key_buffers[li][:, :, :length, :])
+                self._cached_values.append(self._value_buffers[li][:, :, :length, :])
             C = self._attention(Q, K, V, heads=heads, head_dim=dh)
             X = X + C @ blob["Wo"].T
             if blob.get("W1") is not None:
@@ -275,9 +312,16 @@ class TorchAccel:
             qh = q.reshape(1, heads, hd).transpose(0, 1).unsqueeze(0)
             kh = k.reshape(1, heads, hd).transpose(0, 1).unsqueeze(0)
             vh = v.reshape(1, heads, hd).transpose(0, 1).unsqueeze(0)
+            current_len = (
+                self._cached_keys[layer_index].shape[-2]
+                if layer_index < len(self._cached_keys) else 0
+            )
+            self._reserve_kv(layer_index, current_len + 1, heads, hd)
+            self._key_buffers[layer_index][:, :, current_len:current_len + 1, :].copy_(kh)
+            self._value_buffers[layer_index][:, :, current_len:current_len + 1, :].copy_(vh)
+            kh = self._key_buffers[layer_index][:, :, :current_len + 1, :]
+            vh = self._value_buffers[layer_index][:, :, :current_len + 1, :]
             if layer_index < len(self._cached_keys):
-                kh = torch.cat((self._cached_keys[layer_index], kh), dim=-2)
-                vh = torch.cat((self._cached_values[layer_index], vh), dim=-2)
                 self._cached_keys[layer_index] = kh
                 self._cached_values[layer_index] = vh
             else:
@@ -321,8 +365,16 @@ class TorchAccel:
                 and self._cached_ids[1:] == window[:-1]
             ):
                 for i in range(len(self._cached_keys)):
-                    self._cached_keys[i] = self._cached_keys[i][:, :, 1:, :]
-                    self._cached_values[i] = self._cached_values[i][:, :, 1:, :]
+                    # Reclaim the first slot; views preserve the same buffers
+                    # and no new full-size cache allocation is required.
+                    self._key_buffers[i][:, :, :-1, :].copy_(
+                        self._cached_keys[i][:, :, 1:, :].clone()
+                    )
+                    self._value_buffers[i][:, :, :-1, :].copy_(
+                        self._cached_values[i][:, :, 1:, :].clone()
+                    )
+                    self._cached_keys[i] = self._key_buffers[i][:, :, :-1, :]
+                    self._cached_values[i] = self._value_buffers[i][:, :, :-1, :]
                 del self._cached_ids[0]
                 result = self._cached_step(window[-1])
             else:
