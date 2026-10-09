@@ -15,6 +15,7 @@ import re
 import sqlite3
 import stat
 import threading
+from typing import Callable
 
 
 SCHEMA = "skeleton.app.offline_library.v1"
@@ -176,7 +177,18 @@ class OfflineDocumentLibrary:
         with self._lock:
             self._db.close()
 
-    def index_directory(self, directory: str | Path) -> dict[str, int | str]:
+    def index_directory(
+        self,
+        directory: str | Path,
+        *,
+        before_commit: Callable[[], None] | None = None,
+    ) -> dict[str, int | str]:
+        """Import local documents atomically.
+
+        A durable queue worker may provide a lease guard. It runs while the
+        library transaction is open, immediately before commit, to prevent a
+        worker with an expired/reclaimed lease from publishing stale results.
+        """
         root = str(_root(directory))
         staged = _files(Path(root))  # Finish validation before mutating SQLite.
         seen = {item[0] for item in staged}
@@ -251,6 +263,8 @@ class OfflineDocumentLibrary:
                         "DELETE FROM offline_document_fts WHERE rowid=?",
                         (orphan_id,),
                     )
+                if before_commit is not None:
+                    before_commit()
                 self._db.execute("COMMIT")
             except BaseException:
                 self._db.execute("ROLLBACK")
