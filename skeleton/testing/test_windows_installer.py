@@ -191,6 +191,9 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert '@("--local-ai-training-smoke")' in source
     assert '@("--local-ai-benchmark-smoke")' in source
     assert '"--offline-command", "local-ai"' in source
+    assert '"--gguf-model"' in source
+    assert '"--llama-executable"' in source
+    assert "GGUF command did not fail closed" in source
     assert '"--inspect-model", "--json"' in source
     assert '@("--local-ai-smoke")' in source
     assert '"/VERYSILENT"' in source
