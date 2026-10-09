@@ -157,7 +157,8 @@ def validate_evidence(value: Any, question: str, request_digest: str,
 
 
 _CITATION_TOKEN = re.compile(
-    r"local:[A-Za-z0-9_-]{1,128}:[0-9]+:[0-9a-f]{16}"
+    r"(?<![A-Za-z0-9_:-])local:[A-Za-z0-9_-]{1,128}:[0-9]+:"
+    r"[0-9a-f]{16}(?![A-Za-z0-9_:-])"
 )
 
 
