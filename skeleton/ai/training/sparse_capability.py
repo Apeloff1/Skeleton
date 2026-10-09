@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from .offline_foundations import (
     DATASET_ID, FAMILIES, ORACLES, SyntheticCurriculumError,
@@ -95,6 +95,7 @@ def build_sparse_capability_plan(
     directory: str | Path,
     *,
     budget: int = DEFAULT_BUDGET,
+    focus_modes: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Return an ordered, immutable-in-practice training plan, never train."""
     budget = _budget(budget)
@@ -108,11 +109,28 @@ def build_sparse_capability_plan(
     choices: list[SparseCapabilityExample] = []
     seen_groups: set[str] = set()
     members = _candidate_ids()
+    if isinstance(focus_modes, (str, bytes)) or not isinstance(focus_modes, (list, tuple)):
+        raise SyntheticCurriculumError("focus modes must be a sequence of known capability IDs")
+    focus = tuple(focus_modes)
+    known = {family + ":" + title for family, title, _ in members}
+    if (
+        len(focus) > len(members) or len(set(focus)) != len(focus)
+        or any(type(x) is not str or x not in known for x in focus)
+    ):
+        raise SyntheticCurriculumError("invalid or duplicate adaptive focus capability")
+    rank = {item: i for i, item in enumerate(focus)}
+    secondary = sorted(
+        members,
+        key=lambda member: (
+            0 if member[0] + ":" + member[1] in rank else 1,
+            rank.get(member[0] + ":" + member[1], 0),
+        ),
+    )
     # Round-robin: one for each capability BEFORE selecting a second for
     # any capability. Higher hardware tiers don't unlock different features.
     for phase in (0, 1):
         group_choices = _FIRST_GROUPS if phase == 0 else _SECOND_GROUPS
-        for family, title, variant in members:
+        for family, title, variant in (members if phase == 0 else secondary):
             if len(choices) >= budget:
                 break
             group_number = group_choices[variant]
@@ -159,6 +177,8 @@ def build_sparse_capability_plan(
         "source_manifest_sha256": baseline["manifest_sha256"],
         "source_train_corpus_sha256": baseline["train_only_export_sha256"],
         "sample_budget": budget,
+        "focus_modes": list(focus),
+        "adaptive_focus_requested": bool(focus),
         "capability_modes_available": len(members),
         "capability_modes_covered": len(covered),
         "source_training_pool": 504,
@@ -275,7 +295,11 @@ def register_sparse_capability_plan(
     """
     if not isinstance(plan, Mapping):
         raise SyntheticCurriculumError("invalid sparse plan mapping")
-    expected = build_sparse_capability_plan(directory, budget=plan.get("sample_budget"))
+    expected = build_sparse_capability_plan(
+        directory,
+        budget=plan.get("sample_budget"),
+        focus_modes=plan.get("focus_modes", ()),
+    )
     if dict(plan) != expected:
         raise SyntheticCurriculumError("sparse plan differs from verified source training pool")
     from skeleton.ai.runtime.training.data import (
