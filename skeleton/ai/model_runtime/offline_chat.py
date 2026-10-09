@@ -195,6 +195,36 @@ class OfflineChatStore:
         transcript.validate_turn_order()
         return StoredChat(sid, row[2], transcript, row[0], row[1])
 
+    def list_sessions(self, model_digest: str, tokenizer_digest: str,
+                      *, limit: int = 100) -> tuple[tuple[str, int], ...]:
+        """Find resumable conversations for this exact offline model identity."""
+        if type(limit) is not int or not 1 <= limit <= 1000:
+            raise RuntimeContractError("invalid offline listing limit")
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT session_id, revision FROM offline_sessions "
+                "WHERE model_digest=? AND tokenizer_digest=? "
+                "ORDER BY updated_at DESC, session_id LIMIT ?",
+                (model_digest, tokenizer_digest, limit),
+            ).fetchall()
+        return tuple((_identifier("session id", sid), revision)
+                     for sid, revision in rows)
+
+    def delete(self, session_id: str, model_digest: str,
+               tokenizer_digest: str) -> None:
+        """Delete the canonical conversation and all idempotency receipts."""
+        sid = _identifier("session id", session_id)
+        with self._transaction():
+            cursor = self._db.execute(
+                "DELETE FROM offline_sessions WHERE session_id=? "
+                "AND model_digest=? AND tokenizer_digest=?",
+                (sid, model_digest, tokenizer_digest),
+            )
+            if cursor.rowcount != 1:
+                raise RuntimeContractError(
+                    "unknown conversation or model/tokenizer identity mismatch"
+                )
+
     @staticmethod
     def _receipt(row: tuple[Any, ...], session_id: str, request_id: str,
                  request_digest: str, *, replayed: bool) -> OfflineTurnReceipt:
@@ -279,6 +309,13 @@ class OfflineChatProduct:
     def create(self, *, system: str | None = None) -> str:
         return self.store.create(self.model_digest, self.tokenizer_digest, system=system)
 
+    def list_sessions(self, *, limit: int = 100) -> tuple[tuple[str, int], ...]:
+        return self.store.list_sessions(self.model_digest, self.tokenizer_digest,
+                                        limit=limit)
+
+    def delete(self, session_id: str) -> None:
+        self.store.delete(session_id, self.model_digest, self.tokenizer_digest)
+
     def turn(self, session_id: str, message: str, config: GenerationConfig,
              *, request_id: str | None = None) -> OfflineTurnReceipt:
         if not isinstance(config, GenerationConfig):
@@ -328,7 +365,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--database", type=Path, default=Path("skeleton-offline-chat.sqlite3"))
     parser.add_argument("--session", help="reuse a previous conversation id")
     parser.add_argument("--system", help="system instruction for a new conversation only")
-    parser.add_argument("--message", required=True, help="one user message")
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--message", help="one user message")
+    mode.add_argument("--interactive", action="store_true",
+                      help="continue a local multi-turn chat until /exit or EOF")
+    mode.add_argument("--list", action="store_true",
+                      help="list locally saved conversations for this model")
+    mode.add_argument("--delete-session", metavar="ID",
+                      help="delete a saved conversation and its turn receipts")
     parser.add_argument("--request-id", help="stable idempotency id for safe retries")
     parser.add_argument("--max-new-tokens", type=int, default=32)
     parser.add_argument("--seed", type=int, default=0)
@@ -337,13 +381,59 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.session and args.system is not None:
         parser.error("--system only applies to new conversations")
+    if args.request_id and args.interactive:
+        parser.error("--request-id applies to one-shot --message only")
+    if (args.list or args.delete_session) and (
+        args.system is not None or args.session is not None or args.request_id is not None
+    ):
+        parser.error("session creation and turn arguments are invalid for list/delete")
     try:
         engine = load_offline_engine(args.checkpoint)
         config = GenerationConfig(max_new_tokens=args.max_new_tokens,
                                   seed=args.seed, temperature=args.temperature)
         with OfflineChatStore(args.database) as store:
             product = OfflineChatProduct(engine, store)
+            if args.list:
+                rows = product.list_sessions()
+                if args.json:
+                    print(json.dumps([{"session_id": sid, "revision": rev}
+                                      for sid, rev in rows], sort_keys=True))
+                else:
+                    for sid, rev in rows:
+                        print(f"{sid}  revision={rev}")
+                return 0
+            if args.delete_session:
+                product.delete(args.delete_session)
+                if args.json:
+                    print(json.dumps({"deleted": args.delete_session}))
+                else:
+                    print("Deleted:", args.delete_session)
+                return 0
+
             session = args.session or product.create(system=args.system)
+            if args.interactive:
+                print("Session:", session)
+                print("Type /exit to finish; /id to show the resumable session ID.")
+                while True:
+                    try:
+                        message = input("You> ")
+                    except EOFError:
+                        break
+                    if message.strip() == "/exit":
+                        break
+                    if message.strip() == "/id":
+                        print("Session:", session)
+                        continue
+                    if not message:
+                        continue
+                    receipt = product.turn(session, message, config)
+                    if args.json:
+                        print(json.dumps(receipt.to_dict(), sort_keys=True,
+                                         ensure_ascii=False))
+                    else:
+                        print("AI>", receipt.text)
+                return 0
+
             receipt = product.turn(session, args.message, config,
                                    request_id=args.request_id)
         if args.json:
