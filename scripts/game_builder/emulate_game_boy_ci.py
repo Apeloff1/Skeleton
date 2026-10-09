@@ -137,7 +137,7 @@ def drive_emulator(pyboy: Any, symbols: dict[str, int], route: dict[str, Any]) -
     return result
 
 
-def run(rom: Path, sym: Path, route_path: Path) -> dict[str, Any]:
+def run(rom: Path, sym: Path, route_path: Path, *, cgb: bool = False) -> dict[str, Any]:
     if not rom.is_file() or not sym.is_file() or not route_path.is_file():
         raise EmulatorAcceptanceError("ROM, linker symbol file and reference route required")
     if rom.stat().st_size < 32768 or rom.stat().st_size > 256 * 1024:
@@ -150,11 +150,16 @@ def run(rom: Path, sym: Path, route_path: Path) -> dict[str, Any]:
         from pyboy import PyBoy
     except ImportError as exc:
         raise EmulatorAcceptanceError("PyBoy is required for actual ROM emulation") from exc
-    player = PyBoy(str(rom), window="null", cgb=False, sound_emulated=False)
+    if type(cgb) is not bool:
+        raise EmulatorAcceptanceError("Game Boy emulator hardware mode must be boolean")
+    if cgb and rom.read_bytes()[0x143] != 0xC0:
+        raise EmulatorAcceptanceError("CGB-only emulator run requires authentic color-only ROM header")
+    player = PyBoy(str(rom), window="null", cgb=cgb, sound_emulated=False)
     try:
         attestation = drive_emulator(player, symbols, route)
     finally:
         player.stop()
+    attestation["emulated_hardware_mode"] = "CGB" if cgb else "DMG"
     attestation["rom_sha256"] = sha256(rom.read_bytes()).hexdigest()
     attestation["symbol_file_sha256"] = sha256(sym.read_bytes()).hexdigest()
     return attestation
@@ -163,11 +168,12 @@ def run(rom: Path, sym: Path, route_path: Path) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--rom", required=True, type=Path)
+    parser.add_argument("--cgb", action="store_true", help="Execute in actual Game Boy Color mode")
     parser.add_argument("--symbols", required=True, type=Path)
     parser.add_argument("--route", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args()
-    output = run(args.rom, args.symbols, args.route)
+    output = run(args.rom, args.symbols, args.route, cgb=args.cgb)
     if args.out.exists() or args.out.is_symlink():
         raise FileExistsError(str(args.out))
     with args.out.open("x", encoding="utf-8") as stream:
