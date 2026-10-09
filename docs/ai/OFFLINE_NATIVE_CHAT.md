@@ -242,6 +242,26 @@ binding, stored evidence manifests, drift-safe replay and answer-attribution
 evaluations. Accordingly, the project's `assistant.retrieval_grounded`
 capability remains partial rather than being promoted to complete.
 
+### Headless knowledge ingestion and search
+
+The terminal interface shares the *same* model-scoped reference library. It
+accepts a bounded operator-supplied UTF-8 text/code/Markdown file, does not
+execute the file or automatically fetch remote resources, and never creates a
+phantom conversation for reference-only management:
+
+    python -m skeleton.app.offline_chat_cli --gguf-deployment ./my-local-gguf.json --add-reference ./console-architecture.md
+    python -m skeleton.app.offline_chat_cli --gguf-deployment ./my-local-gguf.json --list-references
+    python -m skeleton.app.offline_chat_cli --gguf-deployment ./my-local-gguf.json --search-reference "cartridge mapper address layout" --search-limit 6
+    python -m skeleton.app.offline_chat_cli --gguf-deployment ./my-local-gguf.json --delete-reference DOCUMENT_ID
+
+Use `--native-checkpoint ./model.json` in place of
+`--gguf-deployment` to work with the native model format.
+
+Source citation identifiers are *local deterministic references to verified
+source chunks*, not an external bibliography or assurance that the model
+incorporated the cited passage. Search and AI text-generation remain
+deliberately separate until the grounding/evidence receipt is implemented.
+
 Release test entry points:
 
     python -m pytest -q tests/test_app_offline_knowledge.py tests/test_app_offline_http.py
