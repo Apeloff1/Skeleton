@@ -67,6 +67,9 @@ def _parser() -> argparse.ArgumentParser:
 
     local_ai = sub.add_parser("local-ai", help="run native AI locally, without Docker or provider credentials")
     local_ai.add_argument("--model", help="native content-addressed checkpoint for headless inference")
+    local_ai.add_argument("--gguf-model", help="explicit local GGUF open-weight artifact for llama.cpp inference")
+    local_ai.add_argument("--llama-executable", help="explicit local llama.cpp executable (not downloaded)")
+
     local_ai.add_argument("--inspect-model", action="store_true", help="validate model weights and report offline runtime limits")
     local_ai.add_argument("--train-corpus", help="train a bounded CPU native checkpoint from a local UTF-8 text file")
     local_ai.add_argument("--improve-model", help="previous native checkpoint for independent held-out improvement")
@@ -230,6 +233,36 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
 
     if command == "local-ai":
         from skeleton.app.local_ai import OfflineAISession, inspect_local_model, load_native_checkpoint, run_offline_ai
+
+        if args.gguf_model or args.llama_executable:
+            if (
+                not args.gguf_model or not args.llama_executable or not args.prompt
+                or args.model or args.inspect_model or args.train_corpus
+                or args.improve_model or args.compare_model or args.candidate_model
+                or args.eval_corpus or args.benchmark_suite or args.exclude_train_corpus
+                or args.protect_suite or args.replay_improvement or args.output_model
+                or args.load_chat or args.save_chat or args.epochs is not None
+            ):
+                print("GGUF inference requires --gguf-model, --llama-executable and --prompt only")
+                return 2
+            from skeleton.app.local_ai_gguf import generate_local_gguf_sync
+
+            try:
+                evidence = generate_local_gguf_sync(
+                    args.llama_executable, args.gguf_model, args.prompt,
+                    max_output_tokens=(
+                        args.max_output_tokens if args.max_output_tokens is not None
+                        else 128
+                    ),
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local GGUF request rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(evidence, ensure_ascii=False, sort_keys=True))
+            else:
+                print(evidence["text"])
+            return 0
 
         # Never accept tuning switches that a mode would silently ignore.
         # A replay always uses epochs pinned inside its original receipt;
