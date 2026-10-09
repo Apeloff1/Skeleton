@@ -18,6 +18,8 @@ on:
       - "skeleton/ai/training/resource_admission.py"
       - "skeleton/testing/test_resource_admission.py"
       - "skeleton/ai/runtime/deterministic_capabilities.py"
+      - "skeleton/ai/runtime/capability_graph.py"
+      - "skeleton/testing/test_capability_graph.py"
       - "skeleton/testing/test_deterministic_capabilities.py"
       - "scripts/training/capability_ledger.py"
       - "skeleton/testing/test_capability_ledger.py"
@@ -79,6 +81,8 @@ on:
       - "skeleton/ai/training/resource_admission.py"
       - "skeleton/testing/test_resource_admission.py"
       - "skeleton/ai/runtime/deterministic_capabilities.py"
+      - "skeleton/ai/runtime/capability_graph.py"
+      - "skeleton/testing/test_capability_graph.py"
       - "skeleton/testing/test_deterministic_capabilities.py"
       - "scripts/training/capability_ledger.py"
       - "skeleton/testing/test_capability_ledger.py"
@@ -168,6 +172,8 @@ jobs:
             skeleton/ai/training/capability_ledger.py \
             skeleton/ai/training/resource_admission.py \
             skeleton/ai/runtime/deterministic_capabilities.py \
+            skeleton/ai/runtime/capability_graph.py \
+            skeleton/testing/test_capability_graph.py \
             skeleton/testing/test_resource_admission.py \
             skeleton/testing/test_deterministic_capabilities.py \
             scripts/training/capability_ledger.py \
@@ -229,4 +235,5 @@ jobs:
           skeleton/testing/test_capability_ledger.py
           skeleton/testing/test_resource_admission.py
           skeleton/testing/test_deterministic_capabilities.py
+          skeleton/testing/test_capability_graph.py
           tests/flgb/test_desktop_offline_ai.py
