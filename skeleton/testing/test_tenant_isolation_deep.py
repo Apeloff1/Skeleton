@@ -71,3 +71,41 @@ def test_resource_prefix_confusion_is_rejected() -> None:
 def test_resource_prefix_contract_is_explicit() -> None:
     with pytest.raises(TenantIsolationError,match="terminate"):
         scope(resource_prefix="tenant-a:workspace-a")
+
+
+def test_scope_prefix_cannot_claim_another_tenant() -> None:
+    with pytest.raises(TenantIsolationError, match="bind exact tenant/workspace"):
+        scope(resource_prefix="tenant-b:workspace-a:")
+
+
+def test_scope_prefix_cannot_claim_another_workspace() -> None:
+    with pytest.raises(TenantIsolationError, match="bind exact tenant/workspace"):
+        scope(resource_prefix="tenant-a:workspace-b:")
+
+
+def test_tenant_identifiers_must_not_contain_scope_delimiters() -> None:
+    with pytest.raises(TenantIsolationError, match="resource delimiters"):
+        scope(tenant_id="tenant-a:workspace-b")
+
+
+def test_resource_key_must_match_tenant_metadata_before_authorization() -> None:
+    decision = authorize_tenant_access(
+        scope(),
+        resource(resource_id="tenant-b:workspace-a:memory:1"),
+        operation="read",
+    )
+    assert decision.allowed is False
+    assert decision.reason_code == "resource_scope_mismatch"
+
+
+def test_narrowed_resource_prefix_limits_access_within_tenant() -> None:
+    scoped = scope(resource_prefix="tenant-a:workspace-a:memory:")
+    valid = authorize_tenant_access(scoped, resource(), operation="read")
+    denied = authorize_tenant_access(
+        scoped,
+        resource(resource_id="tenant-a:workspace-a:document:1"),
+        operation="read",
+    )
+    assert valid.allowed is True
+    assert denied.allowed is False
+    assert denied.reason_code == "resource_scope_mismatch"

@@ -203,7 +203,7 @@ export default function GameplayRecorder({
       </div>
       <p style={{fontSize:12,opacity:.75}}>
         Stop sharing in your browser at any time. Avoid capturing passwords,
-        private messages, copyrighted cinematics, or other people's data.
+        private messages, copyrighted cinematics, or other people&apos;s data.
       </p>
     </section>
   );

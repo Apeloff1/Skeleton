@@ -37,6 +37,11 @@ class TenantScope:
         prefix=self.resource_prefix
         if not prefix.endswith(":"):
             raise TenantIsolationError("resource_prefix must terminate with ':'")
+        if ":" in self.tenant_id or ":" in self.workspace_id:
+            raise TenantIsolationError("tenant/workspace ids cannot contain resource delimiters")
+        canonical_prefix=f"{self.tenant_id}:{self.workspace_id}:"
+        if not prefix.startswith(canonical_prefix):
+            raise TenantIsolationError("resource_prefix must bind exact tenant/workspace authority")
 
     @property
     def digest(self) -> str:
@@ -100,6 +105,9 @@ def authorize_tenant_access(
         return TenantAccessDecision(scope.digest,boundary.digest,op,False,"tenant_mismatch")
     if scope.workspace_id != boundary.workspace_id:
         return TenantAccessDecision(scope.digest,boundary.digest,op,False,"workspace_mismatch")
-    if not boundary.resource_id.startswith(scope.resource_prefix):
+    # Do not trust tenant/workspace metadata alone. The resource key itself
+    # must be bound to the authenticated tenant and workspace segment.
+    canonical_prefix=f"{scope.tenant_id}:{scope.workspace_id}:"
+    if not boundary.resource_id.startswith(canonical_prefix) or not boundary.resource_id.startswith(scope.resource_prefix):
         return TenantAccessDecision(scope.digest,boundary.digest,op,False,"resource_scope_mismatch")
     return TenantAccessDecision(scope.digest,boundary.digest,op,True,"authorized")

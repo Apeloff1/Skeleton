@@ -22,7 +22,7 @@ class ContractConformanceTests(unittest.TestCase):
     def test_current_catalog_is_valid(self) -> None:
         result = MODULE.validate(ROOT)
         self.assertEqual(result["status"], "valid")
-        self.assertEqual(result["contract_count"], 36)
+        self.assertEqual(result["contract_count"], 40)
         self.assertEqual(result["override_count"], 3)
         self.assertEqual(result["executed_vector_count"], result["vector_count"])
         self.assertEqual(result["authority_scope"], "contract-conformance-only")

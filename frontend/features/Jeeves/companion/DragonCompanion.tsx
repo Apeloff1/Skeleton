@@ -1,33 +1,35 @@
-import React,{useEffect,useRef}from'react';
-import{Animated,Easing,StyleSheet,Text,View}from'react-native';
+import React from 'react';
+import{Animated,Pressable,StyleSheet,Text,View}from'react-native';
 import{Ionicons}from'@expo/vector-icons';
 import type{DragonCompanionState}from'./dragonCompanion';
+import type{CompanionMotion}from'./dragonPreferences';
+import {useDragonLife} from './useDragonLife';
+import DragonAtmosphere from './DragonAtmosphere';
 const C={ink:'#f8fafc',muted:'#cbd5e1',shell:'#f5d9a7',shellShade:'#c99a63',dragon:'#b86538',dragonDark:'#6d3528',belly:'#f0bd77',ember:'#fb923c',blue:'#60a5fa',card:'#111827'};
-export default function DragonCompanion({state,reducedMotion=false}:{state:DragonCompanionState;reducedMotion?:boolean}){
- const bob=useRef(new Animated.Value(0)).current;const glow=useRef(new Animated.Value(.35)).current;
- useEffect(()=>{if(reducedMotion){bob.setValue(0);return}const a=Animated.loop(Animated.sequence([Animated.timing(bob,{toValue:-5,duration:900,easing:Easing.inOut(Easing.sin),useNativeDriver:true}),Animated.timing(bob,{toValue:2,duration:900,easing:Easing.inOut(Easing.sin),useNativeDriver:true})]));a.start();return()=>a.stop()},[bob,reducedMotion,state.phase]);
- useEffect(()=>{if(reducedMotion){glow.stopAnimation();glow.setValue(1);return}const a=Animated.loop(Animated.sequence([Animated.timing(glow,{toValue:.9,duration:state.fire?260:900,useNativeDriver:true}),Animated.timing(glow,{toValue:.3,duration:state.fire?260:900,useNativeDriver:true})]));a.start();return()=>a.stop()},[glow,state.fire,reducedMotion]);
+export default function DragonCompanion({state,reducedMotion=false,motion='gentle',level,unlocked=[]}:{state:DragonCompanionState;reducedMotion?:boolean;motion?:CompanionMotion;level?:number;unlocked?:readonly string[]}){
+ const life=useDragonLife(state,motion,reducedMotion);
  return <View style={s.wrap} accessibilityRole="summary" accessibilityLabel={`Dragon companion. ${state.label}. ${state.detail}`}>
   <View style={s.scene}>
-   <View style={s.eggBack}/><View style={s.nest}><Text style={s.nestText}>✦  ·  ✧  ·  ✦</Text></View>
-   <Animated.View style={[s.dragon,{transform:[{translateY:bob}]}]}>
-    <View style={s.tail}/>{state.wings&&<><View style={[s.wing,s.wingL]}/><View style={[s.wing,s.wingR]}/></>}
-    <View style={s.body}/><View style={s.belly}/>
-    <View style={s.head}>
-     <View style={s.earL}/><View style={s.earR}/><View style={s.eyeL}><View style={s.pupil}/></View><View style={s.eyeR}><View style={s.pupil}/></View>
+   <View style={s.eggBack}/>{unlocked.includes('star_cartographer')&&<Text style={s.starHalo}>✦ ✧ ✦</Text>}<DragonAtmosphere direction={life.direction} life={life}/><View style={s.nest}><Text style={s.nestText}>✦  ·  ✧  ·  ✦</Text></View>
+   <Animated.View style={[s.dragon,{transform:[{translateY:life.v.bob.interpolate({inputRange:[0,1],outputRange:[0,-7*life.direction.amplitude]})},{translateY:life.v.lift},{rotate:life.v.tilt.interpolate({inputRange:[-1,1],outputRange:['-3deg','3deg']})}]}]}>
+    <Animated.View style={[s.tail,{transform:[{rotate:life.v.tail.interpolate({inputRange:[-1,1],outputRange:['8deg','34deg']})},{translateX:life.v.tailGesture}]}]}/>{(state.wings||unlocked.includes('winged_builder'))&&<><Animated.View style={[s.wing,s.wingL,{transform:[{rotate:life.v.wings.interpolate({inputRange:[-1,1],outputRange:['-52deg','-10deg']})},{translateY:life.v.wingGesture}]}]}/><Animated.View style={[s.wing,s.wingR,{transform:[{rotate:life.v.wings.interpolate({inputRange:[-1,1],outputRange:['10deg','52deg']})},{translateY:life.v.wingGesture}]}]}/></>}
+    <View style={s.body}/><View style={s.belly}/>{unlocked.includes('apprentice_forge')&&<View style={s.scarf}/>}
+    <Animated.View style={[s.head,{transform:[{rotate:life.v.tilt.interpolate({inputRange:[-1,1],outputRange:['-5deg','6deg']})},{rotate:life.v.headGesture.interpolate({inputRange:[-25,25],outputRange:['-25deg','25deg']})}]}]}>
+     <View style={s.earL}/><View style={s.earR}/><Animated.View style={[s.eyeL,{transform:[{scaleY:life.v.blink}]}]}><Animated.View style={[s.pupil,{transform:[{translateX:life.v.eyeGesture}]}]}/></Animated.View><Animated.View style={[s.eyeR,{transform:[{scaleY:life.v.blink}]}]}><Animated.View style={[s.pupil,{transform:[{translateX:life.v.eyeGesture}]}]}/></Animated.View>
      <View style={s.snout}/><View style={s.smile}/>
-     <View style={s.shellHat}><View style={s.shellCrack}/></View>
+     <Animated.View style={[s.shellHat,{transform:[{rotate:life.v.shell.interpolate({inputRange:[-1,1],outputRange:['-11deg','-3deg']})},{translateY:life.v.hatGesture}]}]}><View style={s.shellCrack}/></Animated.View>
      {state.glasses&&<View style={s.glasses}><View style={s.lens}/><View style={s.bridge}/><View style={s.lens}/><View style={s.bandage}><View style={s.bandagePad}/></View></View>}
-    </View>
-    {state.fire&&<Animated.View style={[s.fire,{opacity:glow}]}><Text style={s.fireText}>🔥</Text></Animated.View>}
+    </Animated.View>
+    {state.fire&&<Animated.View style={[s.fire,{opacity:life.v.glow}]}><Text style={s.fireText}>🔥</Text></Animated.View>}
     {state.embers&&<View style={s.embers}><Text style={s.emberText}>✦  ▪  ✧  ▫  ✦</Text></View>}
    </Animated.View>
    <View style={s.eggFront}><View style={s.eggCrack}/></View>
    {state.snuggly&&<View style={s.blanket}><Text style={s.heart}>♥</Text></View>}
   </View>
-  <View style={s.copy}><View style={s.titleRow}><Ionicons name={state.glasses?'glasses-outline':state.fire?'flame-outline':'sparkles-outline'} size={17} color={state.fire?C.ember:C.blue}/><Text style={s.title}>{state.label}</Text></View><Text style={s.detail}>{state.detail}</Text>
+  <View style={s.copy}><View style={s.titleRow}>{level!==undefined&&<Text style={s.levelBadge}>LV {level}</Text>}<Ionicons name={state.glasses?'glasses-outline':state.fire?'flame-outline':'sparkles-outline'} size={17} color={state.fire?C.ember:C.blue}/><Text style={s.title}>{state.label}</Text></View><Text style={s.detail}>{state.detail}</Text><Text accessibilityElementsHidden importantForAccessibility="no" style={s.thought}>{life.direction.beat.thought}</Text>
    <View style={s.track}><View style={[s.fill,{width:`${Math.round(state.progress*100)}%`}]}/></View>
    <Text style={s.mode}>{state.glasses?'DISTILLING · GEEKY GLASSES + WHITE BRIDGE BANDAGE':state.snuggly?'SNUGGLE MODE':'LIVE CRAWL MODE'}</Text>
+   <View style={s.petRow}><Pressable onPress={life.pet} accessibilityRole="button" accessibilityLabel="Boop the little dragon" style={s.petButton}><Text style={s.petButtonText}>♡ Boop the dragon</Text></Pressable>{!!life.petMessage&&<Text style={s.petReply} accessibilityLiveRegion="polite">{life.petMessage}</Text>}</View>
   </View>
  </View>
 }
@@ -46,5 +48,8 @@ const s=StyleSheet.create({
  wing:{position:'absolute',top:66,width:58,height:70,backgroundColor:'#8b4936',borderWidth:3,borderColor:C.dragonDark,borderRadius:32},wingL:{left:-7,transform:[{rotate:'-35deg'}]},wingR:{right:-7,transform:[{rotate:'35deg'}]},tail:{position:'absolute',right:6,bottom:30,width:60,height:24,borderRadius:20,backgroundColor:C.dragonDark,transform:[{rotate:'22deg'}]},
  glasses:{position:'absolute',left:12,top:23,width:88,height:40,flexDirection:'row',alignItems:'center',zIndex:8},lens:{width:34,height:34,borderRadius:11,borderWidth:5,borderColor:'#171717',backgroundColor:'#93c5fd55'},bridge:{width:20,height:6,backgroundColor:'#171717'},bandage:{position:'absolute',left:36,top:11,width:25,height:14,borderRadius:3,backgroundColor:'#f8fafc',transform:[{rotate:'-4deg'}],alignItems:'center',justifyContent:'center'},bandagePad:{width:9,height:8,borderRadius:2,backgroundColor:'#e5e7eb'},
  fire:{position:'absolute',right:-26,top:66,zIndex:8},fireText:{fontSize:54},embers:{position:'absolute',right:-44,top:113},emberText:{color:'#fdba74',fontSize:15},blanket:{position:'absolute',bottom:15,width:188,height:50,borderRadius:50,backgroundColor:'#8b3f57',zIndex:6,opacity:.94},heart:{color:'#fecdd3',fontSize:18,textAlign:'center',marginTop:7},
- copy:{padding:15,gap:7,backgroundColor:C.card},titleRow:{flexDirection:'row',alignItems:'center',gap:7},title:{color:C.ink,fontSize:15,fontWeight:'800'},detail:{color:C.muted,fontSize:12,lineHeight:18},track:{height:5,borderRadius:5,backgroundColor:'#263244',overflow:'hidden'},fill:{height:'100%',backgroundColor:C.ember,borderRadius:5},mode:{fontSize:9,fontWeight:'800',letterSpacing:.7,color:'#94a3b8'}
+ copy:{padding:15,gap:7,backgroundColor:C.card},
+ starHalo:{position:'absolute',top:8,color:'#fcd34d',fontSize:24,fontWeight:'900',letterSpacing:9,zIndex:5},
+ scarf:{position:'absolute',bottom:70,width:90,height:12,borderRadius:6,backgroundColor:'#dba552',borderColor:'#facc15',borderWidth:1,zIndex:3},
+ levelBadge:{fontWeight:'900',fontSize:10,color:'#422006',backgroundColor:'#fbbf24',borderRadius:7,overflow:'hidden',paddingHorizontal:7,paddingVertical:3},thought:{fontSize:11,color:'#fda4af',fontStyle:'italic',minHeight:16},petRow:{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:8,marginTop:5},petButton:{backgroundColor:'#44304b',borderColor:'#825b89',borderWidth:1,paddingVertical:8,paddingHorizontal:13,borderRadius:18},petButtonText:{color:'#fce7f3',fontSize:11,fontWeight:'700'},petReply:{color:'#fbcfe8',fontSize:11,flexShrink:1},titleRow:{flexDirection:'row',alignItems:'center',gap:7},title:{color:C.ink,fontSize:15,fontWeight:'800'},detail:{color:C.muted,fontSize:12,lineHeight:18},track:{height:5,borderRadius:5,backgroundColor:'#263244',overflow:'hidden'},fill:{height:'100%',backgroundColor:C.ember,borderRadius:5},mode:{fontSize:9,fontWeight:'800',letterSpacing:.7,color:'#94a3b8'}
 });
