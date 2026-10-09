@@ -75,6 +75,7 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--session-id", default="default", help="offline workspace conversation identity")
     local_ai.add_argument("--max-output-tokens", type=int, default=8)
     local_ai.add_argument("--json", action="store_true", dest="as_json", help="print a bound inference receipt")
+    local_ai.add_argument("--doctor", action="store_true", help="verify local artifacts without running inference")
     sub.add_parser("down", help="stop the assembled application")
     sub.add_parser("ps", help="show assembled service state")
 
@@ -220,6 +221,22 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             OfflineAISession, OfflineGGUFSession, load_native_checkpoint, run_offline_ai,
         )
         from skeleton.app.offline_workspace import DurableOfflineSession
+
+        if args.doctor:
+            if (bool(args.model) == bool(args.deployment)) or args.prompt or args.backup_in or args.backup_out or args.workspace:
+                print("local-ai --doctor requires exactly one local model and no generation parameters")
+                return 2
+            from skeleton.app.offline_readiness import inspect_local_readiness
+            try:
+                report = inspect_local_readiness(model=args.model, deployment=args.deployment)
+            except (ValueError, RuntimeError, OSError, TypeError) as exc:
+                print("local-ai doctor rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(report, sort_keys=True, ensure_ascii=False))
+            else:
+                print("Local artifact VERIFIED; inference and OS isolation not tested")
+            return 0
 
         if (args.model and args.deployment) or (
             bool(args.prompt) != bool(args.model or args.deployment)
