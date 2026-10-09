@@ -250,13 +250,13 @@ class DurableOfflineAISession(OfflineAISession):
             )
             if persisted_history != previous_history or persisted_instruction != self.instructions:
                 raise OfflineAIError("conversation changed on disk; reload before retry")
+            # super().ask() deliberately shrinks inference context. The
+            # persisted transcript MUST instead extend the complete prior
+            # SQLite history, not the model's shortened context window.
             answer = await super().ask(prompt, max_output_tokens=max_output_tokens)
-            transcript = ChatTranscript(
-                (ChatMessage("system", self.instructions),)
-                if self.instructions else ()
-            ).merge(ChatTranscript(tuple(
-                ChatMessage(role, content) for role, content in self.history
-            )))
+            transcript = saved.transcript.append("user", prompt.strip()).append(
+                "assistant", answer.text
+            )
             transcript.validate_turn_order()
             # The desktop adapter records generated text identity separately
             # from the canonical inference execution receipt shown to users.
@@ -275,6 +275,10 @@ class DurableOfflineAISession(OfflineAISession):
                 prompt_tokens=answer.input_tokens,
                 generated_tokens=answer.output_tokens,
             )
+            # Keep the full durable state available to the desktop while the
+            # inference adapter independently limits prompt context per turn.
+            self.history = tuple((item.role, item.content) for item in
+                                 transcript.messages if item.role in {"user", "assistant"})
             return answer
         except BaseException:
             # Discard uncommitted in-memory content even when inference itself
