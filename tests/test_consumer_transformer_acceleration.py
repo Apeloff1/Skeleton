@@ -441,3 +441,52 @@ def test_rotary_single_layer_eviction_reuses_gpu_buffers():
         assert accel._key_buffers[0].data_ptr() == pointer
         assert accel.cached_tokens == window
     assert accel._cached_next_position == 6
+
+
+def test_runtime_identity_refresh_repins_updated_consumer_accelerator():
+    pytest.importorskip("torch")
+    model = _model(norm="rms", ffn_kind="swiglu")
+    runtime = NativeLLMRuntime(
+        model, device_policy=DevicePolicy(requested="torch", allow_fallback=False)
+    )
+    before = runtime.infer_text("alpha beta")
+    accel = model._accel
+    assert accel is not None and accel.cached_tokens
+    model.bout[2] += 3.25
+    with pytest.raises(RuntimeContractError, match="mutated"):
+        runtime.assert_model_unchanged()
+    new_digest = runtime.refresh_model_identity()
+    assert new_digest != before.model_digest
+    assert model._accel is accel
+    assert accel.cached_tokens == ()  # stale resident keys are invalidated
+    after = runtime.infer_text("alpha beta")
+    assert after.model_digest == new_digest
+    assert after.logits != before.logits
+    reference = TinyTransformer.from_snapshot(model.snapshot())
+    assert after.logits == pytest.approx(
+        reference._logits(runtime.encode("alpha beta").token_ids),
+        rel=2e-5, abs=2e-5,
+    )
+
+
+def test_runtime_identity_refresh_rejects_partial_accelerator_rebind(monkeypatch):
+    pytest.importorskip("torch")
+    model = _model()
+    runtime = NativeLLMRuntime(
+        model, device_policy=DevicePolicy(requested="torch", allow_fallback=False)
+    )
+    prior_digest = runtime.model_digest
+    model.bout[1] += 0.2
+    accel = model._accel
+    assert accel is not None
+
+    def partial_failure():
+        raise RuntimeError("unavailable memory on device")
+
+    monkeypatch.setattr(accel, "pin", partial_failure)
+    with pytest.raises(RuntimeContractError, match="accelerator rebind failed"):
+        runtime.refresh_model_identity()
+    assert runtime.model_digest == prior_digest
+    assert model._accel is None and not model.resident
+    with pytest.raises(RuntimeContractError, match="mutated"):
+        runtime.assert_model_unchanged()
