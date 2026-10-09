@@ -575,6 +575,26 @@ def verify_native_dataset(
                 or source.token_count != row["token_count"]
             ):
                 raise OfflineDatasetError("an original dataset source has drifted")
+        ranking = sorted(
+            actual_sources,
+            key=lambda document: (
+                _digest(
+                    f"{manifest['split_seed']}:{document.name.casefold()}:"
+                    f"{document.sha256}".encode("utf-8")
+                ),
+                document.name.casefold(),
+            ),
+        )
+        heldout_count = max(
+            1, min(len(ranking) - 1,
+                   (len(ranking) * manifest["validation_percent"] + 99) // 100),
+        )
+        expected_validation = {doc.name for doc in ranking[:heldout_count]}
+        observed_validation = {row["name"] for row in grouped["validation"]}
+        if expected_validation != observed_validation:
+            raise OfflineDatasetError(
+                "recorded validation partition differs from deterministic source split"
+            )
         for part in ("training", "validation"):
             expected = ("\n".join(
                 line
