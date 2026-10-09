@@ -68,6 +68,10 @@ def _parser() -> argparse.ArgumentParser:
     local_ai = sub.add_parser("local-ai", help="run native AI locally, without Docker or provider credentials")
     local_ai.add_argument("--model", help="native content-addressed checkpoint for headless inference")
     local_ai.add_argument("--inspect-model", action="store_true", help="validate model weights and report offline runtime limits")
+    local_ai.add_argument("--train-corpus", help="train a bounded CPU native checkpoint from a local UTF-8 text file")
+    local_ai.add_argument("--output-model", help="new native checkpoint filename for --train-corpus")
+    local_ai.add_argument("--epochs", type=int, default=1, help="bounded native CPU training passes (1-4)")
+
     local_ai.add_argument("--prompt", help="headless text request (requires --model)")
     local_ai.add_argument("--max-output-tokens", type=int, default=8)
     local_ai.add_argument("--json", action="store_true", dest="as_json", help="print a bound inference receipt")
@@ -217,6 +221,31 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if command == "local-ai":
         from skeleton.app.local_ai import OfflineAISession, inspect_local_model, load_native_checkpoint, run_offline_ai
 
+        if args.train_corpus:
+            if (
+                not args.output_model or args.model or args.prompt
+                or args.inspect_model or args.load_chat or args.save_chat
+            ):
+                print("local-ai training requires --train-corpus and --output-model without chat/inference options")
+                return 2
+            from skeleton.app.local_ai_training import train_local_text
+
+            try:
+                receipt = train_local_text(args.train_corpus, args.output_model, epochs=args.epochs)
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local-ai training rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(receipt.as_dict(), ensure_ascii=False, sort_keys=True))
+            else:
+                print("Trained bounded CPU checkpoint: " + str(args.output_model))
+                print("model digest: " + receipt.model_digest)
+                print("training steps: " + str(receipt.training_steps))
+                print("quality: not independently certified; not foundation-model weights")
+            return 0
+        if args.output_model:
+            print("--output-model requires --train-corpus")
+            return 2
         if args.inspect_model:
             if not args.model or args.prompt or args.load_chat or args.save_chat:
                 print("local-ai --inspect-model requires only --model")
