@@ -182,6 +182,7 @@ class WindowsLauncher:
         self._browser_app = None
         self._browser_worker = None
         self._browser_token_file: Path | None = None
+        self._launcher_closed = False
 
         outer = ttk.Frame(self.window, padding=20)
         outer.pack(fill="both", expand=True)
@@ -290,7 +291,13 @@ class WindowsLauncher:
                 self._set_log(rendered)
                 self._busy(False, "Ready" if error is None else "Action failed")
 
-            self.window.after(0, finish)
+            if not self._launcher_closed:
+                try:
+                    self.window.after(0, finish)
+                except (RuntimeError, self.tk.TclError):
+                    # The window can be destroyed while model admission or
+                    # a long-running offline inference service is starting.
+                    pass
 
         threading.Thread(target=worker, name="skeleton-windows-launcher", daemon=True).start()
 
@@ -356,6 +363,8 @@ class WindowsLauncher:
         )
 
         with self._browser_lock:
+            if self._launcher_closed:
+                raise RuntimeError("offline browser launcher has closed")
             if self._browser_server is not None:
                 url = "http://127.0.0.1:" + str(
                     self._browser_server.server_port
@@ -374,6 +383,9 @@ class WindowsLauncher:
             db.parent / ("browser-" + secrets.token_hex(12) + ".secret")
         )
         try:
+            with self._browser_lock:
+                if self._launcher_closed:
+                    raise RuntimeError("offline browser launcher closed during model admission")
             server = LocalOnlyHTTPServer(app, port=0)
             # Do not write a credential until the socket is definitely bound.
             create_token_file(credential_file, token=token)
@@ -383,14 +395,22 @@ class WindowsLauncher:
                 name="skeleton-offline-browser-service",
                 daemon=True,
             )
-            thread.start()
             with self._browser_lock:
+                if self._launcher_closed:
+                    raise RuntimeError("offline browser launcher closed before service start")
+                thread.start()
                 self._browser_server = server
                 self._browser_app = app
                 self._browser_worker = thread
                 self._browser_token_file = credential_file
             url = "http://127.0.0.1:" + str(server.server_port) + "/"
-            webbrowser.open(url)
+            try:
+                webbrowser.open(url)
+            except (OSError, webbrowser.Error):
+                # A missing default browser must not destroy a correctly
+                # admitted local model service. The operator can open its
+                # recorded localhost URL manually.
+                pass
             return (
                 "Offline AI browser: " + url + "\n"
                 "Paste the local bearer token from this owner-only file:\n"
@@ -475,6 +495,8 @@ class WindowsLauncher:
             self.window.mainloop()
             return 0
         finally:
+            with self._browser_lock:
+                self._launcher_closed = True
             self._stop_browser_service()
 
 
