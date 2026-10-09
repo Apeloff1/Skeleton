@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 from hashlib import sha256
-from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import hmac
 import json
@@ -103,6 +102,13 @@ class OfflineHTTPApplication:
             self.model_digest, self.tokenizer_digest,
         )
 
+    @property
+    def default_output_tokens(self) -> int:
+        if hasattr(self.backend, "runtime"):
+            limits = self.backend.runtime.limits
+            return min(32, limits.max_new_tokens, max(1, limits.max_context // 4))
+        return min(32, max(1, (self.backend.config.context_size or 4096) // 4))
+
     def _perform_turn(self, session_id: str,
                       request: dict[str, Any]) -> dict[str, Any]:
         _fields(request, {"message", "request_id", "max_output_tokens"},
@@ -113,7 +119,7 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(400, "message must contain 1–4096 UTF-8 bytes")
         text = text.strip()
         rid = _identifier("request id", request["request_id"])
-        budget = _budget(request, 32)
+        budget = _budget(request, self.default_output_tokens)
         digest = _digest_request(text, GenerationConfig(max_new_tokens=budget))
         with self._lock:
             current = self._session(session_id)
@@ -163,6 +169,7 @@ class OfflineHTTPApplication:
                 "model_digest": self.model_digest,
                 "tokenizer_digest": self.tokenizer_digest,
                 "saved_session_limit": 1000,
+                "default_output_tokens": self.default_output_tokens,
             }
         if path == "/v1/sessions":
             if method == "GET":
@@ -277,6 +284,10 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", kind + ("; charset=utf-8"
                                                  if kind.startswith("text/") else ""))
         self.send_header("Content-Length", str(len(payload)))
+        # One request per connection: never reuse a socket after rejecting a
+        # bearer token or request body that was intentionally not consumed.
+        self.send_header("Connection", "close")
+        self.close_connection = True
         self.send_header("Cache-Control", "no-store, max-age=0")
         self.send_header("Pragma", "no-cache")
         self.send_header("Referrer-Policy", "no-referrer")
