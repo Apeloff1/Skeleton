@@ -309,6 +309,20 @@ class OfflineAIWindow:
         self.clear_button.pack(side="left", padx=8)
         self.cancel_button = ttk.Button(toolbar, text="Cancel generation", command=self.cancel)
         self.cancel_button.pack(side="left")
+        sessions = ttk.Frame(frame)
+        sessions.pack(fill="x", pady=(8, 0))
+        ttk.Label(sessions, text="Saved conversation").pack(side="left")
+        self.session_choices: dict[str, str] = {}
+        self.session_picker = ttk.Combobox(sessions, state="readonly", width=33)
+        self.session_picker.pack(side="left", padx=6)
+        self.resume_button = ttk.Button(
+            sessions, text="Resume", command=self.resume_selected
+        )
+        self.resume_button.pack(side="left")
+        self.delete_button = ttk.Button(
+            sessions, text="Delete", command=self.delete_selected
+        )
+        self.delete_button.pack(side="left", padx=6)
         self.status = tk.StringVar(value="Choose a local native model checkpoint to begin.")
         ttk.Label(frame, textvariable=self.status, wraplength=790).pack(anchor="w", pady=8)
         self.transcript = scrolledtext.ScrolledText(frame, state="disabled", wrap="word", height=18, font=("Segoe UI", 10))
@@ -326,6 +340,68 @@ class OfflineAIWindow:
         self.send_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.clear_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.cancel_button.configure(state="normal" if self.active else "disabled")
+        can_switch = isinstance(self.session, DurableOfflineAISession) and not self.active
+        self.resume_button.configure(state="normal" if can_switch else "disabled")
+        self.delete_button.configure(state="normal" if can_switch else "disabled")
+
+    def _update_sessions(self) -> None:
+        if not isinstance(self.session, DurableOfflineAISession):
+            return
+        choices = {}
+        selected = ""
+        for sid, revision in self.session.list_conversations():
+            label = f"{sid[:18]}…  ·  {revision} turns"
+            choices[label] = sid
+            if sid == self.session.session_id:
+                selected = label
+        self.session_choices = choices
+        self.session_picker.configure(values=tuple(choices))
+        self.session_picker.set(selected)
+
+    def _display_history(self) -> None:
+        self.transcript.configure(state="normal")
+        self.transcript.delete("1.0", "end")
+        self.transcript.configure(state="disabled")
+        if self.session is not None:
+            for role, content in self.session.history:
+                self._append("You" if role == "user" else "Skeleton · Local", content)
+
+    def resume_selected(self) -> None:
+        if self.active or not isinstance(self.session, DurableOfflineAISession):
+            return
+        sid = self.session_choices.get(self.session_picker.get())
+        if sid is None:
+            return
+        try:
+            self.session.resume(sid)
+            self._display_history()
+            self._update_sessions()
+            self.status.set("Restored saved conversation: " + sid[:18] + "…")
+        except Exception as exc:
+            self.status.set("Cannot restore conversation: " + str(exc))
+        self._refresh()
+
+    def delete_selected(self) -> None:
+        if self.active or not isinstance(self.session, DurableOfflineAISession):
+            return
+        sid = self.session_choices.get(self.session_picker.get())
+        if sid is None:
+            return
+        from tkinter import messagebox
+        if not messagebox.askyesno(
+            "Delete saved conversation?",
+            "Permanently delete this local conversation and its saved receipts?",
+            parent=self.window,
+        ):
+            return
+        try:
+            self.session.delete_conversation(sid)
+            self._display_history()
+            self._update_sessions()
+            self.status.set("Local conversation deleted.")
+        except Exception as exc:
+            self.status.set("Cannot delete conversation: " + str(exc))
+        self._refresh()
 
     def _append(self, speaker: str, text: str) -> None:
         self.transcript.configure(state="normal")
@@ -349,7 +425,10 @@ class OfflineAIWindow:
 
         def work() -> None:
             try:
-                session = OfflineAISession(load_native_checkpoint(selected))
+                backend = load_native_checkpoint(selected)
+                session = DurableOfflineAISession(
+                    backend, database=private_desktop_database(backend.model_digest)
+                )
                 self.events.put(("loaded", session))
             except Exception as exc:
                 self.events.put(("error", str(exc)))
@@ -359,11 +438,18 @@ class OfflineAIWindow:
     def clear(self) -> None:
         if self.active or self.session is None:
             return
-        self.session.clear()
-        self.transcript.configure(state="normal")
-        self.transcript.delete("1.0", "end")
-        self.transcript.configure(state="disabled")
-        self.status.set("Conversation reset in memory.")
+        if isinstance(self.session, DurableOfflineAISession):
+            try:
+                self.session.create_conversation()
+                self._display_history()
+                self._update_sessions()
+                self.status.set("New persistent conversation created.")
+            except Exception as exc:
+                self.status.set("Unable to create local conversation: " + str(exc))
+        else:
+            self.session.clear()
+            self._display_history()
+            self.status.set("Conversation reset in memory.")
 
     def send(self) -> None:
         if self.active or self.session is None:
@@ -416,11 +502,16 @@ class OfflineAIWindow:
                 self.active = False
                 if kind == "loaded":
                     self.session = value  # type: ignore[assignment]
-                    self.clear()
-                    self.status.set("Native model loaded: " + self.session.model_digest[:16] + "…")
+                    self._display_history()
+                    self._update_sessions()
+                    self.status.set(
+                        "Native model loaded offline: "
+                        + self.session.model_digest[:16] + "… · saved locally"
+                    )
                 elif kind == "answer":
                     answer = value
                     self._append("Skeleton · Local", answer.text)  # type: ignore[attr-defined]
+                    self._update_sessions()
                     self.status.set(
                         "Completed · " + str(answer.input_tokens) + " input / " + str(answer.output_tokens) + " output tokens · receipt " + answer.execution_receipt_digest[:12]  # type: ignore[attr-defined]
                     )
@@ -435,6 +526,8 @@ class OfflineAIWindow:
     def close(self) -> None:
         self.cancel()
         self.closed = True
+        if isinstance(self.session, DurableOfflineAISession) and not self.active:
+            self.session.close()
         self.window.destroy()
 
 
