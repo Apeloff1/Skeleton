@@ -147,6 +147,7 @@ JAVASCRIPT = r"""'use strict';
     get('secret').value = '';
     get('indicator').textContent = 'OFFLINE • CONNECTED';
     get('model').textContent = health.runtime_kind + ' · ' + health.model_digest.slice(0, 20) + '…';
+    get('budget').value = String(health.default_output_tokens);
     await loadSessions();
     status('Authenticated locally. No remote provider is involved.');
   }));
