@@ -22,6 +22,7 @@ from pathlib import Path
 
 from .desktop_native_export import compile_native_desktop, export_native_desktop_source
 from .game_boy_native_export import compile_native_game_boy, export_native_game_boy
+from .game_boy_color_native_export import compile_native_game_boy_color, export_native_game_boy_color
 from .nes_native_export import compile_native_nes, export_native_nes
 from .c64_native_export import compile_native_c64, export_native_c64
 from .dos_native_export import compile_native_dos, export_native_dos
@@ -36,6 +37,7 @@ _NATIVE = {
     "linux_desktop": "sdl2_c11",
     "macos_modern": "sdl2_c11",
     "nintendo_game_boy": "gb_rgbds",
+    "nintendo_game_boy_color": "cgb_rgbds",
     "nintendo_famicom": "nes_ca65",
     "commodore_64": "c64_cc65",
     "dos_vga": "dos_nasm_8086",
@@ -87,6 +89,11 @@ def build_game(
         project = compile_native_game_boy(world, source, authorized=True)
         folder = export_native_game_boy(project, output, authorized=True)
         artifact_type = "native_game_boy_rgbds_6502free_rom_source"
+        digest = project.content_digest
+    elif kind == "cgb_rgbds":
+        project = compile_native_game_boy_color(world, source, authorized=True)
+        folder = export_native_game_boy_color(project, output, authorized=True)
+        artifact_type = "native_cgb_rgb555_rgbds_rom_source"
         digest = project.content_digest
     elif kind == "nes_ca65":
         project = compile_native_nes(world, source, authorized=True)
