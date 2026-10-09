@@ -41,14 +41,22 @@ def verify_xex(path: Path) -> dict[str, object]:
     pos = 0
     segments = []
     runad = False
-    while pos + 4 <= len(blob):
-        start, end = unpack_from("<HH", blob, pos)
-        pos += 4
+    while pos < len(blob):
+        if len(blob) - pos < 4:
+            raise ValueError("truncated Atari XEX section header")
+        start = unpack_from("<H", blob, pos)[0]
+        pos += 2
         if start == 0xFFFF:
-            if pos + 4 > len(blob):
+            # Atari XEX segment markers are a TWO-byte prefix, not a
+            # four-byte (start,end) pair. The next word is the real start.
+            if len(blob) - pos < 4:
                 raise ValueError("truncated Atari XEX extended header")
-            start, end = unpack_from("<HH", blob, pos)
-            pos += 4
+            start = unpack_from("<H", blob, pos)[0]
+            pos += 2
+        if len(blob) - pos < 2:
+            raise ValueError("truncated Atari XEX end address")
+        end = unpack_from("<H", blob, pos)[0]
+        pos += 2
         if end < start:
             raise ValueError("Atari XEX section has reversed addresses")
         length = end - start + 1
