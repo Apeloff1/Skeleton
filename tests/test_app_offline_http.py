@@ -244,6 +244,35 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         finally:
             conn.close()
 
+    def test_request_smuggling_controls_and_unsupported_methods(self) -> None:
+        conn = HTTPConnection("127.0.0.1", self.port, timeout=15)
+        try:
+            conn.putrequest("GET", "/v1/status")
+            conn.putheader("Host", "evil.example")
+            conn.putheader("Authorization", "Bearer " + _TOKEN)
+            conn.endheaders()
+            response = conn.getresponse()
+            self.assertEqual(response.status, 400)
+            self.assertIn("duplicate", response.read().decode("utf-8"))
+        finally:
+            conn.close()
+        status, error, _ = self._request(
+            "GET", "/v1/status", headers={"Transfer-Encoding": "chunked"}
+        )
+        self.assertEqual(status, 400)
+        status, error, _ = self._request("OPTIONS", "/v1/sessions")
+        self.assertEqual(status, 405)
+        self.assertIn("unsupported", error["error"])
+        status, error, _ = self._request("GET", "/v1/status?x=1")
+        self.assertEqual(status, 400)
+
+    def test_token_file_refuses_weak_explicit_secret(self) -> None:
+        from skeleton.app.offline_http import OfflineHTTPError
+        path = self.folder / "weak.secret"
+        with self.assertRaises(OfflineHTTPError):
+            create_token_file(path, token="weak")
+        self.assertFalse(path.exists())
+
     def test_owner_only_token_file_is_create_once(self) -> None:
         path = self.folder / "bearer.secret"
         token = create_token_file(path)
