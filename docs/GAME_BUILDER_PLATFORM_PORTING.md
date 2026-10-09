@@ -71,6 +71,14 @@ A typical desktop build, after selecting the platform's legal SDL2 toolchain:
 
 On Windows, the resulting artifact can be a genuine `.exe`; its actual runtime behavior, SDL2 distribution, installer creation and signing still require target-specific CI and hardware testing. This route deliberately does **not** masquerade as a Game Boy / PlayStation / Xbox exporter.
 
+## Native executable build-and-replay acceptance pipeline (October 2026)
+
+This branch additionally introduces `.github/workflows/game-builder-native-desktop.yml`. Its three operating-system jobs use **real host compilers and native SDL2 development libraries** to build the generated C11 source, then invoke `skeleton_homebrew --verify-replay` (or `skeleton_homebrew.exe --verify-replay` on Windows). The C implementation embeds the generated world's deterministic safe actions for every level and checks map transitions, collectible scoring, health, action count and victory. Native ELF, Mach-O and PE headers are independently checked by `scripts/game_builder/native_desktop_ci.py`, which also records SHA-256 of each compiled executable.
+
+The matrix targets Linux x86-64, macOS arm64/Intel depending on the selected runner, and Windows UCRT64 x86-64. Sparse checkout avoids unrelated historic filenames on Windows. GitHub Actions artifacts contain the actual native binary, source-project manifest, runtime DLL on Windows and run evidence. **Run conclusions must be checked on the current commit SHA** before treating these as compiled or gameplay-verified. Adding a CI workflow does not, by itself, attest that a build has passed.
+
+This acceptance checks one deterministic, independently generated original three-level game, not every authored homebrew project, physical console or hardware revision. It does **not** provide console ROM output, prove every game works, confer third-party rights, sign an installer, or qualify redistribution of SDL2 runtime dependencies. The emitted project's own manifest remains fail-closed with `executable_built=false`, `native_headless_replay_executed=false` and `releasable=false` until actual separate build/QA/release receipts exist.
+
 ## Build adapter qualification still required
 
 1. Confirm **independent homebrew source authority** through the existing game-builder rights ledger, source inventory, license/attribution rules and legal review where needed.
