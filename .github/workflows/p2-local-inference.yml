@@ -4,6 +4,12 @@ on:
   pull_request:
     paths:
       - "skeleton/ai/runtime/inference/**"
+      - "skeleton/ai/model_runtime/**"
+      - "skeleton/cortex/transformer.py"
+      - "skeleton/cortex/torch_lm.py"
+      - "skeleton/cortex/device.py"
+      - "tests/test_consumer_transformer_acceleration.py"
+      - "tests/test_consumer_llama_budget.py"
       - "skeleton/app/local_ai.py"
       - "tests/flgb/test_desktop_offline_ai.py"
       - "skeleton/testing/test_local_inference.py"
@@ -22,6 +28,12 @@ on:
       - feat/p2-functional-ai-closure-atomic
     paths:
       - "skeleton/ai/runtime/inference/**"
+      - "skeleton/ai/model_runtime/**"
+      - "skeleton/cortex/transformer.py"
+      - "skeleton/cortex/torch_lm.py"
+      - "skeleton/cortex/device.py"
+      - "tests/test_consumer_transformer_acceleration.py"
+      - "tests/test_consumer_llama_budget.py"
       - "skeleton/app/local_ai.py"
       - "tests/flgb/test_desktop_offline_ai.py"
       - "skeleton/testing/test_local_inference.py"
@@ -82,3 +94,5 @@ jobs:
           skeleton/testing/test_llama_cpp_local_inference.py
           skeleton/testing/test_local_model_deployment.py
           tests/flgb/test_desktop_offline_ai.py
+          tests/test_consumer_transformer_acceleration.py
+          tests/test_consumer_llama_budget.py
