@@ -717,3 +717,82 @@ def test_kv_budget_rejects_invalid_limits(invalid):
     model = _model()
     with pytest.raises(ValueError, match="max_kv_bytes"):
         model.to("torch", max_kv_bytes=invalid)
+
+
+def test_runtime_device_policy_admits_compact_kv_and_restores_checkpoint():
+    torch = pytest.importorskip("torch")
+    model = _model(norm="rms", ffn_kind="swiglu")
+    policy = DevicePolicy(
+        requested="torch", allow_fallback=False,
+        kv_dtype="bf16", kv_limit_bytes=4096,
+    )
+    runtime = NativeLLMRuntime(model, device_policy=policy)
+    assert runtime.device.resident
+    assert runtime.device.kv_dtype == "bf16"
+    assert runtime.device.kv_limit_bytes == 4096
+    assert runtime.model._accel.kv_dtype == torch.bfloat16
+    original_receipt = runtime.device.digest
+    result = runtime.infer_text("alpha beta gamma")
+    assert result.cache_tokens == len(runtime.encode("alpha beta gamma").token_ids)
+    assert runtime.model._accel.kv_reserved_bytes <= 4096
+
+    restored = NativeLLMRuntime.restore(runtime.checkpoint())
+    assert restored.device_policy.to_dict() == policy.to_dict()
+    assert restored.device.digest == original_receipt
+    assert restored.model._accel is not None
+    assert restored.model._accel.kv_dtype == torch.bfloat16
+    assert restored.infer_text("alpha beta gamma").logits == pytest.approx(
+        result.logits, rel=3e-3, abs=3e-3
+    )
+
+
+def test_native_policy_default_serialization_preserves_legacy_identity():
+    from skeleton.ai.model_runtime.runtime_contracts import DeviceReceipt
+
+    assert DevicePolicy().to_dict() == {
+        "requested": "cpu", "allow_fallback": True,
+    }
+    assert DeviceReceipt("cpu", "cpu", False, False).to_dict() == {
+        "requested": "cpu",
+        "actual": "cpu",
+        "resident": False,
+        "degraded": False,
+    }
+    assert DevicePolicy(
+        requested="torch", kv_dtype="fp16", kv_limit_bytes=512
+    ).to_dict()["kv_limit_bytes"] == 512
+
+
+@pytest.mark.parametrize("policy", [
+    dict(requested="cpu", kv_dtype="bf16"),
+    dict(requested="cpu", kv_limit_bytes=2048),
+])
+def test_cpu_reference_rejects_inapplicable_kv_backend_policy(policy):
+    model = _model()
+    with pytest.raises(RuntimeContractError, match="requires a Torch"):
+        NativeLLMRuntime(model, device_policy=DevicePolicy(**policy))
+
+
+@pytest.mark.parametrize("bad", ["fp64", "", None, 3, "BF16"])
+def test_device_policy_validates_compact_cache_dtype(bad):
+    with pytest.raises(RuntimeContractError, match="KV cache precision"):
+        DevicePolicy(requested="torch", kv_dtype=bad)
+
+
+@pytest.mark.parametrize("bad", [True, 0, -1, 1.5, 2 ** 41])
+def test_device_policy_validates_cache_byte_budget(bad):
+    with pytest.raises(RuntimeContractError, match="KV cache byte ceiling"):
+        DevicePolicy(requested="torch", kv_limit_bytes=bad)
+
+
+def test_native_runtime_rejects_kv_ceiling_above_authorized_limit():
+    from skeleton.ai.model_runtime.runtime_contracts import RuntimeLimits
+
+    model = _model()
+    limits = RuntimeLimits(
+        max_context=model.ctx, max_new_tokens=2, max_total_tokens=12,
+        max_kv_bytes=2048,
+    )
+    policy = DevicePolicy(requested="torch", kv_limit_bytes=4096)
+    with pytest.raises(RuntimeContractError, match="exceeds native runtime"):
+        NativeLLMRuntime(model, limits=limits, device_policy=policy)
