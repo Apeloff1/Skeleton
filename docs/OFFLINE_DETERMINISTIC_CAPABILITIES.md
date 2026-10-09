@@ -1,6 +1,6 @@
 # Standalone deterministic capabilities — October 2026
 
-**Scope:** 30 built-in, typed, bounded local computations plus a
+**Scope:** 31 built-in, typed, bounded local computations plus a
 32-node deterministic dependency graph. This extends the functional
 abilities of Skeleton's standalone AI without collecting new training
 examples, training a transformer, trusting internet content or granting
@@ -16,7 +16,7 @@ are deterministic algorithms, **not** generative-language proficiency.
    deployments generate text and require separate model/runtime trust,
    context persistence and target-hardware qualification.
 2. **Deterministic capability execution:** Strict JSON task dispatch to an
-   explicit allowlist of 30 operations, each with closed-form or bounded
+   explicit allowlist of 31 operations, each with closed-form or bounded
    calculations, no model dependency and a SHA-256 result receipt.
 
 A model may *propose* a JSON task, but its text is never sufficient
