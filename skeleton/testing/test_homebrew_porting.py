@@ -342,3 +342,34 @@ def test_native_port_ui_treats_unavailable_window_as_nonfatal_to_headless_accept
     with pytest.raises(HomebrewPortError, match="display"):
         open_native_homebrew_port(str(original_path), str(port_path))
     assert verify_port_gameplay(source, port)["hybrid_gameplay_proven"]
+
+
+def test_keyquest_goal_is_reversible_when_player_arrives_before_collecting_keys():
+    """A hybrid win gate must never irreversibly softlock its source runtime."""
+    source = original()
+    port = make_homebrew_port(source, hybrids=["keyquest", "collectathon"])
+    run = PortedHomebrewSession(source, port)
+    assert run.pending
+    # Legal in-game position adjacent to the original goal; intentionally
+    # simulate an alternate route that bypassed the collectible markers.
+    goal = compile_level({"tiles": source["tilemap"]})["goal"]
+    prior = {"x": goal["x"] - 1, "y": goal["y"], "vx": 0, "vy": 0}
+    assert source["tilemap"][prior["y"]][prior["x"]] == "."
+    run.game.avatar = dict(prior)
+    locked = run.tick(right=True)
+    assert locked["original_game_goal_reached"] is False
+    assert locked["hybrid_win"] is False
+    assert locked["keyquest_goal_locked"] is True
+    assert locked["locked_goal_attempts"] == 1
+    assert locked["remaining_items"]
+    assert run.game.avatar == prior
+    # After keys are collected by gameplay, the exact same source goal
+    # is once again available; no VM reset, cheat or map mutation needed.
+    run.pending.clear()
+    won = run.tick(right=True)
+    assert won["original_game_goal_reached"] is True
+    assert won["hybrid_win"] is True
+    assert won["keyquest_goal_locked"] is False
+    assert won["locked_goal_attempts"] == 1
+    assert run.game.tiles == tuple(source["tilemap"])
+    assert won["underlying_physics_unchanged"] is True
