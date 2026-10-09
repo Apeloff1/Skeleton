@@ -31,6 +31,11 @@ def backend(*, ctx: int = 96) -> NativeRuntimeLocalModel:
 
 
 class TestOfflineDesktopAI(unittest.TestCase):
+    def test_bundled_native_inference_smoke_graph(self):
+        from skeleton.app.local_ai import smoke_offline_native_inference
+
+        self.assertTrue(smoke_offline_native_inference())
+
     def test_checkpoint_load_and_native_generation_without_providers(self):
         with tempfile.TemporaryDirectory() as directory:
             model_path = Path(directory) / "local.json"
