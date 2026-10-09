@@ -13,7 +13,7 @@ import sqlite3
 import sys
 
 from skeleton.ai.model_runtime.offline_chat import (
-    load_private_bundle, save_private_bundle,
+    OfflineChatStore, load_private_bundle, save_private_bundle,
 )
 from skeleton.app.local_ai import (
     DurableOfflineAISession,
@@ -21,6 +21,7 @@ from skeleton.app.local_ai import (
     load_gguf_deployment,
     load_native_checkpoint,
     private_desktop_database,
+    _model_tokenizer_digest,
 )
 
 
@@ -124,40 +125,48 @@ def main(argv: list[str] | None = None) -> int:
                    if args.native_checkpoint is not None
                    else load_gguf_deployment(args.gguf_deployment))
         database = args.database or private_desktop_database(backend.model_digest)
-        with_store = DurableOfflineAISession(
+        if manage:
+            # Administrative inspection/deletion must not silently create a
+            # new chat. Use the same per-model store without a session adapter.
+            with OfflineChatStore(database) as store:
+                model_digest = backend.model_digest
+                token_digest = _model_tokenizer_digest(backend)
+                if args.list:
+                    records = [
+                        {"session_id": sid, "revision": revision}
+                        for sid, revision in store.list_sessions(
+                            model_digest, token_digest
+                        )
+                    ]
+                    if args.json:
+                        print(json.dumps(records, sort_keys=True))
+                    else:
+                        for record in records:
+                            print(record["session_id"], "revision=", record["revision"])
+                    return 0
+                if args.delete_session:
+                    store.delete(args.delete_session, model_digest, token_digest)
+                    print(json.dumps({"deleted_session_id": args.delete_session}))
+                    return 0
+                if args.export_session:
+                    payload = store.export_bundle(
+                        args.export_session, model_digest, token_digest
+                    )
+                    save_private_bundle(args.output, payload)
+                    print(json.dumps({"exported_session_id": args.export_session,
+                                      "path": str(args.output)}))
+                    return 0
+                if args.import_bundle:
+                    new_session = store.import_bundle(
+                        load_private_bundle(args.import_bundle),
+                        model_digest, token_digest
+                    )
+                    print(json.dumps({"imported_session_id": new_session}))
+                    return 0
+        chat = DurableOfflineAISession(
             backend, database=database, session_id=args.session
         )
         try:
-            chat = with_store
-            if args.list:
-                records = [
-                    {"session_id": sid, "revision": rev}
-                    for sid, rev in chat.list_conversations()
-                ]
-                if args.json:
-                    print(json.dumps(records, sort_keys=True))
-                else:
-                    for record in records:
-                        print(record["session_id"], "revision=", record["revision"])
-                return 0
-            if args.delete_session:
-                chat.delete_conversation(args.delete_session)
-                print(json.dumps({"deleted_session_id": args.delete_session,
-                                  "active_session_id": chat.session_id}))
-                return 0
-            if args.export_session:
-                save_private_bundle(
-                    args.output, chat.export_conversation(args.export_session)
-                )
-                print(json.dumps({"exported_session_id": args.export_session,
-                                  "path": str(args.output)}))
-                return 0
-            if args.import_bundle:
-                new_session = chat.import_conversation(
-                    load_private_bundle(args.import_bundle)
-                )
-                print(json.dumps({"imported_session_id": new_session}))
-                return 0
             budget = args.max_output_tokens or chat.preferred_output_tokens
             if args.interactive:
                 _run_interactive(chat, max_tokens=budget, as_json=args.json)
