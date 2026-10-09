@@ -157,14 +157,16 @@ class OfflineIndexQueue:
             raise OfflineQueueError("queue database and document library must differ")
         now = time.time()
         with self._lock:
+            # BEGIN IMMEDIATE makes deduplication atomic across *processes*.
+            self._db.execute("BEGIN IMMEDIATE")
             try:
-                # Reuse active matching work instead of spawning duplicate scans.
                 row = self._db.execute(
                     f"SELECT {_COLUMNS} FROM offline_index_jobs "
                     "WHERE source=? AND library=? AND state IN ('queued','running') "
                     "ORDER BY created_at LIMIT 1", (source, target),
                 ).fetchone()
                 if row is not None:
+                    self._db.execute("COMMIT")
                     return _as_job(row)
                 job_id = secrets.token_hex(16)
                 self._db.execute(
@@ -173,9 +175,11 @@ class OfflineIndexQueue:
                     "next_due_at) VALUES (?,'queued',?,?,0,?,?,?)",
                     (job_id, source, target, now, now, now),
                 )
-                return self.get(job_id)
-            except sqlite3.Error as exc:
-                raise OfflineQueueError("failed to enqueue local indexing work") from exc
+                self._db.execute("COMMIT")
+            except BaseException:
+                self._db.execute("ROLLBACK")
+                raise
+        return self.get(job_id)
 
     def get(self, job_id: str) -> IndexJob:
         job_id = _job_id(job_id)
