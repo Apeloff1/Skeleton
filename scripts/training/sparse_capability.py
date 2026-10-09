@@ -41,15 +41,20 @@ def _new_file(destination: Path, payload: bytes, *, dataset: Path) -> Path:
         os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
         0o600,
     )
+    original = os.fstat(fd)
     try:
         with os.fdopen(fd, "wb") as writer:
             writer.write(payload)
             writer.flush()
             os.fsync(writer.fileno())
     except BaseException:
-        # Never delete a competing writer's replacement after a failure.
+        # Only remove this operation's inode; preserve a competing process's
+        # replacement, even if a write or fsync failed.
         try:
-            if target.exists() and target.stat().st_nlink >= 1:
+            observed = target.lstat()
+            if (observed.st_dev, observed.st_ino) == (
+                original.st_dev, original.st_ino
+            ):
                 target.unlink()
         except OSError:
             pass
