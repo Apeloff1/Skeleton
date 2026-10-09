@@ -15,6 +15,7 @@ from typing import Any, Mapping
 from .game_rights import GameRightsError, admit_game_rights
 from .game_platform_catalog import GamePlatformError, plan_game_targets
 from .gameplay_capabilities import GameplayError, compile_level, compile_native_scene
+from .game_playability import check_game_playability
 
 SCHEMA = "skeleton.game.portable_capsule.v1"
 MAX_EDITS = 64
@@ -127,6 +128,9 @@ def make_game_capsule(
         if updated["shortest_goal_steps"] is None:
             raise GameCapsuleError("game project cannot have an unreachable goal")
         scene = compile_native_scene({"tiles": final_tiles})
+        real_playability = check_game_playability({
+            "tiles": final_tiles, "max_frames": 96,
+        })
         if scene["solid_tiles_covered"] != updated["solid_count"]:
             raise GameCapsuleError("scene collider coverage drift")
         plan = plan_game_targets(
@@ -153,7 +157,12 @@ def make_game_capsule(
         "playability": {
             "grid_goal_reachable": updated["goal_reachable"],
             "shortest_grid_steps": updated["shortest_goal_steps"],
-            "actual_controller_replay_qualified": False,
+            "actual_controller_replay_qualified": (
+                real_playability["status"] == "playable"
+            ),
+            "controller_search_status": real_playability["status"],
+            "controller_frames_if_playable": real_playability["controller_frames"],
+            "controller_trace_sha256": real_playability["controls_sha256"],
             "real_hardware_validated": False,
         },
         "output_kind": "engine_neutral_json_project",
@@ -211,6 +220,9 @@ def verify_game_capsule(capsule: Mapping[str, Any]) -> dict[str, Any]:
         replayed = _admit_edits(capsule["source_tilemap"], capsule["modifications"])
         scene = compile_native_scene({"tiles": capsule["tilemap"]})
         compiled = compile_level({"tiles": capsule["tilemap"]})
+        replay_check = check_game_playability({
+            "tiles": capsule["tilemap"], "max_frames": 96,
+        })
     except (GameplayError, GameCapsuleError) as exc:
         raise GameCapsuleError("capsule tilemap cannot be compiled") from exc
     if (
@@ -221,6 +233,22 @@ def verify_game_capsule(capsule: Mapping[str, Any]) -> dict[str, Any]:
         or not compiled["goal_reachable"]
     ):
         raise GameCapsuleError("capsule native scene or source tile hash mismatch")
+    gameplay = capsule["playability"]
+    if (
+        not isinstance(gameplay, dict)
+        or gameplay != {
+            "grid_goal_reachable": compiled["goal_reachable"],
+            "shortest_grid_steps": compiled["shortest_goal_steps"],
+            "actual_controller_replay_qualified": (
+                replay_check["status"] == "playable"
+            ),
+            "controller_search_status": replay_check["status"],
+            "controller_frames_if_playable": replay_check["controller_frames"],
+            "controller_trace_sha256": replay_check["controls_sha256"],
+            "real_hardware_validated": False,
+        }
+    ):
+        raise GameCapsuleError("capsule controller-playability evidence changed")
     receipt = capsule["rights_receipt"]
     if (
         not isinstance(receipt, dict)
