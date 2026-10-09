@@ -563,6 +563,12 @@ class OfflineChatStore:
                 "messages": stored.transcript.to_list(),
                 "turns": turns,
             }
+            grounding = self.turn_evidence(sid, model_digest, tokenizer_digest)
+            if any(item is not None for item in grounding):
+                # Legacy v1 exports stay byte/schema compatible. A v2 backup
+                # carries the complete immutable source snapshot per turn.
+                body["schema"] = _BUNDLE_SCHEMA_V2
+                body["evidence"] = grounding
             body_bytes = _stable_bytes(body)
             bundle = _stable_bytes({
                 "body": body,
@@ -592,9 +598,15 @@ class OfflineChatStore:
         if not isinstance(envelope, dict) or set(envelope) != {"body", "sha256"}:
             raise RuntimeContractError("invalid conversation bundle envelope")
         body = envelope["body"]
-        if not isinstance(body, dict) or set(body) != {
+        common_fields = {
             "schema", "model_digest", "tokenizer_digest", "revision", "messages", "turns"
-        } or body["schema"] != _BUNDLE_SCHEMA:
+        }
+        if not isinstance(body, dict) or (
+            body.get("schema") == _BUNDLE_SCHEMA and set(body) != common_fields
+        ) or (
+            body.get("schema") == _BUNDLE_SCHEMA_V2
+            and set(body) != common_fields | {"evidence"}
+        ) or body.get("schema") not in {_BUNDLE_SCHEMA, _BUNDLE_SCHEMA_V2}:
             raise RuntimeContractError("unsupported conversation bundle schema")
         if not hmac.compare_digest(
             _sha256(envelope["sha256"], "bundle digest"),
@@ -650,6 +662,24 @@ class OfflineChatStore:
                 turn["generated_tokens"],
             ))
         _validate_complete_history(transcript, turns)
+        evidence = (body["evidence"] if body["schema"] == _BUNDLE_SCHEMA_V2
+                    else [None] * len(turns))
+        if not isinstance(evidence, list) or len(evidence) != len(turns):
+            raise RuntimeContractError("grounding backup evidence count mismatch")
+        checked_evidence = []
+        for index, item in enumerate(evidence):
+            if item is None:
+                continue
+            question = dialogue[index * 2].content
+            from skeleton.app.offline_grounding import validate_evidence
+            encoded_evidence = validate_evidence(
+                item, question, turns[index]["request_digest"],
+                model_digest, tokenizer_digest,
+            )
+            checked_evidence.append((
+                turns[index]["request_id"], encoded_evidence.decode("utf-8"),
+                sha256(encoded_evidence).hexdigest(),
+            ))
         serialized = transcript.to_json()
         if len(serialized.encode("utf-8")) > MAX_TRANSCRIPT_BYTES:
             raise RuntimeContractError("restored conversation exceeds byte budget")
@@ -662,6 +692,10 @@ class OfflineChatStore:
             self._db.executemany(
                 "INSERT INTO offline_turns VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 [(new_id, *row) for row in validated],
+            )
+            self._db.executemany(
+                "INSERT INTO offline_turn_evidence VALUES (?, ?, ?, ?)",
+                [(new_id, *row) for row in checked_evidence],
             )
         return new_id
 
@@ -705,7 +739,8 @@ class OfflineChatStore:
     def commit(self, *, session: StoredChat, request_id: str,
                request_digest: str, transcript: ChatTranscript, text: str,
                output_digest: str, prompt_tokens: int,
-               generated_tokens: int) -> OfflineTurnReceipt:
+               generated_tokens: int,
+               evidence_manifest: dict[str, Any] | None = None) -> OfflineTurnReceipt:
         rid = _identifier("request id", request_id)
         if (not isinstance(transcript, ChatTranscript) or not isinstance(text, str)
                 or not text.strip()):
@@ -729,6 +764,13 @@ class OfflineChatStore:
             raise RuntimeContractError("invalid native generation output digest")
         if any(type(n) is not int or n < 0 for n in (prompt_tokens, generated_tokens)):
             raise RuntimeContractError("invalid native generation token count")
+        stored_evidence = None
+        if evidence_manifest is not None:
+            from skeleton.app.offline_grounding import validate_evidence
+            stored_evidence = validate_evidence(
+                evidence_manifest, next_messages[-2].content, request_digest,
+                session.model_digest, session.tokenizer_digest,
+            )
         with self._transaction():
             existing = self._db.execute(
                 "SELECT request_digest, revision, text, output_digest, prompt_tokens, "
@@ -753,6 +795,12 @@ class OfflineChatStore:
                 (session.session_id, rid, request_digest, session.revision + 1,
                  text, output_digest, prompt_tokens, generated_tokens),
             )
+            if stored_evidence is not None:
+                self._db.execute(
+                    "INSERT INTO offline_turn_evidence VALUES (?, ?, ?, ?)",
+                    (session.session_id, rid, stored_evidence.decode("utf-8"),
+                     sha256(stored_evidence).hexdigest()),
+                )
             return OfflineTurnReceipt(session.session_id, rid, session.revision + 1,
                                       text, output_digest, prompt_tokens,
                                       generated_tokens, False)
