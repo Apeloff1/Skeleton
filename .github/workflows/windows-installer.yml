@@ -15,6 +15,10 @@ on:
       - "skeleton/ai/runtime/game_playability.py"
       - "skeleton/ai/runtime/game_platform_catalog.py"
       - "skeleton/ai/runtime/game_rights.py"
+      - "skeleton/ai/runtime/homebrew_editor.py"
+      - "skeleton/app/homebrew_editor_ui.py"
+      - "scripts/game/homebrew_edit.py"
+      - "skeleton/testing/test_homebrew_editor.py"
       - "skeleton/ai/runtime/game_project_capsule.py"
       - "skeleton/ai/runtime/chip8_machine.py"
       - "scripts/game/export_chip8.py"
@@ -44,6 +48,10 @@ on:
       - "skeleton/ai/runtime/game_playability.py"
       - "skeleton/ai/runtime/game_platform_catalog.py"
       - "skeleton/ai/runtime/game_rights.py"
+      - "skeleton/ai/runtime/homebrew_editor.py"
+      - "skeleton/app/homebrew_editor_ui.py"
+      - "scripts/game/homebrew_edit.py"
+      - "skeleton/testing/test_homebrew_editor.py"
       - "skeleton/ai/runtime/game_project_capsule.py"
       - "skeleton/ai/runtime/chip8_machine.py"
       - "scripts/game/export_chip8.py"
@@ -384,6 +392,70 @@ jobs:
           if ($chip8Repeat.rom_sha256 -ne $chip8Receipt.rom_sha256) {
             throw "CHIP-8 ROM changed between independent frozen EXE runs"
           }
+
+          # End-to-end ORIGINAL HOME-BREW production. Compose a new
+          # rights-attested 7x7 level, edit the actual geometry using the
+          # 11-tool engine, then compile the edited output via the
+          # installed Windows EXE into authentic CHIP-8 bytecode and WIN.
+          $sourceHomebrew = Join-Path $env:RUNNER_TEMP "SkeletonOriginalEditableHomebrew.json"
+          $homebrewRecipe = Join-Path $env:RUNNER_TEMP "SkeletonHomebrewRecipe.json"
+          $editedHomebrew = Join-Path $env:RUNNER_TEMP "SkeletonEditedHomebrew.json"
+          $editedHomebrewRom = Join-Path $env:RUNNER_TEMP "SkeletonEditedHomebrew.ch8"
+          & python scripts/game/game_project.py --demo-project $sourceHomebrew --seed 42 --width 7 --height 7 --targets chip8-vip,windows-11
+          if ($LASTEXITCODE -ne 0) {
+            throw "could not originate editable lawful 7x7 CHIP-8 game"
+          }
+          $optionJson = & python scripts/game/homebrew_edit.py --capsule $sourceHomebrew --tools
+          if ($LASTEXITCODE -ne 0) {
+            throw "homebrew editor options unavailable"
+          }
+          $options = $optionJson | ConvertFrom-Json
+          if (-not $options.homebrew_only -or $options.tool_count -lt 11 -or
+              $options.third_party_game_import_allowed -or
+              $options.max_edited_cells -lt 1024) {
+            throw "homebrew editor capabilities bypassed original-only policy"
+          }
+          $baseProject = Get-Content -LiteralPath $sourceHomebrew -Raw -Encoding utf8 | ConvertFrom-Json
+          $oldCell = $baseProject.tilemap[2].Substring(2, 1)
+          $newCell = if ($oldCell -eq "#") { "." } else { "#" }
+          $recipe = @{
+            schema_version = "skeleton.game.homebrew_editor_recipe.v1"
+            base_tile_sha256 = $baseProject.edited_tile_sha256
+            batches = @(
+              @{
+                commands = @(@{ op = "paint"; x = 2; y = 2; tile = $newCell })
+                require_grid_route = $true
+                require_controller_win = $false
+              }
+            )
+            analysis_targets = @("chip8-vip", "windows-11")
+            require_final_controller_win = $false
+          }
+          $recipe | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $homebrewRecipe -Encoding utf8
+          $editRaw = & python scripts/game/homebrew_edit.py --capsule $sourceHomebrew --recipe $homebrewRecipe --output $editedHomebrew
+          if ($LASTEXITCODE -ne 0) {
+            throw "homebrew editor failed to produce new original project"
+          }
+          $editReceipt = $editRaw | ConvertFrom-Json
+          if (-not $editReceipt.homebrew_only -or
+              $editReceipt.third_party_rom_exported -or
+              $editReceipt.modified_cells -ne 1 -or
+              $editReceipt.training_examples_added -ne 0 -or
+              $editReceipt.new_capsule_sha256 -eq $editReceipt.source_capsule_sha256) {
+            throw "homebrew editor did not preserve original-only project identity"
+          }
+          $editedRomRaw = & $offline --chip8-export-capsule $editedHomebrew --chip8-rom-output $editedHomebrewRom
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed SkeletonOffline.exe could not compile edited original game"
+          }
+          $editedRom = $editedRomRaw | ConvertFrom-Json
+          if (-not $editedRom.acceptance.win_state_reached -or
+              -not $editedRom.original_homebrew_only -or
+              $editedRom.licensed_sdk_embedded -or
+              $editedRom.training_examples_added -ne 0) {
+            throw "edited original CHIP-8 game was not actually executable homebrew"
+          }
+
 
           # The separate native SkeletonGame.exe exposes a real CHIP-8
           # framebuffer/keypad mode. Its headless simulation must independently
