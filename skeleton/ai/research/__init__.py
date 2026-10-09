@@ -1,6 +1,6 @@
 """Research evidence and historical lineage; this namespace grants no production authority."""
 
-from ..research import (
+from .contracts import (
     EvidenceGraph,
     EvidenceNode,
     ExperimentPlan,
