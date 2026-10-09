@@ -260,7 +260,9 @@ def test_legitimate_original_capsule_contains_real_scene_and_modifiable_map():
     assert game["scene"]["solid_tiles_covered"] > 0
     assert game["scene"]["entities"][0]["kind"] == "controllable_actor"
     assert game["playability"]["grid_goal_reachable"] is True
-    assert game["playability"]["actual_controller_replay_qualified"] is False
+    assert game["playability"]["actual_controller_replay_qualified"] == (
+        game["playability"]["controller_search_status"] == "playable"
+    )
     assert game["console_rom_or_native_export_generated"] is False
     assert game["legal_release_authorized"] is False
     assert game["training_examples_added"] == 0
