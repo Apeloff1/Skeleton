@@ -33,7 +33,7 @@ def test_machine_validator_executes_complete_inventory_and_vectors():
  module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
  result=module.validate(ROOT)
  assert result["status"]=="valid"
- assert result["contract_count"]==36
+ assert result["contract_count"]==40
  assert result["executed_vector_count"]==result["vector_count"]
  assert result["authority_scope"]=="contract-conformance-only"
  assert len(result["qualification_digest"])==64
