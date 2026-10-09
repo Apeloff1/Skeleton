@@ -104,6 +104,27 @@ class TestEvaluatedOfflineImprovement(unittest.TestCase):
                     improve_local_model(source, train, heldout, dest)
             self.assertFalse(dest.exists())
 
+    def test_rejects_embedded_heldout_passage_before_any_gradient(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source, train, heldout, destination = self._fixture(directory)
+            # Not an identical line: the evaluation passage was copied from
+            # inside a longer training example after token normalization.
+            train.write_text(
+                "user hello assistant world alpha beta\n",
+                encoding="utf-8",
+            )
+            heldout.write_text(
+                "HELLO, assistant world alpha\n",
+                encoding="utf-8",
+            )
+            with patch.object(
+                TinyTransformer, "fit",
+                side_effect=AssertionError("leaked holdout must not train"),
+            ):
+                with self.assertRaisesRegex(OfflineImprovementError, "overlaps"):
+                    improve_local_model(source, train, heldout, destination)
+            self.assertFalse(destination.exists())
+
     def test_rejects_wrong_vocabulary_and_missing_evaluation(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             source, train, heldout, dest = self._fixture(d)
