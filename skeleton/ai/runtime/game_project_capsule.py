@@ -257,6 +257,14 @@ def verify_game_capsule(capsule: Mapping[str, Any]) -> dict[str, Any]:
         or receipt.get("action") != capsule["action"]
         or receipt.get("legal_compliance_certified") is not False
         or receipt.get("distribution_authorized") is not False
+        or receipt.get("human_legal_review_completed") is not False
+        or receipt.get("all_licenses_independently_verified") is not False
+        or receipt.get("training_authorized") is not False
+        or receipt.get("requires_human_review_for_release") is not True
+        or receipt.get("rights_assertion_only") is not True
+        or receipt.get("technology_circumvention_performed") is not False
+        or not isinstance(receipt.get("manifest_sha256"), str)
+        or len(receipt["manifest_sha256"]) != 64
     ):
         raise GameCapsuleError("capsule has incompatible rights receipt")
     # Rebuild every advertised platform row from the checked-in catalog.
