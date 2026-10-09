@@ -48,8 +48,17 @@ def test_native_emitters_make_platform_specific_source_not_html(target):
     assert p.digest==sha(p.files)
     assert p==make(target)
     assert all(not name.endswith(".html") for name in p.files)
-    assert "Makefile" in p.files or "CMakeLists.txt" in p.files
-    assert "src/main.c" in p.files or "src/main.asm" in p.files or "src/main.s" in p.files
+    # Arduboy is a genuine AVR C++ PlatformIO project; it must not be
+    # incorrectly forced into a C/Makefile contract for unrelated targets.
+    if target=="arduboy":
+        assert "platformio.ini" in p.files
+        assert "src/main.cpp" in p.files
+        assert "board = arduboy" in p.files["platformio.ini"]
+        assert "#include <Arduboy2.h>" in p.files["src/main.cpp"]
+    else:
+        assert "Makefile" in p.files or "CMakeLists.txt" in p.files
+        assert ("src/main.c" in p.files or "src/main.asm" in p.files
+                or "src/main.s" in p.files)
     assert "source_generated" in p.files["dragon-native-manifest.json"]
     assert "physics" in p.deferred_mechanics if target in ("game_boy","nes","dos_vga") else True
 
