@@ -77,6 +77,39 @@ class CreditsBundle:
     release_authorized: bool = False
     licensed_material_independently_cleared: bool = False
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.project_id, str) or not _ID.fullmatch(self.project_id):
+            raise CreditsError("invalid credited project")
+        if not isinstance(self.target_platform_id, str) or not _ID.fullmatch(self.target_platform_id):
+            raise CreditsError("invalid credited platform")
+        if any(type(getattr(self, v)) is not bool or getattr(self, v) is not False for v in (
+            "release_authorized", "licensed_material_independently_cleared",
+        )):
+            raise CreditsError("credits cannot grant a release permission or legal clearance")
+        if not isinstance(self.review_issues, tuple) or any(
+            not isinstance(v, str) or not v for v in self.review_issues
+        ):
+            raise CreditsError("invalid material review issues")
+        if any(not isinstance(v, str) for v in (
+            self.credits_md, self.third_party_notices_txt, self.inventory_json
+        )):
+            raise CreditsError("invalid authored notices")
+        expected = sha256((
+            self.credits_md + "\\0" + self.third_party_notices_txt + "\\0" + self.inventory_json
+        ).encode("utf-8")).hexdigest()
+        if not _is_sha256(self.bundle_sha256) or expected != self.bundle_sha256:
+            raise CreditsError("reviewed credit and notice bytes do not match digest")
+        try:
+            inventory = json.loads(self.inventory_json)
+        except (TypeError, ValueError) as exc:
+            raise CreditsError("invalid rights inventory") from exc
+        if (not isinstance(inventory, dict) or
+            inventory.get("project_id") != self.project_id or
+            inventory.get("target_platform_id") != self.target_platform_id or
+            inventory.get("legal_clearance_granted") is not False or
+            inventory.get("review_issues") != list(self.review_issues)):
+            raise CreditsError("credit inventory metadata differs from signed manifest")
+
     def as_receipt(self) -> dict[str, object]:
         return {
             "schema": "skeleton.game_builder.credits_bundle.v1",
@@ -87,6 +120,10 @@ class CreditsBundle:
             "release_authorized": False,
             "third_party_licenses_legally_certified": False,
         }
+
+
+def _is_sha256(value: object) -> bool:
+    return isinstance(value, str) and bool(_SHA.fullmatch(value))
 
 
 def _md(text: str) -> str:
