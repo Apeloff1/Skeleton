@@ -113,7 +113,7 @@ def _read_document(
     finally:
         if fd is not None:
             os.close(fd)
-    if len(raw) > MAX_DOCUMENT_BYTES or b"\\x00" in raw:
+    if len(raw) > MAX_DOCUMENT_BYTES or b"\x00" in raw:
         raise OfflineLibraryError("unsupported binary or oversized local document")
     try:
         body = raw.decode("utf-8", "strict")
