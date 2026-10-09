@@ -44,6 +44,10 @@ opt-in, not proof of an isolated host.
 | F14: SQLite companion redirection | Selected database has a symlinked `-wal`, `-shm` or `-journal` companion that points outside the intended directory | Shared SQLite path admission rejects symlink/special-file companions before opening offline workspace, library, queue, snapshots and audits | `test_offline_sqlite_safety.py` |
 | F15: Incomplete release qualification | Syntax defects or a frozen EXE missing local queue/recovery code escape review | Exact-head P2 pipeline now parse-checks offline Python before dependency installation; Windows installer smoke exercises queue completion, restored job quarantine, and semantic re-audit | P2 Local Inference + Windows Installer; exact-head verdict pending |
 
+| F16: Unverified model continuity | A smoke fixture or artifact digest passes even though a deployed model cannot infer a second turn from reopened persisted conversation | Added `--qualify-model`: two actual local model generations, fresh engine/session per turn, SQLite reload and model/runtime digest re-admission. The signed/airgap/quality fields remain false | `test_offline_console.py`, `test_app_offline_gguf.py`, installed Windows console smoke |
+| F17: Ambiguous GGUF configuration | Duplicate JSON members, NaN constants, giant manifests or symlinked manifest files confuse runtime admission | Strict duplicate-key and nonfinite rejection; bounded UTF-8 manifest read and direct symlink guard | `test_local_model_deployment.py` |
+| F18: Misleading qualification success | A first turn succeeds but the second generation fails while tooling still prints a successful receipt | Qualification emits success only after both model turns, persisted state and final artifact revalidation; injected second-call fault must return error with no success JSON | `test_offline_console.py` |
+
 ## Invariants checked by acceptance tests
 
 1. Document indexing never fetches a URL or executes indexed source text.
@@ -110,3 +114,25 @@ installation after a process interruption. The frozen native smoke fixture is
 
 A passing static review or successful commit does not substitute for those
 runtime outcomes.
+
+## Final-head functional acceptance extension
+
+The `--qualify-model` command checks one complete temporary model session,
+closes the connection, recreates its local engine and session, restores the
+first conversation turn, executes a second model call, and independently
+reopens SQLite to verify both committed turns. The receipt reports only
+output hashes, execution receipt digests and token counts, not raw answers.
+
+The installed Windows console test generates a deterministic synthetic
+native checkpoint on CI and qualifies it **through the installed EXE**. This
+is stronger than `--native-smoke` but is still not a trained-model test
+or evidence of host isolation. A separately trusted real GGUF executable
+and licensed weights are required for target-device acceptance.
+
+The deployment manifest parser now fails closed for duplicate JSON keys
+at any depth, NaN/Infinity, oversized UTF-8 input and direct manifest
+symlinks. These are admission safeguards, not publisher authentication.
+
+**No release signed:** The exact-head P2, Windows Installer, App Assembly,
+Backend Quality and Merge Readiness jobs must pass, and device-specific
+runtime/provenance/network checks must be completed independently.
