@@ -1,0 +1,738 @@
+{
+  "records": [
+    {
+      "trial_id": "T-0000",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1000 GB-0 AIFT-TRIAL-0",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0001",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1001 GB-1 AIFT-TRIAL-1",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0002",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1002 GB-2 AIFT-TRIAL-2",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0003",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1003 GB-3 AIFT-TRIAL-3",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0004",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1004 GB-4 AIFT-TRIAL-4",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0005",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1005 GB-5 AIFT-TRIAL-5",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0006",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1006 GB-6 AIFT-TRIAL-6",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0007",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1007 GB-7 AIFT-TRIAL-7",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0008",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1008 GB-8 AIFT-TRIAL-8",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0009",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1009 GB-9 AIFT-TRIAL-9",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0010",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1010 GB-10 AIFT-TRIAL-10",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0011",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1011 GB-11 AIFT-TRIAL-11",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0012",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1012 GB-12 AIFT-TRIAL-12",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0013",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1013 GB-13 AIFT-TRIAL-13",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0014",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1014 GB-14 AIFT-TRIAL-14",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0015",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1015 GB-15 AIFT-TRIAL-15",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0016",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1016 GB-16 AIFT-TRIAL-16",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0017",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1017 GB-17 AIFT-TRIAL-17",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0018",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1018 GB-18 AIFT-TRIAL-18",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0019",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1019 GB-19 AIFT-TRIAL-19",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0020",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1020 GB-20 AIFT-TRIAL-20",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0021",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1021 GB-21 AIFT-TRIAL-21",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0022",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1022 GB-22 AIFT-TRIAL-22",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0023",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1023 GB-23 AIFT-TRIAL-23",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0024",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1024 GB-24 AIFT-TRIAL-24",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0025",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1025 GB-25 AIFT-TRIAL-25",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0026",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1026 GB-26 AIFT-TRIAL-26",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0027",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1027 GB-27 AIFT-TRIAL-27",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0028",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1028 GB-28 AIFT-TRIAL-28",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0029",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1029 GB-29 AIFT-TRIAL-29",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0030",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1030 GB-30 AIFT-TRIAL-30",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0031",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1031 GB-31 AIFT-TRIAL-31",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0032",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1032 GB-32 AIFT-TRIAL-32",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0033",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1033 GB-33 AIFT-TRIAL-33",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0034",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1034 GB-34 AIFT-TRIAL-34",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0035",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1035 GB-35 AIFT-TRIAL-35",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0036",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1036 GB-36 AIFT-TRIAL-36",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0037",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1037 GB-37 AIFT-TRIAL-37",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0038",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1038 GB-38 AIFT-TRIAL-38",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0039",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1039 GB-39 AIFT-TRIAL-39",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0040",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1040 GB-0 AIFT-TRIAL-40",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0041",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1041 GB-1 AIFT-TRIAL-41",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0042",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1042 GB-2 AIFT-TRIAL-42",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0043",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1043 GB-3 AIFT-TRIAL-43",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0044",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1044 GB-4 AIFT-TRIAL-44",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0045",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1045 GB-5 AIFT-TRIAL-45",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "T-0046",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1046 GB-6 AIFT-TRIAL-46",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": 2
+      },
+      "output_digest": "0455fca8784c3c06c02519672e1e88d7e567303f6438d55112c9074c375f8303"
+    },
+    {
+      "trial_id": "T-0047",
+      "stimulus": "github.com/Apeloff1/Skeleton VOL-1047 GB-7 AIFT-TRIAL-47",
+      "capability_id": "AIFT-POINTER-PARSE",
+      "expect_fail": false,
+      "output": {
+        "hit": 1,
+        "law": "trial",
+        "n": 4,
+        "head": "github.com/Apeloff1/Skeleton",
+        "mismatch_at": null
+      },
+      "output_digest": "7c4dd517ea7266632b3eb995481c5dec2cf30f84652ee97e1cddbacfd6a35f78"
+    },
+    {
+      "trial_id": "N-SECRET",
+      "stimulus": "negative:scan",
+      "capability_id": "NEG-scan",
+      "expect_fail": true,
+      "output": {
+        "hit": 0,
+        "law": "secret",
+        "detail": "live secret refused"
+      },
+      "output_digest": "71dcee772c08e1d41ac9dd5d8f72d6d4d46be08596091921d377d0ab116b60e2"
+    },
+    {
+      "trial_id": "N-GPU",
+      "stimulus": "negative:mobile",
+      "capability_id": "NEG-mobile",
+      "expect_fail": true,
+      "output": {
+        "hit": 0,
+        "law": "gpu-on-mobile",
+        "detail": "gpu"
+      },
+      "output_digest": "dc0fcca3ac4454e9e992d601c60480a585eaed4fd7135526c06936592f4b2c19"
+    },
+    {
+      "trial_id": "N-ROUTER",
+      "stimulus": "negative:router",
+      "capability_id": "NEG-router",
+      "expect_fail": true,
+      "output": {
+        "hit": 0,
+        "law": "third-router",
+        "detail": "shadow-router"
+      },
+      "output_digest": "4b0fd50e3957228e324885f3953a7d2be1f8d1c795689c5d834d28196d1bcb53"
+    },
+    {
+      "trial_id": "N-FRAME",
+      "stimulus": "negative:frame",
+      "capability_id": "NEG-frame",
+      "expect_fail": true,
+      "output": {
+        "hit": 0,
+        "law": "executable-frame",
+        "detail": "frame is not code"
+      },
+      "output_digest": "f082ead7e59ece8c03e88cd4fc7a589d406da83b3760e3a7302891ebabc67355"
+    },
+    {
+      "trial_id": "N-CAP",
+      "stimulus": "negative:cap",
+      "capability_id": "NEG-cap",
+      "expect_fail": true,
+      "output": {
+        "hit": 0,
+        "law": "over-cap",
+        "detail": "9"
+      },
+      "output_digest": "176a46c1e4a04094134a2f809694f03a6be9cb5ff7a005a98a0f1cc001436e58"
+    }
+  ],
+  "log_digest": "f7bd4d57301d35d6cf96af385679dac7c29564ebc07b9ad0b0d37fcac24faa05",
+  "independent": true
+}

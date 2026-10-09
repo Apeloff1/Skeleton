@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AIFT-NATIVE-TREE-FILL",
+    "path": "skeleton/ai/tree_fill.py",
+    "kind": "file",
+    "ownership_mode": "canonical_native",
+    "residual_only": false,
+    "role": "Non-owning facade for contrib/ai-tree-fill. Not a cutover.",
+    "volume_refs": [
+      "VOL-113"
+    ]
+  }
+]

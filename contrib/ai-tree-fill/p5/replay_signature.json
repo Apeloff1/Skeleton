@@ -1,0 +1,14 @@
+{
+  "alg": "Ed25519",
+  "artifact_digest": "edfdae4371082da366123184c9a5e1e03051de35329e6259979486630f9ff720",
+  "evidence_bundle_digest": "f7bd4d57301d35d6cf96af385679dac7c29564ebc07b9ad0b0d37fcac24faa05",
+  "fault_manifest_digest": "d99782ed5268e806de5c2224314e539a589612a09c1c754eaeb3b1fb8a10813d",
+  "git_sha": "9d4a652d",
+  "public_key_hex": "ec5c81f277e56f7184f2354ce883e35a9ee6ce91e42e48587baac7371eb2a6a3",
+  "role": "independent_verification",
+  "scope": "independent trials and ownership claim; not a tree-wide cutover signoff",
+  "signature": "02aff3e223bb6d8031a26d6eaeb052e3af087f6b9f4344a15dceb4210c64b2153fd890ecb4f5ddf26136f48621086891fce818734274abaed465a5c5491b860c",
+  "signed_at_utc": "2026-10-09T14:55:55Z",
+  "signer_id": "p5-replay-verifier",
+  "signer_type": "replay"
+}

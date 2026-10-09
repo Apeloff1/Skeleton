@@ -6181,7 +6181,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "178_mapping_plus_24_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "178_mapping_plus_25_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7484,6 +7484,17 @@
         ]
       },
       "policy": "Replace stale or shorthand mature-volume implementation paths with current repository owners and bind newly exposed governed AI owners without changing runtime behavior, cutover authority, implementation maturity, completion signatures, or independent verification."
+    },
+    "ai_tree_fill_p5_2026_10_09": {
+      "status": "owner_claimed_not_cutover",
+      "path": "skeleton/ai/tree_fill.py",
+      "contrib": "contrib/ai-tree-fill",
+      "faults_closed": [
+        "F-11",
+        "F-12",
+        "F-13"
+      ],
+      "signoff": "replay verifier only; implementation_signoff and verification_signoff remain unsigned"
     }
   },
   "native_ai_owners": [
@@ -7876,6 +7887,17 @@
       "role": "Canonical AI-native deterministic mathematical reference substrate for stable numerics, linear algebra, probability, optimization, and runtime parity evidence; no independent knowledge, model, promotion, or execution authority.",
       "volume_refs": [
         "VOL-012"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TREE-FILL",
+      "path": "skeleton/ai/tree_fill.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Non-owning facade for contrib/ai-tree-fill. Claim only. Not cutover. Not a tree-wide signoff.",
+      "volume_refs": [
+        "VOL-113"
       ]
     }
   ]

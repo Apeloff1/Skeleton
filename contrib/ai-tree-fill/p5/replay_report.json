@@ -1,0 +1,9 @@
+{
+  "log_digest": "f7bd4d57301d35d6cf96af385679dac7c29564ebc07b9ad0b0d37fcac24faa05",
+  "negatives": 5,
+  "result": "confirmed",
+  "role": "independent_verification",
+  "signer_id": "p5-replay-verifier",
+  "trials": 53,
+  "unique_stimuli": 48
+}
