@@ -293,3 +293,37 @@ available native-source destinations currently cover three modern
 desktop operating systems, two different classic cartridge formats,
 Commodore 64 and 8086 DOS. The broader archive still remains research/
 design-only wherever a true machine-specific backend is absent.
+
+## Original Atari 8-bit game programs: authentic 6502 / ANTIC / GTIA / POKEY
+
+The builder now includes `atari8_native_export.py`, a separate genuine
+Atari 400/800 **48KB-class** native source adapter. It translates the
+original, independently solvable maze world into a DOS-loadable `.xex`
+project built by `cl65 -t atari`. It uses the Atari OS 40-column
+text display through cc65 `conio`, the real STICK0 joystick shadow
+at $0278, ANTIC's VCOUNT ($D40B) as the frame clock, Atari colour
+shadows, and original POKEY audio on $D200/$D201. The produced game
+has interactive movement, all separate original levels, collectible
+clearing, hazard damage, health, scoring and victory conditions.
+It uses no Atari commercial-game ROMs or artwork.
+
+`Game Builder Native Atari 8-bit XEX` compiles an actual 6502
+executable with cc65 on an Ubuntu runner and checks the Atari segmented
+load format, valid segment address bounds, RUNAD autostart and source
+hash before uploading the binary as a downloadable workflow artifact.
+This is a *compilation-level* control: passing such a gate does not
+imply full Atari OS emulation, physical hardware verification, or
+rights to redistribute material that was not independently authored.
+
+This specific program envelope assumes a compatible Atari 8-bit
+OS installation and adequate RAM. The early 16KB Atari 400 cannot
+be treated as equivalent to a later 48KB configuration without a
+separate real memory-budget pass. The larger family of 5200, XE,
+XEGS and compatible Atari machines remains catalogued but is
+not fraudulently counted as additional independently certified
+game exporters.
+
+**Source-engine progress**: three desktop builds plus separate
+Game Boy, NES, Commodore 64, IBM DOS 8086 and Atari 400/800
+native-source adapters. These are eight authored targets, not
+eight legally approved commercial cartridge reissues.
