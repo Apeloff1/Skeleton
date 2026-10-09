@@ -131,6 +131,11 @@ def test_windows_build_is_pinned_and_hashes_installer():
     assert "& git @ArchiveArgs" in source
     assert "Get-FileHash -Algorithm SHA256" in source
     assert "Skeleton-Setup-*-windows-x64.exe" in source
+    assert '"--windowed",' in source
+    assert '$ConsoleArgs[$WindowFlagIndex] = "--console"' in source
+    assert '$ConsoleArgs[$LauncherNameIndex] = "SkeletonCLI"' in source
+    assert 'Join-Path $LauncherDist "SkeletonCLI.exe"' in source
+    assert 'Join-Path $PayloadDir "SkeletonCLI.exe"' in source
     assert '"--hidden-import", "skeleton.app.local_ai_acceptance",' in source
     assert "ISCC.exe" in source
 
@@ -192,6 +197,12 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert '@("--local-ai-training-smoke")' in source
     assert '@("--local-ai-benchmark-smoke")' in source
     assert '"--offline-command", "local-ai"' in source
+    assert 'Join-Path $installDir "SkeletonCLI.exe"' in source
+    assert '$cliTrain = Start-Process -FilePath $cliLauncher' in source
+    assert '$cliInspect = Start-Process -FilePath $cliLauncher' in source
+    assert '$acceptance = Start-Process -FilePath $cliLauncher' in source
+    assert '$missingGguf = Start-Process -FilePath $cliLauncher' in source
+    assert "uninstall left installed native console executable behind" in source
     assert '"--gguf-model"' in source
     assert '"--llama-executable"' in source
     assert "GGUF command did not fail closed" in source
