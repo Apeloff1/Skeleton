@@ -226,6 +226,7 @@ class NativeLLMRuntime:
         requested = policy.requested
         wants_kv_policy = (
             policy.kv_dtype != "fp32" or policy.kv_limit_bytes is not None
+            or policy.prefill_query_chunk is not None
         )
         if policy.kv_limit_bytes is not None and (
             policy.kv_limit_bytes > self.limits.max_kv_bytes
@@ -235,7 +236,7 @@ class NativeLLMRuntime:
             )
         if requested == "cpu" and wants_kv_policy:
             raise RuntimeContractError(
-                "KV compression/budget requires a Torch execution device"
+                "KV compression/budget or chunked prefill requires a Torch execution device"
             )
         current = str(getattr(self.model, "device", "cpu") or "cpu")
         was_resident = bool(getattr(self.model, "resident", False))
@@ -249,6 +250,7 @@ class NativeLLMRuntime:
                         requested,
                         kv_dtype=policy.kv_dtype,
                         max_kv_bytes=policy.kv_limit_bytes,
+                        prefill_query_chunk=policy.prefill_query_chunk,
                     )
                 else:
                     # Preserve compatibility with legacy device binders and
@@ -281,6 +283,7 @@ class NativeLLMRuntime:
             requested, actual, resident, degraded,
             policy.kv_dtype if resident else "fp32",
             policy.kv_limit_bytes if resident else None,
+            policy.prefill_query_chunk if resident else None,
         )
 
     def bind_device(self, policy: DevicePolicy) -> DeviceReceipt:
