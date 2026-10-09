@@ -15,6 +15,10 @@ from skeleton.ai.game_builder.legal_paths import (
     MaterialRecord, assess_homebrew, hardware_rights_matrix, legal_authorities,
 )
 from skeleton.ai.game_builder.legal_port_bridge import propose_rights_aware_port
+from skeleton.ai.game_builder.legal_native_export import (
+    ClearedSourceExportError, compile_rights_aware_desktop, export_rights_aware_desktop,
+)
+from skeleton.ai.game_builder.playable_world import GameBuildIntent, generate_playable_world
 from skeleton.ai.game_builder.legal_census import catalog_rights_census
 from skeleton.ai.game_builder.port_planner import HomebrewSource, PortMode
 
@@ -267,3 +271,63 @@ def test_every_catalogued_historical_system_has_a_legal_review_profile():
                for x in census.records.values())
     assert all("jurisdiction_and_current_statutory_exceptions" in x.review_questions
                for x in census.records.values())
+
+
+
+def _original_world():
+    return generate_playable_world(GameBuildIntent(
+        project_id="authored-next-age-game", title="Fresh Successor", subtitle="Cross-era",
+        seed=10087, width=11, height=11, levels=1, collectibles_per_level=1,
+        hazards_per_level=0, theme="space",
+    ), authorized=True)
+
+
+def test_legally_guarded_desktop_source_bundles_explicit_nonrelease_receipt(tmp_path):
+    world = _original_world()
+    package = compile_rights_aware_desktop(world, owned_source(), request(), authorized=True)
+    again = compile_rights_aware_desktop(world, owned_source(), request(), authorized=True)
+    assert package == again
+    assert package.project.output_kind == "native_sdl2_source_project"
+    assert package.native_executable_compiled is False
+    assert package.release_authorized is False
+    receipt = package.legal_receipt()
+    assert receipt["legal_policy_disposition"] == "design_allowed_release_not_certified"
+    assert receipt["full_release_legality_certified"] is False
+    assert receipt["real_toolchain_run_verified"] is False
+    assert receipt["source_project_id"] == world.intent.project_id
+    assert len(receipt["combined_sha256"]) == 64
+    path = export_rights_aware_desktop(package, tmp_path / "native", authorized=True)
+    files = {p.name for p in path.iterdir()}
+    assert files == {"game.c", "CMakeLists.txt", "manifest.json", "legal_review.json"}
+    assert json.loads((path / "legal_review.json").read_text()) == receipt
+    with pytest.raises(FileExistsError):
+        export_rights_aware_desktop(package, path, authorized=True)
+
+
+@pytest.mark.parametrize("fact_change", [
+    {"distinctive_visual_or_narrative_similarity": True},
+    {"uses_franchise_title_or_marks": True},
+    {"implies_official_affiliation": True},
+    {"release_requested": True},
+])
+def test_guarded_native_source_refuses_unknown_clearance_or_release_requests(fact_change):
+    with pytest.raises(ClearedSourceExportError):
+        compile_rights_aware_desktop(
+            _original_world(), owned_source(), replace(request(), **fact_change),
+            authorized=True,
+        )
+
+
+def test_guarded_export_fails_closed_on_illegal_assets_and_other_project():
+    ripped = MaterialRecord("ripped", "art", MaterialKind.UNLICENSED_THIRD_PARTY)
+    with pytest.raises(ClearedSourceExportError):
+        compile_rights_aware_desktop(
+            _original_world(), owned_source(), request(material=ripped), authorized=True,
+        )
+    with pytest.raises(ClearedSourceExportError):
+        compile_rights_aware_desktop(
+            _original_world(), owned_source(),
+            replace(request(), project_id="different-project"), authorized=True,
+        )
+    with pytest.raises(PermissionError):
+        compile_rights_aware_desktop(_original_world(), owned_source(), request(), authorized=False)
