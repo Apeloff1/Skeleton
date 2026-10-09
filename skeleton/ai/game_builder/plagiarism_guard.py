@@ -200,7 +200,10 @@ class OriginalityReport:
 
 def _tokens(text: str) -> tuple[str, ...]:
     norm = unicodedata.normalize("NFKC", text).casefold()
-    return tuple(_WORD.findall(norm))[:_MAX_TOKENS]
+    found = _WORD.findall(norm)
+    if len(found) > _MAX_TOKENS:
+        raise OriginalityError("oversize expressive sample cannot be silently truncated")
+    return tuple(found)
 
 
 def _shingles(tokens: tuple[str, ...]) -> frozenset[tuple[str, ...]]:
@@ -222,8 +225,10 @@ def _longest_overlap(left: tuple[str, ...], right: tuple[str, ...]) -> int:
     longest = 0
     for i in range(max(0, len(left) - _SHINGLE + 1)):
         for j in positions.get(left[i:i + _SHINGLE], ()):
-            k = _SHINGLE
             limit = min(len(left) - i, len(right) - j)
+            if limit <= longest or left[i + longest] != right[j + longest]:
+                continue
+            k = max(_SHINGLE, longest)
             while k < limit and left[i + k] == right[j + k]:
                 k += 1
             longest = max(longest, k)
@@ -367,7 +372,8 @@ def audit_game_originality(
     review.add("NONEXHAUSTIVE_SIMILARITY_CORPUS_AND_HUMAN_RELEASE_REVIEW_REQUIRED")
     disposition = (
         OriginalityDisposition.BLOCKED if blockers else
-        OriginalityDisposition.HUMAN_REVIEW_REQUIRED if review else
+        OriginalityDisposition.HUMAN_REVIEW_REQUIRED
+        if review - {"NONEXHAUSTIVE_SIMILARITY_CORPUS_AND_HUMAN_RELEASE_REVIEW_REQUIRED"} else
         OriginalityDisposition.DESIGN_ADMISSIBLE_NOT_LEGAL_CLEARANCE
     )
     # A release-specific verification process must independently certify actual
