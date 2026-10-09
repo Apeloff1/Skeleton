@@ -162,6 +162,13 @@ jobs:
             throw "installed Skeleton.exe local CPU training smoke exited $($trainSmoke.ExitCode)"
           }
 
+          # Exercise real two-checkpoint/per-category heldout evaluation inside
+          # the installed frozen executable; never self-promote models.
+          $benchmarkSmoke = Start-Process -FilePath $launcher -ArgumentList @("--local-ai-benchmark-smoke") -Wait -PassThru
+          if ($benchmarkSmoke.ExitCode -ne 0) {
+            throw "installed Skeleton.exe native multi-category benchmark smoke exited $($benchmarkSmoke.ExitCode)"
+          }
+
           $uninstaller = Join-Path $installDir "unins000.exe"
           if (-not (Test-Path -LiteralPath $uninstaller)) {
             throw "uninstaller missing"
