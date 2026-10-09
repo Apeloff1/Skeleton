@@ -350,3 +350,35 @@ def test_torch_training_sync_marks_real_weight_mutations():
     assert after != before
     assert accel._weights_modified is False
     assert snapshot_digest(portable_model_snapshot(model)) == after
+
+
+def test_accelerator_sync_failure_never_silently_publishes_stale_weights(monkeypatch):
+    pytest.importorskip("torch")
+    model = _model()
+    model.to("torch")
+    accel = model._accel
+    assert accel is not None
+
+    def fail_sync():
+        raise OSError("device transfer failed")
+
+    monkeypatch.setattr(accel, "sync", fail_sync)
+    with pytest.raises(RuntimeError, match="refusing stale model weights"):
+        model.snapshot()
+    with pytest.raises(RuntimeError, match="refusing stale model weights"):
+        model.to("cpu")
+    assert model._accel is accel  # failed migration did not discard authority
+
+
+def test_hidden_sequence_avoids_duplicate_gpu_forward(monkeypatch):
+    pytest.importorskip("torch")
+    model = _model()
+    model.to("torch")
+    accel = model._accel
+    assert accel is not None
+    monkeypatch.setattr(
+        accel, "hidden",
+        lambda ids: (_ for _ in ()).throw(AssertionError("redundant GPU pass")),
+    )
+    output = model.hidden_seq("alpha beta")
+    assert len(output) == 2 and all(len(row) == model.dim for row in output)
