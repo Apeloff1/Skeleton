@@ -143,6 +143,11 @@ def computer_source(target_id:str,seed:int)->dict[str,str]:
     n=_seed(seed)
     if target_id not in PLATFORMS:
         raise ValueError("unimplemented original 8-bit computer target")
+    if target_id=="commodore_vic20":
+        # The cc65 conio CRT does not fit the original unexpanded 5 KiB VIC20.
+        # Emit a much smaller 6502 native KERNAL/screen-memory program.
+        from .dragon_vic20_tiny import vic20_tiny_source
+        return vic20_tiny_source(n)
     spec=PLATFORMS[target_id]
     body=SOURCE
     vars={

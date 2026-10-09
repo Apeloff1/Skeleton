@@ -9,6 +9,7 @@ on:
       - 'skeleton/ai/webcrawler/dragon_native_nintendo_ppc_3ds.py'
       - 'skeleton/ai/webcrawler/dragon_native_dreamcast_ps2.py'
       - 'skeleton/ai/webcrawler/dragon_native_8bit_computers.py'
+      - 'skeleton/ai/webcrawler/dragon_vic20_tiny.py'
       - 'skeleton/ai/webcrawler/dragon_desktop_abi.py'
       - 'skeleton/ai/webcrawler/dragon_native_targets.py'
       - 'skeleton/ai/webcrawler/dragon_native_projects.py'

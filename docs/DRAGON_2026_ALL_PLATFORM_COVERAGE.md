@@ -292,3 +292,18 @@ and no emulator or hardware certification is inferred.
 
 This increases *genre/kernel depth*, not the source-target count:
 still **55 of 169** platform identities with source emitters.
+
+## VIC-20 unexpanded memory fix after real compiler evidence
+
+The first cc65-based VIC-20 program **failed to link**, because the full
+C/conio startup and rendering exceeded the original unexpanded memory
+layout. The repaired implementation deliberately **does not request RAM
+expansion**. It compiles 6502 assembly with ca65/ld65, links a BASIC
+`SYS 4109` load/start program at $1001, stores game state below $1D00,
+uses KERNAL GETIN, writes directly to VIC-I screen RAM at $1E00,
+and touches the VIC-I border/sound registers at $900F/$900E.
+Gameplay retains W/A/S/D controls, star collection, moving foe,
+five hit points, retry and exit. The linker bounds code below
+$1C00, with no C runtime. Exact-heading CI still must prove
+compiler success and then emulator playback on a genuine unexpanded
+VIC-20. The source-target count remains 55.

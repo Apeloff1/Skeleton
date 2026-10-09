@@ -55,7 +55,7 @@ MILESTONES=(
   CurriculumMilestone("gb_input","game_boy","arcade_score_attack",(),
                        "D-pad game logic and SM83 sprites",100,"handheld_8bit"),
   CurriculumMilestone("gb_platforms","game_boy","side_scrolling_platformer",
-                       ("game_boy",),"scrolling camera and jump physics",95,"handheld_8bit"),
+                       ("game_boy",),"scrolling camera and jump physics",104,"handheld_8bit"),
   CurriculumMilestone("nes_chase","nes","arcade_score_attack",
                        ("game_boy",),"6502 CPU and NES CHR graphics",94,"cartridge_8bit"),
   CurriculumMilestone("nes_scroll","nes","side_scrolling_platformer",
