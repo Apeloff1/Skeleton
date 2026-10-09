@@ -142,6 +142,7 @@ def make_game_capsule(
         "project_id": admitted_rights["project_id"],
         "source_tile_sha256": initial["tile_digest"],
         "edited_tile_sha256": updated["tile_digest"],
+        "source_tilemap": list(source_tiles),
         "tilemap": list(final_tiles),
         "scene": scene,
         "target_plan": plan,
@@ -178,7 +179,7 @@ def verify_game_capsule(capsule: Mapping[str, Any]) -> dict[str, Any]:
         raise GameCapsuleError("game capsule must be an object")
     if set(capsule) != {
         "schema_version", "project_id", "source_tile_sha256",
-        "edited_tile_sha256", "tilemap", "scene", "target_plan",
+        "edited_tile_sha256", "source_tilemap", "tilemap", "scene", "target_plan",
         "rights_receipt", "modifications", "action", "jurisdiction",
         "playability", "output_kind", "game_data_provenance_attested",
         "legal_release_authorized",
@@ -206,12 +207,16 @@ def verify_game_capsule(capsule: Mapping[str, Any]) -> dict[str, Any]:
     ):
         raise GameCapsuleError("game capsule attempted to claim unverified release")
     try:
+        source = compile_level({"tiles": capsule["source_tilemap"]})
+        replayed = _admit_edits(capsule["source_tilemap"], capsule["modifications"])
         scene = compile_native_scene({"tiles": capsule["tilemap"]})
         compiled = compile_level({"tiles": capsule["tilemap"]})
-    except GameplayError as exc:
+    except (GameplayError, GameCapsuleError) as exc:
         raise GameCapsuleError("capsule tilemap cannot be compiled") from exc
     if (
         scene != capsule["scene"]
+        or source["tile_digest"] != capsule["source_tile_sha256"]
+        or replayed != capsule["tilemap"]
         or compiled["tile_digest"] != capsule["edited_tile_sha256"]
         or not compiled["goal_reachable"]
     ):
@@ -226,14 +231,34 @@ def verify_game_capsule(capsule: Mapping[str, Any]) -> dict[str, Any]:
         or receipt.get("distribution_authorized") is not False
     ):
         raise GameCapsuleError("capsule has incompatible rights receipt")
+    # Rebuild every advertised platform row from the checked-in catalog.
+    # Merely changing self-hashes must not turn a design-only target into a
+    # fake validated PlayStation/Nintendo/Xbox exporter.
     plan = capsule["target_plan"]
     if (
         not isinstance(plan, dict)
         or plan.get("design_only") is not True
         or plan.get("native_binaries_ready") != 0
         or plan.get("rom_images_created") != 0
+        or not isinstance(plan.get("targets"), list)
+        or not plan["targets"]
+        or not isinstance(plan["targets"][0], dict)
     ):
         raise GameCapsuleError("capsule claimed unsupported native platform readiness")
+    try:
+        requested = plan["targets"][0]["requested_features"]
+        expected_plan = plan_game_targets(
+            target_ids=[row["id"] for row in plan["targets"]],
+            required_features=requested,
+            sdk_authorizations={
+                row["id"]: "attested-not-independently-verified"
+                for row in plan["targets"] if row["sdk_reference_attested"] is True
+            },
+        )
+    except (KeyError, TypeError, GamePlatformError) as exc:
+        raise GameCapsuleError("capsule platform planning identity is invalid") from exc
+    if expected_plan != plan:
+        raise GameCapsuleError("capsule target plan differs from authenticated registry")
     return {
         "schema_version": "skeleton.game.portable_capsule.verify.v1",
         "capsule_sha256": capsule["capsule_sha256"],
