@@ -65,7 +65,7 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-VOL-030` — VOL-030 Distributed Systems — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-031` — VOL-031 Compute & Hardware — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-032` — VOL-032 High-Performance Native Core — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-033` — VOL-033 Java / JVM Plane — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-033` — VOL-033 Java / JVM Plane — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [x] `ACC-VOL-034` — VOL-034 Observability — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Evidence Identity Gate** — completed_at_utc: `2026-10-04T04:35:02Z`
 - [x] `ACC-VOL-035` — VOL-035 Evaluation Program — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Evidence Identity Gate** — completed_at_utc: `2026-10-04T04:35:02Z`
 - [x] `ACC-VOL-036` — VOL-036 Adversarial Evaluation — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Evidence Identity Gate** — completed_at_utc: `2026-10-04T04:35:02Z`
@@ -83,9 +83,9 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-VOL-048` — VOL-048 Updater — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-049` — VOL-049 Repair System — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-050` — VOL-050 Uninstaller — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
-- [ ] `ACC-VOL-051` — VOL-051 Repository Architecture — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-051` — VOL-051 Repository Architecture — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [x] `ACC-VOL-052` — VOL-052 Internal Python Architecture — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:23:00Z`
-- [ ] `ACC-VOL-053` — VOL-053 Import Architecture — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-053` — VOL-053 Import Architecture — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-054` — VOL-054 Machine Architecture Manifests — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [x] `ACC-VOL-055` — VOL-055 Architecture Linter — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:23:00Z`
 - [x] `ACC-VOL-056` — VOL-056 Gap Ledger — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Evidence Identity Gate** — completed_at_utc: `2026-10-04T04:32:01Z`
@@ -154,19 +154,19 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-VOL-119` — VOL-119 Completion Model — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-120` — VOL-120 Final Assembly Test — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-121` — VOL-121 Master Appendices — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-122` — VOL-122 Requirements Engineering — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-123` — VOL-123 Non-Functional Requirements — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-124` — VOL-124 Capability Taxonomy — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-125` — VOL-125 Capability Maturity Model — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-126` — VOL-126 Behavior Specifications — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-127` — VOL-127 State Machine Catalogue — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-128` — VOL-128 Interface Design Standard — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-122` — VOL-122 Requirements Engineering — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-123` — VOL-123 Non-Functional Requirements — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-124` — VOL-124 Capability Taxonomy — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-125` — VOL-125 Capability Maturity Model — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-126` — VOL-126 Behavior Specifications — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-127` — VOL-127 State Machine Catalogue — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-128` — VOL-128 Interface Design Standard — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [x] `ACC-VOL-129` — VOL-129 Schema Registry — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:23:00Z`
 - [x] `ACC-VOL-130` — VOL-130 Compatibility Model — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:23:00Z`
 - [x] `ACC-VOL-131` — VOL-131 Internal Protocols — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:23:00Z`
 - [x] `ACC-VOL-132` — VOL-132 Consistency Model — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:23:00Z`
 - [ ] `ACC-VOL-133` — VOL-133 Distributed Transaction Strategy — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
-- [ ] `ACC-VOL-134` — VOL-134 Outbox / Inbox Patterns — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-134` — VOL-134 Outbox / Inbox Patterns — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-135` — VOL-135 Cache Architecture — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-136` — VOL-136 Content Addressing — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-137` — VOL-137 Data Ingestion Engine — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
@@ -198,28 +198,28 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-VOL-163` — VOL-163 Tool Marketplace Security — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-164` — VOL-164 Sandbox Runtime — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-165` — VOL-165 Policy Language — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-166` — VOL-166 Policy Simulation — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-167` — VOL-167 Threat Model — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-166` — VOL-166 Policy Simulation — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-167` — VOL-167 Threat Model — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-168` — VOL-168 AI-Specific Threats — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
-- [ ] `ACC-VOL-169` — VOL-169 Security Boundaries — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-169` — VOL-169 Security Boundaries — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-170` — VOL-170 Zero-Trust Internal Model — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-171` — VOL-171 Network Architecture — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
-- [ ] `ACC-VOL-172` — VOL-172 Egress Control — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-173` — VOL-173 Secret Security — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-174` — VOL-174 Key Management — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-175` — VOL-175 Tenant Isolation — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-176` — VOL-176 Privacy Engine — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-177` — VOL-177 Data Deletion — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-178` — VOL-178 Software Bill of Materials — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-172` — VOL-172 Egress Control — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-173` — VOL-173 Secret Security — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-174` — VOL-174 Key Management — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-175` — VOL-175 Tenant Isolation — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-176` — VOL-176 Privacy Engine — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-177` — VOL-177 Data Deletion — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-178` — VOL-178 Software Bill of Materials — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-179` — VOL-179 Model Bill of Materials — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
-- [ ] `ACC-VOL-180` — VOL-180 Service Level Objectives — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-181` — VOL-181 Error Budgets — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-182` — VOL-182 Observability Cardinality Control — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-183` — VOL-183 Trace Model — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-184` — VOL-184 Performance Profiling — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-185` — VOL-185 Latency Budgeting — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-186` — VOL-186 Cost Governor — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-187` — VOL-187 Energy / Compute Efficiency — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-180` — VOL-180 Service Level Objectives — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-181` — VOL-181 Error Budgets — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-182` — VOL-182 Observability Cardinality Control — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-183` — VOL-183 Trace Model — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-184` — VOL-184 Performance Profiling — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-185` — VOL-185 Latency Budgeting — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-186` — VOL-186 Cost Governor — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-187` — VOL-187 Energy / Compute Efficiency — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-188` — VOL-188 Chaos Engineering — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-189` — VOL-189 Recovery Drills — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-190` — VOL-190 Release Qualification Matrix — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
@@ -227,7 +227,7 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-VOL-192` — VOL-192 Feature Flags — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-193` — VOL-193 Rollback Architecture — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-194` — VOL-194 Developer Experience — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
-- [ ] `ACC-VOL-195` — VOL-195 Local Development — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-195` — VOL-195 Local Development — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [x] `ACC-VOL-196` — VOL-196 Test Fixture Platform — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:23:00Z`
 - [ ] `ACC-VOL-197` — VOL-197 Simulation Mode — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-198` — VOL-198 Contract Fuzzing — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
@@ -242,25 +242,25 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-VOL-207` — VOL-207 Adversarial Reviewer — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-208` — VOL-208 Independent Verifier — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-209` — VOL-209 Artifact Review Workflow — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
-- [ ] `ACC-VOL-210` — VOL-210 Research Agent Team — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-211` — VOL-211 Literature Watch System — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-212` — VOL-212 Citation Graph Analytics — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-213` — VOL-213 Reproduction Packages — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-214` — VOL-214 Experiment Comparison — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-215` — VOL-215 Statistical Analysis — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-216` — VOL-216 Model Evaluation Harness — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-217` — VOL-217 Agent Evaluation Harness — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-218` — VOL-218 Long-Horizon Benchmarks — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-219` — VOL-219 Contamination Auditor — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-220` — VOL-220 Human Evaluation — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-221` — VOL-221 Model Card System — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-222` — VOL-222 Dataset Card System — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-223` — VOL-223 Tool Card System — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-224` — VOL-224 Agent Card System — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-225` — VOL-225 Component Health Scorecard — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-226` — VOL-226 Dependency Health — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-227` — VOL-227 Vendor / Provider Risk — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-228` — VOL-228 Provider Failover — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-210` — VOL-210 Research Agent Team — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-211` — VOL-211 Literature Watch System — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-212` — VOL-212 Citation Graph Analytics — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-213` — VOL-213 Reproduction Packages — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-214` — VOL-214 Experiment Comparison — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-215` — VOL-215 Statistical Analysis — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-216` — VOL-216 Model Evaluation Harness — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-217` — VOL-217 Agent Evaluation Harness — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-218` — VOL-218 Long-Horizon Benchmarks — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-219` — VOL-219 Contamination Auditor — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-220` — VOL-220 Human Evaluation — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-221` — VOL-221 Model Card System — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-222` — VOL-222 Dataset Card System — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-223` — VOL-223 Tool Card System — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-224` — VOL-224 Agent Card System — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-225` — VOL-225 Component Health Scorecard — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-226` — VOL-226 Dependency Health — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-227` — VOL-227 Vendor / Provider Risk — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-228` — VOL-228 Provider Failover — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-229` — VOL-229 Offline Mode — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-230` — VOL-230 Air-Gapped Profile — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-231` — VOL-231 Edge Deployment — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
@@ -275,10 +275,10 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-VOL-240` — VOL-240 Model Rollback — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-241` — VOL-241 Prompt / Instruction Registry — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-242` — VOL-242 Prompt Regression Testing — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-243` — VOL-243 Routing Policy Registry — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-244` — VOL-244 Memory Policy Registry — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-245` — VOL-245 Retrieval Policy Registry — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-246` — VOL-246 Knowledge Refresh — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-243` — VOL-243 Routing Policy Registry — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-244` — VOL-244 Memory Policy Registry — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-245` — VOL-245 Retrieval Policy Registry — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-246` — VOL-246 Knowledge Refresh — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-247` — VOL-247 Temporal Knowledge — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [x] `ACC-VOL-248` — VOL-248 Uncertainty Representation — status: `hardened` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Reasoning Search Stop Policy Gate** — completed_at_utc: `2026-10-04T04:16:01Z`
 - [ ] `ACC-VOL-249` — VOL-249 Hypothesis Engine — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
@@ -332,125 +332,125 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-VOL-297` — VOL-297 Time Architecture — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-298` — VOL-298 Identifier Standard — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-299` — VOL-299 Logical Clocks / Event Ordering — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-300` — VOL-300 Final Master Control Plane — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-301` — VOL-301 System Objective Model — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-302` — VOL-302 Objective Normalization — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-303` — VOL-303 Constraint Engine — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-304` — VOL-304 Decision Engine — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-305` — VOL-305 Decision Record Graph — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-306` — VOL-306 Workflow Intermediate Representation — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-307` — VOL-307 Workflow DSL — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-308` — VOL-308 Workflow Compiler — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-309` — VOL-309 Workflow Versioning — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-310` — VOL-310 Workflow Migration — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-311` — VOL-311 Semantic Task Types — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-312` — VOL-312 Task Complexity Estimator — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-313` — VOL-313 Task Decomposition Engine — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-314` — VOL-314 Critical Path Analysis — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-315` — VOL-315 Scheduling Algorithms — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-316` — VOL-316 Scheduling Simulator — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-317` — VOL-317 Control Theory for Autonomy — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-300` — VOL-300 Final Master Control Plane — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-301` — VOL-301 System Objective Model — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-302` — VOL-302 Objective Normalization — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-303` — VOL-303 Constraint Engine — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-304` — VOL-304 Decision Engine — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-305` — VOL-305 Decision Record Graph — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-306` — VOL-306 Workflow Intermediate Representation — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-307` — VOL-307 Workflow DSL — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-308` — VOL-308 Workflow Compiler — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-309` — VOL-309 Workflow Versioning — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-310` — VOL-310 Workflow Migration — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-311` — VOL-311 Semantic Task Types — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-312` — VOL-312 Task Complexity Estimator — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-313` — VOL-313 Task Decomposition Engine — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-314` — VOL-314 Critical Path Analysis — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-315` — VOL-315 Scheduling Algorithms — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-316` — VOL-316 Scheduling Simulator — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-317` — VOL-317 Control Theory for Autonomy — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-318` — VOL-318 Autonomy Levels — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
-- [ ] `ACC-VOL-319` — VOL-319 Autonomy Escalation — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-319` — VOL-319 Autonomy Escalation — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-320` — VOL-320 Autonomy De-Escalation — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-321` — VOL-321 Human Override Plane — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-322` — VOL-322 Interrupt Handling — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-323` — VOL-323 Goal Drift Detector — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-324` — VOL-324 Specification Gaming Tests — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-325` — VOL-325 Alignment Between Plan and Execution — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
-- [ ] `ACC-VOL-326` — VOL-326 Human Factors — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-327` — VOL-327 Approval Fatigue Control — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-328` — VOL-328 Trust Calibration — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-329` — VOL-329 User Intent Continuity — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-330` — VOL-330 Project Memory — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-331` — VOL-331 Workspace Model — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-332` — VOL-332 Resource Namespace — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-333` — VOL-333 Resource Resolution Service — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-334` — VOL-334 Artifact Dependency Graph — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-335` — VOL-335 Artifact Rebuild Engine — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-336` — VOL-336 Impact Analysis Engine — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-337` — VOL-337 Change Risk Estimator — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-338` — VOL-338 Safe Change Planner — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-339` — VOL-339 System Compiler Concept — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-340` — VOL-340 Code Generation from Contracts — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-341` — VOL-341 API Client SDK Generator — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-342` — VOL-342 Internal SDK — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-343` — VOL-343 Provider SDK — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-344` — VOL-344 Storage SDK — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-345` — VOL-345 Event SDK — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-346` — VOL-346 Evaluation SDK — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-347` — VOL-347 Benchmark Plugin System — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-348` — VOL-348 Data Contracts — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-349` — VOL-349 Data Service SLOs — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-350` — VOL-350 Embedding Lifecycle — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-351` — VOL-351 Vector Index Migration — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-352` — VOL-352 Search Index Lifecycle — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-353` — VOL-353 Retrieval Freshness Engine — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-354` — VOL-354 Source Trust Model — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-355` — VOL-355 Source Diversity Engine — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-356` — VOL-356 Claim Deduplication — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-357` — VOL-357 Claim Scope — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-358` — VOL-358 Claim Expiration — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-359` — VOL-359 Knowledge Reconciliation — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-360` — VOL-360 Knowledge Snapshots — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-326` — VOL-326 Human Factors — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-327` — VOL-327 Approval Fatigue Control — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-328` — VOL-328 Trust Calibration — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-329` — VOL-329 User Intent Continuity — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-330` — VOL-330 Project Memory — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-331` — VOL-331 Workspace Model — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-332` — VOL-332 Resource Namespace — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-333` — VOL-333 Resource Resolution Service — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-334` — VOL-334 Artifact Dependency Graph — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-335` — VOL-335 Artifact Rebuild Engine — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-336` — VOL-336 Impact Analysis Engine — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-337` — VOL-337 Change Risk Estimator — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-338` — VOL-338 Safe Change Planner — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-339` — VOL-339 System Compiler Concept — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-340` — VOL-340 Code Generation from Contracts — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-341` — VOL-341 API Client SDK Generator — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-342` — VOL-342 Internal SDK — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-343` — VOL-343 Provider SDK — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-344` — VOL-344 Storage SDK — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-345` — VOL-345 Event SDK — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-346` — VOL-346 Evaluation SDK — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-347` — VOL-347 Benchmark Plugin System — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-348` — VOL-348 Data Contracts — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-349` — VOL-349 Data Service SLOs — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-350` — VOL-350 Embedding Lifecycle — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-351` — VOL-351 Vector Index Migration — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-352` — VOL-352 Search Index Lifecycle — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-353` — VOL-353 Retrieval Freshness Engine — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-354` — VOL-354 Source Trust Model — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-355` — VOL-355 Source Diversity Engine — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-356` — VOL-356 Claim Deduplication — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-357` — VOL-357 Claim Scope — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-358` — VOL-358 Claim Expiration — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-359` — VOL-359 Knowledge Reconciliation — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-360` — VOL-360 Knowledge Snapshots — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-361` — VOL-361 Memory Garbage Collection — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-362` — VOL-362 Memory Quality Evaluation — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-363` — VOL-363 Memory Interference Testing — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-364` — VOL-364 Memory Versioning — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-365` — VOL-365 Memory Reconciliation — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-366` — VOL-366 Cognitive Strategy Registry — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-367` — VOL-367 Strategy Selection — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-368` — VOL-368 Reasoning Cost Accounting — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-366` — VOL-366 Cognitive Strategy Registry — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-367` — VOL-367 Strategy Selection — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-368` — VOL-368 Reasoning Cost Accounting — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-369` — VOL-369 Reasoning Regression Tests — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-370` — VOL-370 Plan Verifier — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
-- [ ] `ACC-VOL-371` — VOL-371 Plan Static Analyzer — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-372` — VOL-372 Plan Simulation — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-373` — VOL-373 Tool Composition Engine — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-374` — VOL-374 Tool Dependency Graph — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-375` — VOL-375 Tool Health — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-376` — VOL-376 Tool Capability Discovery — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-377` — VOL-377 Tool Result Trust — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-378` — VOL-378 Side-Effect Ledger — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-379` — VOL-379 Compensation Engine — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-380` — VOL-380 Saga Workflows — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-371` — VOL-371 Plan Static Analyzer — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-372` — VOL-372 Plan Simulation — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-373` — VOL-373 Tool Composition Engine — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-374` — VOL-374 Tool Dependency Graph — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-375` — VOL-375 Tool Health — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-376` — VOL-376 Tool Capability Discovery — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-377` — VOL-377 Tool Result Trust — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-378` — VOL-378 Side-Effect Ledger — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-379` — VOL-379 Compensation Engine — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-380` — VOL-380 Saga Workflows — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-381` — VOL-381 Distributed Inference Control Plane — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-382` — VOL-382 Model Placement — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
-- [ ] `ACC-VOL-383` — VOL-383 GPU Memory Manager — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-384` — VOL-384 Model Eviction — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-383` — VOL-383 GPU Memory Manager — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-384` — VOL-384 Model Eviction — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-385` — VOL-385 Model Warming — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-386` — VOL-386 Continuous Batching Scheduler — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
-- [ ] `ACC-VOL-387` — VOL-387 KV Cache Service — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-388` — VOL-388 Prefix Cache — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-389` — VOL-389 Speculative Inference — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-387` — VOL-387 KV Cache Service — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-388` — VOL-388 Prefix Cache — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-389` — VOL-389 Speculative Inference — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-390` — VOL-390 Inference Autoscaling — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-391` — VOL-391 Inference Load Testing — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-392` — VOL-392 Hardware Topology Model — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
-- [ ] `ACC-VOL-393` — VOL-393 NUMA Awareness — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-394` — VOL-394 GPU Interconnect Awareness — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-395` — VOL-395 Storage Tiering — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-396` — VOL-396 Data Locality — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-393` — VOL-393 NUMA Awareness — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-394` — VOL-394 GPU Interconnect Awareness — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-395` — VOL-395 Storage Tiering — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-396` — VOL-396 Data Locality — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-397` — VOL-397 Network Topology Awareness — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-398` — VOL-398 Remote Execution Protocol — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-399` — VOL-399 Worker Attestation — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
-- [ ] `ACC-VOL-400` — VOL-400 Build Farm — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-401` — VOL-401 Evaluation Farm — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-402` — VOL-402 Research Compute Queue — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-400` — VOL-400 Build Farm — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-401` — VOL-401 Evaluation Farm — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-402` — VOL-402 Research Compute Queue — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-403` — VOL-403 Compute Quotas — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-404` — VOL-404 Budget Accounting Ledger — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-405` — VOL-405 Forecasting Engine — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-406` — VOL-406 Cost Anomaly Detection — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
-- [ ] `ACC-VOL-407` — VOL-407 License Intelligence — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-408` — VOL-408 Data Usage Rights — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-407` — VOL-407 License Intelligence — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-408` — VOL-408 Data Usage Rights — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-409` — VOL-409 Attribution Engine — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-410` — VOL-410 Research Ethics Review — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-411` — VOL-411 Model Lifecycle Governance — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-412` — VOL-412 Model Deprecation — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-413` — VOL-413 Provider Migration — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-410` — VOL-410 Research Ethics Review — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-411` — VOL-411 Model Lifecycle Governance — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-412` — VOL-412 Model Deprecation — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-413` — VOL-413 Provider Migration — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-414` — VOL-414 Shadow Traffic — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `—`
 - [ ] `ACC-VOL-415` — VOL-415 Champion / Challenger Registry — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-416` — VOL-416 Experimental Feature Sandbox — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-417` — VOL-417 Research Branching Model — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-418` — VOL-418 Technique Retirement — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-416` — VOL-416 Experimental Feature Sandbox — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-417` — VOL-417 Research Branching Model — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
+- [x] `ACC-VOL-418` — VOL-418 Technique Retirement — status: `verified` — builder: **grok:volume-implementation-agent** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:28:00Z`
 - [ ] `ACC-VOL-419` — VOL-419 Knowledge of Failure — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [x] `ACC-VOL-420` — VOL-420 Architecture Scope Freeze — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Evidence Identity Gate** — completed_at_utc: `2026-10-04T04:35:02Z`
 

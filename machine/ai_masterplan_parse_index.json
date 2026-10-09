@@ -3,10 +3,10 @@
   "kind": "ai-masterplan-parse-index",
   "sources": {
     "machine/ai_master_plan.json": {
-      "git_blob_sha": "4b9ebcf2bc97ebcbac32b6c312c500d17f500f38"
+      "git_blob_sha": "190e77cb89b5661a9497727bfb9cc4e287c8bde1"
     },
     "machine/ai_build_accountability.json": {
-      "git_blob_sha": "ca65810b759e5935b728fc77c77117a9149e1684"
+      "git_blob_sha": "24c44f3ebab9c25586ddeb49bad6052ca7fcf322"
     }
   },
   "policy": {
@@ -17,12 +17,12 @@
   },
   "volume_summary": {
     "total": 421,
-    "implementation_signed": 280,
-    "verification_signed": 178,
-    "complete": 49,
+    "implementation_signed": 421,
+    "verification_signed": 319,
+    "complete": 190,
     "implementation_signed_open": 231,
     "gap_free_waiting_verification": 7,
-    "implementation_unsigned": 141
+    "implementation_unsigned": 0
   },
   "fast_sets": {
     "fully_complete": [
@@ -42,13 +42,16 @@
       "VOL-020",
       "VOL-022",
       "VOL-027",
+      "VOL-033",
       "VOL-034",
       "VOL-035",
       "VOL-036",
       "VOL-037",
       "VOL-038",
       "VOL-039",
+      "VOL-051",
       "VOL-052",
+      "VOL-053",
       "VOL-055",
       "VOL-056",
       "VOL-057",
@@ -67,28 +70,6 @@
       "VOL-096",
       "VOL-104",
       "VOL-110",
-      "VOL-129",
-      "VOL-130",
-      "VOL-131",
-      "VOL-132",
-      "VOL-196",
-      "VOL-248",
-      "VOL-253",
-      "VOL-420"
-    ],
-    "gap_free_waiting_verification": [
-      "VOL-032",
-      "VOL-081",
-      "VOL-086",
-      "VOL-087",
-      "VOL-091",
-      "VOL-092",
-      "VOL-095"
-    ],
-    "implementation_unsigned": [
-      "VOL-033",
-      "VOL-051",
-      "VOL-053",
       "VOL-122",
       "VOL-123",
       "VOL-124",
@@ -96,6 +77,10 @@
       "VOL-126",
       "VOL-127",
       "VOL-128",
+      "VOL-129",
+      "VOL-130",
+      "VOL-131",
+      "VOL-132",
       "VOL-134",
       "VOL-166",
       "VOL-167",
@@ -116,6 +101,7 @@
       "VOL-186",
       "VOL-187",
       "VOL-195",
+      "VOL-196",
       "VOL-210",
       "VOL-211",
       "VOL-212",
@@ -139,6 +125,8 @@
       "VOL-244",
       "VOL-245",
       "VOL-246",
+      "VOL-248",
+      "VOL-253",
       "VOL-300",
       "VOL-301",
       "VOL-302",
@@ -226,20 +214,31 @@
       "VOL-413",
       "VOL-416",
       "VOL-417",
-      "VOL-418"
-    ]
+      "VOL-418",
+      "VOL-420"
+    ],
+    "gap_free_waiting_verification": [
+      "VOL-032",
+      "VOL-081",
+      "VOL-086",
+      "VOL-087",
+      "VOL-091",
+      "VOL-092",
+      "VOL-095"
+    ],
+    "implementation_unsigned": []
   },
   "by_depth_pass": {
     "DP-000-040": {
       "total": 41,
-      "implementation_signed": 40,
-      "complete": 22,
+      "implementation_signed": 41,
+      "complete": 23,
       "gap_free_waiting_verification": 1
     },
     "DP-041-080": {
       "total": 40,
-      "implementation_signed": 38,
-      "complete": 11,
+      "implementation_signed": 40,
+      "complete": 13,
       "gap_free_waiting_verification": 0
     },
     "DP-081-120": {
@@ -250,64 +249,63 @@
     },
     "DP-121-160": {
       "total": 40,
-      "implementation_signed": 32,
-      "complete": 4,
+      "implementation_signed": 40,
+      "complete": 12,
       "gap_free_waiting_verification": 0
     },
     "DP-161-200": {
       "total": 40,
-      "implementation_signed": 21,
-      "complete": 1,
+      "implementation_signed": 40,
+      "complete": 20,
       "gap_free_waiting_verification": 0
     },
     "DP-201-240": {
       "total": 40,
-      "implementation_signed": 21,
-      "complete": 0,
+      "implementation_signed": 40,
+      "complete": 19,
       "gap_free_waiting_verification": 0
     },
     "DP-241-280": {
       "total": 40,
-      "implementation_signed": 36,
-      "complete": 2,
+      "implementation_signed": 40,
+      "complete": 6,
       "gap_free_waiting_verification": 0
     },
     "DP-281-320": {
       "total": 40,
-      "implementation_signed": 21,
-      "complete": 0,
+      "implementation_signed": 40,
+      "complete": 19,
       "gap_free_waiting_verification": 0
     },
     "DP-321-360": {
       "total": 40,
-      "implementation_signed": 5,
-      "complete": 0,
+      "implementation_signed": 40,
+      "complete": 35,
       "gap_free_waiting_verification": 0
     },
     "DP-361-400": {
       "total": 40,
-      "implementation_signed": 17,
-      "complete": 0,
+      "implementation_signed": 40,
+      "complete": 23,
       "gap_free_waiting_verification": 0
     },
     "DP-401-420": {
       "total": 20,
-      "implementation_signed": 9,
-      "complete": 1,
+      "implementation_signed": 20,
+      "complete": 12,
       "gap_free_waiting_verification": 0
     }
   },
   "accountability_summary": {
     "volume": {
       "total": 421,
-      "implementation_signed": 280,
-      "verification_signed": 178,
-      "complete": 49,
+      "implementation_signed": 421,
+      "verification_signed": 319,
+      "complete": 190,
       "status_counts": {
-        "verified": 171,
+        "verified": 312,
         "implemented": 102,
-        "hardened": 7,
-        "unverified": 141
+        "hardened": 7
       }
     },
     "work_package": {
