@@ -574,7 +574,9 @@ class OfflineAIWindow:
         if not prompt:
             return
         self.composer.delete("1.0", "end")
-        self._append("You", prompt)
+        # Display turns only after the model result passed identity, text and
+        # tool-call validation. Failed or cancelled sends must not fabricate
+        # a conversation turn in the visible transcript.
         self.active = True
         self.status.set("Generating locally…")
         self._refresh()
@@ -590,11 +592,13 @@ class OfflineAIWindow:
 
             try:
                 answer = asyncio.run(generate())
-                self.events.put(("answer", answer))
+                self.events.put(("answer", (prompt, answer)))
             except asyncio.CancelledError:
-                self.events.put(("error", "Generation cancelled; no conversation state committed."))
+                self.events.put(("generation_error", (
+                    prompt, "Generation cancelled; no conversation state committed.",
+                )))
             except Exception as exc:
-                self.events.put(("error", str(exc)))
+                self.events.put(("generation_error", (prompt, str(exc))))
             finally:
                 with self.worker_lock:
                     self.worker_loop = None
@@ -685,8 +689,9 @@ class OfflineAIWindow:
                         + " bytes · " + self.session.model_digest[:12] + "…"
                     )
                 elif kind == "answer":
-                    answer = value
-                    self._append("Skeleton · Local", answer.text)  # type: ignore[attr-defined]
+                    prompt, answer = value
+                    self._append("You", prompt)
+                    self._append("Skeleton · Local", answer.text)
                     self.status.set(
                         "Completed · " + str(answer.input_tokens) + " input / " + str(answer.output_tokens)
                         + " output tokens · " + (
@@ -695,9 +700,15 @@ class OfflineAIWindow:
                             "no execution receipt from this backend; GGUF token counts estimated"
                         )
                     )
+                elif kind == "generation_error":
+                    rejected_prompt, reason = value
+                    # Restore the rejected prompt for editing or retry, but
+                    # never replay an unsuccessful assistant turn into history.
+                    if not self.composer.get("1.0", "end-1c").strip():
+                        self.composer.insert("1.0", rejected_prompt)
+                    self.status.set("Local generation rejected: " + str(reason))
                 else:
-                    self._append("Local runtime", "Request rejected: " + str(value))
-                    self.status.set("Local model unavailable or request rejected.")
+                    self.status.set("Local model unavailable or request rejected: " + str(value))
                 self._refresh()
         except Empty:
             pass
