@@ -9,6 +9,11 @@ on:
       - "scripts/training/verify_offline_foundations.py"
       - "scripts/training/generate_offline_foundations.py"
       - "skeleton/testing/test_offline_foundations.py"
+      - "skeleton/ai/training/sparse_capability.py"
+      - "scripts/training/sparse_capability.py"
+      - "scripts/training/probe_sparse_capabilities.py"
+      - "skeleton/testing/test_sparse_capability.py"
+      - "skeleton/testing/test_procedural_capabilities.py"
       - "skeleton/app/local_ai.py"
       - "skeleton/app/cli.py"
       - "skeleton/testing/test_app_offline_gguf.py"
@@ -58,6 +63,11 @@ on:
       - "scripts/training/verify_offline_foundations.py"
       - "scripts/training/generate_offline_foundations.py"
       - "skeleton/testing/test_offline_foundations.py"
+      - "skeleton/ai/training/sparse_capability.py"
+      - "scripts/training/sparse_capability.py"
+      - "scripts/training/probe_sparse_capabilities.py"
+      - "skeleton/testing/test_sparse_capability.py"
+      - "skeleton/testing/test_procedural_capabilities.py"
       - "skeleton/app/local_ai.py"
       - "skeleton/app/cli.py"
       - "skeleton/testing/test_app_offline_gguf.py"
@@ -136,6 +146,11 @@ jobs:
             scripts/training/verify_offline_foundations.py \
             scripts/training/generate_offline_foundations.py \
             skeleton/testing/test_offline_foundations.py \
+            skeleton/ai/training/sparse_capability.py \
+            scripts/training/sparse_capability.py \
+            scripts/training/probe_sparse_capabilities.py \
+            skeleton/testing/test_sparse_capability.py \
+            skeleton/testing/test_procedural_capabilities.py \
             skeleton/app/offline_cli.py \
             skeleton/app/local_ai.py \
             skeleton/app/cli.py \
@@ -148,6 +163,10 @@ jobs:
         run: |
           python scripts/training/generate_offline_foundations.py
           python scripts/training/verify_offline_foundations.py
+      - name: Check sparse capability breadth without adding training data
+        run: |
+          python scripts/training/sparse_capability.py --profile low-memory
+          python scripts/training/probe_sparse_capabilities.py --per-mode 1
       - name: Install focused test dependency
         run: >-
           python -m pip install --disable-pip-version-check
@@ -184,4 +203,6 @@ jobs:
           skeleton/testing/test_offline_sqlite_safety.py
           skeleton/testing/test_offline_firewall_policy.py
           skeleton/testing/test_offline_foundations.py
+          skeleton/testing/test_sparse_capability.py
+          skeleton/testing/test_procedural_capabilities.py
           tests/flgb/test_desktop_offline_ai.py
