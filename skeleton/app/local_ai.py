@@ -672,7 +672,11 @@ class OfflineAIWindow:
         session = self.session
 
         def work() -> None:
+            if self.closed:
+                return
             async def generate() -> OfflineAnswer:
+                if self.closed:
+                    raise asyncio.CancelledError()
                 task = asyncio.create_task(session.ask(
                     prompt, max_output_tokens=session.preferred_output_tokens
                 ))
@@ -692,6 +696,14 @@ class OfflineAIWindow:
                 with self.worker_lock:
                     self.worker_loop = None
                     self.worker_task = None
+                if self.closed and isinstance(session, DurableOfflineAISession):
+                    # GUI lifetime may end during a long subprocess inference.
+                    # Always close the model-specific SQLite authority once
+                    # the worker really finished and cancellation settled.
+                    try:
+                        session.close()
+                    except Exception:
+                        pass
 
         threading.Thread(target=work, name="skeleton-native-inference", daemon=True).start()
 
@@ -748,8 +760,19 @@ class OfflineAIWindow:
         self.window.after(100, self._drain)
 
     def close(self) -> None:
+        if self.closed:
+            return
         self.cancel()
         self.closed = True
+        # A checkpoint loader can finish before the closed window drains
+        # its event queue. Release these orphan session handles explicitly.
+        try:
+            while True:
+                kind, value = self.events.get_nowait()
+                if kind == "loaded" and isinstance(value, DurableOfflineAISession):
+                    value.close()
+        except Empty:
+            pass
         if isinstance(self.session, DurableOfflineAISession) and not self.active:
             self.session.close()
         self.window.destroy()
