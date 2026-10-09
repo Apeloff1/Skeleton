@@ -249,6 +249,32 @@ jobs:
             throw "installed deterministic capability accepted ambiguous duplicate JSON"
           }
 
+          # Multi-step model-free gameplay from an installed EXE: no Python,
+          # no network dependency, no model weights or extra training data.
+          $capabilityGraphTask = Join-Path $env:RUNNER_TEMP "SkeletonOfflineCapabilityGraph.json"
+          '{"schema_version":"skeleton.offline_capability_graph.v1","nodes":[{"id":"hp","operation":"game.damage","args":{"health":20,"damage":7}},{"id":"points","operation":"game.coins","args":{"coins":3,"points_per_coin":5}},{"id":"score","operation":"math.add","args":{"a":{"$ref":"hp"},"b":{"$ref":"points"}}}],"outputs":["score"]}' |
+            Set-Content -LiteralPath $capabilityGraphTask -Encoding utf8
+          $graphReportJson = & $offline --capability-graph-file $capabilityGraphTask --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed frozen console failed deterministic graph execution"
+          }
+          $graphReport = $graphReportJson | ConvertFrom-Json
+          if ($graphReport.outputs.score -ne 28 -or
+              $graphReport.node_count -ne 3 -or
+              $graphReport.training_examples_added -ne 0 -or
+              $graphReport.model_inference_used -or
+              $graphReport.network_access_used -or
+              $graphReport.executor_authority_granted) {
+            throw "installed frozen console returned an invalid multi-step capability result"
+          }
+          '{"schema_version":"skeleton.offline_capability_graph.v1","nodes":[{"id":"self","operation":"math.add","args":{"a":{"$ref":"self"},"b":1}}],"outputs":["self"]}' |
+            Set-Content -LiteralPath $capabilityGraphTask -Encoding utf8
+          $null = & $offline --capability-graph-file $capabilityGraphTask --json 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            throw "installed graph evaluator accepted a self-referencing task"
+          }
+
+
 
 
           # Exercise the installed console's actual local knowledge, durable
