@@ -65,7 +65,11 @@ def _parser() -> argparse.ArgumentParser:
     up.add_argument("--verify-attempts", type=int, default=12)
     up.add_argument("--verify-delay", type=float, default=1.0)
 
-    sub.add_parser("local-ai", help="run native AI locally, without Docker or provider credentials")
+    local_ai = sub.add_parser("local-ai", help="run native AI locally, without Docker or provider credentials")
+    local_ai.add_argument("--model", help="native content-addressed checkpoint for headless inference")
+    local_ai.add_argument("--prompt", help="headless text request (requires --model)")
+    local_ai.add_argument("--max-output-tokens", type=int, default=8)
+    local_ai.add_argument("--json", action="store_true", dest="as_json", help="print a bound inference receipt")
     sub.add_parser("down", help="stop the assembled application")
     sub.add_parser("ps", help="show assembled service state")
 
@@ -207,8 +211,32 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if command == "local-ai":
-        from skeleton.app.local_ai import run_offline_ai
+        from skeleton.app.local_ai import OfflineAISession, load_native_checkpoint, run_offline_ai
 
+        if bool(args.model) != bool(args.prompt):
+            print("local-ai headless inference requires both --model and --prompt")
+            return 2
+        if args.model:
+            import asyncio
+
+            try:
+                session = OfflineAISession(load_native_checkpoint(args.model))
+                answer = asyncio.run(session.ask(args.prompt, max_output_tokens=args.max_output_tokens))
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local-ai request rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps({
+                    "schema_version": 1,
+                    "text": answer.text,
+                    "model_digest": answer.model_digest,
+                    "execution_receipt_digest": answer.execution_receipt_digest,
+                    "input_tokens": answer.input_tokens,
+                    "output_tokens": answer.output_tokens,
+                }, ensure_ascii=False, sort_keys=True))
+            else:
+                print(answer.text)
+            return 0
         return run_offline_ai()
 
     if command in {"preload", "setup", "install"}:
