@@ -25,6 +25,8 @@ from scripts.game.game_project import _demo
 from skeleton.app.offline_game_preview import verify_game_preview
 from skeleton.ai.runtime.gameplay_capabilities import compile_level
 from skeleton.ai.runtime.game_project_capsule import verify_game_capsule
+from skeleton.ai.runtime.homebrew_porting import make_homebrew_port, verify_port_gameplay
+from scripts.windows.create_offline_game_fixture import create_fixture
 
 SCHEMA = "skeleton.game.executed_acceptance.v1"
 
@@ -98,12 +100,36 @@ def execute_all_available_game_acceptance() -> dict[str, Any]:
     native = verify_game_preview(42)
     if not native["terminal_won"] or not native["replay_deterministic"]:
         raise GameAcceptanceError("native gameplay was not completed deterministically")
+    # Destination enhancement is a *fourth* actual gameplay output:
+    # the original homebrew source must still WIN with independently
+    # replayed Windows art/UX enhancements and five interacting hybrids.
+    windows_source = create_fixture(42)
+    windows_blueprint = make_homebrew_port(
+        windows_source,
+        creative_mode="hybrid_original", art_direction="neon_noir",
+        quality="cinematic", seed=42, scale=40,
+        hybrids=["collectathon", "keyquest", "speedrun", "exploration", "combo"],
+        high_contrast=True, decor_budget=36,
+    )
+    windows_acceptance = verify_port_gameplay(
+        windows_source, windows_blueprint,
+    )
+    if (
+        not windows_acceptance["hybrid_gameplay_proven"]
+        or not windows_acceptance["original_gameplay_proven"]
+        or windows_acceptance["remaining_collectibles"] != 0
+        or not windows_acceptance["deterministic"]
+    ):
+        raise GameAcceptanceError(
+            "enhanced original Windows port failed actual hybrid win acceptance"
+        )
     return {
         "schema_version": SCHEMA,
         "accepted_execution_targets": [
             "portable-iso-c89-original-turn-based",
             "chip8-vip-original-homebrew-vm",
             "native-2d-preview-headless",
+            "native-windows-enhanced-original-hybrid",
         ],
         "portable_c89": portable,
         "chip8_original_rom": {
@@ -121,6 +147,17 @@ def execute_all_available_game_acceptance() -> dict[str, Any]:
             "frames_verified": native["frames_verified"],
             "display_opened": False,
             "installed_windows_binary_verified": False,
+        },
+        "windows_homebrew_port": {
+            "source_capsule_sha256": windows_source["capsule_sha256"],
+            "port_sha256": windows_blueprint["port_sha256"],
+            "real_hybrid_win_replayed": windows_acceptance["hybrid_gameplay_proven"],
+            "original_gameplay_preserved": windows_acceptance["original_gameplay_proven"],
+            "remaining_keys_at_win": windows_acceptance["remaining_collectibles"],
+            "source_physics_untouched": windows_blueprint["render"]["source_collision_map_unchanged"],
+            "actual_windows_display_opened": False,
+            "commercial_assets_imported": False,
+            "legal_distribution_approved": False,
         },
         "all_implemented_gameplay_outputs_executed": True,
         "all_platform_releases_completed": False,
