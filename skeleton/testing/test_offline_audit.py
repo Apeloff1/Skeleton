@@ -128,3 +128,17 @@ def test_standalone_and_unified_cli_audit_without_mutation(
     assert run_app_cli(["local-ai", *args]) == 0
     assert json.loads(capsys.readouterr().out)["ok"] is True
     assert offline_cli(["--audit-queue", str(queue), "--prompt", "never invoke"]) == 2
+
+def test_doctor_cannot_silently_ignore_mutating_flags(
+    tmp_path: Path, capsys,
+) -> None:
+    database = tmp_path / "local.db"
+    assert offline_cli(["--queue-db", str(database), "--doctor", "--model", "missing"]) == 2
+    assert offline_cli(["--snapshot-workspace", str(database), "--doctor", "--model", "missing"]) == 2
+    assert offline_cli([
+        "--audit-queue", str(database), "--snapshot-to", str(tmp_path / "backup"),
+    ]) == 2
+    assert offline_cli([
+        "--audit-queue", str(database), "--queue-db", str(database), "--queue-status",
+    ]) == 2
+    assert capsys.readouterr().out == ""
