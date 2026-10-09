@@ -159,7 +159,8 @@ class CanonicalEnvelope:
             ("identity.run_id", self.identity.run_id),
             ("identity.run_attempt", self.identity.run_attempt),
         ):
-            if not isinstance(value, str) or (label in {"identity.repository", "identity.commit_sha"} and not value.strip()):
+            required = label in {"identity.repository", "identity.commit_sha"}
+            if not isinstance(value, str) or (required and not value.strip()):
                 raise CanonicalContractError(f"{label} must be text")
             _unicode_scalar_text(value)
         if not isinstance(self.evidence, tuple) or any(
