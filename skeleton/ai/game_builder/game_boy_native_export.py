@@ -410,7 +410,7 @@ def _tile_bytes() -> str:
                 raise GameBoySourceError("invalid source tile graphics")
             lo = sum((int(px) & 1) << (7 - n) for n, px in enumerate(row))
             hi = sum(((int(px) >> 1) & 1) << (7 - n) for n, px in enumerate(row))
-            lines.append(f"    db ${lo:02X}, ${hi:02X}".replace("\$", "$"))
+            lines.append(f"    db ${lo:02X}, ${hi:02X}")
     return "\n".join(lines)
 
 
@@ -438,7 +438,7 @@ def compile_native_game_boy(
         for row in level.rows:
             tiles = [_TILE_INDEX[char] for char in row]
             tiles.extend([TILE_FLOOR] * (32 - len(tiles)))
-            rows.append("    db " + ", ".join(f"${tile:02X}".replace("\$", "$") for tile in tiles))
+            rows.append("    db " + ", ".join(f"${tile:02X}" for tile in tiles))
         for _ in range(18 - len(level.rows)):
             rows.append("    ds 32, 0")
         tables.append(f"LevelMap{level.index}:\n" + "\n".join(rows))
