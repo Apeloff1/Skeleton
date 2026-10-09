@@ -256,11 +256,15 @@ system compromise. Other processes and any additional spawned binaries
 must be governed separately. For a truly disconnected acceptance test,
 use an independent OS policy or physically isolated test machine.
 
+## Enhanced original-homebrew Windows destination ports
+
+Original games can now be upgraded in Windows using seven original art directions, higher-resolution tile rendering, generated decorations, a camera, accessibility controls and five real hybrid modes. All effects preserve the authenticated source game physics; the port is independently replayed to a winning state. Use the native editor **Windows Port Studio**, or run `scripts/game/port_homebrew.py` and play with `SkeletonGame.exe --project original.json --port-blueprint enhanced.json`. This feature does not import, re-skin or reproduce third-party games. See [Homebrew Destination Adaptation](HOMEBREW_DESTINATION_ADAPTATION.md).
+
 ## Cross-era game authoring, legal modification and portable C
 
 The game-development system now has **166 explicit hardware-era design
 profiles** covering eight decades, plus a rights-aware project compiler.
-It can create an original game, apply licensed/authorized tile edits,
+It can create an original game, edit its own original homebrew tiles,
 recompute physics/controller playability, and reopen the modified
 project in the native 2D preview.
 
