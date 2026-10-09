@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 import secrets
 import sqlite3
+import stat
 import sys
 import threading
 import time
@@ -170,6 +171,21 @@ class OfflineChatStore:
                     os.close(descriptor)
                 except FileExistsError:
                     pass
+            # Do not silently use an existing database with unsafe owner,
+            # permissions, type or hard-link count. The write transaction
+            # would otherwise expose sensitive prompts to another account.
+            details = p.stat()
+            if not stat.S_ISREG(details.st_mode):
+                raise RuntimeContractError("offline database must be a regular file")
+            if os.name != "nt":
+                if details.st_mode & 0o077:
+                    raise RuntimeContractError(
+                        "offline database must have owner-only permissions (chmod 600)"
+                    )
+                if details.st_nlink != 1:
+                    raise RuntimeContractError("offline database must not be hard-linked")
+                if hasattr(os, "getuid") and details.st_uid != os.getuid():
+                    raise RuntimeContractError("offline database must be owned by the user")
         self._lock = threading.RLock()
         self._db = sqlite3.connect(filename, isolation_level=None,
                                    check_same_thread=False, timeout=10.0)
