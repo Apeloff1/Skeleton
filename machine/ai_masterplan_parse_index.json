@@ -21,7 +21,7 @@
     "verification_signed": 22,
     "complete": 22,
     "implementation_signed_open": 251,
-    "gap_free_waiting_verification": 24,
+    "gap_free_waiting_verification": 23,
     "implementation_unsigned": 148
   },
   "fast_sets": {
@@ -50,7 +50,6 @@
       "VOL-420"
     ],
     "gap_free_waiting_verification": [
-      "VOL-003",
       "VOL-019",
       "VOL-020",
       "VOL-022",
@@ -231,7 +230,7 @@
       "total": 41,
       "implementation_signed": 40,
       "complete": 13,
-      "gap_free_waiting_verification": 7
+      "gap_free_waiting_verification": 6
     },
     "DP-041-080": {
       "total": 40,
