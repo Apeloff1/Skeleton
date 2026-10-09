@@ -95,7 +95,7 @@ class CreditsBundle:
         )):
             raise CreditsError("invalid authored notices")
         expected = sha256((
-            self.credits_md + "\\0" + self.third_party_notices_txt + "\\0" + self.inventory_json
+            self.credits_md + "\0" + self.third_party_notices_txt + "\0" + self.inventory_json
         ).encode("utf-8")).hexdigest()
         if not _is_sha256(self.bundle_sha256) or expected != self.bundle_sha256:
             raise CreditsError("reviewed credit and notice bytes do not match digest")
