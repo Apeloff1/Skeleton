@@ -70,6 +70,77 @@ also terminates. The checkpoint remains local. No implicit model downloader,
 provider fallback, tool access, file editing, external networking, or privilege
 elevation is enabled.
 
+## Real GGUF/open-weight deployment in the standalone desktop
+
+The existing Windows **Local AI (offline)** window supports two explicit
+loaders. **Load native checkpoint** restores Skeleton's internal transformer
+checkpoint format. **Load local GGUF** loads an operator-owned deployment
+manifest through the canonical `LocalModelDeployment` authority.
+
+The GGUF manifest pins both the llama.cpp executable and the GGUF model by
+SHA-256, rejects unexpected remote artifact acquisition, and validates the
+GGUF header. The subprocess receives prompts in a private temporary file;
+model and executable identities are checked again on every invocation.
+There is no implicit download, hosted API fallback or provider token.
+
+A GGUF file **alone** is not an executable model deployment: the operator
+must also install an appropriate compatible `llama.cpp` CLI, define a
+manifest using `skeleton.local_model.deployment.v1`, and set the exact
+digest-pinned local paths. See the existing deployment module
+`skeleton/ai/runtime/inference/deployment.py` for the validated schema.
+
+The same model-identified SQLite conversations are available in both GUI
+and headless operation. The GGUF tokenizer binding derives from the exact
+verified model artifact bytes; native checkpoint/tokenizer binding keeps
+its existing explicit tokenizer hash.
+
+### Headless native or GGUF chat on Windows, Linux or macOS
+
+```bash
+# Start a real locally installed GGUF/llama.cpp deployment, no Tk required:
+python -m skeleton.app.offline_chat_cli \
+  --gguf-deployment ./local-gguf-deployment.json \
+  --interactive
+
+# Use the same per-model saved state with a native checkpoint:
+python -m skeleton.app.offline_chat_cli \
+  --native-checkpoint ./model.json \
+  --message "hello" --json
+
+# Read saved sessions without creating an empty conversation:
+python -m skeleton.app.offline_chat_cli \
+  --gguf-deployment ./local-gguf-deployment.json \
+  --list --json
+
+# Export a selected conversation including all durable turn receipts:
+python -m skeleton.app.offline_chat_cli \
+  --gguf-deployment ./local-gguf-deployment.json \
+  --export-session YOUR_SESSION_ID --output ./private-backup.json
+
+# Restore into a new ID without overwriting another session:
+python -m skeleton.app.offline_chat_cli \
+  --gguf-deployment ./local-gguf-deployment.json \
+  --import-bundle ./private-backup.json
+```
+
+The GUI and headless entry points default to the same local model-specific
+database under `~/.skeleton/offline-ai/`. Override with `--database` if a
+separate store is preferred. Terminal commands `/id`, `/new`, `/list`,
+`/resume SESSION_ID` and `/exit` are supported.
+
+For an **actual model acceptance smoke** rather than the bundled untrained
+native demonstration, on Windows run:
+
+```powershell
+Skeleton.exe --local-gguf-smoke .\local-gguf-deployment.json
+```
+
+A zero exit code requires successful real GGUF inference and persisted session
+restoration. This is an execution check, **not** a model-quality or security
+certification. Checkpoint quality and legal model-use rights remain external
+operator responsibilities.
+
+
 ## Windows desktop product integration
 
 The installed Windows launcher already includes a **Local AI (offline)**
@@ -145,7 +216,7 @@ be used as an untrusted instruction feed.
 ## Verification
 
 ```bash
-python -m pytest -q tests/test_ai_offline_native_chat.py tests/test_app_offline_chat_persistence.py
+python -m pytest -q tests/test_ai_offline_native_chat.py tests/test_app_offline_chat_persistence.py tests/test_app_offline_chat_cli.py
 python -m skeleton.ai.model_runtime.offline_chat --help
 ```
 
