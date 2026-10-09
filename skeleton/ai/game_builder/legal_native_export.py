@@ -19,6 +19,7 @@ from .legal_paths import (
     HomebrewLegalAssessment, HomebrewLegalRequest, LegalDisposition,
 )
 from .legal_port_bridge import propose_rights_aware_port
+from .plagiarism_guard import OriginalityReport, OriginalityDisposition
 from .platform_registry import default_registry
 from .port_planner import HomebrewSource, PortMode
 from .playable_world import PlayableWorld
@@ -34,6 +35,7 @@ class LegalNativeDesktopSource:
     assessment: HomebrewLegalAssessment
     evidence_sha256: str
     package_content_sha256: str
+    originality: OriginalityReport | None = None
     native_executable_compiled: bool = False
     release_authorized: bool = False
     legal_advice_or_certificate: bool = False
@@ -50,6 +52,13 @@ class LegalNativeDesktopSource:
             "combined_sha256": self.package_content_sha256,
             "game_content_and_assets_independently_verified": False,
             "real_toolchain_run_verified": False,
+            "plagiarism_screened": self.originality is not None,
+            "originality_screen_digest": self.originality.screen_digest if self.originality else None,
+            "originality_artifact_bound": (
+                self.originality.artifact_sha256 == self.project.world_digest
+                if self.originality is not None else False
+            ),
+            "false_claim_of_plagiarism_free": False,
             "full_release_legality_certified": False,
             "release_authorized": False,
             "human_legal_review_required": True,
@@ -60,6 +69,7 @@ class LegalNativeDesktopSource:
 def compile_rights_aware_desktop(
     world: PlayableWorld, source: HomebrewSource, request: HomebrewLegalRequest,
     *, authorized: bool,
+    originality: OriginalityReport | None = None,
 ) -> LegalNativeDesktopSource:
     """Refuse review holds and prohibited reuse before emitting source code."""
     if type(authorized) is not bool or not authorized:
@@ -70,6 +80,15 @@ def compile_rights_aware_desktop(
         raise ClearedSourceExportError("generated world and rights packet project mismatch")
     if request.release_requested:
         raise ClearedSourceExportError("native source generation is not legal release certification")
+    if originality is not None:
+        if not isinstance(originality, OriginalityReport):
+            raise ClearedSourceExportError("typed originality screen required")
+        if originality.project_id != request.project_id or originality.artifact_sha256 != world.digest:
+            raise ClearedSourceExportError("plagiarism screen does not belong to exact game artifact")
+        if not originality.design_admissible or originality.blockers or (
+            originality.disposition is not OriginalityDisposition.DESIGN_ADMISSIBLE_NOT_LEGAL_CLEARANCE
+        ):
+            raise ClearedSourceExportError("potential plagiarism or missing provenance requires review")
     proposal = propose_rights_aware_port(source, request, mode=PortMode.ENHANCED)
     if not proposal.design_stage_admitted or proposal.technical_blueprint is None:
         raise ClearedSourceExportError(
@@ -87,6 +106,23 @@ def compile_rights_aware_desktop(
         project=output, assessment=proposal.legal,
         evidence_sha256=source.evidence_sha256,
         package_content_sha256=combined,
+        originality=originality,
+    )
+
+
+def compile_originality_gated_desktop(
+    world: PlayableWorld, source: HomebrewSource, request: HomebrewLegalRequest,
+    *, originality: OriginalityReport, authorized: bool,
+) -> LegalNativeDesktopSource:
+    """Required originality screen for release-bound native prototype workflows.
+
+    Does not approve final release. Fresh work may still infringe uncatalogued
+    references or violate other rights, contracts and platform measures.
+    """
+    if not isinstance(originality, OriginalityReport):
+        raise ClearedSourceExportError("mandatory comprehensive originality screen absent")
+    return compile_rights_aware_desktop(
+        world, source, request, originality=originality, authorized=authorized,
     )
 
 
