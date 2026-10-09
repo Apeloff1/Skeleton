@@ -200,6 +200,11 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert 'Join-Path $installDir "SkeletonCLI.exe"' in source
     assert '$cliTrain = Start-Process -FilePath $cliLauncher' in source
     assert '$cliInspect = Start-Process -FilePath $cliLauncher' in source
+    assert '-RedirectStandardOutput $cliTrainReceipt' in source
+    assert '-RedirectStandardOutput $cliInspectReceipt' in source
+    assert '$inspectedReceipt.model_digest -ne $trainedReceipt.model_digest' in source
+    assert '$inspectedReceipt.tokenizer_digest -ne $trainedReceipt.tokenizer_digest' in source
+    assert '$trainedReceipt.training_steps -lt 1' in source
     assert '$acceptance = Start-Process -FilePath $cliLauncher' in source
     assert '$missingGguf = Start-Process -FilePath $cliLauncher' in source
     assert "uninstall left installed native console executable behind" in source
