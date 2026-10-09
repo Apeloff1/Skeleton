@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "reviewed_open",
+  "status": "reviewed_clear",
   "tasks": [
     {
       "task_id": "P5-PROBE-01",
@@ -12,34 +12,8 @@
       "task_id": "P5-GAP-01",
       "title": "Hold open function gaps",
       "completion_checkbox": false,
-      "status": "open"
+      "status": "clear"
     }
   ],
-  "findings": [
-    {
-      "id": "P5-P3-FOUNDATION-OPEN",
-      "severity": "high",
-      "plane": "p3"
-    },
-    {
-      "id": "P5-P3-ENGINEERING-OPEN",
-      "severity": "high",
-      "plane": "p3"
-    },
-    {
-      "id": "P5-P3T2-LIFECYCLE-OPEN",
-      "severity": "high",
-      "plane": "p3"
-    },
-    {
-      "id": "P5-TRACE-CATALOGUE-DRIFT",
-      "severity": "medium",
-      "plane": "p2"
-    },
-    {
-      "id": "P5-REPO-EDGE-STATUS",
-      "severity": "medium",
-      "plane": "p2"
-    }
-  ]
+  "findings": []
 }

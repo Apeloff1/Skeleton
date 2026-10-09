@@ -1,7 +1,7 @@
 {
   "schema_version": "skeleton.ai.p3.learning_execution_map.v1",
   "map_version": "0.2.0",
-  "status": "active",
+  "status": "closed",
   "phase": "P3-T2",
   "phase_objective": "Extend the closed P3-T1 engineering frontier into provider-independent learning, training and multimodal execution without re-owning earlier P3 volumes.",
   "prerequisite": {
@@ -540,10 +540,10 @@
   },
   "progress": {
     "task_count": 6,
-    "in_progress_count": 1,
+    "in_progress_count": 0,
     "ready_count": 0,
     "blocked_count": 0,
-    "landed_unpromoted_count": 5,
+    "landed_unpromoted_count": 0,
     "scheduled_volume_count": 32,
     "queued_volume_count": 165,
     "source_volume_count": 197

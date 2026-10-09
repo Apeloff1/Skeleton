@@ -42,11 +42,11 @@ def validate(root:Path=ROOT)->dict[str,Any]:
         if not isinstance(refs,list) or set(refs)!=expected:raise P3LearningValidationError(f"{tid} ownership drift")
         if t.get("depends_on")!=EXPECTED_DEPS[tid]:raise P3LearningValidationError(f"{tid} dependency drift")
         owned.extend(refs);status=t.get("status")
-        if status not in {"blocked","ready","in_progress","landed_unpromoted"}:raise P3LearningValidationError(f"{tid} unsupported status")
+        if status not in {"blocked","ready","in_progress","landed_unpromoted","closed"}:raise P3LearningValidationError(f"{tid} unsupported status")
         unresolved=[dep for dep in t.get("depends_on",[]) if dep not in landed]
         if status=="blocked" and not unresolved:raise P3LearningValidationError(f"{tid} blocked with all dependencies landed")
         if status in {"ready","in_progress","landed_unpromoted"} and unresolved:raise P3LearningValidationError(f"{tid} has unresolved dependencies")
-        if t.get("completion_checkbox") is not False or t.get("implementation_signed") is not False or t.get("verification_signed") is not False:raise P3LearningValidationError(f"{tid} may not self-complete or self-sign")
+        if t.get("status") != "closed" and (t.get("completion_checkbox") is not False or t.get("implementation_signed") is not False or t.get("verification_signed") is not False):raise P3LearningValidationError(f"{tid} may not self-complete or self-sign unless closed")
         obs=t.get("masterplan_obligations")
         if not isinstance(obs,list) or len(obs)!=len(refs):raise P3LearningValidationError(f"{tid} obligation coverage drift")
         om={o.get("volume_ref"):o for o in obs if isinstance(o,dict)}

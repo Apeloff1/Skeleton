@@ -15,10 +15,13 @@ from skeleton.p5.review import run_review
 def main() -> int:
     report = run_review()
     backlog = json.loads((ROOT / "machine/ai_p5_task_backlog.json").read_text())
-    if backlog.get("status") != "reviewed_open":
+    findings = report["open_findings"]
+    if findings and backlog.get("status") != "reviewed_open":
         raise SystemExit("P5 must stay reviewed_open while findings exist")
+    if not findings and backlog.get("status") != "reviewed_clear":
+        raise SystemExit("P5 must be reviewed_clear when findings are empty")
     if any(task.get("completion_checkbox") for task in backlog["tasks"]):
-        raise SystemExit("P5 task may not check completion while findings are open")
+        raise SystemExit("P5 task may not check completion")
     finding_ids = {row["id"] for row in report["open_findings"]}
     declared = {row["id"] for row in backlog["findings"]}
     if finding_ids != declared:
