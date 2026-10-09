@@ -2,7 +2,7 @@
 
 Graph execution is read-only, has no dynamic imports, Python eval, shell,
 network or filesystem operations. Data dependencies MUST refer to preceding
-nodes. Each node invokes the same 24 guarded operations and produces a
+nodes. Each node invokes the admitted guarded operations and produces a
 replayable hashed receipt. This is verified computation, not model inference.
 """
 from __future__ import annotations
