@@ -266,6 +266,83 @@ class TestEvaluatedOfflineImprovement(unittest.TestCase):
         # Taking an unweighted mean of line scores is not equivalent.
         self.assertNotAlmostEqual(measured, math.sqrt(2.0 * 4.0))
 
+    def test_protected_suite_rejects_training_overlap_before_gradient(self) -> None:
+        from skeleton.app.local_ai_benchmark import SCHEMA
+
+        with tempfile.TemporaryDirectory() as directory:
+            source, train, heldout, dest = self._fixture(directory)
+            suite = Path(directory) / "protected.json"
+            suite.write_text(json.dumps({
+                "schema": SCHEMA,
+                "cases": [
+                    {"id": "overlap", "category": "safety",
+                     "text": "user hello assistant world alpha"},
+                ],
+            }), encoding="utf-8")
+            parent = source.read_bytes()
+            with patch.object(
+                TinyTransformer, "fit", side_effect=AssertionError("leaked case must not train"),
+            ):
+                with self.assertRaisesRegex(OfflineImprovementError, "overlaps"):
+                    improve_local_model(
+                        source, train, heldout, dest, protected_suite=suite,
+                    )
+            self.assertFalse(dest.exists())
+            self.assertEqual(source.read_bytes(), parent)
+
+    def test_protected_suite_must_pass_before_new_weights_are_published(self) -> None:
+        from skeleton.app.local_ai_benchmark import SCHEMA
+
+        with tempfile.TemporaryDirectory() as directory:
+            source, train, heldout, dest = self._fixture(directory)
+            suite = Path(directory) / "protected.json"
+            suite.write_text(json.dumps({
+                "schema": SCHEMA,
+                "cases": [
+                    {"id": "a", "category": "safety", "text": "alpha beta user"},
+                    {"id": "b", "category": "safety", "text": "beta alpha user"},
+                    {"id": "c", "category": "dialog", "text": "assistant beta alpha"},
+                    {"id": "d", "category": "dialog", "text": "alpha assistant beta"},
+                ],
+            }), encoding="utf-8")
+            original = source.read_bytes()
+            with patch(
+                "skeleton.app.local_ai_improvement._token_weighted_perplexity",
+                side_effect=[4.0, 3.0, 3.0],
+            ), patch(
+                "skeleton.app.local_ai_benchmark.compare_benchmark_results",
+                return_value={"passes_local_regression_gate": False},
+            ):
+                with self.assertRaisesRegex(OfflineImprovementError, "protected benchmark"):
+                    improve_local_model(
+                        source, train, heldout, dest, protected_suite=suite,
+                    )
+            self.assertFalse(dest.exists())
+            self.assertEqual(source.read_bytes(), original)
+            with patch(
+                "skeleton.app.local_ai_improvement._token_weighted_perplexity",
+                side_effect=[4.0, 3.0, 3.0],
+            ), patch(
+                "skeleton.app.local_ai_benchmark.compare_benchmark_results",
+                return_value={"passes_local_regression_gate": True},
+            ):
+                receipt = improve_local_model(
+                    source, train, heldout, dest, protected_suite=suite,
+                )
+            self.assertTrue(dest.is_file())
+            self.assertTrue(receipt.protected_suite_passed)
+            self.assertEqual(receipt.protected_suite_cases, 4)
+            self.assertEqual(len(receipt.protected_suite_digest), 64)
+            self.assertEqual(source.read_bytes(), original)
+
+    def test_cli_protected_suite_requires_improvement_command(self) -> None:
+        from skeleton.app.cli import run_app_cli
+
+        with redirect_stdout(StringIO()):
+            self.assertEqual(run_app_cli([
+                "local-ai", "--protect-suite", "bench.json",
+            ]), 2)
+
     def test_cli_cannot_skip_independent_evaluation(self) -> None:
         from skeleton.app.cli import run_app_cli
 
