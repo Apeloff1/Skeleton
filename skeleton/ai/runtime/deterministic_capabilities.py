@@ -16,7 +16,7 @@ from typing import Any, Callable, Mapping
 
 SCHEMA = "skeleton.offline_deterministic_capabilities.v1"
 MAX_INPUT_BYTES = 8192
-MAX_OUTPUT_BYTES = 8192
+MAX_OUTPUT_BYTES = 32768
 MAX_TEXT = 2048
 MAX_NUMBER = 1_000_000
 MAX_COLLECTION = 64
@@ -44,8 +44,11 @@ def _n(value: Any, *, low: int = -MAX_NUMBER,
 
 
 def _str(value: Any, limit: int = MAX_TEXT) -> str:
-    if not isinstance(value, str) or len(value) > limit or "\x00" in value:
-        raise CapabilityTaskError("text must be a bounded unicode string")
+    if (
+        not isinstance(value, str) or len(value) > limit or "\x00" in value
+        or any(0xD800 <= ord(char) <= 0xDFFF for char in value)
+    ):
+        raise CapabilityTaskError("text must be a bounded valid unicode string")
     return value
 
 
@@ -241,7 +244,7 @@ def _animation(args: dict[str, Any]) -> int:
 def _event_order(args: dict[str, Any]) -> list[str]:
     v = _keys(args, ("events",))
     events = _list(v["events"])
-    ordered: list[tuple[int, str, int]] = []
+    ordered: list[tuple[int, int, str]] = []
     for n, item in enumerate(events):
         event = _keys(item, ("name", "tick"))
         ordered.append((_n(event["tick"]), n, _str(event["name"], 64)))
@@ -341,6 +344,8 @@ OPERATIONS: dict[str, Callable[[dict[str, Any]], Any]] = {
 
 
 def _strict_json(data: bytes) -> dict[str, Any]:
+    if not isinstance(data, bytes):
+        raise CapabilityTaskError("task JSON must be bytes")
     if len(data) > MAX_INPUT_BYTES:
         raise CapabilityTaskError("task payload exceeds size limit")
     try:
@@ -349,7 +354,7 @@ def _strict_json(data: bytes) -> dict[str, Any]:
             object_pairs_hook=lambda entries: _pairs(entries),
             parse_constant=lambda token: _invalid_constant(token),
         )
-    except (UnicodeError, ValueError, RecursionError) as exc:
+    except (UnicodeError, ValueError, TypeError, RecursionError) as exc:
         raise CapabilityTaskError("invalid task JSON") from exc
     if not isinstance(parsed, dict):
         raise CapabilityTaskError("task JSON must be an object")
