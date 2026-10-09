@@ -61,3 +61,26 @@ def test_canonical_envelope_requires_typed_identity_and_structural_fields():
   fields.update(override)
   with pytest.raises(CanonicalContractError):
    CanonicalEnvelope(**fields).canonical_payload()
+
+
+
+def test_canonical_envelope_rejects_malformed_metadata_fields():
+    base = {
+        "schema_version": 1,
+        "kind": "vol003.contract",
+        "identity": Identity("repo", "a" * 40),
+        "evidence": (EvidenceRef("repo", "b" * 64),),
+        "constraints": ("safe",),
+        "payload": {},
+    }
+    invalid_cases = (
+        {"identity": Identity(123, "a" * 40)},
+        {"identity": Identity("repo", chr(0xD800))},
+        {"evidence": (EvidenceRef("", "b" * 64),)},
+        {"evidence": (EvidenceRef("repo", chr(0xDFFF)),)},
+        {"constraints": (chr(0xD800),)},
+    )
+    for override in invalid_cases:
+        fields = {**base, **override}
+        with pytest.raises(CanonicalContractError):
+            CanonicalEnvelope(**fields).canonical_payload()
