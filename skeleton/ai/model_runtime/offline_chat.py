@@ -634,9 +634,11 @@ class OfflineChatStore:
                                      replayed=True)
             cursor = self._db.execute(
                 "UPDATE offline_sessions SET revision=?, transcript_json=?, updated_at=? "
-                "WHERE session_id=? AND revision=? AND model_digest=? AND tokenizer_digest=?",
+                "WHERE session_id=? AND revision=? AND model_digest=? "
+                "AND tokenizer_digest=? AND transcript_json=?",
                 (session.revision + 1, encoded, time.time_ns(), session.session_id,
-                 session.revision, session.model_digest, session.tokenizer_digest),
+                 session.revision, session.model_digest, session.tokenizer_digest,
+                 session.transcript.to_json()),
             )
             if cursor.rowcount != 1:
                 raise RuntimeContractError("offline conversation revision conflict")
