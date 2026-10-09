@@ -208,10 +208,13 @@ jobs:
             "--offline-command", "local-ai",
             "--gguf-model", ('"' + (Join-Path $env:TEMP "missing-native-model.gguf") + '"'),
             "--llama-executable", ('"' + (Join-Path $env:TEMP "missing-llama-cli.exe") + '"'),
-            "--prompt", "offline must fail closed", "--json"
+            # Start-Process flattens ArgumentList into a Windows command
+            # line. A multiword prompt without embedded quotes can be parsed
+            # as extra CLI arguments, returning 2 before GGUF admission.
+            "--prompt", "offline", "--json"
           ) -Wait -PassThru
           if ($missingGguf.ExitCode -ne 1) {
-            throw "installed Skeleton.exe GGUF command did not fail closed on missing artifacts"
+            throw "installed Skeleton.exe GGUF missing-artifact smoke: expected runtime refusal (1), got $($missingGguf.ExitCode)"
           }
 
           $uninstaller = Join-Path $installDir "unins000.exe"
