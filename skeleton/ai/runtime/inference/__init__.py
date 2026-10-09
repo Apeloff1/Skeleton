@@ -26,6 +26,7 @@ from .llama_cpp import (
     LlamaCppRuntimeError,
     build_llama_cpp_adapter,
     detect_consumer_hardware_budget,
+    estimate_gqa_kv_bytes_per_token,
     inspect_gguf,
     plan_consumer_llama_cpp,
 )
@@ -64,6 +65,7 @@ __all__ = [
     "ConsumerLlamaPlan",
     "plan_consumer_llama_cpp",
     "detect_consumer_hardware_budget",
+    "estimate_gqa_kv_bytes_per_token",
     "GgufHeader",
     "LlamaCppConfig",
     "LlamaCppModel",
