@@ -16,6 +16,9 @@ from .offline_workspace import DurableOfflineSession
 from .offline_library import OfflineDocumentLibrary, OfflineLibraryError, render_local_context
 from .offline_readiness import inspect_local_readiness
 from .offline_index_queue import OfflineIndexQueue
+from .offline_snapshot import (
+    create_snapshot, verify_snapshot, restore_snapshot,
+)
 from .local_ai import (
     OfflineAISession,
     OfflineGGUFSession,
@@ -53,6 +56,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--cancel-queue-job", help="cancel a queued indexing job by id")
     parser.add_argument("--retry-queue-job", help="retry a terminal failed indexing job by id")
     parser.add_argument("--drain-limit", type=int, default=5, help="maximum queued indexing jobs per invocation")
+    parser.add_argument("--snapshot-to", help="publish portable SQLite recovery folder")
+    parser.add_argument("--restore-from", help="restore verified SQLite recovery folder")
+    parser.add_argument("--verify-snapshot", help="verify portable local recovery folder")
+    parser.add_argument("--snapshot-workspace", help="selected chat SQLite file")
+    parser.add_argument("--snapshot-library", help="selected document SQLite file")
+    parser.add_argument("--snapshot-queue", help="selected indexing queue SQLite file")
     parser.add_argument(
         "--native-smoke", action="store_true",
         help="run a small locally constructed test model (NOT a trained assistant)",
@@ -63,10 +72,56 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     library_mode = args.index_dir is not None or args.search is not None
+    snapshot_mode = bool(
+        args.snapshot_to or args.restore_from or args.verify_snapshot
+    )
     queue_mode = bool(
         args.enqueue_dir or args.run_queue or args.queue_status
         or args.cancel_queue_job or args.retry_queue_job
     )
+    if snapshot_mode:
+        actions = sum(bool(x) for x in (
+            args.snapshot_to, args.restore_from, args.verify_snapshot,
+        ))
+        if (
+            actions != 1 or args.model or args.deployment or args.prompt
+            or args.backup_in or args.backup_out or args.workspace
+            or args.doctor or args.native_smoke or library_mode
+            or queue_mode or args.use_library or args.library or args.queue_db
+            or (args.verify_snapshot and (
+                args.snapshot_workspace or args.snapshot_library or args.snapshot_queue
+            ))
+        ):
+            print("snapshot operations require one action without inference or queue options", file=sys.stderr)
+            return 2
+        paths = {
+            "workspace": args.snapshot_workspace,
+            "library": args.snapshot_library,
+            "queue": args.snapshot_queue,
+        }
+        try:
+            if args.snapshot_to:
+                report = create_snapshot(args.snapshot_to, **paths)
+                action = "created"
+            elif args.restore_from:
+                report = restore_snapshot(args.restore_from, **paths)
+                action = "restored"
+            else:
+                report = verify_snapshot(args.verify_snapshot)
+                action = "verified"
+        except (ValueError, RuntimeError, OSError) as exc:
+            print(f"offline recovery rejected: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 1
+        response = {
+            "schema_version": "skeleton.app.offline_snapshot.command.v1",
+            "action": action, "manifest": report,
+        }
+        if args.json_output:
+            print(json.dumps(response, sort_keys=True, ensure_ascii=False))
+        else:
+            print(f"Offline snapshot {action}: {len(report['databases'])} local databases")
+        return 0
+
     if args.native_smoke and args.doctor:
         print("--native-smoke and --doctor are mutually exclusive", file=sys.stderr)
         return 2
@@ -75,7 +130,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             not args.queue_db or args.model or args.deployment or args.prompt
             or args.backup_in or args.backup_out or args.workspace
             or args.doctor or args.native_smoke or library_mode
-            or args.use_library or args.library
+            or args.use_library or args.library or args.snapshot_workspace
+            or args.snapshot_library or args.snapshot_queue
             or (bool(args.enqueue_dir) != bool(args.queue_library))
             or (args.cancel_queue_job and args.retry_queue_job)
             or (args.cancel_queue_job and (args.enqueue_dir or args.run_queue))
