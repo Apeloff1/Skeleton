@@ -328,6 +328,62 @@ def _evaluate_backend(
     }
 
 
+def compare_benchmark_results(
+    baseline: Mapping[str, Any],
+    candidate: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Compare two already-scored reports with matching frozen case identities.
+
+    Reused by read-only benchmark evaluation and pre-publication learning
+    gates. Neither caller gains any model-promotion authority.
+    """
+    original_cases = [
+        (r["id"], r["category"], r["text_digest"], r["predicted_tokens"])
+        for r in baseline["case_scores"]
+    ]
+    candidate_cases = [
+        (r["id"], r["category"], r["text_digest"], r["predicted_tokens"])
+        for r in candidate["case_scores"]
+    ]
+    if original_cases != candidate_cases:
+        raise OfflineBenchmarkError("evaluation case identity drift between models")
+    left = baseline["category_scores"]
+    right = candidate["category_scores"]
+    if set(left) != set(right):
+        raise OfflineBenchmarkError("evaluation category identity drift")
+    categories = {}
+    for name, base in left.items():
+        contender = right[name]
+        if (
+            base["predicted_tokens"] != contender["predicted_tokens"]
+            or base["next_token_trials"] != contender["next_token_trials"]
+        ):
+            raise OfflineBenchmarkError("evaluation category scope differs")
+        categories[name] = {
+            "baseline_perplexity": base["perplexity"],
+            "candidate_perplexity": contender["perplexity"],
+            "perplexity_nonregression": (
+                contender["perplexity"] <= base["perplexity"] + MIN_VALIDATION_IMPROVEMENT
+            ),
+            "top1_nonregression": (
+                contender["next_token_correct"] >= base["next_token_correct"]
+            ),
+        }
+    improves = (
+        candidate["overall_perplexity"]
+        < baseline["overall_perplexity"] - MIN_VALIDATION_IMPROVEMENT
+    )
+    safe_categories = all(
+        row["perplexity_nonregression"] and row["top1_nonregression"]
+        for row in categories.values()
+    )
+    return {
+        "category_comparisons": categories,
+        "overall_improves": improves,
+        "passes_local_regression_gate": improves and safe_categories,
+    }
+
+
 def benchmark_native_models(
     suite_path: str | Path,
     *,
@@ -369,31 +425,8 @@ def benchmark_native_models(
     if original.runtime.model.itos != other.runtime.model.itos:
         raise OfflineBenchmarkError("benchmark vocabulary ordering differs")
     result = _evaluate_backend(suite, other)
-    categories = {}
-    for name, base in original_result["category_scores"].items():
-        contender = result["category_scores"][name]
-        categories[name] = {
-            "baseline_perplexity": base["perplexity"],
-            "candidate_perplexity": contender["perplexity"],
-            "perplexity_nonregression": (
-                contender["perplexity"] <= base["perplexity"] + MIN_VALIDATION_IMPROVEMENT
-            ),
-            "top1_nonregression": (
-                contender["next_token_correct"] >= base["next_token_correct"]
-            ),
-        }
-    improves = (
-        result["overall_perplexity"]
-        < original_result["overall_perplexity"] - MIN_VALIDATION_IMPROVEMENT
-    )
-    safe_categories = all(
-        row["perplexity_nonregression"] and row["top1_nonregression"]
-        for row in categories.values()
-    )
     report["candidate"] = result
-    report["category_comparisons"] = categories
-    report["overall_improves"] = improves
-    report["passes_local_regression_gate"] = improves and safe_categories
+    report.update(compare_benchmark_results(original_result, result))
     return report
 
 
