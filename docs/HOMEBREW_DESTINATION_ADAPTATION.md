@@ -118,6 +118,22 @@ reduced motion, contrast, colorblind-safe hues, parallax, HUD,
 distinct Save As project/port paths and reproducible gameplay QA.
 No output overwrites source or publishes unapproved content.
 
+## Reversible keyquest and executed acceptance
+
+The destination-specific keyquest gate prevents an **unwinnable
+terminal state**: reaching the original goal before collecting every
+homebrew key returns the player to the last legal cell and records a
+locked-goal attempt. After collecting keys, the exact same original
+goal remains available. No copyrighted art, new training data or
+replacement source physics is introduced.
+
+The completion gate now executes four original-game outputs:
+real ISO C89 executable to WIN, actual CHIP-8 homebrew ROM bytes to
+WIN, native 2D deterministic gameplay to WIN, and enhanced native
+Windows gameplay with all five hybrids to WIN. Installed Windows
+packaging, real desktop display, independent compatibility testing
+and human rights clearance remain separate release prerequisites.
+
 ## Honest completion and resource accounting
 
 The working implementation is a destination blueprint interpreted
