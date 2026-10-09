@@ -19,6 +19,7 @@ from .offline_index_queue import OfflineIndexQueue
 from .offline_snapshot import (
     create_snapshot, verify_snapshot, restore_snapshot,
 )
+from .offline_audit import audit_database
 from .local_ai import (
     OfflineAISession,
     OfflineGGUFSession,
@@ -62,6 +63,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--snapshot-workspace", help="selected chat SQLite file")
     parser.add_argument("--snapshot-library", help="selected document SQLite file")
     parser.add_argument("--snapshot-queue", help="selected indexing queue SQLite file")
+    parser.add_argument("--audit-workspace", help="inspect local conversation SQLite semantics")
+    parser.add_argument("--audit-library", help="inspect local FTS5 SQLite semantics")
+    parser.add_argument("--audit-queue", help="inspect local job queue SQLite semantics")
     parser.add_argument(
         "--native-smoke", action="store_true",
         help="run a small locally constructed test model (NOT a trained assistant)",
@@ -75,6 +79,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     snapshot_mode = bool(
         args.snapshot_to or args.restore_from or args.verify_snapshot
     )
+    audits = {
+        "workspace": args.audit_workspace,
+        "library": args.audit_library,
+        "queue": args.audit_queue,
+    }
+    audit_mode = any(path is not None for path in audits.values())
     queue_mode = bool(
         args.enqueue_dir or args.run_queue or args.queue_status
         or args.cancel_queue_job or args.retry_queue_job
@@ -120,6 +130,35 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps(response, sort_keys=True, ensure_ascii=False))
         else:
             print(f"Offline snapshot {action}: {len(report['databases'])} local databases")
+        return 0
+
+    if audit_mode:
+        if (
+            args.native_smoke or args.doctor or snapshot_mode or library_mode
+            or queue_mode or args.model or args.deployment or args.prompt
+            or args.backup_in or args.backup_out or args.workspace
+            or args.library or args.use_library or args.queue_db
+            or args.snapshot_workspace or args.snapshot_library or args.snapshot_queue
+        ):
+            print("local semantic audits cannot be combined with inference or mutation", file=sys.stderr)
+            return 2
+        try:
+            reports = {
+                kind: audit_database(path, kind)
+                for kind, path in audits.items() if path is not None
+            }
+        except (ValueError, RuntimeError, OSError) as exc:
+            print(f"offline audit rejected: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 1
+        output = {
+            "schema_version": "skeleton.app.offline_audit.command.v1",
+            "ok": True,
+            "reports": reports,
+        }
+        if args.json_output:
+            print(json.dumps(output, sort_keys=True, ensure_ascii=False))
+        else:
+            print("Offline state integrity PASS: " + ", ".join(sorted(reports)))
         return 0
 
     if args.native_smoke and args.doctor:
