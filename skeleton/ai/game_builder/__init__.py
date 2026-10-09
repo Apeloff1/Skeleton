@@ -341,6 +341,8 @@ _KNOWLEDGE_EXPORTS = {
     "compile_native_dos": ".dos_native_export",
     "export_native_dos": ".dos_native_export",
     "build_native_evolution": ".native_evolution_cli",
+    "NativePortfolioError": ".native_portfolio_cli",
+    "compile_native_portfolio": ".native_portfolio_cli",
     "NativeC64Error": ".c64_native_export",
     "NativeC64SourceProject": ".c64_native_export",
     "compile_native_c64": ".c64_native_export",
