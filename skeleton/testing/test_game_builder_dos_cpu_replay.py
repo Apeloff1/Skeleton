@@ -65,7 +65,7 @@ def test_dos_reference_fails_closed_if_attacker_rewrites_source_or_fakes_success
 
 def _fake_header():
     # Only a deliberately manufactured parsing fixture, not a build receipt.
-    header = b"\x0e\x1f\xb8\x03\x00\xcd\x10"
+    header = b"\x0e\x1f\xfc\xb8\x03\x00\xcd\x10"
     return header + b"\x00" * 300
 
 
