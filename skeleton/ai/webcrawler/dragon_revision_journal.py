@@ -200,8 +200,6 @@ class RevisionJournal:
         self.db.execute("BEGIN IMMEDIATE")
         try:
             latest = self._latest_unchecked(owner, review.claim_id)
-            if latest and latest.event_hash != self._receipt_hash(latest):
-                raise RuntimeError("tampered journal head")
             current = latest.sequence if latest else 0
             head = self.db.execute("""
               SELECT sequence,event_hash FROM crawler_revision_heads

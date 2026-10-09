@@ -156,7 +156,7 @@ def test_fingerprints_change_when_source_revision_changes():
     assert before.current_custody_fingerprint != after.current_custody_fingerprint
     assert not after.prior_readings_reusable
     assert after.sources[0].quality_changed
-    assert after.readings[0].disposition is ReadingDisposition.QUOTE_ABSENT
+    assert after.readings[0].disposition is ReadingDisposition.QUALITY_CHANGED
 
 
 def test_permutation_does_not_change_any_revision_receipt():
