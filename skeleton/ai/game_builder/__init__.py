@@ -242,6 +242,20 @@ __all__ = [
 from importlib import import_module as _game_builder_import_module
 
 _KNOWLEDGE_EXPORTS = {
+    "MachineArchiveError": ".archive_import",
+    "MachineRecord": ".archive_import",
+    "MachineSnapshot": ".archive_import",
+    "import_mame_listxml": ".archive_import",
+    "export_review_queue": ".archive_import",
+    "GameEvolutionError": ".evolution_archive",
+    "EvolutionNode": ".evolution_archive",
+    "EvolutionArchive": ".evolution_archive",
+    "EvolutionStage": ".evolution_archive",
+    "EvolutionCampaign": ".evolution_archive",
+    "parse_evolution_archive": ".evolution_archive",
+    "default_evolution_archive": ".evolution_archive",
+    "plan_evolution_campaign": ".evolution_archive",
+    "archive_coverage_report": ".evolution_archive",
     "NativeDesktopExportError": ".desktop_native_export",
     "NativeDesktopSourceProject": ".desktop_native_export",
     "compile_native_desktop": ".desktop_native_export",
