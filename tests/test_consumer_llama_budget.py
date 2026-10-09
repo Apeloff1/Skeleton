@@ -143,3 +143,38 @@ def test_consumer_probe_fails_closed_without_memory_or_physical_core_evidence(mo
     monkeypatch.setattr(Path, "read_text", lambda *args, **kw: (_ for _ in ()).throw(OSError()))
     with pytest.raises(LlamaCppRuntimeError, match="cannot determine available RAM"):
         detect_consumer_hardware_budget(kv_bytes_per_token=1024)
+
+
+def test_grouped_query_kv_geometry_reduces_consumer_memory_requirements():
+    from skeleton.ai.runtime.inference import estimate_gqa_kv_bytes_per_token
+
+    common = dict(layers=32, query_heads=32, key_head_dim=128,
+                  value_head_dim=128, key_bytes_per_element=2,
+                  value_bytes_per_element=2)
+    multihead = estimate_gqa_kv_bytes_per_token(kv_heads=32, **common)
+    grouped = estimate_gqa_kv_bytes_per_token(kv_heads=8, **common)
+    multiquery = estimate_gqa_kv_bytes_per_token(kv_heads=1, **common)
+    assert multihead == 524288
+    assert grouped == 131072
+    assert multiquery == 16384
+    assert multihead == 4 * grouped == 32 * multiquery
+
+    config = _config(context_size=8192)
+    budget = ConsumerHardwareBudget(
+        ram_bytes=8 * GIB, physical_cpu_cores=8,
+        kv_bytes_per_token=grouped,
+    )
+    plan = plan_consumer_llama_cpp(config, budget, model_bytes=4 * GIB)
+    assert plan.configuration.context_size == 8192
+    assert plan.reserved_kv_bytes == 1 * GIB
+
+
+@pytest.mark.parametrize("kv_heads", [0, 3, 33, True])
+def test_grouped_query_rejects_inconsistent_head_geometry(kv_heads):
+    from skeleton.ai.runtime.inference import estimate_gqa_kv_bytes_per_token
+
+    with pytest.raises(ValueError):
+        estimate_gqa_kv_bytes_per_token(
+            layers=8, query_heads=32, kv_heads=kv_heads,
+            key_head_dim=128, value_head_dim=128,
+        )
