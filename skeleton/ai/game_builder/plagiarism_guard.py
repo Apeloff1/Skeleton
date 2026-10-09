@@ -306,6 +306,10 @@ def audit_game_originality(
         raise OriginalityError("bounded originality batch exceeded")
     if any(not isinstance(s, ExpressionSample) for s in (*candidate_samples, *references)):
         raise OriginalityError("typed expression samples required")
+    if len(candidate_samples) * len(references) > 4096:
+        raise OriginalityError("comparison batch must be sharded into review cohorts")
+    if sum(len(s.text) for s in (*candidate_samples, *references)) > 4_000_000:
+        raise OriginalityError("aggregate review input exceeds memory budget")
     if len({x.work_id for x in candidate_samples}) != len(candidate_samples) or (
         len({x.work_id for x in references}) != len(references)
     ):
