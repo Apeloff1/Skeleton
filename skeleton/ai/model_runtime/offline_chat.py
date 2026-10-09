@@ -431,6 +431,16 @@ class OfflineChatStore:
         if not isinstance(transcript, ChatTranscript) or not isinstance(text, str):
             raise RuntimeContractError("invalid completed native chat result")
         transcript.validate_turn_order()
+        prior = session.transcript.messages
+        next_messages = transcript.messages
+        if (
+            len(next_messages) != len(prior) + 2
+            or next_messages[:-2] != prior
+            or next_messages[-2].role != "user"
+            or next_messages[-1].role != "assistant"
+            or next_messages[-1].content != text
+        ):
+            raise RuntimeContractError("completed turn must extend full saved transcript")
         encoded = transcript.to_json()
         if len(encoded.encode("utf-8")) > MAX_TRANSCRIPT_BYTES:
             raise RuntimeContractError("completed conversation exceeds persisted budget")
@@ -515,11 +525,17 @@ class OfflineChatProduct:
         # exception the store is never touched.
         result = self.engine.turn(session.transcript, message, config)
         generation = result.generation
+        # The native engine may evict old dialogue to fit its token window.
+        # Persist the complete prior transcript plus the committed new turn,
+        # never that shortened inference-only projection.
+        full_transcript = session.transcript.append("user", message).append(
+            "assistant", generation.text
+        )
         return self.store.commit(
             session=session,
             request_id=rid,
             request_digest=request_digest,
-            transcript=result.transcript,
+            transcript=full_transcript,
             text=generation.text,
             output_digest=generation.output_digest,
             prompt_tokens=result.prompt_tokens,
