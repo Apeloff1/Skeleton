@@ -159,6 +159,51 @@ certification. Checkpoint quality and legal model-use rights remain external
 operator responsibilities.
 
 
+## Localhost browser workspace and authenticated offline API
+
+A standalone browser service lets local clients use the same model-bound SQLite authority, including recovery, forks, backups and stable request receipts. Start an operator-owned model from this repository:
+
+    # Native transformer checkpoint
+    python -m skeleton.app.offline_http --native-checkpoint ./local-model.json --token-file ./new-private-token.secret --port 8137
+
+    # Or a preinstalled, digest-pinned GGUF/llama.cpp deployment
+    python -m skeleton.app.offline_http --gguf-deployment ./my-gguf.json --token-file ./new-private-token.secret --port 8137
+
+Open http://127.0.0.1:8137/ on **the same computer**. Paste the bearer token from the new owner-readable secret file into **Local access token**. The browser uses only the same-origin local service; it includes no CDN, remote font, external script, account login, provider fallback, browser localStorage or cookies.
+
+The installed Windows frozen launcher exposes the same feature:
+
+    Skeleton.exe --local-http --local-gguf-deployment .\my-gguf.json --local-token-file .\new-private-token.secret --local-port 8137
+
+Use `--local-native-checkpoint` instead of `--local-gguf-deployment` for the native format.
+
+### API operations
+
+| Method | Route | Action |
+| --- | --- | --- |
+| GET | /v1/status | Exact local model identity and token default |
+| GET, POST | /v1/sessions | List / create persistent conversations |
+| GET, DELETE | /v1/sessions/{id} | Retrieve full history / delete |
+| POST | /v1/sessions/{id}/turn | Native or GGUF inference and durable commit |
+| POST | /v1/sessions/{id}/fork | Fork at a committed revision |
+| GET | /v1/sessions/{id}/export | Retrieve full integrity-checked backup |
+| POST | /v1/sessions/import | Import into a new conversation ID |
+
+Every API call requires the `Authorization: Bearer <private-token>` header. All POST routes use JSON. Example turn request:
+
+    {"message":"hello","request_id":"my-stable-retry-001","max_output_tokens":32}
+
+The server binds exclusively to numeric 127.0.0.1, checks the Host and Origin, denies cross-origin requests and encoded paths, uses no permissive CORS, restricts HTTP body and connection budgets, and never logs prompts or secrets. The token is held in browser tab memory only. Reusing a request ID with identical inputs replays the recorded answer; changing its inputs rejects the request without a new model execution.
+
+The browser UI supports model status, multi-turn chat, full saved-history recall, new sessions, deletion, forking and portable backup. **Backups remain plaintext** and should be protected as private records. This local single-user surface is not yet an independently security-assessed, authenticated multi-user product.
+
+Black-box acceptance:
+
+    python -m pytest -q tests/test_app_offline_http.py
+
+The integration test binds a real ephemeral localhost port, executes native inference, checks token/origin/host protections, concurrent exact-once retries, complete-history backups, forks and local token-file permissions.
+
+
 ## Windows desktop product integration
 
 The installed Windows launcher already includes a **Local AI (offline)**
@@ -237,7 +282,7 @@ be used as an untrusted instruction feed.
 ## Verification
 
 ```bash
-python -m pytest -q tests/test_ai_offline_native_chat.py tests/test_app_offline_chat_persistence.py tests/test_app_offline_chat_cli.py
+python -m pytest -q tests/test_ai_offline_native_chat.py tests/test_app_offline_chat_persistence.py tests/test_app_offline_chat_cli.py tests/test_app_offline_http.py
 python -m skeleton.ai.model_runtime.offline_chat --help
 ```
 
