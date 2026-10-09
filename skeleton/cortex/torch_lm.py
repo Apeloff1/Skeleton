@@ -367,8 +367,21 @@ class TorchAccel:
 
     def logits_window(self, ids: Sequence[int]) -> List[float]:
         """Serialize resident KV mutation across concurrent local requests."""
+        result, _ = self.logits_window_with_cache(ids)
+        return result
+
+    def logits_window_with_cache(
+        self, ids: Sequence[int]
+    ) -> tuple[List[float], tuple[int, ...]]:
+        """Return logits and occupancy from the same atomic cache transition.
+
+        Separate logits and cache-token reads race with another inference
+        session and can corrupt resource/replay accounting even if logits
+        themselves remain correct.
+        """
         with self._state_lock:
-            return self._logits_window_unlocked(ids)
+            result = self._logits_window_unlocked(ids)
+            return result, tuple(self._cached_ids)
 
     def _logits_window_unlocked(self, ids: Sequence[int]) -> List[float]:
         """Prefill once, then decode with on-device per-layer K/V tensors."""
