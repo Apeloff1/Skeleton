@@ -115,6 +115,7 @@ class ReleaseCandidate:
     rights_evidence_sha256: str
     legal_assessment_sha256: str
     originality_screen_sha256: str
+    credits_bundle_sha256: str
     channel: ReleaseChannel
     jurisdictions: tuple[str, ...]
     author_ids: tuple[str, ...]
@@ -130,7 +131,7 @@ class ReleaseCandidate:
         for name in (
             "world_sha256", "native_source_sha256", "native_binary_sha256",
             "rights_evidence_sha256", "legal_assessment_sha256",
-            "originality_screen_sha256", "native_build_evidence_sha256",
+            "originality_screen_sha256", "credits_bundle_sha256", "native_build_evidence_sha256",
             "native_gameplay_evidence_sha256",
         ):
             if not _is_sha(getattr(self, name)):
@@ -170,7 +171,7 @@ class ReleaseCandidate:
                 "project_id", "target_platform_id", "world_sha256",
                 "native_source_sha256", "native_binary_sha256",
                 "rights_evidence_sha256", "legal_assessment_sha256",
-                "originality_screen_sha256", "native_build_evidence_sha256",
+                "originality_screen_sha256", "credits_bundle_sha256", "native_build_evidence_sha256",
                 "native_gameplay_evidence_sha256", "platform_authority_evidence_sha256",
                 "distribution_license_evidence_sha256",
             )},
