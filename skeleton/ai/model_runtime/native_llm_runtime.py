@@ -232,9 +232,9 @@ class NativeLLMRuntime:
             actual = str(getattr(self.model, "device", "cpu") or "cpu")
             resident = bool(getattr(self.model, "resident", False))
         if requested in {"cuda", "gpu"}:
-            degraded = actual != "cuda"
+            degraded = actual != "cuda" or not resident
         elif requested == "mps":
-            degraded = actual != "mps"
+            degraded = actual != "mps" or not resident
         elif requested in {"torch", "torch-cpu"}:
             degraded = not resident
         else:
