@@ -7,6 +7,8 @@ import json
 
 import pytest
 
+from skeleton.ai.game_builder.playable_world import GameBuildIntent, generate_playable_world
+from skeleton.ai.game_builder.evolution_practice import practice_evolution_games, MAX_PRACTICE_STAGES
 from skeleton.ai.game_builder.archive_import import (
     MachineArchiveError, import_mame_listxml, export_review_queue,
 )
@@ -182,3 +184,47 @@ def test_archive_parser_rejects_time_travel_unknown_nodes_and_fake_verification(
             data["nodes"].append(dict(child))
         with pytest.raises(GameEvolutionError):
             parse_evolution_archive(json.dumps(data))
+
+
+def test_dated_evolution_campaign_produces_actual_solvable_original_game_worlds():
+    from skeleton.ai.game_builder.playable_simulation import verify_replay
+    original = generate_playable_world(
+        GameBuildIntent(
+            project_id="fresh-evolution-game", title="Original evolution platformer",
+            subtitle="Cross-era practice", seed=5003, width=15, height=15,
+            levels=3, collectibles_per_level=2, hazards_per_level=2, theme="space",
+        ),
+        authorized=True,
+    )
+    plan = plan_evolution_campaign(homebrew("nintendo_famicom"), "nintendo_switch")
+    pack = practice_evolution_games(original, plan, authorized=True)
+    assert len(pack.demos) == len(plan.stages)
+    assert pack.status()["successful_deterministic_replays"] == len(plan.stages)
+    assert pack.status()["console_roms_built"] == 0
+    assert all(not p.native_binary_built for p in pack.demos)
+    assert all(p.target_adapter_state == "concept_prototype_not_native" for p in pack.demos)
+    assert len({p.game_world.digest for p in pack.demos}) == len(pack.demos)
+    assert all(p.game_world.intent.project_id == original.intent.project_id for p in pack.demos)
+    assert practice_evolution_games(original, plan, authorized=True) == pack
+
+
+def test_evolution_gameplay_rejects_mismatched_and_overbudget_campaigns():
+    original = generate_playable_world(
+        GameBuildIntent(
+            project_id="fresh-evolution-game", title="Original game",
+            subtitle="Training", seed=3211, width=11, height=11,
+            levels=1, collectibles_per_level=1, hazards_per_level=0,
+        ),
+        authorized=True,
+    )
+    plan = plan_evolution_campaign(homebrew("sony_playstation"), "sony_ps5")
+    with pytest.raises(PermissionError):
+        practice_evolution_games(original, plan, authorized=False)
+    with pytest.raises(GameEvolutionError):
+        practice_evolution_games(original, plan, authorized=True, maximum_stages=0)
+    with pytest.raises(GameEvolutionError):
+        practice_evolution_games(original, plan, authorized=True, maximum_stages=True)
+    with pytest.raises(GameEvolutionError):
+        practice_evolution_games(original, replace(plan, original_project_id="wrong-project"), authorized=True)
+    with pytest.raises(GameEvolutionError):
+        practice_evolution_games(original, plan, authorized=True, maximum_stages=2)
