@@ -25,6 +25,7 @@ from .game_boy_native_export import compile_native_game_boy, export_native_game_
 from .nes_native_export import compile_native_nes, export_native_nes
 from .c64_native_export import compile_native_c64, export_native_c64
 from .dos_native_export import compile_native_dos, export_native_dos
+from .atari8_native_export import compile_native_atari8, export_native_atari8
 from .platform_registry import default_registry
 from .playable_simulation import demonstrate_solvable
 from .playable_world import GameBuildIntent, generate_playable_world
@@ -38,6 +39,7 @@ _NATIVE = {
     "nintendo_famicom": "nes_ca65",
     "commodore_64": "c64_cc65",
     "dos_vga": "dos_nasm_8086",
+    "atari_400_800": "atari8_cc65",
 }
 
 _MAX_EVIDENCE_FILE = 8 * 1024 * 1024
@@ -100,6 +102,11 @@ def build_game(
         project = compile_native_dos(world, source, authorized=True)
         folder = export_native_dos(project, output, authorized=True)
         artifact_type = "native_dos_8086_pc_textmode_com_source"
+        digest = project.content_digest
+    elif kind == "atari8_cc65":
+        project = compile_native_atari8(world, source, authorized=True)
+        folder = export_native_atari8(project, output, authorized=True)
+        artifact_type = "native_atari8_6502_antic_gtia_pokey_xex_source"
         digest = project.content_digest
     else:
         project = compile_native_desktop(world, source, target, authorized=True)
