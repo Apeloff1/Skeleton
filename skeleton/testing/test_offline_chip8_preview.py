@@ -142,7 +142,13 @@ def test_chip8_native_display_failure_keeps_headless_gameplay_operational(monkey
 def test_native_game_entrypoint_routes_to_original_chip8_mode_without_web_browser(
     monkeypatch,
 ):
-    from packaging.windows import game_preview_entry as entry
+    import importlib.util
+    from pathlib import Path
+    entrypoint = Path("packaging/windows/game_preview_entry.py").resolve()
+    spec = importlib.util.spec_from_file_location("skeleton_game_preview_entry_test", entrypoint)
+    assert spec is not None and spec.loader is not None
+    entry = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(entry)
     called = []
     monkeypatch.setattr(entry, "run_native_chip8_preview",
                         lambda: called.append("chip8") or 0)
