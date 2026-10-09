@@ -273,6 +273,69 @@ generation and replay. Real model quality and installer signing remain separate
 release gates.
 
 
+## Opt-in grounded conversation turns (bounded offline source custody)
+
+**Local browser:** import one or more operator-owned text references into the
+Local Reference Library, enable **Include local evidence** in the chat composer,
+then submit a question. The server performs deterministic verified local
+retrieval before model work. If nothing matches, it rejects the grounded turn
+without committing a response. Ordinary chat remains available without
+references. Evidence excerpts are appended as **untrusted user-context text**,
+never system/developer instructions and never executable tool input.
+
+**Terminal:**
+
+    python -m skeleton.app.offline_chat_cli --gguf-deployment ./my-local-gguf.json --grounded-message "How does the rasterizer handle edge coverage?" --max-output-tokens 64 --json
+
+To ask several grounded questions in the terminal's interactive mode:
+
+    python -m skeleton.app.offline_chat_cli --gguf-deployment ./my-local-gguf.json --interactive
+    You> /ground How does the rasterizer handle edge coverage?
+
+The same commands work with `--native-checkpoint ./model.json` for a
+locally admitted native checkpoint. For real answers, a trained and qualified
+model is still required; the CI native fixture has random, untrained weights.
+
+**HTTP request:** `POST /v1/sessions/{id}/turn`, JSON body:
+
+    {"message":"How does the rasterizer handle edge coverage?","grounded":true,"request_id":"stable-id-001","max_output_tokens":64}
+
+The turn response and `GET /v1/sessions/{id}` expose independently validated
+`evidence` and `citation_audit` fields. A grounded snapshot records the exact
+source substring *actually supplied* to the model, SHA-256 of the full original
+document and excerpt, original character offsets, citation ID, original
+question and request/configuration/model/tokenizer identity. No silent
+truncation of evidence can be represented as having been supplied.
+
+A `citation_audit` reports `recognized_identifiers`,
+`unknown_identifiers` or `no_identifiers`. This is only syntactic
+citation-ID checking: it **cannot prove answer factual correctness or semantic
+support**. Source text is untrusted. The model is not allowed tool execution
+by this feature.
+
+Source changes or deletion **after a successful committed turn** cannot
+rewrite its original receipt. An identical `request_id` with the identical
+prompt, mode and generation settings returns the previous answer and its
+saved evidence; changing those inputs with the same ID fails closed.
+Each SQLite turn has an explicit persisted grounded marker, so a missing
+evidence row is detected rather than silently becoming ungrounded.
+
+Grounded portable backups use `skeleton.ai.offline-chat-bundle.v2`, preserving
+evidence for every grounded turn and keeping v1 support for purely ungrounded
+conversations. Forking preserves exactly the prefix of prior evidence.
+Backups remain **unencrypted plaintext** and require private storage.
+
+Grounding validation commands:
+
+    python -m pytest -q tests/test_app_offline_grounding.py tests/test_app_offline_http.py tests/test_app_offline_chat_cli.py
+    Skeleton.exe --local-http-smoke
+
+These qualify runtime/evidence custody only. Model hallucination, unsupported
+claims, trained-model effectiveness, historical-source poisoning,
+contradiction evaluations, Windows file ACLs and signed release quality remain
+explicit open acceptance criteria.
+
+
 ## Windows desktop product integration
 
 The installed Windows launcher already includes a **Local AI (offline)**
