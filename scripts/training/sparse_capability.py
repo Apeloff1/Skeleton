@@ -16,6 +16,9 @@ from skeleton.ai.training.offline_foundations import (
     SyntheticCurriculumError, validate_curriculum,
 )
 from skeleton.ai.training.capability_ledger import OfflineCapabilityLedger
+from skeleton.ai.training.resource_admission import (
+    MIB, observe_resources, select_sparse_profile,
+)
 from skeleton.ai.training.sparse_capability import (
     DEFAULT_BUDGET, HARDWARE_BUDGETS, HARDWARE_CORPUS_BYTE_BUDGETS,
     assess_heldout_capabilities, build_sparse_capability_plan,
@@ -69,8 +72,14 @@ def _parser() -> argparse.ArgumentParser:
         description="Prepare 36-72 supervised samples without expanding the synthetic data bank."
     )
     parser.add_argument("--dataset", type=Path, default=DATASET)
-    parser.add_argument("--profile", choices=tuple(HARDWARE_BUDGETS), default="low-memory",
-                        help="maximum active samples, not an actual hardware benchmark")
+    parser.add_argument("--profile", choices=(*HARDWARE_BUDGETS, "auto"),
+                        default="low-memory",
+                        help="fixed sparse profile or read-only hardware-aware auto policy")
+    parser.add_argument("--auto-ceiling", choices=tuple(HARDWARE_BUDGETS),
+                        default="workstation",
+                        help="maximum auto profile (does not bypass resource checks)")
+    parser.add_argument("--reserve-mib", type=int, default=512,
+                        help="memory reserve for auto mode (0-16384 MiB)")
     parser.add_argument("--budget", type=int, default=None,
                         help="36-72 samples; cannot exceed selected hardware profile")
     focus = parser.add_mutually_exclusive_group()
@@ -107,10 +116,28 @@ def main(argv: Sequence[str] | None = None) -> int:
     if (args.focus_ledger is not None) != (args.model_tag is not None):
         print("--focus-ledger requires --model-tag and vice versa", file=sys.stderr)
         return 2
-    budget = HARDWARE_BUDGETS[args.profile] if args.budget is None else args.budget
+    if (
+        args.profile != "auto"
+        and (args.auto_ceiling != "workstation" or args.reserve_mib != 512)
+    ):
+        print("auto memory controls require --profile auto", file=sys.stderr)
+        return 2
+    if type(args.reserve_mib) is not int or not 0 <= args.reserve_mib <= 16384:
+        print("reserve-mib must be between 0 and 16384", file=sys.stderr)
+        return 2
+    resources = None
+    profile = args.profile
+    if profile == "auto":
+        resources = select_sparse_profile(
+            observe_resources(),
+            ceiling_profile=args.auto_ceiling,
+            reserve_bytes=args.reserve_mib * MIB,
+        )
+        profile = resources["selected_profile"]
+    budget = HARDWARE_BUDGETS[profile] if args.budget is None else args.budget
     if (
         type(budget) is not int or budget < DEFAULT_BUDGET
-        or budget > HARDWARE_BUDGETS[args.profile]
+        or budget > HARDWARE_BUDGETS[profile]
     ):
         print("sparse data budget violates selected hardware profile", file=sys.stderr)
         return 2
@@ -162,7 +189,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.dataset, budget=budget, focus_modes=focus_modes,
         )
         report = sparse_plan_receipt(plan)
-        limit_bytes = HARDWARE_CORPUS_BYTE_BUDGETS[args.profile]
+        limit_bytes = HARDWARE_CORPUS_BYTE_BUDGETS[profile]
         if plan["active_training_bytes"] > limit_bytes:
             raise SyntheticCurriculumError(
                 "sparse training text exceeds selected hardware profile byte budget"
@@ -176,7 +203,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             report["adaptive_selection_feedback_sha256"] = ledger_feedback["prediction_sha256"]
             report["adaptive_selection_did_not_copy_heldout_labels"] = True
             report["raw_predictions_loaded"] = False
-        report["hardware_profile"] = args.profile
+        report["hardware_profile"] = profile
+        report["hardware_profile_requested"] = args.profile
+        report["resource_admission"] = resources
         report["hardware_benchmark_run"] = False
         if args.export is not None:
             result = _new_file(
