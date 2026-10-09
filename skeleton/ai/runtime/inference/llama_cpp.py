@@ -298,6 +298,45 @@ class ConsumerLlamaPlan:
     context_clamped: bool
 
 
+def estimate_gqa_kv_bytes_per_token(
+    *,
+    layers: int,
+    query_heads: int,
+    kv_heads: int,
+    key_head_dim: int,
+    value_head_dim: int,
+    key_bytes_per_element: int = 2,
+    value_bytes_per_element: int = 2,
+) -> int:
+    """Exact logical K/V tensor bytes per token from known model geometry.
+
+    Supports multi-head (kv_heads=query_heads), grouped-query and multi-query
+    attention. It deliberately excludes allocator padding, paging overhead and
+    backend scratch; the consumer RAM planner reserves those separately.
+    It is not correct to infer KV geometry from GGUF file size alone.
+    """
+    fields = {
+        "layers": layers,
+        "query_heads": query_heads,
+        "kv_heads": kv_heads,
+        "key_head_dim": key_head_dim,
+        "value_head_dim": value_head_dim,
+        "key_bytes_per_element": key_bytes_per_element,
+        "value_bytes_per_element": value_bytes_per_element,
+    }
+    for name, value in fields.items():
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0 or value > 65536:
+            raise ValueError(f"{name} must be a bounded positive integer")
+    if kv_heads > query_heads or query_heads % kv_heads:
+        raise ValueError("query head count must be divisible by KV head count")
+    if key_bytes_per_element > 8 or value_bytes_per_element > 8:
+        raise ValueError("KV element width must be <= 8 bytes")
+    return layers * kv_heads * (
+        key_head_dim * key_bytes_per_element
+        + value_head_dim * value_bytes_per_element
+    )
+
+
 def detect_consumer_hardware_budget(
     *,
     kv_bytes_per_token: int,
@@ -1000,6 +1039,7 @@ __all__ = [
     "ConsumerHardwareBudget",
     "ConsumerLlamaPlan",
     "detect_consumer_hardware_budget",
+    "estimate_gqa_kv_bytes_per_token",
     "plan_consumer_llama_cpp",
     "build_llama_cpp_adapter",
     "inspect_gguf",
