@@ -190,6 +190,7 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert "Smoke install generated Setup.exe" in source
     assert '@("--local-ai-training-smoke")' in source
     assert '@("--local-ai-benchmark-smoke")' in source
+    assert '@("--local-ai-dataset-smoke")' in source
     assert '"--offline-command", "local-ai"' in source
     assert '"--inspect-model", "--json"' in source
     assert '@("--local-ai-smoke")' in source
