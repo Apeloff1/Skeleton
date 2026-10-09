@@ -298,6 +298,106 @@ class ConsumerLlamaPlan:
     context_clamped: bool
 
 
+def detect_consumer_hardware_budget(
+    *,
+    kv_bytes_per_token: int,
+    target_context_tokens: int = 4096,
+    available_ram_bytes: int | None = None,
+    physical_cpu_cores: int | None = None,
+) -> ConsumerHardwareBudget:
+    """Conservatively probe an offline host; fail rather than invent capacity.
+
+    psutil, when installed, works on Windows, macOS and Linux. On Linux
+    /proc/meminfo and /proc/cpuinfo allow a standard-library-only fallback.
+    Cgroup v2 memory and CPU quotas and process affinity tighten the budget.
+    Optional explicit overrides support constrained and headless deployments.
+    """
+    def positive(value: object, name: str) -> int:
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise LlamaCppRuntimeError(f"invalid detected {name}")
+        return value
+
+    memory = available_ram_bytes
+    cores = physical_cpu_cores
+    if memory is None or cores is None:
+        try:
+            import psutil  # type: ignore[import-not-found]  # optional host probe
+        except ImportError:
+            psutil = None
+        if psutil is not None:
+            if memory is None:
+                memory = int(psutil.virtual_memory().available)
+            if cores is None:
+                detected = psutil.cpu_count(logical=False)
+                cores = int(detected) if detected else None
+    if memory is None:
+        try:
+            for line in Path("/proc/meminfo").read_text(encoding="ascii").splitlines():
+                if line.startswith("MemAvailable:"):
+                    memory = int(line.split()[1]) * 1024
+                    break
+        except (OSError, ValueError, IndexError):
+            pass
+    if cores is None:
+        try:
+            pairs = set()
+            physical = logical_core = None
+            for line in Path("/proc/cpuinfo").read_text(encoding="ascii").splitlines() + [""]:
+                if not line.strip():
+                    if physical is not None and logical_core is not None:
+                        pairs.add((physical, logical_core))
+                    physical = logical_core = None
+                elif line.startswith("physical id"):
+                    physical = line.split(":", 1)[1].strip()
+                elif line.startswith("core id"):
+                    logical_core = line.split(":", 1)[1].strip()
+            if pairs:
+                cores = len(pairs)
+        except (OSError, ValueError, IndexError):
+            pass
+    if memory is None or cores is None:
+        raise LlamaCppRuntimeError(
+            "cannot determine available RAM and physical cores; provide explicit values"
+        )
+    memory = positive(memory, "available RAM")
+    cores = positive(cores, "physical CPU count")
+
+    # Linux containers may see the entire host's RAM from psutil or /proc.
+    # The effective budget cannot exceed unallocated cgroup allowance.
+    cgroup = Path("/sys/fs/cgroup")
+    try:
+        max_text = (cgroup / "memory.max").read_text(encoding="ascii").strip()
+        if max_text != "max":
+            mem_limit = int(max_text)
+            mem_current = int((cgroup / "memory.current").read_text(encoding="ascii"))
+            if mem_limit <= 0 or mem_current < 0:
+                raise LlamaCppRuntimeError("invalid cgroup memory accounting")
+            memory = min(memory, max(0, mem_limit - mem_current))
+    except (OSError, ValueError):
+        pass
+    # Container CPU quotas can be smaller than visible physical core count.
+    try:
+        if hasattr(os, "sched_getaffinity"):
+            cores = min(cores, len(os.sched_getaffinity(0)))
+    except OSError:
+        pass
+    try:
+        quota_text, period_text = (cgroup / "cpu.max").read_text(encoding="ascii").split()
+        if quota_text != "max":
+            quota, period = int(quota_text), int(period_text)
+            if quota <= 0 or period <= 0:
+                raise LlamaCppRuntimeError("invalid cgroup CPU quota")
+            cores = min(cores, max(1, (quota + period - 1) // period))
+    except (OSError, ValueError):
+        pass
+    return ConsumerHardwareBudget(
+        ram_bytes=positive(memory, "effective available RAM"),
+        physical_cpu_cores=positive(cores, "effective CPU cores"),
+        kv_bytes_per_token=kv_bytes_per_token,
+        target_context_tokens=target_context_tokens,
+    )
+
+
 def plan_consumer_llama_cpp(
     config: LlamaCppConfig,
     budget: ConsumerHardwareBudget,
@@ -899,6 +999,7 @@ __all__ = [
     "LlamaCppRuntimeError",
     "ConsumerHardwareBudget",
     "ConsumerLlamaPlan",
+    "detect_consumer_hardware_budget",
     "plan_consumer_llama_cpp",
     "build_llama_cpp_adapter",
     "inspect_gguf",
