@@ -81,8 +81,9 @@ async def generate_local_gguf(
         not isinstance(result.text, str) or not result.text.strip()
         or result.tool_calls or result.structured_output is not None
         or result.model_digest != backend.model_digest
+        or len(result.text) > 32_768
     ):
-        raise OfflineGGUFError("GGUF backend returned invalid unbound text output")
+        raise OfflineGGUFError("GGUF backend returned invalid, unbound, or oversized text")
     # Receipt identifies the *actual* local executable and model bytes.
     # Never make up an execution_receipt_digest if the canonical backend
     # has not emitted one; keep response identity separate from attestation.
@@ -192,8 +193,9 @@ class OfflineGGUFSession:
             or result.tool_calls
             or result.structured_output is not None
             or result.model_digest != self.backend.model_digest
+            or len(result.text) > 8192
         ):
-            raise OfflineGGUFError("invalid or unbound local GGUF chat response")
+            raise OfflineGGUFError("invalid, unbound or oversized GGUF chat response")
         self.history = (
             history + (("user", request.prompt), ("assistant", result.text))
         )[-16:]
