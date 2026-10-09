@@ -866,3 +866,27 @@ def test_prompt_memoization_is_invalidated_on_sgd():
     new_logits = accel.logits_window(prompt)
     assert new_logits != old_logits
     assert new_logits == pytest.approx(accel.logits(prompt), abs=2e-5)
+
+
+def test_explicit_compact_kv_policy_never_degrades_after_kernel_failure(monkeypatch):
+    pytest.importorskip("torch")
+    model = _model()
+    model.to("torch", kv_dtype="bf16", max_kv_bytes=4096)
+    accel = model._accel
+    assert accel is not None and model.resident
+
+    def unavailable_kernel(*args, **kwargs):
+        raise RuntimeError("backend does not implement requested kernel")
+
+    monkeypatch.setattr(accel, "logits_window_with_cache", unavailable_kernel)
+    cache = KVCache(model.n_layers, model.ctx)
+    with pytest.raises(RuntimeError, match="forbids silent CPU fallback"):
+        model._logits_window((1, 2), cache)
+    assert cache.tokens == []
+    assert model._accel is accel
+    assert model.resident
+
+    monkeypatch.setattr(accel, "logits", unavailable_kernel)
+    with pytest.raises(RuntimeError, match="forbids silent CPU fallback"):
+        model._logits((1, 2))
+    assert model._accel is accel
