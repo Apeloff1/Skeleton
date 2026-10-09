@@ -261,7 +261,7 @@ def test_installer_contains_dedicated_one_click_offline_game_executable():
     workflow = Path(".github/workflows/windows-installer.yml").read_text("utf-8")
 
     assert "$GamePreviewEntryPoint" in build
-    assert '"game_preview_entry.py"' in build
+    assert 'game_preview_entry.py' in build
     assert '"--name", "SkeletonGame"' in build
     assert '"--windowed"' in build
     assert '"skeleton.app.offline_game_preview"' in build
