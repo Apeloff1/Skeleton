@@ -46,13 +46,11 @@
           "ambiguous retry duplicates mutation",
           "UI-specific fields leak into core contracts"
         ],
-        "gaps": [
-          "materialize API schema registry",
-          "bind compatibility tests to release gate"
-        ],
+        "gaps": [],
         "tests": [
           "backend/tests/test_api_contract_registry.py",
-          "tests/test_p1_api_contract_registry.py"
+          "tests/test_p1_api_contract_registry.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-api-contract-registry.yml"
@@ -282,10 +280,7 @@
           "stale optimistic state",
           "hidden degraded capability"
         ],
-        "gaps": [
-          "define canonical product projection contract",
-          "bind shell state to operation/event cursors"
-        ],
+        "gaps": [],
         "tests": [
           "backend/tests/test_operation_projection.py",
           "backend/tests/test_operation_stream_transport.py",
@@ -293,7 +288,8 @@
           "skeleton/testing/test_operation_stream.py",
           "backend/tests/test_product_shell_projection.py",
           "frontend/scripts/test-product-projection.mjs",
-          "frontend/scripts/test-operation-stream-reducer.mjs"
+          "frontend/scripts/test-operation-stream-reducer.mjs",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-streaming-projection-authority.yml",
@@ -523,13 +519,11 @@
           "version skew",
           "stale local cache"
         ],
-        "gaps": [
-          "define desktop/runtime handshake",
-          "materialize platform-specific permission matrix"
-        ],
+        "gaps": [],
         "tests": [
           "backend/tests/test_tenant_storage_boundary.py",
-          "frontend/scripts/test-tenant-storage-boundary.mjs"
+          "frontend/scripts/test-tenant-storage-boundary.mjs",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-tenant-storage-boundary.yml"
@@ -760,17 +754,15 @@
           "cross-tenant cache leakage",
           "double submit"
         ],
-        "gaps": [
-          "bind client cursor model to streaming contract",
-          "add storage classification enforcement"
-        ],
+        "gaps": [],
         "tests": [
           "backend/tests/test_operation_projection.py",
           "backend/tests/test_operation_stream_transport.py",
           "backend/tests/test_operation_stream_route.py",
           "skeleton/testing/test_operation_stream.py",
           "backend/tests/test_tenant_storage_boundary.py",
-          "frontend/scripts/test-tenant-storage-boundary.mjs"
+          "frontend/scripts/test-tenant-storage-boundary.mjs",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-streaming-projection-authority.yml",
@@ -1004,10 +996,7 @@
           "terminal-state race",
           "hidden blocked work"
         ],
-        "gaps": [
-          "define evidence-backed progress schema",
-          "materialize pause/resume semantics"
-        ],
+        "gaps": [],
         "tests": [
           "backend/tests/test_product_shell_projection.py",
           "backend/tests/test_operation_projection.py",
@@ -1250,13 +1239,11 @@
           "shared cache poisoning",
           "quota bypass"
         ],
-        "gaps": [
-          "define tenant propagation invariant",
-          "materialize cross-store deletion test"
-        ],
+        "gaps": [],
         "tests": [
           "backend/tests/test_tenant_storage_boundary.py",
-          "frontend/scripts/test-tenant-storage-boundary.mjs"
+          "frontend/scripts/test-tenant-storage-boundary.mjs",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-tenant-storage-boundary.yml"
@@ -1483,12 +1470,10 @@
           "unsigned/tampered artifact",
           "prerequisite mis-detection"
         ],
-        "gaps": [
-          "bind installer to release provenance",
-          "materialize interruption checkpoints"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_installer_lifecycle.py"
+          "skeleton/testing/test_installer_lifecycle.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-installer-lifecycle.yml"
@@ -1718,13 +1703,11 @@
           "mixed-version drift",
           "rollback incompatible with new data"
         ],
-        "gaps": [
-          "define update compatibility graph",
-          "bind migrations to restore/rollback proof"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_installer_lifecycle.py",
-          "skeleton/testing/test_migration_rollback_compatibility.py"
+          "skeleton/testing/test_migration_rollback_compatibility.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-installer-lifecycle.yml",
@@ -1954,12 +1937,10 @@
           "tampered repair source",
           "silent data loss"
         ],
-        "gaps": [
-          "define health invariant catalogue",
-          "materialize quarantine/recovery paths"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_installer_lifecycle.py"
+          "skeleton/testing/test_installer_lifecycle.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-installer-lifecycle.yml"
@@ -2184,12 +2165,10 @@
           "orphaned service/secret",
           "shared dependency removal"
         ],
-        "gaps": [
-          "define ownership manifest from installer receipts",
-          "materialize residual scanner"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_installer_lifecycle.py"
+          "skeleton/testing/test_installer_lifecycle.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-installer-lifecycle.yml"
@@ -2406,26 +2385,29 @@
         "canonical_paths": [
           "machine/architecture.json",
           "machine/ai_file_tree.json",
-          "scripts"
+          "scripts",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "competing canonical roots",
           "dependency cycles",
           "stale compatibility mirror"
         ],
-        "gaps": [
-          "bind all AI roots to one ownership graph",
-          "materialize relocation parity gate"
-        ],
+        "gaps": [],
         "tests": [
           "planned:skeleton/testing/test_repository_architecture.py",
-          "planned:skeleton/testing/test_ai_file_tree_ownership.py"
+          "planned:skeleton/testing/test_ai_file_tree_ownership.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:cycle/ownership violation suite",
           "planned:legacy-mirror drift evaluation"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -2639,10 +2621,7 @@
           "import-time mutation",
           "framework leakage"
         ],
-        "gaps": [
-          "define package layer manifest",
-          "add import graph fitness test"
-        ],
+        "gaps": [],
         "tests": [
           "planned:skeleton/testing/test_python_layering.py",
           "planned:skeleton/testing/test_import_side_effects.py"
@@ -2651,7 +2630,10 @@
           "planned:dependency-cycle scan",
           "planned:cold-import determinism evaluation"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -2858,26 +2840,29 @@
         "canonical_paths": [
           "skeleton",
           "scripts",
-          "pyproject.toml"
+          "pyproject.toml",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "module shadowing",
           "environment-dependent imports",
           "optional dependency drift"
         ],
-        "gaps": [
-          "remove remaining path hacks",
-          "materialize packaged-wheel import test"
-        ],
+        "gaps": [],
         "tests": [
           "planned:skeleton/testing/test_import_roots.py",
-          "planned:skeleton/testing/test_optional_imports.py"
+          "planned:skeleton/testing/test_optional_imports.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:packaged-vs-source import matrix",
           "planned:module shadowing evaluation"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -3092,12 +3077,11 @@
           "dangling path/reference",
           "schema downgrade"
         ],
-        "gaps": [
-          "independent manifest-reference drift, schema-downgrade, and doc-digest verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
           "tests/test_architecture_manifest_references.py",
-          "tests/test_architecture_rule_registry.py"
+          "tests/test_architecture_rule_registry.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:manifest drift injection suite",
@@ -3319,10 +3303,7 @@
           "waiver permanence",
           "non-deterministic diagnostics"
         ],
-        "gaps": [
-          "define rule registry",
-          "add waiver expiry enforcement"
-        ],
+        "gaps": [],
         "tests": [
           "planned:skeleton/testing/test_architecture_linter.py",
           "planned:skeleton/testing/test_architecture_waivers.py"
@@ -3331,7 +3312,10 @@
           "planned:mutation suite for architecture violations",
           "planned:false-positive regression corpus"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -4023,10 +4007,7 @@
           "stale ADR authority",
           "missing impact analysis"
         ],
-        "gaps": [
-          "create canonical ADR index schema",
-          "bind cross-cutting changes to ADR check"
-        ],
+        "gaps": [],
         "tests": [
           "planned:skeleton/testing/test_adr_index.py",
           "planned:skeleton/testing/test_adr_references.py"
@@ -4035,7 +4016,10 @@
           "planned:orphan-decision audit",
           "planned:supersession consistency evaluation"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -4487,12 +4471,10 @@
           "unsigned artifact",
           "rollback unproven"
         ],
-        "gaps": [
-          "define release evidence bundle schema",
-          "bind installer/updater artifacts to release digest"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_release_qualification.py"
+          "skeleton/testing/test_release_qualification.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-release-evidence-bundle.yml"
@@ -4719,12 +4701,10 @@
           "bad health signal",
           "partial rollback"
         ],
-        "gaps": [
-          "define environment promotion graph",
-          "materialize deployment reconciliation"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_migration_rollback_compatibility.py"
+          "skeleton/testing/test_migration_rollback_compatibility.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-migration-rollback-compatibility.yml"
@@ -4951,12 +4931,10 @@
           "secret leakage",
           "implicit local dependency"
         ],
-        "gaps": [
-          "define canonical environment schema",
-          "materialize hermetic test environment"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_migration_rollback_compatibility.py"
+          "skeleton/testing/test_migration_rollback_compatibility.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-migration-rollback-compatibility.yml"
@@ -5183,12 +5161,10 @@
           "unsafe default",
           "ambiguous precedence"
         ],
-        "gaps": [
-          "create typed config registry",
-          "bind effective config digest to evidence"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_migration_rollback_compatibility.py"
+          "skeleton/testing/test_migration_rollback_compatibility.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-migration-rollback-compatibility.yml"
@@ -5413,13 +5389,11 @@
           "missing authoritative state",
           "retention/privacy violation"
         ],
-        "gaps": [
-          "define backup coverage manifest",
-          "bind restore drill cadence"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_backup_restore_integration.py",
-          "skeleton/testing/test_backup_restore_qualification.py"
+          "skeleton/testing/test_backup_restore_qualification.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-backup-restore-qualification.yml"
@@ -5645,14 +5619,12 @@
           "recovery deadlock",
           "RPO/RTO unproven"
         ],
-        "gaps": [
-          "build recovery dependency graph",
-          "materialize full DR evidence bundle"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_backup_restore_integration.py",
           "skeleton/testing/test_backup_restore_qualification.py",
-          "skeleton/testing/test_disaster_recovery_qualification.py"
+          "skeleton/testing/test_disaster_recovery_qualification.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-backup-restore-qualification.yml",
@@ -5882,12 +5854,10 @@
           "evidence loss",
           "slow containment"
         ],
-        "gaps": [
-          "define incident schema/runbooks",
-          "bind postmortem actions into gap/risk ledgers"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_disaster_recovery_qualification.py"
+          "skeleton/testing/test_disaster_recovery_qualification.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-disaster-recovery-feedback.yml"
@@ -6113,12 +6083,10 @@
           "tail latency regression",
           "optimization breaks semantics"
         ],
-        "gaps": [
-          "define canonical workloads",
-          "bind budgets to engineering profiles"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_capacity_qualification.py"
+          "skeleton/testing/test_capacity_qualification.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-capacity-qualification.yml"
@@ -6344,12 +6312,10 @@
           "unbounded queues",
           "forecast drift"
         ],
-        "gaps": [
-          "bind resource telemetry to capacity model",
-          "materialize saturation drills"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_capacity_qualification.py"
+          "skeleton/testing/test_capacity_qualification.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-capacity-qualification.yml"
@@ -6575,12 +6541,10 @@
           "misattributed cost",
           "budget causes unsafe fallback"
         ],
-        "gaps": [
-          "define canonical cost units",
-          "bind budget decisions to routing evidence"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_budget_accounting_ledger.py"
+          "skeleton/testing/test_budget_accounting_ledger.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-budget-accounting.yml"
@@ -6805,11 +6769,10 @@
           "metric correlation bias",
           "threshold drift"
         ],
-        "gaps": [
-          "independent quality-vector threshold and non-compensable-failure verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "tests/test_vol070_quality_vector.py"
+          "tests/test_vol070_quality_vector.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:metric-gaming evaluation",
@@ -7031,11 +6994,10 @@
           "overconfidence out of domain",
           "specialist data drift"
         ],
-        "gaps": [
-          "independent specialization routing and out-of-domain verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "tests/test_vol071_specialized_intelligence.py"
+          "tests/test_vol071_specialized_intelligence.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:out-of-domain abstention evaluation",
@@ -7258,11 +7220,10 @@
           "stale/unsourced market data",
           "migration drift"
         ],
-        "gaps": [
-          "independent Jeeves custody, freshness, provenance, and parity verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "tests/test_vol072_jeeves_domain.py"
+          "tests/test_vol072_jeeves_domain.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:stale-market-data evaluation",
@@ -7956,12 +7917,10 @@
           "mutable overwrite",
           "orphan artifact"
         ],
-        "gaps": [
-          "define canonical artifact registry",
-          "bind artifact digests into evidence graph"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_release_qualification.py"
+          "skeleton/testing/test_release_qualification.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-release-evidence-bundle.yml"
@@ -8185,12 +8144,10 @@
           "live-object deletion",
           "digest algorithm migration"
         ],
-        "gaps": [
-          "define digest/version policy",
-          "materialize reachability proof tooling"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_release_qualification.py"
+          "skeleton/testing/test_release_qualification.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-release-evidence-bundle.yml"
@@ -8417,13 +8374,11 @@
           "selection bias",
           "missing negative results"
         ],
-        "gaps": [
-          "define experiment schema",
-          "bind experiments to reproducibility/provenance"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_experiment_registry.py",
-          "tests/test_p1_experiment_registry.py"
+          "tests/test_p1_experiment_registry.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-experiment-registry.yml"
