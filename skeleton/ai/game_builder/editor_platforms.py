@@ -8,8 +8,14 @@ from __future__ import annotations
 from .platform_registry import PlatformProfile, PlatformRegistry, PlatformRegistryError, default_registry
 from .port_planner import PortMode
 
-# These adapters generate genuine SDL2/C11 source only, NOT verified executable builds.
-_NATIVE_SOURCE_TARGETS = frozenset({"windows_modern", "linux_desktop", "macos_modern"})
+# Source producers are real and platform-specific. None self-certifies a build or release.
+_NATIVE_SOURCE_ADAPTERS = {
+    "windows_modern": "sdl2_c11_cmake",
+    "linux_desktop": "sdl2_c11_cmake",
+    "macos_modern": "sdl2_c11_cmake",
+    "nintendo_game_boy": "rgbds_dmg_2bpp_rom_source",
+}
+_NATIVE_SOURCE_TARGETS = frozenset(_NATIVE_SOURCE_ADAPTERS)
 
 
 def _option(profile: PlatformProfile, *, as_source: bool) -> dict[str, object]:
@@ -30,7 +36,7 @@ def _option(profile: PlatformProfile, *, as_source: bool) -> dict[str, object]:
         "planned_native_format": profile.artifact,
         "capability_status": "native_source_project_only" if source_ready else "design_catalogue_only",
         "native_source_project_available": source_ready,
-        "native_source_project_kind": "sdl2_c11_cmake" if source_ready else None,
+        "native_source_project_kind": _NATIVE_SOURCE_ADAPTERS.get(profile.id),
         "native_binary_built": False,
         "native_gameplay_run_verified": False,
         "distribution_licensed": False,
@@ -93,7 +99,7 @@ def editor_portability_context(
             "design_reachable": True,
             "native_export_verified": False,
             "native_source_project_available": target.id in _NATIVE_SOURCE_TARGETS,
-            "native_source_project_kind": "sdl2_c11_cmake" if target.id in _NATIVE_SOURCE_TARGETS else None,
+            "native_source_project_kind": _NATIVE_SOURCE_ADAPTERS.get(target.id),
             "source_style_retained_as_requirement": True,
         })
     return {
@@ -125,7 +131,7 @@ def editor_platform_form(*, registry: PlatformRegistry | None = None) -> dict[st
             {"value": PortMode.CROSS_HYBRID.value, "label": "Original, independently cleared two-source hybrid"},
         ],
         "export_status": "no_native_target_verified",
-        "source_export_status": "three_desktop_c11_source_exporters_unverified_binaries",
+        "source_export_status": "three_desktop_c11_and_one_dmg_rgbds_native_source_project",
         "native_source_project_destinations": sorted(_NATIVE_SOURCE_TARGETS & set(catalog.profiles)),
         "native_source_export_requires": [
             "generated_original_playable_world",
@@ -139,5 +145,5 @@ def editor_platform_form(*, registry: PlatformRegistry | None = None) -> dict[st
             "creative_identity_invariants",
             "target_platform_id",
         ],
-        "disclaimer": "System selection produces a design blueprint, not a native ROM, disc, executable or firmware.",
+        "disclaimer": "Platform selection is a blueprint unless a source adapter is shown; generated sources are not compiled binaries or release approvals.",
     }
