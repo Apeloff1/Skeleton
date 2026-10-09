@@ -584,20 +584,29 @@ def main(argv: list[str] | None = None) -> int:
         # not leave behind an unused secret file on the user's disk.
         with LocalOnlyHTTPServer(app, port=args.port) as server:
             create_token_file(args.token_file, token=token)
-            print("Skeleton offline AI:", f"http://127.0.0.1:{server.server_port}/")
-            print("Private bearer token file:", args.token_file)
-            print("Model digest:", app.model_digest)
-            # PyInstaller's --windowed Windows launcher may deliberately set
-            # stdout/stderr to None. Never make local serving contingent on
-            # an attached terminal.
+            url = f"http://127.0.0.1:{server.server_port}/"
+            # Windows PyInstaller --windowed sets sys.stdout/sys.stderr to
+            # None. The HTTP service must work without a console. Open the
+            # exact loopback page in that case; the credential stays only
+            # in the operator-selected new private file.
             if sys.stdout is not None:
+                print("Skeleton offline AI:", url)
+                print("Private bearer token file:", args.token_file)
+                print("Model digest:", app.model_digest)
                 sys.stdout.flush()
+            else:
+                import webbrowser
+                try:
+                    webbrowser.open(url)
+                except (OSError, webbrowser.Error):
+                    pass
             server.serve_forever(poll_interval=0.25)
         return 0
     except KeyboardInterrupt:
         return 0
     except (ValueError, OSError, RuntimeError) as exc:
-        print("Offline HTTP startup rejected:", str(exc), file=sys.stderr)
+        if sys.stderr is not None:
+            print("Offline HTTP startup rejected:", str(exc), file=sys.stderr)
         return 1
     finally:
         if app is not None:
