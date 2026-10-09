@@ -231,6 +231,26 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if command == "local-ai":
         from skeleton.app.local_ai import OfflineAISession, inspect_local_model, load_native_checkpoint, run_offline_ai
 
+        # Never accept tuning switches that a mode would silently ignore.
+        # A replay always uses epochs pinned inside its original receipt;
+        # inspection, evaluation and inference do not train any weights.
+        if args.epochs != 1 and (
+            not args.train_corpus
+            or args.replay_improvement
+            or args.compare_model
+            or args.candidate_model and not args.improve_model
+            or args.benchmark_suite
+        ):
+            print("--epochs applies only to local training or continued training")
+            return 2
+        if args.max_output_tokens != 8 and (
+            args.train_corpus or args.improve_model or args.replay_improvement
+            or args.benchmark_suite or args.compare_model or args.candidate_model
+            or args.inspect_model
+        ):
+            print("--max-output-tokens applies only to native inference")
+            return 2
+
         if args.replay_improvement:
             if (
                 not args.compare_model or not args.candidate_model
