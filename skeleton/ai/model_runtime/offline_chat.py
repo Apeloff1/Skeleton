@@ -33,7 +33,7 @@ MAX_ID_BYTES = 128
 MAX_TURN_BYTES = 262_144
 MAX_TRANSCRIPT_BYTES = 2_359_296
 MAX_BUNDLE_BYTES = 16 * 1024 * 1024
-MAX_EXPORTED_TURNS = 8192
+MAX_EXPORTED_TURNS = 1024
 _BUNDLE_SCHEMA = "skeleton.ai.offline-chat-bundle.v1"
 
 
@@ -64,6 +64,36 @@ def _sha256(value: object, name: str) -> str:
         raise RuntimeContractError(f"invalid {name}")
     return value
 
+
+
+def _validate_complete_history(transcript: ChatTranscript,
+                               turns: list[dict[str, Any]]) -> None:
+    """Prove every saved generation has exactly one retained dialogue pair.
+
+    Revision counters and digest-matched JSON alone are insufficient: a bundle
+    may contain authentic *but truncated* history and thereby erase previously
+    committed chat context on import.
+    """
+    messages = transcript.messages
+    offset = 1 if messages and messages[0].role == "system" else 0
+    dialogue = messages[offset:]
+    if len(turns) > MAX_EXPORTED_TURNS or len(dialogue) != 2 * len(turns):
+        raise RuntimeContractError("conversation turn history is incomplete")
+    ids: set[str] = set()
+    for index, turn in enumerate(turns):
+        user, assistant = dialogue[index * 2:index * 2 + 2]
+        if (
+            user.role != "user" or not user.content.strip()
+            or assistant.role != "assistant" or not assistant.content.strip()
+            or assistant.content != turn["text"]
+            or type(turn["revision"]) is not int
+            or turn["revision"] != index + 1
+        ):
+            raise RuntimeContractError("conversation turn history/receipt mismatch")
+        rid = _identifier("request id", turn["request_id"])
+        if rid in ids:
+            raise RuntimeContractError("duplicate request id in conversation")
+        ids.add(rid)
 
 
 def _identifier(name: str, raw: str) -> str:
@@ -287,6 +317,9 @@ class OfflineChatStore:
                      generated_tokens=row[6])
                 for row in rows
             ]
+            if stored.revision != len(turns):
+                raise RuntimeContractError("conversation receipt count does not match revision")
+            _validate_complete_history(stored.transcript, turns)
             body = {
                 "schema": _BUNDLE_SCHEMA,
                 "model_digest": stored.model_digest,
@@ -381,11 +414,7 @@ class OfflineChatStore:
                 turn["output_digest"], turn["prompt_tokens"],
                 turn["generated_tokens"],
             ))
-        if rev and (
-            len(transcript.messages) < 2
-            or transcript.messages[-1].content != turns[-1]["text"]
-        ):
-            raise RuntimeContractError("bundle terminal answer does not match transcript")
+        _validate_complete_history(transcript, turns)
         serialized = transcript.to_json()
         if len(serialized.encode("utf-8")) > MAX_TRANSCRIPT_BYTES:
             raise RuntimeContractError("restored conversation exceeds byte budget")
