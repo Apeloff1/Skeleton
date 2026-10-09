@@ -256,6 +256,27 @@ system compromise. Other processes and any additional spawned binaries
 must be governed separately. For a truly disconnected acceptance test,
 use an independent OS policy or physically isolated test machine.
 
+## Deterministic local capabilities and game dataflows
+
+Skeleton now exposes **24 bounded model-free capabilities**, including
+grid search, integer-tick physics, collision checks, game state logic,
+inventories, event chronology, exact JSON selection, source-fact lookups
+and offline policy recommendations. Each produces a deterministic
+content-addressed receipt without running a model or adding training
+examples.
+
+To chain those operations without writing scripts or relying on a
+language model, use a **32-node typed capability graph** with
+forward-only JSON references. The installed \`SkeletonOffline.exe\`
+supports \`--capability-list\`, \`--capability-file\` and
+\`--capability-graph-file\` with \`--json\` receipts. These are read-only
+computations; no data acquisition or executor permissions are granted.
+
+See [Offline Deterministic Capabilities](OFFLINE_DETERMINISTIC_CAPABILITIES.md)
+for examples, hard limits, source trust boundaries, exact contracts,
+adversarial checks and installed Windows acceptance. Real model
+proficiency is still separately evaluated.
+
 ## Original synthetic training set and evaluation
 
 The first fully materialized offline training curriculum now lives at
