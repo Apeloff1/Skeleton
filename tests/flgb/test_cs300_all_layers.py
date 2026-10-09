@@ -19,7 +19,7 @@ def test_layer_module_builds_and_rejects(ordinal: int) -> None:
             "adversarial": {"accepted": False},
             "boundary": {"at_bound": True},
             "failure": {"failed": True, "opened": False},
-            "recovery": {"restored": True},
+            "recovery": {"restored": True, "generation": ordinal},
         },
     }
     assert module.build(card)["built"]
