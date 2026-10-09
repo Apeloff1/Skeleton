@@ -167,6 +167,35 @@ the receipt records validation source identity, measured perplexity for both
 models, and the Boolean result. If you edit the validation source, the digest
 changes and previous scores cannot be silently treated as comparable.
 
+### Reproduce a learned checkpoint from its source evidence
+
+A local candidate can be independently **recomputed** without touching its
+existing parent or candidate checkpoint. Save the original improvement CLI
+output to a JSON file, then invoke the deterministic replay verifier:
+
+```bash
+python -m skeleton app local-ai --improve-model ./my-native.json \
+  --train-corpus ./train.txt --eval-corpus ./heldout.txt \
+  --output-model ./my-native-v2.json --epochs 3 --json > accepted-receipt.json
+
+python -m skeleton app local-ai --replay-improvement ./accepted-receipt.json \
+  --compare-model ./my-native.json --candidate-model ./my-native-v2.json \
+  --train-corpus ./train.txt --eval-corpus ./heldout.txt --json
+```
+
+For a protected improvement, also supply the original `--protect-suite`
+file during both generation and replay. Replay strictly validates the receipt
+JSON, all four artifact/data identities, training and validation metrics, and
+the optional protected suite. It then **re-trains actual CPU weights** into
+temporary storage and verifies that the resulting checkpoint has the exact
+same digest. The scratch data is deleted afterward. Edited sources, mismatched
+weights, corrupt receipts or nonreproducible floating-point behavior fail
+closed, without modifying either input checkpoint.
+
+The receipt is a content-addressed local record, **not** a signed identity or
+third-party audit. Matching a tiny native checkpoint is not an independent
+production-model quality, safety or general intelligence certification.
+
 The JSON receipt binds the original/candidate model digests, tokenizer identity,
 both source digests, original/new artifact hashes, CPU training steps, best epoch,
 and baseline/accepted held-out perplexity. Keep the input artifact to roll back.
