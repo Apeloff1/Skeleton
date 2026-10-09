@@ -13,6 +13,7 @@ from skeleton.ai.model_runtime import NativeLLMRuntime
 from skeleton.ai.runtime.inference.artifact import write_local_model_artifact
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
 from skeleton.app.local_ai import load_native_checkpoint
+from skeleton.app.local_ai_training import OfflineTrainingError, publish_native_checkpoint_no_replace
 from skeleton.app.local_ai_improvement import (
     OfflineImprovementError,
     compare_local_models,
@@ -209,6 +210,33 @@ class TestEvaluatedOfflineImprovement(unittest.TestCase):
                     ])
             self.assertEqual(code, 1)
             self.assertFalse(json.loads(out.getvalue())["improves"])
+
+    def test_concurrent_checkpoint_writer_never_overwrites_foreign_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source, train, heldout, dest = self._fixture(directory)
+            model = load_native_checkpoint(source)
+            previous = source.read_bytes()
+
+            def concurrent_writer(_staged, target):
+                Path(target).write_text("rival checkpoint", encoding="utf-8")
+                raise FileExistsError("another writer claimed the filename")
+
+            with patch("os.link", side_effect=concurrent_writer):
+                with self.assertRaisesRegex(OfflineTrainingError, "already exists"):
+                    publish_native_checkpoint_no_replace(model, dest)
+            self.assertEqual(dest.read_text(encoding="utf-8"), "rival checkpoint")
+            self.assertEqual(source.read_bytes(), previous)
+            self.assertEqual(list(Path(directory).glob(".skeleton-native-stage-*")), [])
+
+    def test_atomic_checkpoint_publication_keeps_canonical_model_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source, _, _, dest = self._fixture(directory)
+            model = load_native_checkpoint(source)
+            receipt = publish_native_checkpoint_no_replace(model, dest)
+            restored = load_native_checkpoint(dest)
+            self.assertEqual(receipt.model_digest, restored.model_digest)
+            self.assertEqual(restored.model_digest, model.model_digest)
+            self.assertEqual(list(Path(directory).glob(".skeleton-native-stage-*")), [])
 
     def test_cli_cannot_skip_independent_evaluation(self) -> None:
         from skeleton.app.cli import run_app_cli
