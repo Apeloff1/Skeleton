@@ -59,19 +59,61 @@ def _root(path: str | Path) -> Path:
         raise OfflineLibraryError("cannot resolve document root") from exc
 
 
-def _read_document(path: Path) -> tuple[str, str, int]:
-    # Where supported, reject symlink substitution even after enumeration.
+def _read_document(
+    path: Path,
+    *,
+    root: Path | None = None,
+) -> tuple[str, str, int]:
+    """Read bounded bytes without following a swapped parent-directory link.
+
+    On POSIX the root is opened first, then each relative directory is
+    traversed with O_DIRECTORY | O_NOFOLLOW via dir_fd. The final document
+    is also O_NOFOLLOW. This prevents a malicious local directory from
+    replacing an enumerated child with a symlink to an unrelated secret.
+    """
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+    fd: int | None = None
     try:
-        fd = os.open(path, flags)
+        if root is not None and os.name == "posix":
+            relative = path.relative_to(root)
+            parts = relative.parts
+            if not parts or any(part in ("", ".", "..") for part in parts):
+                raise OfflineLibraryError("invalid local document relative path")
+            directory_flags = (
+                os.O_RDONLY
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0)
+            )
+            parent_fd = os.open(root, directory_flags)
+            try:
+                for component in parts[:-1]:
+                    child_fd = os.open(component, directory_flags, dir_fd=parent_fd)
+                    os.close(parent_fd)
+                    parent_fd = child_fd
+                fd = os.open(parts[-1], flags, dir_fd=parent_fd)
+            finally:
+                os.close(parent_fd)
+        else:
+            if root is not None:
+                # Windows lacks portable Python dir_fd traversal. Reject
+                # detected junction/parent redirection before opening.
+                expected = Path(os.path.abspath(path))
+                resolved = path.resolve(strict=True)
+                if resolved != expected or not resolved.is_relative_to(root):
+                    raise OfflineLibraryError("local document path redirection is forbidden")
+            fd = os.open(path, flags)
         with os.fdopen(fd, "rb") as handle:
+            fd = None
             info = os.fstat(handle.fileno())
             if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_DOCUMENT_BYTES:
                 raise OfflineLibraryError("document is not a bounded regular file")
             raw = handle.read(MAX_DOCUMENT_BYTES + 1)
     except OSError as exc:
-        raise OfflineLibraryError("cannot read selected local document") from exc
-    if len(raw) > MAX_DOCUMENT_BYTES or b"\x00" in raw:
+        raise OfflineLibraryError("cannot read selected local document safely") from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
+    if len(raw) > MAX_DOCUMENT_BYTES or b"\\x00" in raw:
         raise OfflineLibraryError("unsupported binary or oversized local document")
     try:
         body = raw.decode("utf-8", "strict")
@@ -101,7 +143,7 @@ def _files(directory: Path) -> list[tuple[str, str, str, int]]:
             relative = path.relative_to(directory).as_posix()
             if len(relative) > 500:
                 raise OfflineLibraryError("document relative path exceeds safety budget")
-            body, digest, byte_count = _read_document(path)
+            body, digest, byte_count = _read_document(path, root=directory)
             budget += byte_count
             if budget > MAX_TOTAL_BYTES or len(staged) >= MAX_FILES:
                 raise OfflineLibraryError("indexed corpus exceeds offline budget")
