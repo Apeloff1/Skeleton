@@ -23,6 +23,7 @@ on:
       - "skeleton/ai/game_builder/media_similarity.py"
       - "skeleton/ai/game_builder/release_assurance.py"
       - "skeleton/testing/test_game_builder_release_assurance.py"
+      - "docs/GAME_BUILDER_SIGNED_RELEASE_REVIEW.md"
       - "skeleton/testing/test_game_builder_media_similarity.py"
       - "skeleton/ai/game_builder/plagiarism_cli.py"
       - "skeleton/testing/test_game_builder_plagiarism_guard.py"
