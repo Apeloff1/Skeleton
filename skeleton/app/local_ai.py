@@ -66,6 +66,7 @@ class OfflineAISession:
         self.backend = backend
         self.engine = LocalInferenceEngine(backend, cache_size=0)
         self.history: tuple[tuple[str, str], ...] = ()
+        self.instructions: str = ""
 
     def clear(self) -> None:
         self.history = ()
@@ -93,6 +94,7 @@ class OfflineAISession:
         while True:
             request = LocalInferenceRequest(
                 prompt=prompt.strip(),
+                instructions=self.instructions,
                 history=history,
                 max_output_tokens=max_output_tokens,
             )
@@ -161,15 +163,18 @@ class DurableOfflineAISession(OfflineAISession):
             self.session_id, self.backend.model_digest, self.backend.tokenizer_digest
         )
         messages = record.transcript.messages
-        # This UI is intentionally simple: only full user/assistant pairs,
-        # never an orphan message or privileged role recovered from disk.
-        if len(messages) % 2 or any(
+        has_instruction = bool(messages and messages[0].role == "system")
+        dialogue = messages[1:] if has_instruction else messages
+        # Preserve an imported system instruction verbatim, but reject any
+        # later instructions or mismatched dialogue turns.
+        if len(dialogue) % 2 or any(
             message.role != ("user" if index % 2 == 0 else "assistant")
             or not message.content.strip()
-            for index, message in enumerate(messages)
+            for index, message in enumerate(dialogue)
         ):
             raise OfflineAIError("desktop conversation contains invalid dialogue history")
-        self.history = tuple((m.role, m.content) for m in messages)
+        self.instructions = messages[0].content if has_instruction else ""
+        self.history = tuple((m.role, m.content) for m in dialogue)
 
     def create_conversation(self) -> str:
         if self._busy:
@@ -178,6 +183,7 @@ class DurableOfflineAISession(OfflineAISession):
             self.backend.model_digest, self.backend.tokenizer_digest
         )
         self.history = ()
+        self.instructions = ""
         return self.session_id
 
     def resume(self, session_id: str) -> None:
@@ -185,12 +191,14 @@ class DurableOfflineAISession(OfflineAISession):
             raise OfflineAIError("cannot resume conversation during generation")
         previous = self.session_id
         history = self.history
+        instructions = self.instructions
         self.session_id = session_id
         try:
             self._restore()
         except BaseException:
             self.session_id = previous
             self.history = history
+            self.instructions = instructions
             raise
 
     def list_conversations(self) -> tuple[tuple[str, int], ...]:
@@ -233,12 +241,22 @@ class DurableOfflineAISession(OfflineAISession):
             saved = self.store.load(
                 self.session_id, self.backend.model_digest, self.backend.tokenizer_digest
             )
-            if tuple((m.role, m.content) for m in saved.transcript.messages) != previous_history:
+            stored_messages = saved.transcript.messages
+            stored_has_system = bool(stored_messages and stored_messages[0].role == "system")
+            persisted_instruction = stored_messages[0].content if stored_has_system else ""
+            persisted_history = tuple(
+                (m.role, m.content) for m in
+                (stored_messages[1:] if stored_has_system else stored_messages)
+            )
+            if persisted_history != previous_history or persisted_instruction != self.instructions:
                 raise OfflineAIError("conversation changed on disk; reload before retry")
             answer = await super().ask(prompt, max_output_tokens=max_output_tokens)
-            transcript = ChatTranscript(tuple(
+            transcript = ChatTranscript(
+                (ChatMessage("system", self.instructions),)
+                if self.instructions else ()
+            ).merge(ChatTranscript(tuple(
                 ChatMessage(role, content) for role, content in self.history
-            ))
+            )))
             transcript.validate_turn_order()
             # The desktop adapter records generated text identity separately
             # from the canonical inference execution receipt shown to users.
