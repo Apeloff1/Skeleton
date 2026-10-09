@@ -18,6 +18,8 @@ import json
 import re
 import unicodedata
 
+from .media_similarity import MediaMatchEvidence
+
 _SHA = re.compile(r"^[0-9a-f]{64}$")
 _ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$")
 _WORD = re.compile(r"[^\W_]+(?:['’][^\W_]+)?", re.UNICODE)
@@ -160,6 +162,7 @@ class OriginalityReport:
     review_issues: tuple[str, ...]
     class_coverage: tuple[str, ...]
     unexamined_external_media: tuple[str, ...]
+    media_overlap_findings: tuple[MediaMatchEvidence, ...] = ()
     legal_originality_certified: bool = False
     release_permitted: bool = False
     independent_human_signoff_complete: bool = False
@@ -181,6 +184,14 @@ class OriginalityReport:
             "review_issues": list(self.review_issues),
             "screened_asset_classes": list(self.class_coverage),
             "non_text_assets_needing_specialized_review": list(self.unexamined_external_media),
+            "potential_media_matches": [
+                {"submitted_id": f.submitted_id, "reference_id": f.reference_id,
+                 "category": f.category, "reference_sha256": f.reference_sha256,
+                 "signal": f.signal, "matched_bytes": f.matched_bytes,
+                 "media_similarity_score": f.media_similarity_score,
+                 "legal_infringement_determined": False}
+                for f in self.media_overlap_findings
+            ],
             "potential_expressive_matches": [
                 {"sample_id": x.sample_id, "reference_id": x.reference_id,
                  "modality": x.modality,
@@ -285,6 +296,7 @@ def audit_game_originality(
     references: tuple[ExpressionSample, ...],
     reference_corpus_declared_complete: bool = False,
     artifact_sha256: str | None = None,
+    media_findings: tuple[MediaMatchEvidence, ...] = (),
 ) -> OriginalityReport:
     """Fail closed on gaps and matches, but never mistake sparse references for clearance.
 
@@ -300,6 +312,10 @@ def audit_game_originality(
         any(not isinstance(a, AssetDeclaration) for a in assets) or
         {a.modality for a in assets} != _ASSET_CLASSES):
         raise OriginalityError("all eight media classes must have a unique disclosure, including not_used")
+    if not isinstance(media_findings, tuple) or len(media_findings) > 512 or any(
+        not isinstance(f, MediaMatchEvidence) for f in media_findings
+    ):
+        raise OriginalityError("invalid bounded non-text overlap findings")
     if not isinstance(candidate_samples, tuple) or not isinstance(references, tuple):
         raise OriginalityError("samples and references must be fixed tuples")
     if len(candidate_samples) > _MAX_REFERENCES or len(references) > _MAX_REFERENCES:
@@ -377,6 +393,13 @@ def audit_game_originality(
             findings.append(found)
             review.add("POTENTIAL_EXPRESSIVE_REUSE_REQUIRES_HUMAN_REVIEW:" + cand.work_id + ":" + prior.work_id)
     findings.sort(key=lambda x: (x.modality, x.sample_id, x.reference_id))
+    for finding in media_findings:
+        if finding.category not in _NON_TEXT_CLASSES or not finding.signal:
+            raise OriginalityError("invalid attached non-text overlap class")
+        if by_modality[finding.category].disposition is AssetDisposition.NOT_USED:
+            raise OriginalityError("media finding attached to unused game modality")
+        review.add("POTENTIAL_PROTECTED_MEDIA_MATCH_REQUIRES_HUMAN_REVIEW:" +
+                   finding.submitted_id + ":" + finding.reference_id)
     # A clean hit list is never proof of non-plagiarism: the reference set may
     # miss obscure, licensed, localized, recently created or offline games.
     review.add("NONEXHAUSTIVE_SIMILARITY_CORPUS_AND_HUMAN_RELEASE_REVIEW_REQUIRED")
@@ -404,6 +427,9 @@ def audit_game_originality(
         "candidate_sha256":cand_digest,"reference_corpus_sha256":ref_digest,
         "signals":[(f.sample_id,f.reference_id,f.modality,f.longest_consecutive_tokens,
                     f.shared_word_shingles,f.triage_signal) for f in findings],
+        "media_findings":[(m.submitted_id,m.reference_id,m.submitted_sha256,
+                            m.reference_sha256,m.signal,m.media_similarity_score)
+                           for m in sorted(media_findings, key=lambda x:(x.category,x.submitted_id,x.reference_id))],
         "blockers":sorted(blockers),"review":sorted(review),
     }
     digest = sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"),
@@ -415,4 +441,6 @@ def audit_game_originality(
         blockers=tuple(sorted(blockers)), review_issues=tuple(sorted(review)),
         class_coverage=tuple(sorted(_ASSET_CLASSES)),
         unexamined_external_media=tuple(sorted(uncovered)),
+        media_overlap_findings=tuple(sorted(media_findings,
+            key=lambda x: (x.category,x.submitted_id,x.reference_id))),
     )
