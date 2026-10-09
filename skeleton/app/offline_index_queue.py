@@ -301,6 +301,19 @@ class OfflineIndexQueue:
             raise OfflineQueueError("index job lease ownership lost")
         return self.get(job.job_id)
 
+    def _assert_live_lease(self, job_id: str, token: str) -> None:
+        """Reject a stale worker before the document index transaction commits."""
+        with self._lock:
+            row = self._db.execute(
+                "SELECT state,lease_token,lease_until FROM offline_index_jobs "
+                "WHERE job_id=?", (job_id,),
+            ).fetchone()
+        if (
+            row is None or row[0] != "running" or row[1] != token
+            or type(row[2]) not in (int, float) or row[2] <= time.time()
+        ):
+            raise OfflineQueueError("index job lease ownership lost before commit")
+
     def run_one(self) -> IndexJob | None:
         """Perform one eligible bounded directory scan synchronously."""
         claimed = self._claim()
@@ -309,7 +322,10 @@ class OfflineIndexQueue:
         job, token = claimed
         try:
             with OfflineDocumentLibrary(job.library) as documents:
-                result = documents.index_directory(job.source)
+                result = documents.index_directory(
+                    job.source,
+                    before_commit=lambda: self._assert_live_lease(job.job_id, token),
+                )
             return self._finish(job, token, result=result)
         except Exception as exc:
             return self._finish(job, token, error=exc)
