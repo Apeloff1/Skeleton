@@ -105,6 +105,64 @@ schemas, counts, group assignments, all record identities, independent
 answer-oracle checks, exact prompt deduplication, checksums, and train-only
 text export identity. Unlisted files are rejected.
 
+## Sparse active curriculum (default; reference bank remains unchanged)
+
+**Default active training is 36 examples, not 504.** The complete original
+reference dataset is retained solely for provenance, deterministic oracles,
+held-out evaluation and explicit opt-in training experiments. The capability
+planner selects one existing train-split example for each of 36 modes across
+12 families, and caps active training at **72 examples** (two per mode).
+
+\`\`\`sh
+PYTHONPATH=. python scripts/training/sparse_capability.py
+PYTHONPATH=. python scripts/training/sparse_capability.py \
+  --export ./active-36-training.txt
+PYTHONPATH=. python scripts/training/sparse_capability.py \
+  --register-db ./sparse-governed-registry.sqlite
+\`\`\`
+
+The same sparse default is used by the reference-bank verifier's
+\`--export-train\` and \`--register-db\` options. To intentionally use the
+full 504-row training reference bank, an operator must instead select the
+separate \`--export-reference-bank\` or
+\`--register-reference-bank-db\` option. No training or model promotion
+occurs implicitly through either path.
+
+For a larger explicitly budgeted training subset, use
+\`--profile consumer\` (up to 48 examples) or
+\`--profile workstation\` (up to 72). These are conservative **policy
+budgets**, not runtime hardware detection or evidence of proficiency.
+
+A measured validation-prediction file can be used to reorder *only the
+second training example* assigned to each mode:
+
+\`\`\`sh
+PYTHONPATH=. python scripts/training/sparse_capability.py \
+  --profile consumer \
+  --focus-validation ./validation-predictions.jsonl \
+  --export ./active-focused-training.txt
+\`\`\`
+
+This uses validation **error counts**, not validation answer strings; it
+does not alter the source bank or touch final test answers. Repeated
+validation-driven tuning risks overfitting the visible validation set;
+reserve final test scenarios for independent evaluation.
+
+For evaluation without adding any training rows, generate on-demand,
+prompt-only deterministic challenges:
+
+\`\`\`sh
+PYTHONPATH=. python scripts/training/probe_sparse_capabilities.py \
+  --per-mode 1 --export-prompts ./capability-prompts.jsonl
+PYTHONPATH=. python scripts/training/probe_sparse_capabilities.py \
+  --per-mode 1 --score ./capability-predictions.jsonl
+\`\`\`
+
+The procedural probes cover all 36 modes but **do not** append their
+answers to training. They use the same task families and are therefore
+**not an independent generalization benchmark**. Test results are only
+useful evidence after a real candidate model produces the predictions.
+
 ## Governed training admission, without automatic promotion
 
 The existing Skeleton \`DatasetRegistry\`, \`IngestEnvelope\`,
@@ -119,8 +177,8 @@ PYTHONPATH=. python scripts/training/verify_offline_foundations.py \
   --register-db ./offline-training-registry.sqlite
 \`\`\`
 
-This registers a **training-ready dataset** under the existing governance
-contract; it **does not train or promote a model**. Candidate weights still
+This registers a **sparse 36-row training-ready dataset** under the existing
+governance contract by default; it **does not train or promote a model**. Candidate weights still
 require the separate training, verification, risk evaluation, rollback and
 promotion controls enforced by Skeleton's training authority.
 
@@ -130,8 +188,8 @@ contains only the 504 training examples as
 \`<user>\`, \`<assistant>\`, \`<end>\` sequences.
 
 \`\`\`sh
-PYTHONPATH=. python scripts/training/verify_offline_foundations.py \
-  --export-train ./train-only-copy.txt
+PYTHONPATH=. python scripts/training/sparse_capability.py \
+  --export ./train-only-copy.txt
 # Optional experimental local model build. May be CPU-intensive.
 PYTHONPATH=. python -m skeleton.ai.runtime.inference.train \
   ./train-only-copy.txt --output ./candidate-model.json \
