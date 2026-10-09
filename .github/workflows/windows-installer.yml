@@ -170,6 +170,51 @@ jobs:
             throw "standalone offline console help failed"
           }
 
+          # Exercise the installed console's actual local knowledge, durable
+          # queue and portable database recovery without external Python.
+          $offlineNotes = Join-Path $env:RUNNER_TEMP "SkeletonOfflineNotes"
+          New-Item -ItemType Directory -Force -Path $offlineNotes | Out-Null
+          "Deterministic local physics frames and game replay." |
+            Set-Content -LiteralPath (Join-Path $offlineNotes "facts.md") -Encoding utf8
+          $offlineIndex = Join-Path $env:RUNNER_TEMP "SkeletonOfflineKnowledge.sqlite"
+          & $offline --library $offlineIndex --index-dir $offlineNotes --json | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            throw "frozen offline local-text index failed"
+          }
+          $searchResult = & $offline --library $offlineIndex --search "physics" --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "frozen offline FTS5 retrieval failed"
+          }
+          $parsedSearch = $searchResult | ConvertFrom-Json
+          if ($parsedSearch.results.Count -lt 1) {
+            throw "offline search returned no indexed local knowledge"
+          }
+
+          $offlineQueue = Join-Path $env:RUNNER_TEMP "SkeletonOfflineJobs.sqlite"
+          $queueJson = & $offline --queue-db $offlineQueue --queue-status --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "frozen offline indexing queue failed"
+          }
+          $queueStatus = $queueJson | ConvertFrom-Json
+          if ($null -eq $queueStatus.jobs) {
+            throw "offline indexing queue returned no jobs envelope"
+          }
+          $offlineSnapshot = Join-Path $env:RUNNER_TEMP "SkeletonOfflineRecovery"
+          & $offline --snapshot-to $offlineSnapshot --snapshot-library $offlineIndex --snapshot-queue $offlineQueue --json | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            throw "offline SQLite snapshot creation failed"
+          }
+          & $offline --verify-snapshot $offlineSnapshot --json | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            throw "offline SQLite snapshot verification failed"
+          }
+          $recoveredKnowledge = Join-Path $env:RUNNER_TEMP "SkeletonRecoveredKnowledge.sqlite"
+          $recoveredQueue = Join-Path $env:RUNNER_TEMP "SkeletonRecoveredJobs.sqlite"
+          & $offline --restore-from $offlineSnapshot --snapshot-library $recoveredKnowledge --snapshot-queue $recoveredQueue --json | Out-Null
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $recoveredKnowledge)) {
+            throw "offline SQLite snapshot restore failed"
+          }
+
           $uninstaller = Join-Path $installDir "unins000.exe"
           if (-not (Test-Path -LiteralPath $uninstaller)) {
             throw "uninstaller missing"
