@@ -192,3 +192,19 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97" in source
     assert "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" in source
     assert "dist/windows/Skeleton-Setup-*-windows-x64.exe" in source
+
+
+def test_frozen_offline_console_is_packaged_and_smoke_tested():
+    build = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    installer = Path("packaging/windows/SkeletonSetup.iss").read_text(encoding="utf-8")
+    pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
+
+    assert "packaging\\windows\\offline_cli_entry.py" in build
+    assert '"--console"' in build
+    assert '"SkeletonOffline"' in build
+    assert "SkeletonOffline.exe" in build
+    assert "SkeletonOffline.exe" in workflow
+    assert "& $offline --native-smoke" in workflow
+    assert "SkeletonOffline.exe" in installer
+    assert 'skeleton-offline = "skeleton.app.offline_cli:main"' in pyproject
