@@ -173,7 +173,8 @@ def test_archive_parser_rejects_time_travel_unknown_nodes_and_fake_verification(
         data = json.loads(json.dumps(raw))
         child = next(n for n in data["nodes"] if n["predecessor"] is not None)
         if mutation == "time_travel":
-            child["first_year"] = 1955
+            parent = next(n for n in data["nodes"] if n["platform_id"] == child["predecessor"])
+            child["first_year"] = parent["first_year"] - 1
         if mutation == "unknown":
             child["platform_id"] = "not_catalogued"
         if mutation == "self_parent":
