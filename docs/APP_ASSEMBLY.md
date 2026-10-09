@@ -56,6 +56,33 @@ python -m skeleton app local-ai --model ./native-runtime.json \\
 Skeleton.exe --local-ai
 ```
 
+### Check real offline functionality after installation
+
+The user-facing, Docker-free native AI acceptance mode runs actual finite
+native-model inference with private chat-transcript round-trip, actual bounded
+CPU gradient training with artifact reload, and a two-checkpoint categorical
+benchmark. It uses disposable local files and **does not** qualify the
+general quality of any model, ship pretrained weights, download GGUF weights,
+or install a llama.cpp runtime.
+
+```powershell
+Skeleton.exe --offline-command local-ai --self-check --json
+```
+
+For developers without the Windows installer:
+
+```bash
+python -m skeleton app local-ai --self-check --json
+```
+
+A successful exit code `0` means **only** these three concrete packaged-native
+functions completed. Exit `1` means at least one function failed, with
+per-check success/failure and exception *class only* (local error paths and
+prompts are not echoed). Passing does not certify useful pretrained-model
+quality, GGUF readiness, independent security, enterprise release or
+end-to-end Docker-based services. The exact same mode is exercised in the
+installed-executable Windows CI workflow.
+
 ### Run native AI commands directly from the installed Windows executable
 
 No external Python executable, Docker daemon, hosted API credentials or
