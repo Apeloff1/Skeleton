@@ -94,6 +94,8 @@ def validate_model_snapshot(snapshot: Mapping[str, Any]) -> None:
     )
     if dim % heads:
         raise RuntimeContractError("model dimension must be divisible by head count")
+    if snapshot.get("position_mode", "learned_rope") not in {"rope", "learned_rope"}:
+        raise RuntimeContractError("unsupported model position mode")
 
     vocab = snapshot.get("itos")
     if (
