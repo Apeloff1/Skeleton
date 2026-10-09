@@ -377,3 +377,49 @@ Plus/4 cannot be falsely mapped to an incompatible source engine.
 Distinct engine count has NOT increased from compatibility mappings.
 No device-level execution or user-facing commercial game readiness
 is claimed for any of the mapped revisions.
+
+
+## Verified-compiler priority: PET, Plus/4, BBC Micro and Oric Atmos
+
+Four more source-native game projects use cc65's *documented, supported*
+6502 machine targets: pet, plus4, bbc and atmos. This is intentionally
+not a renamed Apple II executable. Each project compiles the same original
+turn-based maze rules against its destination's actual conio text-video
+and keyboard runtime, with target-specific compiler, color/no-color
+constraints, output extension and memory budget. Gameplay features:
+
+- Original bounded 28x17 maze with two rows of obstacles and a central
+  wall, and routes through deliberate gaps.
+- Player WASD movement with in-bounds wall rejection; collectible crystal,
+  locked exit, level transition, health refill on victory.
+- Deterministic turn-based pursuer AI that changes its cadence as levels
+  increase, health, damage guard windows, defeat and restart.
+- PET monochrome guard: color routines are excluded from compiled PET
+  source; other VDU systems may use their target's supported colors.
+
+There is **no bundled machine ROM, firmware, copied game asset or
+proprietary loader**. BBC Micro and Oric Atmos use raw target-linker
+output (bin); neither is falsely described as a complete SSD/TAP disk
+image. The Plus/4 and PET generate cc65 PRG programs, not emulators.
+Every source archive includes a Makefile with a real cc65 target choice.
+
+The all-platform CI installs cc65 and invokes actual cl65 native targets
+for all four additional computer games, checking the output file bytes.
+A compiled linker output is a narrower claim than emulator, audio,
+controller or physical-device verification. Audio chips are identified
+in the catalog but these four programs currently implement text display
+and keyboard only.
+
+**Latest scoped registry: 169 named targets, 72 source-capable targets,
+97 without source.** Exactly 11 of the source-capable targets are
+explicit ABI-compatible *revisions* of previously implemented platforms;
+they are not counted as 11 distinct new engines. Prior snapshot figures
+in sections above (48/169, 57/169, 68/169) describe the historical
+growth of this branch and should not be used as its current count.
+
+Authoritative compiler target references:
+https://cc65.github.io/doc/cc65.html
+https://cc65.github.io/doc/pet.html
+https://cc65.github.io/doc/plus4.html
+https://cc65.github.io/doc/atmos.html
+https://cc65.github.io/doc/bbc.html

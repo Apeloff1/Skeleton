@@ -57,6 +57,10 @@ LIMITS={
     # Developer-facing source budgets, not physical linker map verification.
     "nintendo_64":("Nintendo","VR4300",4194304,262144,4194304,65536,128,128,8192),
     "commodore_vic20":("Commodore","MOS 6502",5120,1024,5120,16384,2,2,384),
+    "commodore_pet":("Commodore","MOS 6502",32768,1024,32768,16384,1,1,1024),
+    "commodore_plus4":("Commodore","MOS 7501",65536,4096,65536,16384,1,1,1024),
+    "bbc_micro":("Acorn","MOS 6502",32768,20480,32768,16384,1,1,1024),
+    "oric_atmos":("Oric","MOS 6502",49152,8192,49152,16384,1,1,1024),
     "commodore_128":("Commodore","MOS 8502",65536,2000,131072,65536,8,8,2048),
     "atari_400_800":("Atari","MOS 6502",16384,1024,16384,16384,4,4,1024),
     "msx1":("MSX","Z80",16384,1024,65536,16384,4,4,1024),

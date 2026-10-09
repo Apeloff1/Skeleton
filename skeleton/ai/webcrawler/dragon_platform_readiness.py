@@ -68,6 +68,12 @@ SOURCE_RENDERERS.update({
        " (native source inherited from "+r.parent+")"
     for r in REVISIONS
 })
+SOURCE_RENDERERS.update({
+    "commodore_pet":"6502 PET monochrome native conio VDU",
+    "commodore_plus4":"7501 TED native cc65 text VDU",
+    "bbc_micro":"6502 BBC Micro MOS native conio VDU",
+    "oric_atmos":"6502 Oric Atmos ULA native cc65 text VDU",
+})
 assert set(SOURCE_RENDERERS)==EMITTERS
 
 @dataclass(frozen=True)

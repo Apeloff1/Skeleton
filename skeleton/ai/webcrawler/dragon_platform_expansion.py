@@ -60,7 +60,7 @@ analogue_pocket|Analogue|FPGA handheld|2021|FPGA|FPGA display|FPGA audio|buttons
 evercade|Blaze|emulation handheld|2020|ARM|LCD|PCM|buttons|authorized SDK / emulator|elf|toolchain_adapter
 zx81|Sinclair|8-bit home computer|1981|Z80|monochrome ULA|beeper|keyboard|z88dk +zx81|p|toolchain_adapter
 zx_spectrum_next|Sinclair lineage|enhanced Z80 home computer|2017|Z80N|Layer 2 / sprites|AY|keyboard/gamepad|z88dk +zxn|nex|toolchain_adapter
-bbc_micro|Acorn|8-bit home computer|1981|6502|6845 CRTC|SN76489|keyboard|cc65 bbc|ssd|toolchain_adapter
+bbc_micro|Acorn|8-bit home computer|1981|6502|6845 CRTC|SN76489|keyboard|cc65 bbc|bin|native_source
 acorn_electron|Acorn|8-bit home computer|1983|6502|ULA|SN76489|keyboard|cc65 / BeebAsm|uef|toolchain_adapter
 amstrad_cpc|Amstrad|8-bit home computer|1984|Z80|6845 gate array|AY-3-8912|keyboard|z88dk +cpc|bin|native_source
 msx1|MSX|8-bit home computer|1983|Z80|TMS9918|AY-3-8910|keyboard|z88dk +msx|bin|native_source
@@ -68,14 +68,14 @@ msx2|MSX|8-bit home computer|1985|Z80|V9938|AY-3-8910|keyboard|z88dk / SDCC|rom|
 msx_turbo_r|MSX|16-bit home computer|1990|R800|V9958|YM2413|keyboard|z88dk +msx|rom|toolchain_adapter
 commodore_vic20|Commodore|8-bit home computer|1980|6502|VIC|VIC audio|keyboard|cc65 vic20|prg|native_source
 commodore_128|Commodore|8-bit home computer|1985|8502 / Z80|VIC-II|SID|keyboard|cc65 c128|prg|native_source
-commodore_plus4|Commodore|8-bit home computer|1984|7501|TED|TED|keyboard|cc65 plus4|prg|toolchain_adapter
-commodore_pet|Commodore|8-bit home computer|1977|6502|text VDU|beeper|keyboard|cc65 pet|prg|toolchain_adapter
+commodore_plus4|Commodore|8-bit home computer|1984|7501|TED|TED|keyboard|cc65 plus4|prg|native_source
+commodore_pet|Commodore|8-bit home computer|1977|6502|text VDU|beeper|keyboard|cc65 pet|prg|native_source
 atari_400_800|Atari|8-bit computer|1979|6502|ANTIC / GTIA|POKEY|joystick|cc65 atari|xex|native_source
 atari_130xe|Atari|8-bit computer|1985|6502C|ANTIC / GTIA|POKEY|joystick|cc65 atari|xex|native_source
 apple_iigs|Apple|16-bit computer|1986|65816|Super Hi-Res|Ensoniq|keyboard|ORCA / cc65|sys|toolchain_adapter
 trs80_model_i|Tandy|8-bit computer|1977|Z80|text video|mono|keyboard|z88dk trs80|cmd|toolchain_adapter
 ti_99_4a|Texas Instruments|16-bit computer|1981|TMS9900|TMS9918|SN76489|joystick|TI99 homebrew GCC|bin|toolchain_adapter
-oric_atmos|Oric|8-bit computer|1984|6502|ULA|AY-3-8912|keyboard|cc65 atmos|tap|toolchain_adapter
+oric_atmos|Oric|8-bit computer|1984|6502|ULA|AY-3-8912|keyboard|cc65 atmos|bin|native_source
 sharp_x68000|Sharp|16-bit Japanese PC|1987|68000|custom sprite GPU|YM2151|keyboard|Human68k GCC|x|toolchain_adapter
 nec_pc_8801|NEC|8-bit Japanese PC|1981|Z80|NEC video|YM2203|keyboard|PC-88 cross compiler|d88|toolchain_adapter
 nec_pc_9801|NEC|16-bit Japanese PC|1982|8086|GDC|YM2608|keyboard|OpenWatcom PC-98|exe|toolchain_adapter
