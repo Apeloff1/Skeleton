@@ -13,6 +13,7 @@ on:
       - "skeleton/ai/runtime/capability_graph.py"
       - "skeleton/ai/runtime/gameplay_capabilities.py"
       - "skeleton/testing/test_gameplay_capabilities.py"
+      - "skeleton/testing/test_offline_game_preview.py"
       - "skeleton/testing/test_deterministic_capabilities.py"
       - "skeleton/testing/test_capability_graph.py"
       - "docker-compose.yml"
@@ -30,6 +31,7 @@ on:
       - "skeleton/ai/runtime/capability_graph.py"
       - "skeleton/ai/runtime/gameplay_capabilities.py"
       - "skeleton/testing/test_gameplay_capabilities.py"
+      - "skeleton/testing/test_offline_game_preview.py"
       - "skeleton/testing/test_deterministic_capabilities.py"
       - "skeleton/testing/test_capability_graph.py"
       - "docker-compose.yml"
@@ -323,6 +325,18 @@ jobs:
             throw "installed frozen console failed procedural gameplay graph"
           }
           $gameGraphReport = $gameGraphRaw | ConvertFrom-Json
+          # Safe headless installed-module admission. Never open a GUI window
+          # on the ephemeral CI runner; a real interactive desktop test is
+          # required for the final Windows acceptance checklist.
+          $null = & $offline --game-preview --json 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            throw "native game preview incorrectly accepted incompatible JSON mode"
+          }
+          $null = & $offline --game-preview --game-seed -1 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            throw "native game preview accepted an invalid seed"
+          }
+
           if ($gameGraphReport.node_count -ne 3 -or
               -not $gameGraphReport.outputs.compiled.goal_reachable -or
               $gameGraphReport.outputs.step.avatar.x -lt 1 -or
