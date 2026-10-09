@@ -235,6 +235,33 @@ class TestPublicGGUFCLI(unittest.TestCase):
             with self.subTest(args=arguments), redirect_stdout(StringIO()):
                 self.assertEqual(run_app_cli(["local-ai", *arguments]), 2)
 
+    def test_installed_command_missing_gguf_artifacts_refuses_without_launch(self):
+        """Missing artifacts are a runtime admission failure (1), not a CLI parse failure (2)."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            missing_model = root / "missing.gguf"
+            missing_runtime = root / "missing-llama-cli.exe"
+            args = [
+                "local-ai", "--gguf-model", str(missing_model),
+                "--llama-executable", str(missing_runtime),
+                "--prompt", "offline", "--json",
+            ]
+            for runner in (
+                lambda: run_app_cli(args),
+                lambda: exe_main(["--offline-command", *args]),
+            ):
+                with self.subTest(runner=runner):
+                    result = StringIO()
+                    with patch("subprocess.Popen", side_effect=AssertionError(
+                        "missing artifacts must never reach process launch"
+                    )), redirect_stdout(result):
+                        code = runner()
+                    self.assertEqual(code, 1, result.getvalue())
+                    self.assertIn("local GGUF request rejected:", result.getvalue())
+                    self.assertNotIn("hosted", result.getvalue().lower())
+            self.assertFalse(missing_model.exists())
+            self.assertFalse(missing_runtime.exists())
+
     def test_invalid_gguf_token_budgets_fail_before_launch(self):
         for budget in (True, 0, -1, 2049):
             with self.subTest(budget=budget), self.assertRaises(OfflineGGUFError):
