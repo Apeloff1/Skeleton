@@ -10,19 +10,13 @@
       "volume_ref": "VOL-032",
       "title": "High-Performance Native Core",
       "accountability_id": "ACC-VOL-032",
-      "required_gap_texts": [
-        "select acceleration targets by profiling evidence",
-        "expand isolation strategy for crash-prone native code"
-      ]
+      "required_gap_texts": []
     },
     {
       "volume_ref": "VOL-033",
       "title": "Java / JVM Plane",
       "accountability_id": "ACC-VOL-033",
-      "required_gap_texts": [
-        "identify workloads where JVM is actually beneficial",
-        "standardize protocol/version negotiation"
-      ]
+      "required_gap_texts": []
     }
   ],
   "runtime_authority": {
