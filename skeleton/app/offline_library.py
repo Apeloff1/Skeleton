@@ -7,6 +7,7 @@ parses active formats, or asks a model to classify indexed text.
 """
 from __future__ import annotations
 
+from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
 from dataclasses import dataclass
 import hashlib
 import os
@@ -183,6 +184,10 @@ class OfflineDocumentLibrary:
             db_path.exists() and not db_path.is_file()
         ):
             raise OfflineLibraryError("library must be a regular local SQLite file")
+        try:
+            check_sqlite_companion_paths(db_path)
+        except UnsafeOfflineSqlitePath as exc:
+            raise OfflineLibraryError(str(exc)) from exc
         self.path = Path(os.path.abspath(db_path))
         self._lock = threading.RLock()
         was_present = db_path.exists()
