@@ -409,6 +409,7 @@ class OfflineAIWindow:
         self.session: OfflineAISession | None = None
         self.events: Queue[tuple[str, object]] = Queue()
         self.active = False
+        self.loading_model = False
         self.closed = False
         self.worker_loop: asyncio.AbstractEventLoop | None = None
         self.worker_task: asyncio.Task[OfflineAnswer] | None = None
@@ -618,6 +619,7 @@ class OfflineAIWindow:
         if not selected:
             return
         self.active = True
+        self.loading_model = True
         self.status.set("Validating offline GGUF executable/model…" if is_gguf
                         else "Validating the native model checkpoint…")
         self._refresh()
@@ -720,6 +722,8 @@ class OfflineAIWindow:
             while True:
                 kind, value = self.events.get_nowait()
                 self.active = False
+                if self.loading_model:
+                    self.loading_model = False
                 if kind == "loaded":
                     if isinstance(self.session, DurableOfflineAISession):
                         self.session.close()
@@ -772,7 +776,10 @@ class OfflineAIWindow:
                     value.close()
         except Empty:
             pass
-        if isinstance(self.session, DurableOfflineAISession) and not self.active:
+        if (isinstance(self.session, DurableOfflineAISession)
+                and (not self.active or self.loading_model)):
+            # The old session is not being used during checkpoint loading;
+            # release it even if an unrelated model-load thread is active.
             self.session.close()
         self.window.destroy()
 
