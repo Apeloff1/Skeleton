@@ -7,9 +7,9 @@
 
 Every catalogued system can be selected as a **creative basis**, as a **destination for a porting plan**, or both. Production discontinuation is *not* a reason to drop it. PC, game console, handheld, arcade board, calculator, mobile runtime, toy and hobbyist microcontroller histories all contain valuable gameplay and interaction designs.
 
-The registry includes 300 entries and 21 approximate capability presets. It deliberately tracks the unusual, regional, transitional and failed commercial systems alongside mainstream machines. Examples: Fairchild Channel F, Interton VC 4000, Super Cassette Vision, Watara Supervision, Gamate, Mega Duck, WonderSwan and SwanCrystal, Neo Geo Pocket, PC-FX, FM Towns Marty, CD-i, CD32, Pippin, Nuon, Jaguar CD, Gizmondo, Tapwave Zodiac, Atari ST, RISC OS, ZX80/81, Thomson MO5, MSX, PC-88/98, X68000, Sega Model 2/3 arcade, Konami GX, Sega NAOMI, TI/HP calculators, Palm OS, BREW, J2ME, Arduboy and RP2040.
+The maintained registry currently includes 504 entries and 26 approximate capability presets; this is an **interim curation corpus**, not a complete worldwide platform census. It deliberately tracks the unusual, regional, transitional and failed commercial systems alongside mainstream machines. Examples: Fairchild Channel F, Interton VC 4000, Super Cassette Vision, Watara Supervision, Gamate, Mega Duck, WonderSwan and SwanCrystal, Neo Geo Pocket, PC-FX, FM Towns Marty, CD-i, CD32, Pippin, Nuon, Jaguar CD, Gizmondo, Tapwave Zodiac, Atari ST, RISC OS, ZX80/81, Thomson MO5, MSX, PC-88/98, X68000, Sega Model 2/3 arcade, Konami GX, Sega NAOMI, TI/HP calculators, Palm OS, BREW, J2ME, Arduboy and RP2040.
 
-The UI-neutral selector in `editor_platforms.py` exposes all 300 systems as browsable source/destination options, with search, family/type filters and a full target-directed design graph. It never presents an unverified native exporter as available. Connect the selector through the product API and actual editor surface in a subsequent integration step.
+The UI-neutral selector in `editor_platforms.py` exposes every catalogued system as browsable source/destination options, with search, family/type filters and a full target-directed design graph. It never presents an unverified native exporter as available. Connect the selector through the product API and actual editor surface in a subsequent integration step.
 
 The approximate tier and preset are **planning heuristics**, not machine-specific hardware specifications, verified instruction sets, video timings, RAM addresses or supported executable targets. Individual regional models, hardware revisions, add-ons, controllers, multiformat media and FPGA reimplementations need machine-specific adapters and test evidence.
 
@@ -100,3 +100,36 @@ Licensing and trademark policy is fail-closed. "Clone", hybridization and decomp
 - `platform_catalog.json` is included in the installed Python package data.
 - `platform_registry.py` and `port_planner.py` are canonical AI-native modules, not mirrored legacy forge code.
 - This increment adds **design/inventory capability**; future increments must supply compiler adapters, tested toolchains, genuine game content generation, real target packages and independently signed builds.
+
+
+## Archival evolution corpus: the missing long tail
+
+The hardware catalog now includes first-generation fixed-game Pong-style consoles and regional models, portable variants and peripherals, 8-bit regional computers, Japanese microcomputers, classic workstations, modern devices, and arcade board generations. None of this implies exact game cartridge interchangeability or executable support.
+
+The separate `evolution_lineages.json` records **78 dated design milestones across 18 reference lineages**. It is a bounded *illustrative design-succession DAG*, not a proof of backwards compatibility. `evolution_archive.py` rejects unknown machines, duplicate identifiers, reversed chronological parent edges and fictitious source verification. Its report lists all curated platforms currently missing timeline and lineage records. `evolution_practice.py` turns any authorized dated progression into a set of generated, deterministic **playable original puzzle worlds** with reproducible winning replays. Exercises are target-inspired, not native builds for those consoles.
+
+An operator can inspect all gaps without a database or network:
+
+    python -m skeleton.ai.game_builder.archive_cli summary
+    python -m skeleton.ai.game_builder.archive_cli lineage nintendo_famicom nintendo_switch
+
+## Long-tail archival discovery: offline MAME metadata importer
+
+Current MAME documents tens of thousands of machines, many of which are not distinct game consoles: some are ROM-set variants, arcade boards, chips, computer configurations, gambling devices, BIOS parents, or clone entries. Bulk copying their names into the console registry would be dishonest and technologically useless.
+
+`archive_import.py` reads an official **locally supplied** `mame -listxml` snapshot using a streaming parser with size, XML-entity and record-count defenses. It extracts machine identifiers, titles, dates (where parseable), manufacturers, clone relationships, display/input descriptions and emulator-driver status. It does not copy ROM entries, proprietary software, BIOS, checksums or game assets into the curated record. Each resulting row is a *candidate* requiring separate system-type, hardware revision, rights and primary-source review.
+
+Example (the reader does not download or run anything):
+
+    mame -listxml > mame-listxml.xml
+    python -m skeleton.ai.game_builder.archive_cli import-mame mame-listxml.xml --review-file missing_platforms.jsonl
+
+**Candidate `mame -listxml` entries are not a production target and are never automatically promoted.** Running the optional archive import requires the user to provide a legally obtained local metadata file. It does not authorize use of third-party ROM sets.
+
+### Closure audit
+
+A global archival completeness percentage **cannot** be claimed while the worldwide historical platform denominator is undefined, machine revisions and rebrands are inconsistently counted, and individual record-level historical sources are still missing. The `archive_coverage_report()` intentionally reports the concrete known gaps and a `complete_historical_census: false` gate. Treat that boolean as a hard stop for claims of comprehensive archive completion.
+
+Future archival closure is by tracked evidence, not arbitrary line or platform quotas: identify primary sources and dated hardware revisions, reconcile manufacturer/region/rebrand/board-family identities, ingest external metadata as candidate records, separate peripherals and software environments from independent systems, verify machine-specific constraints with lawful source references, implement real native homebrew toolchains, and validate against representative hardware.
+
+The exact-head `Homebrew Historical Archive` GitHub Action checks the maintained catalog, lineage validation, rights-safe MAME metadata ingest and generated evolution-game replay regressions. Passing the Action means these **code contracts** passed, not that every historical machine is known.
