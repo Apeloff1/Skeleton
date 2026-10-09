@@ -7,7 +7,6 @@ parses active formats, or asks a model to classify indexed text.
 """
 from __future__ import annotations
 
-from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
 from dataclasses import dataclass
 import hashlib
 import os
@@ -17,6 +16,7 @@ import sqlite3
 import stat
 import threading
 from typing import Callable
+from .offline_sqlite_safety import check_sqlite_companion_paths, UnsafeOfflineSqlitePath
 
 
 SCHEMA = "skeleton.app.offline_library.v1"
