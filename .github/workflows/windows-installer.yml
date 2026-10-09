@@ -372,6 +372,51 @@ jobs:
             throw "installed native preview replay accepted an invalid seed"
           }
 
+          # Full legal-first project import, not merely the embedded demo.
+          # The generated capsule has an original-content SHA256/rights
+          # record and checked real-controller playability. The standalone
+          # EXE must load it, win, and reject a forged clearance flag.
+          $authoredGame = Join-Path $env:RUNNER_TEMP "SkeletonAuthorizedOriginalGame.json"
+          & python scripts/windows/create_offline_game_fixture.py --output $authoredGame
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $authoredGame)) {
+            throw "cannot build original authorized game fixture"
+          }
+          $authoredReceiptRaw = & $offline --game-preview-check --game-project $authoredGame --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed original game capsule failed real-controller gameplay"
+          }
+          $authoredReceipt = $authoredReceiptRaw | ConvertFrom-Json
+          if (-not $authoredReceipt.terminal_won -or
+              $authoredReceipt.project_source -ne "verified_portable_capsule" -or
+              -not $authoredReceipt.replay_deterministic -or
+              $authoredReceipt.training_examples_added -ne 0 -or
+              $authoredReceipt.installed_tk_display_verified) {
+            throw "installed original game project falsely claimed gameplay/legal readiness"
+          }
+          $authoredRepeatRaw = & $offline --game-preview-check --game-project $authoredGame --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed authored game repeat failed"
+          }
+          $authoredRepeat = $authoredRepeatRaw | ConvertFrom-Json
+          if ($authoredRepeat.replay_sha256 -ne $authoredReceipt.replay_sha256) {
+            throw "original game player replay was not deterministic across processes"
+          }
+          $tamperedGame = Join-Path $env:RUNNER_TEMP "SkeletonUnauthorizedGame.json"
+          $originalBytes = Get-Content -LiteralPath $authoredGame -Raw -Encoding utf8
+          $changedBytes = $originalBytes.Replace(
+            '"legal_release_authorized":false',
+            '"legal_release_authorized":true'
+          )
+          if ($changedBytes -eq $originalBytes) {
+            throw "fixture did not expose legal-release flag for mutation"
+          }
+          Set-Content -LiteralPath $tamperedGame -Value $changedBytes -Encoding utf8
+          $null = & $offline --game-preview-check --game-project $tamperedGame --json 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            throw "installed native preview accepted a tampered legal-release flag"
+          }
+
+
           # The typed graph can feed the generated tilemap into the compiler
           # and simulator without shell execution or adding training rows.
           $gameGraph = Join-Path $env:RUNNER_TEMP "SkeletonOfflineGameplayGraph.json"
