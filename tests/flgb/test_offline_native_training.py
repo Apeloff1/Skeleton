@@ -130,6 +130,12 @@ class TestOfflineNativeTraining(unittest.TestCase):
                     "--offline-command", "status",
                 ]), 2)
                 self.assertEqual(exe_main(["--offline-command"]), 2)
+                self.assertEqual(exe_main([
+                    "--full", "--offline-command", "local-ai",
+                ]), 2)
+                self.assertEqual(exe_main([
+                    "--development", "--offline-command", "local-ai",
+                ]), 2)
 
     def test_training_is_explicit_never_implicit_and_requires_output_path(self) -> None:
         from skeleton.app.cli import run_app_cli
