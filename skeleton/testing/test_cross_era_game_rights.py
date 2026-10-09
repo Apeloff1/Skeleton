@@ -216,6 +216,14 @@ def test_modified_original_game_requires_source_reference_and_edit_rights():
     )
     assert result["action"] == "modify_authorized"
     assert result["legal_compliance_certified"] is False
+    # Source research may describe a license, but the production pipeline
+    # remains homebrew ONLY even for legally licensed commercial games.
+    with pytest.raises(GameCapsuleError, match="admitted source|homebrew"):
+        make_game_capsule(
+            source_tiles=TILES, rights_manifest=licensed,
+            target_ids=["windows-11"], required_features=["tile2d"],
+            action="modify_authorized", jurisdiction="NO",
+        )
     licensed["source_game_reference"] = None
     with pytest.raises(GameRightsError, match="identify"):
         admit_game_rights(
@@ -231,7 +239,7 @@ def test_research_observations_cannot_become_distributable_game_or_training_data
     )
     with pytest.raises(GameRightsError, match="permissions|interoperability"):
         admit_game_rights(observations, action="publish", jurisdiction="EEA")
-    with pytest.raises(GameCapsuleError, match="segregated"):
+    with pytest.raises(GameCapsuleError, match="admitted source|homebrew|segregated"):
         make_game_capsule(
             source_tiles=TILES, rights_manifest=observations,
             target_ids=["windows-11"], required_features=["tile2d"],
