@@ -126,6 +126,66 @@ private knowledge. A normal local application cannot guarantee that a
 malicious operating-system process or third-party model executable has no
 network access; enforce that separately at the OS level.
 
+## Restart-safe on-device knowledge acquisition
+
+Local folders can now be submitted to a durable bounded indexing queue.
+This remains an explicitly requested **local file-indexing job**, not
+unattended internet crawling or autonomous source promotion.
+
+```sh
+skeleton-offline --queue-db ./index-jobs.sqlite \
+  --enqueue-dir ./notes --queue-library ./knowledge.sqlite --json
+skeleton-offline --queue-db ./index-jobs.sqlite \
+  --run-queue --drain-limit 5 --queue-status --json
+```
+
+The queue is SQLite-backed, reopens after process restarts, and admits only
+the existing no-network local text indexer. Jobs are identified by opaque
+tokens and atomically claimed under a 15-minute lease. A stale worker may
+not replace the newer job receipt, and workers can recover from an expired
+lease up to a bounded three-attempt budget. Processing always happens in
+the foreground when `--run-queue` is invoked; there is no hidden always-on
+daemon, timer or hosted worker. Unavailable folders produce a bounded
+retryable failure rather than a fabricated success.
+
+Operators can inspect `--queue-status`, cancel an unstarted job with
+`--cancel-queue-job <id>`, or explicitly requeue a terminal failure with
+`--retry-queue-job <id>`. If a host requires recurring scans, use its
+trusted operating-system scheduler to invoke a bounded queue run.
+
+## Portable database recovery
+
+Conversation workspaces, local document libraries and indexing queues can
+be snapshotted to an operator-selected folder using SQLite's online
+backup API. This captures committed WAL pages instead of byte-copying
+live, possibly inconsistent database files.
+
+```sh
+skeleton-offline --snapshot-to ./offline-recovery \
+  --snapshot-workspace ./chat.sqlite \
+  --snapshot-library ./knowledge.sqlite \
+  --snapshot-queue ./index-jobs.sqlite --json
+skeleton-offline --verify-snapshot ./offline-recovery --json
+skeleton-offline --restore-from ./offline-recovery \
+  --snapshot-workspace ./new-chat.sqlite \
+  --snapshot-library ./new-knowledge.sqlite \
+  --snapshot-queue ./new-index-jobs.sqlite --json
+```
+
+Restore requires **new destination files** and validates every database
+schema, SQLite integrity check, file size and SHA-256 checksum before
+publishing the restored files. Existing user databases are never
+intentionally overwritten. No network or cloud account is involved.
+
+**Boundaries:** Each database receives a consistent SQLite online backup,
+but the collection is **not a single globally atomic snapshot** across all
+three subsystems. Stop writers when cross-database synchronization matters.
+The snapshot is **plaintext** and is not signed or encrypted. A SHA-256
+manifest detects corruption, but an actor controlling both manifest and
+database files can forge it. Independently authenticate and protect
+backups on trusted media. Restored transcripts remain context, not
+execution authorizations or canonical production conversation state.
+
 ## Offline readiness doctor
 
 Use `--doctor` with one preinstalled local artifact before running it:
@@ -279,7 +339,7 @@ and offline system-completion attestation are not yet provided.
 ## Acceptance
 
 ```sh
-python -m pytest skeleton/testing/test_app_offline_gguf.py skeleton/testing/test_offline_history_backup.py skeleton/testing/test_offline_kit.py skeleton/testing/test_offline_console.py skeleton/testing/test_offline_workspace.py skeleton/testing/test_offline_readiness.py skeleton/testing/test_offline_library.py -q
+python -m pytest skeleton/testing/test_app_offline_gguf.py skeleton/testing/test_offline_history_backup.py skeleton/testing/test_offline_kit.py skeleton/testing/test_offline_console.py skeleton/testing/test_offline_workspace.py skeleton/testing/test_offline_readiness.py skeleton/testing/test_offline_library.py skeleton/testing/test_offline_index_queue.py skeleton/testing/test_offline_snapshot.py -q
 python -m pytest skeleton/testing/test_local_model_deployment.py -q
 python scripts/check_architecture_map.py
 python scripts/check_ai_app_construction.py
