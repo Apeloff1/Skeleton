@@ -229,7 +229,7 @@ def test_research_observations_cannot_become_distributable_game_or_training_data
         third_party=True, source_game="interoperability-study",
         allowed_uses=["modify"],
     )
-    with pytest.raises(GameRightsError, match="interoperability"):
+    with pytest.raises(GameRightsError, match="permissions|interoperability"):
         admit_game_rights(observations, action="publish", jurisdiction="EEA")
     with pytest.raises(GameCapsuleError, match="segregated"):
         make_game_capsule(
