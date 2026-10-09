@@ -302,11 +302,14 @@ class TransformerBlock:
         q = matvec(self.Wq, y)
         k = matvec(self.Wk, y)
         v = matvec(self.Wv, y)
-        Ks.append(k)
+        # Store already-rotated keys once: re-rotating every historical key
+        # on each token makes incremental decode needlessly quadratic in RoPE
+        # work. Window shifts reset the cache, preserving absolute parity
+        # with the reference window-relative full-sequence path.
+        Ks.append(apply_rope(k, pos))
         Vs.append(v)
-        K_rope = [apply_rope(kk, t) for t, kk in enumerate(Ks)]
         q_rope = apply_rope(q, pos)
-        c, _ = cached_mha(q_rope, K_rope, Vs, n_heads)
+        c, _ = cached_mha(q_rope, Ks, Vs, n_heads)
         attn = matvec(self.Wo, c)
         u = add(x, attn)
         if self.d_ff:
