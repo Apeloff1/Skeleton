@@ -15,6 +15,7 @@ from skeleton.app.offline_game_preview import (
 )
 from skeleton.app.offline_chip8_preview import run_native_chip8_preview
 from skeleton.app.homebrew_editor_ui import open_homebrew_editor
+from skeleton.app.homebrew_port_ui import open_native_homebrew_port
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -27,16 +28,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     mode.add_argument("--seed", type=int, help="optional original game seed")
     mode.add_argument("--edit-project", help="open verified original homebrew project editor")
     parser.add_argument("--output", help="new, unused output capsule path for editor Save As")
+    parser.add_argument("--port-blueprint", help="verified original-homebrew Windows enhancement blueprint for --project")
     mode.add_argument("--chip8-demo", action="store_true",
                       help="play a genuine original CHIP-8 homebrew ROM in native window")
     args = parser.parse_args(argv)
     if args.output is not None and args.edit_project is None:
         parser.error("--output is only valid with --edit-project")
+    if args.port_blueprint is not None and args.project is None:
+        parser.error("--port-blueprint requires an explicit original --project")
     if args.edit_project is not None:
         return open_homebrew_editor(args.edit_project, output=args.output)
     if args.chip8_demo:
         return run_native_chip8_preview()
     if args.project is not None:
+        if args.port_blueprint is not None:
+            return open_native_homebrew_port(args.project, args.port_blueprint)
         return run_game_preview(project_tiles=load_game_project(args.project))
     return run_game_preview() if args.seed is None else run_game_preview(seed=args.seed)
 
