@@ -2,8 +2,8 @@
 
 **Purpose:** Prevent an original homebrew project's old/irrelevant legal and plagiarism checks being silently reused for a modified game, different platform, altered license evidence or new distribution channel.
 
-**System:** `skeleton/ai/game_builder/release_assurance.py`  
-**Tests:** `skeleton/testing/test_game_builder_release_assurance.py`  
+**System:** `skeleton/ai/game_builder/release_assurance.py`
+**Tests:** `skeleton/testing/test_game_builder_release_assurance.py`
 **Status:** A review-control boundary, **not** a copyright clearance service, automatic release bot, legal certificate or platform-license grant.
 
 ## Essential review architecture
