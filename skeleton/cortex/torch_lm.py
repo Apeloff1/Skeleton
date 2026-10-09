@@ -40,6 +40,14 @@ class TorchAccel:
         self.resident = False
         self._E = self._P = self._Wout = self._bout = None
         self._layers: List[Dict[str, Any]] = []
+        self.reset_decode_cache()
+
+    def reset_decode_cache(self) -> None:
+        """Drop all accelerator-local decode history after weight changes."""
+        self._cached_ids: List[int] = []
+        self._cached_keys: List[Any] = []
+        self._cached_values: List[Any] = []
+        self._cached_next_position = 0
 
     def _t2(self, rows: List[List[float]], grad: bool = True):
         return self.torch.tensor(rows, dtype=self.torch.float32, device=self.device, requires_grad=grad)
@@ -50,6 +58,9 @@ class TorchAccel:
     def pin(self) -> "TorchAccel":
         """Upload python weights once. Subsequent SGD stays on-device."""
         lm = self.lm
+        if getattr(lm, "use_mod", False):
+            raise ValueError("accelerator does not implement Mixture of Depths routing")
+        self.reset_decode_cache()
         self._E = self._t2(lm.E)
         self._P = self._t2(lm.P)
         self._Wout = self._E if getattr(lm, "tied", False) else self._t2(lm.Wout)
@@ -144,7 +155,6 @@ class TorchAccel:
         torch = self.torch
         functional = torch.nn.functional
         length = q.size(0)
-        shape = (1, heads, length, head_dim)
         qh = q.reshape(length, heads, head_dim).transpose(0, 1).unsqueeze(0)
         kh = k.reshape(length, heads, head_dim).transpose(0, 1).unsqueeze(0)
         vh = v.reshape(length, heads, head_dim).transpose(0, 1).unsqueeze(0)
@@ -188,15 +198,15 @@ class TorchAccel:
                 X = X + z @ blob["W2"].T + blob["b2"]
         return X[-1] @ self._Wout.T + self._bout, X[-1]
 
-    def _rope(self, X):
-        """Match attn.apply_rope: even/odd pairs, θ = pos / 10000^(i/d)."""
+    def _rope(self, X, *, position_offset: int = 0):
+        """Match attn.apply_rope, including absolute offsets for cached decode."""
         torch = self.torch
         T, D = X.shape
         d = D - (D % 2)
         if d < 2:
             return X
         out = X.clone()
-        pos = torch.arange(T, device=X.device, dtype=X.dtype).unsqueeze(1)
+        pos = (torch.arange(T, device=X.device, dtype=X.dtype) + position_offset).unsqueeze(1)
         i = torch.arange(0, d, 2, device=X.device, dtype=X.dtype)
         theta = pos / (10000.0 ** (i / float(d)))
         c, s = torch.cos(theta), torch.sin(theta)
@@ -213,6 +223,87 @@ class TorchAccel:
         k = 0.7978845608028654  # sqrt(2/pi)
         return 0.5 * x * (1.0 + torch.tanh(k * (x + 0.044715 * x * x * x)))
 
+    def _cached_step(self, token_id: int) -> "Any":
+        """Single-token attention using resident K/V (no repeated prefill).
+
+        Keys are rotated exactly once at their original position. For learned
+        absolute positional embeddings, a sliding window always re-prefills.
+        Rotary-only sliding eviction is safe only for a one-block transformer
+        because deeper blocks' historic keys depend on discarded context.
+        """
+        torch = self.torch
+        lm = self.lm
+        pos = self._cached_next_position
+        token_id = int(token_id) if 0 <= int(token_id) < lm.V else lm.unk
+        x = self._E[token_id]
+        if getattr(lm, "position_mode", "learned_rope") != "rope":
+            x = x + self._P[min(pos, lm.ctx - 1)]
+        heads = lm.n_heads
+        hd = lm.dim // heads
+        for layer_index, blob in enumerate(self._layers):
+            xn = self._normalize(x, blob, "ln1")
+            q = self._rope((xn @ blob["Wq"].T).unsqueeze(0), position_offset=pos)
+            k = self._rope((xn @ blob["Wk"].T).unsqueeze(0), position_offset=pos)
+            v = (xn @ blob["Wv"].T).unsqueeze(0)
+            qh = q.reshape(1, heads, hd).transpose(0, 1).unsqueeze(0)
+            kh = k.reshape(1, heads, hd).transpose(0, 1).unsqueeze(0)
+            vh = v.reshape(1, heads, hd).transpose(0, 1).unsqueeze(0)
+            if layer_index < len(self._cached_keys):
+                kh = torch.cat((self._cached_keys[layer_index], kh), dim=-2)
+                vh = torch.cat((self._cached_values[layer_index], vh), dim=-2)
+                self._cached_keys[layer_index] = kh
+                self._cached_values[layer_index] = vh
+            else:
+                self._cached_keys.append(kh)
+                self._cached_values.append(vh)
+            # A single query attends to all preceding keys, including its
+            # own; is_causal=True would mask almost the entire key history.
+            if hasattr(torch.nn.functional, "scaled_dot_product_attention"):
+                context = torch.nn.functional.scaled_dot_product_attention(
+                    qh, kh, vh, dropout_p=0.0, is_causal=False
+                )
+            else:
+                scores = qh @ kh.transpose(-2, -1) * (hd ** -0.5)
+                context = torch.softmax(scores, dim=-1) @ vh
+            x = x + context.squeeze(0).transpose(0, 1).reshape(lm.dim) @ blob["Wo"].T
+            if blob.get("W1") is not None:
+                un = self._normalize(x, blob, "ln2")
+                gate = un @ blob["W1"].T + blob["b1"]
+                if blob.get("Wu") is not None:
+                    z = torch.nn.functional.silu(gate) * (un @ blob["Wu"].T + blob["bu"])
+                else:
+                    z = self._gelu(gate)
+                x = x + z @ blob["W2"].T + blob["b2"]
+        self._cached_ids.append(token_id)
+        self._cached_next_position += 1
+        return x @ self._Wout.T + self._bout
+
+    def logits_window(self, ids: Sequence[int]) -> List[float]:
+        """Prefill once, then decode with on-device per-layer K/V tensors."""
+        if not self.resident:
+            self.pin()
+        lm = self.lm
+        window = list(ids[-lm.ctx:] or [lm.unk])
+        with self.torch.no_grad():
+            if self._cached_ids == window[:-1]:
+                result = self._cached_step(window[-1])
+            elif (
+                getattr(lm, "position_mode", "learned_rope") == "rope"
+                and lm.n_layers == 1
+                and len(self._cached_ids) == lm.ctx
+                and self._cached_ids[1:] == window[:-1]
+            ):
+                for i in range(len(self._cached_keys)):
+                    self._cached_keys[i] = self._cached_keys[i][:, :, 1:, :]
+                    self._cached_values[i] = self._cached_values[i][:, :, 1:, :]
+                del self._cached_ids[0]
+                result = self._cached_step(window[-1])
+            else:
+                self.reset_decode_cache()
+                for idx in window:
+                    result = self._cached_step(idx)
+            return result.detach().cpu().tolist()
+
     def logits(self, ids: Sequence[int]) -> List[float]:
         with self.torch.no_grad():
             y, _ = self._forward_ids(ids)
@@ -224,6 +315,7 @@ class TorchAccel:
             return h.detach().cpu().tolist()
 
     def sgd(self, ids: Sequence[int], target: int, lr: float) -> float:
+        self.reset_decode_cache()
         torch = self.torch
         if not self.resident:
             self.pin()
@@ -253,8 +345,8 @@ class TorchAccel:
         with torch.no_grad():
             for _ in range(max(1, n)):
                 window = ids[-lm.ctx:]
-                logits, _ = self._forward_ids(window)
-                p = torch.softmax(logits.float().cpu(), dim=-1)
+                logits = self.logits_window(window)
+                p = torch.softmax(torch.tensor(logits, dtype=torch.float32), dim=-1)
                 nxt = int(torch.multinomial(p, 1, generator=g).item())
                 ids.append(nxt)
         return " ".join(lm.itos[i] if 0 <= i < len(lm.itos) else UNK for i in ids[:n])
