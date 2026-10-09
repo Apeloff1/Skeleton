@@ -47,6 +47,17 @@ Unused categories must be **explicitly** declared `not_used`; silent omissions f
 
 Visual/audio similarity **cannot be deemed clear because a textual detector passed**. A reviewer must supply separate evidence for included nontext modalities; lacking it creates a hold.
 
+## Local image and audio fingerprinting
+
+The optional `media_similarity.py` adds **actual local fingerprinting** as an additional triage channel:
+
+- **Images:** PNG/JPEG/WebP/GIF images can be decoded using optional Pillow, bounded to 16 megapixels; raw SHA-256 matches catch identical files while 64-bit horizontal difference hashes flag visually similar layouts and sprites for human review. The image algorithm is **not** a proof of copying: flat pictures can collide, transformed frames can evade detection, and pixel changes do not make a derived character lawful.
+- **Audio:** uncompressed 8-/16-bit mono/stereo PCM WAV is read using a bounded standard-library parser. Exact bytes and similar normalized 128-window energy envelopes can generate flagged comparison evidence, not proofs of copied musical composition. Other compressed formats, re-orchestration, melody, timbre, arrangement and audiovisual synchrony require specialist review.
+- **Evidence:** matches are SHA-256-bound and store reference/work IDs and triage signals, **not copyrighted image/audio bytes**. Every flagged match enters the `OriginalityReport` review issues, preventing higher-assurance native source admission without independent resolution.
+- **Missing dependencies or unsupported formats fail visibly**, never get silently relabeled as an original work. Existing human-check fields remain required for art/music even when the technical media check produced no hits.
+
+This optional feature is intentionally not an image-generative similarity model or a world-scale search. It can find candidate overlap in a lawfully provided reference set; it cannot know every game in history.
+
 ## Technical triage model and limitations
 
 The tool compares user-supplied *authorized local textual material* against a bounded reference corpus. It tokenizes Unicode text, detects normalized exact copying, longest contiguous phrases, and overlapping six-token windows. Outputs include work IDs, file fingerprints, overlap counts and structured issues. It **does not** include copyrighted source text in a public review receipt.
