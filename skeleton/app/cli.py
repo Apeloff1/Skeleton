@@ -332,7 +332,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 not args.train_corpus or not args.eval_corpus or not args.output_model
                 or args.model or args.prompt or args.inspect_model
                 or args.load_chat or args.save_chat
-                or args.compare_model or args.candidate_model or args.benchmark_suite or args.replay_improvement or args.replay_improvement
+                or args.compare_model or args.candidate_model or args.benchmark_suite or args.replay_improvement
             ):
                 print("local-ai improvement requires --improve-model, --train-corpus, --eval-corpus and --output-model only")
                 return 2
