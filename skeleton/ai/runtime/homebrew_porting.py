@@ -172,12 +172,20 @@ def make_homebrew_port(
             or any(not isinstance(h, str) or h not in HYBRID_MODES for h in hybrids)
             or len(set(hybrids)) != len(hybrids)):
         raise HomebrewPortError("hybrid combinations must be known and unique")
-    if (creative_mode == "faithful_homebrew" and hybrids
-            or creative_mode == "clean_room_spiritual_successor"
-            and art_direction == "pixel_heritage"):
-        # A clean-room successor must have distinct original art direction.
-        # This is only a *design differentiation* control, not legal proof.
-        raise HomebrewPortError("chosen creative mode conflicts with fidelity constraints")
+    if (
+        creative_mode == "faithful_homebrew"
+        and (hybrids or art_direction != "pixel_heritage")
+    ) or (
+        creative_mode == "hybrid_original" and not hybrids
+    ) or (
+        creative_mode == "clean_room_spiritual_successor"
+        and art_direction == "pixel_heritage"
+    ):
+        # Faithful means original pixel-native style and no added game modes.
+        # Hybrid must actually contain new gameplay; a clean-room successor
+        # selects a visibly independent new art direction. None alone
+        # proves freedom from copyright/trademark infringement.
+        raise HomebrewPortError("chosen creative mode conflicts with fidelity or hybrid constraints")
     for value in (reduced_motion, high_contrast, colorblind_safe, hud, parallax):
         if type(value) is not bool:
             raise HomebrewPortError("visual and accessibility toggles must be Boolean")
@@ -193,6 +201,10 @@ def make_homebrew_port(
     if requested_coins < 0:
         requested_coins = 0
     coins = _collectibles(tiles, route, seed, requested_coins)
+    if any(h in hybrids for h in ("collectathon", "combo")) and not coins:
+        raise HomebrewPortError(
+            "actual collectible gameplay needs at least one reachable original item"
+        )
     if "keyquest" in hybrids and not coins:
         raise HomebrewPortError("keyquest requires original reachable key placements")
     # The source tiles and colliders MUST remain unchanged by enhancement.
