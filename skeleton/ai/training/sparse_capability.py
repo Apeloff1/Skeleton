@@ -25,6 +25,11 @@ DEFAULT_BUDGET = 36
 MAX_BUDGET = 72
 MIN_BUDGET = 36
 HARDWARE_BUDGETS = {"low-memory": 36, "consumer": 48, "workstation": 72}
+# Policy limits, not inferred RAM sizes or measured token capacity.
+HARDWARE_CORPUS_BYTE_BUDGETS = {
+    "low-memory": 8192, "consumer": 12288, "workstation": 16384,
+}
+MAX_CORPUS_BYTES = max(HARDWARE_CORPUS_BYTE_BUDGETS.values())
 
 CAPABILITIES: dict[str, tuple[str, str, str]] = {
     "integer_arithmetic": ("arithmetic_addition", "score_accumulation", "arithmetic_multiplication"),
@@ -166,6 +171,8 @@ def build_sparse_capability_plan(
         _FORMAT.format(instruction=item.instruction, response=item.response)
         for item in choices
     ).encode("utf-8")
+    if len(corpus) > MAX_CORPUS_BYTES:
+        raise SyntheticCurriculumError("sparse corpus exceeds absolute 16 KiB training-text cap")
     rows = tuple(item.as_record() for item in choices)
     canonical = (
         "".join(json.dumps(x, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
@@ -184,6 +191,8 @@ def build_sparse_capability_plan(
         "source_training_pool": 504,
         "heldout_source_rows": 216,
         "active_training_rows": len(rows),
+        "active_training_bytes": len(corpus),
+        "absolute_training_byte_cap": MAX_CORPUS_BYTES,
         "per_mode_upper_bound": 2,
         "selected_sample_ids": [x.sample_id for x in choices],
         "selected_scenario_groups": [x.group_id for x in choices],
@@ -342,7 +351,7 @@ def register_sparse_capability_plan(
     ).encode("utf-8")
     manifest = DatasetManifest(
         dataset_id=identity,
-        version=f"1.0.0-b{budget:03}",
+        version=f"1.0.0-b{budget:03}-{plan['training_text_sha256'][:12]}",
         splits=(DatasetSplit(
             name="train", digest=corpus_digest((text.decode("utf-8"),)),
             record_count=budget,
@@ -385,6 +394,7 @@ def register_sparse_capability_plan(
 
 __all__ = [
     "SCHEMA", "DEFAULT_BUDGET", "MAX_BUDGET", "HARDWARE_BUDGETS",
+    "HARDWARE_CORPUS_BYTE_BUDGETS", "MAX_CORPUS_BYTES",
     "CAPABILITIES", "SparseCapabilityExample", "SyntheticCurriculumError",
     "build_sparse_capability_plan", "sparse_plan_receipt",
     "assess_heldout_capabilities", "register_sparse_capability_plan",
