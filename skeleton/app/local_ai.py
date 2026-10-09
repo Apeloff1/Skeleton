@@ -19,6 +19,7 @@ from skeleton.ai.runtime.inference.llama_cpp import LlamaCppModel
 from skeleton.ai.runtime.inference.local import LocalInferenceRequest, LocalInferenceResult, LocalInferenceEngine
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
 from skeleton.app.offline_history import backup_history, restore_history
+from skeleton.app.offline_workspace import DurableOfflineSession
 
 
 MAX_USER_CHARS = 4096
@@ -236,16 +237,17 @@ class OfflineAIWindow:
 
     def __init__(self, parent: Any) -> None:
         import tkinter as tk
-        from tkinter import filedialog, scrolledtext, ttk
+        from tkinter import filedialog, messagebox, scrolledtext, ttk
 
         self.tk = tk
         self.filedialog = filedialog
+        self.messagebox = messagebox
         self.window = tk.Toplevel(parent)
         self.window.title("Skeleton · Local AI")
         self.window.geometry("850x660")
         self.window.minsize(600, 440)
         self.window.protocol("WM_DELETE_WINDOW", self.close)
-        self.session: OfflineAISession | OfflineGGUFSession | None = None
+        self.session: OfflineAISession | OfflineGGUFSession | DurableOfflineSession | None = None
         self.events: Queue[tuple[str, object]] = Queue()
         self.active = False
         self.closed = False
@@ -281,6 +283,10 @@ class OfflineAIWindow:
             backup_toolbar, text="Restore conversation…", command=self.restore_backup
         )
         self.restore_history_button.pack(side="left", padx=8)
+        self.workspace_button = ttk.Button(
+            backup_toolbar, text="Attach local workspace…", command=self.attach_workspace
+        )
+        self.workspace_button.pack(side="left", padx=8)
         self.status = tk.StringVar(value="Choose a local native model checkpoint to begin.")
         ttk.Label(frame, textvariable=self.status, wraplength=790).pack(anchor="w", pady=8)
         self.transcript = scrolledtext.ScrolledText(frame, state="disabled", wrap="word", height=18, font=("Segoe UI", 10))
@@ -301,6 +307,12 @@ class OfflineAIWindow:
         )
         self.restore_history_button.configure(
             state="normal" if self.session is not None and not self.active else "disabled"
+        )
+        self.workspace_button.configure(
+            state="normal"
+            if (self.session is not None and not self.active
+                and not isinstance(self.session, DurableOfflineSession))
+            else "disabled"
         )
         self.send_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.clear_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
@@ -356,6 +368,34 @@ class OfflineAIWindow:
             self._redraw_history()
             self.status.set("Restored " + str(turns) + " local turns as untrusted context")
 
+    def attach_workspace(self) -> None:
+        """Attach a user-selected SQLite workspace; never silently overwrite turns."""
+        if self.active or self.session is None or isinstance(self.session, DurableOfflineSession):
+            return
+        if self.session.history:
+            self.status.set("Start a new empty conversation before attaching durable workspace.")
+            return
+        selected = self.filedialog.asksaveasfilename(
+            parent=self.window,
+            title="Create or open an unencrypted local SQLite workspace",
+            defaultextension=".sqlite",
+            filetypes=[("SQLite workspace", "*.sqlite"), ("All files", "*.*")],
+            confirmoverwrite=False,
+        )
+        if not selected:
+            return
+        try:
+            self.session = DurableOfflineSession(self.session, selected)
+        except (ValueError, RuntimeError, OSError) as exc:
+            self.status.set("Workspace rejected: " + str(exc))
+            return
+        self._redraw_history()
+        self.status.set(
+            "Offline SQLite workspace active: " + str(len(self.session.history) // 2)
+            + " restored turns (unencrypted local state)"
+        )
+        self._refresh()
+
     def choose_model(self) -> None:
         if self.active:
             return
@@ -404,9 +444,21 @@ class OfflineAIWindow:
     def clear(self) -> None:
         if self.active or self.session is None:
             return
-        self.session.clear()
+        if isinstance(self.session, DurableOfflineSession):
+            if not self.messagebox.askyesno(
+                "Clear saved offline conversation?",
+                "This clears the current SQLite workspace conversation and cannot be undone. "
+                "Portable backups are unaffected.",
+                parent=self.window,
+            ):
+                return
+        try:
+            self.session.clear()
+        except (ValueError, RuntimeError, OSError) as exc:
+            self.status.set("Clear rejected: " + str(exc))
+            return
         self._redraw_history()
-        self.status.set("Conversation reset in memory; existing backups are unchanged.")
+        self.status.set("Conversation cleared; portable backups are unchanged.")
 
     def send(self) -> None:
         if self.active or self.session is None:
@@ -458,8 +510,11 @@ class OfflineAIWindow:
                 kind, value = self.events.get_nowait()
                 self.active = False
                 if kind == "loaded":
+                    previous = self.session
+                    if isinstance(previous, DurableOfflineSession):
+                        previous.close()
                     self.session = value  # type: ignore[assignment]
-                    self.clear()
+                    self._redraw_history()
                     self.status.set("Offline model loaded: " + self.session.model_digest[:16] + "…")
                 elif kind == "answer":
                     answer = value
@@ -480,6 +535,8 @@ class OfflineAIWindow:
     def close(self) -> None:
         self.cancel()
         self.closed = True
+        if isinstance(self.session, DurableOfflineSession):
+            self.session.close()
         self.window.destroy()
 
 
