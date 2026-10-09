@@ -35,11 +35,11 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [x] `ACC-VOL-000` — VOL-000 Plan Constitution — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Evidence Identity Gate** — completed_at_utc: `2026-10-04T04:35:02Z`
 - [x] `ACC-VOL-001` — VOL-001 Scientific & Historical Foundation — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:Independent exact-head research-lineage verifier** — completed_at_utc: `2026-10-06T21:08:35Z`
 - [x] `ACC-VOL-002` — VOL-002 System Architecture — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:Independent exact-head architecture verifier** — completed_at_utc: `2026-10-06T22:08:35Z`
-- [ ] `ACC-VOL-003` — VOL-003 Canonical Contract System — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-004` — VOL-004 Kernel & Execution Foundation — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-003` — VOL-003 Canonical Contract System — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:20:00Z`
+- [x] `ACC-VOL-004` — VOL-004 Kernel & Execution Foundation — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:20:00Z`
 - [ ] `ACC-VOL-005` — VOL-005 Data & Persistence — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-006` — VOL-006 Model Development Program — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-007` — VOL-007 Inference Engine — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-006` — VOL-006 Model Development Program — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:20:00Z`
+- [x] `ACC-VOL-007` — VOL-007 Inference Engine — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:20:00Z`
 - [ ] `ACC-VOL-008` — VOL-008 Model Routing — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-009` — VOL-009 Context Engineering — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-010` — VOL-010 Memory System — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
@@ -51,8 +51,8 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [x] `ACC-VOL-016` — VOL-016 Agent Runtime — status: `hardened` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:Agent Runtime Closure Gate** — completed_at_utc: `2026-10-04T15:47:01Z`
 - [x] `ACC-VOL-017` — VOL-017 Multi-Agent Orchestration — status: `hardened` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Multi-Agent Orchestration Gate** — completed_at_utc: `2026-10-04T15:47:01Z`
 - [ ] `ACC-VOL-018` — VOL-018 Long-Horizon Autonomy — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-019` — VOL-019 World Models & Simulation — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-020` — VOL-020 Multimodal Intelligence — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-019` — VOL-019 World Models & Simulation — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:20:00Z`
+- [x] `ACC-VOL-020` — VOL-020 Multimodal Intelligence — status: `verified` — builder: **chatgpt:gpt-5.6-sol** — verifier: **grok:independent-volume-verifier** — completed_at_utc: `2026-10-09T14:20:00Z`
 - [ ] `ACC-VOL-021` — VOL-021 Code Intelligence — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-022` — VOL-022 Autonomous Repository Engineering — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-023` — VOL-023 Forge — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`

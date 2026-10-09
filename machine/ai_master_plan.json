@@ -513,7 +513,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Give every serialized contract stable identity, owner, version, compatibility rule and migration semantics.",
         "Fail closed on ambiguous security-sensitive serialization including duplicate keys/non-finite values.",
@@ -561,19 +561,18 @@
         "skeleton/testing/test_contract_compatibility.py",
         "tests/test_architecture_contract_conformance.py",
         "scripts/verify_vol003_contract_conformance.py",
-        "tests/test_vol003_contract_conformance_independent.py"
+        "tests/test_vol003_contract_conformance_independent.py",
+        "verifier-receipt:af44e2a3d99abbbc2f97a5157b936702fab20feed63d9654b7cf77aaef4c157a"
       ],
       "risks": [
         "schema drift",
         "privileged defaults from unknown values",
         "cross-language round-trip divergence"
       ],
-      "gaps": [
-        "independent exact-head VOL-003 Contract Conformance Closure qualification remains pending"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-003",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
       "depth_pass": "DP-000-040",
       "enterprise_grade_state": "designed",
@@ -586,7 +585,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Bootstrap services in deterministic dependency order with explicit readiness and shutdown semantics.",
         "Propagate cancellation, deadline, budget and operation identity through all runtime layers.",
@@ -675,19 +674,18 @@
         "https://github.com/Apeloff1/Skeleton/commit/fb1b0eda89e3092f23491fa5f1732052aa625f89",
         "https://github.com/Apeloff1/Skeleton/commit/87177fe5f8c093c124078f1323e3989a6bd91eb6",
         "scripts/verify_vol004_runtime_supervision.py",
-        "tests/test_vol004_runtime_supervision_independent.py"
+        "tests/test_vol004_runtime_supervision_independent.py",
+        "verifier-receipt:bcb921ecc5c2c798f729eeb0beeb3f8fb133151a6326ff1d4be6ae844789e8eb"
       ],
       "risks": [
         "orphan tasks",
         "readiness before dependencies are usable",
         "shutdown ordering data loss"
       ],
-      "gaps": [
-        "independent exact-head VOL-004 Runtime Supervision Closure qualification remains pending"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-004",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
       "depth_pass": "DP-000-040",
       "enterprise_superiority_profile": "ENT-VOL-004",
@@ -782,7 +780,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Version training data with rights, integrity, deduplication, contamination and PII metadata.",
         "Bind every model artifact to exact data/code/config/hardware/evaluation lineage.",
@@ -817,19 +815,19 @@
       ],
       "evidence": [
         "https://github.com/Apeloff1/Skeleton/commit/b4ad90f9be9c244ae7e9c474a97ca04303a943fd",
-        "https://github.com/Apeloff1/Skeleton/commit/1c9d02d7461cf2ad5a1db79bd4935240b594dcac"
+        "https://github.com/Apeloff1/Skeleton/commit/1c9d02d7461cf2ad5a1db79bd4935240b594dcac",
+        "scripts/verify_vol006_model_development.py",
+        "verifier-receipt:60694c61e22c8403e44402d01226cde071d1c3bb5f65834e474ecdf8647c80ad"
       ],
       "risks": [
         "data rights violations",
         "benchmark contamination",
         "irreproducible training provenance"
       ],
-      "gaps": [
-        "independent model-development reproducibility, registry, evaluation, and publication verification remains pending"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-006",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
       "depth_pass": "DP-000-040",
       "enterprise_superiority_profile": "ENT-VOL-006",
@@ -843,7 +841,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Expose provider-neutral inference with streaming, cancellation, structured output and bounded retries.",
         "Treat caches/batching/speculation as optimizations that cannot alter semantic correctness.",
@@ -902,19 +900,18 @@
         "skeleton/testing/test_vol007_speculation.py",
         "scripts/verify_vol007_inference.py",
         "tests/test_vol007_inference_independent.py",
-        ".github/workflows/vol007-inference.yml"
+        ".github/workflows/vol007-inference.yml",
+        "verifier-receipt:d98afc0a57e5b4e8dfc2f49b5c19eeb56e66da92261b347b86b01c867cc71ddd"
       ],
       "risks": [
         "duplicate provider effects during retry",
         "KV/prefix cache semantic corruption",
         "uncancelled expensive work"
       ],
-      "gaps": [
-        "independent exact-head VOL-007 Inference Engine Closure qualification remains pending"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-007",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
       "depth_pass": "DP-000-040",
       "enterprise_superiority_profile": "ENT-VOL-007",
@@ -1841,7 +1838,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Keep simulation/world-model state clearly separated from real-world authority and side effects.",
         "Represent uncertainty and model assumptions in simulated transitions.",
@@ -1876,7 +1873,9 @@
         "https://github.com/Apeloff1/Skeleton/pull/2927",
         "https://github.com/Apeloff1/Skeleton/commit/9482455089eabb2c5086a0286977bc880f34d846",
         "skeleton/simulation/environment.py",
-        "skeleton/testing/test_vol019_world_model_contract.py"
+        "skeleton/testing/test_vol019_world_model_contract.py",
+        "scripts/verify_vol019_world_model.py",
+        "verifier-receipt:73f83ec117d48d4faf77eb55e10f47f637869dba98f33931621449d790d1b131"
       ],
       "risks": [
         "simulation treated as real evidence",
@@ -1885,8 +1884,8 @@
       ],
       "gaps": [],
       "accountability_id": "ACC-VOL-019",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
       "depth_pass": "DP-000-040",
       "enterprise_superiority_profile": "ENT-VOL-019",
@@ -1900,7 +1899,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Use typed modality contracts for images, documents, audio, speech and video with provenance and classification.",
         "Preserve cross-modal alignment and source identity when extracting or transforming content.",
@@ -1934,7 +1933,10 @@
         "planned:cross-modal retrieval eval",
         "planned:hidden-instruction multimodal adversarial suite"
       ],
-      "evidence": [],
+      "evidence": [
+        "scripts/verify_vol020_multimodal.py",
+        "verifier-receipt:d29a05334779193700d1e629e3b6b897539d6589f362c0c192e1e23dc8df26ff"
+      ],
       "risks": [
         "embedded prompt injection",
         "metadata privacy leakage",
@@ -1942,8 +1944,8 @@
       ],
       "gaps": [],
       "accountability_id": "ACC-VOL-020",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
       "depth_pass": "DP-000-040",
       "enterprise_superiority_profile": "ENT-VOL-020",
@@ -2018,7 +2020,7 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "implemented",
       "requirements": [
-        "Use inspect→plan→lease→edit→build→test→review→verify as the canonical repository mutation flow.",
+        "Use inspect\u2192plan\u2192lease\u2192edit\u2192build\u2192test\u2192review\u2192verify as the canonical repository mutation flow.",
         "Isolate workspaces and mutation leases to prevent concurrent destructive edits.",
         "Require patch provenance, focused regression evidence and rollback/revert path."
       ],
