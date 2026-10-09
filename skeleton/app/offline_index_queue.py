@@ -18,7 +18,7 @@ import threading
 import time
 from typing import Any
 
-from .offline_library import OfflineDocumentLibrary, OfflineLibraryError, _root
+from .offline_library import OfflineDocumentLibrary, _root
 
 
 SCHEMA = "skeleton.app.offline_index_queue.v1"
