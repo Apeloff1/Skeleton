@@ -18,12 +18,11 @@ def test_unpaired_unicode_surrogates_are_rejected_for_values_and_keys():
  from skeleton.contracts.canonical import CanonicalContractError
  for payload in ({"text":"\\ud800"},{"\\udc00":"text"},{"nested":[{"bad":"\\udfff"}]}):
   # Escaped literals above are intentionally converted to literal codepoints.
-  text = next(iter(payload)) if len(payload)==1 else ""
   with pytest.raises(CanonicalContractError,match="Unicode surrogate"):
    canonical_json_bytes(payload)
 
 def test_legitimate_unicode_emoji_remains_portable():
- assert canonical_json_bytes({"text":"😀"})==b'{"text":"😀"}'
+ assert canonical_json_bytes({"text":"😀"})=='{"text":"😀"}'.encode("utf-8")
 
 def test_cyclic_and_excessively_nested_payloads_fail_closed():
  import pytest
