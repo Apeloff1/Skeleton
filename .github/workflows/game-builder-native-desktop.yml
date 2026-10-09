@@ -1,0 +1,125 @@
+name: Game Builder Native Desktop Executable
+
+on:
+  pull_request:
+    paths:
+      - 'skeleton/ai/game_builder/**'
+      - 'scripts/game_builder/native_desktop_ci.py'
+      - '.github/workflows/game-builder-native-desktop.yml'
+      - 'docs/GAME_BUILDER_PLATFORM_PORTING.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: game-builder-native-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile-and-replay:
+    name: ${{ matrix.platform }} native build and real gameplay replay
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux_desktop
+          - runner: macos-14
+            platform: macos_modern
+          - runner: windows-2022
+            platform: windows_modern
+    steps:
+      - name: Narrow source checkout (avoids legacy Windows checkout-length failure)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /skeleton/__init__.py
+            /skeleton/ai/__init__.py
+            /skeleton/ai/game_builder/
+            /scripts/game_builder/native_desktop_ci.py
+
+      - uses: actions/setup-python@v5
+        if: runner.os != 'Windows'
+        with:
+          python-version: '3.12'
+
+      - name: Install Linux native SDL2 build toolchain
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config libsdl2-dev
+
+      - name: Install macOS native SDL2 build toolchain
+        if: runner.os == 'macOS'
+        run: |
+          brew install sdl2 cmake ninja pkg-config
+
+      - name: Install Windows UCRT64 native compiler, SDL2 and Python
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-SDL2
+
+      - name: Generate, compile, replay and fingerprint Linux/macOS game
+        if: runner.os != 'Windows'
+        env:
+          PYTHONPATH: .
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/game_builder/native_desktop_ci.py --emit native-src --target "${{ matrix.platform }}"
+          cmake -S native-src -B native-build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build native-build --config Release --parallel 2
+          native-build/skeleton_homebrew --verify-replay | tee native-replay.txt
+          grep -q '^SKELETON_NATIVE_REPLAY_OK ' native-replay.txt
+          python scripts/game_builder/native_desktop_ci.py \
+            --verify-binary native-build/skeleton_homebrew --target "${{ matrix.platform }}" \
+            > binary-validation.json
+
+      - name: Generate, compile, replay and fingerprint Windows .exe
+        if: runner.os == 'Windows'
+        env:
+          PYTHONPATH: .
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          python scripts/game_builder/native_desktop_ci.py --emit native-src --target windows_modern
+          cmake -S native-src -B native-build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build native-build --config Release --parallel 2
+          native-build/skeleton_homebrew.exe --verify-replay | tee native-replay.txt
+          grep -q '^SKELETON_NATIVE_REPLAY_OK ' native-replay.txt
+          python scripts/game_builder/native_desktop_ci.py \
+            --verify-binary native-build/skeleton_homebrew.exe --target windows_modern \
+            > binary-validation.json
+          cp /ucrt64/bin/SDL2.dll native-build/
+
+      - name: Upload native game binary, SDL2 runtime (Windows) and verification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: skeleton-original-homebrew-${{ matrix.platform }}
+          path: |
+            native-build/skeleton_homebrew
+            native-build/skeleton_homebrew.exe
+            native-build/SDL2.dll
+            native-src/manifest.json
+            native-replay.txt
+            binary-validation.json
+          if-no-files-found: error
+          retention-days: 7
