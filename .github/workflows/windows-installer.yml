@@ -201,6 +201,36 @@ jobs:
             Remove-Item -LiteralPath $cliDir -Recurse -Force -ErrorAction SilentlyContinue
           }
 
+          # Public user-runnable offline functionality check validates all
+          # three real native operations inside the *installed* frozen app,
+          # without Python/Docker/provider service availability.
+          $acceptanceOut = Join-Path $env:TEMP ("skeleton-acceptance-" + [guid]::NewGuid().ToString("N") + ".json")
+          $acceptanceErr = $acceptanceOut + ".err"
+          try {
+            $acceptance = Start-Process -FilePath $launcher -ArgumentList @(
+              "--offline-command", "local-ai", "--self-check", "--json"
+            ) -Wait -PassThru -RedirectStandardOutput $acceptanceOut -RedirectStandardError $acceptanceErr
+            if ($acceptance.ExitCode -ne 0) {
+              Write-Host ("Acceptance stdout: " + (Get-Content -LiteralPath $acceptanceOut -Raw -ErrorAction SilentlyContinue))
+              Write-Host ("Acceptance stderr: " + (Get-Content -LiteralPath $acceptanceErr -Raw -ErrorAction SilentlyContinue))
+              throw "installed Skeleton.exe offline native functionality acceptance failed with exit $($acceptance.ExitCode)"
+            }
+            $acceptanceReport = Get-Content -LiteralPath $acceptanceOut -Raw | ConvertFrom-Json
+            if (
+              $acceptanceReport.schema -ne "skeleton.app.local_ai.acceptance.v1" -or
+              $acceptanceReport.passed -ne $true -or
+              $acceptanceReport.checks_passed -ne 3 -or
+              $acceptanceReport.checks_total -ne 3 -or
+              $acceptanceReport.general_model_quality_certified -ne $false -or
+              $acceptanceReport.enterprise_release_qualified -ne $false -or
+              $acceptanceReport.gguf_model_qualified -ne $false
+            ) {
+              throw "installed Skeleton.exe acceptance returned untrusted or exaggerated evidence"
+            }
+          } finally {
+            Remove-Item -LiteralPath $acceptanceOut, $acceptanceErr -Force -ErrorAction SilentlyContinue
+          }
+
           # No GGUF or llama.cpp binary is shipped. Verify that the installed
           # command fails closed on missing operator-owned artifacts, rather
           # than invoking a downloader or silently falling back to hosted AI.
