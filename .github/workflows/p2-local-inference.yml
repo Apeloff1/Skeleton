@@ -146,3 +146,10 @@ jobs:
           --dim 8 --heads 2 --layers 1 --ffn 12
           --context 16 --prefill 4 --decode 2 --warmup 0 --runs 1
           --assert-parity
+      - name: Verify bounded causal query tiles on CPU PyTorch
+        run: >-
+          python scripts/benchmark_consumer_transformer.py
+          --device torch --prefill-query-chunk 3
+          --dim 8 --heads 2 --layers 2 --ffn 12
+          --context 32 --prefill 14 --decode 3 --warmup 0 --runs 1
+          --assert-parity
