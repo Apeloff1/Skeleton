@@ -77,6 +77,45 @@ modules. The Windows CI builds, installs and invokes this public CLI path
 for an actual CPU training/checkpoint/inspection round-trip. Full
 frontend/backend/Mongo service assembly still uses Docker separately.
 
+### Run operator-owned GGUF weights through the existing local llama.cpp engine
+
+The offline window now offers **Load GGUF…** as well as **Load checkpoint…**.
+The GGUF path requires you to choose *both* an existing local llama.cpp
+executable and your own GGUF weight file. The selected local executable is
+run as an explicit subprocess after a confirmation dialog. Skeleton does
+not download a model, install the binary, invoke a shell, or forward hosted
+provider credentials. Prefer binaries and model weights you trust.
+
+The same operation is available in the headless canonical application CLI,
+including in the installed Windows executable:
+
+```powershell
+Skeleton.exe --offline-command local-ai `
+  --llama-executable "C:\path\to\llama-cli.exe" `
+  --gguf-model "D:\models\my-model.gguf" `
+  --prompt "Describe your offline capabilities" `
+  --max-output-tokens 128 --json
+```
+
+Model and executable bytes are content-hashed; both identities are validated
+before inference. The existing `llama.cpp` execution plane prohibits
+remote acquisition flags, sanitizes its child process environment, writes
+the prompt to a private local file rather than argv, limits output and
+deadline, and observes cancellation. These are local-process protections,
+not a guarantee that an arbitrary operator-selected executable is benign.
+
+The receipt labels llama.cpp token counts as **estimated** and exposes
+`execution_receipt_digest: null` when the upstream backend has not produced
+one. The GUI keeps only ephemeral conversation history for GGUF because
+Skeleton cannot currently bind those turns to a verified GGUF tokenizer
+identity. **Native checkpoint transcript import/export, CPU training and
+category benchmarks apply only to native checkpoints**, not GGUF.
+
+GGUF quality depends entirely on the user's actual model weights. Bundling
+a local process adapter does not bundle trained weights or establish a
+general-purpose model-quality certificate. Full Docker service assembly
+remains a separate deployment profile.
+
 ### Train a small native checkpoint on your own text
 
 The desktop window's **Train small local model…** action can train a genuine,
