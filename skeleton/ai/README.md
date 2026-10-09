@@ -50,10 +50,14 @@ receipts, transactional turn commits, exact-turn forks, portable backups and
 restart recovery.
 
 `skeleton/app/local_ai.py` and `skeleton/app/offline_chat_cli.py` expose
-that same offline SQLite authority through the existing installed desktop UI
-and a headless interface. Both support native checkpoints and explicitly
-operator-installed GGUF/llama.cpp deployments. Only the model context
-*projection* is trimmed; the full committed conversation remains durable.
+that same offline SQLite authority through the installed desktop UI and a
+headless interface. `skeleton/app/offline_http.py` adds a strictly
+loopback-bound, bearer-authenticated HTTP API and same-origin browser UI
+from `skeleton/app/offline_web.py`. All three support native checkpoints
+and explicitly operator-installed GGUF/llama.cpp deployments. Only the
+model context *projection* is trimmed; the full committed conversation
+remains durable. The HTTP server enforces private credentials, origin/host
+restrictions, bounded request sizes and ordered shutdown.
 No weights are downloaded, tools are not granted, and there is no hosted-model
 fallback. See [Offline Native Chat](../../docs/ai/OFFLINE_NATIVE_CHAT.md)
 for runnable commands, release smoke, model requirements and limitations.
