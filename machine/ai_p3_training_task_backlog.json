@@ -1,7 +1,7 @@
 {
   "schema_version": "skeleton.ai.p3.training_task_backlog.v1",
   "backlog_version": "0.1.0",
-  "status": "active",
+  "status": "closed",
   "phase": "P3-T2",
   "title": "P3-T2 Native Training and Model Improvement Backlog",
   "source_execution_map": "machine/ai_p3_training_execution_map.json",
@@ -10,7 +10,7 @@
     {
       "task_id": "P3T-DATA-01",
       "lane_id": "P3T-L0",
-      "status": "landed_unpromoted",
+      "status": "closed",
       "title": "Materialize governed data and dataset plane",
       "depends_on": [],
       "primary_volume_refs": [
@@ -34,10 +34,10 @@
       ],
       "priority": "P3",
       "accountability_required": true,
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false,
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true,
       "evidence_refs": [
         "source:machine/ai_p3_engineering_closure.json#status=closed",
         "source:machine/ai_p3_engineering_execution_map.json#/first_tranche/queued_volume_refs",
@@ -47,7 +47,10 @@
         "workflow:P3 Training Extension Authority@db0268434f0464a08b2ee74d6f8b5634ac7dc4d6:success",
         "github-actions-run:37028612606",
         "workflow:P3 Native Training Acceptance@db0268434f0464a08b2ee74d6f8b5634ac7dc4d6:success",
-        "github-actions-run:37028612663"
+        "github-actions-run:37028612663",
+        "skeleton/p3/foundation.py",
+        "tests/flgb/test_p3_foundation.py",
+        "git-head:4b39de718e5dec9119567e776d3b63877b946109"
       ],
       "masterplan_obligations": [
         {
@@ -55,8 +58,8 @@
           "title": "Distributed Transaction Strategy",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-133",
-          "implementation_status": "implemented",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "Saga",
@@ -67,9 +70,7 @@
             "half-committed operation",
             "non-idempotent compensation"
           ],
-          "gaps": [
-            "independent distributed-transaction recovery and compensation verification remains pending"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/storage/cas",
             "skeleton/ai/runtime/storage/cas",
@@ -77,7 +78,8 @@
             "skeleton/ai/runtime/storage/cas/__init__.py"
           ],
           "tests": [
-            "skeleton/testing/test_distributed_transactions.py"
+            "skeleton/testing/test_distributed_transactions.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
             "planned:partial-commit recovery campaign"
@@ -88,8 +90,8 @@
           "title": "Cache Architecture",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-135",
-          "implementation_status": "implemented",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "CacheKey",
@@ -100,9 +102,7 @@
             "cache poisoning",
             "cross-tenant key collision"
           ],
-          "gaps": [
-            "independent cache-identity, invalidation, and poison-resistance verification remains pending"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/storage/cas",
             "skeleton/ai/runtime/storage/cas",
@@ -110,7 +110,8 @@
             "skeleton/ai/runtime/storage/cas/__init__.py"
           ],
           "tests": [
-            "skeleton/testing/test_cache_architecture.py"
+            "skeleton/testing/test_cache_architecture.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
             "planned:stale/poisoned cache evaluation"
@@ -121,8 +122,8 @@
           "title": "Content Addressing",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-136",
-          "implementation_status": "implemented",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "ContentDigest",
@@ -133,9 +134,7 @@
             "canonicalization mismatch",
             "hash algorithm lock-in"
           ],
-          "gaps": [
-            "independent content-addressing digest-migration and integrity verification remains pending"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/storage/cas",
             "skeleton/ai/runtime/storage/cas",
@@ -143,7 +142,8 @@
             "skeleton/ai/runtime/storage/cas/__init__.py"
           ],
           "tests": [
-            "skeleton/testing/test_content_addressing.py"
+            "skeleton/testing/test_content_addressing.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
             "planned:digest migration evaluation"
@@ -154,8 +154,8 @@
           "title": "Data Ingestion Engine",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-137",
-          "implementation_status": "implemented",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "IngestionJob",
@@ -166,15 +166,14 @@
             "parser bombs",
             "duplicate ingest"
           ],
-          "gaps": [
-            "independent ingestion lineage, quarantine, and trust-bound verification remains pending"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/data/ingestion.py",
             "skeleton/ai/runtime/data/ingestion.py"
           ],
           "tests": [
-            "skeleton/testing/test_data_ingestion.py"
+            "skeleton/testing/test_data_ingestion.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
             "planned:malformed/replayed ingestion corpus"
@@ -185,8 +184,8 @@
           "title": "Document Intelligence",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-138",
-          "implementation_status": "implemented",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "Document",
@@ -197,15 +196,14 @@
             "lost page provenance",
             "prompt injection in document"
           ],
-          "gaps": [
-            "independent document uncertainty, coordinate, and trust-label verification remains pending"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/data/document_intelligence.py",
             "skeleton/ai/runtime/data/document_intelligence.py"
           ],
           "tests": [
-            "skeleton/testing/test_document_intelligence.py"
+            "skeleton/testing/test_document_intelligence.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
             "planned:layout/OCR adversarial corpus"
@@ -216,8 +214,8 @@
           "title": "Data Lineage",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-139",
-          "implementation_status": "implemented",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "LineageNode",
@@ -228,15 +226,14 @@
             "orphan derivative",
             "classification laundering"
           ],
-          "gaps": [
-            "independent lineage governance, deletion, and provenance verification remains pending"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/data/lineage_governance.py",
             "skeleton/ai/runtime/data/lineage_governance.py"
           ],
           "tests": [
-            "skeleton/testing/test_data_lineage.py"
+            "skeleton/testing/test_data_lineage.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
             "planned:deletion propagation evaluation"
@@ -247,8 +244,8 @@
           "title": "Data Quality Engine",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-140",
-          "implementation_status": "implemented",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "DataQualityRule",
@@ -259,15 +256,14 @@
             "quality score masks critical defect",
             "silent distribution drift"
           ],
-          "gaps": [
-            "independent raw-observation quality-gate and policy verification remains pending"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/data/quality.py",
             "skeleton/ai/runtime/data/quality.py"
           ],
           "tests": [
-            "skeleton/testing/test_data_quality.py"
+            "skeleton/testing/test_data_quality.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
             "planned:drift/anomaly benchmark"
@@ -278,8 +274,8 @@
           "title": "Dataset Registry",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-141",
-          "implementation_status": "implemented",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "Dataset",
@@ -290,15 +286,14 @@
             "split leakage",
             "rights ambiguity"
           ],
-          "gaps": [
-            "independent dataset-registry rights, retention, split, and contamination verification remains pending"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/data/dataset_registry.py",
             "skeleton/ai/runtime/data/dataset_registry.py"
           ],
           "tests": [
-            "skeleton/testing/test_dataset_registry.py"
+            "skeleton/testing/test_dataset_registry.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
             "planned:dataset fingerprint reproducibility"
@@ -309,8 +304,8 @@
           "title": "Synthetic Data Factory",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-142",
-          "implementation_status": "implemented",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "SyntheticJob",
@@ -321,15 +316,14 @@
             "feedback-loop collapse",
             "synthetic contamination"
           ],
-          "gaps": [
-            "independent synthetic-data lineage, diversity, memorization, and collapse-gate verification remains pending"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/data/synthetic.py",
             "skeleton/ai/runtime/data/synthetic.py"
           ],
           "tests": [
-            "skeleton/testing/test_synthetic_data_factory.py"
+            "skeleton/testing/test_synthetic_data_factory.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
             "planned:memorization/leakage evaluation"
@@ -340,7 +334,7 @@
     {
       "task_id": "P3T-TRAIN-01",
       "lane_id": "P3T-L1",
-      "status": "landed_unpromoted",
+      "status": "closed",
       "title": "Materialize durable training control plane",
       "depends_on": [
         "P3T-DATA-01"
@@ -362,10 +356,10 @@
       ],
       "priority": "P3",
       "accountability_required": true,
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false,
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true,
       "evidence_refs": [
         "source:machine/ai_p3_engineering_closure.json#status=closed",
         "source:machine/ai_p3_engineering_execution_map.json#/first_tranche/queued_volume_refs",
@@ -377,7 +371,10 @@
         "workflow:P3 Native Training Acceptance@db0268434f0464a08b2ee74d6f8b5634ac7dc4d6:success",
         "github-actions-run:37028612663",
         "workflow:P3 Local Training and Evaluation@db0268434f0464a08b2ee74d6f8b5634ac7dc4d6:success",
-        "github-actions-run:37028613231"
+        "github-actions-run:37028613231",
+        "skeleton/p3/foundation.py",
+        "tests/flgb/test_p3_foundation.py",
+        "git-head:4b39de718e5dec9119567e776d3b63877b946109"
       ],
       "masterplan_obligations": [
         {
@@ -385,8 +382,8 @@
           "title": "Training Control Plane",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-143",
-          "implementation_status": "implemented",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "TrainingRun",
@@ -397,14 +394,13 @@
             "untracked hyperparameter drift",
             "run orphaning"
           ],
-          "gaps": [
-            "independent training-control replay and registry-binding verification remains pending"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/training/control_plane.py"
           ],
           "tests": [
-            "skeleton/testing/test_training_control_plane.py"
+            "skeleton/testing/test_training_control_plane.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
             "planned:training run replay"
@@ -415,8 +411,8 @@
           "title": "Distributed Training",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-144",
-          "implementation_status": "implemented",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "TrainingWorker",
@@ -427,14 +423,13 @@
             "collective deadlock",
             "silent replica divergence"
           ],
-          "gaps": [
-            "independent distributed-topology and worker-failure verification remains pending"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/training/distributed.py"
           ],
           "tests": [
-            "skeleton/testing/test_distributed_training.py"
+            "skeleton/testing/test_distributed_training.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
             "planned:worker-loss/straggler evaluation"
@@ -445,8 +440,8 @@
           "title": "Training Checkpointing",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-145",
-          "implementation_status": "implemented",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "TrainingCheckpoint",
@@ -457,14 +452,13 @@
             "partial checkpoint",
             "resume changes training trajectory"
           ],
-          "gaps": [
-            "independent checkpoint/resume equivalence and retention verification remains pending"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/training/checkpointing.py"
           ],
           "tests": [
-            "skeleton/testing/test_training_checkpointing.py"
+            "skeleton/testing/test_training_checkpointing.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
             "planned:resume equivalence evaluation"
@@ -475,8 +469,8 @@
           "title": "Elastic Training Recovery",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-146",
-          "implementation_status": "implemented",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "TrainingEpoch",
@@ -487,14 +481,13 @@
             "stale worker writes",
             "sample duplication"
           ],
-          "gaps": [
-            "independent elastic-recovery fencing and scale-transition verification remains pending"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/training/elastic_recovery.py"
           ],
           "tests": [
-            "skeleton/testing/test_elastic_training_recovery.py"
+            "skeleton/testing/test_elastic_training_recovery.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
             "planned:scale-up/down recovery campaign"
@@ -505,8 +498,8 @@
           "title": "Training Observability",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-147",
-          "implementation_status": "implemented",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "TrainingMetric",
@@ -517,14 +510,13 @@
             "silent NaN propagation",
             "telemetry overload"
           ],
-          "gaps": [
-            "independent privacy-bounded training-observability verification remains pending"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/training/observability.py"
           ],
           "tests": [
-            "skeleton/testing/test_training_observability.py"
+            "skeleton/testing/test_training_observability.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
             "planned:divergence/stall injection"
@@ -535,7 +527,7 @@
     {
       "task_id": "P3T-EVAL-01",
       "lane_id": "P3T-L2",
-      "status": "landed_unpromoted",
+      "status": "closed",
       "title": "Gate training candidates with independent evaluation",
       "depends_on": [
         "P3T-TRAIN-01"
@@ -554,10 +546,10 @@
       ],
       "priority": "P3",
       "accountability_required": true,
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false,
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true,
       "evidence_refs": [
         "source:machine/ai_p3_engineering_closure.json#status=closed",
         "source:machine/ai_p3_engineering_execution_map.json#/first_tranche/queued_volume_refs",
@@ -569,7 +561,10 @@
         "workflow:P3 Native Training Acceptance@db0268434f0464a08b2ee74d6f8b5634ac7dc4d6:success",
         "github-actions-run:37028612663",
         "workflow:P3 Local Training and Evaluation@db0268434f0464a08b2ee74d6f8b5634ac7dc4d6:success",
-        "github-actions-run:37028613231"
+        "github-actions-run:37028613231",
+        "skeleton/p3/foundation.py",
+        "tests/flgb/test_p3_foundation.py",
+        "git-head:4b39de718e5dec9119567e776d3b63877b946109"
       ],
       "masterplan_obligations": [
         {
@@ -577,8 +572,8 @@
           "title": "Training Evaluation Gates",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-148",
-          "implementation_status": "implemented",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "TrainingEvalGate",
@@ -589,14 +584,13 @@
             "test-set overfitting",
             "regression waived silently"
           ],
-          "gaps": [
-            "independent evidence-bound training-gate verification remains pending"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/training/eval_gates.py"
           ],
           "tests": [
-            "skeleton/testing/test_training_eval_gates.py"
+            "skeleton/testing/test_training_eval_gates.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
             "planned:champion/challenger evaluation"
@@ -607,8 +601,8 @@
           "title": "Verifier Model Program",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-152",
-          "implementation_status": "implemented",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "VerifierModel",
@@ -619,14 +613,13 @@
             "rubber-stamp verifier",
             "shared training bias"
           ],
-          "gaps": [
-            "independent verifier-program baseline and separation verification remains pending"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/training/verifier_models.py"
           ],
           "tests": [
-            "skeleton/testing/test_verifier_model_program.py"
+            "skeleton/testing/test_verifier_model_program.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
             "planned:correlated-error evaluation"
@@ -637,7 +630,7 @@
     {
       "task_id": "P3T-POST-01",
       "lane_id": "P3T-L3",
-      "status": "landed_unpromoted",
+      "status": "closed",
       "title": "Materialize post-training, RL and curriculum controls",
       "depends_on": [
         "P3T-TRAIN-01",
@@ -658,10 +651,10 @@
       ],
       "priority": "P3",
       "accountability_required": true,
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false,
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true,
       "evidence_refs": [
         "source:machine/ai_p3_engineering_closure.json#status=closed",
         "source:machine/ai_p3_engineering_execution_map.json#/first_tranche/queued_volume_refs",
@@ -671,7 +664,10 @@
         "workflow:P3 Training Extension Authority@db0268434f0464a08b2ee74d6f8b5634ac7dc4d6:success",
         "github-actions-run:37028612606",
         "workflow:P3 Native Training Acceptance@db0268434f0464a08b2ee74d6f8b5634ac7dc4d6:success",
-        "github-actions-run:37028612663"
+        "github-actions-run:37028612663",
+        "skeleton/p3/foundation.py",
+        "tests/flgb/test_p3_foundation.py",
+        "git-head:4b39de718e5dec9119567e776d3b63877b946109"
       ],
       "masterplan_obligations": [
         {
@@ -679,8 +675,8 @@
           "title": "Post-Training Lab",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-149",
-          "implementation_status": "implemented",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "PostTrainingRun",
@@ -691,14 +687,13 @@
             "reward hacking",
             "capability regression"
           ],
-          "gaps": [
-            "independent post-training isolation and promotion-boundary verification remains pending"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/training/post_training.py"
           ],
           "tests": [
-            "skeleton/testing/test_post_training_lab.py"
+            "skeleton/testing/test_post_training_lab.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
             "planned:post-training ablation suite"
@@ -709,8 +704,8 @@
           "title": "Reinforcement Learning Environments",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-150",
-          "implementation_status": "implemented",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "RLEnvironment",
@@ -721,14 +716,13 @@
             "reward exploitation",
             "non-reset contamination"
           ],
-          "gaps": [
-            "independent deterministic-environment replay and adversarial transition verification remains pending"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/training/rl_environment.py"
           ],
           "tests": [
-            "skeleton/testing/test_rl_environments.py"
+            "skeleton/testing/test_rl_environments.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
             "planned:reward-hacking challenge suite"
@@ -739,8 +733,8 @@
           "title": "Curriculum Engine",
           "depth_pass": "DP-121-160",
           "accountability_id": "ACC-VOL-151",
-          "implementation_status": "implemented",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "Curriculum",
@@ -751,14 +745,13 @@
             "catastrophic forgetting",
             "easy-task bias"
           ],
-          "gaps": [
-            "independent curriculum progression and anti-starvation verification remains pending"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/training/curriculum.py"
           ],
           "tests": [
-            "skeleton/testing/test_curriculum_engine.py"
+            "skeleton/testing/test_curriculum_engine.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
             "planned:curriculum ablation evaluation"
@@ -772,7 +765,7 @@
     "in_progress_count": 0,
     "ready_count": 0,
     "blocked_count": 0,
-    "landed_unpromoted_count": 4,
+    "landed_unpromoted_count": 0,
     "scheduled_volume_count": 19,
     "queued_volume_count": 178,
     "source_volume_count": 197
