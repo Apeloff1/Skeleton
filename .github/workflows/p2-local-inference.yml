@@ -28,6 +28,8 @@ on:
       - "skeleton/ai/runtime/chip8_machine.py"
       - "scripts/game/export_chip8.py"
       - "skeleton/testing/test_chip8_homebrew.py"
+      - "skeleton/app/offline_chip8_preview.py"
+      - "skeleton/testing/test_offline_chip8_preview.py"
       - "scripts/game/verify_target_completion.py"
       - "skeleton/testing/test_target_completion.py"
       - "scripts/game/accept_game_builds.py"
@@ -111,6 +113,8 @@ on:
       - "skeleton/ai/runtime/chip8_machine.py"
       - "scripts/game/export_chip8.py"
       - "skeleton/testing/test_chip8_homebrew.py"
+      - "skeleton/app/offline_chip8_preview.py"
+      - "skeleton/testing/test_offline_chip8_preview.py"
       - "scripts/game/verify_target_completion.py"
       - "skeleton/testing/test_target_completion.py"
       - "scripts/game/accept_game_builds.py"
@@ -225,6 +229,8 @@ jobs:
             skeleton/testing/test_game_build_acceptance.py \
             skeleton/testing/test_target_completion.py \
             skeleton/testing/test_chip8_homebrew.py \
+            skeleton/app/offline_chip8_preview.py \
+            skeleton/testing/test_offline_chip8_preview.py \
             skeleton/testing/test_game_playability.py \
             scripts/game/export_portable_c89.py \
             skeleton/testing/test_game_c89_export.py \
@@ -312,6 +318,7 @@ jobs:
           skeleton/testing/test_cross_era_game_rights.py
           skeleton/testing/test_game_playability.py
           skeleton/testing/test_chip8_homebrew.py
+          skeleton/testing/test_offline_chip8_preview.py
           skeleton/testing/test_target_completion.py
           skeleton/testing/test_game_build_acceptance.py
           skeleton/testing/test_game_c89_export.py
