@@ -80,8 +80,9 @@ def _prompt_suffix(citations: list[dict[str, Any]]) -> str:
         "If uncertain, say so. Source provision does not prove answer accuracy.",
     ]
     for citation in citations:
-        excerpt = citation["passage"][:MAX_EXCERPT_CHARS]
-        rows.append(f"[{citation['citation']}] {excerpt}")
+        # Manifest stores the exact bytes supplied to the model, not a
+        # longer source passage that was silently shortened while rendering.
+        rows.append(f"[{citation['citation']}] {citation['passage']}")
     return "\n".join(rows)
 
 
@@ -91,7 +92,15 @@ def prepare_evidence(question: str, request_digest: str, hits: list[dict[str, An
         raise RuntimeContractError("grounded turn requires user question")
     if not isinstance(hits, list) or not 1 <= len(hits) <= MAX_EVIDENCE_HITS:
         raise RuntimeContractError("no bounded local evidence available for grounding")
-    citations = [_citation(hit) for hit in hits]
+    citations = []
+    for hit in hits:
+        # Search verifies the full source chunk first. Record only the exact
+        # prefix that will actually be presented to the model, with truthful
+        # character offsets into the original SHA-pinned document.
+        excerpt = hit["passage"][:MAX_EXCERPT_CHARS]
+        selected = dict(hit, passage=excerpt,
+                        char_end=hit["char_start"] + len(excerpt))
+        citations.append(_citation(selected))
     if len({item["citation"] for item in citations}) != len(citations):
         raise RuntimeContractError("duplicate offline grounding source")
     context = _prompt_suffix(citations)
