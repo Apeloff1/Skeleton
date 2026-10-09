@@ -189,7 +189,28 @@ capped at 500 receipts per database. The source dataset is never edited.
 
 The comparison shows which observed capability-mode counts improved or
 regressed between the two most recent reports for the same model tag and
-source-manifest identity. This is **descriptive performance tracking**, not
+source-manifest identity.
+
+For the **next small training allocation**, the stored aggregate can
+prioritize previously weak modes without retaining a validation prediction
+file:
+
+\`\`\`sh
+PYTHONPATH=. python scripts/training/sparse_capability.py \
+  --profile consumer \
+  --focus-ledger ./capability-history.sqlite \
+  --model-tag candidate-v1 \
+  --export ./focused-active-48.txt
+\`\`\`
+
+The ledger must already contain a valid result for that exact model tag
+and unchanged dataset manifest. It cannot invent a missing report. Only
+the **second** example for weak modes is reprioritized; one training
+example for each of the 36 modes remains mandatory. The first 36 active
+records, source-bank size and zero-heldout-training invariant are
+preserved. A better score is not evidence of broad generalization.
+
+ This is **descriptive performance tracking**, not
 a scientific claim of generalization or statistical significance:
 validation has only three prompts per mode, tasks share templates, and
 the ledger is unsigned. A local attacker who controls SQLite and its
