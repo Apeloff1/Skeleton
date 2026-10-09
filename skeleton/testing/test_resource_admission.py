@@ -255,3 +255,34 @@ def test_resource_probe_never_uses_an_external_shell_or_network():
     assert "os.system(" not in code
     assert "urllib" not in code
     assert "requests." not in code
+
+
+def test_macos_physical_memory_alone_never_impersonates_available_memory():
+    observation = observe_resources(
+        platform="darwin",
+        cpu_count=lambda: 16,
+        sysconf=lambda name: (
+            8 * 1024 * 1024 if name == "SC_PHYS_PAGES" else 4096
+        ),
+    )
+    assert observation.physical_ram_bytes == 32 * GIB
+    # Physical RAM does not establish free RAM; stay sparse conservatively.
+    assert observation.available_ram_bytes is None
+    assert select_sparse_profile(observation)["selected_profile"] == "low-memory"
+    assert select_sparse_profile(observation)["training_record_limit"] == 36
+
+
+def test_linux_physical_ram_without_free_estimate_is_not_a_workstation_signal():
+    observed = observe_resources(
+        platform="linux",
+        read_text=lambda path: (
+            "MemTotal: 33554432 kB\n" if path == "/proc/meminfo"
+            else (_ for _ in ()).throw(FileNotFoundError(path))
+        ),
+        cpu_count=lambda: 32,
+        cpu_affinity=lambda: 32,
+        sysconf=lambda _: None,
+    )
+    assert observed.physical_ram_bytes == 32 * GIB
+    assert observed.available_ram_bytes is None
+    assert select_sparse_profile(observed)["training_record_limit"] == 36
