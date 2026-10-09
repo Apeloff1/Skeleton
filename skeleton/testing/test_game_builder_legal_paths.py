@@ -233,8 +233,9 @@ def test_material_validation_rejects_unsupported_rights_category():
         MaterialRecord("malicious", "bios_rom", MaterialKind.ORIGINAL_EXPRESSION, EXPRESSION)
     with pytest.raises(HomebrewPolicyError):
         MaterialRecord("duplicated", "art", MaterialKind.ORIGINAL_EXPRESSION, "invalid")
+    duplicated = MaterialRecord("duplicated", "art", MaterialKind.ORIGINAL_EXPRESSION, EXPRESSION)
     with pytest.raises(HomebrewPolicyError):
-        request(material=MaterialRecord("a", "art", MaterialKind.ORIGINAL_EXPRESSION, EXPRESSION),)
+        replace(request(), materials=(duplicated, duplicated))
 
 
 def test_proprietary_adaptation_never_certifies_release_even_if_assertions_are_positive():
