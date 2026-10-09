@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import redirect_stdout
+from io import StringIO
 import json
 from pathlib import Path
 import tempfile
@@ -104,6 +106,33 @@ class TestOfflineDesktopAI(unittest.TestCase):
             with patch.object(Path, "open", side_effect=AssertionError("must not read oversized file")):
                 with self.assertRaises(LocalModelArtifactError):
                     load_native_checkpoint(path)
+
+    def test_headless_app_cli_executes_native_model_without_docker(self):
+        from skeleton.app.cli import run_app_cli
+
+        with tempfile.TemporaryDirectory() as directory:
+            model_path = Path(directory) / "local.json"
+            write_local_model_artifact(backend(), model_path)
+            output = StringIO()
+            with redirect_stdout(output):
+                status = run_app_cli([
+                    "local-ai", "--model", str(model_path), "--prompt", "hello",
+                    "--max-output-tokens", "2", "--json",
+                ])
+            self.assertEqual(status, 0, output.getvalue())
+            payload = json.loads(output.getvalue())
+            self.assertTrue(payload["text"])
+            self.assertEqual(len(payload["execution_receipt_digest"]), 64)
+            self.assertEqual(payload["output_tokens"], 2)
+
+    def test_headless_inference_requires_explicit_model_and_prompt(self):
+        from skeleton.app.cli import run_app_cli
+
+        output = StringIO()
+        with redirect_stdout(output):
+            status = run_app_cli(["local-ai", "--prompt", "hello"])
+        self.assertEqual(status, 2)
+        self.assertIn("requires both", output.getvalue())
 
     def test_symlink_artifact_refused(self):
         with tempfile.TemporaryDirectory() as directory:
