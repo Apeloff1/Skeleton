@@ -77,6 +77,7 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--benchmark-suite", help="strict offline multi-category native model evaluation JSON")
     local_ai.add_argument("--exclude-train-corpus", help="reject benchmark cases copied from a specified local training text")
     local_ai.add_argument("--protect-suite", help="require an independent category benchmark pass before publishing trained weights")
+    local_ai.add_argument("--replay-improvement", help="verify JSON receipt by regenerating exact native weights in temporary storage")
 
     local_ai.add_argument("--output-model", help="new native checkpoint filename for --train-corpus")
     local_ai.add_argument("--epochs", type=int, default=1, help="bounded native CPU training passes (1-4)")
@@ -230,12 +231,41 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if command == "local-ai":
         from skeleton.app.local_ai import OfflineAISession, inspect_local_model, load_native_checkpoint, run_offline_ai
 
+        if args.replay_improvement:
+            if (
+                not args.compare_model or not args.candidate_model
+                or not args.train_corpus or not args.eval_corpus
+                or args.model or args.prompt or args.inspect_model
+                or args.output_model or args.load_chat or args.save_chat
+                or args.improve_model or args.benchmark_suite
+                or args.exclude_train_corpus
+            ):
+                print("replay requires --compare-model parent, --candidate-model, --train-corpus and --eval-corpus")
+                return 2
+            from skeleton.app.local_ai_replay import replay_local_improvement
+
+            try:
+                evidence = replay_local_improvement(
+                    args.replay_improvement, args.compare_model,
+                    args.candidate_model, args.train_corpus, args.eval_corpus,
+                    protected_suite=args.protect_suite,
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local-ai reproduction rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(evidence, sort_keys=True, ensure_ascii=False))
+            else:
+                print("Native model improvement reproduced: " + evidence["candidate_model_digest"])
+                print("Recorded artifact SHA256: " + evidence["replayed_artifact_sha256"])
+                print("No deployment promotion or independent quality certification")
+            return 0
         if args.benchmark_suite:
             if (
                 not args.model or args.prompt or args.inspect_model
                 or args.compare_model or args.improve_model or args.train_corpus
                 or args.eval_corpus or args.output_model or args.load_chat
-                or args.save_chat or args.protect_suite
+                or args.save_chat or args.protect_suite or args.replay_improvement
             ):
                 print("local-ai --benchmark-suite requires --model and optional --candidate-model only")
                 return 2
@@ -267,7 +297,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         if args.exclude_train_corpus:
             print("--exclude-train-corpus requires --benchmark-suite")
             return 2
-        if args.protect_suite and not args.improve_model:
+        if args.protect_suite and not args.improve_model and not args.replay_improvement:
             print("--protect-suite requires incremental --improve-model")
             return 2
         if args.compare_model or args.candidate_model:
@@ -302,7 +332,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 not args.train_corpus or not args.eval_corpus or not args.output_model
                 or args.model or args.prompt or args.inspect_model
                 or args.load_chat or args.save_chat
-                or args.compare_model or args.candidate_model or args.benchmark_suite
+                or args.compare_model or args.candidate_model or args.benchmark_suite or args.replay_improvement or args.replay_improvement
             ):
                 print("local-ai improvement requires --improve-model, --train-corpus, --eval-corpus and --output-model only")
                 return 2
