@@ -8,11 +8,16 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from hashlib import sha256
 from pathlib import Path
 from queue import Empty, Queue
+import secrets
 import threading
 from typing import Any
 
+from skeleton.ai.model_runtime.chat_protocol import ChatMessage, ChatTranscript
+from skeleton.ai.model_runtime.offline_chat import OfflineChatStore
+from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig, RuntimeContractError
 from skeleton.ai.runtime.inference.artifact import load_local_model_artifact
 from skeleton.ai.runtime.inference.local import LocalInferenceRequest, LocalInferenceResult, LocalInferenceEngine
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
@@ -119,6 +124,151 @@ class OfflineAISession:
             input_tokens=result.input_tokens,
             output_tokens=result.output_tokens,
         )
+
+
+class DurableOfflineAISession(OfflineAISession):
+    """Durable desktop adapter; the existing canonical inference backend stays owner.
+
+    LocalInferenceEngine still executes/cancels each turn. The native
+    OfflineChatStore alone owns the transcript, version CAS, and durable
+    receipts. The app shell can never silently substitute a different model.
+    """
+
+    def __init__(self, backend: NativeRuntimeLocalModel, *,
+                 database: str | Path, session_id: str | None = None) -> None:
+        super().__init__(backend)
+        self.store = OfflineChatStore(database)
+        self._busy_lock = threading.Lock()
+        self._busy = False
+        try:
+            if session_id is None:
+                existing = self.store.list_sessions(
+                    backend.model_digest, backend.tokenizer_digest, limit=1
+                )
+                session_id = existing[0][0] if existing else self.store.create(
+                    backend.model_digest, backend.tokenizer_digest
+                )
+            self.session_id = session_id
+            self._restore()
+        except BaseException:
+            self.store.close()
+            raise
+
+    def _restore(self) -> None:
+        record = self.store.load(
+            self.session_id, self.backend.model_digest, self.backend.tokenizer_digest
+        )
+        messages = record.transcript.messages
+        # This UI is intentionally simple: only full user/assistant pairs,
+        # never an orphan message or privileged role recovered from disk.
+        if len(messages) % 2 or any(
+            message.role != ("user" if index % 2 == 0 else "assistant")
+            or not message.content.strip()
+            for index, message in enumerate(messages)
+        ):
+            raise OfflineAIError("desktop conversation contains invalid dialogue history")
+        self.history = tuple((m.role, m.content) for m in messages)
+
+    def create_conversation(self) -> str:
+        if self._busy:
+            raise OfflineAIError("cannot switch conversation during generation")
+        self.session_id = self.store.create(
+            self.backend.model_digest, self.backend.tokenizer_digest
+        )
+        self.history = ()
+        return self.session_id
+
+    def resume(self, session_id: str) -> None:
+        if self._busy:
+            raise OfflineAIError("cannot resume conversation during generation")
+        previous = self.session_id
+        history = self.history
+        self.session_id = session_id
+        try:
+            self._restore()
+        except BaseException:
+            self.session_id = previous
+            self.history = history
+            raise
+
+    def list_conversations(self) -> tuple[tuple[str, int], ...]:
+        return self.store.list_sessions(
+            self.backend.model_digest, self.backend.tokenizer_digest
+        )
+
+    def delete_conversation(self, session_id: str) -> None:
+        if self._busy:
+            raise OfflineAIError("cannot delete conversation during generation")
+        self.store.delete(
+            session_id, self.backend.model_digest, self.backend.tokenizer_digest
+        )
+        if session_id == self.session_id:
+            self.create_conversation()
+
+    async def ask(self, prompt: str, *, max_output_tokens: int = 32) -> OfflineAnswer:
+        with self._busy_lock:
+            if self._busy:
+                raise OfflineAIError("a local generation is already running")
+            self._busy = True
+        previous_history = self.history
+        try:
+            # Recheck durable authority immediately before inference so a
+            # concurrent process cannot silently rewrite the prior context.
+            saved = self.store.load(
+                self.session_id, self.backend.model_digest, self.backend.tokenizer_digest
+            )
+            if tuple((m.role, m.content) for m in saved.transcript.messages) != previous_history:
+                raise OfflineAIError("conversation changed on disk; reload before retry")
+            answer = await super().ask(prompt, max_output_tokens=max_output_tokens)
+            transcript = ChatTranscript(tuple(
+                ChatMessage(role, content) for role, content in self.history
+            ))
+            transcript.validate_turn_order()
+            # The desktop adapter records generated text identity separately
+            # from the canonical inference execution receipt shown to users.
+            text_digest = sha256(answer.text.encode("utf-8")).hexdigest()
+            # GenerationConfig matches the actual local request's seed and
+            # bounded output budget; random IDs avoid accidental replay.
+            config = GenerationConfig(max_new_tokens=max_output_tokens)
+            from skeleton.ai.model_runtime.offline_chat import _digest_request
+            self.store.commit(
+                session=saved,
+                request_id=secrets.token_urlsafe(18),
+                request_digest=_digest_request(prompt.strip(), config),
+                transcript=transcript,
+                text=answer.text,
+                output_digest=text_digest,
+                prompt_tokens=answer.input_tokens,
+                generated_tokens=answer.output_tokens,
+            )
+            return answer
+        except BaseException:
+            # Discard uncommitted in-memory content even when inference itself
+            # succeeded but SQLite CAS/disk storage failed.
+            self.history = previous_history
+            raise
+        finally:
+            with self._busy_lock:
+                self._busy = False
+
+    def close(self) -> None:
+        if self._busy:
+            raise OfflineAIError("cannot close active local generation")
+        self.store.close()
+
+
+def private_desktop_database(model_digest: str) -> Path:
+    """Per-model owner-only local data directory, no network or cloud paths."""
+    if (not isinstance(model_digest, str) or len(model_digest) != 64
+            or any(c not in "0123456789abcdef" for c in model_digest)):
+        raise OfflineAIError("invalid model identity for local conversation store")
+    folder = Path.home() / ".skeleton" / "offline-ai"
+    if folder.is_symlink():
+        raise OfflineAIError("offline data directory must not be a symlink")
+    folder.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if folder.is_symlink():
+        raise OfflineAIError("offline data directory must not be a symlink")
+    return folder / (model_digest + ".sqlite3")
 
 
 class OfflineAIWindow:
