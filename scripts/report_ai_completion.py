@@ -125,7 +125,7 @@ def audit_ai_delivery(root: Path = ROOT) -> dict[str, Any]:
             "note": "No end-to-end shipped installer, trained model quality, and operation acceptance is proven by the volume signing ledger.",
         },
         "whole_project_completion_percent": None,
-        "ready_for_full_completion": not errors and False,
+        "ready_for_full_completion": False,  # no independent full-release evidence in these sources
         "open_obligations": errors,
     }
 
