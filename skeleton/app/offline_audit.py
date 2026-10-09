@@ -9,6 +9,7 @@ creating/changing any tables.
 from __future__ import annotations
 
 import hashlib
+from contextlib import closing
 import json
 import math
 import os
@@ -202,7 +203,7 @@ def audit_database(path: str | Path, kind: str) -> dict[str, Any]:
         raise OfflineAuditError("unknown offline audit data domain")
     source = _admit(path)
     try:
-        with sqlite3.connect(source.as_uri() + "?mode=ro", uri=True, timeout=10) as conn:
+        with closing(sqlite3.connect(source.as_uri() + "?mode=ro", uri=True, timeout=10)) as conn:
             conn.execute("PRAGMA query_only=ON")
             conn.execute("BEGIN")
             if conn.execute("PRAGMA integrity_check").fetchone() != ("ok",):
