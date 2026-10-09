@@ -167,6 +167,41 @@ class OriginalityReport:
     release_permitted: bool = False
     independent_human_signoff_complete: bool = False
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.project_id, str) or not _ID.fullmatch(self.project_id):
+            raise OriginalityError("invalid originality report project")
+        if any(not isinstance(v, str) or not _SHA.fullmatch(v) for v in (
+            self.candidate_sha256, self.reference_corpus_sha256, self.screen_digest,
+        )):
+            raise OriginalityError("unsigned/invalid originality content identifier")
+        if self.artifact_sha256 is not None and (
+            not isinstance(self.artifact_sha256, str) or not _SHA.fullmatch(self.artifact_sha256)
+        ):
+            raise OriginalityError("report artifact SHA-256 is malformed")
+        if (
+            self.legal_originality_certified is not False
+            or self.release_permitted is not False
+            or self.independent_human_signoff_complete is not False
+        ):
+            raise OriginalityError("automated originality report cannot grant legal/release certification")
+        if not isinstance(self.disposition, OriginalityDisposition) or (
+            set(self.class_coverage) != _ASSET_CLASSES
+        ):
+            raise OriginalityError("incomplete or invalid originality status")
+        actionable = set(self.review_issues) - {
+            "NONEXHAUSTIVE_SIMILARITY_CORPUS_AND_HUMAN_RELEASE_REVIEW_REQUIRED"
+        }
+        if self.blockers and self.disposition is not OriginalityDisposition.BLOCKED:
+            raise OriginalityError("plagiarism blockers cannot be downgraded")
+        if not self.blockers and (actionable or self.overlap_findings or
+                                  self.media_overlap_findings or self.unexamined_external_media):
+            if self.disposition is not OriginalityDisposition.HUMAN_REVIEW_REQUIRED:
+                raise OriginalityError("unresolved expressive similarities cannot be marked admissible")
+        if not self.blockers and not (actionable or self.overlap_findings or
+                                     self.media_overlap_findings or self.unexamined_external_media):
+            if self.disposition is not OriginalityDisposition.DESIGN_ADMISSIBLE_NOT_LEGAL_CLEARANCE:
+                raise OriginalityError("unexpected fail-open or fail-closed originality transition")
+
     @property
     def design_admissible(self) -> bool:
         return self.disposition is OriginalityDisposition.DESIGN_ADMISSIBLE_NOT_LEGAL_CLEARANCE
