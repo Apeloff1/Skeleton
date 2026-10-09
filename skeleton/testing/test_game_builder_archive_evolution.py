@@ -227,3 +227,35 @@ def test_evolution_gameplay_rejects_mismatched_and_overbudget_campaigns():
         practice_evolution_games(original, replace(plan, original_project_id="wrong-project"), authorized=True)
     with pytest.raises(GameEvolutionError):
         practice_evolution_games(original, plan, authorized=True, maximum_stages=2)
+
+
+def test_preconsole_archive_preserves_category_and_first_year_without_fake_emulator():
+    registry = default_registry()
+    assert len(registry.profiles) >= 520
+    patent = registry.get("crt_amusement_device_1947")
+    assert patent.kind == "precursor"
+    assert patent.archive_disposition == "patent_concept"
+    assert patent.first_year_candidate == 1947
+    assert patent.verified_for_native_export is False
+    ancient = registry.get("gottlieb_baffle_ball")
+    assert ancient.kind == "mechanical"
+    assert ancient.first_year_candidate == 1931
+    arcade = registry.get("sega_periscope_em")
+    assert arcade.kind == "electromechanical"
+    assert arcade.preset == "em_arcade"
+    archive = default_evolution_archive()
+    assert archive.get("gottlieb_baffle_ball").year == 1931
+    assert archive.get("atari_arcade_pong").year == 1972
+    assert tuple(n.platform_id for n in archive.progress(
+        "atari_arcade_pong", "atari_home_pong",
+    )) == ("atari_arcade_pong", "atari_home_pong")
+
+
+def test_ancient_mechanical_game_can_inspire_rights_cleared_modern_design():
+    from skeleton.ai.game_builder.port_planner import PortMode, PortRequest, compile_port
+    source = homebrew("gottlieb_baffle_ball")
+    blueprint = compile_port(PortRequest((source,), "windows_modern", PortMode.ENHANCED))
+    assert "visual_upgrade" in {a.phase for a in blueprint.actions}
+    assert "simulation_upgrade" in {a.phase for a in blueprint.actions}
+    assert blueprint.native_build_verified is False
+    assert blueprint.releasable is False
