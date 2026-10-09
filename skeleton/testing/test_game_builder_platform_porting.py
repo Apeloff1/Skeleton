@@ -288,16 +288,17 @@ def test_native_desktop_exports_a_exact_three_level_replay_without_html() -> Non
 def test_editor_distinguishes_real_native_source_generation_from_certified_binaries():
     form = editor_platform_form()
     assert form["native_source_project_destinations"] == [
-        "linux_desktop", "macos_modern", "nintendo_famicom", "nintendo_game_boy", "windows_modern",
+        "commodore_64", "linux_desktop", "macos_modern", "nintendo_famicom", "nintendo_game_boy", "windows_modern",
     ]
-    assert form["source_export_status"] == "three_desktop_c11_and_two_original_console_rom_source_projects"
+    assert form["source_export_status"] == "three_desktop_c11_two_rom_and_one_c64_6510_native_source_projects"
     assert form["export_status"] == "no_native_target_verified"
     native = {option["id"]: option for option in form["target_options"]}
     for target in form["native_source_project_destinations"]:
         option = native[target]
         assert option["native_source_project_available"] is True
         assert option["native_source_project_kind"] == (
-            "rgbds_dmg_2bpp_rom_source" if target == "nintendo_game_boy"
+            "cc65_6510_vic_ii_sid_prg_source" if target == "commodore_64"
+            else "rgbds_dmg_2bpp_rom_source" if target == "nintendo_game_boy"
             else "ca65_nrom256_2bpp_rom_source" if target == "nintendo_famicom"
             else "sdl2_c11_cmake"
         )
@@ -309,6 +310,6 @@ def test_editor_distinguishes_real_native_source_generation_from_certified_binar
         assert native[target]["native_source_project_available"] is False
         assert native[target]["native_source_project_kind"] is None
     route = editor_portability_context("nec_pc_fx")
-    assert route["native_source_project_destination_count"] == 5
+    assert route["native_source_project_destination_count"] == 6
     assert route["native_export_destination_count"] == 0
-    assert sum(option["native_source_project_available"] for option in route["targets"]) == 5
+    assert sum(option["native_source_project_available"] for option in route["targets"]) == 6
