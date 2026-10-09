@@ -100,15 +100,40 @@ def _no_follow() -> int:
 
 
 def _open_directory(path: Path) -> int:
+    """Open every ancestor through a no-follow directory descriptor."""
+    path = Path(path)
+    if any(part == ".." for part in path.parts) or len(path.parts) > 40:
+        raise NativeIntakeError("untrusted ancestor traversal in native evidence path")
+    initial = "/" if path.is_absolute() else "."
     try:
-        return os.open(path, os.O_RDONLY | os.O_DIRECTORY | _no_follow())
+        handle = os.open(initial, os.O_RDONLY | os.O_DIRECTORY | _no_follow())
     except OSError as exc:
-        raise NativeIntakeError("cannot open an authorized native project directory") from exc
+        raise NativeIntakeError("cannot open authorized evidence workspace") from exc
+    try:
+        for part in path.parts:
+            if part in ("/", ".", ""):
+                continue
+            next_handle = os.open(
+                part, os.O_RDONLY | os.O_DIRECTORY | _no_follow(), dir_fd=handle
+            )
+            os.close(handle)
+            handle = next_handle
+        return handle
+    except OSError as exc:
+        os.close(handle)
+        raise NativeIntakeError("symlinked or missing evidence ancestor directory") from exc
 
 
 def _read_bounded(path: Path, *, max_bytes: int, root_fd: int | None = None) -> bytes:
-    """Open through directory handles, excluding symlinks and nonregular files."""
+    """Open through no-follow directory handles, excluding nonregular files."""
     path = Path(path)
+    if root_fd is None:
+        parent_handle = _open_directory(path.parent)
+        try:
+            return _read_bounded(Path(path.name), max_bytes=max_bytes,
+                                 root_fd=parent_handle)
+        finally:
+            os.close(parent_handle)
     if root_fd is not None and (
         path.is_absolute() or len(path.parts) != 1 or path.name in {"", ".", ".."}
     ):
