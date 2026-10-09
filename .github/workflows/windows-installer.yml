@@ -315,6 +315,38 @@ jobs:
             throw "installed generated-game digest was nondeterministic"
           }
 
+          # Unlike a GUI window smoke in headless CI, this runs the exact
+          # native preview engine from the installed EXE and must actually
+          # play a complete seeded game to its goal twice, identically.
+          $headlessGameRaw = & $offline --game-preview-check --game-seed 1729 --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed frozen native gameplay replay acceptance failed"
+          }
+          $headlessGame = $headlessGameRaw | ConvertFrom-Json
+          if (-not $headlessGame.terminal_won -or
+              -not $headlessGame.replay_deterministic -or
+              -not $headlessGame.source_level_goal_reachable -or
+              $headlessGame.frames_verified -lt 16 -or
+              $headlessGame.frames_verified -gt 32 -or
+              $headlessGame.training_examples_added -ne 0 -or
+              $headlessGame.model_inference_used -or
+              $headlessGame.installed_tk_display_verified -or
+              $headlessGame.native_display_opened) {
+            throw "installed native preview did not satisfy deterministic playable-game contract"
+          }
+          $headlessGameRepeatRaw = & $offline --game-preview-check --game-seed 1729 --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed native preview second replay failed"
+          }
+          $headlessGameRepeat = $headlessGameRepeatRaw | ConvertFrom-Json
+          if ($headlessGameRepeat.replay_sha256 -ne $headlessGame.replay_sha256) {
+            throw "installed native preview replay changed across independent processes"
+          }
+          $null = & $offline --game-preview-check --game-seed -1 --json 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            throw "installed native preview replay accepted an invalid seed"
+          }
+
           # The typed graph can feed the generated tilemap into the compiler
           # and simulator without shell execution or adding training rows.
           $gameGraph = Join-Path $env:RUNNER_TEMP "SkeletonOfflineGameplayGraph.json"
