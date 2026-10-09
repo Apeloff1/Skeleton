@@ -33,3 +33,59 @@ python -m unittest tests.flgb.test_flgb_02_tokenization_pipeline -v
 python -m unittest tests.flgb.test_flgb_02_native_llm_runtime -v
 python -m unittest discover -s tests/flgb -p 'test_flgb_02_*.py' -v
 ```
+
+## Bounded serving-control preflight and observations
+
+The deterministic SLO resource planner caps prefill chunk materialization to
+`max_prefill_chunks` (default 4096). Inputs that exceed the bound return a
+fail-closed `prefill_chunk_limit_exceeded` decision with no chunk allocation
+and zero claimed KV reservation. A `ResourcePlan` is **not** a KV allocation;
+serving callers must verify `admitted`, then independently enforce runtime
+limits before generation. The plan digest binds planner configuration.
+
+The EWMA runtime estimator rejects repeated request identities within a
+bounded recent-identity window of `max_samples`. This is a recent-replay
+fence, **not** cross-process exactly-once storage. Deployments need durable
+request deduplication before accepting retried observations. Serving telemetry
+windows have finite record capacity and reject new records when full rather
+than silently dropping old SLO evidence. An operator should rotate or persist
+the window explicitly and preserve its digest. These mechanisms grant no
+model execution, provider credentials, network, or release-promotion authority.
+
+Focused regression:
+
+```bash
+python -m unittest tests.flgb.test_serving_control_adversarial_boundaries -v
+python -m unittest tests.flgb.test_slo_planner tests.flgb.test_runtime_feedback tests.flgb.test_serving_telemetry tests.flgb.test_closed_loop_serving -v
+```
+
+This evidence does not independently qualify FLGB-02 or sign a masterplan volume.
+
+## Explicit feedback checkpoint and restart recovery
+
+`DeterministicRuntimeEstimator.checkpoint()` returns an operator-managed JSON
+record with a version tag, estimator configuration, learned estimate, sample
+counts, bounded recent identities, and a deterministic SHA-256 digest.
+`DeterministicRuntimeEstimator.from_checkpoint(record)` rejects unknown fields,
+missing fields, invalid primitive types, negative counts, mismatched identity
+horizons, duplicate identities, incompatible limits, and modified digests.
+Restored controllers retain the previous estimate and recent replay fence.
+
+The digest detects accidental or unsophisticated modification but **does not
+authenticate a publisher**. Production callers must arrange trusted, atomic
+persistence and independent source authentication. A checkpoint does not grant
+serving authority, and this in-process replay fence does not replace a durable
+cross-worker idempotency ledger. Controlled rollback must be explicit.
+
+## Evidence digest input binding
+
+SLO plan v2 digests cover planner policy **and** the input prompt count,
+forecast, performance objectives, KV capacity/occupancy and queue pressure.
+A successful decision from a stale pressure snapshot cannot be substituted for
+a new decision with matching aggregate output fields. Serving telemetry v2
+binds metric thresholds and a canonical digest of sorted individual
+observations (request identity, latency, tokens and prefix reuse), preventing
+summaries of different cohorts from being treated as identical evidence.
+Raw telemetry identifiers must remain in a governed data store; the exported
+metrics expose only the observation digest. No cryptographic source authenticity
+is implied by hashing.

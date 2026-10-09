@@ -335,6 +335,59 @@ class TestNativeModelService(unittest.TestCase):
         with self.assertRaises(NativeServiceError):
             service.execute(request, "alpha", config)
 
+    def test_midstream_tokenizer_rejection_emits_no_generated_output(self):
+        from unittest.mock import patch
+        from skeleton.ai.model_runtime.tokenization import TokenizerContractError
+        from skeleton.ai.model_runtime.runtime_contracts import RuntimeEvent
+
+        service = NativeModelService(self.runtime())
+        config = GenerationConfig(max_new_tokens=2)
+        request = service.request("midstream-tokenizer", "alpha", config, deadline_ms=1000)
+
+        def rejected_stream(*args, **kwargs):
+            yield RuntimeEvent(sequence=0, kind="token", token_id=1)
+            raise TokenizerContractError("stream tokenizer rejected")
+
+        with patch.object(service.runtime, "stream", side_effect=rejected_stream):
+            result = service.execute(request, "alpha", config)
+        self.assertEqual(result.receipt.terminal_reason, "model_error")
+        self.assertIsNone(result.generation)
+        self.assertIsNone(result.receipt.output_digest)
+        self.assertEqual(result.events, ())
+        self.assertEqual(len(result.receipt.usage_digest), 64)
+
+    def test_tokenizer_mutation_rejected_at_service_admission(self):
+        from unittest.mock import patch
+        from skeleton.ai.model_runtime.tokenization import TokenizerContractError
+
+        service = NativeModelService(self.runtime())
+        config = GenerationConfig(max_new_tokens=1)
+        request = service.request("tokenizer-mutation", "alpha", config, deadline_ms=1000)
+        with patch.object(
+            service.runtime.tokenizer,
+            "assert_unchanged",
+            side_effect=TokenizerContractError("vocabulary drift"),
+        ):
+            with self.assertRaisesRegex(
+                NativeServiceError, "tokenizer identity changed after admission"
+            ) as caught:
+                service.execute(request, "alpha", config)
+        self.assertIsInstance(caught.exception.__cause__, TokenizerContractError)
+
+    def test_falsey_invalid_cancellation_handle_is_rejected(self):
+        from unittest.mock import patch
+
+        service = NativeModelService(self.runtime())
+        config = GenerationConfig(max_new_tokens=1)
+        request = service.request("invalid-cancellation", "alpha", config, deadline_ms=1000)
+        with patch.object(service.runtime, "stream", side_effect=AssertionError("generated")):
+            for invalid in (False, 0, "", (), []):
+                with self.subTest(invalid=repr(invalid)):
+                    with self.assertRaisesRegex(
+                        NativeServiceError, "CancellationToken required"
+                    ):
+                        service.execute(request, "alpha", config, cancellation=invalid)
+
     def test_clock_contract_fails_closed(self):
         service = NativeModelService(self.runtime(), clock_ns=lambda: -1)
         config = GenerationConfig(max_new_tokens=1, temperature=0.0)
