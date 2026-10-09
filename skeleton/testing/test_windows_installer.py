@@ -228,3 +228,21 @@ def test_installed_frozen_console_qualifies_two_local_inference_turns() -> None:
     assert "DurableOfflineSession" in source
     assert "TemporaryDirectory" in source
     assert '"trained_model_quality_verified": False' in source
+
+
+def test_installed_offline_capability_engine_is_bundled_and_actually_exercised():
+    workflow = Path(".github/workflows/windows-installer.yml").read_text("utf-8")
+    build = Path("scripts/windows/build_installer.ps1").read_text("utf-8")
+    cli = Path("skeleton/app/offline_cli.py").read_text("utf-8")
+
+    assert '"skeleton.ai.runtime.deterministic_capabilities"' in build
+    assert "& $offline --capability-list --json" in workflow
+    assert "$capabilityCatalog.operations.Count -ne 24" in workflow
+    assert "& $offline --capability-file $capabilityTask --json" in workflow
+    assert '$capabilityReport.result.steps -ne 5' in workflow
+    assert "$capabilityReport.model_inference_used" in workflow
+    assert "$capabilityReport.network_access_used" in workflow
+    assert "duplicate JSON" in workflow
+    assert "args.capability_file" in cli
+    assert "execute_capability_json" in cli
+    assert "stat.S_ISREG" in cli
