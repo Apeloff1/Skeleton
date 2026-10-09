@@ -1,0 +1,68 @@
+name: Game Builder Native NES ROM
+
+on:
+  pull_request:
+    paths:
+      - 'skeleton/ai/game_builder/**'
+      - 'scripts/game_builder/native_nes_ci.py'
+      - '.github/workflows/game-builder-native-nes.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: game-builder-nes-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-nes-game:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /skeleton/__init__.py
+            /skeleton/ai/__init__.py
+            /skeleton/ai/capability_map.py
+            /skeleton/ai/game_builder/
+            /scripts/game_builder/native_nes_ci.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install open-source real 6502 native assembler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cc65 make
+          ca65 --version
+          ld65 --version
+      - name: Compile source-authored worlds to real NES iNES ROM
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          python scripts/game_builder/native_nes_ci.py --emit nes-world-src > nes-source-evidence.json
+          make -C nes-world-src
+          test -s nes-world-src/build/skeleton-original.nes
+          python scripts/game_builder/native_nes_ci.py --verify-rom nes-world-src/build/skeleton-original.nes > nes-compiled-rom-verification.json
+          python - <<'PY'
+          import json
+          result=json.load(open("nes-compiled-rom-verification.json", encoding="utf-8"))
+          assert result["ines_header_verified"] and result["mapper_0_prg_chr_verified"]
+          assert not result["emulator_playthrough_verified"]
+          print("Compiled genuine native NES cartridge", result["sha256"])
+          PY
+      - name: Save ROM with provenance and reproducible build source
+        uses: actions/upload-artifact@v4
+        with:
+          name: skeleton-original-playable-nes-cartridge
+          path: |
+            nes-world-src/build/skeleton-original.nes
+            nes-world-src/manifest.json
+            nes-compiled-rom-verification.json
+            nes-source-evidence.json
+          if-no-files-found: error
+          retention-days: 7
