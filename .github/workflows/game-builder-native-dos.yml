@@ -5,6 +5,7 @@ on:
     paths:
       - 'skeleton/ai/game_builder/**'
       - 'scripts/game_builder/native_dos_ci.py'
+      - 'scripts/game_builder/emulate_dos_ci.py'
       - '.github/workflows/game-builder-native-dos.yml'
   workflow_dispatch:
 
@@ -18,7 +19,7 @@ concurrency:
 jobs:
   original-8086-game:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,6 +31,7 @@ jobs:
             /skeleton/ai/capability_map.py
             /skeleton/ai/game_builder/
             /scripts/game_builder/native_dos_ci.py
+            /scripts/game_builder/emulate_dos_ci.py
             /skeleton/testing/test_game_builder_dos_native.py
       - uses: actions/setup-python@v5
         with:
@@ -62,6 +64,24 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check "pytest>=8.4,<9"
           python -m pytest -q --noconftest skeleton/testing/test_game_builder_dos_native.py
+      - name: Execute full original game on real 8086 machine-code emulator
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m pip install --disable-pip-version-check --only-binary=:all: unicorn==2.1.4
+          python scripts/game_builder/emulate_dos_ci.py \
+            --com original-dos-src/build/skeleton-original.com \
+            --trace original-dos-src/original-dos-replay.json \
+            --out original-dos-cpu-attestation.json
+          python - <<'PY'
+          import json
+          evidence=json.load(open("original-dos-cpu-attestation.json",encoding="utf-8"))
+          assert evidence["hardware_cpu_gameplay_passed"] is True
+          assert evidence["actual_guest_ram_final"]["won"] == 1
+          assert evidence["native_keyboard_actions"] > 100
+          assert evidence["physical_hardware_verified"] is False
+          print("DOS_8086_ALL_NATIVE_CPU_MOVES_PASSED", evidence["native_keyboard_actions"])
+          PY
       - name: Upload native 8086 DOS program and provenance
         uses: actions/upload-artifact@v4
         with:
@@ -69,6 +89,8 @@ jobs:
           path: |
             original-dos-src/build/skeleton-original.com
             original-dos-src/manifest.json
+            original-dos-src/original-dos-replay.json
+            original-dos-cpu-attestation.json
             original-dos-source-receipt.json
             original-dos-binary-receipt.json
           if-no-files-found: error
