@@ -505,12 +505,27 @@ class TinyTransformer:
                 "accelerator synchronization failed; refusing stale model weights"
             ) from exc
 
-    def to(self, device: str = "cpu") -> "TinyTransformer":
-        """Bind CPU, CUDA, or Metal, with optional Torch residency.
+    def to(
+        self,
+        device: str = "cpu",
+        *,
+        kv_dtype: str = "fp32",
+        max_kv_bytes: int | None = None,
+    ) -> "TinyTransformer":
+        """Bind CPU, CUDA or Metal with optional bounded reduced-precision KV.
 
-        Preserve the canonical Python weights until training modifies them.
-        Refuse device transition if syncing trained weights fails.
+        FP16/BF16 are explicitly opt-in storage choices for the Torch KV
+        cache only. Core weights and attention computations remain FP32.
+        Preserve canonical weights across device transitions.
         """
+        if kv_dtype not in {"fp32", "fp16", "bf16"}:
+            raise ValueError("kv_dtype must be fp32, fp16 or bf16")
+        if max_kv_bytes is not None and (
+            isinstance(max_kv_bytes, bool)
+            or not isinstance(max_kv_bytes, int)
+            or max_kv_bytes <= 0
+        ):
+            raise ValueError("max_kv_bytes must be a positive integer or None")
         from skeleton.cortex.device import resolve
         info = resolve(device)
         self._sync_accelerator()
@@ -527,7 +542,10 @@ class TinyTransformer:
         if pin:
             try:
                 from skeleton.cortex.torch_lm import TorchAccel
-                self._accel = TorchAccel(self, device=self.device)
+                self._accel = TorchAccel(
+                    self, device=self.device, kv_dtype=kv_dtype,
+                    max_kv_bytes=max_kv_bytes,
+                )
                 self._accel.pin()
                 self.device = self._accel.device_name
                 self.resident = True
