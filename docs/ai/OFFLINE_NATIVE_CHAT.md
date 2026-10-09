@@ -123,6 +123,24 @@ python -m skeleton.app.offline_chat_cli \
   --import-bundle ./private-backup.json
 ```
 
+### Branch a previous conversation without losing its original
+
+The desktop's **Fork** action creates an independent conversation. You can
+also branch from an earlier committed turn by using the command line:
+
+```bash
+python -m skeleton.app.offline_chat_cli \
+  --gguf-deployment ./local-gguf-deployment.json \
+  --fork-session SOURCE_SESSION_ID --fork-after-turn 3
+```
+
+A fork copies exactly the chosen prefix of user/assistant turns, including
+the applicable original system instruction and idempotency receipts. The
+parent and its later dialogue remain unchanged. Revisions and future
+inference on each branch are independent; invalid or uncommitted fork
+boundaries fail closed. No local-model call occurs during the copy.
+
+
 The GUI and headless entry points default to the same local model-specific
 database under `~/.skeleton/offline-ai/`. Override with `--database` if a
 separate store is preferred. Terminal commands `/id`, `/new`, `/list`,
@@ -198,6 +216,9 @@ be used as an untrusted instruction feed.
 ## Safety and consistency properties
 
 - SQLite is authoritative for the local conversation and saved turn receipts.
+  **The full dialogue is retained** while only a smaller temporary copy is
+  sent to the model after context-window eviction. Historical assistant
+  responses are never truncated from the durable record to fit inference.
   Each persistent conversation is pinned to **exact model and tokenizer digests**.
 - Full generated turns are stored in one transaction using optimistic revision
   compare-and-swap. Failed inference, stale revisions and oversized transcripts
