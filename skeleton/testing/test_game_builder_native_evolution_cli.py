@@ -39,16 +39,20 @@ def test_historical_vic20_to_c64_campaign_emits_actual_new_native_6510_source(tm
     assert receipt["rights_independently_verified"] is False
 
 
-def test_handheld_design_evolution_emits_game_boy_machine_source_and_keeps_unbuilt_stages_visible(tmp_path):
+def test_handheld_evolution_now_emits_two_distinct_true_dmg_and_cgb_native_cartridges(tmp_path):
     args = _options(tmp_path, "nintendo_game_watch", "nintendo_game_boy_color")
     receipt = build_native_evolution(**args, authorized=True)
     assert receipt["campaign_stage_count"] == 2
-    assert receipt["native_source_stages"] == 1
-    assert receipt["design_only_stages"] == 1
+    assert receipt["native_source_stages"] == 2
+    assert receipt["design_only_stages"] == 0
     assert (args["output"] / "stage-01-nintendo_game_boy" / "main.asm").is_file()
-    assert not (args["output"] / "stage-02-nintendo_game_boy_color").exists()
+    assert (args["output"] / "stage-02-nintendo_game_boy_color" / "main.asm").is_file()
+    cgb = (args["output"] / "stage-02-nintendo_game_boy_color" / "main.asm").read_text(encoding="utf-8")
+    assert "CGBBackgroundPalette:" in cgb
+    assert "LoadCGBAttributes:" in cgb
     assert receipt["stage_dispositions"][0]["source_kind"] == "game_boy_dmg_rgbds_source"
-    assert receipt["stage_dispositions"][1]["status"] == "design_only"
+    assert receipt["stage_dispositions"][1]["status"] == "native_source_ready"
+    assert receipt["stage_dispositions"][1]["source_kind"] == "native_cgb_rgbds_rgb555_attribute_rom_source"
     assert all(stage["emulator_or_hardware_played"] is False for stage in receipt["stage_dispositions"])
 
 
