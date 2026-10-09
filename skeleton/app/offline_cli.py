@@ -54,6 +54,8 @@ def _parser() -> argparse.ArgumentParser:
     capabilities.add_argument("--capability-list", action="store_true", help="list available model-free deterministic operations")
     capabilities.add_argument("--game-preview", action="store_true", help="open native Tk offline playable game preview")
     capabilities.add_argument("--game-preview-check", action="store_true", help="verify 32 frames of native game logic without opening desktop")
+    capabilities.add_argument("--homebrew-editor", help="open native visual editor for a verified ORIGINAL homebrew capsule")
+    parser.add_argument("--homebrew-editor-output", help="unused Save As path for native homebrew editor")
     capabilities.add_argument("--chip8-demo-output", help="new original legal CHIP-8 homebrew ROM output file")
     capabilities.add_argument("--chip8-demo-check", action="store_true", help="execute native CHIP-8 homebrew through a winning controller replay")
     capabilities.add_argument("--chip8-export-capsule", help="rights-attested original 5-8 tile capsule for CHIP-8")
@@ -105,6 +107,32 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.enqueue_dir or args.run_queue or args.queue_status
         or args.cancel_queue_job or args.retry_queue_job
     )
+    if args.homebrew_editor_output and args.homebrew_editor is None:
+        print("--homebrew-editor-output requires --homebrew-editor",
+              file=sys.stderr)
+        return 2
+    if args.homebrew_editor is not None:
+        if (
+            args.model or args.deployment or args.prompt or args.backup_in
+            or args.backup_out or args.workspace or args.native_smoke
+            or args.doctor or args.qualify_model or args.library
+            or args.use_library or library_mode or queue_mode or snapshot_mode
+            or audit_mode or args.queue_db or args.queue_library
+            or args.snapshot_workspace or args.snapshot_library
+            or args.snapshot_queue or args.game_seed is not None
+            or args.game_project is not None or args.json_output
+        ):
+            print("original homebrew editor cannot combine with model, state or JSON modes",
+                  file=sys.stderr)
+            return 2
+        from .homebrew_editor_ui import open_homebrew_editor
+        try:
+            return open_homebrew_editor(
+                args.homebrew_editor, output=args.homebrew_editor_output
+            )
+        except (ValueError, TypeError, RuntimeError, OSError) as exc:
+            print("homebrew editor rejected: " + str(exc), file=sys.stderr)
+            return 1
     chip8_mode = (
         args.chip8_demo_output is not None
         or args.chip8_export_capsule is not None
