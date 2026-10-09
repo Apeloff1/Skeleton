@@ -66,7 +66,7 @@ general quality of any model, ship pretrained weights, download GGUF weights,
 or install a llama.cpp runtime.
 
 ```powershell
-Skeleton.exe --offline-command local-ai --self-check --json
+SkeletonCLI.exe --offline-command local-ai --self-check --json
 ```
 
 For developers without the Windows installer:
@@ -83,6 +83,21 @@ quality, GGUF readiness, independent security, enterprise release or
 end-to-end Docker-based services. The exact same mode is exercised in the
 installed-executable Windows CI workflow.
 
+### Two distinct Windows executables for reliable offline operation
+
+The installer ships **`Skeleton.exe`** as a windowed desktop launcher and
+**`SkeletonCLI.exe`** as a console-capable executable. Both are fully frozen
+Python runtimes built from the same source; neither requires a separate
+Python interpreter, provider connection or Docker for the native AI command
+path. They deliberately use different subsystems for output: the desktop
+app opens windows, whereas the console app supports real stdout/stderr,
+redirected JSON receipts, exit status codes and shell automation.
+
+This split is required on Windows because a PyInstaller `--windowed`
+executable may have no usable stdout/stderr and therefore cannot reliably
+serve a command-line JSON API. Run the commands below with
+`SkeletonCLI.exe`, not `Skeleton.exe`.
+
 ### Run native AI commands directly from the installed Windows executable
 
 No external Python executable, Docker daemon, hosted API credentials or
@@ -92,15 +107,15 @@ can be invoked through the installed executable:
 
 ```powershell
 # Run in PowerShell, from a directory with UTF-8 source data:
-Skeleton.exe --offline-command local-ai --train-corpus .\notes.txt --output-model .\checkpoint.json --epochs 1 --json
-Skeleton.exe --offline-command local-ai --model .\checkpoint.json --inspect-model --json
-Skeleton.exe --offline-command local-ai --model .\checkpoint.json --prompt "hello" --json
-Skeleton.exe --offline-command local-ai --benchmark-suite .\suite.json --model .\checkpoint.json --json
+SkeletonCLI.exe --offline-command local-ai --train-corpus .\notes.txt --output-model .\checkpoint.json --epochs 1 --json
+SkeletonCLI.exe --offline-command local-ai --model .\checkpoint.json --inspect-model --json
+SkeletonCLI.exe --offline-command local-ai --model .\checkpoint.json --prompt "hello" --json
+SkeletonCLI.exe --offline-command local-ai --benchmark-suite .\suite.json --model .\checkpoint.json --json
 ```
 
 The `--offline-command` mode is deliberately restricted to `local-ai`:
 it cannot activate Docker services, arbitrary shell commands or Python
-modules. The Windows CI builds, installs and invokes this public CLI path
+modules. The Windows CI builds, installs and invokes this public console CLI path
 for an actual CPU training/checkpoint/inspection round-trip. Full
 frontend/backend/Mongo service assembly still uses Docker separately.
 
@@ -117,7 +132,7 @@ The same operation is available in the headless canonical application CLI,
 including in the installed Windows executable:
 
 ```powershell
-Skeleton.exe --offline-command local-ai `
+SkeletonCLI.exe --offline-command local-ai `
   --llama-executable "C:\path\to\llama-cli.exe" `
   --gguf-model "D:\models\my-model.gguf" `
   --prompt "Describe your offline capabilities" `
