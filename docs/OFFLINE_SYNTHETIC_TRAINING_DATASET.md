@@ -163,6 +163,40 @@ answers to training. They use the same task families and are therefore
 **not an independent generalization benchmark**. Test results are only
 useful evidence after a real candidate model produces the predictions.
 
+## Persistent proficiency without accumulating training samples
+
+For each evaluated model, Skeleton can now keep an **aggregate-only**
+local SQLite proficiency ledger across the 36 capability modes. It
+stores neither raw predictions nor source prompts nor correct answers.
+
+\`\`\`sh
+PYTHONPATH=. python scripts/training/capability_ledger.py \
+  --ledger ./capability-history.sqlite \
+  --model-tag candidate-v1 \
+  --record-predictions ./validation-predictions.jsonl
+
+PYTHONPATH=. python scripts/training/capability_ledger.py \
+  --ledger ./capability-history.sqlite \
+  --model-tag candidate-v1 --status
+\`\`\`
+
+These operations require the original 720-row reference dataset to pass
+the independent checksum, source rights and label oracles. Incoming
+predictions must match the 108 validation identities, and only 36
+per-mode scored aggregates are kept in SQLite. Reports are deduplicated
+by content digest, fenced against malformed/contradictory totals, and
+capped at 500 receipts per database. The source dataset is never edited.
+
+The comparison shows which observed capability-mode counts improved or
+regressed between the two most recent reports for the same model tag and
+source-manifest identity. This is **descriptive performance tracking**, not
+a scientific claim of generalization or statistical significance:
+validation has only three prompts per mode, tasks share templates, and
+the ledger is unsigned. A local attacker who controls SQLite and its
+hashes can still fabricate receipt data. Do not automatically promote
+model weights, increase training rows or treat a better validation score
+as proof of real-world capability.
+
 ## Governed training admission, without automatic promotion
 
 The existing Skeleton \`DatasetRegistry\`, \`IngestEnvelope\`,
