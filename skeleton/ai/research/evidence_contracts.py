@@ -38,6 +38,8 @@ def _digest(value: object) -> str:
 def _required_text(value: object, label: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ResearchError(f"{label} must be non-empty text")
+    if any(0xD800 <= ord(char) <= 0xDFFF for char in value):
+        raise ResearchError(f"{label} contains an unpaired Unicode surrogate")
     return value.strip()
 
 
