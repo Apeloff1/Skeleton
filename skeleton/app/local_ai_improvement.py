@@ -253,6 +253,31 @@ def improve_local_model(
             raise OfflineImprovementError(
                 "protected benchmark category regression: candidate not published"
             )
+    # Protect the pre-publication evidence boundary against data or model
+    # edits during multi-epoch CPU execution. The recorded digests must still
+    # describe the actual files selected by the operator.
+    current_train, _ = _read_corpus(training_text)
+    current_holdout, _ = _read_corpus(validation_text)
+    if current_train != train_raw or current_holdout != heldout_raw:
+        raise OfflineImprovementError(
+            "training or validation source changed during execution"
+        )
+    latest_parent = load_local_model_artifact(checkpoint)
+    if (
+        latest_parent.receipt.artifact_sha256 != loaded.receipt.artifact_sha256
+        or getattr(latest_parent.model, "model_digest", None) != initial_digest
+    ):
+        raise OfflineImprovementError(
+            "original checkpoint changed during execution; candidate not published"
+        )
+    if protected_evidence is not None:
+        from skeleton.app.local_ai_benchmark import load_benchmark_suite
+
+        latest_suite = load_benchmark_suite(protected_suite, backend=original)
+        if latest_suite.suite_digest != protected_evidence.suite_digest:
+            raise OfflineImprovementError(
+                "protected benchmark source changed during execution"
+            )
     written = publish_native_checkpoint_no_replace(candidate, output)
     restored = load_native_checkpoint(output)
     if (
