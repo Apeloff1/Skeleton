@@ -128,7 +128,7 @@ export default function DragonGameStudio({
           <h3>Review your recording</h3>
           <p>
             The selected recording remains local unless the connected analyzer
-            explicitly transfers it. Review that analyzer's privacy policy
+            explicitly transfers it. Review that analyzer&apos;s privacy policy
             before continuing.
           </p>
           <button type="button" onClick={analyze} disabled={busy}>

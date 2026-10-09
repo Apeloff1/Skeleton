@@ -1,0 +1,66 @@
+name: Dragon Native Executable Release
+
+on:
+  pull_request:
+    paths:
+      - 'skeleton/ai/webcrawler/dragon_native_puzzle.py'
+      - 'skeleton/ai/webcrawler/dragon_native_release.py'
+      - 'skeleton/ai/webcrawler/dragon_native_projects.py'
+      - 'skeleton/ai/webcrawler/dragon_native_targets.py'
+      - 'tests/test_ai_webcrawler_dragon_native_release.py'
+      - 'tests/test_ai_webcrawler_dragon_native_puzzle.py'
+      - '.github/workflows/dragon-native-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dragon-native-release-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cross-platform-original-executable:
+    name: Compiled native game (${{ matrix.host }})
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [ubuntu-24.04, windows-2025, macos-15]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Confirm available native host C compiler and CMake
+        run: cmake --version
+      - name: Build native executable and replay all original puzzle stages
+        run: >
+          python -m skeleton.ai.webcrawler.dragon_native_release
+          --out _generated/dragon-puzzle
+          --title "Original Dragon Puzzle Quest"
+      - name: Verify release ZIP SHA and native executable evidence
+        shell: python
+        run: |
+          from pathlib import Path
+          from hashlib import sha256
+          import json
+          path=Path("_generated/dragon-puzzle")
+          release=json.loads((path/"dragon-native-release.json").read_text())
+          z=(path/"dragon-native-release.zip").read_bytes()
+          assert sha256(z).hexdigest()==release["artifact_zip_sha256"]
+          assert release["selftest_state"]=="native_selftest_passed"
+          assert release["selftest_stage_lines"]==4
+          assert release["binary_sha256"] and release["source_fingerprint"]
+          print("DRAGON_NATIVE_HOST_ARTIFACT_PASS",release["target"],release["binary_format"])
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dragon-native-puzzle-${{ matrix.host }}
+          path: |
+            _generated/dragon-puzzle/dragon-native-release.zip
+            _generated/dragon-puzzle/dragon-native-release.json
+          if-no-files-found: error
+          retention-days: 14

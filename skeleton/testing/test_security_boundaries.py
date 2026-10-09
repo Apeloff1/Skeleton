@@ -75,3 +75,32 @@ def test_allow_by_default_boundary_is_forbidden() -> None:
             ("scope",),
             default_action="allow",
         )
+
+
+def test_presented_workload_identity_must_match_crossing_workload() -> None:
+    decision = evaluate_boundary(
+        boundary(), crossing(authenticated_identity="spiffe://skeleton/worker-b")
+    )
+    assert decision.allowed is False
+    assert decision.reason_code == "authentication_identity_mismatch"
+    assert decision.effective_scopes == ()
+
+
+def test_changed_workload_id_cannot_reuse_other_workload_identity() -> None:
+    decision = evaluate_boundary(boundary(), crossing(workload_id="worker-b"))
+    assert decision.allowed is False
+    assert decision.reason_code == "authentication_identity_mismatch"
+
+
+def test_unsupported_authentication_methods_do_not_default_to_allow() -> None:
+    unsupported = SecurityBoundary(
+        boundary_id="BOUNDARY.TOOL",
+        source_zone="planner",
+        target_zone="tool-runtime",
+        required_authn="unverified-header",
+        required_scopes=("tool:invoke", "resource:repo"),
+    )
+    decision = evaluate_boundary(unsupported, crossing())
+    assert decision.allowed is False
+    assert decision.reason_code == "authentication_method_unsupported"
+    assert decision.effective_scopes == ()
