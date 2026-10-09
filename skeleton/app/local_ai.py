@@ -20,6 +20,7 @@ from skeleton.ai.runtime.inference.local import LocalInferenceRequest, LocalInfe
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
 from skeleton.app.offline_history import backup_history, restore_history
 from skeleton.app.offline_workspace import DurableOfflineSession
+from skeleton.app.offline_library import OfflineDocumentLibrary
 
 
 MAX_USER_CHARS = 4096
@@ -248,6 +249,7 @@ class OfflineAIWindow:
         self.window.minsize(600, 440)
         self.window.protocol("WM_DELETE_WINDOW", self.close)
         self.session: OfflineAISession | OfflineGGUFSession | DurableOfflineSession | None = None
+        self.library: OfflineDocumentLibrary | None = None
         self.events: Queue[tuple[str, object]] = Queue()
         self.active = False
         self.closed = False
@@ -287,6 +289,20 @@ class OfflineAIWindow:
             backup_toolbar, text="Attach local workspace…", command=self.attach_workspace
         )
         self.workspace_button.pack(side="left", padx=8)
+        library_toolbar = ttk.Frame(frame)
+        library_toolbar.pack(fill="x", pady=(7, 0))
+        self.attach_library_button = ttk.Button(
+            library_toolbar, text="Open local library…", command=self.attach_library
+        )
+        self.attach_library_button.pack(side="left")
+        self.index_library_button = ttk.Button(
+            library_toolbar, text="Index text folder…", command=self.index_library
+        )
+        self.index_library_button.pack(side="left", padx=8)
+        self.search_library_button = ttk.Button(
+            library_toolbar, text="Search local library", command=self.search_library
+        )
+        self.search_library_button.pack(side="left")
         self.status = tk.StringVar(value="Choose a local native model checkpoint to begin.")
         ttk.Label(frame, textvariable=self.status, wraplength=790).pack(anchor="w", pady=8)
         self.transcript = scrolledtext.ScrolledText(frame, state="disabled", wrap="word", height=18, font=("Segoe UI", 10))
@@ -313,6 +329,13 @@ class OfflineAIWindow:
             if (self.session is not None and not self.active
                 and not isinstance(self.session, DurableOfflineSession))
             else "disabled"
+        )
+        self.attach_library_button.configure(state="disabled" if self.active else "normal")
+        self.index_library_button.configure(
+            state="normal" if self.library is not None and not self.active else "disabled"
+        )
+        self.search_library_button.configure(
+            state="normal" if self.library is not None and not self.active else "disabled"
         )
         self.send_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.clear_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
@@ -395,6 +418,75 @@ class OfflineAIWindow:
             + " restored turns (unencrypted local state)"
         )
         self._refresh()
+
+    def attach_library(self) -> None:
+        if self.active:
+            return
+        selected = self.filedialog.asksaveasfilename(
+            parent=self.window,
+            title="Select or create an offline document index",
+            defaultextension=".sqlite",
+            filetypes=[("SQLite library", "*.sqlite"), ("All files", "*.*")],
+            confirmoverwrite=False,
+        )
+        if not selected:
+            return
+        try:
+            replacement = OfflineDocumentLibrary(selected)
+        except (ValueError, RuntimeError, OSError) as exc:
+            self.status.set("Local library rejected: " + str(exc))
+            return
+        previous = self.library
+        self.library = replacement
+        if previous is not None:
+            previous.close()
+        self.status.set(
+            "Offline document library opened · " + str(replacement.count())
+            + " indexed files"
+        )
+        self._refresh()
+
+    def index_library(self) -> None:
+        if self.active or self.library is None:
+            return
+        selected = self.filedialog.askdirectory(
+            parent=self.window,
+            title="Select a local UTF-8 text folder to index (no network)",
+        )
+        if not selected:
+            return
+        self.active = True
+        self.status.set("Indexing selected local text files; no provider calls…")
+        self._refresh()
+        library = self.library
+
+        def work() -> None:
+            try:
+                self.events.put(("indexed", library.index_directory(selected)))
+            except Exception as exc:
+                self.events.put(("library_error", str(exc)))
+
+        threading.Thread(target=work, name="skeleton-offline-indexer", daemon=True).start()
+
+    def search_library(self) -> None:
+        if self.active or self.library is None:
+            return
+        query = self.composer.get("1.0", "end-1c").strip()
+        if not query:
+            self.status.set("Enter a search phrase in the message field.")
+            return
+        self.active = True
+        self.status.set("Searching on-device FTS5 library without model inference…")
+        self._refresh()
+        library = self.library
+
+        def work() -> None:
+            try:
+                self.events.put(("library_hits", library.search(query)))
+            except Exception as exc:
+                self.events.put(("library_error", str(exc)))
+
+        threading.Thread(target=work, name="skeleton-offline-library-search", daemon=True).start()
 
     def choose_model(self) -> None:
         if self.active:
@@ -516,6 +608,27 @@ class OfflineAIWindow:
                     self.session = value  # type: ignore[assignment]
                     self._redraw_history()
                     self.status.set("Offline model loaded: " + self.session.model_digest[:16] + "…")
+                elif kind == "indexed":
+                    summary = value
+                    self.status.set(
+                        "Indexed " + str(summary["indexed_files"]) + " local files · "
+                        + str(summary["updated_files"]) + " updated · "
+                        + str(summary["removed_files"]) + " removed"
+                    )
+                elif kind == "library_hits":
+                    matches = value
+                    if matches:
+                        lines = [
+                            hit.relative_path + " · sha256 "
+                            + hit.document_sha256[:16] + "\\n" + hit.excerpt
+                            for hit in matches
+                        ]
+                        self._append("Local library · not an AI response", "\\n\\n".join(lines))
+                    self.status.set(
+                        str(len(matches)) + " local source matches (not generated by a model)"
+                    )
+                elif kind == "library_error":
+                    self.status.set("Offline library rejected: " + str(value))
                 elif kind == "answer":
                     answer = value
                     self._append("Skeleton · Local", answer.text)  # type: ignore[attr-defined]
@@ -537,6 +650,8 @@ class OfflineAIWindow:
         self.closed = True
         if isinstance(self.session, DurableOfflineSession):
             self.session.close()
+        if self.library is not None:
+            self.library.close()
         self.window.destroy()
 
 
