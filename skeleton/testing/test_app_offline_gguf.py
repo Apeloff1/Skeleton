@@ -257,3 +257,25 @@ async def test_gguf_transient_context_does_not_replace_user_question(
     )
     assert result.text == "offline GGUF desktop answer"
     assert session.history[0] == ("user", "actual question")
+
+
+def test_real_two_turn_gguf_qualification_keeps_runtime_bound(
+    local_deployment: tuple[Path, Path, Path], capsys,
+) -> None:
+    from skeleton.app.offline_cli import main as offline_console
+
+    manifest, executable, weights = local_deployment
+    assert offline_console([
+        "--deployment", str(manifest),
+        "--qualify-model", "--max-output-tokens", "2", "--json",
+    ]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["kind"] == "gguf-llama.cpp"
+    assert report["model_digest"] == _sha(weights)
+    assert report["runtime_digest"] == _sha(executable)
+    assert report["session_reopened_between_turns"] is True
+    assert report["sqlite_context_restored_and_verified"] is True
+    assert report["turns_completed"] == 2
+    assert all(len(item["execution_receipt_digest"]) == 64
+               for item in report["receipts"])
+    assert report["network_isolation_verified"] is False
