@@ -134,6 +134,14 @@ $PyInstallerArgs = @(
     "--hidden-import", "skeleton.app.installer",
     "--hidden-import", "skeleton.app.preloader",
     "--hidden-import", "skeleton.app.setup_runtime",
+    "--hidden-import", "skeleton.app.local_ai",
+    "--hidden-import", "skeleton.ai.runtime.inference.local",
+    "--hidden-import", "skeleton.ai.runtime.inference.native_runtime",
+    "--hidden-import", "skeleton.ai.runtime.inference.artifact",
+    "--hidden-import", "skeleton.ai.model_runtime.native_llm_runtime",
+    "--hidden-import", "skeleton.ai.model_runtime.runtime_checkpoint",
+    "--hidden-import", "skeleton.ai.model_runtime.tokenization",
+    "--hidden-import", "skeleton.cortex.transformer",
     "--hidden-import", "tkinter",
     $EntryPoint
 )
