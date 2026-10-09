@@ -11,7 +11,6 @@ import json
 import os
 from pathlib import Path
 import sys
-from typing import Sequence
 
 from skeleton.ai.training.offline_foundations import (
     SyntheticCurriculumError, validate_curriculum,
