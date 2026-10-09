@@ -506,7 +506,7 @@ def smoke_offline_http_inference() -> bool:
 
     runtime = NativeLLMRuntime(TinyTransformer(
         vocab=("system:", "user:", "assistant:", "hello", "world", "answer"),
-        dim=8, ctx=96, seed=41, n_heads=2, n_layers=2, d_ff=16,
+        dim=8, ctx=1024, seed=41, n_heads=2, n_layers=2, d_ff=16,
     ))
     backend = NativeRuntimeLocalModel(runtime)
     token = secrets.token_urlsafe(48)
@@ -590,6 +590,24 @@ def smoke_offline_http_inference() -> bool:
                             or evidence["hits"][0]["document_sha256"] != added["sha256"]):
                         accepted = False
                     reference_id = added.get("document_id")
+                    grounded_payload = {
+                        "message": "Explain the rasterizer depth-buffer sorting",
+                        "request_id": "frozen-grounded-smoke",
+                        "max_output_tokens": 2, "grounded": True,
+                    }
+                    grounded_status, grounded_answer = request(
+                        "POST", route, grounded_payload,
+                    )
+                    retry_status, grounded_retry = request(
+                        "POST", route, grounded_payload,
+                    )
+                    if (grounded_status != 200 or retry_status != 200
+                            or grounded_answer.get("revision") != 2
+                            or grounded_retry.get("revision") != 2
+                            or not grounded_retry.get("replayed")
+                            or grounded_retry.get("evidence") != grounded_answer.get("evidence")
+                            or not isinstance(grounded_answer.get("evidence"), dict)):
+                        accepted = False
                 finally:
                     server.shutdown()
                     worker.join(timeout=10)
@@ -621,14 +639,19 @@ def smoke_offline_http_inference() -> bool:
                 and retrieved[0]["document_sha256"] == sha256(
                     reference_text.encode("utf-8")
                 ).hexdigest()
-                and restored.revision == 1
-                and len(restored.transcript.messages) == 2
+                and restored.revision == 2
+                and len(restored.transcript.messages) == 4
                 and restored.transcript.messages[0].content == "hello"
                 and restored.transcript.messages[1].content == first["text"]
+                and restored.transcript.messages[2].content == grounded_payload["message"]
+                and restored.transcript.messages[3].content == grounded_answer["text"]
                 and receipt is not None
                 and receipt.revision == 1
                 and receipt.text == first["text"]
                 and receipt.output_digest == first["output_digest"]
+                and reopened.turn_evidence(
+                    sid, backend.model_digest, app.tokenizer_digest
+                ) == [None, grounded_answer["evidence"]]
             )
 
 
