@@ -297,11 +297,15 @@ def test_dataset_operator_cli_checks_rights_and_nonclobber_exports(
     ]) == 0
     result = json.loads(capsys.readouterr().out)
     assert result["held_out_examples_exported"] == 0
-    assert output.read_bytes() == (SOURCE / "train_corpus.txt").read_bytes()
+    assert result["exported_training_rows"] == 36
+    assert result["full_bank_explicitly_selected"] is False
+    from skeleton.ai.training.sparse_capability import build_sparse_capability_plan
+    assert output.read_bytes() == build_sparse_capability_plan(SOURCE)["training_text"]
     assert main([
         "--dataset", str(SOURCE), "--export-train", str(output),
     ]) == 1
-    assert output.read_bytes() == (SOURCE / "train_corpus.txt").read_bytes()
+    from skeleton.ai.training.sparse_capability import build_sparse_capability_plan
+    assert output.read_bytes() == build_sparse_capability_plan(SOURCE)["training_text"]
     assert "requires a new local file" in capsys.readouterr().err
     assert main(["--dataset", str(SOURCE), "--split", "test"]) == 2
     assert main([
@@ -309,6 +313,8 @@ def test_dataset_operator_cli_checks_rights_and_nonclobber_exports(
     ]) == 0
     receipt = json.loads(capsys.readouterr().out)
     assert receipt["governed_training_ready"] is True
+    assert receipt["registered_training_rows"] == 36
+    assert receipt["full_bank_explicitly_selected"] is False
     assert receipt["trained_weights_promoted"] is False
     assert len(receipt["registered_dataset_digest"]) == 64
 
