@@ -255,6 +255,7 @@ def test_legitimate_original_capsule_contains_real_scene_and_modifiable_map():
     assert game["schema_version"] == "skeleton.game.portable_capsule.v1"
     assert len(game["capsule_sha256"]) == 64
     assert game["source_tilemap"] == TILES
+    assert game["rights_manifest"]["assets"][0]["sha256"] == game["source_tile_sha256"]
     assert game["tilemap"][2][3] == "#"
     assert game["source_tile_sha256"] != game["edited_tile_sha256"]
     assert game["scene"]["solid_tiles_covered"] > 0
@@ -396,3 +397,43 @@ def test_original_data_bank_does_not_grow_when_modifying_projects(tmp_path: Path
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()
         for path in root.iterdir() if path.is_file()
     }
+
+
+def test_capsule_embeds_reviewable_rights_evidence_not_merely_an_opaque_hash():
+    project = capsule()
+    assert project["rights_manifest"]["schema_version"] == RIGHTS_SCHEMA
+    assert len(project["rights_manifest"]["assets"]) == 1
+    assert project["rights_manifest"]["assets"][0]["asset_id"] == "tilemap"
+    assert project["rights_manifest"]["assets"][0]["sha256"] == project["source_tile_sha256"]
+    assert verify_game_capsule(project)["scene_recomputed"] is True
+
+
+def test_rehashed_attacker_modification_cannot_strip_embedded_license_permissions():
+    game = capsule()
+    attacks = [
+        lambda p: p["rights_manifest"]["assets"][0].update({
+            "allowed_uses": ["modify"],
+        }),
+        lambda p: p["rights_manifest"]["assets"][0].update({
+            "source_kind": "licensed",
+            "contains_third_party_content": True,
+        }),
+        lambda p: p["rights_manifest"]["assets"][0].update({
+            "sha256": "f" * 64,
+        }),
+        lambda p: p["rights_manifest"].update({
+            "source_game_reference": "unauthorized-1980s-reference",
+        }),
+        lambda p: p["rights_manifest"]["assets"][0].update({
+            "contains_technological_protection": True,
+        }),
+        lambda p: p["rights_manifest"]["assets"][0].update({
+            "license_reference": "fake-new-license",
+        }),
+    ]
+    for change in attacks:
+        forged = copy.deepcopy(game)
+        change(forged)
+        _resign(forged)
+        with pytest.raises(GameCapsuleError):
+            verify_game_capsule(forged)
