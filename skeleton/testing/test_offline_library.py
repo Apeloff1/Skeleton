@@ -215,3 +215,54 @@ def test_aggregate_size_cap_rolls_back_a_second_library_import(
         with pytest.raises(OfflineLibraryError, match="aggregate"):
             library.index_directory(root2)
         assert library.count() == 1
+
+
+def test_parent_directory_swap_cannot_index_external_private_text(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    import os
+    import skeleton.app.offline_library as mod
+
+    if os.name != "posix":
+        pytest.skip("dirfd and O_NOFOLLOW protection is POSIX-specific")
+
+    source = tmp_path / "admitted"
+    source.mkdir()
+    nested = source / "chapter"
+    nested.mkdir()
+    (nested / "facts.md").write_text("public knowledge", encoding="utf-8")
+    outside = tmp_path / "private"
+    outside.mkdir()
+    (outside / "facts.md").write_text(
+        "PRIVATE_SECRET_SHOULD_NOT_BE_INDEXED", encoding="utf-8",
+    )
+    library = tmp_path / "library.sqlite"
+    original = mod._read_document
+    swapped = False
+
+    def replace_during_enumeration(path, *, root=None):
+        nonlocal swapped
+        if not swapped and path.name == "facts.md":
+            swapped = True
+            nested.rename(source / "chapter-original")
+            nested.symlink_to(outside, target_is_directory=True)
+        return original(path, root=root)
+
+    monkeypatch.setattr(mod, "_read_document", replace_during_enumeration)
+    with OfflineDocumentLibrary(library) as index:
+        with pytest.raises(OfflineLibraryError, match="safely"):
+            index.index_directory(source)
+        assert index.count() == 0
+    assert swapped
+
+
+def test_binary_nul_document_still_rejected_after_dirfd_hardening(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "selected"
+    root.mkdir()
+    (root / "binary.txt").write_bytes(b"real-text\x00trailing-private")
+    with OfflineDocumentLibrary(tmp_path / "library.sqlite") as documents:
+        with pytest.raises(OfflineLibraryError, match="binary"):
+            documents.index_directory(root)
+        assert documents.count() == 0
