@@ -15,6 +15,10 @@ from scripts.game.game_project import _read_json, _write_new
 from skeleton.ai.runtime.homebrew_editor import (
     HomebrewEditor, HomebrewEditorError, EDITOR_TOOLS,
 )
+from skeleton.ai.runtime.homebrew_porting import (
+    ART_DIRECTIONS, CREATIVE_MODES, HYBRID_MODES, QUALITY,
+    make_homebrew_port, verify_port_gameplay, HomebrewPortError,
+)
 
 CELL = 24
 DEFAULT_STAMP = ("###", "#?#", "###")
@@ -280,6 +284,134 @@ def open_homebrew_editor(project: str | Path, output: str | Path | None = None) 
         except (HomebrewEditorError, ValueError, TypeError, OSError) as exc:
             fail(exc)
 
+    def open_windows_port_studio() -> None:
+        """Separate compact dialog to avoid overflowing the map tool sidebar."""
+        studio = tk.Toplevel(root)
+        studio.title("Original Homebrew → Enhanced Windows Port")
+        studio.resizable(False, False)
+        theme = tk.StringVar(value="neon_noir")
+        quality = tk.StringVar(value="enhanced")
+        creative = tk.StringVar(value="hybrid_original")
+        scale = tk.IntVar(value=32)
+        decor = tk.IntVar(value=24)
+        reduced = tk.BooleanVar(value=False)
+        contrast = tk.BooleanVar(value=False)
+        colorblind = tk.BooleanVar(value=False)
+        hud = tk.BooleanVar(value=True)
+        parallax = tk.BooleanVar(value=True)
+        enabled = {
+            mode: tk.BooleanVar(value=False) for mode in HYBRID_MODES
+        }
+        out = tk.StringVar(value="")
+        info = tk.StringVar(value="No commercial imports or cloned game assets.")
+        tk.Label(
+            studio, text="ORIGINAL HOME-BREW WINDOWS PORT",
+            font=("Arial", 11, "bold"),
+        ).pack(anchor="w")
+        tk.Label(
+            studio,
+            text="Preserve core physics; upgrade graphics and optional mechanics.",
+        ).pack(anchor="w")
+        for label, value, options in (
+            ("Art direction", theme, tuple(ART_DIRECTIONS)),
+            ("Creative method", creative, CREATIVE_MODES),
+            ("Rendering quality", quality, QUALITY),
+        ):
+            tk.Label(studio, text=label).pack(anchor="w")
+            tk.OptionMenu(studio, value, *options).pack(fill="x")
+        for label, value, low, high in (
+            ("Windows tile pixels", scale, 16, 56),
+            ("Generated ambient details", decor, 0, 96),
+        ):
+            tk.Scale(
+                studio, label=label, variable=value,
+                orient="horizontal", from_=low, to=high,
+            ).pack(fill="x")
+        tk.Label(
+            studio, text="Hybrid modes (real gameplay effects)",
+            font=("Arial", 10, "bold"),
+        ).pack(anchor="w")
+        for mode in HYBRID_MODES:
+            tk.Checkbutton(
+                studio, text=mode.replace("_", " ").title(),
+                variable=enabled[mode],
+            ).pack(anchor="w")
+        for label, value in (
+            ("Reduced motion", reduced),
+            ("High contrast", contrast),
+            ("Colorblind-safe colors", colorblind),
+            ("Show enhanced HUD", hud),
+            ("Original procedural parallax", parallax),
+        ):
+            tk.Checkbutton(studio, text=label, variable=value).pack(anchor="w")
+        tk.Label(
+            studio, text="New port blueprint path (.json, no overwrite)",
+        ).pack(anchor="w")
+        tk.Entry(studio, textvariable=out, width=48).pack(fill="x")
+        tk.Label(
+            studio, text="New original project path is in the main Save As field.",
+        ).pack(anchor="w")
+
+        def build_native_port() -> None:
+            try:
+                source = editor.export_capsule()
+                selected = [m for m, v in enabled.items() if v.get()]
+                blueprint = make_homebrew_port(
+                    source, destination="windows-native",
+                    creative_mode=creative.get(), art_direction=theme.get(),
+                    quality=quality.get(), hybrids=selected,
+                    seed=int(seed.get()), scale=int(scale.get()),
+                    decor_budget=int(decor.get()),
+                    reduced_motion=bool(reduced.get()),
+                    high_contrast=bool(contrast.get()),
+                    colorblind_safe=bool(colorblind.get()),
+                    hud=bool(hud.get()), parallax=bool(parallax.get()),
+                )
+                proof = verify_port_gameplay(source, blueprint)
+                if not proof["hybrid_gameplay_proven"]:
+                    raise HomebrewPortError("hybrid destination did not pass gameplay replay")
+                project_file = Path(saved_to.get().strip()).expanduser().absolute()
+                port_file = Path(out.get().strip()).expanduser().absolute()
+                if (
+                    not saved_to.get().strip() or not out.get().strip()
+                    or project_file == port_file
+                    or project_file.exists() or project_file.is_symlink()
+                    or port_file.exists() or port_file.is_symlink()
+                    or not project_file.parent.is_dir()
+                    or not port_file.parent.is_dir()
+                ):
+                    raise HomebrewPortError(
+                        "choose distinct unused paths for source and port outputs"
+                    )
+                _write_new(project_file, source)
+                # The source is already independently verifiable. If the
+                # second write fails, the source remains as a new legal-
+                # attribution artifact; we do NOT silently overwrite it.
+                _write_new(port_file, blueprint)
+                info.set("Saved verified original Windows port; replay WIN passed.")
+                report(
+                    "Enhanced Windows homebrew port created. "
+                    "Open with SkeletonGame.exe --project <original> "
+                    "--port-blueprint <blueprint>."
+                )
+                messagebox.showinfo(
+                    "Original Windows game port created",
+                    "Source: " + str(project_file)
+                    + "\nPort: " + str(port_file)
+                    + "\nPlayable: " + str(proof["hybrid_gameplay_proven"])
+                    + "\nRelease rights: NOT INDEPENDENTLY VERIFIED",
+                )
+            except (HomebrewPortError, HomebrewEditorError,
+                    ValueError, TypeError, OSError) as exc:
+                info.set("Port rejected: " + str(exc)[:100])
+                fail(exc)
+
+        tk.Button(
+            studio, text="Build Original Enhanced Windows Port",
+            command=build_native_port,
+        ).pack(fill="x")
+        tk.Label(studio, textvariable=info, wraplength=300).pack(fill="x")
+
     canvas.bind("<ButtonPress-1>", on_down)
     canvas.bind("<ButtonRelease-1>", on_up)
     tk.Button(sidebar, text="Undo (Ctrl+Z)", command=undo).pack(fill="x")
@@ -290,6 +422,8 @@ def open_homebrew_editor(project: str | Path, output: str | Path | None = None) 
               command=lambda: do_apply((0, 0), (0, 0))).pack(fill="x")
     tk.Button(sidebar, text="Save as NEW verified homebrew project",
               command=save_as).pack(fill="x")
+    tk.Button(sidebar, text="Windows Port Studio · Hybrid Enhancements",
+              command=open_windows_port_studio).pack(fill="x")
     tk.Label(sidebar, textvariable=status, wraplength=275,
              justify="left").pack(fill="x")
     root.bind("<Control-z>", lambda _evt: undo())
