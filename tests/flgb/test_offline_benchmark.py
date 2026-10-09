@@ -209,6 +209,68 @@ class TestOfflineBenchmark(unittest.TestCase):
                 with self.assertRaises(OfflineBenchmarkError):
                     load_benchmark_suite(suite, backend=load_native_checkpoint(parent))
 
+    def test_excluded_training_corpus_rejects_normalized_benchmark_leakage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent, candidate, suite = self._setup(directory)
+            training = Path(directory) / "train.txt"
+            training.write_text(
+                "USER: hello, WORLD alpha!\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(OfflineBenchmarkError, "overlaps"):
+                benchmark_native_models(
+                    suite, baseline=parent, candidate=candidate,
+                    excluded_training_text=training,
+                )
+            training.write_text(
+                "assistant gamma user world\n",
+                encoding="utf-8",
+            )
+            report = benchmark_native_models(
+                suite, baseline=parent, candidate=candidate,
+                excluded_training_text=training,
+            )
+            self.assertEqual(len(report["excluded_training_source_sha256"]), 64)
+            self.assertFalse(report["historical_training_disjointness_proven"])
+            self.assertFalse(report["candidate_promoted"])
+
+    def test_excluded_training_substring_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent, _, suite = self._setup(directory)
+            training = Path(directory) / "train.txt"
+            training.write_text(
+                "user hello world alpha assistant beta\n", encoding="utf-8",
+            )
+            with self.assertRaisesRegex(OfflineBenchmarkError, "overlaps"):
+                benchmark_native_models(
+                    suite, baseline=parent, excluded_training_text=training,
+                )
+
+    def test_cli_can_exclude_training_corpus_without_forging_provenance(self):
+        from skeleton.app.cli import run_app_cli
+
+        with tempfile.TemporaryDirectory() as directory:
+            parent, _, suite = self._setup(directory)
+            training = Path(directory) / "train.txt"
+            training.write_text("assistant gamma user world\n", encoding="utf-8")
+            out = StringIO()
+            with redirect_stdout(out):
+                status = run_app_cli([
+                    "local-ai", "--benchmark-suite", str(suite),
+                    "--model", str(parent), "--exclude-train-corpus",
+                    str(training), "--json",
+                ])
+            self.assertEqual(status, 0, out.getvalue())
+            report = json.loads(out.getvalue())
+            self.assertEqual(len(report["excluded_training_source_sha256"]), 64)
+            self.assertFalse(report["historical_training_disjointness_proven"])
+            with redirect_stdout(StringIO()):
+                status = run_app_cli([
+                    "local-ai", "--model", str(parent),
+                    "--exclude-train-corpus", str(training),
+                ])
+            self.assertEqual(status, 2)
+
     def test_candidate_must_use_exact_tokenizer(self):
         with tempfile.TemporaryDirectory() as directory:
             parent, candidate, suite = self._setup(directory)
