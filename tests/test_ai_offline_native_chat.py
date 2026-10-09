@@ -333,6 +333,32 @@ class OfflineNativeChatTests(unittest.TestCase):
             self.store.load(sid, self.product.model_digest,
                             self.product.tokenizer_digest)
 
+    def test_same_revision_changed_prior_transcript_is_not_silently_overwritten(self):
+        sid = self.product.create(system="original-system")
+        snapshot = self.store.load(
+            sid, self.product.model_digest, self.product.tokenizer_digest
+        )
+        with self.store._transaction():
+            self.store._db.execute(
+                "UPDATE offline_sessions SET transcript_json=? WHERE session_id=?",
+                ('[{"role":"system","content":"substituted-context"}]', sid),
+            )
+        attempted = snapshot.transcript.append("user", "hello").append(
+            "assistant", "stale-answer"
+        )
+        with self.assertRaisesRegex(RuntimeContractError, "revision conflict"):
+            self.store.commit(
+                session=snapshot, request_id="stale-context", request_digest="a" * 64,
+                transcript=attempted, text="stale-answer", output_digest="b" * 64,
+                prompt_tokens=2, generated_tokens=1,
+            )
+        current = self.store.load(
+            sid, self.product.model_digest, self.product.tokenizer_digest
+        )
+        self.assertEqual(current.revision, 0)
+        self.assertEqual(current.transcript.messages[0].content,
+                         "substituted-context")
+
     def test_two_separate_sqlite_connections_commit_without_lost_updates(self):
         sid = self.product.create()
         with OfflineChatStore(self.root / "chat.sqlite") as other:
