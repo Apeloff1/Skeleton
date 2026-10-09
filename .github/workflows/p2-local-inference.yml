@@ -15,6 +15,10 @@ on:
       - "skeleton/testing/test_sparse_capability.py"
       - "skeleton/testing/test_procedural_capabilities.py"
       - "skeleton/ai/training/capability_ledger.py"
+      - "skeleton/ai/training/resource_admission.py"
+      - "skeleton/testing/test_resource_admission.py"
+      - "skeleton/ai/runtime/deterministic_capabilities.py"
+      - "skeleton/testing/test_deterministic_capabilities.py"
       - "scripts/training/capability_ledger.py"
       - "skeleton/testing/test_capability_ledger.py"
       - "skeleton/app/local_ai.py"
@@ -72,6 +76,10 @@ on:
       - "skeleton/testing/test_sparse_capability.py"
       - "skeleton/testing/test_procedural_capabilities.py"
       - "skeleton/ai/training/capability_ledger.py"
+      - "skeleton/ai/training/resource_admission.py"
+      - "skeleton/testing/test_resource_admission.py"
+      - "skeleton/ai/runtime/deterministic_capabilities.py"
+      - "skeleton/testing/test_deterministic_capabilities.py"
       - "scripts/training/capability_ledger.py"
       - "skeleton/testing/test_capability_ledger.py"
       - "skeleton/app/local_ai.py"
@@ -158,6 +166,10 @@ jobs:
             skeleton/testing/test_sparse_capability.py \
             skeleton/testing/test_procedural_capabilities.py \
             skeleton/ai/training/capability_ledger.py \
+            skeleton/ai/training/resource_admission.py \
+            skeleton/ai/runtime/deterministic_capabilities.py \
+            skeleton/testing/test_resource_admission.py \
+            skeleton/testing/test_deterministic_capabilities.py \
             scripts/training/capability_ledger.py \
             skeleton/testing/test_capability_ledger.py \
             skeleton/app/offline_cli.py \
@@ -215,4 +227,6 @@ jobs:
           skeleton/testing/test_sparse_capability.py
           skeleton/testing/test_procedural_capabilities.py
           skeleton/testing/test_capability_ledger.py
+          skeleton/testing/test_resource_admission.py
+          skeleton/testing/test_deterministic_capabilities.py
           tests/flgb/test_desktop_offline_ai.py
