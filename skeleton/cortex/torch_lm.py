@@ -40,6 +40,7 @@ class TorchAccel:
         self.resident = False
         self._E = self._P = self._Wout = self._bout = None
         self._layers: List[Dict[str, Any]] = []
+        self._weights_modified = False
         self.reset_decode_cache()
 
     @property
@@ -66,6 +67,7 @@ class TorchAccel:
         if getattr(lm, "use_mod", False):
             raise ValueError("accelerator does not implement Mixture of Depths routing")
         self.reset_decode_cache()
+        self._weights_modified = False
         self._E = self._t2(lm.E)
         self._P = self._t2(lm.P)
         self._Wout = self._E if getattr(lm, "tied", False) else self._t2(lm.Wout)
@@ -116,8 +118,12 @@ class TorchAccel:
 
     def sync(self) -> None:
         """Python lists catch up. Snapshot / to() / fallback call this."""
-        if not self.resident or self._E is None:
+        if not self.resident or self._E is None or not self._weights_modified:
             return
+        # CPU Python weights are the canonical admission and checkpoint
+        # identity. A float32 device pin is not a training mutation: avoid
+        # silently rounding the canonical snapshot and uploading weights on
+        # every per-token identity check.
         lm = self.lm
         lm.E = self._E.detach().cpu().tolist()
         lm.P = self._P.detach().cpu().tolist()
@@ -144,6 +150,7 @@ class TorchAccel:
                 if hasattr(target, "ln2_g") and blob.get("ln2_g") is not None:
                     target.ln2_g = blob["ln2_g"].detach().cpu().tolist()
                     target.ln2_b = blob["ln2_b"].detach().cpu().tolist()
+        self._weights_modified = False
 
     def _normalize(self, x, layer, prefix: str):
         torch = self.torch
@@ -348,6 +355,7 @@ class TorchAccel:
             for p in self._params():
                 if p.grad is not None:
                     p.add_(p.grad, alpha=-float(lr))
+        self._weights_modified = True
         self.lm.steps += 1
         return float(loss.detach().cpu())
 
