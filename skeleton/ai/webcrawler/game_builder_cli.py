@@ -21,6 +21,16 @@ import sqlite3
 
 from .core import CrawlDocument, FetchResponse, CrawlPolicy, extract_document
 from .game_builder_knowledge_runtime import KnowledgeDrivenGameBuilder
+from .game_scale_integration import build_enhanced_game
+from .game_scale_campaign import generate_game_campaign
+from .game_scale_campaign_hub import export_interactive_campaign
+from .game_scale_mass_production import produce_game_portfolio
+from .game_scale_feedback import (
+    decode_play_sessions,analyze_player_feedback,tune_game_from_feedback,
+)
+from .game_playable_builder import export_playable_game_archive
+from .game_scale_world import generate_world_region,world_region_to_blueprint
+from .game_knowledge_design import find_level_route
 
 
 def import_research_captures(
@@ -79,6 +89,20 @@ def run(args=None) -> int:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--width", type=int, default=32)
     parser.add_argument("--height", type=int, default=14)
+    parser.add_argument("--feedback",type=Path,
+                        help="Use exported local gameplay feedback to tune a matching single game")
+    parser.add_argument("--enhanced", action="store_true",
+                        help="Ship original SVG art, audio, route balancing and interactive studio")
+    parser.add_argument("--theme", choices=("fantasy","cyber","desert","ice","forest","space"),
+                        default="fantasy")
+    parser.add_argument("--batch-games", type=int, default=0,
+                        help="10x production: compile 1-1000 distinct playable games")
+    parser.add_argument("--batch-offset", type=int, default=0,
+                        help="Resume production with new deterministic game numbers")
+    parser.add_argument("--world-rooms",type=int,default=0,
+                        help="Generate 2-20 connected, playable top-down exploration rooms")
+    parser.add_argument("--campaign-levels", type=int, default=1,
+                        help="Generate 1-50 connected playable campaign levels")
     parser.add_argument("--approve", action="store_true",
                         help="Explicitly approve original game generation")
     opts=parser.parse_args(args)
@@ -92,22 +116,111 @@ def run(args=None) -> int:
                 import_research_captures(opts.sources),
                 engine=opts.engine,authorized=True,
             )
-        generated=builder.build_game(
-            title=opts.title,genre=opts.genre,engine=opts.engine,
-            seed=opts.seed,width=opts.width,height=opts.height,
-            authorized=True,human_approved=True,
-        )
+        if not 1<=opts.campaign_levels<=50:
+            parser.error("Campaign length must be between 1 and 50")
+        if opts.feedback and (opts.batch_games or opts.campaign_levels>1 or opts.world_rooms or opts.engine!="web"):
+            parser.error("Player feedback currently tunes one HTML5 game at a time")
+        if opts.world_rooms:
+            if not 2<=opts.world_rooms<=20 or opts.engine!="web" or (
+                opts.batch_games or opts.campaign_levels!=1 or opts.genre!="exploration"
+            ):
+                parser.error("Connected worlds need --genre exploration --engine web, 2-20 rooms, and a single-game build")
+            region=generate_world_region(opts.title,rooms=opts.world_rooms,
+                                         seed=opts.seed,columns=4)
+            blueprint=world_region_to_blueprint(
+                region,title=opts.title,seed=opts.seed,
+            )
+            if opts.enhanced:
+                archive=build_enhanced_game(blueprint,theme=opts.theme).archive
+            else:
+                archive=export_playable_game_archive(blueprint)
+            report={
+                "game_title":opts.title,"target":"web",
+                "world_rooms":len(region.rooms),
+                "world_connections":len(region.connections),
+                "world_start":region.spawn,"world_goal":region.exit,
+                "route_tiles":len(find_level_route(blueprint.grid)),
+                "top_down_playable":True,
+                "interactive_studio":bool(opts.enhanced),
+            }
+        elif opts.batch_games:
+            if opts.engine!="web" or opts.campaign_levels!=1:
+                parser.error("Batch production currently requires a web target and a single campaign")
+            output=produce_game_portfolio(
+                builder.knowledge,title=opts.title,count=opts.batch_games,
+                seed=opts.seed,batch_offset=opts.batch_offset,
+                width=opts.width,height=opts.height,
+                authorized=True,human_approved=True,
+            )
+            archive=output.archive
+            report={
+                "game_title":opts.title,"target":"web",
+                "batch_games":len(output.games),
+                "source_count":output.source_count,
+                "total_bytes":output.total_bytes,
+            }
+        elif opts.campaign_levels>1:
+            if opts.engine!="web":
+                parser.error("Multi-level campaign ZIP is currently a web target")
+            campaign=generate_game_campaign(
+                builder.knowledge,title=opts.title,genre=opts.genre,
+                engine="web",seed=opts.seed,chapters=opts.campaign_levels,
+            )
+            archive=export_interactive_campaign(campaign)
+            report={
+                "game_title":opts.title,"target":"web",
+                "campaign_levels":len(campaign.chapters),
+                "campaign_id":campaign.campaign_id,
+                "campaign_unlocks":True,
+                "xp_skill_progression":True,
+                "portable_save":True,
+                "knowledge_sources":builder.knowledge.db.execute(
+                    "SELECT COUNT(*) FROM game_knowledge_sources WHERE active=1"
+                ).fetchone()[0],
+            }
+        else:
+            generated=builder.build_game(
+                title=opts.title,genre=opts.genre,engine=opts.engine,
+                seed=opts.seed,width=opts.width,height=opts.height,
+                authorized=True,human_approved=True,
+            )
+            playable_blueprint=generated.blueprint
+            feedback_report=None
+            if opts.feedback:
+                source,events=decode_play_sessions(opts.feedback.read_bytes())
+                feedback_report=analyze_player_feedback(source,events)
+                adjustment=tune_game_from_feedback(
+                    playable_blueprint,feedback_report,
+                )
+                playable_blueprint=adjustment.new_blueprint
+            if opts.enhanced:
+                if opts.engine!="web":
+                    parser.error("Enhanced sprite/audio studio is currently a web target")
+                enriched=build_enhanced_game(playable_blueprint,theme=opts.theme)
+                archive=enriched.archive
+            elif opts.feedback:
+                archive=export_playable_game_archive(playable_blueprint)
+            else:
+                archive=generated.archive
+            report={
+                "game_title":generated.title,"target":opts.engine,
+                "knowledge_sources":generated.knowledge_sources,
+                "missing_topics":[g.topic for g in generated.missing_topics if g.coverage<1],
+                "playable_route":generated.metrics.playable,
+                "mechanics":playable_blueprint.mechanics,
+                "interactive_studio":bool(opts.enhanced),
+                "used_play_feedback":bool(opts.feedback),
+                "adjusted_blueprint":playable_blueprint.fingerprint,
+                "feedback_completion_rate":(
+                    feedback_report.completion_rate if feedback_report else None
+                ),
+            }
         opts.output.parent.mkdir(parents=True,exist_ok=True)
-        opts.output.write_bytes(generated.archive)
+        opts.output.write_bytes(archive)
         print(json.dumps({
             "output":str(opts.output),
-            "game_title":generated.title,
-            "target":opts.engine,
-            "archive_sha256":sha256(generated.archive).hexdigest(),
-            "knowledge_sources":generated.knowledge_sources,
-            "missing_topics":[g.topic for g in generated.missing_topics if g.coverage<1],
-            "playable_route":generated.metrics.playable,
-            "mechanics":generated.blueprint.mechanics,
+            "archive_sha256":sha256(archive).hexdigest(),
+            **report,
         },sort_keys=True,indent=2))
         return 0
     finally:

@@ -71,7 +71,8 @@ def compile_tile_collision(blueprint: GameBlueprint) -> tuple[tuple[int,...],...
 def compile_input_controls_js() -> str:
     return r"""
 const keys = new Set();
-const touch = {left:false,right:false,jump:false};
+const touch = {left:false,right:false,up:false,down:false,
+  jump:false,dash:false,attack:false,shoot:false,heal:false,shop:false};
 const actionKeys = new Set(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"]);
 addEventListener("keydown", e => {
   if(actionKeys.has(e.code)) e.preventDefault();
@@ -90,8 +91,10 @@ document.querySelectorAll("[data-button]").forEach(node=>{
 const left = () => keys.has("ArrowLeft")||keys.has("KeyA")||touch.left;
 const right = () => keys.has("ArrowRight")||keys.has("KeyD")||touch.right;
 const jump = () => keys.has("Space")||keys.has("ArrowUp")||keys.has("KeyW")||touch.jump;
-const attack = () => keys.has("KeyJ")||keys.has("KeyK");
-const dash = () => keys.has("ShiftLeft")||keys.has("ShiftRight");
+const up = () => keys.has("ArrowUp")||keys.has("KeyW")||touch.up;
+const down = () => keys.has("ArrowDown")||keys.has("KeyS")||touch.down;
+const attack = () => keys.has("KeyJ")||keys.has("KeyK")||touch.attack;
+const dash = () => keys.has("ShiftLeft")||keys.has("ShiftRight")||touch.dash;
 """
 
 
@@ -132,6 +135,27 @@ function moveAxis(body,axis,amount){
 function physicsStep(dt){
   const p=state.player;
   if(!p.alive||state.won) return;
+  if(scene.genre==="exploration"){
+    // Top-down world mode: keyboard-controlled x/y acceleration, no gravity.
+    // Tile collision and fixed-step deterministic updates remain identical.
+    const horizontal=Number(right())-Number(left());
+    const vertical=Number(down())-Number(up());
+    const magnitude=Math.max(1,Math.hypot(horizontal,vertical));
+    const speed=scene.physics.move_speed*TILE;
+    const accel=scene.physics.acceleration*TILE;
+    const friction=scene.physics.friction*TILE;
+    const targetX=horizontal/magnitude*speed;
+    const targetY=vertical/magnitude*speed;
+    const ax=(horizontal?accel:friction)*dt;
+    const ay=(vertical?accel:friction)*dt;
+    p.vx+=Math.sign(targetX-p.vx)*Math.min(Math.abs(targetX-p.vx),ax);
+    p.vy+=Math.sign(targetY-p.vy)*Math.min(Math.abs(targetY-p.vy),ay);
+    moveAxis(p,"x",p.vx*dt);
+    moveAxis(p,"y",p.vy*dt);
+    p.grounded=true;
+    p.invincible=Math.max(0,p.invincible-dt);
+    return;
+  }
   const direction=Number(right())-Number(left());
   const desired=direction*scene.physics.move_speed*TILE;
   const accel=scene.physics.acceleration*TILE;
@@ -188,17 +212,31 @@ function updateEnemies(dt){
   }
   for(const e of state.enemies){
     if(!e.active) continue;
-    const next=e.x+e.direction*scene.physics.enemy_speed*TILE*dt;
-    const preview={x:next,y:e.y,w:e.w,h:e.h};
-    const lookX=Math.floor((next+(e.direction>0?e.w:0))/TILE);
-    const floorY=Math.floor((e.y+e.h+3)/TILE);
-    if(hitsSolid(preview)||!solid(lookX,floorY)||
-       Math.abs(next-e.home)>TILE*2){
-      e.direction*=-1;
-    }else e.x=next;
+    if(scene.genre==="exploration"){
+      // Actual top-down pursuit within nearby rooms; tile collision blocks
+      // pursuit around barriers and prevents NPCs moving through walls.
+      const p=state.player;
+      const dx=p.x-e.x,dy=p.y-e.y,dist=Math.hypot(dx,dy);
+      if(p.alive&&dist<TILE*8&&dist>1){
+        const stride=scene.physics.enemy_speed*TILE*dt;
+        const horizontal={x:e.x+dx/dist*stride,y:e.y,w:e.w,h:e.h};
+        if(!hitsSolid(horizontal))e.x=horizontal.x;
+        const vertical={x:e.x,y:e.y+dy/dist*stride,w:e.w,h:e.h};
+        if(!hitsSolid(vertical))e.y=vertical.y;
+      }
+    }else{
+      const next=e.x+e.direction*scene.physics.enemy_speed*TILE*dt;
+      const preview={x:next,y:e.y,w:e.w,h:e.h};
+      const lookX=Math.floor((next+(e.direction>0?e.w:0))/TILE);
+      const floorY=Math.floor((e.y+e.h+3)/TILE);
+      if(hitsSolid(preview)||!solid(lookX,floorY)||
+         Math.abs(next-e.home)>TILE*2){
+        e.direction*=-1;
+      }else e.x=next;
+    }
     if(state.player.alive&&intersects(e,state.player) &&
        state.player.invincible<=0){
-      if(state.player.vy>0 &&
+      if(scene.genre!=="exploration"&&state.player.vy>0 &&
          state.player.y+state.player.h < e.y+e.h*.5){
         e.active=false; state.score+=100;
         state.player.vy=-scene.physics.jump_speed*TILE*.55;
@@ -224,6 +262,7 @@ function restart(){
     .map(e=>({...e,x:e.x+4,y:e.y+6,w:24,h:26,
                home:e.x+4,direction:1,active:true}));
   state.goal=scene.entities.find(e=>e.type==="goal");
+  state.hazards=scene.entities.filter(e=>e.type==="hazard");
   state.score=0;state.lives=scene.physics.max_lives|0;
   state.attackCooldown=0;
   state.won=false;state.paused=false;
@@ -238,6 +277,11 @@ function loseLife(){
   p.vx=0;p.vy=0;p.invincible=1.5;
 }
 function updateGameState(){
+  if(state.player.alive&&state.player.invincible<=0){
+    for(const hazard of state.hazards){
+      if(intersects(state.player,hazard)){loseLife();break}
+    }
+  }
   for(const item of state.pickups){
     if(item.active&&intersects(state.player,item)){
       item.active=false;state.score+=10;
@@ -285,6 +329,13 @@ function draw(){
       ctx.fillStyle="#344765";ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
       ctx.fillStyle="#78b1c8";ctx.fillRect(x*TILE,y*TILE,TILE,4);
     }
+  }
+  for(const hazard of state.hazards){
+    ctx.fillStyle="#ce6071";
+    ctx.beginPath();ctx.moveTo(hazard.x,hazard.y+TILE);
+    ctx.lineTo(hazard.x+TILE/2,hazard.y+TILE/5);
+    ctx.lineTo(hazard.x+TILE,hazard.y+TILE);
+    ctx.closePath();ctx.fill();
   }
   for(const item of state.pickups) if(item.active){
     ctx.fillStyle="#f8ca55";ctx.beginPath();
@@ -378,7 +429,7 @@ requestAnimationFrame(frame);
 font:16px system-ui;display:flex;flex-direction:column;align-items:center;
 min-height:100vh;padding:18px}canvas{width:min(100%,960px);
 border:2px solid #6686a8;aspect-ratio:16/9;image-rendering:pixelated}
-.controls{display:flex;gap:16px;margin-top:20px}
+.controls{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;justify-content:center}
 button{border:0;border-radius:12px;padding:16px 23px;
 font-size:20px;background:#365474;color:white;touch-action:none}
 button:focus-visible{outline:3px solid #ffd373}
@@ -392,7 +443,11 @@ button:focus-visible{outline:3px solid #ffd373}
         'aria-label="Original playable platform game"></canvas>'
         '<div class="controls"><button data-button="left" aria-label="Move left">◀</button>'
         '<button data-button="right" aria-label="Move right">▶</button>'
-        '<button data-button="jump" aria-label="Jump">⤒</button></div>'
+        '<button data-button="up" aria-label="Move up">▲</button>'
+        '<button data-button="down" aria-label="Move down">▼</button>'
+        '<button data-button="jump" aria-label="Jump">⤒</button>'
+        '<button data-button="dash" aria-label="Dash">Dash</button>'
+        '<button data-button="attack" aria-label="Attack">Hit</button></div>'
         '<p class="note">Keyboard or touch controls. Offline, original art.</p>'
         '<script>'+js+'</script></body></html>'
     )
