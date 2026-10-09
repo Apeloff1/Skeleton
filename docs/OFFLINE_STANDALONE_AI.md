@@ -33,7 +33,7 @@ python offline_kit.py install --kit . --destination ../Skeleton-Offline
 ../Skeleton-Offline/bin/python -m skeleton app local-ai
 ```
 
-On Windows, replace `bin/python` with `Scriptspython.exe`. The installer creates
+On Windows, replace `bin/python` with `Scripts\\python.exe`. The installer creates
 a Python virtual environment, resolves packages strictly from the wheelhouse
 using `pip --isolated install --no-index --only-binary`, and does not
 fetch packages or weights. If model artifacts are included, the model manifest
@@ -51,6 +51,59 @@ The manifest provides SHA-256 corruption detection, **not a cryptographic
 release signature or provenance guarantee**. Independently verify the
 distribution source before using it.
 
+
+## Self-contained Windows offline console
+
+The Windows installer builds two frozen, Python-bundled executables:
+
+- `Skeleton.exe` — the existing graphical setup/runtime launcher, including
+  its **Local AI (offline)** button.
+- `SkeletonOffline.exe` — a separate **console** executable for headless,
+  credential-free local inference. It does not require system Python or Docker.
+
+Example in PowerShell with a trusted local model already installed:
+
+```powershell
+.\SkeletonOffline.exe --native-smoke
+.\SkeletonOffline.exe --deployment .\model\deployment.json --prompt "Hello" --json
+.\SkeletonOffline.exe --deployment .\model\deployment.json --prompt "Continue" --workspace .\state\chats.sqlite --session-id default --json
+```
+
+`--native-smoke` only proves the packaged native inference graph can execute
+using a tiny deterministic test fixture; it is not a trained assistant and
+does not validate real GGUF/model quality. The Windows installer workflow
+now checks both installed executables after silent installation.
+
+The wheelhouse kit below is a separate, Python-dependent distribution route
+for matching operating systems and Python versions. A Windows frozen console
+does **not** include arbitrary local GGUF weights or automatically install
+GPU drivers or the llama.cpp executable.
+
+## Local SQLite conversation workspace
+
+For automatic headless transcript persistence, pass `--workspace` and an
+explicit `--session-id` (defaults to `default`). Both `skeleton-offline`
+and `python -m skeleton app local-ai` can use this feature:
+
+```sh
+skeleton-offline --deployment ./deployment.json --prompt "First" \
+    --workspace ./chat.sqlite --session-id my-session --json
+skeleton-offline --deployment ./deployment.json --prompt "Second" \
+    --workspace ./chat.sqlite --session-id my-session --json
+```
+
+The local SQLite store commits only complete, checksum-bound turns and uses
+optimistic revisions to prevent concurrent writers from silently replacing
+each other's history. It rejects another model's identity and corrupted
+transcripts. An interrupted or rejected generation is not committed to
+workspace state. History is intentionally bounded to eight recent full
+turns to constrain model context. The database is **unencrypted** user data
+and remains separate from the production conversation authority. Protect it
+with OS permissions and encrypted storage where appropriate.
+
+Manual `--backup-in` cannot be combined with a revisioned workspace,
+because that would ambiguously overwrite workspace history. Manual
+`--backup-out` can export a snapshot after successful inference.
 
 ## Two supported models
 
@@ -147,15 +200,16 @@ Use an independently verified, trusted llama.cpp build and disable outbound
 network access using the OS firewall/sandbox for an air-gapped guarantee.
 Do not run unknown binaries just because their digest matches a manifest.
 
-**Data durability:** Live turns remain in memory unless the user explicitly
-exports a portable backup. The app does not yet provide automatic durable
-history, a local authoritative conversation database, managed model downloads,
-auto-update or offline system-completion attestation.
+**Data durability:** Live desktop turns remain in memory unless manually
+backed up; the headless CLI now supports an opt-in automatic local SQLite
+workspace. Neither backup format nor workspace is the production authoritative
+conversation database. Managed downloads, updates, encrypted local state,
+and offline system-completion attestation are not yet provided.
 
 ## Acceptance
 
 ```sh
-python -m pytest skeleton/testing/test_app_offline_gguf.py skeleton/testing/test_offline_history_backup.py skeleton/testing/test_offline_kit.py -q
+python -m pytest skeleton/testing/test_app_offline_gguf.py skeleton/testing/test_offline_history_backup.py skeleton/testing/test_offline_kit.py skeleton/testing/test_offline_console.py skeleton/testing/test_offline_workspace.py -q
 python -m pytest skeleton/testing/test_local_model_deployment.py -q
 python scripts/check_architecture_map.py
 python scripts/check_ai_app_construction.py
