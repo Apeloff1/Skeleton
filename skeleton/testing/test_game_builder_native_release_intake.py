@@ -271,3 +271,106 @@ def test_relative_ancestor_traversal_in_native_file_path_is_rejected(tmp_path):
     )
     with pytest.raises(NativeIntakeError):
         verify_native_release_intake(**inputs)
+
+
+
+def _review_panel(candidate):
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+    from skeleton.ai.game_builder.release_assurance import (
+        ReviewRole, ReviewDomain, ReviewDecision, TrustedReviewer, ReviewAttestation,
+        _ROLE_BY_DOMAIN,
+    )
+    keys = {role: Ed25519PrivateKey.generate() for role in ReviewRole}
+    reviewers = tuple(TrustedReviewer(
+        reviewer_id="independent-"+role.value, key_id="key-"+role.value,
+        public_key_hex=keys[role].public_key().public_bytes(
+            Encoding.Raw, PublicFormat.Raw,
+        ).hex(),
+        role=role,
+        allowed_domains=frozenset(d for d,r in _ROLE_BY_DOMAIN.items() if r is role),
+        valid_from_utc="2026-01-01T00:00:00Z",
+        expires_utc="2028-01-01T00:00:00Z",
+    ) for role in ReviewRole)
+    lookup = {r.role:r for r in reviewers}
+    signatures = []
+    for domain, role in _ROLE_BY_DOMAIN.items():
+        reviewer = lookup[role]
+        unsigned = ReviewAttestation(
+            key_id=reviewer.key_id,
+            reviewer_id=reviewer.reviewer_id,
+            domain=domain,
+            candidate_sha256=candidate.digest,
+            review_evidence_sha256=_digest("independent-review-"+domain.value),
+            decision=ReviewDecision.ACCEPTED,
+            issued_utc="2026-10-10T00:00:00Z",
+            expires_utc="2027-01-01T00:00:00Z",
+            signature_hex="00"*64,
+        )
+        signatures.append(replace(
+            unsigned, signature_hex=keys[role].sign(unsigned.signed_bytes).hex(),
+        ))
+    return reviewers, tuple(signatures)
+
+
+def test_complete_native_release_pipeline_binds_real_bytes_and_signed_domains(tmp_path):
+    from skeleton.ai.game_builder.release_pipeline import run_native_release_gate
+    inputs = _setup(tmp_path)
+    trust, signatures = _review_panel(inputs["candidate"])
+    receipt = run_native_release_gate(
+        **inputs, trust_registry=trust, attestations=signatures,
+        evaluation_utc="2026-10-11T12:00:00Z",
+    )
+    assert receipt.independent_reviews_complete is True
+    assert receipt.bytes_and_review_bound is True
+    assert receipt.intake.native_binary_sha256 == inputs["candidate"].native_binary_sha256
+    assert receipt.signed_review.candidate_sha256 == inputs["candidate"].digest
+    assert receipt.release_authorized is False
+    assert receipt.legal_clearance_issued is False
+    assert receipt.actual_native_execution_attested is False
+    assert receipt.public_receipt()["native_binary_boot_verified"] is False
+    assert receipt.public_receipt()["publisher_approval_granted"] is False
+    assert receipt == run_native_release_gate(
+        **inputs, trust_registry=trust, attestations=signatures,
+        evaluation_utc="2026-10-11T12:00:00Z",
+    )
+
+
+def test_integrated_gate_never_uses_signed_paper_to_approve_changed_game_bytes(tmp_path):
+    from skeleton.ai.game_builder.release_pipeline import run_native_release_gate
+    inputs = _setup(tmp_path)
+    trust, signatures = _review_panel(inputs["candidate"])
+    inputs["compiled_binary"].write_bytes(b"MZ" + b"evil update" + b"\\x00" * 1024)
+    with pytest.raises(NativeIntakeError):
+        run_native_release_gate(
+            **inputs, trust_registry=trust, attestations=signatures,
+            evaluation_utc="2026-10-11T12:00:00Z",
+        )
+
+
+def test_integrated_gate_with_no_independent_reviewers_is_not_approved(tmp_path):
+    from skeleton.ai.game_builder.release_pipeline import run_native_release_gate
+    inputs = _setup(tmp_path)
+    report = run_native_release_gate(
+        **inputs, trust_registry=(), attestations=(),
+        evaluation_utc="2026-10-11T12:00:00Z",
+    )
+    assert not report.independent_reviews_complete
+    assert report.release_authorized is False
+    assert report.signed_review.unsigned_or_missing_domains
+
+
+def test_integrated_gate_cannot_forge_signed_scope_or_legal_release(tmp_path):
+    from skeleton.ai.game_builder.release_pipeline import run_native_release_gate
+    inputs = _setup(tmp_path)
+    trust, signatures = _review_panel(inputs["candidate"])
+    report = run_native_release_gate(
+        **inputs, trust_registry=trust, attestations=signatures,
+        evaluation_utc="2026-10-11T12:00:00Z",
+    )
+    with pytest.raises(ValueError):
+        replace(report, release_authorized=True)
+    with pytest.raises(ValueError):
+        replace(report, report_sha256="f" * 64)
+    with pytest.raises(ValueError):
+        replace(report, candidate_sha256="f" * 64)
