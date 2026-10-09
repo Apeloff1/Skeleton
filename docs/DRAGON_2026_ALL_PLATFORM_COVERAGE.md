@@ -423,3 +423,14 @@ https://cc65.github.io/doc/pet.html
 https://cc65.github.io/doc/plus4.html
 https://cc65.github.io/doc/atmos.html
 https://cc65.github.io/doc/bbc.html
+
+
+### Compiler-readiness finding (Ubuntu cc65)
+
+The Ubuntu-packaged cc65 runtime includes pet.lib, plus4.lib and atmos.lib,
+but this runner does not contain bbc.lib even though cc65 recognizes the
+BBC compiler target. The dedicated test therefore requires a real native
+6502 object compile for BBC, marks the missing linker stage SKIPPED, and
+does not claim a BBC binary exists until a full toolchain is provisioned.
+PET, Plus/4 and Atmos are independently linked in the same compiler gate.
+No counted source target is automatically promoted to emulator-verified.
