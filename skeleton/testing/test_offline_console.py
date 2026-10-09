@@ -85,3 +85,35 @@ def test_console_rejects_missing_gguf_artifact(tmp_path: Path, capsys) -> None:
         "--prompt", "hello", "--json",
     ]) == 1
     assert capsys.readouterr().out == ""
+
+
+def test_console_workspace_automatically_recovers_between_runs(
+    tmp_path: Path, capsys,
+) -> None:
+    weights = _checkpoint(tmp_path / "weights.json")
+    store = tmp_path / "local-state.db"
+    for prompt in ("hello", "world"):
+        assert main([
+            "--model", str(weights), "--prompt", prompt,
+            "--max-output-tokens", "2", "--workspace", str(store),
+            "--session-id", "offline-user", "--json",
+        ]) == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["text"]
+    from skeleton.app.offline_workspace import OfflineWorkspace
+    with OfflineWorkspace(store) as journal:
+        revision, history = journal.open("offline-user", payload["model_digest"])
+        assert revision == 2
+        assert len(history) == 4
+
+
+def test_console_rejects_workspace_and_backup_import_conflict(
+    tmp_path: Path, capsys,
+) -> None:
+    weights = _checkpoint(tmp_path / "weights.json")
+    assert main([
+        "--model", str(weights), "--prompt", "hello",
+        "--workspace", str(tmp_path / "db.sqlite"),
+        "--backup-in", str(tmp_path / "chat.json"),
+    ]) == 2
+    assert "cannot be combined" in capsys.readouterr().err
