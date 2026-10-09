@@ -243,3 +243,31 @@ def test_required_intake_receipt_cannot_forge_hardware_or_legal_certification(tm
                  "compiler_execution_verified","emulator_or_hardware_execution_verified"):
         with pytest.raises(NativeIntakeError):
             replace(receipt, **{flag:True})
+
+
+
+def test_symlinked_parent_directory_of_binary_is_rejected(tmp_path):
+    inputs = _setup(tmp_path)
+    alias = tmp_path / "compiled-artifacts"
+    alias.symlink_to(tmp_path, target_is_directory=True)
+    inputs["compiled_binary"] = alias / "game.exe"
+    with pytest.raises(NativeIntakeError):
+        verify_native_release_intake(**inputs)
+
+
+def test_symlinked_parent_directory_of_build_evidence_is_rejected(tmp_path):
+    inputs = _setup(tmp_path)
+    alias = tmp_path / "untrusted-evidence"
+    alias.symlink_to(tmp_path, target_is_directory=True)
+    inputs["build_evidence"] = alias / "build-evidence.json"
+    with pytest.raises(NativeIntakeError):
+        verify_native_release_intake(**inputs)
+
+
+def test_relative_ancestor_traversal_in_native_file_path_is_rejected(tmp_path):
+    inputs = _setup(tmp_path)
+    inputs["compiled_binary"] = (
+        inputs["source_directory"] / ".." / "game.exe"
+    )
+    with pytest.raises(NativeIntakeError):
+        verify_native_release_intake(**inputs)
