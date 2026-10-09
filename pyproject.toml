@@ -21,7 +21,7 @@ include = ["skeleton*"]
 
 [tool.setuptools.package-data]
 "skeleton.acquired.gaming" = ["*.json", "*.jsonl"]
-"skeleton.ai.game_builder" = ["platform_catalog.json"]
+"skeleton.ai.game_builder" = ["platform_catalog.json", "evolution_lineages.json"]
 "skeleton.native" = ["asm/*.S", "asm/*.md", "asm/*.h"]
 "skeleton.app" = ["manifest.json"]
 
