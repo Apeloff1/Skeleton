@@ -57,7 +57,19 @@ def benchmark(args: argparse.Namespace) -> dict[str, object]:
     prompt = tuple((i % (model.V - 1)) + 1 for i in range(args.prefill))
     reference = TinyTransformer.from_snapshot(model.snapshot())
     expected = reference._logits(prompt)
-    model.to(args.device)
+    kv_dtype = getattr(args, "kv_dtype", "fp32")
+    kv_limit_mib = getattr(args, "kv_limit_mib", None)
+    if kv_limit_mib is not None and kv_limit_mib < 1:
+        raise ValueError("kv_limit_mib must be a positive integer")
+    if args.device == "cpu" and (
+        kv_dtype != "fp32" or kv_limit_mib is not None
+    ):
+        raise ValueError("KV precision and allocation caps require a Torch accelerator")
+    model.to(
+        args.device,
+        kv_dtype=kv_dtype,
+        max_kv_bytes=kv_limit_mib * (1024 ** 2) if kv_limit_mib else None,
+    )
     expected_accel = {
         "cuda": "cuda",
         "gpu": "cuda",
@@ -71,6 +83,9 @@ def benchmark(args: argparse.Namespace) -> dict[str, object]:
         raise RuntimeError(
             f"device {args.device} unavailable; refusing to benchmark fallback as requested hardware"
         )
+
+    if (kv_dtype != "fp32" or kv_limit_mib is not None) and model._accel is None:
+        raise RuntimeError("requested Torch KV precision/budget unavailable on selected device")
 
     prefill_ms: list[float] = []
     decode_ms: list[float] = []
@@ -87,7 +102,11 @@ def benchmark(args: argparse.Namespace) -> dict[str, object]:
         if run == args.warmup:
             parity_error = max(abs(a - b) for a, b in zip(logits, expected))
             if args.assert_parity and any(
-                not math.isclose(a, b, rel_tol=2e-4, abs_tol=2e-4)
+                not math.isclose(
+                    a, b,
+                    rel_tol=3e-3 if kv_dtype == "bf16" else 1e-3 if kv_dtype == "fp16" else 2e-4,
+                    abs_tol=3e-3 if kv_dtype == "bf16" else 1e-3 if kv_dtype == "fp16" else 2e-4,
+                )
                 for a, b in zip(logits, expected)
             ):
                 raise RuntimeError("accelerator and reference next-token logits diverged")
@@ -113,6 +132,8 @@ def benchmark(args: argparse.Namespace) -> dict[str, object]:
         "device_requested": args.device,
         "device_actual": model.device,
         "resident": model.resident,
+        "kv_dtype": kv_dtype,
+        "kv_limit_mib": kv_limit_mib,
         "architecture": {
             "dim": model.dim, "heads": model.n_heads,
             "layers": model.n_layers, "context": model.ctx,
@@ -132,6 +153,8 @@ def benchmark(args: argparse.Namespace) -> dict[str, object]:
         },
         "notes": "Untrained miniature model; performance only, not model quality",
     }
+    if model._accel is not None:
+        sample["measured"]["kv_reserved_bytes"] = int(model._accel.kv_reserved_bytes)
     if model.device == "cuda":
         import torch
         sample["measured"]["cuda_peak_allocated_bytes"] = int(
@@ -156,6 +179,10 @@ def main() -> None:
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--position-mode", choices=("learned_rope", "rope"),
                         default="rope")
+    parser.add_argument("--kv-dtype", choices=("fp32", "fp16", "bf16"),
+                        default="fp32")
+    parser.add_argument("--kv-limit-mib", type=int, default=None,
+                        help="hard Torch KV allocation ceiling in mebibytes")
     parser.add_argument("--assert-parity", action="store_true")
     args = parser.parse_args()
     print(json.dumps(benchmark(args), indent=2, sort_keys=True))
