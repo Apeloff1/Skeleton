@@ -14,6 +14,9 @@ on:
       - "scripts/training/probe_sparse_capabilities.py"
       - "skeleton/testing/test_sparse_capability.py"
       - "skeleton/testing/test_procedural_capabilities.py"
+      - "skeleton/ai/training/capability_ledger.py"
+      - "scripts/training/capability_ledger.py"
+      - "skeleton/testing/test_capability_ledger.py"
       - "skeleton/app/local_ai.py"
       - "skeleton/app/cli.py"
       - "skeleton/testing/test_app_offline_gguf.py"
@@ -68,6 +71,9 @@ on:
       - "scripts/training/probe_sparse_capabilities.py"
       - "skeleton/testing/test_sparse_capability.py"
       - "skeleton/testing/test_procedural_capabilities.py"
+      - "skeleton/ai/training/capability_ledger.py"
+      - "scripts/training/capability_ledger.py"
+      - "skeleton/testing/test_capability_ledger.py"
       - "skeleton/app/local_ai.py"
       - "skeleton/app/cli.py"
       - "skeleton/testing/test_app_offline_gguf.py"
@@ -151,6 +157,9 @@ jobs:
             scripts/training/probe_sparse_capabilities.py \
             skeleton/testing/test_sparse_capability.py \
             skeleton/testing/test_procedural_capabilities.py \
+            skeleton/ai/training/capability_ledger.py \
+            scripts/training/capability_ledger.py \
+            skeleton/testing/test_capability_ledger.py \
             skeleton/app/offline_cli.py \
             skeleton/app/local_ai.py \
             skeleton/app/cli.py \
@@ -205,4 +214,5 @@ jobs:
           skeleton/testing/test_offline_foundations.py
           skeleton/testing/test_sparse_capability.py
           skeleton/testing/test_procedural_capabilities.py
+          skeleton/testing/test_capability_ledger.py
           tests/flgb/test_desktop_offline_ai.py
