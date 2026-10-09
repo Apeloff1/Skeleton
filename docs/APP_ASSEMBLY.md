@@ -75,6 +75,31 @@ python -m skeleton app local-ai --model ./my-native.json \
   --prompt "user: hello" --max-output-tokens 8 --json
 ```
 
+### Continue improving existing weights, with rollback
+
+The **Improve model…** button and CLI can continue local CPU training of
+an existing native checkpoint and measure held-out perplexity on a distinct,
+explicitly supplied UTF-8 file. Both corpora must use the existing vocabulary;
+unknown words and exact overlapping training/evaluation lines fail closed.
+The source checkpoint is never modified. A new candidate checkpoint is written
+**only if** at least one trained epoch lowers held-out perplexity versus the
+original. The best measured epoch is selected; all regressions reject the
+candidate with no output file. This is a bounded local improvement trial,
+**not** evidence of generalized intelligence or a production-model promotion.
+
+```bash
+python -m skeleton app local-ai --improve-model ./my-native.json \
+  --train-corpus ./train.txt --eval-corpus ./heldout.txt \
+  --output-model ./my-native-v2.json --epochs 3 --json
+```
+
+The JSON receipt binds the original/candidate model digests, tokenizer identity,
+both source digests, original/new artifact hashes, CPU training steps, best epoch,
+and baseline/accepted held-out perplexity. Keep the input artifact to roll back.
+No remote provider, autonomous data harvesting, hidden training, or destructive
+overwrite is permitted. Held-out fit is a **narrow** metric and not independently
+certified safety, reliability or broad intelligence.
+
 Training is bounded to a 32-KiB input file, at most 512 normalized tokens,
 256 vocabulary entries, and 1–4 CPU epochs with a fixed small architecture.
 The output is checkpointed using the existing model artifact writer, loaded
