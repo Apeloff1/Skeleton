@@ -23,6 +23,7 @@ from pathlib import Path
 from .desktop_native_export import compile_native_desktop, export_native_desktop_source
 from .game_boy_native_export import compile_native_game_boy, export_native_game_boy
 from .nes_native_export import compile_native_nes, export_native_nes
+from .c64_native_export import compile_native_c64, export_native_c64
 from .platform_registry import default_registry
 from .playable_simulation import demonstrate_solvable
 from .playable_world import GameBuildIntent, generate_playable_world
@@ -34,6 +35,7 @@ _NATIVE = {
     "macos_modern": "sdl2_c11",
     "nintendo_game_boy": "gb_rgbds",
     "nintendo_famicom": "nes_ca65",
+    "commodore_64": "c64_cc65",
 }
 
 _MAX_EVIDENCE_FILE = 8 * 1024 * 1024
@@ -86,6 +88,11 @@ def build_game(
         project = compile_native_nes(world, source, authorized=True)
         folder = export_native_nes(project, output, authorized=True)
         artifact_type = "native_nes_6502_ca65_nrom_source"
+        digest = project.content_digest
+    elif kind == "c64_cc65":
+        project = compile_native_c64(world, source, authorized=True)
+        folder = export_native_c64(project, output, authorized=True)
+        artifact_type = "native_c64_6510_vic_ii_sid_cc65_prg_source"
         digest = project.content_digest
     else:
         project = compile_native_desktop(world, source, target, authorized=True)
