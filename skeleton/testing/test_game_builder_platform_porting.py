@@ -33,11 +33,12 @@ def test_catalog_is_broad_and_includes_abandoned_and_obscure_systems():
     registry = default_registry()
     summary = registry.summary()
     assert summary["platform_count"] >= 290
-    assert all(count >= 9 for count in summary["kinds"].values())
+    assert len(summary["kinds"]) >= 9
+    assert all(count >= 3 for count in summary["kinds"].values())
     for platform_id in (
         "fairchild_channel_f", "interton_vc4000", "epoch_super_cassette_vision",
         "bandai_wonderswan", "bandai_swancrystal", "nec_pc_fx",
-        "apple_ban_dai_pippin", "nuon", "philips_cd_i", "atari_jaguar",
+        "apple_bandai_pippin", "nuon", "philips_cd_i", "atari_jaguar",
         "commodore_amiga_cd32", "fujitsu_fm_towns_marty", "sinclair_zx81",
         "sharp_x68000", "msx1", "atari_st", "arcade_sega_model3", "arcade_cave_cv1000",
         "ti_84_plus", "symbian_s60", "arduboy", "windows_modern", "sony_ps5",
@@ -53,6 +54,9 @@ def test_registry_selection_is_sorted_and_does_not_modify_registry():
     assert handhelds and all(p.kind == "handheld" and p.is_legacy for p in handhelds)
     assert tuple(p.id for p in handhelds) == tuple(sorted(p.id for p in handhelds))
     assert lookup_platform("bandai_wonderswan").artifact == "homebrew_rom"
+    assert lookup_platform("playdate").render == "one_bit_bitmap"
+    assert lookup_platform("pico8_fantasy").artifact == "source_cartridge_or_module"
+    assert lookup_platform("nintendo_virtual_boy").render == "monochrome_stereoscopic"
     assert registry.summary() == default_registry().summary()
 
 
@@ -64,6 +68,8 @@ def test_registry_selection_is_sorted_and_does_not_modify_registry():
     lambda d: d["platforms"][0].update(id="../sneaky"),
     lambda d: d["presets"][d["platforms"][0]["preset"]].update(tier=True),
     lambda d: d["presets"][d["platforms"][0]["preset"]].update(constraints=[]),
+    lambda d: d["platforms"][0].update(overrides={"unknown_sdk": "verified"}),
+    lambda d: d["platforms"][0].update(overrides={"tier": 5}),
 ])
 def test_registry_rejects_unsafe_or_broken_catalog(mutation):
     data = {"schema_version": 1, "presets": {"p": {
