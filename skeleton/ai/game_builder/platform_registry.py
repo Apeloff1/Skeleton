@@ -16,7 +16,7 @@ import re
 
 REGISTRY_SCHEMA = 1
 _ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]+$")
-_KINDS = frozenset({"console", "handheld", "computer", "arcade", "calculator", "mobile", "educational", "micro"})
+_KINDS = frozenset({"console", "handheld", "computer", "arcade", "calculator", "mobile", "educational", "micro", "fantasy"})
 _ALLOWED_LIFECYCLE = frozenset({"legacy", "current"})
 _ALLOWED_RESEARCH = frozenset({"catalogued"})
 _ALLOWED_TOOLCHAIN = frozenset({"unverified"})
@@ -124,6 +124,11 @@ def parse_registry(document: str | bytes) -> PlatformRegistry:
         preset = presets.get(item["preset"])
         if not isinstance(preset, dict):
             raise PlatformRegistryError("missing preset: " + item["preset"])
+        overrides = item.get("overrides", {})
+        allowed_overrides = {"tier", "render", "sound", "input", "artifact", "constraints"}
+        if not isinstance(overrides, dict) or set(overrides) - allowed_overrides:
+            raise PlatformRegistryError("unknown machine-specific override")
+        preset = {**preset, **overrides}
         tier = preset.get("tier")
         if type(tier) is not int or not 0 <= tier <= 4:
             raise PlatformRegistryError("invalid capability tier")
