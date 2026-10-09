@@ -201,6 +201,8 @@ class OfflineAIWindow:
         self.load_button.pack(side="left")
         self.train_button = ttk.Button(toolbar, text="Train small local model…", command=self.train_model)
         self.train_button.pack(side="left", padx=4)
+        self.improve_button = ttk.Button(toolbar, text="Improve model…", command=self.improve_model)
+        self.improve_button.pack(side="left", padx=4)
         self.clear_button = ttk.Button(toolbar, text="New conversation", command=self.clear)
         self.clear_button.pack(side="left", padx=8)
         self.open_history_button = ttk.Button(toolbar, text="Open chat…", command=self.open_history)
@@ -224,6 +226,9 @@ class OfflineAIWindow:
     def _refresh(self) -> None:
         self.load_button.configure(state="disabled" if self.active else "normal")
         self.train_button.configure(state="disabled" if self.active else "normal")
+        self.improve_button.configure(
+            state="normal" if self.session is not None and not self.active else "disabled"
+        )
         self.send_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.clear_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.cancel_button.configure(state="normal" if self.active else "disabled")
@@ -305,6 +310,71 @@ class OfflineAIWindow:
 
         threading.Thread(
             target=work, daemon=True, name="skeleton-native-cpu-training",
+        ).start()
+
+    def improve_model(self) -> None:
+        """Consent-bound learning never modifies the loaded checkpoint itself."""
+        if self.active or self.session is None:
+            return
+        from tkinter import messagebox
+
+        if not messagebox.askyesno(
+            "Evaluate experimental model improvement",
+            "Continue CPU training this model on your chosen text, "
+            "evaluate it on a separate held-out text file, and save "
+            "a NEW checkpoint only if held-out perplexity improves? "
+            "The current model is kept unchanged. No data is uploaded.",
+            parent=self.window,
+        ):
+            return
+        parent_path = self.filedialog.askopenfilename(
+            parent=self.window, title="Choose current native checkpoint",
+            filetypes=[("Native checkpoint", "*.json"), ("All files", "*.*")],
+        )
+        if not parent_path:
+            return
+        training_path = self.filedialog.askopenfilename(
+            parent=self.window, title="Choose incremental training text",
+            filetypes=[("UTF-8 text", "*.txt"), ("All files", "*.*")],
+        )
+        if not training_path:
+            return
+        heldout_path = self.filedialog.askopenfilename(
+            parent=self.window, title="Choose separate held-out evaluation text",
+            filetypes=[("UTF-8 text", "*.txt"), ("All files", "*.*")],
+        )
+        if not heldout_path:
+            return
+        destination = self.filedialog.asksaveasfilename(
+            parent=self.window, title="Save evaluated checkpoint to NEW file",
+            defaultextension=".json", filetypes=[("Native checkpoint", "*.json")],
+        )
+        if not destination:
+            return
+        session = self.session
+        self.active = True
+        self.status.set("Training locally and checking held-out model quality…")
+        self._refresh()
+
+        def work() -> None:
+            try:
+                from skeleton.app.local_ai_improvement import improve_local_model
+
+                parent = load_native_checkpoint(parent_path)
+                if parent.model_digest != session.model_digest:
+                    raise OfflineAIError(
+                        "selected checkpoint does not match the active local model"
+                    )
+                receipt = improve_local_model(
+                    parent_path, training_path, heldout_path, destination,
+                )
+                improved = OfflineAISession(load_native_checkpoint(destination))
+                self.events.put(("improved", (improved, receipt)))
+            except Exception as exc:
+                self.events.put(("error", str(exc)))
+
+        threading.Thread(
+            target=work, daemon=True, name="skeleton-evaluated-local-learning",
         ).start()
 
     def clear(self) -> None:
@@ -404,7 +474,18 @@ class OfflineAIWindow:
             while True:
                 kind, value = self.events.get_nowait()
                 self.active = False
-                if kind == "trained":
+                if kind == "improved":
+                    self.session, receipt = value  # type: ignore[misc]
+                    # Different weight identity means old turns are not silently
+                    # assigned to the newly evaluated model.
+                    self.clear()
+                    self.status.set(
+                        "Local candidate accepted by held-out perplexity · "
+                        + f"{receipt.baseline_perplexity:.2f} → "
+                        + f"{receipt.accepted_perplexity:.2f}"
+                        + " · keep parent checkpoint for rollback"
+                    )
+                elif kind == "trained":
                     self.session, receipt = value  # type: ignore[misc]
                     self.clear()
                     self.status.set(
