@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from skeleton.ai.model_runtime import NativeLLMRuntime
-from skeleton.ai.runtime.inference.artifact import write_local_model_artifact
+from skeleton.ai.runtime.inference.artifact import load_local_model_artifact, write_local_model_artifact
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
 from skeleton.app.local_ai import load_native_checkpoint
 from skeleton.app.local_ai_training import (
@@ -119,13 +119,15 @@ def improve_local_model(
         raise OfflineImprovementError("new checkpoint must not already exist")
     if Path(training_text).resolve() == Path(validation_text).resolve():
         raise OfflineImprovementError("training and validation must be separate sources")
-    original = load_native_checkpoint(checkpoint)
+    loaded = load_local_model_artifact(checkpoint)
+    original = loaded.model
+    if not isinstance(original, NativeRuntimeLocalModel):
+        raise OfflineImprovementError("only native transformer checkpoints can be improved")
     original.assert_identity()
     model = original.runtime.model
     if not isinstance(model, TinyTransformer):
         raise OfflineImprovementError("native transformer weights required")
     initial_digest = original.model_digest
-    checkpoint_bytes = Path(checkpoint).read_bytes()
     vocab = set(model.stoi)
     train_raw, train_lines, _ = _read_lines(
         training_text, label="training", vocabulary=vocab, minimum_tokens=2,
@@ -185,7 +187,7 @@ def improve_local_model(
         tokenizer_digest=restored.tokenizer_digest,
         train_source_sha256=hashlib.sha256(train_raw).hexdigest(),
         validation_source_sha256=hashlib.sha256(heldout_raw).hexdigest(),
-        input_checkpoint_sha256=hashlib.sha256(checkpoint_bytes).hexdigest(),
+        input_checkpoint_sha256=loaded.receipt.artifact_sha256,
         checkpoint_sha256=written.artifact_sha256,
         baseline_perplexity=baseline,
         accepted_perplexity=best_score,
