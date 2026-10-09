@@ -399,6 +399,7 @@ def parser() -> argparse.ArgumentParser:
     mode.add_argument("--local-ai-smoke", action="store_true", help="verify bundled native CPU inference without Docker")
     mode.add_argument("--local-ai-training-smoke", action="store_true", help="verify bundled CPU training, checkpoint, and inference")
     mode.add_argument("--local-ai-benchmark-smoke", action="store_true", help="verify native model category evaluation after install")
+    mode.add_argument("--offline-command", nargs=argparse.REMAINDER, metavar="LOCAL_AI_ARGS", help="execute native local-ai CLI inside bundled exe without Docker/Python")
     result.add_argument(
         "--development",
         action="store_true",
@@ -412,6 +413,17 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     root = installation_root()
+    if args.offline_command is not None:
+        # Explicitly constrain the frozen-command boundary to the app's
+        # credential-free native AI plane; never invoke generic shell,
+        # arbitrary Python modules or Docker/service commands here.
+        arguments = list(args.offline_command)
+        if not arguments or arguments[0] != "local-ai":
+            print("--offline-command only accepts the local-ai command")
+            return 2
+        from skeleton.app.cli import run_app_cli
+
+        return run_app_cli(arguments)
     if args.local_ai:
         if os.name != "nt":
             print("Skeleton Windows launcher requires Windows.")
