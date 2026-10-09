@@ -136,6 +136,7 @@ $PyInstallerArgs = @(
     "--hidden-import", "skeleton.app.setup_runtime",
     "--hidden-import", "skeleton.app.local_ai",
     "--hidden-import", "skeleton.app.local_ai_transcript",
+    "--hidden-import", "skeleton.app.local_ai_training",
     "--hidden-import", "skeleton.ai.runtime.inference.local",
     "--hidden-import", "skeleton.ai.runtime.inference.native_runtime",
     "--hidden-import", "skeleton.ai.runtime.inference.artifact",
