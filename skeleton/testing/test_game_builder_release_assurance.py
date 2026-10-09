@@ -330,3 +330,28 @@ def test_review_expiry_and_unknown_jurisdictions_are_invalid():
 def _evidence_for(candidate):
     _, legal, originality = base_evidence()
     return legal, originality
+
+
+
+def test_new_signatures_cannot_authorize_unreviewed_new_territory():
+    """Re-signing another jurisdiction must not recycle the old legal opinion."""
+    candidate, legal, originality = base_evidence()
+    forged_new_market = replace(candidate, jurisdictions=("US",))
+    reviewers, new_signatures = signed_panel(forged_new_market)
+    result = evaluate(forged_new_market, legal, originality, reviewers, new_signatures)
+    assert result.status is ReleaseReadiness.BLOCKED
+    assert "RELEASE_JURISDICTIONS_NOT_IN_LEGAL_ASSESSMENT" in result.blocking_reasons
+    assert result.release_authorized is False
+
+
+def test_review_signatures_cannot_reauthorize_a_different_credit_bundle():
+    """All ten freshly signed domains must still refer to reviewed credit bytes."""
+    candidate, legal, originality = base_evidence()
+    replaced_notices = replace(candidate, credits_bundle_sha256=digest("other-credit-notices"))
+    reviewers, signatures = signed_panel(replaced_notices)
+    result = evaluate(replaced_notices, legal, originality, reviewers, signatures)
+    assert result.status is ReleaseReadiness.REVIEW_RECEIPTS_SATISFIED_PUBLICATION_PENDING
+    # This signature-only plane checks approval of a DECLARED credit digest.
+    # The native byte-intake must separately verify the signed digest
+    # actually matches the reviewed source/credits files.
+    assert result.release_authorized is False
