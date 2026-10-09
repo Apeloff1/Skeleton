@@ -20,6 +20,7 @@ $LauncherSpec = "$ShortDrive\launcher-spec"
 $ArchivePath = "$ShortDrive\source.zip"
 $EntryPoint = Join-Path $RepoRoot "packaging\windows\launcher_entry.py"
 $OfflineEntryPoint = Join-Path $RepoRoot "packaging\windows\offline_cli_entry.py"
+$GamePreviewEntryPoint = Join-Path $RepoRoot "packaging\windows\game_preview_entry.py"
 $InstallerScript = Join-Path $RepoRoot "packaging\windows\SkeletonSetup.iss"
 
 if (-not $Version) {
@@ -209,6 +210,37 @@ if (-not (Test-Path -LiteralPath $OfflineExe)) {
     throw "Expected offline console executable not found: $OfflineExe"
 }
 Copy-Item -LiteralPath $OfflineExe -Destination (Join-Path $PayloadDir "SkeletonOffline.exe") -Force
+
+# A separate one-click Windows game window. The game app has no LLM,
+# browser, API key, downloaded art, or console dependency. Unlike the
+# SkeletonOffline.exe headless driver, this is a windowed entrypoint.
+Write-Host "==> Building model-free native SkeletonGame.exe"
+$GamePyInstallerArgs = @(
+    "-m", "PyInstaller",
+    "--noconfirm",
+    "--clean",
+    "--onefile",
+    "--windowed",
+    "--name", "SkeletonGame",
+    "--distpath", $LauncherDist,
+    "--workpath", $LauncherWork,
+    "--specpath", $LauncherSpec,
+    "--paths", $RepoRoot,
+    "--hidden-import", "skeleton.app.offline_game_preview",
+    "--hidden-import", "skeleton.ai.runtime.gameplay_capabilities",
+    "--hidden-import", "tkinter",
+    $GamePreviewEntryPoint
+)
+& python @GamePyInstallerArgs
+if ($LASTEXITCODE -ne 0) {
+    throw "PyInstaller native game preview build failed"
+}
+$GameExe = Join-Path $LauncherDist "SkeletonGame.exe"
+if (-not (Test-Path -LiteralPath $GameExe)) {
+    throw "Expected native game preview not found: $GameExe"
+}
+Copy-Item -LiteralPath $GameExe -Destination (Join-Path $PayloadDir "SkeletonGame.exe") -Force
+
 
 $CompilerCandidates = @(
     (Join-Path $env:ProgramFiles "Inno Setup 7\ISCC.exe"),
