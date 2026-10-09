@@ -231,7 +231,7 @@ class DurableOfflineAISession(OfflineAISession):
 
     def _restore(self) -> None:
         record = self.store.load(
-            self.session_id, self.backend.model_digest, self.self.tokenizer_digest
+            self.session_id, self.backend.model_digest, self.tokenizer_digest
         )
         messages = record.transcript.messages
         has_instruction = bool(messages and messages[0].role == "system")
@@ -251,7 +251,7 @@ class DurableOfflineAISession(OfflineAISession):
         if self._busy:
             raise OfflineAIError("cannot switch conversation during generation")
         self.session_id = self.store.create(
-            self.backend.model_digest, self.self.tokenizer_digest
+            self.backend.model_digest, self.tokenizer_digest
         )
         self.history = ()
         self.instructions = ""
@@ -274,19 +274,19 @@ class DurableOfflineAISession(OfflineAISession):
 
     def list_conversations(self) -> tuple[tuple[str, int], ...]:
         return self.store.list_sessions(
-            self.backend.model_digest, self.self.tokenizer_digest
+            self.backend.model_digest, self.tokenizer_digest
         )
 
     def export_conversation(self, session_id: str) -> bytes:
         return self.store.export_bundle(
-            session_id, self.backend.model_digest, self.self.tokenizer_digest
+            session_id, self.backend.model_digest, self.tokenizer_digest
         )
 
     def import_conversation(self, payload: bytes) -> str:
         if self._busy:
             raise OfflineAIError("cannot import during model generation")
         session_id = self.store.import_bundle(
-            payload, self.backend.model_digest, self.self.tokenizer_digest
+            payload, self.backend.model_digest, self.tokenizer_digest
         )
         self.resume(session_id)
         return session_id
@@ -295,7 +295,7 @@ class DurableOfflineAISession(OfflineAISession):
         if self._busy:
             raise OfflineAIError("cannot delete conversation during generation")
         self.store.delete(
-            session_id, self.backend.model_digest, self.self.tokenizer_digest
+            session_id, self.backend.model_digest, self.tokenizer_digest
         )
         if session_id == self.session_id:
             self.create_conversation()
@@ -310,7 +310,7 @@ class DurableOfflineAISession(OfflineAISession):
             # Recheck durable authority immediately before inference so a
             # concurrent process cannot silently rewrite the prior context.
             saved = self.store.load(
-                self.session_id, self.backend.model_digest, self.self.tokenizer_digest
+                self.session_id, self.backend.model_digest, self.tokenizer_digest
             )
             stored_messages = saved.transcript.messages
             stored_has_system = bool(stored_messages and stored_messages[0].role == "system")
