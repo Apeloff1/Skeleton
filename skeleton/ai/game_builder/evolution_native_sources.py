@@ -22,6 +22,10 @@ from .game_boy_native_export import (
     GameBoySourceError, GameBoySourceProject,
     compile_native_game_boy, export_native_game_boy,
 )
+from .game_boy_color_native_export import (
+    GameBoyColorSourceError, GameBoyColorSourceProject,
+    compile_native_game_boy_color, export_native_game_boy_color,
+)
 from .nes_native_export import (
     NativeNESError, NativeNESSourceProject, compile_native_nes, export_native_nes,
 )
@@ -31,7 +35,7 @@ from .atari8_native_export import Atari8BitNativeError, Atari8BitSourceProject, 
 from .port_planner import HomebrewSource
 
 _DESKTOP = frozenset({"windows_modern", "linux_desktop", "macos_modern"})
-_HANDHELD = frozenset({"nintendo_game_boy"})
+_HANDHELD = frozenset({"nintendo_game_boy", "nintendo_game_boy_color"})
 _ALLOWED_EXPORTS = _DESKTOP | _HANDHELD
 _STATUSES = frozenset({"native_source_ready", "budget_incompatible", "design_only"})
 
@@ -45,7 +49,7 @@ class EvolutionNativeStage:
     source_kind: str | None
     source_digest: str | None
     status: str
-    project: NativeDesktopSourceProject | GameBoySourceProject | NativeNESSourceProject | NativeC64SourceProject | NativeDOSSourceProject | Atari8BitSourceProject | None
+    project: NativeDesktopSourceProject | GameBoySourceProject | NativeNESSourceProject | NativeC64SourceProject | NativeDOSSourceProject | Atari8BitSourceProject | GameBoyColorSourceProject | None
 
     def __post_init__(self):
         if self.status not in _STATUSES:
@@ -131,7 +135,7 @@ def compile_evolution_native_sources(
         if stage.native_binary_built or stage.target_adapter_state != "concept_prototype_not_native":
             raise GameEvolutionError("upstream practice has forged hardware build assertion")
         target = stage.intended_platform_id
-        project: NativeDesktopSourceProject | GameBoySourceProject | NativeNESSourceProject | NativeC64SourceProject | NativeDOSSourceProject | Atari8BitSourceProject | None = None
+        project: NativeDesktopSourceProject | GameBoySourceProject | NativeNESSourceProject | NativeC64SourceProject | NativeDOSSourceProject | Atari8BitSourceProject | GameBoyColorSourceProject | None = None
         status = "design_only"
         if target in _DESKTOP:
             try:
@@ -144,6 +148,13 @@ def compile_evolution_native_sources(
             except GameBoySourceError as exc:
                 if "exceeds DMG" not in str(exc):
                     raise GameEvolutionError("handheld compiler refused practice stage") from exc
+                status = "budget_incompatible"
+        elif target == "nintendo_game_boy_color":
+            try:
+                project = compile_native_game_boy_color(stage.game_world, source, authorized=True)
+            except GameBoyColorSourceError as exc:
+                if "gameplay engine" not in str(exc):
+                    raise GameEvolutionError("CGB color compiler refused original stage") from exc
                 status = "budget_incompatible"
         elif target == "nintendo_famicom":
             try:
@@ -217,6 +228,8 @@ def export_evolution_native_sources(
         folder = root / f"stage-{stage.stage_number:02d}-{stage.target_platform_id}"
         if isinstance(stage.project, GameBoySourceProject):
             export_native_game_boy(stage.project, folder, authorized=True)
+        elif isinstance(stage.project, GameBoyColorSourceProject):
+            export_native_game_boy_color(stage.project, folder, authorized=True)
         elif isinstance(stage.project, NativeNESSourceProject):
             export_native_nes(stage.project, folder, authorized=True)
         elif isinstance(stage.project, NativeC64SourceProject):
