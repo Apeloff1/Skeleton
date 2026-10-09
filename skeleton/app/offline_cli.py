@@ -54,6 +54,9 @@ def _parser() -> argparse.ArgumentParser:
     capabilities.add_argument("--capability-list", action="store_true", help="list available model-free deterministic operations")
     capabilities.add_argument("--game-preview", action="store_true", help="open native Tk offline playable game preview")
     capabilities.add_argument("--game-preview-check", action="store_true", help="verify 32 frames of native game logic without opening desktop")
+    capabilities.add_argument("--chip8-demo-output", help="new original legal CHIP-8 homebrew ROM output file")
+    capabilities.add_argument("--chip8-export-capsule", help="rights-attested original 5-8 tile capsule for CHIP-8")
+    parser.add_argument("--chip8-rom-output", help="unused output .ch8 filename for --chip8-export-capsule")
     parser.add_argument("--game-seed", type=int, help="deterministic seed for explicit native game preview")
     parser.add_argument("--game-project", help="user-selected, verified portable game project for native preview")
     parser.add_argument("--library", help="user-owned local SQLite document search index")
@@ -101,6 +104,40 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.enqueue_dir or args.run_queue or args.queue_status
         or args.cancel_queue_job or args.retry_queue_job
     )
+    chip8_mode = (
+        args.chip8_demo_output is not None
+        or args.chip8_export_capsule is not None
+    )
+    if args.chip8_rom_output and args.chip8_export_capsule is None:
+        print("--chip8-rom-output requires --chip8-export-capsule", file=sys.stderr)
+        return 2
+    if args.chip8_export_capsule and not args.chip8_rom_output:
+        print("--chip8-export-capsule requires --chip8-rom-output", file=sys.stderr)
+        return 2
+    if chip8_mode:
+        if (
+            args.model or args.deployment or args.prompt or args.backup_in
+            or args.backup_out or args.workspace or args.native_smoke
+            or args.doctor or args.qualify_model or args.library
+            or args.use_library or library_mode or queue_mode or snapshot_mode
+            or audit_mode or args.queue_db or args.queue_library
+            or args.snapshot_workspace or args.snapshot_library
+            or args.snapshot_queue or args.game_seed is not None
+            or args.game_project is not None
+        ):
+            print("original CHIP-8 ROM export cannot combine with model, state or game preview",
+                  file=sys.stderr)
+            return 2
+        from scripts.game.export_chip8 import main as export_chip8
+        flags = (
+            ["--demo-rom", "--output", args.chip8_demo_output]
+            if args.chip8_demo_output is not None
+            else [
+                "--capsule", args.chip8_export_capsule,
+                "--output", args.chip8_rom_output,
+            ]
+        )
+        return export_chip8(flags)
     if args.game_project is not None and not (args.game_preview or args.game_preview_check):
         print("--game-project requires --game-preview or --game-preview-check", file=sys.stderr)
         return 2
