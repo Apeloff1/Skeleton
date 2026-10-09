@@ -243,6 +243,11 @@ def test_installed_offline_capability_engine_is_bundled_and_actually_exercised()
     assert "$capabilityReport.model_inference_used" in workflow
     assert "$capabilityReport.network_access_used" in workflow
     assert "duplicate JSON" in workflow
+    assert '"skeleton/ai/runtime/deterministic_capabilities.py"' in workflow
+    assert '"skeleton/ai/runtime/capability_graph.py"' in workflow
+    assert "& $offline --capability-graph-file $capabilityGraphTask --json" in workflow
+    assert "$graphReport.outputs.score -ne 28" in workflow
+    assert "self-referencing task" in workflow
     assert "args.capability_file" in cli
     assert "execute_capability_json" in cli
     assert "stat.S_ISREG" in cli
