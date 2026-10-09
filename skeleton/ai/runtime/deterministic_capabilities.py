@@ -14,7 +14,7 @@ import json
 import re
 from typing import Any, Callable, Mapping
 
-from .gameplay_capabilities import GAMEPLAY_OPERATIONS
+from .gameplay_capabilities import GAMEPLAY_OPERATIONS, GameplayError
 
 SCHEMA = "skeleton.offline_deterministic_capabilities.v1"
 MAX_INPUT_BYTES = 8192
@@ -392,7 +392,12 @@ def execute_capability_task(payload: Mapping[str, Any]) -> dict[str, Any]:
         raise CapabilityTaskError("task is not JSON-compatible") from exc
     if len(canonical) > MAX_INPUT_BYTES:
         raise CapabilityTaskError("task exceeds bounded input size")
-    result = OPERATIONS[op](args)
+    try:
+        result = OPERATIONS[op](args)
+    except GameplayError as exc:
+        # Normalize admitted game-domain rejection into the shared
+        # capability contract so DAGs fail atomically at the correct node.
+        raise CapabilityTaskError("gameplay operation rejected") from exc
     receipt = {
         "schema_version": SCHEMA,
         "operation": op,
