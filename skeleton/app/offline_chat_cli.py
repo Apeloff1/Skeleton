@@ -12,9 +12,12 @@ from pathlib import Path
 import sys
 
 from skeleton.ai.model_runtime.offline_chat import (
-    OfflineChatStore, load_private_bundle, save_private_bundle,
+    OfflineChatStore, _digest_request, load_private_bundle, save_private_bundle,
 )
-from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
+from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig, RuntimeContractError
+from skeleton.app.offline_grounding import (
+    grounded_request_digest, prepare_evidence,
+)
 from skeleton.app.offline_knowledge import (
     OfflineKnowledgeLibrary, MAX_DOCUMENT_BYTES,
 )
@@ -46,25 +49,58 @@ def _read_reference_file(path: Path) -> str:
     return text
 
 
-def _result(answer, session_id: str, *, as_json: bool) -> None:
+def _result(answer, session_id: str, *, as_json: bool,
+            evidence: dict | None = None) -> None:
     if as_json:
-        print(json.dumps({
+        body = {
             "session_id": session_id,
             "model_digest": answer.model_digest,
             "text": answer.text,
             "execution_receipt_digest": answer.execution_receipt_digest,
             "input_tokens": answer.input_tokens,
             "output_tokens": answer.output_tokens,
-        }, sort_keys=True, ensure_ascii=False))
+        }
+        if evidence is not None:
+            body["evidence"] = evidence
+        print(json.dumps(body, sort_keys=True, ensure_ascii=False))
     else:
         print("Local AI>", answer.text)
+        if evidence is not None:
+            print("Sources supplied to model (accuracy not verified):")
+            for source in evidence["citations"]:
+                print(" ", source["title"], source["citation"])
+
+
+def _grounded_turn(chat: DurableOfflineAISession, message: str, *,
+                   max_tokens: int):
+    """Use the same source selection and atomic turn receipt as localhost."""
+    if not isinstance(message, str) or not message.strip():
+        raise RuntimeContractError("grounded message must not be empty")
+    if len(message.strip().encode("utf-8")) > 1024:
+        raise RuntimeContractError("grounded query exceeds 1024 bytes")
+    index = OfflineKnowledgeLibrary(
+        chat.store, chat.model_digest, chat.tokenizer_digest,
+    )
+    references = index.search(message, limit=2)
+    if not references:
+        raise RuntimeContractError("no local reference passages match this question")
+    digest = grounded_request_digest(_digest_request(
+        message.strip(), GenerationConfig(max_new_tokens=max_tokens),
+    ))
+    manifest = prepare_evidence(
+        message.strip(), digest, references,
+        chat.model_digest, chat.tokenizer_digest,
+    )
+    return asyncio.run(chat.ask(
+        message, max_output_tokens=max_tokens, evidence_manifest=manifest,
+    )), manifest
 
 
 def _run_interactive(chat: DurableOfflineAISession, *, max_tokens: int,
                      as_json: bool) -> None:
     print("Offline model:", chat.model_digest)
     print("Session:", chat.session_id)
-    print("Commands: /id  /new  /list  /resume SESSION_ID  /exit")
+    print("Commands: /id  /new  /list  /resume SESSION_ID  /ground QUESTION  /exit")
     while True:
         try:
             message = input("You> ").strip()
@@ -89,8 +125,14 @@ def _run_interactive(chat: DurableOfflineAISession, *, max_tokens: int,
             continue
         if not message:
             continue
-        answer = asyncio.run(chat.ask(message, max_output_tokens=max_tokens))
-        _result(answer, chat.session_id, as_json=as_json)
+        if message.startswith("/ground "):
+            answer, evidence = _grounded_turn(
+                chat, message[len("/ground "):].strip(), max_tokens=max_tokens,
+            )
+            _result(answer, chat.session_id, as_json=as_json, evidence=evidence)
+        else:
+            answer = asyncio.run(chat.ask(message, max_output_tokens=max_tokens))
+            _result(answer, chat.session_id, as_json=as_json)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -107,6 +149,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--session", help="resume a saved conversation ID")
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--message", help="complete and commit one local AI turn")
+    modes.add_argument("--grounded-message",
+                       help="generate one offline turn with immutable supplied-source evidence")
     modes.add_argument("--interactive", action="store_true",
                        help="multi-turn terminal conversation, including session switching")
     modes.add_argument("--list", action="store_true",
@@ -245,8 +289,16 @@ def main(argv: list[str] | None = None) -> int:
             if args.interactive:
                 _run_interactive(chat, max_tokens=budget, as_json=args.json)
                 return 0
-            answer = asyncio.run(chat.ask(args.message, max_output_tokens=budget))
-            _result(answer, chat.session_id, as_json=args.json)
+            if args.grounded_message is not None:
+                answer, evidence = _grounded_turn(
+                    chat, args.grounded_message, max_tokens=budget,
+                )
+                _result(answer, chat.session_id, as_json=args.json, evidence=evidence)
+            else:
+                answer = asyncio.run(
+                    chat.ask(args.message, max_output_tokens=budget)
+                )
+                _result(answer, chat.session_id, as_json=args.json)
             if not args.json:
                 print("Session:", chat.session_id)
             return 0
