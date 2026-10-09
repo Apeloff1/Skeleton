@@ -24,6 +24,10 @@ on:
       - "skeleton/ai/runtime/game_platform_catalog.py"
       - "skeleton/ai/runtime/game_rights.py"
       - "skeleton/ai/runtime/homebrew_editor.py"
+      - "skeleton/ai/runtime/homebrew_porting.py"
+      - "skeleton/app/homebrew_port_ui.py"
+      - "scripts/game/port_homebrew.py"
+      - "skeleton/testing/test_homebrew_porting.py"
       - "skeleton/app/homebrew_editor_ui.py"
       - "scripts/game/homebrew_edit.py"
       - "skeleton/testing/test_homebrew_editor.py"
@@ -114,6 +118,10 @@ on:
       - "skeleton/ai/runtime/game_platform_catalog.py"
       - "skeleton/ai/runtime/game_rights.py"
       - "skeleton/ai/runtime/homebrew_editor.py"
+      - "skeleton/ai/runtime/homebrew_porting.py"
+      - "skeleton/app/homebrew_port_ui.py"
+      - "scripts/game/port_homebrew.py"
+      - "skeleton/testing/test_homebrew_porting.py"
       - "skeleton/app/homebrew_editor_ui.py"
       - "scripts/game/homebrew_edit.py"
       - "skeleton/testing/test_homebrew_editor.py"
@@ -231,6 +239,10 @@ jobs:
             skeleton/ai/runtime/game_platform_catalog.py \
             skeleton/ai/runtime/game_rights.py \
             skeleton/ai/runtime/homebrew_editor.py \
+            skeleton/ai/runtime/homebrew_porting.py \
+            skeleton/app/homebrew_port_ui.py \
+            scripts/game/port_homebrew.py \
+            skeleton/testing/test_homebrew_porting.py \
             skeleton/app/homebrew_editor_ui.py \
             scripts/game/homebrew_edit.py \
             skeleton/testing/test_homebrew_editor.py \
@@ -288,6 +300,9 @@ jobs:
           "pydantic-settings==2.15.0"
           "fastapi>=0.141.1"
           "numpy==2.4.6"
+      - name: Require real original-homebrew Windows hybrid port win acceptance
+        run: |
+          PYTHONPATH=. python -c "from skeleton.testing.test_homebrew_porting import original; from skeleton.ai.runtime.homebrew_porting import make_homebrew_port,verify_port_gameplay; c=original(); p=make_homebrew_port(c,hybrids=['collectathon','keyquest','speedrun','exploration','combo'],quality='cinematic'); r=verify_port_gameplay(c,p); assert r['hybrid_gameplay_proven'] and r['remaining_collectibles']==0 and r['deterministic']"
       - name: Execute full original-game build pipeline through three genuine runtimes
         env:
           OPENAI_API_KEY: ""
@@ -332,6 +347,7 @@ jobs:
           skeleton/testing/test_gameplay_capabilities.py
           skeleton/testing/test_cross_era_game_rights.py
           skeleton/testing/test_homebrew_editor.py
+          skeleton/testing/test_homebrew_porting.py
           skeleton/testing/test_game_playability.py
           skeleton/testing/test_chip8_homebrew.py
           skeleton/testing/test_chip8_classic.py
