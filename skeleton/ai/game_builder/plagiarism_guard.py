@@ -150,6 +150,7 @@ class ExpressiveOverlap:
 @dataclass(frozen=True, slots=True)
 class OriginalityReport:
     project_id: str
+    artifact_sha256: str | None
     candidate_sha256: str
     reference_corpus_sha256: str
     screen_digest: str
@@ -171,6 +172,7 @@ class OriginalityReport:
         return {
             "schema": "skeleton.game_builder.originality.v1",
             "project_id": self.project_id,
+            "artifact_sha256": self.artifact_sha256,
             "candidate_sha256": self.candidate_sha256,
             "reference_corpus_sha256": self.reference_corpus_sha256,
             "screen_digest": self.screen_digest,
@@ -282,6 +284,7 @@ def audit_game_originality(
     candidate_samples: tuple[ExpressionSample, ...],
     references: tuple[ExpressionSample, ...],
     reference_corpus_declared_complete: bool = False,
+    artifact_sha256: str | None = None,
 ) -> OriginalityReport:
     """Fail closed on gaps and matches, but never mistake sparse references for clearance.
 
@@ -290,6 +293,9 @@ def audit_game_originality(
     """
     if not isinstance(project_id, str) or not _ID.fullmatch(project_id):
         raise OriginalityError("invalid project identity")
+    if artifact_sha256 is not None and (not isinstance(artifact_sha256, str) or
+        not _SHA.fullmatch(artifact_sha256)):
+        raise OriginalityError("originality screen must bind to a valid artifact digest")
     if (not isinstance(assets, tuple) or len(assets) != len(_ASSET_CLASSES) or
         any(not isinstance(a, AssetDeclaration) for a in assets) or
         {a.modality for a in assets} != _ASSET_CLASSES):
@@ -387,7 +393,7 @@ def audit_game_originality(
          sorted(references, key=lambda x: x.work_id)], separators=(",", ":")
     ).encode()).hexdigest()
     payload = {
-        "project_id":project_id,
+        "project_id":project_id,"artifact_sha256":artifact_sha256,
         "assets":[{k:getattr(a,k).value if isinstance(getattr(a,k), Enum) else
                    getattr(a,k) for k in a.__dataclass_fields__}
                   for a in sorted(assets, key=lambda a:a.modality)],
@@ -399,7 +405,7 @@ def audit_game_originality(
     digest = sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"),
                                ensure_ascii=False).encode()).hexdigest()
     return OriginalityReport(
-        project_id=project_id, candidate_sha256=cand_digest,
+        project_id=project_id, artifact_sha256=artifact_sha256, candidate_sha256=cand_digest,
         reference_corpus_sha256=ref_digest, screen_digest=digest,
         disposition=disposition, overlap_findings=tuple(findings),
         blockers=tuple(sorted(blockers)), review_issues=tuple(sorted(review)),
