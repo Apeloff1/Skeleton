@@ -242,6 +242,21 @@ __all__ = [
 from importlib import import_module as _game_builder_import_module
 
 _KNOWLEDGE_EXPORTS = {
+    "PlatformProfile": ".platform_registry",
+    "PlatformRegistry": ".platform_registry",
+    "PlatformRegistryError": ".platform_registry",
+    "default_registry": ".platform_registry",
+    "lookup_platform": ".platform_registry",
+    "list_platforms": ".platform_registry",
+    "parse_registry": ".platform_registry",
+    "HomebrewSource": ".port_planner",
+    "PortMode": ".port_planner",
+    "PortRequest": ".port_planner",
+    "PortAction": ".port_planner",
+    "PortBlueprint": ".port_planner",
+    "PortPlanningError": ".port_planner",
+    "compile_port": ".port_planner",
+    "compile_port_route": ".port_planner",
     "KnowledgeError": ".reviewed_knowledge",
     "KnowledgePolicy": ".reviewed_knowledge",
     "ReviewedNote": ".reviewed_knowledge",
