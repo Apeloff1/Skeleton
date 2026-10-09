@@ -81,7 +81,7 @@ class NativeServingHardeningTests(unittest.TestCase):
         })
 
     def test_tokenizer_integrity_failure_has_typed_error(self):
-        runtime = _Runtime(_Runtime(error=TokenizerContractError("mutation")))
+        runtime = _Runtime(error=TokenizerContractError("mutation"))
         service = _service(runtime)
         config = GenerationConfig(max_new_tokens=1)
         request = service.request("integrity-failure", "hello", config, deadline_ms=1000)
