@@ -123,7 +123,7 @@ def execute_all_available_game_acceptance() -> dict[str, Any]:
             "installed_windows_binary_verified": False,
         },
         "all_implemented_gameplay_outputs_executed": True,
-        "full_166_platform_release_completion": False,
+        "all_platform_releases_completed": False,
         "full_legal_publication_signoff": False,
         "training_examples_added": 0,
     }
