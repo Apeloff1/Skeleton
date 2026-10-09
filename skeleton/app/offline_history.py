@@ -146,10 +146,14 @@ def restore_history(
     model = _model_digest(model_digest)
     source = _safe_file(path, create=False)
     try:
-        info = source.stat()
-        if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_BACKUP_BYTES:
-            raise OfflineHistoryError("offline backup is not a bounded regular file")
-        with source.open("rb") as inp:
+        # Open the actual descriptor with O_NOFOLLOW when supported. A path
+        # replaced by a symlink after preflight must not be followed.
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+        fd = os.open(source, flags)
+        with os.fdopen(fd, "rb") as inp:
+            info = os.fstat(inp.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_BACKUP_BYTES:
+                raise OfflineHistoryError("offline backup is not a bounded regular file")
             raw = inp.read(MAX_BACKUP_BYTES + 1)
     except OSError as exc:
         raise OfflineHistoryError("cannot read offline history backup") from exc
