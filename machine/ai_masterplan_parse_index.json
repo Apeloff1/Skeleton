@@ -3,10 +3,10 @@
   "kind": "ai-masterplan-parse-index",
   "sources": {
     "machine/ai_master_plan.json": {
-      "git_blob_sha": "fb2030b2fe96b12077be4400d0f67791a6bb7169"
+      "git_blob_sha": "64a68f16383b7219e771e44c52de0c13851f5b99"
     },
     "machine/ai_build_accountability.json": {
-      "git_blob_sha": "3af9a572a337ca273e075142f9758cdb044e274d"
+      "git_blob_sha": "e2b71660c273e5d81e3c6c65b474a2d3d5394b32"
     }
   },
   "policy": {
@@ -17,12 +17,12 @@
   },
   "volume_summary": {
     "total": 421,
-    "implementation_signed": 273,
-    "verification_signed": 28,
-    "complete": 28,
-    "implementation_signed_open": 245,
-    "gap_free_waiting_verification": 21,
-    "implementation_unsigned": 148
+    "implementation_signed": 280,
+    "verification_signed": 49,
+    "complete": 49,
+    "implementation_signed_open": 231,
+    "gap_free_waiting_verification": 7,
+    "implementation_unsigned": 141
   },
   "fast_sets": {
     "fully_complete": [
@@ -40,51 +40,55 @@
       "VOL-017",
       "VOL-019",
       "VOL-020",
+      "VOL-022",
+      "VOL-027",
       "VOL-034",
       "VOL-035",
       "VOL-036",
       "VOL-037",
       "VOL-038",
+      "VOL-039",
+      "VOL-052",
+      "VOL-055",
       "VOL-056",
       "VOL-057",
+      "VOL-058",
       "VOL-059",
+      "VOL-073",
+      "VOL-074",
       "VOL-078",
       "VOL-079",
       "VOL-080",
+      "VOL-085",
+      "VOL-088",
+      "VOL-089",
+      "VOL-090",
+      "VOL-094",
+      "VOL-096",
+      "VOL-104",
+      "VOL-110",
+      "VOL-129",
+      "VOL-130",
+      "VOL-131",
+      "VOL-132",
+      "VOL-196",
       "VOL-248",
       "VOL-253",
       "VOL-420"
     ],
     "gap_free_waiting_verification": [
-      "VOL-022",
-      "VOL-027",
       "VOL-032",
-      "VOL-039",
-      "VOL-073",
-      "VOL-074",
       "VOL-081",
-      "VOL-085",
       "VOL-086",
       "VOL-087",
-      "VOL-088",
-      "VOL-089",
-      "VOL-090",
       "VOL-091",
       "VOL-092",
-      "VOL-094",
-      "VOL-095",
-      "VOL-096",
-      "VOL-104",
-      "VOL-110",
-      "VOL-196"
+      "VOL-095"
     ],
     "implementation_unsigned": [
       "VOL-033",
       "VOL-051",
-      "VOL-052",
       "VOL-053",
-      "VOL-055",
-      "VOL-058",
       "VOL-122",
       "VOL-123",
       "VOL-124",
@@ -92,10 +96,6 @@
       "VOL-126",
       "VOL-127",
       "VOL-128",
-      "VOL-129",
-      "VOL-130",
-      "VOL-131",
-      "VOL-132",
       "VOL-134",
       "VOL-166",
       "VOL-167",
@@ -233,32 +233,32 @@
     "DP-000-040": {
       "total": 41,
       "implementation_signed": 40,
-      "complete": 19,
-      "gap_free_waiting_verification": 4
+      "complete": 22,
+      "gap_free_waiting_verification": 1
     },
     "DP-041-080": {
       "total": 40,
-      "implementation_signed": 35,
-      "complete": 6,
-      "gap_free_waiting_verification": 2
+      "implementation_signed": 38,
+      "complete": 11,
+      "gap_free_waiting_verification": 0
     },
     "DP-081-120": {
       "total": 40,
       "implementation_signed": 40,
-      "complete": 0,
-      "gap_free_waiting_verification": 14
+      "complete": 8,
+      "gap_free_waiting_verification": 6
     },
     "DP-121-160": {
       "total": 40,
-      "implementation_signed": 28,
-      "complete": 0,
+      "implementation_signed": 32,
+      "complete": 4,
       "gap_free_waiting_verification": 0
     },
     "DP-161-200": {
       "total": 40,
       "implementation_signed": 21,
-      "complete": 0,
-      "gap_free_waiting_verification": 1
+      "complete": 1,
+      "gap_free_waiting_verification": 0
     },
     "DP-201-240": {
       "total": 40,
@@ -300,14 +300,14 @@
   "accountability_summary": {
     "volume": {
       "total": 421,
-      "implementation_signed": 273,
-      "verification_signed": 28,
-      "complete": 28,
+      "implementation_signed": 280,
+      "verification_signed": 49,
+      "complete": 49,
       "status_counts": {
-        "verified": 21,
-        "implemented": 245,
+        "verified": 42,
+        "implemented": 231,
         "hardened": 7,
-        "unverified": 148
+        "unverified": 141
       }
     },
     "work_package": {
