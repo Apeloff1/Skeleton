@@ -127,7 +127,7 @@ def observe_resources(
         current_platform = "unknown"
     reader = read_text or (lambda name: Path(name).read_text(encoding="ascii"))
     cpu = cpu_count or os.cpu_count
-    sysconf = sysconf or os.sysconf
+    sysconf = sysconf or getattr(os, "sysconf", lambda _name: None)
     try:
         cpus = _positive(cpu())
     except (OSError, TypeError, ValueError):
