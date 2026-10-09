@@ -79,6 +79,53 @@ for matching operating systems and Python versions. A Windows frozen console
 does **not** include arbitrary local GGUF weights or automatically install
 GPU drivers or the llama.cpp executable.
 
+## Entirely local document knowledge library
+
+The desktop includes **Open local library…**, **Index text folder…**
+and **Search local library**. This is a local SQLite FTS5 projection of
+user-selected documents. It works with no model loaded and does not require
+Docker, a database server, an internet connection, or provider credentials.
+
+The frozen console, installed `skeleton-offline` command, and unified app
+CLI can build or search exactly the same local SQLite index:
+
+```sh
+skeleton-offline --library ./knowledge.sqlite --index-dir ./notes --json
+skeleton-offline --library ./knowledge.sqlite --search "game physics" --json
+python -m skeleton app local-ai --library ./knowledge.sqlite --search "physics" --json
+```
+
+To explicitly enrich a **real local model inference** with retrieved text:
+
+```sh
+skeleton-offline --deployment ./deployment.json --prompt "Explain physics" \
+  --library ./knowledge.sqlite --use-library --context-limit 3 --json
+```
+
+Results include relative paths, SHA-256 checksums and bounded excerpts.
+The model response's `retrieved_sources` field identifies supplied local
+references; it does not prove that the answer is correct or faithful. Source
+text is clearly marked untrusted. Document data never becomes permission for
+code execution, tool use or a hosted-model request.
+
+The importer reads only regular UTF-8 text files with these extensions:
+`.txt`, `.md`, `.markdown`, `.rst`, `.py`, `.json`,
+`.jsonl`, `.csv`, `.toml`, `.yaml`, `.yml`.
+It rejects symlinks, embedded NUL bytes and files over 128 KiB. Each batch
+is bounded to 2,000 files and 32 MiB. Indexing is transactional, supports
+incremental replacement and prunes deleted files **within the selected
+directory**, without deleting content from other indexed roots. Search
+identifiers are parameterized and all returned text is checked against its
+stored SHA-256. Neither PDFs nor arbitrary binary formats are opened by this
+low-trust local text importer.
+
+This is an **opt-in local search utility**, not the canonical crawler or
+semantic knowledgebase owner. Indexes and conversation databases are
+unencrypted local files. Use filesystem permissions/encrypted volumes for
+private knowledge. A normal local application cannot guarantee that a
+malicious operating-system process or third-party model executable has no
+network access; enforce that separately at the OS level.
+
 ## Offline readiness doctor
 
 Use `--doctor` with one preinstalled local artifact before running it:
@@ -232,7 +279,7 @@ and offline system-completion attestation are not yet provided.
 ## Acceptance
 
 ```sh
-python -m pytest skeleton/testing/test_app_offline_gguf.py skeleton/testing/test_offline_history_backup.py skeleton/testing/test_offline_kit.py skeleton/testing/test_offline_console.py skeleton/testing/test_offline_workspace.py skeleton/testing/test_offline_readiness.py -q
+python -m pytest skeleton/testing/test_app_offline_gguf.py skeleton/testing/test_offline_history_backup.py skeleton/testing/test_offline_kit.py skeleton/testing/test_offline_console.py skeleton/testing/test_offline_workspace.py skeleton/testing/test_offline_readiness.py skeleton/testing/test_offline_library.py -q
 python -m pytest skeleton/testing/test_local_model_deployment.py -q
 python scripts/check_architecture_map.py
 python scripts/check_ai_app_construction.py
