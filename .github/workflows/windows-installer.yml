@@ -201,6 +201,19 @@ jobs:
             Remove-Item -LiteralPath $cliDir -Recurse -Force -ErrorAction SilentlyContinue
           }
 
+          # No GGUF or llama.cpp binary is shipped. Verify that the installed
+          # command fails closed on missing operator-owned artifacts, rather
+          # than invoking a downloader or silently falling back to hosted AI.
+          $missingGguf = Start-Process -FilePath $launcher -ArgumentList @(
+            "--offline-command", "local-ai",
+            "--gguf-model", ('"' + (Join-Path $env:TEMP "missing-native-model.gguf") + '"'),
+            "--llama-executable", ('"' + (Join-Path $env:TEMP "missing-llama-cli.exe") + '"'),
+            "--prompt", "offline must fail closed", "--json"
+          ) -Wait -PassThru
+          if ($missingGguf.ExitCode -ne 1) {
+            throw "installed Skeleton.exe GGUF command did not fail closed on missing artifacts"
+          }
+
           $uninstaller = Join-Path $installDir "unins000.exe"
           if (-not (Test-Path -LiteralPath $uninstaller)) {
             throw "uninstaller missing"
