@@ -32,6 +32,38 @@ from skeleton.cortex.transformer import TinyTransformer
 MIN_HELDOUT_TOKENS = 4
 MIN_VALIDATION_IMPROVEMENT = 1e-7
 
+def _token_weighted_perplexity(model: TinyTransformer, lines: list[str]) -> float:
+    """Exponentiate total token negative log-likelihood, not mean line score.
+
+    TinyTransformer.logprob(text) returns the mean log probability per
+    predicted token for that individual text. Weight each line by its true
+    prediction count before exponentiating. Variable-length evaluation lines
+    must not have equal voting power.
+    """
+    if not lines:
+        raise OfflineImprovementError("evaluation requires non-empty text")
+    prediction_count = 0
+    weighted_log_probability = 0.0
+    for line in lines:
+        count = len(model._ids(line)) - 1
+        if count < 1:
+            raise OfflineImprovementError("evaluation line has no predictable token")
+        mean_log_probability = model.logprob(line)
+        if not math.isfinite(mean_log_probability) or mean_log_probability > 1e-9:
+            raise OfflineImprovementError("non-finite or positive model log probability")
+        weighted_log_probability += mean_log_probability * count
+        prediction_count += count
+    if prediction_count < 1 or not math.isfinite(weighted_log_probability):
+        raise OfflineImprovementError("held-out likelihood has invalid totals")
+    try:
+        result = math.exp(-weighted_log_probability / prediction_count)
+    except OverflowError as exc:
+        raise OfflineImprovementError("held-out perplexity overflow") from exc
+    if not math.isfinite(result) or result <= 0:
+        raise OfflineImprovementError("held-out perplexity is invalid")
+    return result
+
+
 
 class OfflineImprovementError(OfflineTrainingError):
     """Candidate model cannot be admitted or lacks held-out improvement."""
@@ -148,7 +180,7 @@ def improve_local_model(
     }:
         raise OfflineImprovementError("held-out evaluation overlaps normalized training tokens")
 
-    baseline = model.perplexity(heldout_lines)
+    baseline = _token_weighted_perplexity(model, heldout_lines)
     if not math.isfinite(baseline) or baseline <= 0:
         raise OfflineImprovementError("baseline held-out perplexity is invalid")
 
@@ -158,7 +190,7 @@ def improve_local_model(
     step_count = 0
     for epoch in range(1, epochs + 1):
         step_count += model.fit(train_lines, lr=0.02, schedule="cosine")
-        observed = model.perplexity(heldout_lines)
+        observed = _token_weighted_perplexity(model, heldout_lines)
         if not math.isfinite(observed) or observed <= 0:
             raise OfflineImprovementError("candidate produced nonfinite held-out perplexity")
         if observed < best_score - MIN_VALIDATION_IMPROVEMENT:
@@ -178,7 +210,7 @@ def improve_local_model(
         raise OfflineImprovementError("candidate weights did not change")
     if candidate.tokenizer_digest != original.tokenizer_digest:
         raise OfflineImprovementError("tokenizer identity drift after training")
-    independently_rechecked = trained.perplexity(heldout_lines)
+    independently_rechecked = _token_weighted_perplexity(trained, heldout_lines)
     if not math.isclose(independently_rechecked, best_score, abs_tol=1e-9, rel_tol=1e-9):
         raise OfflineImprovementError("candidate replay differs from selected held-out epoch")
     written = publish_native_checkpoint_no_replace(candidate, output)
@@ -256,8 +288,8 @@ def compare_local_models(
         validation_text, label="validation",
         vocabulary=set(parent.runtime.model.stoi), minimum_tokens=MIN_HELDOUT_TOKENS,
     )
-    baseline_ppl = parent.runtime.model.perplexity(lines)
-    candidate_ppl = improved.runtime.model.perplexity(lines)
+    baseline_ppl = _token_weighted_perplexity(parent.runtime.model, lines)
+    candidate_ppl = _token_weighted_perplexity(improved.runtime.model, lines)
     if any(not math.isfinite(v) or v <= 0 for v in (baseline_ppl, candidate_ppl)):
         raise OfflineImprovementError("held-out comparison yielded invalid perplexity")
     return OfflineComparisonReceipt(
