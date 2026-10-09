@@ -284,14 +284,20 @@ def restore_components(
     if len(canonical_bytes(checkpoint)) > limits.max_checkpoint_bytes:
         raise RuntimeContractError("runtime checkpoint exceeds configured byte budget")
 
+    policy_raw = body["device_policy"]
+    required_policy_keys = {"requested", "allow_fallback"}
+    allowed_policy_keys = required_policy_keys | {"kv_dtype", "kv_limit_bytes"}
+    if (
+        not required_policy_keys.issubset(policy_raw)
+        or not set(policy_raw).issubset(allowed_policy_keys)
+    ):
+        raise RuntimeContractError("runtime checkpoint device policy shape mismatch")
+    # Validate the embedded policy even when an explicit device override is
+    # supplied: a malformed signed checkpoint must never be laundered through
+    # a caller-provided otherwise-valid backend selection.
+    validated_policy = DevicePolicy(**dict(policy_raw))
     if device_policy is None:
-        policy_raw = body["device_policy"]
-        if set(policy_raw) != {"requested", "allow_fallback"}:
-            raise RuntimeContractError("runtime checkpoint device policy shape mismatch")
-        device_policy = DevicePolicy(
-            requested=policy_raw["requested"],
-            allow_fallback=policy_raw["allow_fallback"],
-        )
+        device_policy = validated_policy
 
     return model, limits, device_policy, tokenizer_checkpoint, body["architecture"]
 
