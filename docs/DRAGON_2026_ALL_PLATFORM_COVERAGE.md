@@ -434,3 +434,40 @@ BBC compiler target. The dedicated test therefore requires a real native
 does not claim a BBC binary exists until a full toolchain is provisioned.
 PET, Plus/4 and Atmos are independently linked in the same compiler gate.
 No counted source target is automatically promoted to emulator-verified.
+
+
+## Original 6502 executable custody and build reproducibility
+
+The dedicated compiler-release tool emits a *real* cc65 target-linker
+artifact (not a renamed source file) for each of PET, Plus/4 and Oric
+Atmos wherever its platform-specific runtime library is installed. For
+BBC Micro on the current Ubuntu cc65 distribution, which lacks bbc.lib,
+it emits a native machine-specific object and accurately reports
+native_6502_object_compiled_unlinked. It must never say this is a working
+BBC binary. If a later runner provides the proper BBC runtime, the same
+command can produce the completed target linker output.
+
+Command for a host with installed cc65:
+python -m skeleton.ai.webcrawler.dragon_cc65_release --out ./generated-6502
+
+The command requires an empty destination, only compiles the four
+explicit target IDs, bounds per-process execution, reads target-specific
+source directly from the original Dragon renderer, validates output size
+and retains the *exact generated source* beside each output. Each
+source-bound receipt includes target ID, compile/link assurance stage,
+file size and SHA-256, source SHA-256, full generated source project
+fingerprint, compiler signature fingerprint and missing-SDK information.
+The deterministically packaged archive contains per-target original
+source, Makefile, native output and receipt plus an aggregate manifest.
+The CI uploads the evidence only after checks pass.
+
+The receipt deliberately sets emulator_verified, device_verified and
+filesystem_container_verified to false. A 6502 object or a cc65 linked
+program does **not** certify lawful loader availability, packaging as
+commercial disk/tape media, sound, scanline behavior, latency, controller
+handling or game enjoyment.
+
+No platform identity, file extension, or reused source compatibility
+automatically upgrades the proof stage. This is concrete compilation
+and artifact custody for four previously unsupported home computers,
+while the global ledger still reads 72/169 source-capable targets.
