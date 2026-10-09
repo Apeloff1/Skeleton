@@ -389,7 +389,9 @@ class TorchAccel:
             self.pin()
         lm = self.lm
         window = list(ids[-lm.ctx:] or [lm.unk])
-        with self.torch.no_grad():
+        # Inference mode avoids autograd view/version bookkeeping on the
+        # hot prefill/decode path; SGD remains in regular grad-enabled mode.
+        with self.torch.inference_mode():
             if self._cached_ids == window[:-1]:
                 result = self._cached_step(window[-1])
             elif (
@@ -418,12 +420,12 @@ class TorchAccel:
             return result.detach().cpu().tolist()
 
     def logits(self, ids: Sequence[int]) -> List[float]:
-        with self._state_lock, self.torch.no_grad():
+        with self._state_lock, self.torch.inference_mode():
             y, _ = self._forward_ids(ids)
             return y.detach().cpu().tolist()
 
     def hidden(self, ids: Sequence[int]) -> List[float]:
-        with self._state_lock, self.torch.no_grad():
+        with self._state_lock, self.torch.inference_mode():
             _, h = self._forward_ids(ids)
             return h.detach().cpu().tolist()
 
