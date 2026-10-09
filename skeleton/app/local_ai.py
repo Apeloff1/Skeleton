@@ -36,6 +36,31 @@ def load_native_checkpoint(source: str | Path) -> NativeRuntimeLocalModel:
     return loaded.model
 
 
+def inspect_local_model(backend: NativeRuntimeLocalModel) -> dict[str, object]:
+    """Report actual offline model limits and identity without executing a prompt.
+
+    This is technical capability inspection, NOT a trained-quality or general
+    intelligence certificate.
+    """
+    if not isinstance(backend, NativeRuntimeLocalModel):
+        raise OfflineAIError("native transformer model required")
+    backend.assert_identity()
+    runtime = backend.runtime
+    return {
+        "schema_version": 1,
+        "model_id": backend.model_id,
+        "model_digest": backend.model_digest,
+        "tokenizer_digest": backend.tokenizer_digest,
+        "runtime_digest": backend.runtime_digest,
+        "max_context_tokens": runtime.limits.max_context,
+        "max_output_tokens": runtime.limits.max_new_tokens,
+        "model_bytes": runtime.model_bytes,
+        "provider_credentials_required": False,
+        "network_required": False,
+        "model_quality_certified": False,
+    }
+
+
 @dataclass(frozen=True)
 class OfflineAnswer:
     text: str
@@ -331,7 +356,14 @@ class OfflineAIWindow:
                 if kind == "loaded":
                     self.session = value  # type: ignore[assignment]
                     self.clear()
-                    self.status.set("Native model loaded: " + self.session.model_digest[:16] + "…")
+                    info = inspect_local_model(self.session.backend)
+                    self.status.set(
+                        "Native model loaded · context "
+                        + str(info["max_context_tokens"])
+                        + " tokens · weights "
+                        + str(info["model_bytes"])
+                        + " bytes · " + self.session.model_digest[:12] + "…"
+                    )
                 elif kind == "answer":
                     answer = value
                     self._append("Skeleton · Local", answer.text)  # type: ignore[attr-defined]
