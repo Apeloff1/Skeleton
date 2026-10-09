@@ -13,7 +13,8 @@ from pathlib import Path
 import pytest
 
 from skeleton.ai.runtime.gameplay_capabilities import (
-    GAMEPLAY_OPERATIONS, GameplayError, compile_level, generate_level,
+    GAMEPLAY_OPERATIONS, GameplayError, compile_level, compile_native_scene,
+    generate_level,
     platformer_replay, platformer_step, tile_line_of_sight,
 )
 from skeleton.ai.runtime.deterministic_capabilities import (
@@ -35,12 +36,13 @@ W = [
 CONTROLS = {"left": False, "right": False, "jump": False}
 
 
-def test_five_additional_gameplay_capabilities_are_installed_without_model():
+def test_six_additional_gameplay_capabilities_are_installed_without_model():
     assert set(GAMEPLAY_OPERATIONS) == {
-        "game.level_generate", "game.level_compile", "game.platformer_step",
-        "game.platformer_replay", "game.tile_line_of_sight",
+        "game.level_generate", "game.level_compile", "game.scene_compile",
+        "game.platformer_step", "game.platformer_replay",
+        "game.tile_line_of_sight",
     }
-    assert len(OPERATIONS) == 29
+    assert len(OPERATIONS) == 30
     assert set(GAMEPLAY_OPERATIONS).issubset(OPERATIONS)
     for name in GAMEPLAY_OPERATIONS:
         assert callable(OPERATIONS[name])
@@ -295,3 +297,71 @@ def test_procedural_level_generation_is_resource_bounded_and_replay_stable():
         assert len(serialized) < 8192
         assert level["goal_reachable"]
         assert compile_level({"tiles": level["tiles"]})["goal_reachable"]
+
+
+def test_engine_neutral_scene_packs_wall_runs_without_losing_geometry():
+    scene = compile_native_scene({"tiles": W})
+    level = compile_level({"tiles": W})
+    assert scene["schema_version"] == "skeleton.gameplay.engine_neutral_scene.v1"
+    assert scene["coordinate_system"] == "integer_grid_y_down"
+    assert scene["tile_size"] == 1
+    assert scene["width"] == 7 and scene["height"] == 5
+    assert scene["source_tile_digest"] == level["tile_digest"]
+    assert scene["goal_reachable"] is True
+    assert scene["solid_tiles_covered"] == level["solid_count"]
+    assert scene["collider_count"] < scene["solid_tiles_covered"]
+    assert scene["entities"] == [
+        {"id": "player", "kind": "controllable_actor",
+         "position": {"x": 1, "y": 1},
+         "velocity": {"x": 0, "y": 0}},
+        {"id": "goal", "kind": "goal_trigger",
+         "position": {"x": 5, "y": 1}},
+    ]
+    assert scene["native_executable_created"] is False
+    assert scene["external_artwork_included"] is False
+    assert scene["training_examples_added"] == 0
+    cells = {
+        (x, rect["y"])
+        for rect in scene["collider_rectangles"]
+        for x in range(rect["x"], rect["x"] + rect["width"])
+    }
+    expected = {(x, y) for y, line in enumerate(W)
+                for x, ch in enumerate(line) if ch == "#"}
+    assert cells == expected
+
+
+def test_compiled_scene_large_checkerboard_still_within_receipt_budget():
+    rows = []
+    for y in range(32):
+        rows.append("".join("#" if (x + y) % 2 else "."
+                            for x in range(32)))
+    rows[1] = rows[1][:1] + "S" + rows[1][2:]
+    rows[30] = rows[30][:30] + "G" + rows[30][31:]
+    receipt = execute_capability_task({
+        "operation": "game.scene_compile", "args": {"tiles": rows},
+    })
+    scene = receipt["result"]
+    assert scene["solid_tiles_covered"] == sum(row.count("#") for row in rows)
+    assert scene["collider_count"] <= 512
+    assert len(json.dumps(receipt, sort_keys=True).encode("utf-8")) < 32768
+
+
+def test_graph_compiles_seeded_map_into_engine_neutral_scene_without_assets():
+    graph = {
+        "schema_version": GRAPH_SCHEMA,
+        "nodes": [
+            {"id": "map", "operation": "game.level_generate",
+             "args": {"seed": 7, "width": 8, "height": 7,
+                      "wall_percent": 25}},
+            {"id": "scene", "operation": "game.scene_compile",
+             "args": {"tiles": {"$ref": "map", "path": ["tiles"]}}},
+        ],
+        "outputs": ["scene"],
+    }
+    result = execute_capability_graph(graph)
+    scene = result["outputs"]["scene"]
+    assert result["node_count"] == 2
+    assert scene["goal_reachable"] is True
+    assert scene["training_examples_added"] == 0
+    assert scene["native_executable_created"] is False
+    assert len(scene["entities"]) == 2
