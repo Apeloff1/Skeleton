@@ -117,6 +117,55 @@ def compile_level(arguments: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def compile_native_scene(arguments: dict[str, Any]) -> dict[str, Any]:
+    """Compile a portable *engine-neutral* 2D scene with packed wall spans.
+
+    The output is structured geometry/actors, never generated source code,
+    a platform binary, console ROM, or a promise of a particular GPU API.
+    One horizontal collider is emitted for each contiguous wall run.
+    """
+    args = _fields(arguments, {"tiles"})
+    level = compile_level(args)
+    rows, spawn, goal = _map(args["tiles"])
+    rectangles: list[dict[str, int]] = []
+    for y, row in enumerate(rows):
+        x = 0
+        while x < len(row):
+            if row[x] != "#":
+                x += 1
+                continue
+            origin = x
+            while x < len(row) and row[x] == "#":
+                x += 1
+            rectangles.append({
+                "x": origin, "y": y, "width": x - origin, "height": 1,
+            })
+    covered = sum(item["width"] * item["height"] for item in rectangles)
+    if covered != level["solid_count"]:
+        raise GameplayError("compiled collider count disagrees with source map")
+    return {
+        "schema_version": "skeleton.gameplay.engine_neutral_scene.v1",
+        "coordinate_system": "integer_grid_y_down",
+        "tile_size": 1,
+        "width": level["width"],
+        "height": level["height"],
+        "source_tile_digest": level["tile_digest"],
+        "collider_rectangles": rectangles,
+        "collider_count": len(rectangles),
+        "solid_tiles_covered": covered,
+        "entities": [
+            {"id": "player", "kind": "controllable_actor",
+             "position": _point(spawn), "velocity": {"x": 0, "y": 0}},
+            {"id": "goal", "kind": "goal_trigger",
+             "position": _point(goal)},
+        ],
+        "goal_reachable": level["goal_reachable"],
+        "external_artwork_included": False,
+        "native_executable_created": False,
+        "training_examples_added": 0,
+    }
+
+
 def generate_level(arguments: dict[str, Any]) -> dict[str, Any]:
     """Create an original solvable maze tilemap from a stable seed.
 
@@ -295,6 +344,7 @@ def tile_line_of_sight(arguments: dict[str, Any]) -> dict[str, Any]:
 GAMEPLAY_OPERATIONS = {
     "game.level_generate": generate_level,
     "game.level_compile": compile_level,
+    "game.scene_compile": compile_native_scene,
     "game.platformer_step": platformer_step,
     "game.platformer_replay": platformer_replay,
     "game.tile_line_of_sight": tile_line_of_sight,
@@ -302,5 +352,6 @@ GAMEPLAY_OPERATIONS = {
 
 
 __all__ = ["GameplayError", "GAMEPLAY_OPERATIONS", "compile_level",
+           "compile_native_scene",
            "generate_level", "platformer_step", "platformer_replay",
            "tile_line_of_sight"]
