@@ -205,3 +205,63 @@ def test_rotary_only_torch_and_reference_parity():
     assert accel.logits((1, 2, 3)) == pytest.approx(
         cpu_logits, rel=2e-5, abs=2e-5
     )
+
+
+@pytest.mark.parametrize("norm,ffn,position_mode,layers", [
+    ("ln", "gelu", "learned_rope", 1),
+    ("ln", "gelu", "learned_rope", 2),
+    ("rms", "swiglu", "rope", 1),
+    ("rms", "swiglu", "rope", 2),
+])
+def test_torch_resident_incremental_decode_parity(norm, ffn, position_mode, layers):
+    pytest.importorskip("torch")
+    model = TinyTransformer(
+        vocab=("alpha", "beta", "gamma"),
+        dim=8, ctx=4, seed=127, n_heads=2, n_layers=layers,
+        d_ff=12, norm=norm, ffn_kind=ffn, position_mode=position_mode,
+    )
+    reference = TinyTransformer.from_snapshot(model.snapshot())
+    model.to("torch")
+    assert model.resident and model._accel is not None
+    cache = KVCache(model.n_layers, model.ctx)
+    windows = [
+        (1,), (1, 2), (1, 2, 3), (1, 2, 3, 1),
+        (2, 3, 1, 2), (3, 1, 2, 3), (1, 2, 3, 1),
+        (1, 3, 2, 1),  # unrelated window forces fresh prefill
+    ]
+    for window in windows:
+        cached = model._logits_window(window, cache)
+        full = reference._logits_window(window)
+        assert cached == pytest.approx(full, rel=2e-5, abs=2e-5)
+        assert model._accel is not None and model.resident
+    assert model._accel._cached_ids == list(windows[-1])
+
+
+def test_torch_decode_cache_is_invalidated_after_training():
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = _model(norm="rms", ffn_kind="swiglu")
+    accel = TorchAccel(model, device="cpu").pin()
+    _ = accel.logits_window((1, 2, 3))
+    assert accel._cached_ids == [1, 2, 3]
+    accel.sgd((1, 2), target=3, lr=0.05)
+    assert accel._cached_ids == []
+    assert accel.logits_window((1, 2, 3)) == pytest.approx(
+        accel.logits((1, 2, 3)), rel=2e-5, abs=2e-5
+    )
+
+
+def test_mixture_of_depths_model_never_executes_unimplemented_torch_graph():
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = TinyTransformer(
+        vocab=("alpha", "beta"), dim=8, ctx=4,
+        n_heads=2, n_layers=1, seed=7, use_mod=True,
+    )
+    with pytest.raises(ValueError, match="Mixture of Depths"):
+        TorchAccel(model).pin()
+    model.to("torch")
+    assert model.device == "cpu" and not model.resident
+    assert model._accel is None
