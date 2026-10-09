@@ -65,6 +65,37 @@ The default preview is 18x12 tiles, with a 28-pixel tile size and
 consumer-grade PCs. It uses standard-library Tk graphics; no webview,
 downloaded images or game-engine service is used.
 
+## Play an original or properly licensed edited project
+
+The native preview is no longer limited to its embedded procedural
+demo. It accepts an **explicitly user-selected** portable project JSON
+from the cross-era game authoring pipeline:
+
+\`\`\`powershell
+SkeletonGame.exe --project .\my-edited-game.json
+SkeletonOffline.exe --game-preview --game-project .\my-edited-game.json
+SkeletonOffline.exe --game-preview-check --game-project .\my-edited-game.json --json
+\`\`\`
+
+The loader refuses symlinks, oversize files, duplicate JSON fields,
+forged release flags, altered rights manifests, replaced source asset
+hashes, broken edit replay, fake console export claims and unsupported
+tile formats. A bounded real-controller solver must find a winning
+sequence under the exact movement/jump/gravity rules before the
+imported game can be previewed. If it cannot prove playability within
+its resource cap, it declines rather than declaring the game valid.
+
+The native renderer adapts to the authored map dimensions (5-32 tiles
+per side), and the background scene is built from that map rather
+than copied copyrighted game artwork. Original or separately authorized
+rights must be recorded in the project; author declarations remain
+**unverified** until a qualified rights review.
+
+Use \`scripts/game/game_project.py --compose <input.json> --output
+<new-project.json>\` to make a new private project after applying
+bounded authorized tile modifications. This does not implicitly
+authorize distribution, console build access or model training.
+
 ## Headless actual-play qualification
 
 To prove the frozen runtime can **win** without a display:
