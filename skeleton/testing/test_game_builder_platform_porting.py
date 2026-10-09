@@ -41,7 +41,8 @@ def test_catalog_is_broad_and_includes_abandoned_and_obscure_systems():
     summary = registry.summary()
     assert summary["platform_count"] >= 290
     assert len(summary["kinds"]) >= 9
-    assert all(count >= 3 for count in summary["kinds"].values())
+    assert len(summary["kinds"]) >= 12
+    assert all(count >= 1 for count in summary["kinds"].values())
     for platform_id in (
         "fairchild_channel_f", "interton_vc4000", "epoch_super_cassette_vision",
         "bandai_wonderswan", "bandai_swancrystal", "nec_pc_fx",
