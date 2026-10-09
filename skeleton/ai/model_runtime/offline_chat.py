@@ -36,6 +36,7 @@ MAX_TRANSCRIPT_BYTES = 2_359_296
 MAX_BUNDLE_BYTES = 16 * 1024 * 1024
 MAX_EXPORTED_TURNS = 1024
 _BUNDLE_SCHEMA = "skeleton.ai.offline-chat-bundle.v1"
+_BUNDLE_SCHEMA_V2 = "skeleton.ai.offline-chat-bundle.v2"
 
 
 def _stable_bytes(obj: Any) -> bytes:
@@ -237,6 +238,16 @@ class OfflineChatStore:
                 PRIMARY KEY (session_id, request_id),
                 UNIQUE (session_id, revision)
             )""")
+            self._db.execute("""CREATE TABLE IF NOT EXISTS offline_turn_evidence (
+                session_id TEXT NOT NULL,
+                request_id TEXT NOT NULL,
+                evidence_json TEXT NOT NULL,
+                evidence_digest TEXT NOT NULL,
+                PRIMARY KEY (session_id, request_id),
+                FOREIGN KEY (session_id, request_id)
+                    REFERENCES offline_turns(session_id, request_id)
+                    ON DELETE CASCADE
+            )""")
 
             if self._db.execute("PRAGMA foreign_keys").fetchone() != (1,):
                 raise RuntimeContractError("SQLite foreign-key enforcement unavailable")
@@ -319,6 +330,12 @@ class OfflineChatStore:
                     "prompt_tokens, generated_tokens FROM offline_turns "
                     "WHERE session_id=? ORDER BY revision", (sid,),
                 ).fetchall()
+                evidence_rows = self._db.execute(
+                    "SELECT e.request_id, e.evidence_json, e.evidence_digest "
+                    "FROM offline_turn_evidence e JOIN offline_turns t "
+                    "ON e.session_id=t.session_id AND e.request_id=t.request_id "
+                    "WHERE e.session_id=? ORDER BY t.revision", (sid,),
+                ).fetchall()
             finally:
                 if own_snapshot:
                     self._db.execute("ROLLBACK")
@@ -352,7 +369,73 @@ class OfflineChatStore:
                 prompt_tokens=item[5], generated_tokens=item[6],
             ))
         _validate_complete_history(transcript, turns)
+        evidence_index = {item["request_id"]: item for item in turns}
+        for receipt_id, encoded, claimed in evidence_rows:
+            turn = evidence_index.get(receipt_id)
+            if turn is None:
+                raise RuntimeContractError("orphaned grounded turn evidence")
+            self._validate_evidence_record(
+                encoded, claimed, turn, transcript, row[0], row[1]
+            )
         return StoredChat(sid, revision, transcript, row[0], row[1])
+
+    @staticmethod
+    def _validate_evidence_record(encoded: str, digest: str,
+                                  turn: dict[str, Any],
+                                  transcript: ChatTranscript, model_digest: str,
+                                  tokenizer_digest: str) -> dict[str, Any]:
+        from skeleton.app.offline_grounding import validate_evidence
+
+        if not isinstance(encoded, str) or len(encoded.encode("utf-8")) > 6_144:
+            raise RuntimeContractError("stored grounding evidence exceeds limit")
+        if sha256(encoded.encode("utf-8")).hexdigest() != _sha256(
+            digest, "stored grounding digest"
+        ):
+            raise RuntimeContractError("stored grounding evidence digest mismatch")
+        try:
+            item = json.loads(encoded, object_pairs_hook=_strict_pairs,
+                              parse_constant=_reject_constant)
+        except (ValueError, UnicodeError) as exc:
+            raise RuntimeContractError("corrupted stored grounding JSON") from exc
+        messages = transcript.messages
+        offset = 1 if messages and messages[0].role == "system" else 0
+        question = messages[offset + 2 * (turn["revision"] - 1)].content
+        reconstructed = validate_evidence(
+            item, question, turn["request_digest"],
+            model_digest, tokenizer_digest,
+        )
+        if reconstructed.decode("utf-8") != encoded:
+            raise RuntimeContractError("noncanonical grounded turn evidence")
+        return item
+
+    def turn_evidence(self, session_id: str, model_digest: str,
+                      tokenizer_digest: str) -> list[dict[str, Any] | None]:
+        """Read validated immutable supplied-source snapshots per saved turn."""
+        record = self.load(session_id, model_digest, tokenizer_digest)
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT t.request_id, t.request_digest, t.revision, t.text, "
+                "t.output_digest, t.prompt_tokens, t.generated_tokens, "
+                "e.evidence_json, e.evidence_digest "
+                "FROM offline_turns t LEFT JOIN offline_turn_evidence e "
+                "ON t.session_id=e.session_id AND t.request_id=e.request_id "
+                "WHERE t.session_id=? ORDER BY t.revision",
+                (record.session_id,),
+            ).fetchall()
+        if len(rows) != record.revision:
+            raise RuntimeContractError("grounded turn read changed during lookup")
+        out: list[dict[str, Any] | None] = []
+        for row in rows:
+            turn = dict(request_id=row[0], request_digest=row[1],
+                        revision=row[2], text=row[3], output_digest=row[4],
+                        prompt_tokens=row[5], generated_tokens=row[6])
+            out.append(
+                self._validate_evidence_record(
+                    row[7], row[8], turn, record.transcript,
+                    model_digest, tokenizer_digest
+                ) if row[7] is not None else None
+            )
+        return out
 
     def list_sessions(self, model_digest: str, tokenizer_digest: str,
                       *, limit: int = 100) -> tuple[tuple[str, int], ...]:
@@ -430,6 +513,15 @@ class OfflineChatStore:
             self._db.executemany(
                 "INSERT INTO offline_turns VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 [(new_id, *row) for row in rows[:after_turn]],
+            )
+            self._db.execute(
+                "INSERT INTO offline_turn_evidence "
+                "(session_id, request_id, evidence_json, evidence_digest) "
+                "SELECT ?, e.request_id, e.evidence_json, e.evidence_digest "
+                "FROM offline_turn_evidence e JOIN offline_turns t "
+                "ON e.session_id=t.session_id AND e.request_id=t.request_id "
+                "WHERE e.session_id=? AND t.revision <= ?",
+                (new_id, sid, after_turn),
             )
             return new_id
 
