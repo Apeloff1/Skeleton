@@ -16,8 +16,7 @@ def test_unicode_normalization_is_not_silently_collapsed():
 def test_unpaired_unicode_surrogates_are_rejected_for_values_and_keys():
  import pytest
  from skeleton.contracts.canonical import CanonicalContractError
- for payload in ({"text":"\\ud800"},{"\\udc00":"text"},{"nested":[{"bad":"\\udfff"}]}):
-  # Escaped literals above are intentionally converted to literal codepoints.
+ for payload in ({"text":chr(0xD800)},{chr(0xDC00):"text"},{"nested":[{"bad":chr(0xDFFF)}]}):
   with pytest.raises(CanonicalContractError,match="Unicode surrogate"):
    canonical_json_bytes(payload)
 
