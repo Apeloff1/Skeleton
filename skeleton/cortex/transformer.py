@@ -891,9 +891,11 @@ class TinyTransformer:
         lm.fitted = int((data or {}).get("fitted") or 0)
         lm.steps = int((data or {}).get("steps") or 0)
         lm.device = str((data or {}).get("device") or "cpu")
-        if lm.device == "cuda":
+        if lm.device in {"cuda", "mps"}:
+            # Snapshots are portable weights, never proof of a bound accelerator.
+            lm.requested = lm.device
             lm.device = "cpu"
-            lm.requested = "cuda"
+            lm.resident = False
         return lm
 
 
