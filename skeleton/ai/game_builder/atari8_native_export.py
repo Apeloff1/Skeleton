@@ -18,7 +18,7 @@ from .playable_world import PlayableWorld
 from .port_planner import HomebrewSource, PortMode, PortRequest, compile_port
 
 MAX_WIDTH = 37
-MAX_HEIGHT = 23
+MAX_HEIGHT = 22
 MAX_STAGES = 8
 _TILE_INDEX = {".": 0, "S": 0, "#": 1, "C": 2, "H": 3, "G": 4}
 
