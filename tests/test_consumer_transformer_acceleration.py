@@ -143,3 +143,15 @@ def test_mps_policy_no_silent_downgrade(monkeypatch):
     monkeypatch.setattr(model, "to", degraded_to)
     with pytest.raises(RuntimeContractError, match="fallback"):
         NativeLLMRuntime(model, device_policy=DevicePolicy(requested="mps", allow_fallback=False))
+
+
+def test_mps_snapshot_is_portable_and_not_falsely_resident():
+    model = _model()
+    snapshot = model.snapshot()
+    snapshot["device"] = "mps"
+    snapshot["resident"] = True
+    restored = TinyTransformer.from_snapshot(snapshot)
+    assert restored.device == "cpu"
+    assert restored.requested == "mps"
+    assert restored.resident is False
+    assert restored._accel is None
