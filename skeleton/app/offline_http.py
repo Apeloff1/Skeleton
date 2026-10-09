@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from hashlib import sha256
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import hmac
 import json
@@ -537,6 +538,24 @@ def smoke_offline_http_inference() -> bool:
                         and len(saved["messages"]) == 2
                         and len(saved["messages"][-1]["content"].strip()) > 0
                     )
+                    reference_text = (
+                        "The offline rasterizer uses depth-buffer rejection "
+                        "and deterministic tile sorting for frame rendering."
+                    )
+                    ref_status, added = request(
+                        "POST", "/v1/knowledge/documents",
+                        {"title": "Local acceptance reference", "text": reference_text},
+                    )
+                    search_status, evidence = request(
+                        "POST", "/v1/knowledge/search",
+                        {"query": "rasterizer depth-buffer sorting"},
+                    )
+                    if (ref_status != 201 or search_status != 200
+                            or not evidence.get("hits")
+                            or evidence["hits"][0]["document_id"] != added["document_id"]
+                            or evidence["hits"][0]["document_sha256"] != added["sha256"]):
+                        accepted = False
+                    reference_id = added.get("document_id")
                 finally:
                     server.shutdown()
                     worker.join(timeout=10)
@@ -557,8 +576,18 @@ def smoke_offline_http_inference() -> bool:
                 sid, payload["request_id"],
                 _digest_request("hello", GenerationConfig(max_new_tokens=2))
             )
+            references = OfflineKnowledgeLibrary(
+                reopened, backend.model_digest, app.tokenizer_digest
+            )
+            retrieved = references.search("depth-buffer deterministic rasterizer")
             return bool(
-                restored.revision == 1
+                len(retrieved) > 0
+                and retrieved[0]["document_id"] == reference_id
+                and retrieved[0]["passage"] == reference_text
+                and retrieved[0]["document_sha256"] == sha256(
+                    reference_text.encode("utf-8")
+                ).hexdigest()
+                and restored.revision == 1
                 and len(restored.transcript.messages) == 2
                 and restored.transcript.messages[0].content == "hello"
                 and restored.transcript.messages[1].content == first["text"]
