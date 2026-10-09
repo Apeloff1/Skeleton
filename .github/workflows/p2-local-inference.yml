@@ -96,6 +96,12 @@ jobs:
           tests/flgb/test_desktop_offline_ai.py
           tests/test_consumer_transformer_acceleration.py
           tests/test_consumer_llama_budget.py
+      - name: Verify CPU-only benchmark on reference engine
+        run: >-
+          python scripts/benchmark_consumer_transformer.py
+          --device cpu --dim 8 --heads 2 --layers 1 --ffn 12
+          --context 16 --prefill 4 --decode 2 --warmup 0 --runs 1
+          --assert-parity
 
   consumer-transformer-cpu-torch:
     # Verify the optimized numerical path on commodity CPU-only hardware.
@@ -127,3 +133,9 @@ jobs:
           python -m pytest -q
           tests/test_consumer_transformer_acceleration.py
           tests/test_consumer_llama_budget.py
+      - name: Verify measured Torch CPU prefill and decode parity
+        run: >-
+          python scripts/benchmark_consumer_transformer.py
+          --device torch --dim 8 --heads 2 --layers 1 --ffn 12
+          --context 16 --prefill 4 --decode 2 --warmup 0 --runs 1
+          --assert-parity
