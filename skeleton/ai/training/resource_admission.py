@@ -85,8 +85,12 @@ def _read_linux_meminfo(read_text: Callable[[str], str]) -> tuple[int | None, in
         if _positive(val) is not None:
             values[key] = val
     total = values.get("MemTotal")
+    # Available bytes without a validated physical ceiling could be a
+    # malformed/injected value. Fail conservatively instead of escalating.
+    if total is None:
+        return None, None
     free = values.get("MemAvailable") or values.get("MemFree")
-    if total is not None and free is not None and free > total:
+    if free is not None and free > total:
         free = total
     return total, free
 
