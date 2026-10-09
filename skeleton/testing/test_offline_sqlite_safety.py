@@ -48,6 +48,7 @@ def test_snapshot_and_auditor_reject_symlinked_wal_input(
     victim = tmp_path / "outside.txt"
     victim.write_bytes(b"DO NOT ALTER")
     sidecar = Path(str(target) + "-wal")
+    sidecar.unlink(missing_ok=True)
     try:
         sidecar.symlink_to(victim)
     except OSError:
