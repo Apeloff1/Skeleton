@@ -188,6 +188,73 @@ class OfflineNativeChatTests(unittest.TestCase):
             self.assertEqual(reopened.list_sessions(
                 self.product.model_digest, self.product.tokenizer_digest), ())
 
+    def test_portable_export_import_preserves_history_and_replay(self):
+        sid = self.product.create(system="Stay precise.")
+        prior = self.product.turn(sid, "hello", self.config, request_id="portable")
+        bundle = self.product.export_session(sid)
+        restored = self.product.import_session(bundle)
+        self.assertNotEqual(restored, sid)
+        saved = self.store.load(restored, self.product.model_digest,
+                                self.product.tokenizer_digest)
+        self.assertEqual(saved.revision, 1)
+        self.assertEqual(saved.transcript.messages[0].role, "system")
+        self.assertEqual(saved.transcript.messages[-1].content, prior.text)
+        repeated = self.product.turn(restored, "hello", self.config,
+                                     request_id="portable")
+        self.assertTrue(repeated.replayed)
+        self.assertEqual(repeated.output_digest, prior.output_digest)
+        self.assertEqual(repeated.revision, 1)
+
+    def test_corrupt_backup_and_wrong_model_cannot_import(self):
+        sid = self.product.create()
+        self.product.turn(sid, "hello", self.config, request_id="backup")
+        bundle = self.product.export_session(sid)
+        count = len(self.product.list_sessions())
+        envelope = json.loads(bundle)
+        envelope["body"]["messages"][-1]["content"] = "tampered"
+        with self.assertRaisesRegex(RuntimeContractError, "digest mismatch"):
+            self.product.import_session(json.dumps(envelope).encode("utf-8"))
+        with self.assertRaisesRegex(RuntimeContractError, "model/tokenizer"):
+            self.store.import_bundle(bundle, "b" * 64, self.product.tokenizer_digest)
+        self.assertEqual(len(self.product.list_sessions()), count)
+
+    def test_backup_import_is_create_only_and_failed_import_is_atomic(self):
+        sid = self.product.create()
+        self.product.turn(sid, "hello", self.config, request_id="first")
+        bundle = self.product.export_session(sid)
+        a = self.product.import_session(bundle)
+        b = self.product.import_session(bundle)
+        self.assertNotEqual(a, b)
+        self.assertEqual(len(self.product.list_sessions()), 3)
+        envelope = json.loads(bundle)
+        envelope["body"]["turns"][0]["revision"] = True
+        import hashlib
+        import json as js
+        canonical = js.dumps(
+            envelope["body"], sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+        envelope["sha256"] = hashlib.sha256(canonical).hexdigest()
+        with self.assertRaisesRegex(RuntimeContractError, "revision"):
+            self.product.import_session(js.dumps(envelope).encode("utf-8"))
+        self.assertEqual(len(self.product.list_sessions()), 3)
+
+    def test_bundle_file_creation_denies_overwrite_and_symlink(self):
+        from skeleton.ai.model_runtime.offline_chat import (
+            load_private_bundle, save_private_bundle,
+        )
+        sid = self.product.create()
+        backup = self.root / "backup.json"
+        payload = self.product.export_session(sid)
+        save_private_bundle(backup, payload)
+        self.assertEqual(load_private_bundle(backup), payload)
+        with self.assertRaises(FileExistsError):
+            save_private_bundle(backup, payload)
+        alias = self.root / "alias.json"
+        alias.symlink_to(backup)
+        with self.assertRaises(RuntimeContractError):
+            load_private_bundle(alias)
+
     def test_corrupt_checkpoint_is_rejected_before_inference(self):
         p = self.root / "model.json"
         checkpoint = json.loads(self.engine.runtime.checkpoint_json())
