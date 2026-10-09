@@ -143,6 +143,10 @@ jobs:
           if (-not (Test-Path -LiteralPath $launcher)) {
             throw "installed Skeleton.exe missing"
           }
+          $cliLauncher = Join-Path $installDir "SkeletonCLI.exe"
+          if (-not (Test-Path -LiteralPath $cliLauncher)) {
+            throw "installed SkeletonCLI.exe missing; offline command stdout cannot be verified"
+          }
           $launch = Start-Process -FilePath $launcher -ArgumentList @("--help") -Wait -PassThru
           if ($launch.ExitCode -ne 0) {
             throw "installed Skeleton.exe launch smoke exited $($launch.ExitCode)"
@@ -180,7 +184,7 @@ jobs:
               "user hello assistant world",
               "user world assistant hello"
             ) -Encoding utf8
-            $cliTrain = Start-Process -FilePath $launcher -ArgumentList @(
+            $cliTrain = Start-Process -FilePath $cliLauncher -ArgumentList @(
               "--offline-command", "local-ai",
               "--train-corpus", ('"' + $cliSource + '"'),
               "--output-model", ('"' + $cliModel + '"'),
@@ -189,7 +193,7 @@ jobs:
             if ($cliTrain.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $cliModel)) {
               throw "installed Skeleton.exe offline command training failed"
             }
-            $cliInspect = Start-Process -FilePath $launcher -ArgumentList @(
+            $cliInspect = Start-Process -FilePath $cliLauncher -ArgumentList @(
               "--offline-command", "local-ai",
               "--model", ('"' + $cliModel + '"'),
               "--inspect-model", "--json"
@@ -207,7 +211,7 @@ jobs:
           $acceptanceOut = Join-Path $env:TEMP ("skeleton-acceptance-" + [guid]::NewGuid().ToString("N") + ".json")
           $acceptanceErr = $acceptanceOut + ".err"
           try {
-            $acceptance = Start-Process -FilePath $launcher -ArgumentList @(
+            $acceptance = Start-Process -FilePath $cliLauncher -ArgumentList @(
               "--offline-command", "local-ai", "--self-check", "--json"
             ) -Wait -PassThru -RedirectStandardOutput $acceptanceOut -RedirectStandardError $acceptanceErr
             if ($acceptance.ExitCode -ne 0) {
@@ -239,7 +243,7 @@ jobs:
           try {
             # Start-Process joins the argument array into a Windows command
             # line; use one token for a genuinely unambiguous refusal probe.
-            $missingGguf = Start-Process -FilePath $launcher -ArgumentList @(
+            $missingGguf = Start-Process -FilePath $cliLauncher -ArgumentList @(
               "--offline-command", "local-ai",
               "--gguf-model", ('"' + (Join-Path $env:TEMP "missing-native-model.gguf") + '"'),
               "--llama-executable", ('"' + (Join-Path $env:TEMP "missing-llama-cli.exe") + '"'),
@@ -271,6 +275,9 @@ jobs:
           Start-Sleep -Seconds 1
           if (Test-Path -LiteralPath $launcher) {
             throw "uninstall left installed launcher behind"
+          }
+          if (Test-Path -LiteralPath $cliLauncher) {
+            throw "uninstall left installed native console executable behind"
           }
 
       - name: Upload Windows installer
