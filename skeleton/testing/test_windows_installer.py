@@ -186,6 +186,8 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert "sparse-checkout-cone-mode: false" in source
     assert "scripts/windows/build_installer.ps1" in source
     assert "Smoke install generated Setup.exe" in source
+    assert '@("--local-ai-training-smoke")' in source
+    assert '@("--local-ai-smoke")' in source
     assert '"/VERYSILENT"' in source
     assert 'Start-Process -FilePath $launcher -ArgumentList @("--help") -Wait -PassThru' in source
     assert "$launch.ExitCode" in source
