@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
@@ -16,6 +17,7 @@ from skeleton.app.local_ai_training import (
     MAX_TRAINING_TOKENS,
     OfflineTrainingError,
     train_local_text,
+    token_weighted_training_perplexity,
 )
 
 
@@ -55,6 +57,29 @@ class TestOfflineNativeTraining(unittest.TestCase):
             )
             self.assertTrue(reply.text)
             self.assertEqual(reply.model_digest, receipt["model_digest"])
+
+    def test_training_perplexity_weights_each_predicted_target(self) -> None:
+        from skeleton.cortex.transformer import TinyTransformer
+
+        model = TinyTransformer(
+            vocab=("hello", "world", "alpha", "beta"),
+            dim=8, ctx=16, seed=19, n_heads=2, n_layers=1, d_ff=16,
+        )
+        short = "hello world"
+        long = "hello world alpha beta"
+        counts = (len(model._ids(short)) - 1, len(model._ids(long)) - 1)
+        self.assertNotEqual(counts[0], counts[1])
+        with patch.object(
+            TinyTransformer, "logprob",
+            side_effect=[-math.log(2.0), -math.log(8.0)],
+        ):
+            actual = token_weighted_training_perplexity(model, [short, long])
+        expected = math.exp(
+            (counts[0] * math.log(2.0) + counts[1] * math.log(8.0))
+            / sum(counts)
+        )
+        self.assertAlmostEqual(actual, expected)
+        self.assertNotAlmostEqual(actual, math.sqrt(2.0 * 8.0))
 
     def test_native_role_vocabulary_matches_actual_chat_tokenizer(self) -> None:
         from skeleton.cortex.port import tokens
