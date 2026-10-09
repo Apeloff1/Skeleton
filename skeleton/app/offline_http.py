@@ -234,7 +234,10 @@ class OfflineHTTPApplication:
 
 
 class LocalOnlyHTTPServer(ThreadingHTTPServer):
-    daemon_threads = True
+    # Do not close SQLite while a live inference worker still owns a
+    # model-bound transaction. Server close waits for bounded request threads.
+    daemon_threads = False
+    block_on_close = True
     allow_reuse_address = False
     request_queue_size = 32
 
