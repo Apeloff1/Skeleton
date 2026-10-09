@@ -42,6 +42,11 @@ class TorchAccel:
         self._layers: List[Dict[str, Any]] = []
         self.reset_decode_cache()
 
+    @property
+    def cached_tokens(self) -> tuple[int, ...]:
+        """Expose countable decode occupancy without exporting device tensors."""
+        return tuple(self._cached_ids)
+
     def reset_decode_cache(self) -> None:
         """Drop all accelerator-local decode history after weight changes."""
         self._cached_ids: List[int] = []
