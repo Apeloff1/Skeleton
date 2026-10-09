@@ -358,9 +358,16 @@ class PortedHomebrewSession:
         self.win = False
         self.frames = 0
         self.earned_speedrun_medal = False
+        self.locked_goal_attempts = 0
 
     def tick(self, *, left: bool = False, right: bool = False,
              jump: bool = False) -> dict[str, Any]:
+        # Source physics must remain unchanged. The destination's keyquest
+        # prevents the *completion transition*, not the player's movement
+        # model: touching the goal before obtaining every original key
+        # returns the player to their last legal position, so the map
+        # never softlocks a game that was previously proven winnable.
+        prior_avatar = dict(self.game.avatar)
         frame = self.game.tick(left=left, right=right, jump=jump)
         pos = frame.avatar
         self.frames = frame.frame
@@ -371,6 +378,12 @@ class PortedHomebrewSession:
             self.score += self.combo * 100 if self.port["gameplay"]["collectathon_score"] else 10
         elif self.port["gameplay"]["combo_on_collectible_pickup"]:
             self.combo = 0
+        if frame.won and self.port["gameplay"]["keyquest_gate"] and self.pending:
+            self.locked_goal_attempts += 1
+            self.game.avatar = prior_avatar
+            self.game.won = False
+            # Keep the frame counter, so retries still count for speedrun.
+            frame = self.game.snapshot()
         self.win = frame.won and (
             not self.port["gameplay"]["keyquest_gate"] or not self.pending
         )
@@ -390,6 +403,10 @@ class PortedHomebrewSession:
             "hybrid_win": self.win,
             "score": self.score,
             "combo": self.combo,
+            "keyquest_goal_locked": (
+                self.port["gameplay"]["keyquest_gate"] and bool(self.pending)
+            ),
+            "locked_goal_attempts": self.locked_goal_attempts,
             "remaining_items": [
                 {"x": x, "y": y} for x, y in sorted(self.pending, key=lambda p: (p[1], p[0]))
             ],
