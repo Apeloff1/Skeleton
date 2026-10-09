@@ -12,6 +12,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from queue import Queue
+from types import SimpleNamespace
 import struct
 import tempfile
 import unittest
@@ -168,6 +170,54 @@ class TestPublicGGUFCLI(unittest.TestCase):
             self.assertEqual(window.send_button.state, "normal")
             self.assertEqual(window.clear_button.state, "normal")
             self.assertEqual(window.gguf_button.state, "normal")
+
+    def test_desktop_never_displays_or_persists_rejected_generation(self):
+        from skeleton.app.local_ai import OfflineAIWindow
+
+        class Composer:
+            text = ""
+
+            def get(self, *_):
+                return self.text
+
+            def insert(self, _at, text):
+                self.text = text
+
+        class Status:
+            text = ""
+
+            def set(self, value):
+                self.text = value
+
+        window = OfflineAIWindow.__new__(OfflineAIWindow)
+        window.closed = False
+        window.active = True
+        window.events = Queue()
+        window.composer = Composer()
+        window.status = Status()
+        window.window = SimpleNamespace(after=lambda *_: None)
+        rendered = []
+        window._append = lambda role, text: rendered.append((role, text))
+        window._refresh = lambda: None
+
+        window.events.put(("generation_error", ("private user prompt", "cancelled")))
+        window._drain()
+        self.assertEqual(rendered, [])
+        self.assertEqual(window.composer.text, "private user prompt")
+        self.assertIn("cancelled", window.status.text)
+
+        window.composer.text = ""
+        answer = SimpleNamespace(
+            text="accepted local answer", input_tokens=3, output_tokens=4,
+            execution_receipt_digest=None,
+        )
+        window.events.put(("answer", ("verified user prompt", answer)))
+        window._drain()
+        self.assertEqual(rendered, [
+            ("You", "verified user prompt"),
+            ("Skeleton · Local", "accepted local answer"),
+        ])
+        self.assertIn("no execution receipt", window.status.text)
 
     def test_explicit_model_runtime_and_prompt_are_all_required(self):
         missing = (
