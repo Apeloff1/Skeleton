@@ -25,6 +25,7 @@ on:
       - "skeleton/ai/game_builder/asset_credits.py"
       - "skeleton/ai/game_builder/native_release_intake.py"
       - "skeleton/testing/test_game_builder_native_release_intake.py"
+      - "docs/GAME_BUILDER_NATIVE_BYTE_INTAKE.md"
       - "skeleton/testing/test_game_builder_asset_credits.py"
       - "skeleton/testing/test_game_builder_release_assurance.py"
       - "docs/GAME_BUILDER_SIGNED_RELEASE_REVIEW.md"
