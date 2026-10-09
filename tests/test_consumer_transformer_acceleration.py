@@ -940,3 +940,135 @@ def test_device_policy_rebind_can_reenable_permitted_reference_fallback(monkeypa
     expected = TinyTransformer.from_snapshot(model.snapshot())._logits((1, 2))
     assert model._logits((1, 2)) == pytest.approx(expected, abs=2e-5)
     assert model._accel is None and not model.resident
+
+
+def test_accelerator_repin_is_atomic_when_mid_layer_upload_fails(monkeypatch):
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = _model(norm="rms", ffn_kind="swiglu")
+    accel = TorchAccel(model).pin()
+    input_ids = (1, 2, 3)
+    expected = accel.logits_window(input_ids)
+    before_parameters = tuple(id(p) for p in accel._params())
+    before_tokens = accel.cached_tokens
+    before_embedding_pointer = accel._E.data_ptr()
+    original_upload = accel._t2
+    calls = 0
+
+    def interrupted_upload(rows, grad=True):
+        nonlocal calls
+        calls += 1
+        if calls == 6:  # after some real tensor uploads succeeded
+            raise RuntimeError("injected late device upload failure")
+        return original_upload(rows, grad)
+
+    monkeypatch.setattr(accel, "_t2", interrupted_upload)
+    with pytest.raises(RuntimeError, match="injected late"):
+        accel.pin()
+    assert calls >= 6
+    assert accel.resident
+    assert accel._E.data_ptr() == before_embedding_pointer
+    assert tuple(id(p) for p in accel._params()) == before_parameters
+    assert accel.cached_tokens == before_tokens
+    assert accel.logits_window(input_ids) == expected
+
+    monkeypatch.setattr(accel, "_t2", original_upload)
+    assert accel.pin() is accel
+    assert accel.cached_tokens == ()
+    assert accel.logits_window(input_ids) == pytest.approx(expected, abs=2e-5)
+
+
+def test_gpu_sync_is_atomic_when_late_parameter_transfer_fails(monkeypatch):
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = _model(norm="rms", ffn_kind="swiglu")
+    accel = TorchAccel(model).pin()
+    accel.sgd((1, 2), target=3, lr=0.02)
+    assert accel._weights_modified
+    before_E = [row[:] for row in model.E]
+    before_P = [row[:] for row in model.P]
+    before_Wq = [row[:] for row in model.layers[0].Wq]
+    before_Wk = [row[:] for row in model.layers[0].Wk]
+    original = accel._layers[-1]["Wk"]
+
+    class InterruptedDownload:
+        def detach(self):
+            raise RuntimeError("late GPU download failure")
+
+    accel._layers[-1]["Wk"] = InterruptedDownload()
+    with pytest.raises(RuntimeError, match="late GPU download failure"):
+        accel.sync()
+    assert accel._weights_modified
+    assert model.E == before_E
+    assert model.P == before_P
+    assert model.layers[0].Wq == before_Wq
+    assert model.layers[0].Wk == before_Wk
+    accel._layers[-1]["Wk"] = original
+    accel.sync()
+    assert not accel._weights_modified
+    assert model.E != before_E
+
+
+@pytest.mark.parametrize("point", ["prefill", "decode"])
+def test_partial_multilayer_kv_failure_invalidates_all_history(monkeypatch, point):
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = TinyTransformer(
+        vocab=("alpha", "beta", "gamma"), dim=8, ctx=12,
+        n_heads=2, n_layers=3, d_ff=12, seed=317,
+        norm="rms", ffn_kind="swiglu",
+    )
+    accel = TorchAccel(model).pin()
+    prefix = (1, 2, 3)
+    if point == "decode":
+        accel.logits_window(prefix)
+    original = accel._reserve_kv
+
+    def fail_after_first_layer(layer, needed, heads, head_dim):
+        if layer == 1 and needed >= (4 if point == "decode" else 3):
+            raise MemoryError("injected layer-2 device OOM")
+        return original(layer, needed, heads, head_dim)
+
+    monkeypatch.setattr(accel, "_reserve_kv", fail_after_first_layer)
+    attempted = prefix + (1,) if point == "decode" else prefix
+    with pytest.raises(MemoryError, match="layer-2 device OOM"):
+        accel.logits_window(attempted)
+    assert accel.cached_tokens == ()
+    assert accel._cached_keys == []
+    assert accel._cached_values == []
+    assert accel._key_buffers == []
+    assert accel._value_buffers == []
+    assert accel._cached_logits is None
+    assert accel.kv_reserved_bytes == 0
+
+    monkeypatch.setattr(accel, "_reserve_kv", original)
+    recovered = accel.logits_window(attempted)
+    assert recovered == pytest.approx(model._logits(attempted), abs=2e-5)
+    assert accel.cached_tokens == attempted
+
+
+def test_failed_cache_operation_cannot_replay_stale_cached_logits(monkeypatch):
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = _model()
+    accel = TorchAccel(model).pin()
+    _ = accel.logits_window((1, 2, 3))
+    assert accel._cached_logits is not None
+    original = accel._cached_step
+
+    def unavailable(_):
+        raise RuntimeError("injected downstream kernel failure")
+
+    monkeypatch.setattr(accel, "_cached_step", unavailable)
+    with pytest.raises(RuntimeError, match="downstream"):
+        accel.logits_window((1, 2, 3, 1))
+    assert accel.cached_tokens == ()
+    assert accel._cached_logits is None
+    monkeypatch.setattr(accel, "_cached_step", original)
+    assert accel.logits_window((1, 2, 3)) == pytest.approx(
+        model._logits((1, 2, 3)), abs=2e-5
+    )
