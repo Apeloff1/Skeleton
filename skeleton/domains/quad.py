@@ -6,7 +6,8 @@ import json
 from typing import Any
 
 PLANES = ("engineering", "computer_science", "reverse_engineering", "security")
-CS_STRATUM_1 = tuple(f"CS300-{i:03d}" for i in range(1, 9))
+CS_STRATA = tuple(f"CS300-S{i:02d}" for i in range(1, 31))
+CS_LAYERS = tuple(f"CS300-{i:03d}" for i in range(1, 301))
 
 
 class DomainReject(Exception):
@@ -39,11 +40,13 @@ def _gate(plane: str, card: dict[str, Any]) -> None:
         if card.get("self_promoting") is not False:
             raise DomainReject("self-promotion")
     elif plane == "computer_science":
-        layers = card.get("layers")
-        if not isinstance(layers, list) or set(layers) != set(CS_STRATUM_1):
-            raise DomainReject("stratum")
-        if card.get("boundary") in (None, ""):
-            raise DomainReject("computability boundary")
+        strata = card.get("strata")
+        if not isinstance(strata, list) or set(strata) != set(CS_STRATA):
+            raise DomainReject("stratum set")
+        if card.get("layers") != 300:
+            raise DomainReject("layer count")
+        if card.get("finality") in (None, ""):
+            raise DomainReject("finality")
     elif plane == "reverse_engineering":
         if card.get("provenance") in (None, ""):
             raise DomainReject("binary provenance")
