@@ -296,6 +296,11 @@ won: db 0
 lost: db 0
 map_ram: times CELLS db 0
 original_game_signature: db "SKELDOS1"
+; Original engine symbols, self-locating offsets for independent 8086 gameplay QA.
+; The metadata is DATA ONLY; the game does not read or trust this table.
+state_trace_signature: db "SKELDOSSTATE"
+state_trace_offsets: dw level, player_x, player_y, health
+                     dw score, gems_left, won, lost
 """
 _MAKEFILE = """NASM ?= nasm
 .PHONY: all clean
