@@ -210,30 +210,42 @@ class OfflineChatStore:
         self._lock = threading.RLock()
         self._db = sqlite3.connect(filename, isolation_level=None,
                                    check_same_thread=False, timeout=10.0)
-        self._db.execute("PRAGMA busy_timeout=10000")
-        self._db.execute("PRAGMA foreign_keys=ON")
-        if filename != ":memory:":
-            self._db.execute("PRAGMA journal_mode=WAL")
-        self._db.execute("""CREATE TABLE IF NOT EXISTS offline_sessions (
-            session_id TEXT PRIMARY KEY,
-            model_digest TEXT NOT NULL,
-            tokenizer_digest TEXT NOT NULL,
-            revision INTEGER NOT NULL CHECK (revision >= 0),
-            transcript_json TEXT NOT NULL,
-            updated_at INTEGER NOT NULL
-        )""")
-        self._db.execute("""CREATE TABLE IF NOT EXISTS offline_turns (
-            session_id TEXT NOT NULL REFERENCES offline_sessions(session_id) ON DELETE CASCADE,
-            request_id TEXT NOT NULL,
-            request_digest TEXT NOT NULL,
-            revision INTEGER NOT NULL CHECK (revision >= 1),
-            text TEXT NOT NULL,
-            output_digest TEXT NOT NULL,
-            prompt_tokens INTEGER NOT NULL CHECK (prompt_tokens >= 0),
-            generated_tokens INTEGER NOT NULL CHECK (generated_tokens >= 0),
-            PRIMARY KEY (session_id, request_id),
-            UNIQUE (session_id, revision)
-        )""")
+        try:
+            self._db.execute("PRAGMA busy_timeout=10000")
+            self._db.execute("PRAGMA trusted_schema=OFF")
+            self._db.execute("PRAGMA secure_delete=ON")
+            self._db.execute("PRAGMA foreign_keys=ON")
+            if filename != ":memory:":
+                self._db.execute("PRAGMA journal_mode=WAL")
+            self._db.execute("""CREATE TABLE IF NOT EXISTS offline_sessions (
+                session_id TEXT PRIMARY KEY,
+                model_digest TEXT NOT NULL,
+                tokenizer_digest TEXT NOT NULL,
+                revision INTEGER NOT NULL CHECK (revision >= 0),
+                transcript_json TEXT NOT NULL,
+                updated_at INTEGER NOT NULL
+            )""")
+            self._db.execute("""CREATE TABLE IF NOT EXISTS offline_turns (
+                session_id TEXT NOT NULL REFERENCES offline_sessions(session_id) ON DELETE CASCADE,
+                request_id TEXT NOT NULL,
+                request_digest TEXT NOT NULL,
+                revision INTEGER NOT NULL CHECK (revision >= 1),
+                text TEXT NOT NULL,
+                output_digest TEXT NOT NULL,
+                prompt_tokens INTEGER NOT NULL CHECK (prompt_tokens >= 0),
+                generated_tokens INTEGER NOT NULL CHECK (generated_tokens >= 0),
+                PRIMARY KEY (session_id, request_id),
+                UNIQUE (session_id, revision)
+            )""")
+
+            if self._db.execute("PRAGMA foreign_keys").fetchone() != (1,):
+                raise RuntimeContractError("SQLite foreign-key enforcement unavailable")
+            if self._db.execute("PRAGMA quick_check").fetchone() != ("ok",):
+                raise RuntimeContractError("SQLite conversation store failed integrity check")
+
+        except BaseException:
+            self._db.close()
+            raise
 
     @contextmanager
     def _transaction(self) -> Iterator[None]:
