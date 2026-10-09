@@ -195,8 +195,13 @@ def open_native_homebrew_port(
                 w // 2, h + 13, text=text,
                 fill=actor, font=("Arial", 10, "bold"),
             )
-            finish = "WIN! R = RESTART" if session.win else (
-                "A/D or arrows move · Space jumps · R resets · Esc quits"
+            finish = (
+                "WIN! R = RESTART"
+                if session.win else
+                ("GOAL LOCKED — COLLECT ALL ORIGINAL KEYS"
+                 if session.locked_goal_attempts > 0 and
+                    blueprint["gameplay"]["keyquest_gate"] and session.pending
+                 else "A/D or arrows move · Space jumps · R resets · Esc quits")
             )
             canvas.create_text(w // 2, h + 35, text=finish,
                                fill=goal_color, font=("Arial", 10))
