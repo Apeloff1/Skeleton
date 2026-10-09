@@ -100,8 +100,9 @@ class OfflineNativeChatTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeContractError, "revision conflict"):
             self.store.commit(
                 session=before, request_id="second", request_digest="b" * 64,
-                transcript=self.store.load(sid, self.product.model_digest,
-                                           self.product.tokenizer_digest).transcript,
+                transcript=before.transcript.append("user", "stale").append(
+                    "assistant", one.text
+                ),
                 text=one.text, output_digest=one.output_digest,
                 prompt_tokens=1, generated_tokens=1,
             )
@@ -254,6 +255,35 @@ class OfflineNativeChatTests(unittest.TestCase):
         alias.symlink_to(backup)
         with self.assertRaises(RuntimeContractError):
             load_private_bundle(alias)
+
+    def test_signed_but_truncated_history_backup_is_rejected(self):
+        import hashlib
+        sid = self.product.create(system="Keep history.")
+        self.product.turn(sid, "hello", self.config, request_id="first-history")
+        self.product.turn(sid, "again", self.config, request_id="second-history")
+        original = json.loads(self.product.export_session(sid))
+        original["body"]["messages"] = (
+            original["body"]["messages"][:1]
+            + original["body"]["messages"][-2:]
+        )
+        canonical = json.dumps(original["body"], sort_keys=True,
+                               separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        original["sha256"] = hashlib.sha256(canonical).hexdigest()
+        with self.assertRaisesRegex(RuntimeContractError, "history is incomplete"):
+            self.product.import_session(json.dumps(original).encode("utf-8"))
+
+    def test_backup_checks_all_historical_assistant_receipts(self):
+        import hashlib
+        sid = self.product.create()
+        self.product.turn(sid, "hello", self.config, request_id="first-record")
+        self.product.turn(sid, "again", self.config, request_id="second-record")
+        envelope = json.loads(self.product.export_session(sid))
+        envelope["body"]["turns"][0]["text"] = "forged previous answer"
+        canonical = json.dumps(envelope["body"], sort_keys=True,
+                               separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        envelope["sha256"] = hashlib.sha256(canonical).hexdigest()
+        with self.assertRaisesRegex(RuntimeContractError, "history/receipt mismatch"):
+            self.product.import_session(json.dumps(envelope).encode("utf-8"))
 
     def test_corrupt_checkpoint_is_rejected_before_inference(self):
         p = self.root / "model.json"
