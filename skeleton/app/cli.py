@@ -80,10 +80,10 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--replay-improvement", help="verify JSON receipt by regenerating exact native weights in temporary storage")
 
     local_ai.add_argument("--output-model", help="new native checkpoint filename for --train-corpus")
-    local_ai.add_argument("--epochs", type=int, default=1, help="bounded native CPU training passes (1-4)")
+    local_ai.add_argument("--epochs", type=int, default=None, help="bounded native CPU training passes (1-4)")
 
     local_ai.add_argument("--prompt", help="headless text request (requires --model)")
-    local_ai.add_argument("--max-output-tokens", type=int, default=8)
+    local_ai.add_argument("--max-output-tokens", type=int, default=None)
     local_ai.add_argument("--json", action="store_true", dest="as_json", help="print a bound inference receipt")
     local_ai.add_argument("--load-chat", help="restore verified turns from explicit model-bound local transcript")
     local_ai.add_argument("--save-chat", help="atomically export model-bound local transcript after inference")
@@ -234,16 +234,16 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         # Never accept tuning switches that a mode would silently ignore.
         # A replay always uses epochs pinned inside its original receipt;
         # inspection, evaluation and inference do not train any weights.
-        if args.epochs != 1 and (
+        if args.epochs is not None and (
             not args.train_corpus
             or args.replay_improvement
             or args.compare_model
-            or args.candidate_model and not args.improve_model
+            or (args.candidate_model and not args.improve_model)
             or args.benchmark_suite
         ):
             print("--epochs applies only to local training or continued training")
             return 2
-        if args.max_output_tokens != 8 and (
+        if args.max_output_tokens is not None and (
             args.train_corpus or args.improve_model or args.replay_improvement
             or args.benchmark_suite or args.compare_model or args.candidate_model
             or args.inspect_model
@@ -361,7 +361,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             try:
                 receipt = improve_local_model(
                     args.improve_model, args.train_corpus, args.eval_corpus,
-                    args.output_model, epochs=args.epochs,
+                    args.output_model, epochs=args.epochs if args.epochs is not None else 1,
                     protected_suite=args.protect_suite,
                 )
             except (ValueError, RuntimeError, OSError) as exc:
@@ -387,7 +387,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             from skeleton.app.local_ai_training import train_local_text
 
             try:
-                receipt = train_local_text(args.train_corpus, args.output_model, epochs=args.epochs)
+                receipt = train_local_text(args.train_corpus, args.output_model, epochs=args.epochs if args.epochs is not None else 1)
             except (ValueError, RuntimeError, OSError) as exc:
                 print("local-ai training rejected: " + type(exc).__name__ + ": " + str(exc))
                 return 1
@@ -434,7 +434,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 session = OfflineAISession(load_native_checkpoint(args.model))
                 if args.load_chat:
                     session.import_transcript(args.load_chat)
-                answer = asyncio.run(session.ask(args.prompt, max_output_tokens=args.max_output_tokens))
+                answer = asyncio.run(session.ask(args.prompt, max_output_tokens=args.max_output_tokens if args.max_output_tokens is not None else 8))
                 chat_digest = session.export_transcript(args.save_chat) if args.save_chat else None
             except (ValueError, RuntimeError, OSError) as exc:
                 print("local-ai request rejected: " + type(exc).__name__ + ": " + str(exc))
