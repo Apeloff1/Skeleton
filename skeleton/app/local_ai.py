@@ -13,12 +13,11 @@ from queue import Empty, Queue
 import threading
 from typing import Any
 
-from skeleton.ai.model_runtime.runtime_checkpoint import parse_checkpoint_json
+from skeleton.ai.runtime.inference.artifact import load_local_model_artifact
 from skeleton.ai.runtime.inference.local import LocalInferenceRequest, LocalInferenceResult, LocalInferenceEngine
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
 
 
-MAX_CHECKPOINT_BYTES = 512 * 1024 * 1024
 MAX_USER_CHARS = 4096
 MAX_HISTORY_MESSAGES = 16
 
@@ -29,18 +28,11 @@ class OfflineAIError(ValueError):
 
 def load_native_checkpoint(source: str | Path) -> NativeRuntimeLocalModel:
     """Load exactly one native checkpoint, without fetching or training weights."""
-    path = Path(source).expanduser().resolve(strict=True)
-    if not path.is_file():
-        raise OfflineAIError("checkpoint must be a regular file")
-    length = path.stat().st_size
-    if length < 1 or length > MAX_CHECKPOINT_BYTES:
-        raise OfflineAIError("checkpoint exceeds the local byte budget")
-    with path.open("rb") as stream:
-        raw = stream.read(MAX_CHECKPOINT_BYTES + 1)
-    if len(raw) != length or len(raw) > MAX_CHECKPOINT_BYTES:
-        raise OfflineAIError("checkpoint changed during load or exceeds byte budget")
-    checkpoint = parse_checkpoint_json(raw)
-    return NativeRuntimeLocalModel.from_checkpoint(checkpoint)
+    loaded = load_local_model_artifact(source)
+    if not isinstance(loaded.model, NativeRuntimeLocalModel):
+        raise OfflineAIError("checkpoint must contain a native transformer, not a reference/demo model")
+    loaded.model.assert_identity()
+    return loaded.model
 
 
 @dataclass(frozen=True)
@@ -238,7 +230,7 @@ class OfflineAIWindow:
 
         def work() -> None:
             async def generate() -> OfflineAnswer:
-                task = asyncio.create_task(session.ask(prompt, max_output_tokens=min(32, session.backend.runtime.limits.max_new_tokens)))
+                task = asyncio.create_task(session.ask(prompt, max_output_tokens=min(32, session.backend.runtime.limits.max_new_tokens, max(1, session.backend.runtime.limits.max_context // 4))))
                 with self.worker_lock:
                     self.worker_loop = asyncio.get_running_loop()
                     self.worker_task = task
