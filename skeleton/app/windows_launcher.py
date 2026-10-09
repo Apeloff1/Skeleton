@@ -203,6 +203,7 @@ class WindowsLauncher:
         self._add_button(buttons, "Install / Repair", self.repair)
         self._add_button(buttons, "Start Skeleton", self.start)
         self._add_button(buttons, "Open App", self.open_app)
+        self._add_button(buttons, "Local AI (offline)", self.local_ai)
         self._add_button(buttons, "Stop", self.stop)
 
         helper = ttk.Frame(outer)
@@ -315,6 +316,16 @@ class WindowsLauncher:
         else:
             self.status.set("Application is not ready")
 
+    def local_ai(self) -> None:
+        """Run real native checkpoint inference inside the installed GUI.
+
+        This path is deliberately independent of Docker and provider tokens.
+        """
+        from skeleton.app.local_ai import open_offline_ai
+
+        self._local_ai_window = open_offline_ai(self.window)
+        self.status.set("Local AI window opened")
+
     def open_docker(self) -> None:
         webbrowser.open(DOCKER_DESKTOP_URL)
 
@@ -363,6 +374,7 @@ def parser() -> argparse.ArgumentParser:
     mode.add_argument("--start", action="store_true")
     mode.add_argument("--stop", action="store_true")
     mode.add_argument("--open", action="store_true")
+    mode.add_argument("--local-ai", action="store_true", help="open Docker-free native AI conversation")
     result.add_argument(
         "--development",
         action="store_true",
@@ -376,6 +388,13 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     root = installation_root()
+    if args.local_ai:
+        if os.name != "nt":
+            print("Skeleton Windows launcher requires Windows.")
+            return 2
+        launcher = WindowsLauncher(root)
+        launcher.local_ai()
+        return launcher.run()
     headless = _headless(args, root)
     if headless >= 0:
         return headless
