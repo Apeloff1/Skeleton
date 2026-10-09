@@ -156,7 +156,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 hits = documents.search(args.prompt, limit=args.context_limit)
             inference_prompt = render_local_context(args.prompt, hits)
         answer = asyncio.run(
-            (durable or session).ask(inference_prompt, max_output_tokens=args.max_output_tokens)
+            (durable or session).ask(
+                args.prompt,
+                max_output_tokens=args.max_output_tokens,
+                inference_prompt=inference_prompt if args.use_library else None,
+            )
         )
         if args.backup_out is not None:
             session.save_history_backup(args.backup_out)
