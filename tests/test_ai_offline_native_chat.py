@@ -285,6 +285,75 @@ class OfflineNativeChatTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeContractError, "history/receipt mismatch"):
             self.product.import_session(json.dumps(envelope).encode("utf-8"))
 
+    def test_deleted_historical_receipt_denies_resume_and_new_generation(self):
+        sid = self.product.create()
+        self.product.turn(sid, "hello", self.config, request_id="first-receipt")
+        self.product.turn(sid, "again", self.config, request_id="second-receipt")
+        with self.store._transaction():
+            self.store._db.execute(
+                "DELETE FROM offline_turns WHERE session_id=? AND revision=1",
+                (sid,),
+            )
+        with self.assertRaisesRegex(RuntimeContractError, "missing turn receipts"):
+            self.store.load(sid, self.product.model_digest,
+                            self.product.tokenizer_digest)
+        with self.assertRaises(RuntimeContractError):
+            self.product.turn(sid, "third", self.config, request_id="third-receipt")
+        with self.store._lock:
+            current = self.store._db.execute(
+                "SELECT revision FROM offline_sessions WHERE session_id=?", (sid,),
+            ).fetchone()
+        self.assertEqual(current[0], 2)
+
+    def test_modified_earlier_response_denies_corrupted_state(self):
+        sid = self.product.create()
+        self.product.turn(sid, "hello", self.config, request_id="original")
+        self.product.turn(sid, "again", self.config, request_id="second")
+        with self.store._transaction():
+            self.store._db.execute(
+                "UPDATE offline_turns SET text=? WHERE session_id=? AND revision=1",
+                ("forged-earlier-output", sid),
+            )
+        with self.assertRaisesRegex(RuntimeContractError, "history/receipt mismatch"):
+            self.store.load(sid, self.product.model_digest,
+                            self.product.tokenizer_digest)
+        with self.assertRaises(RuntimeContractError):
+            self.store.export_bundle(sid, self.product.model_digest,
+                                     self.product.tokenizer_digest)
+
+    def test_revision_forgery_cannot_create_orphaned_turns(self):
+        sid = self.product.create()
+        self.product.turn(sid, "hello", self.config, request_id="one")
+        with self.store._transaction():
+            self.store._db.execute(
+                "UPDATE offline_sessions SET revision=? WHERE session_id=?",
+                (2, sid),
+            )
+        with self.assertRaisesRegex(RuntimeContractError, "missing turn receipts"):
+            self.store.load(sid, self.product.model_digest,
+                            self.product.tokenizer_digest)
+
+    def test_two_separate_sqlite_connections_commit_without_lost_updates(self):
+        sid = self.product.create()
+        with OfflineChatStore(self.root / "chat.sqlite") as other:
+            initial = other.load(sid, self.product.model_digest,
+                                 self.product.tokenizer_digest)
+            self.product.turn(sid, "hello", self.config, request_id="first-writer")
+            with self.assertRaisesRegex(RuntimeContractError, "revision conflict"):
+                other.commit(
+                    session=initial,
+                    request_id="second-writer",
+                    request_digest="a" * 64,
+                    transcript=initial.transcript.append("user", "hello").append(
+                        "assistant", "stale-answer"),
+                    text="stale-answer", output_digest="b" * 64,
+                    prompt_tokens=1, generated_tokens=1,
+                )
+            current = other.load(sid, self.product.model_digest,
+                                 self.product.tokenizer_digest)
+            self.assertEqual(current.revision, 1)
+            self.assertEqual(current.transcript.messages[-2].content, "hello")
+
     def test_existing_world_readable_sqlite_is_rejected(self):
         import os
         if os.name == "nt":
