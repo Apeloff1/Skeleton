@@ -290,6 +290,55 @@ class OfflineChatStore:
                     "unknown conversation or model/tokenizer identity mismatch"
                 )
 
+    def fork(self, session_id: str, model_digest: str, tokenizer_digest: str,
+             *, after_turn: int | None = None) -> str:
+        """Clone a complete conversation up to an exact committed turn boundary.
+
+        Forking never mutates the parent. Every copied turn retains its
+        idempotency identity, while subsequent generations get an independent
+        session and revision sequence.
+        """
+        sid = _identifier("session id", session_id)
+        with self._transaction():
+            parent = self.load(sid, model_digest, tokenizer_digest)
+            rows = self._db.execute(
+                "SELECT request_id, request_digest, revision, text, output_digest, "
+                "prompt_tokens, generated_tokens FROM offline_turns "
+                "WHERE session_id=? ORDER BY revision",
+                (sid,),
+            ).fetchall()
+            turns = [
+                dict(request_id=row[0], request_digest=row[1], revision=row[2],
+                     text=row[3], output_digest=row[4], prompt_tokens=row[5],
+                     generated_tokens=row[6])
+                for row in rows
+            ]
+            if len(turns) != parent.revision:
+                raise RuntimeContractError("parent conversation revision is inconsistent")
+            _validate_complete_history(parent.transcript, turns)
+            if after_turn is None:
+                after_turn = parent.revision
+            if (type(after_turn) is not int or not 0 <= after_turn <= parent.revision):
+                raise RuntimeContractError("fork turn must be within committed history")
+            system_count = (
+                1 if parent.transcript.messages
+                and parent.transcript.messages[0].role == "system" else 0
+            )
+            forked = ChatTranscript(parent.transcript.messages[
+                :system_count + 2 * after_turn
+            ])
+            new_id = secrets.token_urlsafe(24)
+            self._db.execute(
+                "INSERT INTO offline_sessions VALUES (?, ?, ?, ?, ?, ?)",
+                (new_id, model_digest, tokenizer_digest, after_turn,
+                 forked.to_json(), time.time_ns()),
+            )
+            self._db.executemany(
+                "INSERT INTO offline_turns VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                [(new_id, *row) for row in rows[:after_turn]],
+            )
+            return new_id
+
     def export_bundle(self, session_id: str, model_digest: str,
                       tokenizer_digest: str) -> bytes:
         """Atomic read of a complete conversation and its retry receipts.
@@ -531,6 +580,10 @@ class OfflineChatProduct:
 
     def delete(self, session_id: str) -> None:
         self.store.delete(session_id, self.model_digest, self.tokenizer_digest)
+
+    def fork(self, session_id: str, *, after_turn: int | None = None) -> str:
+        return self.store.fork(session_id, self.model_digest,
+                               self.tokenizer_digest, after_turn=after_turn)
 
     def export_session(self, session_id: str) -> bytes:
         return self.store.export_bundle(session_id, self.model_digest,
