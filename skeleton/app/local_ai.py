@@ -388,9 +388,20 @@ def smoke_offline_native_inference() -> bool:
     ))
     session = OfflineAISession(NativeRuntimeLocalModel(runtime))
     answer = asyncio.run(session.ask("hello", max_output_tokens=2))
+    # The Windows bundled binary must also round-trip a verified, private
+    # conversation snapshot without importing optional hosted services.
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="skeleton-native-smoke-") as folder:
+        transcript = Path(folder) / "chat.json"
+        session.export_transcript(transcript)
+        restored = OfflineAISession(NativeRuntimeLocalModel(runtime))
+        turns = restored.import_transcript(transcript)
+        snapshot_ok = turns == 1 and restored.history == session.history
     return (
         bool(answer.text)
         and answer.model_digest == runtime.model_digest
         and len(answer.execution_receipt_digest) == 64
         and len(session.history) == 2
+        and snapshot_ok
     )
