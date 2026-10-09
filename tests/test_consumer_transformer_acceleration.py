@@ -1192,3 +1192,74 @@ def test_chunked_prefill_roundtrips_device_policy_and_checkpoint():
 def test_chunked_prefill_admission_rejects_bad_sizes(bad):
     with pytest.raises(RuntimeContractError, match="prefill query chunk"):
         DevicePolicy(requested="torch", prefill_query_chunk=bad)
+
+
+def test_failed_device_rebind_preserves_proven_accelerator_state(monkeypatch):
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = _model(norm="rms", ffn_kind="swiglu")
+    model.to("torch")
+    prior = model._accel
+    assert prior is not None and model.resident
+    expected = model._logits((1, 2, 3))
+    old_cache = prior.cached_tokens
+
+    def interrupted_pin(self):
+        raise MemoryError("injected entire device transfer failure")
+
+    monkeypatch.setattr(TorchAccel, "pin", interrupted_pin)
+    with pytest.raises(RuntimeError, match="cannot be admitted"):
+        model.to("torch", kv_dtype="bf16", max_kv_bytes=4096)
+    assert model._accel is prior
+    assert model.resident and model.device == "cpu"
+    assert prior.cached_tokens == old_cache
+    assert model._logits((1, 2, 3)) == expected
+
+
+def test_direct_constrained_device_request_never_silently_returns_reference_cpu(
+    monkeypatch,
+):
+    pytest.importorskip("torch")
+    from skeleton.cortex import device as device_harness
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = _model()
+    original_resolve = device_harness.resolve
+    monkeypatch.setattr(
+        device_harness,
+        "resolve",
+        lambda requested: {
+            "requested": requested, "actual": "cpu",
+            "torch": False, "degraded": True,
+        },
+    )
+    with pytest.raises(RuntimeError, match="unavailable"):
+        model.to("mps", kv_dtype="fp16", max_kv_bytes=4096)
+    assert model._accel is None
+    assert not model.resident
+    monkeypatch.setattr(device_harness, "resolve", original_resolve)
+    model.to("torch", kv_dtype="bf16", max_kv_bytes=4096)
+    assert isinstance(model._accel, TorchAccel)
+    assert model._accel.kv_dtype_name == "bf16"
+
+
+def test_legacy_unconstrained_device_probe_can_still_fall_back_to_cpu(monkeypatch):
+    pytest.importorskip("torch")
+    from skeleton.cortex import device as device_harness
+
+    model = _model()
+    monkeypatch.setattr(
+        device_harness,
+        "resolve",
+        lambda device: {
+            "requested": device, "actual": "cpu",
+            "torch": False, "degraded": True,
+        },
+    )
+    assert model.to("mps") is model
+    assert model._accel is None
+    assert not model.resident
+    assert model._logits((1, 2)) == pytest.approx(
+        TinyTransformer.from_snapshot(model.snapshot())._logits((1, 2))
+    )
