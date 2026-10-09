@@ -153,14 +153,34 @@ class CanonicalEnvelope:
             raise CanonicalContractError("missing envelope kind")
         if not isinstance(self.identity, Identity):
             raise CanonicalContractError("envelope identity must be Identity")
+        for label, value in (
+            ("identity.repository", self.identity.repository),
+            ("identity.commit_sha", self.identity.commit_sha),
+            ("identity.run_id", self.identity.run_id),
+            ("identity.run_attempt", self.identity.run_attempt),
+        ):
+            if not isinstance(value, str) or (label in {"identity.repository", "identity.commit_sha"} and not value.strip()):
+                raise CanonicalContractError(f"{label} must be text")
+            _unicode_scalar_text(value)
         if not isinstance(self.evidence, tuple) or any(
             not isinstance(item, EvidenceRef) for item in self.evidence
         ):
             raise CanonicalContractError("envelope evidence must contain EvidenceRef")
+        for item in self.evidence:
+            for label, value in (
+                ("evidence.source", item.source),
+                ("evidence.digest", item.digest),
+                ("evidence.category", item.category),
+            ):
+                if not isinstance(value, str) or not value.strip():
+                    raise CanonicalContractError(f"{label} must be non-empty text")
+                _unicode_scalar_text(value)
         if not isinstance(self.constraints, tuple) or any(
-            not isinstance(item, str) or not item for item in self.constraints
+            not isinstance(item, str) or not item.strip() for item in self.constraints
         ):
             raise CanonicalContractError("envelope constraints must be non-empty strings")
+        for constraint in self.constraints:
+            _unicode_scalar_text(constraint)
         if not isinstance(self.payload, dict):
             raise CanonicalContractError("envelope payload must be an object")
         raw = canonical_json_bytes(self.payload)
