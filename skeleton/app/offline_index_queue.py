@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import math
 import os
 from pathlib import Path
 import secrets
@@ -81,16 +82,41 @@ def _local_db(path: str | Path) -> Path:
 
 def _as_job(row: tuple[Any, ...]) -> IndexJob:
     job_id, state, source, library, attempts, created, updated, due, error, result = row
+    _job_id(job_id)
     if state not in ("queued", "running", "completed", "failed", "cancelled"):
         raise OfflineQueueError("invalid stored job lifecycle state")
-    if type(attempts) is not int or not 0 <= attempts <= MAX_ATTEMPTS:
-        raise OfflineQueueError("invalid stored job attempt count")
+    if (
+        type(attempts) is not int or not 0 <= attempts <= MAX_ATTEMPTS
+        or any(
+            type(value) not in (int, float) or not math.isfinite(value)
+            for value in (created, updated, due)
+        )
+        or not isinstance(source, str) or not source
+        or not isinstance(library, str) or not library
+        or (error is not None and not isinstance(error, str))
+    ):
+        raise OfflineQueueError("invalid stored indexing job metadata")
     try:
-        summary = json.loads(result) if result is not None else None
+        summary = json.loads(
+            result,
+            parse_constant=lambda _val: (_ for _ in ()).throw(
+                ValueError("non-finite job result")
+            ),
+        ) if result is not None else None
     except (ValueError, TypeError) as exc:
         raise OfflineQueueError("corrupt local index job result") from exc
-    if summary is not None and not isinstance(summary, dict):
-        raise OfflineQueueError("invalid local index result envelope")
+    if state == "completed":
+        required = ("indexed_files", "updated_files", "removed_files", "indexed_bytes")
+        if (
+            not isinstance(summary, dict)
+            or not all(field in summary for field in required)
+            or any(type(summary[field]) is not int or summary[field] < 0
+                   for field in required)
+            or summary["updated_files"] > summary["indexed_files"]
+        ):
+            raise OfflineQueueError("completed job has invalid indexing result")
+    elif summary is not None:
+        raise OfflineQueueError("non-completed job has a forged result")
     return IndexJob(
         job_id, state, source, library, attempts,
         created, updated, due, error, summary,
