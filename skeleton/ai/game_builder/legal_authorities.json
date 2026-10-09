@@ -1,0 +1,225 @@
+{
+  "schema_version": 1,
+  "purpose": "Legal reference matrix for independent original homebrew, spiritual successors, interoperability, platform hardware and retro evolution. Statements describe potential rules, not automated legal conclusions.",
+  "last_reviewed_date": "2026-10-09",
+  "jurisdictions": {
+    "NO": {
+      "label": "Norway",
+      "sources": [
+        "NO-AWL-41",
+        "NO-AWL-42",
+        "NO-AWL-99",
+        "NO-AWL-101",
+        "EEA-SOFTWARE-2009-24"
+      ],
+      "note": "Norway applies its Copyright Act and EEA-implemented provisions; do not assume an EU case alone settles a Norwegian hardware circumvention case."
+    },
+    "EU_EEA": {
+      "label": "EU/EEA (national implementation must also be checked)",
+      "sources": [
+        "EEA-SOFTWARE-2009-24",
+        "EU-INFOSOC-2001-29",
+        "EU-SAS-406-10",
+        "EU-NINTENDO-PCBOX-355-12"
+      ],
+      "note": "Domestic law and contractual, trademark, design, patent and consumer rules may apply alongside EU harmonized copyright."
+    },
+    "US": {
+      "label": "United States",
+      "sources": [
+        "US-COPYRIGHT-GAMES",
+        "US-DMCA-1201",
+        "US-EXEMPTION-2024",
+        "US-TETRIS-XIO"
+      ],
+      "note": "Check both exclusive rights and anti-circumvention separately; exemptions often narrow and are not general commercial distribution permissions."
+    },
+    "OTHER": {
+      "label": "Other or unverified jurisdiction",
+      "sources": [],
+      "note": "No global safe-harbor assumption; require jurisdiction-specific qualified review."
+    }
+  },
+  "authorities": [
+    {
+      "id": "NO-AWL-41",
+      "jurisdiction": "NO",
+      "kind": "statute",
+      "title": "Åndsverkloven § 41 — use of computer programs",
+      "url": "https://lovdata.no/nav/lov/2018-06-15-40/kap3",
+      "principles": [
+        "lawful access / use",
+        "observation / testing while lawfully using copy",
+        "ideas and principles",
+        "backup limits"
+      ],
+      "caution": "Does not itself license copied expressive game materials or general-purpose circumvention."
+    },
+    {
+      "id": "NO-AWL-42",
+      "jurisdiction": "NO",
+      "kind": "statute",
+      "title": "Åndsverkloven § 42 — reverse engineering for interoperability",
+      "url": "https://lovdata.no/nav/lov/2018-06-15-40/kap3",
+      "principles": [
+        "necessary interoperability",
+        "lawfully entitled program use",
+        "not readily available",
+        "only necessary parts",
+        "no substantially similar expression"
+      ],
+      "caution": "Limited conditional exception; a generic remake or market replacement is not automatically eligible."
+    },
+    {
+      "id": "NO-AWL-99",
+      "jurisdiction": "NO",
+      "kind": "statute",
+      "title": "Åndsverkloven § 99–100 — technical protection of works",
+      "url": "https://lovdata.no/nav/lov/2018-06-15-40/kap7",
+      "principles": [
+        "anti-circumvention",
+        "technical measures",
+        "restrictions and exceptions"
+      ],
+      "caution": "Some audiovisual game protection may differ from program-specific treatment; analyse the specific measures and legal uses."
+    },
+    {
+      "id": "NO-AWL-101",
+      "jurisdiction": "NO",
+      "kind": "statute",
+      "title": "Åndsverkloven § 101 — technical measures protecting software",
+      "url": "https://lovdata.no/nav/lov/2018-06-15-40/kap7",
+      "principles": [
+        "software protection measures",
+        "devices to facilitate unlawful removal"
+      ],
+      "caution": "Not a general permission to market bypass tools."
+    },
+    {
+      "id": "EEA-SOFTWARE-2009-24",
+      "jurisdiction": "EU_EEA",
+      "kind": "directive",
+      "title": "Directive 2009/24/EC Arts. 1, 4–7 (software copyright)",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32009L0024",
+      "principles": [
+        "ideas and principles excluded from program copyright",
+        "independent programs",
+        "lawful use and study",
+        "limited interoperability exception",
+        "distribution rights"
+      ],
+      "caution": "Program exceptions do not erase audiovisual, artistic, musical or trademark rights."
+    },
+    {
+      "id": "EU-INFOSOC-2001-29",
+      "jurisdiction": "EU_EEA",
+      "kind": "directive",
+      "title": "Directive 2001/29/EC Art. 6 (technological measures)",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32001L0029",
+      "principles": [
+        "technological protection",
+        "copyright in audiovisual content",
+        "national remedies"
+      ],
+      "caution": "Hardware restrictions and TPM challenges require concrete proportionality/jurisdiction review."
+    },
+    {
+      "id": "EU-SAS-406-10",
+      "jurisdiction": "EU_EEA",
+      "kind": "judgment",
+      "title": "C-406/10 SAS Institute v World Programming (2012)",
+      "url": "https://infocuria.curia.europa.eu/tabs/redirect/juris/liste.jsf?language=en&num=C-406%2F10",
+      "principles": [
+        "software functionality and languages",
+        "independent observation",
+        "expression vs underlying principles"
+      ],
+      "caution": "Not a license to copy game art, dialogue, code, sound or distinctive audiovisual look."
+    },
+    {
+      "id": "EU-NINTENDO-PCBOX-355-12",
+      "jurisdiction": "EU_EEA",
+      "kind": "judgment",
+      "title": "C-355/12 Nintendo v PC Box (2014)",
+      "url": "https://curia.europa.eu/site/upload/docs/application/pdf/2014-01/cp140009en.pdf",
+      "principles": [
+        "console technological protection",
+        "proportionality",
+        "legitimate third-party purposes",
+        "circumvention fact-specific"
+      ],
+      "caution": "Do not interpret as blanket authorization to circumvent consoles, distribute bypass devices, or pirate games."
+    },
+    {
+      "id": "US-COPYRIGHT-GAMES",
+      "jurisdiction": "US",
+      "kind": "guidance",
+      "title": "U.S. Copyright Office — Games",
+      "url": "https://www.copyright.gov/register/tx-games.html",
+      "principles": [
+        "game ideas and methods not themselves copyrightable",
+        "protectable literary and pictorial expression"
+      ],
+      "caution": "Original audiovisual assets, narrative and expressive look and feel remain relevant."
+    },
+    {
+      "id": "US-DMCA-1201",
+      "jurisdiction": "US",
+      "kind": "statute",
+      "title": "17 U.S.C. § 1201 — technological measures",
+      "url": "https://www.govinfo.gov/content/pkg/USCODE-2024-title17/html/USCODE-2024-title17-chap12-sec1201.htm",
+      "principles": [
+        "anti-circumvention",
+        "separate access-control restrictions",
+        "statutory exemptions"
+      ],
+      "caution": "A copyright-noninfringing game does not automatically make TPM bypass legal."
+    },
+    {
+      "id": "US-EXEMPTION-2024",
+      "jurisdiction": "US",
+      "kind": "rulemaking",
+      "title": "U.S. Copyright Office 2024 § 1201 exemptions",
+      "url": "https://www.copyright.gov/1201/2024/",
+      "principles": [
+        "limited temporary exemptions",
+        "preservation under conditions",
+        "defined beneficiaries"
+      ],
+      "caution": "Preservation exemptions do not generally confer commercial remake, distribution, or piracy rights; current cycle must be checked."
+    },
+    {
+      "id": "US-TETRIS-XIO",
+      "jurisdiction": "US",
+      "kind": "judgment",
+      "title": "Tetris Holding v Xio Interactive, 863 F.Supp.2d 394 (D.N.J. 2012)",
+      "url": "https://law.justia.com/cases/federal/district-courts/new-jersey/njdce/3%3A2009cv06115/235418/61/",
+      "principles": [
+        "unprotected gameplay idea vs protectable artistic implementation",
+        "substantial expressive similarity"
+      ],
+      "caution": "Even when code is independently written, copied expressive look and feel may infringe."
+    }
+  ],
+  "risk_domains": [
+    "code",
+    "art",
+    "characters",
+    "story_dialogue",
+    "music_audio",
+    "level_maps",
+    "interface_appearance",
+    "marketing_brand",
+    "patent_trade_secrets",
+    "platform_sdk",
+    "hardware_tpm",
+    "distribution_contract"
+  ],
+  "policy_outcomes": [
+    "DESIGN_ALLOWED_RELEASE_NOT_CERTIFIED",
+    "REVIEW_REQUIRED",
+    "POLICY_BLOCKED"
+  ],
+  "no_global_license_exemption": true,
+  "no_automatic_legal_advice_or_certificate": true
+}
