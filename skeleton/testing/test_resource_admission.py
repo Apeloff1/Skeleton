@@ -169,3 +169,89 @@ def test_auto_cli_unknown_memory_keeps_minimal_training_data(capsys, monkeypatch
     assert result["hardware_profile"] == "low-memory"
     assert result["active_training_rows"] == 36
     assert result["resource_admission"]["hardware_benchmark_performed"] is False
+
+
+def test_windows_native_available_ram_enables_consumer_auto_selection():
+    observation = observe_resources(
+        platform="win32",
+        windows_memory=lambda: (16 * GIB, 4 * GIB),
+        cpu_count=lambda: 8,
+        sysconf=lambda _: None,
+    )
+    assert observation.memory_source == "windows_global_memory_status"
+    assert observation.physical_ram_bytes == 16 * GIB
+    assert observation.available_ram_bytes == 4 * GIB
+    selected = select_sparse_profile(observation)
+    assert selected["selected_profile"] == "consumer"
+    assert selected["training_record_limit"] == 48
+    assert selected["hardware_benchmark_performed"] is False
+
+
+def test_windows_native_ram_probe_failure_stays_in_low_memory_mode():
+    observation = observe_resources(
+        platform="win32",
+        windows_memory=lambda: (None, None),
+        cpu_count=lambda: 16,
+        sysconf=lambda _: None,
+    )
+    assert observation.available_ram_bytes is None
+    assert select_sparse_profile(observation)["training_record_limit"] == 36
+
+
+def test_windows_invalid_free_memory_never_escalates_resource_profile():
+    observation = observe_resources(
+        platform="win32",
+        windows_memory=lambda: (8 * GIB, 16 * GIB),
+        cpu_count=lambda: 16,
+        sysconf=lambda _: None,
+    )
+    assert observation.available_ram_bytes is None
+    assert select_sparse_profile(observation)["selected_profile"] == "low-memory"
+
+
+def test_cgroup_cpu_quota_limits_parallel_capacity_even_when_host_is_fast():
+    files = {
+        "/proc/meminfo": "MemTotal:      33554432 kB\nMemAvailable: 29360128 kB\n",
+        "/sys/fs/cgroup/memory.max": "max",
+        "/sys/fs/cgroup/cpu.max": "150000 100000",
+    }
+    def read(path):
+        if path not in files:
+            raise FileNotFoundError(path)
+        return files[path]
+    observed = observe_resources(
+        platform="linux", read_text=read,
+        cpu_count=lambda: 64, cpu_affinity=lambda: 32,
+        sysconf=lambda _: None,
+    )
+    assert observed.logical_cpu_count == 1
+    assert select_sparse_profile(observed)["training_record_limit"] == 36
+
+
+def test_cgroup_cpu_v1_quota_and_affinity_take_stricter_limit():
+    files = {
+        "/proc/meminfo": "MemTotal:      33554432 kB\nMemAvailable: 29360128 kB\n",
+        "/sys/fs/cgroup/cpu/cpu.cfs_quota_us": "350000",
+        "/sys/fs/cgroup/cpu/cpu.cfs_period_us": "100000",
+    }
+    def read(path):
+        if path not in files:
+            raise FileNotFoundError(path)
+        return files[path]
+    observation = observe_resources(
+        platform="linux", read_text=read,
+        cpu_count=lambda: 64, cpu_affinity=lambda: 4,
+        sysconf=lambda _: None,
+    )
+    assert observation.logical_cpu_count == 3
+    assert select_sparse_profile(observation)["selected_profile"] == "low-memory"
+
+
+def test_resource_probe_never_uses_an_external_shell_or_network():
+    from skeleton.ai.training import resource_admission
+    from pathlib import Path
+    code = Path(resource_admission.__file__).read_text("utf-8")
+    assert "subprocess" not in code
+    assert "os.system(" not in code
+    assert "urllib" not in code
+    assert "requests." not in code
