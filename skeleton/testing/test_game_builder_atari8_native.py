@@ -99,3 +99,28 @@ def test_atari8_original_world_seed_changes_executable_logic_and_source_digest()
     assert aa.game_c != bb.game_c
     assert aa.content_digest != bb.content_digest
     assert "commercial game" not in aa.game_c.lower()
+
+
+
+def test_atari_xex_parser_honors_two_byte_sentinel_and_runad(tmp_path):
+    from struct import pack
+    from scripts.game_builder.native_atari8_ci import verify_xex
+    path = tmp_path / "synthetic-structure-only.xex"
+    # Synthetic parser test fixture. Only the real CI cc65 output is an actual game.
+    first = pack("<HHH", 0xFFFF, 0x2000, 0x244B) + b"A" * 1100
+    second = pack("<HH", 0x02E0, 0x02E1) + pack("<H", 0x2000)
+    path.write_bytes(first + second)
+    r = verify_xex(path)
+    assert r["segment_count"] == 2
+    assert r["autostart_runad_present"] is True
+    assert r["segments"][0]["load_address"] == 0x2000
+    assert r["segments"][0]["length"] == 1100
+    assert r["atari_os_emulation_verified"] is False
+    for broken in (
+        first, first + b"\xff",
+        pack("<HHH", 0xFFFF, 0x2000, 0x244C) + b"A" * 1100 + second,
+        first + pack("<HH", 0x02E1, 0x02E0),
+    ):
+        path.write_bytes(broken)
+        with pytest.raises(ValueError):
+            verify_xex(path)
