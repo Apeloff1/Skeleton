@@ -11,6 +11,7 @@ from .dragon_desktop_abi import DESKTOP_NATIVE,ABI_PROFILES,apply_desktop_abi
 
 EMITTERS=frozenset({"game_boy","game_boy_color","nes","dos_vga","master_system","game_gear","snes","commodore_64","genesis","game_boy_advance","nintendo_64","nintendo_ds","psp","ps1","xbox_original","atari_2600","apple_ii","zx_spectrum","dos_8086","windows_95","pc_linux","pc_windows","pc_macos","steam_deck"})
 EMITTERS=EMITTERS|DESKTOP_NATIVE|frozenset(("gamecube","wii","nintendo_3ds","dreamcast","ps2","commodore_vic20","commodore_128","atari_400_800","msx1","amstrad_cpc"))
+EMITTERS=EMITTERS|frozenset(("playdate","arduboy"))
 
 @dataclass(frozen=True)
 class NativeProject:
@@ -552,6 +553,12 @@ def render_native_project(*,title:str,target_id:str,style:str,
     elif target_id in ("commodore_vic20","commodore_128","atari_400_800","msx1","amstrad_cpc"):
         from .dragon_native_8bit_computers import computer_source
         files=computer_source(target_id,seed)
+    elif target_id=="playdate":
+        from .dragon_native_playdate import playdate_source
+        files=playdate_source(seed)
+    elif target_id=="arduboy":
+        from .dragon_native_arduboy import arduboy_source
+        files=arduboy_source(seed)
     elif target_id=="commodore_64":
         from .dragon_native_c64 import commodore64_source
         files=commodore64_source(seed)

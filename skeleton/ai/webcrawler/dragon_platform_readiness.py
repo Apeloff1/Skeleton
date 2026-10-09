@@ -58,6 +58,10 @@ SOURCE_RENDERERS.update({
     "msx1":"Z80 MSX1 BIOS and VDP conio",
     "amstrad_cpc":"Z80 CPC firmware text/ink",
 })
+SOURCE_RENDERERS.update({
+    "playdate":"STM32F7 native Playdate C API 400x240 1bpp",
+    "arduboy":"ATmega32u4 Arduboy2 OLED 128x64 1bpp",
+})
 assert set(SOURCE_RENDERERS)==EMITTERS
 
 @dataclass(frozen=True)

@@ -307,3 +307,41 @@ five hit points, retry and exit. The linker bounds code below
 $1C00, with no C runtime. Exact-heading CI still must prove
 compiler success and then emulator playback on a genuine unexpanded
 VIC-20. The source-target count remains 55.
+
+## Original Playdate and Arduboy tiny-handheld games
+
+Two more independent hardware-native generators expand source coverage to
+**57/169 identified targets (33.7%)**; 112 identified targets still do
+not have source emitters. These numbers measure source implementation,
+NOT verified compile, emulator or physical gameplay.
+
+**Playdate (Panic, STM32F7)**: new native C/Playdate API project includes
+its original seeded collect/chase action loop, D-pad movement, A dash,
+B restart, a mechanical crank that accumulates dash charge, 400x240
+one-bit rendering, score, hearts and increasing enemy pressure.
+Generated build uses the installed Playdate SDK CMake integration and
+Playdate's native C update callback. Source/pdxinfo is original. The
+resulting .pdx (simulator) and ARM device compilation are deliberately
+not asserted without an SDK and verified compile.
+
+**Arduboy (ATmega32u4 AVR)**: native C++ Arduboy2/PlatformIO project
+has a fixed-resource 128x64 1-bit OLED game with original 7-pixel sprites,
+six-button input, A evasive frames, B reset, pickups, health and
+progressive enemy chase. It uses no heap allocation in the gameplay
+source and targets the real PlatformIO `arduboy` board. AVR flash/RAM
+figures in the source audit are conservative until an actual .map or
+compiler size report establishes the usage of the output HEX.
+
+The full game builder now recognizes these projects through its native
+target registry and generator, and refuses to map unsupported genres to
+a falsely functional port. The separate tests inspect C API calls,
+controller logic, deterministic sources and output files. Vendor-SDK
+compiler tests are opt-in and cannot certify hardware without device
+execution evidence.
+
+**Sources used for API contracts:**
+- Playdate C build: https://sdk.play.date/3.1.0/Inside%20Playdate%20with%20C.html
+- Arduboy2 API: https://github.com/MLXXXp/Arduboy2
+- PlatformIO Arduboy board: https://docs.platformio.org/en/latest/boards/atmelavr/arduboy.html
+
+**Source coverage revised:** 57/169; missing native source: 112.

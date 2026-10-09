@@ -9,6 +9,8 @@ on:
       - 'skeleton/ai/webcrawler/dragon_native_nintendo_ppc_3ds.py'
       - 'skeleton/ai/webcrawler/dragon_native_dreamcast_ps2.py'
       - 'skeleton/ai/webcrawler/dragon_native_8bit_computers.py'
+      - 'skeleton/ai/webcrawler/dragon_native_playdate.py'
+      - 'skeleton/ai/webcrawler/dragon_native_arduboy.py'
       - 'skeleton/ai/webcrawler/dragon_vic20_tiny.py'
       - 'skeleton/ai/webcrawler/dragon_desktop_abi.py'
       - 'skeleton/ai/webcrawler/dragon_native_targets.py'
@@ -18,6 +20,7 @@ on:
       - 'tests/test_ai_webcrawler_dragon_native_nintendo_ppc_3ds.py'
       - 'tests/test_ai_webcrawler_dragon_native_dreamcast_ps2.py'
       - 'tests/test_ai_webcrawler_dragon_native_8bit_computers.py'
+      - 'tests/test_ai_webcrawler_dragon_micro_handhelds.py'
       - 'tests/test_ai_webcrawler_dragon_desktop_abi.py'
       - 'tests/test_ai_webcrawler_dragon_platform_matrix.py'
       - 'tests/test_ai_webcrawler_dragon_native_projects.py'
@@ -55,6 +58,7 @@ jobs:
             tests/test_ai_webcrawler_dragon_native_nintendo_ppc_3ds.py \
             tests/test_ai_webcrawler_dragon_native_dreamcast_ps2.py \
             tests/test_ai_webcrawler_dragon_native_8bit_computers.py \
+            tests/test_ai_webcrawler_dragon_micro_handhelds.py \
             tests/test_ai_webcrawler_dragon_desktop_abi.py \
             tests/test_ai_webcrawler_dragon_platform_matrix.py
       - name: Export machine-readable hardware readiness evidence
@@ -68,7 +72,7 @@ jobs:
           path.write_text(readiness_json(),encoding="utf-8")
           result=json.loads(path.read_text())
           assert result["coverage"]["catalog_count"]==169
-          assert result["coverage"]["native_source_count"]==55
+          assert result["coverage"]["native_source_count"]==57
           assert len(result["targets"])==169
           assert all(not t["compiler_verified"] for t in result["targets"])
           print("DRAGON_PLATFORM_COVERAGE_PASS",result["coverage"]["digest"])
