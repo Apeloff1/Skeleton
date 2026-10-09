@@ -285,6 +285,37 @@ class OfflineNativeChatTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeContractError, "history/receipt mismatch"):
             self.product.import_session(json.dumps(envelope).encode("utf-8"))
 
+    def test_existing_world_readable_sqlite_is_rejected(self):
+        import os
+        if os.name == "nt":
+            self.skipTest("Windows local database ACLs use a different policy")
+        path = self.root / "permissive.sqlite"
+        path.write_bytes(b"")
+        path.chmod(0o644)
+        with self.assertRaisesRegex(RuntimeContractError, "chmod 600"):
+            OfflineChatStore(path)
+        path.chmod(0o600)
+        with OfflineChatStore(path) as restored:
+            self.assertEqual(restored.list_sessions(
+                self.product.model_digest, self.product.tokenizer_digest
+            ), ())
+
+    def test_existing_symlink_or_hardlink_sqlite_is_rejected(self):
+        import os
+        if os.name == "nt":
+            self.skipTest("POSIX hard-link protection")
+        path = self.root / "private.sqlite"
+        with OfflineChatStore(path):
+            pass
+        alias = self.root / "alias.sqlite"
+        alias.symlink_to(path)
+        with self.assertRaisesRegex(RuntimeContractError, "symlinks"):
+            OfflineChatStore(alias)
+        hardlink = self.root / "hardlink.sqlite"
+        os.link(path, hardlink)
+        with self.assertRaisesRegex(RuntimeContractError, "hard-linked"):
+            OfflineChatStore(hardlink)
+
     def test_corrupt_checkpoint_is_rejected_before_inference(self):
         p = self.root / "model.json"
         checkpoint = json.loads(self.engine.runtime.checkpoint_json())
