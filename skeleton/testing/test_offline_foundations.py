@@ -239,3 +239,46 @@ def test_cross_group_alias_mutation_cannot_pretend_to_be_same_scenario(
     _change_rows(root, "test", rows)
     with pytest.raises(SyntheticCurriculumError, match="missing|duplicated"):
         validate_curriculum(root)
+
+
+def test_independent_generator_rebuilds_every_committed_byte() -> None:
+    from scripts.training.generate_offline_foundations import (
+        expected_files, verify_regeneration,
+    )
+    report = verify_regeneration(SOURCE)
+    assert report["regeneration_verified"] is True
+    files = expected_files()
+    assert set(files) == {
+        "train.jsonl", "validation.jsonl", "test.jsonl", "train_corpus.txt",
+    }
+    for name, content in files.items():
+        assert content == (SOURCE / name).read_bytes()
+
+
+def test_generator_can_materialize_a_new_pinned_dataset(tmp_path: Path) -> None:
+    from scripts.training.generate_offline_foundations import main
+
+    destination = tmp_path / "regenerated"
+    assert main(["--dataset", str(SOURCE), "--output", str(destination)]) == 0
+    assert validate_curriculum(destination)["oracle_verified_rows"] == 720
+    assert (destination / "train_corpus.txt").read_bytes() == (
+        SOURCE / "train_corpus.txt"
+    ).read_bytes()
+    # Exclusive output path requirement; no replacement.
+    assert main(["--dataset", str(SOURCE), "--output", str(destination)]) == 1
+
+
+def test_generator_detects_template_drift_despite_recomputed_hashes(
+    tmp_path: Path,
+) -> None:
+    from scripts.training.generate_offline_foundations import verify_regeneration
+
+    root = _copy(tmp_path)
+    train = _rows(root, "train")
+    # Changing a harmless suffix leaves its arithmetic answer correct.
+    train[0]["instruction"] += " Please."
+    _change_rows(root, "train", train)
+    _change_corpus(root, train)
+    assert validate_curriculum(root)["oracle_verified_rows"] == 720
+    with pytest.raises(SyntheticCurriculumError, match="does not reproduce"):
+        verify_regeneration(root)
