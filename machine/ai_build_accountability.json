@@ -767,9 +767,9 @@
       "id": "ACC-VOL-003",
       "type": "volume",
       "title": "VOL-003 Canonical Contract System",
-      "status": "implemented",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "status": "verified",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-10-05T18:29:49Z",
       "implementation_signoff": {
@@ -800,20 +800,25 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/3118f3d4c5fcbd421c590b7724289abe8c411e11"
       },
       "verification_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "grok:independent-volume-verifier",
+        "signer_type": "agent",
+        "role": "independent-verifier",
+        "signed_at_utc": "2026-10-09T14:20:00Z",
+        "git_sha": "09bd791a127275a8f7cdf894adaebf89202b4289",
+        "evidence_refs": [
+          "scripts/verify_vol003_contract_conformance.py",
+          "verifier-receipt:af44e2a3d99abbbc2f97a5157b936702fab20feed63d9654b7cf77aaef4c157a",
+          "git-head:09bd791a127275a8f7cdf894adaebf89202b4289",
+          "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
+        ],
+        "statement": "Independent exact-head VOL-003 contract conformance verifier passed on main. This signoff is the verification half only; implementation signer remains distinct.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T18:29:49Z",
+      "completed_at_utc": "2026-10-09T14:20:00Z",
+      "last_event_at_utc": "2026-10-09T14:20:00Z",
       "history": [
         {
           "sequence": 1,
@@ -861,6 +866,26 @@
             "skeleton/testing/test_contract_unicode_edges.py",
             "tests/test_architecture_contract_conformance.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "completed",
+          "actor_id": "grok:independent-volume-verifier",
+          "actor_type": "agent",
+          "role": "independent-verifier",
+          "at_utc": "2026-10-09T14:20:00Z",
+          "git_sha": "09bd791a127275a8f7cdf894adaebf89202b4289",
+          "statement": "Independent exact-head VOL-003 contract conformance verifier passed on main.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289",
+          "from_status": "implemented",
+          "to_status": "verified",
+          "evidence_refs": [
+            "scripts/verify_vol003_contract_conformance.py",
+            "verifier-receipt:af44e2a3d99abbbc2f97a5157b936702fab20feed63d9654b7cf77aaef4c157a",
+            "git-head:09bd791a127275a8f7cdf894adaebf89202b4289",
+            "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
+          ]
         }
       ],
       "evidence": [
@@ -877,7 +902,11 @@
         "skeleton/testing/test_contract_compatibility.py",
         "skeleton/testing/test_contract_serialization_edges.py",
         "skeleton/testing/test_contract_unicode_edges.py",
-        "tests/test_architecture_contract_conformance.py"
+        "tests/test_architecture_contract_conformance.py",
+        "scripts/verify_vol003_contract_conformance.py",
+        "verifier-receipt:af44e2a3d99abbbc2f97a5157b936702fab20feed63d9654b7cf77aaef4c157a",
+        "git-head:09bd791a127275a8f7cdf894adaebf89202b4289",
+        "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
       ],
       "baseline_status": "unverified"
     },
@@ -885,9 +914,9 @@
       "id": "ACC-VOL-004",
       "type": "volume",
       "title": "VOL-004 Kernel & Execution Foundation",
-      "status": "implemented",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "status": "verified",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-10-05T17:03:00Z",
       "implementation_signoff": {
@@ -913,20 +942,25 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/bb080fccd082fe969d695b82190be992e3b2aed3"
       },
       "verification_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "grok:independent-volume-verifier",
+        "signer_type": "agent",
+        "role": "independent-verifier",
+        "signed_at_utc": "2026-10-09T14:20:00Z",
+        "git_sha": "09bd791a127275a8f7cdf894adaebf89202b4289",
+        "evidence_refs": [
+          "scripts/verify_vol004_runtime_supervision.py",
+          "verifier-receipt:bcb921ecc5c2c798f729eeb0beeb3f8fb133151a6326ff1d4be6ae844789e8eb",
+          "git-head:09bd791a127275a8f7cdf894adaebf89202b4289",
+          "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
+        ],
+        "statement": "Independent exact-head VOL-004 runtime supervision verifier passed on main. This signoff is the verification half only; implementation signer remains distinct.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T17:03:00Z",
+      "completed_at_utc": "2026-10-09T14:20:00Z",
+      "last_event_at_utc": "2026-10-09T14:20:00Z",
       "history": [
         {
           "sequence": 1,
@@ -969,6 +1003,26 @@
             "skeleton/testing/test_operation_runtime.py",
             "skeleton/testing/test_operation_server_binding.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "completed",
+          "actor_id": "grok:independent-volume-verifier",
+          "actor_type": "agent",
+          "role": "independent-verifier",
+          "at_utc": "2026-10-09T14:20:00Z",
+          "git_sha": "09bd791a127275a8f7cdf894adaebf89202b4289",
+          "statement": "Independent exact-head VOL-004 runtime supervision verifier passed on main.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289",
+          "from_status": "implemented",
+          "to_status": "verified",
+          "evidence_refs": [
+            "scripts/verify_vol004_runtime_supervision.py",
+            "verifier-receipt:bcb921ecc5c2c798f729eeb0beeb3f8fb133151a6326ff1d4be6ae844789e8eb",
+            "git-head:09bd791a127275a8f7cdf894adaebf89202b4289",
+            "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
+          ]
         }
       ],
       "evidence": [
@@ -980,7 +1034,11 @@
         "skeleton/persistence/operation_runtime.py",
         "skeleton/testing/test_app_assembly.py",
         "skeleton/testing/test_operation_runtime.py",
-        "skeleton/testing/test_operation_server_binding.py"
+        "skeleton/testing/test_operation_server_binding.py",
+        "scripts/verify_vol004_runtime_supervision.py",
+        "verifier-receipt:bcb921ecc5c2c798f729eeb0beeb3f8fb133151a6326ff1d4be6ae844789e8eb",
+        "git-head:09bd791a127275a8f7cdf894adaebf89202b4289",
+        "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
       ],
       "baseline_status": "unverified"
     },
@@ -1091,9 +1149,9 @@
       "id": "ACC-VOL-006",
       "type": "volume",
       "title": "VOL-006 Model Development Program",
-      "status": "implemented",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "status": "verified",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-10-05T16:21:00Z",
       "implementation_signoff": {
@@ -1122,20 +1180,25 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/1c9d02d7461cf2ad5a1db79bd4935240b594dcac"
       },
       "verification_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "grok:independent-volume-verifier",
+        "signer_type": "agent",
+        "role": "independent-verifier",
+        "signed_at_utc": "2026-10-09T14:20:00Z",
+        "git_sha": "09bd791a127275a8f7cdf894adaebf89202b4289",
+        "evidence_refs": [
+          "scripts/verify_vol006_model_development.py",
+          "verifier-receipt:60694c61e22c8403e44402d01226cde071d1c3bb5f65834e474ecdf8647c80ad",
+          "git-head:09bd791a127275a8f7cdf894adaebf89202b4289",
+          "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
+        ],
+        "statement": "Independent exact-head VOL-006 model-development verifier passed on main. This signoff is the verification half only; implementation signer remains distinct.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T16:21:00Z",
+      "completed_at_utc": "2026-10-09T14:20:00Z",
+      "last_event_at_utc": "2026-10-09T14:20:00Z",
       "history": [
         {
           "sequence": 1,
@@ -1184,6 +1247,26 @@
             "skeleton/testing/test_vol006_artifact_publication.py",
             "skeleton/testing/test_vol006_evaluation_eligibility.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "completed",
+          "actor_id": "grok:independent-volume-verifier",
+          "actor_type": "agent",
+          "role": "independent-verifier",
+          "at_utc": "2026-10-09T14:20:00Z",
+          "git_sha": "09bd791a127275a8f7cdf894adaebf89202b4289",
+          "statement": "Independent exact-head VOL-006 model-development verifier passed on main.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289",
+          "from_status": "implemented",
+          "to_status": "verified",
+          "evidence_refs": [
+            "scripts/verify_vol006_model_development.py",
+            "verifier-receipt:60694c61e22c8403e44402d01226cde071d1c3bb5f65834e474ecdf8647c80ad",
+            "git-head:09bd791a127275a8f7cdf894adaebf89202b4289",
+            "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
+          ]
         }
       ],
       "evidence": [
@@ -1198,7 +1281,11 @@
         "skeleton/testing/test_vol006_model_registry.py",
         "skeleton/testing/test_vol006_training_execution.py",
         "skeleton/testing/test_vol006_artifact_publication.py",
-        "skeleton/testing/test_vol006_evaluation_eligibility.py"
+        "skeleton/testing/test_vol006_evaluation_eligibility.py",
+        "scripts/verify_vol006_model_development.py",
+        "verifier-receipt:60694c61e22c8403e44402d01226cde071d1c3bb5f65834e474ecdf8647c80ad",
+        "git-head:09bd791a127275a8f7cdf894adaebf89202b4289",
+        "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
       ],
       "baseline_status": "unverified"
     },
@@ -1206,9 +1293,9 @@
       "id": "ACC-VOL-007",
       "type": "volume",
       "title": "VOL-007 Inference Engine",
-      "status": "implemented",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "status": "verified",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-10-05T16:10:31Z",
       "implementation_signoff": {
@@ -1243,20 +1330,25 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6be4eeadaa81ea36c9e72b0dfc7c02f3bc6342c8"
       },
       "verification_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "grok:independent-volume-verifier",
+        "signer_type": "agent",
+        "role": "independent-verifier",
+        "signed_at_utc": "2026-10-09T14:20:00Z",
+        "git_sha": "09bd791a127275a8f7cdf894adaebf89202b4289",
+        "evidence_refs": [
+          "scripts/verify_vol007_inference.py",
+          "verifier-receipt:d98afc0a57e5b4e8dfc2f49b5c19eeb56e66da92261b347b86b01c867cc71ddd",
+          "git-head:09bd791a127275a8f7cdf894adaebf89202b4289",
+          "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
+        ],
+        "statement": "Independent exact-head VOL-007 inference verifier passed on main. This signoff is the verification half only; implementation signer remains distinct.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T16:10:31Z",
+      "completed_at_utc": "2026-10-09T14:20:00Z",
+      "last_event_at_utc": "2026-10-09T14:20:00Z",
       "history": [
         {
           "sequence": 1,
@@ -1308,6 +1400,26 @@
             "skeleton/testing/test_vol007_provider_bridge.py",
             "tests/test_model_runtime.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "completed",
+          "actor_id": "grok:independent-volume-verifier",
+          "actor_type": "agent",
+          "role": "independent-verifier",
+          "at_utc": "2026-10-09T14:20:00Z",
+          "git_sha": "09bd791a127275a8f7cdf894adaebf89202b4289",
+          "statement": "Independent exact-head VOL-007 inference verifier passed on main.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289",
+          "from_status": "implemented",
+          "to_status": "verified",
+          "evidence_refs": [
+            "scripts/verify_vol007_inference.py",
+            "verifier-receipt:d98afc0a57e5b4e8dfc2f49b5c19eeb56e66da92261b347b86b01c867cc71ddd",
+            "git-head:09bd791a127275a8f7cdf894adaebf89202b4289",
+            "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
+          ]
         }
       ],
       "evidence": [
@@ -1328,7 +1440,11 @@
         "skeleton/testing/test_vol007_inference_replay.py",
         "skeleton/testing/test_vol007_inference_session.py",
         "skeleton/testing/test_vol007_provider_bridge.py",
-        "tests/test_model_runtime.py"
+        "tests/test_model_runtime.py",
+        "scripts/verify_vol007_inference.py",
+        "verifier-receipt:d98afc0a57e5b4e8dfc2f49b5c19eeb56e66da92261b347b86b01c867cc71ddd",
+        "git-head:09bd791a127275a8f7cdf894adaebf89202b4289",
+        "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
       ],
       "baseline_status": "unverified"
     },
@@ -3506,9 +3622,9 @@
       "id": "ACC-VOL-019",
       "type": "volume",
       "title": "VOL-019 World Models & Simulation",
-      "status": "implemented",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "status": "verified",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-10-05T16:21:00Z",
       "implementation_signoff": {
@@ -3532,20 +3648,25 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/c315ad85b405e2d110843ac63a539a2386ecc050"
       },
       "verification_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "grok:independent-volume-verifier",
+        "signer_type": "agent",
+        "role": "independent-verifier",
+        "signed_at_utc": "2026-10-09T14:20:00Z",
+        "git_sha": "09bd791a127275a8f7cdf894adaebf89202b4289",
+        "evidence_refs": [
+          "scripts/verify_vol019_world_model.py",
+          "verifier-receipt:73f83ec117d48d4faf77eb55e10f47f637869dba98f33931621449d790d1b131",
+          "git-head:09bd791a127275a8f7cdf894adaebf89202b4289",
+          "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
+        ],
+        "statement": "Independent exact-head VOL-019 world-model verifier passed on main. This signoff is the verification half only; implementation signer remains distinct.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T17:47:16Z",
+      "completed_at_utc": "2026-10-09T14:20:00Z",
+      "last_event_at_utc": "2026-10-09T14:20:00Z",
       "history": [
         {
           "sequence": 1,
@@ -3608,6 +3729,26 @@
             "skeleton/simulation/environment.py",
             "skeleton/testing/test_vol019_world_model_contract.py"
           ]
+        },
+        {
+          "sequence": 4,
+          "event_type": "completed",
+          "actor_id": "grok:independent-volume-verifier",
+          "actor_type": "agent",
+          "role": "independent-verifier",
+          "at_utc": "2026-10-09T14:20:00Z",
+          "git_sha": "09bd791a127275a8f7cdf894adaebf89202b4289",
+          "statement": "Independent exact-head VOL-019 world-model verifier passed on main.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289",
+          "from_status": "implemented",
+          "to_status": "verified",
+          "evidence_refs": [
+            "scripts/verify_vol019_world_model.py",
+            "verifier-receipt:73f83ec117d48d4faf77eb55e10f47f637869dba98f33931621449d790d1b131",
+            "git-head:09bd791a127275a8f7cdf894adaebf89202b4289",
+            "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
+          ]
         }
       ],
       "evidence": [
@@ -3619,7 +3760,11 @@
         "skeleton/simulation/scenario_runtime.py",
         "skeleton/testing/test_vol019_world_model_contract.py",
         "https://github.com/Apeloff1/Skeleton/pull/2927",
-        "https://github.com/Apeloff1/Skeleton/commit/9482455089eabb2c5086a0286977bc880f34d846"
+        "https://github.com/Apeloff1/Skeleton/commit/9482455089eabb2c5086a0286977bc880f34d846",
+        "scripts/verify_vol019_world_model.py",
+        "verifier-receipt:73f83ec117d48d4faf77eb55e10f47f637869dba98f33931621449d790d1b131",
+        "git-head:09bd791a127275a8f7cdf894adaebf89202b4289",
+        "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
       ],
       "baseline_status": "unverified"
     },
@@ -3627,9 +3772,9 @@
       "id": "ACC-VOL-020",
       "type": "volume",
       "title": "VOL-020 Multimodal Intelligence",
-      "status": "implemented",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "status": "verified",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-10-05T17:10:00Z",
       "implementation_signoff": {
@@ -3657,20 +3802,25 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/d14cbb31494d6f1189f1b22b046f0e706d361545"
       },
       "verification_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "grok:independent-volume-verifier",
+        "signer_type": "agent",
+        "role": "independent-verifier",
+        "signed_at_utc": "2026-10-09T14:20:00Z",
+        "git_sha": "09bd791a127275a8f7cdf894adaebf89202b4289",
+        "evidence_refs": [
+          "scripts/verify_vol020_multimodal.py",
+          "verifier-receipt:d29a05334779193700d1e629e3b6b897539d6589f362c0c192e1e23dc8df26ff",
+          "git-head:09bd791a127275a8f7cdf894adaebf89202b4289",
+          "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
+        ],
+        "statement": "Independent exact-head VOL-020 multimodal verifier passed on main. This signoff is the verification half only; implementation signer remains distinct.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-05T17:10:00Z",
+      "completed_at_utc": "2026-10-09T14:20:00Z",
+      "last_event_at_utc": "2026-10-09T14:20:00Z",
       "history": [
         {
           "sequence": 1,
@@ -3715,6 +3865,26 @@
             "skeleton/testing/test_vol020_multimodal_ingest.py",
             "skeleton/testing/test_vol020_multimodal_sanitize.py"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "completed",
+          "actor_id": "grok:independent-volume-verifier",
+          "actor_type": "agent",
+          "role": "independent-verifier",
+          "at_utc": "2026-10-09T14:20:00Z",
+          "git_sha": "09bd791a127275a8f7cdf894adaebf89202b4289",
+          "statement": "Independent exact-head VOL-020 multimodal verifier passed on main.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289",
+          "from_status": "implemented",
+          "to_status": "verified",
+          "evidence_refs": [
+            "scripts/verify_vol020_multimodal.py",
+            "verifier-receipt:d29a05334779193700d1e629e3b6b897539d6589f362c0c192e1e23dc8df26ff",
+            "git-head:09bd791a127275a8f7cdf894adaebf89202b4289",
+            "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
+          ]
         }
       ],
       "evidence": [
@@ -3728,7 +3898,11 @@
         "skeleton/multimodal/sanitize.py",
         "skeleton/testing/test_vol020_multimodal_contracts.py",
         "skeleton/testing/test_vol020_multimodal_ingest.py",
-        "skeleton/testing/test_vol020_multimodal_sanitize.py"
+        "skeleton/testing/test_vol020_multimodal_sanitize.py",
+        "scripts/verify_vol020_multimodal.py",
+        "verifier-receipt:d29a05334779193700d1e629e3b6b897539d6589f362c0c192e1e23dc8df26ff",
+        "git-head:09bd791a127275a8f7cdf894adaebf89202b4289",
+        "https://github.com/Apeloff1/Skeleton/commit/09bd791a127275a8f7cdf894adaebf89202b4289"
       ],
       "baseline_status": "unverified"
     },
@@ -53697,7 +53871,7 @@
     {
       "id": "ACC-HIST-SYS-020",
       "type": "catalog_entry",
-      "title": "HIST-SYS-020 Saltzer–Schroeder principles",
+      "title": "HIST-SYS-020 Saltzer\u2013Schroeder principles",
       "status": "planned",
       "baseline_status": "planned",
       "checkbox": false,
