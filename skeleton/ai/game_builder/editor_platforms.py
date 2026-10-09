@@ -17,6 +17,7 @@ _NATIVE_SOURCE_ADAPTERS = {
     "nintendo_famicom": "ca65_nrom256_2bpp_rom_source",
     "commodore_64": "cc65_6510_vic_ii_sid_prg_source",
     "dos_vga": "nasm_8086_pc_textmode_com_source",
+    "atari_400_800": "cc65_6502_antic_gtia_pokey_xex_source",
 }
 _NATIVE_SOURCE_TARGETS = frozenset(_NATIVE_SOURCE_ADAPTERS)
 
@@ -134,7 +135,7 @@ def editor_platform_form(*, registry: PlatformRegistry | None = None) -> dict[st
             {"value": PortMode.CROSS_HYBRID.value, "label": "Original, independently cleared two-source hybrid"},
         ],
         "export_status": "no_native_target_verified",
-        "source_export_status": "three_desktop_two_rom_one_c64_and_one_dos_original_native_sources",
+        "source_export_status": "three_desktop_two_rom_one_c64_one_dos_one_atari8_original_native_sources",
         "native_source_project_destinations": sorted(_NATIVE_SOURCE_TARGETS & set(catalog.profiles)),
         "native_source_export_requires": [
             "generated_original_playable_world",
