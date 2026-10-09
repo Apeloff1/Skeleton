@@ -262,7 +262,7 @@ Original games can now be upgraded in Windows using seven original art direction
 
 ## Cross-era game authoring, legal modification and portable C
 
-The game-development system now has **166 explicit hardware-era design
+The game-development system now has **159 explicit hardware-era design
 profiles** covering eight decades, plus a rights-aware project compiler.
 It can create an original game, edit its own original homebrew tiles,
 recompute physics/controller playability, and reopen the modified
