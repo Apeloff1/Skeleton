@@ -79,6 +79,7 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--qualify-model", action="store_true", help="execute and verify two persisted on-device inference turns")
     capability = local_ai.add_mutually_exclusive_group()
     capability.add_argument("--capability-file", help="execute an admitted deterministic local JSON task")
+    capability.add_argument("--capability-graph-file", help="execute a bounded chain of deterministic local tasks")
     capability.add_argument("--capability-list", action="store_true", help="list model-free deterministic operations")
     local_ai.add_argument("--library", help="local SQLite document index")
     local_ai.add_argument("--index-dir", help="index an explicitly selected local text folder")
@@ -244,7 +245,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
 
     if command == "local-ai":
         if (
-            args.capability_file or args.capability_list or args.qualify_model or args.index_dir or args.search or args.use_library or args.enqueue_dir
+            args.capability_file or args.capability_graph_file or args.capability_list or args.qualify_model or args.index_dir or args.search or args.use_library or args.enqueue_dir
             or args.run_queue or args.queue_status or args.cancel_queue_job
             or args.retry_queue_job or args.snapshot_to
             or args.restore_from or args.verify_snapshot
@@ -280,6 +281,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 ("--audit-library", args.audit_library),
                 ("--audit-queue", args.audit_queue),
                 ("--capability-file", args.capability_file),
+                ("--capability-graph-file", args.capability_graph_file),
             ):
                 if value is not None:
                     local_args.extend((option, str(value)))
