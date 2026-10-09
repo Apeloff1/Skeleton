@@ -240,11 +240,17 @@ class NativeLLMRuntime:
             resident = False
         else:
             try:
-                self.model.to(
-                    requested,
-                    kv_dtype=policy.kv_dtype,
-                    max_kv_bytes=policy.kv_limit_bytes,
-                )
+                if wants_kv_policy:
+                    self.model.to(
+                        requested,
+                        kv_dtype=policy.kv_dtype,
+                        max_kv_bytes=policy.kv_limit_bytes,
+                    )
+                else:
+                    # Preserve compatibility with legacy device binders and
+                    # one-argument test doubles when optional compact-KV
+                    # functionality has not been requested.
+                    self.model.to(requested)
             except Exception as exc:
                 raise RuntimeContractError("device binding failed") from exc
             actual = str(getattr(self.model, "device", "cpu") or "cpu")
