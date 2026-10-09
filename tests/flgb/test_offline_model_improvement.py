@@ -86,6 +86,21 @@ class TestEvaluatedOfflineImprovement(unittest.TestCase):
                     improve_local_model(source, train, heldout, dest)
             self.assertFalse(dest.exists())
 
+    def test_rejects_tokenizer_equivalent_leakage_without_training(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            source, train, heldout, dest = self._fixture(d)
+            # Case and punctuation changes still normalize to the same IDs.
+            heldout.write_text(
+                "USER hello ASSISTANT world alpha\n", encoding="utf-8",
+            )
+            with patch.object(
+                TinyTransformer, "fit",
+                side_effect=AssertionError("leaked validation must not train"),
+            ):
+                with self.assertRaisesRegex(OfflineImprovementError, "normalized"):
+                    improve_local_model(source, train, heldout, dest)
+            self.assertFalse(dest.exists())
+
     def test_rejects_wrong_vocabulary_and_missing_evaluation(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             source, train, heldout, dest = self._fixture(d)
