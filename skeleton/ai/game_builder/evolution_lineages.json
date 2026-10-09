@@ -1,0 +1,913 @@
+{
+  "schema_version": 1,
+  "disclaimer": "Illustrative dated succession graph for homebrew design evolution, not an exhaustive release census, proof of technical inheritance, backwards compatibility or legal rights.",
+  "evidence_sources": [
+    "https://commons.wikimedia.org/wiki/Home_game_consoles_by_generation",
+    "https://www.videogameconsolelibrary.com/console-generations-guide/",
+    "https://docs.mamedev.org/initialsetup/mameintro.html"
+  ],
+  "nodes": [
+    {
+      "platform_id": "atari_2600",
+      "first_year": 1977,
+      "lineage": "atari",
+      "predecessor": null,
+      "design_signals": [
+        "cartridge_sprite",
+        "frame_cycle"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "commodore_pet",
+      "first_year": 1977,
+      "lineage": "commodore",
+      "predecessor": null,
+      "design_signals": [
+        "text_games"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "atari_vector_bw",
+      "first_year": 1979,
+      "lineage": "arcade_vectors",
+      "predecessor": null,
+      "design_signals": [
+        "vector_strokes"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "commodore_vic20",
+      "first_year": 1980,
+      "lineage": "commodore",
+      "predecessor": "commodore_pet",
+      "design_signals": [
+        "color_character"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nintendo_game_watch",
+      "first_year": 1980,
+      "lineage": "nintendo_handheld",
+      "predecessor": null,
+      "design_signals": [
+        "segment_lcd",
+        "micro_games"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "sinclair_zx80",
+      "first_year": 1980,
+      "lineage": "spectrum",
+      "predecessor": null,
+      "design_signals": [
+        "minimal_homebrew"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "atari_vector_color",
+      "first_year": 1981,
+      "lineage": "arcade_vectors",
+      "predecessor": "atari_vector_bw",
+      "design_signals": [
+        "colored_vectors"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "sinclair_zx81",
+      "first_year": 1981,
+      "lineage": "spectrum",
+      "predecessor": "sinclair_zx80",
+      "design_signals": [
+        "cassette",
+        "monochrome"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "atari_5200",
+      "first_year": 1982,
+      "lineage": "atari",
+      "predecessor": "atari_2600",
+      "design_signals": [
+        "analog_input",
+        "advanced_video"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "commodore_64",
+      "first_year": 1982,
+      "lineage": "commodore",
+      "predecessor": "commodore_vic20",
+      "design_signals": [
+        "sid_sound",
+        "hardware_sprites"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "sinclair_zx_spectrum",
+      "first_year": 1982,
+      "lineage": "spectrum",
+      "predecessor": "sinclair_zx81",
+      "design_signals": [
+        "color_attributes"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "vectrex",
+      "first_year": 1982,
+      "lineage": "arcade_vectors",
+      "predecessor": "atari_vector_bw",
+      "design_signals": [
+        "home_vector_display"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "msx1",
+      "first_year": 1983,
+      "lineage": "msx",
+      "predecessor": null,
+      "design_signals": [
+        "open_home_computer_standard"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nintendo_famicom",
+      "first_year": 1983,
+      "lineage": "nintendo_console",
+      "predecessor": null,
+      "design_signals": [
+        "tiles",
+        "scrolling",
+        "dpad"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "sega_sg1000",
+      "first_year": 1983,
+      "lineage": "sega",
+      "predecessor": null,
+      "design_signals": [
+        "arcade_sprites"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "amstrad_cpc_464",
+      "first_year": 1984,
+      "lineage": "amstrad",
+      "predecessor": null,
+      "design_signals": [
+        "bitmap_palette"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "dos_ega",
+      "first_year": 1984,
+      "lineage": "pc",
+      "predecessor": null,
+      "design_signals": [
+        "planar_color"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "amstrad_cpc_6128",
+      "first_year": 1985,
+      "lineage": "amstrad",
+      "predecessor": "amstrad_cpc_464",
+      "design_signals": [
+        "memory",
+        "disk"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "commodore_amiga_ocs",
+      "first_year": 1985,
+      "lineage": "commodore",
+      "predecessor": "commodore_64",
+      "design_signals": [
+        "blitter_copper",
+        "sampled_audio"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "msx2",
+      "first_year": 1985,
+      "lineage": "msx",
+      "predecessor": "msx1",
+      "design_signals": [
+        "video_chip_color"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "sega_mark_iii",
+      "first_year": 1985,
+      "lineage": "sega",
+      "predecessor": "sega_sg1000",
+      "design_signals": [
+        "better_tiles"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "sinclair_zx_spectrum_128",
+      "first_year": 1985,
+      "lineage": "spectrum",
+      "predecessor": "sinclair_zx_spectrum",
+      "design_signals": [
+        "memory_banking",
+        "sound_chip"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "atari_7800",
+      "first_year": 1986,
+      "lineage": "atari",
+      "predecessor": "atari_5200",
+      "design_signals": [
+        "improved_sprites"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "dos_vga",
+      "first_year": 1987,
+      "lineage": "pc",
+      "predecessor": "dos_ega",
+      "design_signals": [
+        "vga_bitmap"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nec_pc_engine",
+      "first_year": 1987,
+      "lineage": "nec_console",
+      "predecessor": null,
+      "design_signals": [
+        "hucards"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "arcade_capcom_cps1",
+      "first_year": 1988,
+      "lineage": "capcom_arcade",
+      "predecessor": null,
+      "design_signals": [
+        "large_sprites",
+        "fighting"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "msx2_plus",
+      "first_year": 1988,
+      "lineage": "msx",
+      "predecessor": "msx2",
+      "design_signals": [
+        "hardware_scroll"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nec_cd_rom2",
+      "first_year": 1988,
+      "lineage": "nec_console",
+      "predecessor": "nec_pc_engine",
+      "design_signals": [
+        "optical_streaming"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "sega_mega_drive",
+      "first_year": 1988,
+      "lineage": "sega",
+      "predecessor": "sega_mark_iii",
+      "design_signals": [
+        "fm_audio",
+        "16bit_scroll"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nec_supergrafx",
+      "first_year": 1989,
+      "lineage": "nec_console",
+      "predecessor": "nec_pc_engine",
+      "design_signals": [
+        "multiplane_graphics"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nintendo_game_boy",
+      "first_year": 1989,
+      "lineage": "nintendo_handheld",
+      "predecessor": "nintendo_game_watch",
+      "design_signals": [
+        "tile_lcd",
+        "link_cable"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "amstrad_gx4000",
+      "first_year": 1990,
+      "lineage": "amstrad",
+      "predecessor": "amstrad_cpc_6128",
+      "design_signals": [
+        "cartridge_console"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "msx_turbor",
+      "first_year": 1990,
+      "lineage": "msx",
+      "predecessor": "msx2_plus",
+      "design_signals": [
+        "r800_cpu"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nintendo_snes",
+      "first_year": 1990,
+      "lineage": "nintendo_console",
+      "predecessor": "nintendo_famicom",
+      "design_signals": [
+        "layers",
+        "sample_audio",
+        "perspective"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "arcade_sega_model1",
+      "first_year": 1992,
+      "lineage": "sega_arcade",
+      "predecessor": null,
+      "design_signals": [
+        "3d_polygons"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "commodore_amiga_aga",
+      "first_year": 1992,
+      "lineage": "commodore",
+      "predecessor": "commodore_amiga_ocs",
+      "design_signals": [
+        "palette",
+        "bitplanes"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "arcade_capcom_cps2",
+      "first_year": 1993,
+      "lineage": "capcom_arcade",
+      "predecessor": "arcade_capcom_cps1",
+      "design_signals": [
+        "sprite_expansion",
+        "arcade_audio"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "arcade_sega_model2",
+      "first_year": 1993,
+      "lineage": "sega_arcade",
+      "predecessor": "arcade_sega_model1",
+      "design_signals": [
+        "textured_polygons"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "atari_jaguar",
+      "first_year": 1993,
+      "lineage": "atari",
+      "predecessor": "atari_7800",
+      "design_signals": [
+        "polygon_3d"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "commodore_amiga_cd32",
+      "first_year": 1993,
+      "lineage": "commodore",
+      "predecessor": "commodore_amiga_aga",
+      "design_signals": [
+        "optical_media",
+        "gamepad"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nec_pc_fx",
+      "first_year": 1994,
+      "lineage": "nec_console",
+      "predecessor": "nec_supergrafx",
+      "design_signals": [
+        "fmv_animation"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "sega_saturn",
+      "first_year": 1994,
+      "lineage": "sega",
+      "predecessor": "sega_mega_drive",
+      "design_signals": [
+        "multi_cpu",
+        "cd_media"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "sony_playstation",
+      "first_year": 1994,
+      "lineage": "playstation",
+      "predecessor": null,
+      "design_signals": [
+        "cd_audio",
+        "polygons",
+        "save_cards"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "windows_95_98",
+      "first_year": 1995,
+      "lineage": "pc",
+      "predecessor": "dos_vga",
+      "design_signals": [
+        "consumer_3d"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "arcade_capcom_cps3",
+      "first_year": 1996,
+      "lineage": "capcom_arcade",
+      "predecessor": "arcade_capcom_cps2",
+      "design_signals": [
+        "enhanced_2d",
+        "optical_storage"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "arcade_sega_model3",
+      "first_year": 1996,
+      "lineage": "sega_arcade",
+      "predecessor": "arcade_sega_model2",
+      "design_signals": [
+        "enhanced_3d"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nintendo_64",
+      "first_year": 1996,
+      "lineage": "nintendo_console",
+      "predecessor": "nintendo_snes",
+      "design_signals": [
+        "analogue_input",
+        "3d_camera"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "arcade_sega_naomi",
+      "first_year": 1998,
+      "lineage": "sega_arcade",
+      "predecessor": "arcade_sega_model3",
+      "design_signals": [
+        "modular_3d"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nintendo_game_boy_color",
+      "first_year": 1998,
+      "lineage": "nintendo_handheld",
+      "predecessor": "nintendo_game_boy",
+      "design_signals": [
+        "color_tiles"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "sega_dreamcast",
+      "first_year": 1998,
+      "lineage": "sega",
+      "predecessor": "sega_saturn",
+      "design_signals": [
+        "3d_online",
+        "accessory_screen"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "bandai_wonderswan",
+      "first_year": 1999,
+      "lineage": "wonderswan",
+      "predecessor": null,
+      "design_signals": [
+        "rotatable_orientation",
+        "monochrome"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "arcade_sega_naomi2",
+      "first_year": 2000,
+      "lineage": "sega_arcade",
+      "predecessor": "arcade_sega_naomi",
+      "design_signals": [
+        "geometry_upgrade"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "bandai_wonderswan_color",
+      "first_year": 2000,
+      "lineage": "wonderswan",
+      "predecessor": "bandai_wonderswan",
+      "design_signals": [
+        "color_lcd"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "sony_ps2",
+      "first_year": 2000,
+      "lineage": "playstation",
+      "predecessor": "sony_playstation",
+      "design_signals": [
+        "dvd",
+        "enhanced_3d"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "gamepark_gp32",
+      "first_year": 2001,
+      "lineage": "gamepark",
+      "predecessor": null,
+      "design_signals": [
+        "arm_homebrew"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "microsoft_xbox",
+      "first_year": 2001,
+      "lineage": "xbox",
+      "predecessor": null,
+      "design_signals": [
+        "pc_derived_gpu",
+        "ethernet",
+        "hdd"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nintendo_game_boy_advance",
+      "first_year": 2001,
+      "lineage": "nintendo_handheld",
+      "predecessor": "nintendo_game_boy_color",
+      "design_signals": [
+        "expanded_sprites",
+        "sampled_audio"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nintendo_gamecube",
+      "first_year": 2001,
+      "lineage": "nintendo_console",
+      "predecessor": "nintendo_64",
+      "design_signals": [
+        "programmable_3d",
+        "optical_media"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "bandai_swancrystal",
+      "first_year": 2002,
+      "lineage": "wonderswan",
+      "predecessor": "bandai_wonderswan_color",
+      "design_signals": [
+        "display_contrast"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nintendo_ds",
+      "first_year": 2004,
+      "lineage": "nintendo_handheld",
+      "predecessor": "nintendo_game_boy_advance",
+      "design_signals": [
+        "touch_screen",
+        "dual_display"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "sony_psp",
+      "first_year": 2004,
+      "lineage": "sony_portable",
+      "predecessor": null,
+      "design_signals": [
+        "optical_portable",
+        "3d_handheld"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "gamepark_gp2x",
+      "first_year": 2005,
+      "lineage": "gamepark",
+      "predecessor": "gamepark_gp32",
+      "design_signals": [
+        "linux_handheld"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "microsoft_xbox_360",
+      "first_year": 2005,
+      "lineage": "xbox",
+      "predecessor": "microsoft_xbox",
+      "design_signals": [
+        "hd",
+        "network_multiplayer"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nintendo_wii",
+      "first_year": 2006,
+      "lineage": "nintendo_console",
+      "predecessor": "nintendo_gamecube",
+      "design_signals": [
+        "motion_input",
+        "accessibility"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "sony_ps3",
+      "first_year": 2006,
+      "lineage": "playstation",
+      "predecessor": "sony_ps2",
+      "design_signals": [
+        "hd",
+        "online_services"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nintendo_dsi",
+      "first_year": 2008,
+      "lineage": "nintendo_handheld",
+      "predecessor": "nintendo_ds",
+      "design_signals": [
+        "camera",
+        "downloadable_games"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "gamepark_gp2x_wiz",
+      "first_year": 2009,
+      "lineage": "gamepark",
+      "predecessor": "gamepark_gp2x",
+      "design_signals": [
+        "touch_acceleration"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "gamepark_caanoo",
+      "first_year": 2010,
+      "lineage": "gamepark",
+      "predecessor": "gamepark_gp2x_wiz",
+      "design_signals": [
+        "tilt_controls"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nintendo_3ds",
+      "first_year": 2011,
+      "lineage": "nintendo_handheld",
+      "predecessor": "nintendo_dsi",
+      "design_signals": [
+        "autostereoscopy",
+        "3d_portable"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "sony_ps_vita",
+      "first_year": 2011,
+      "lineage": "sony_portable",
+      "predecessor": "sony_psp",
+      "design_signals": [
+        "touch_input",
+        "better_gpu"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nintendo_wii_u",
+      "first_year": 2012,
+      "lineage": "nintendo_console",
+      "predecessor": "nintendo_wii",
+      "design_signals": [
+        "asymmetric_second_screen"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "microsoft_xbox_one",
+      "first_year": 2013,
+      "lineage": "xbox",
+      "predecessor": "microsoft_xbox_360",
+      "design_signals": [
+        "game_capture",
+        "media_services"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "sony_ps4",
+      "first_year": 2013,
+      "lineage": "playstation",
+      "predecessor": "sony_ps3",
+      "design_signals": [
+        "unified_gpu",
+        "game_capture"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nintendo_switch",
+      "first_year": 2017,
+      "lineage": "nintendo_console",
+      "predecessor": "nintendo_wii_u",
+      "design_signals": [
+        "hybrid_docking",
+        "portable_multiplayer"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "microsoft_xbox_series",
+      "first_year": 2020,
+      "lineage": "xbox",
+      "predecessor": "microsoft_xbox_one",
+      "design_signals": [
+        "fast_storage",
+        "modern_3d"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "sony_ps5",
+      "first_year": 2020,
+      "lineage": "playstation",
+      "predecessor": "sony_ps4",
+      "design_signals": [
+        "ssd",
+        "ray_tracing"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "nintendo_switch_2",
+      "first_year": 2025,
+      "lineage": "nintendo_console",
+      "predecessor": "nintendo_switch",
+      "design_signals": [
+        "enhanced_hybrid_gpu"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    },
+    {
+      "platform_id": "windows_modern",
+      "first_year": 2026,
+      "lineage": "pc",
+      "predecessor": "windows_95_98",
+      "design_signals": [
+        "modern_graphics",
+        "accessibility"
+      ],
+      "chronology_confidence": "reference_era_requires_individual_source_confirmation",
+      "portability_is_not_binary_compatibility": true
+    }
+  ]
+}
