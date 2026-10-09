@@ -242,6 +242,10 @@ __all__ = [
 from importlib import import_module as _game_builder_import_module
 
 _KNOWLEDGE_EXPORTS = {
+    "NativeDesktopExportError": ".desktop_native_export",
+    "NativeDesktopSourceProject": ".desktop_native_export",
+    "compile_native_desktop": ".desktop_native_export",
+    "export_native_desktop_source": ".desktop_native_export",
     "editor_platform_options": ".editor_platforms",
     "editor_portability_context": ".editor_platforms",
     "editor_platform_form": ".editor_platforms",
