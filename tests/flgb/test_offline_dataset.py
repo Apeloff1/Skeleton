@@ -16,6 +16,7 @@ from skeleton.app.local_ai_dataset import (
     DATASET_SCHEMA,
     OfflineDatasetError,
     prepare_native_dataset,
+    verify_native_dataset,
 )
 from skeleton.app.local_ai_training import train_local_text
 from skeleton.cortex.port import tokens
@@ -211,6 +212,121 @@ class TestNativeDatasetCuration(unittest.TestCase):
                     prepare_native_dataset(source, dest)
             self.assertFalse(dest.exists())
             self.assertEqual(count, 2)
+
+    def test_readonly_verification_checks_prepared_data_and_originals(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source = _sources(root)
+            out = root / "curated"
+            expected = prepare_native_dataset(source, out, seed=13)
+            prepared = verify_native_dataset(out)
+            with_sources = verify_native_dataset(out, original_sources=source)
+            self.assertEqual(expected["dataset_id"], prepared["dataset_id"])
+            self.assertTrue(prepared["prepared_outputs_verified"])
+            self.assertFalse(prepared["original_sources_verified"])
+            self.assertTrue(with_sources["original_sources_verified"])
+            self.assertFalse(with_sources["historical_data_disjointness_proven"])
+            self.assertFalse(with_sources["model_quality_certified"])
+            before = {item.name: item.read_bytes() for item in out.iterdir()}
+            self.assertEqual(before, {item.name: item.read_bytes() for item in out.iterdir()})
+
+    def test_byte_level_corruption_of_output_cannot_pass_manifest_verification(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source = _sources(root)
+            out = root / "curated"
+            prepare_native_dataset(source, out)
+            train_path = out / "train.txt"
+            before = train_path.read_bytes()
+            train_path.write_bytes(before.replace(b"world", b"alpha", 1))
+            with self.assertRaises(OfflineDatasetError):
+                verify_native_dataset(out)
+            train_path.write_bytes(before)
+            manifest_path = out / "dataset.json"
+            old = manifest_path.read_bytes()
+            tampered = json.loads(old)
+            tampered["dataset_id"] = "0" * 64
+            manifest_path.write_text(json.dumps(tampered), encoding="utf-8")
+            with self.assertRaises(OfflineDatasetError):
+                verify_native_dataset(out)
+            manifest_path.write_bytes(old)
+            self.assertTrue(verify_native_dataset(out)["prepared_outputs_verified"])
+
+    def test_original_source_modification_cannot_forge_verified_lineage(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source = _sources(root)
+            out = root / "curated"
+            prepare_native_dataset(source, out)
+            (source / "a.txt").write_text(
+                "user beta assistant alpha\nuser world assistant beta\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(verify_native_dataset(out)["prepared_outputs_verified"])
+            with self.assertRaises(OfflineDatasetError):
+                verify_native_dataset(out, original_sources=source)
+
+    def test_manifest_duplicate_fields_or_symlink_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source = _sources(root)
+            out = root / "curated"
+            prepare_native_dataset(source, out)
+            manifest = out / "dataset.json"
+            original = manifest.read_bytes()
+            manifest.write_bytes(original.replace(
+                b'"schema":', b'"schema":"duplicate","schema":', 1,
+            ))
+            with self.assertRaisesRegex(OfflineDatasetError, "duplicate"):
+                verify_native_dataset(out)
+            manifest.write_bytes(original)
+            train = out / "train.txt"
+            saved = train.read_bytes()
+            train.unlink()
+            external = root / "outside.txt"
+            external.write_bytes(saved)
+            try:
+                train.symlink_to(external)
+            except OSError:
+                self.skipTest("symlinks unavailable")
+            with self.assertRaises(OfflineDatasetError):
+                verify_native_dataset(out)
+
+    def test_verification_cli_and_frozen_exe_are_readonly(self) -> None:
+        from skeleton.app.cli import run_app_cli
+        from skeleton.app.windows_launcher import main as frozen_main
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source = _sources(root)
+            out = root / "curated"
+            prepare_native_dataset(source, out)
+            original = {p.name: p.read_bytes() for p in out.iterdir()}
+            output = StringIO()
+            with redirect_stdout(output):
+                code = run_app_cli([
+                    "local-ai", "--verify-dataset", str(out),
+                    "--verify-sources", str(source), "--json",
+                ])
+            self.assertEqual(code, 0, output.getvalue())
+            self.assertTrue(json.loads(output.getvalue())["original_sources_verified"])
+            output = StringIO()
+            with redirect_stdout(output):
+                code = frozen_main([
+                    "--offline-command", "local-ai", "--verify-dataset",
+                    str(out), "--json",
+                ])
+            self.assertEqual(code, 0, output.getvalue())
+            self.assertFalse(json.loads(output.getvalue())["original_sources_verified"])
+            self.assertEqual(original, {p.name: p.read_bytes() for p in out.iterdir()})
+            for invalid in (
+                ["--verify-sources", str(source)],
+                ["--verify-dataset", str(out), "--model", "checkpoint.json"],
+                ["--verify-dataset", str(out), "--train-corpus", "train.txt"],
+                ["--verify-dataset", str(out), "--split-seed", "10"],
+            ):
+                with redirect_stdout(StringIO()):
+                    self.assertEqual(run_app_cli(["local-ai", *invalid]), 2)
 
     def test_rejects_invalid_budgets_and_mixed_cli_modes(self) -> None:
         from skeleton.app.cli import run_app_cli
