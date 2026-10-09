@@ -40,13 +40,16 @@ def _parser() -> argparse.ArgumentParser:
                            help="predictions JSONL with id and prediction, never training records")
     operation.add_argument("--export-train", type=Path,
                            help="write a NEW train-only plain text corpus; never export held-out labels")
-    parser.add_argument("--split", choices=("validation", "test"), default="validation",
+    parser.add_argument("--split", choices=("validation", "test"), default=None,
                         help="held-out evaluation split (only used with --evaluate)")
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    if args.split is not None and args.evaluate is None:
+        print("--split requires --evaluate and may never select training data", file=sys.stderr)
+        return 2
     try:
         report = validate_curriculum(args.dataset)
         if args.register_db is not None:
@@ -56,6 +59,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 path.exists() and not path.is_file()
             ):
                 raise SyntheticCurriculumError("registry must be a local regular SQLite path")
+            if path.absolute().is_relative_to(args.dataset.resolve()):
+                raise SyntheticCurriculumError(
+                    "training registry cannot be created inside source dataset"
+                )
             registry = DatasetRegistry(path)
             try:
                 digest = register_with_training_registry(args.dataset, registry)
@@ -72,16 +79,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             destination = args.export_train.expanduser().absolute()
             if destination.is_symlink() or destination.exists() or not destination.parent.is_dir():
                 raise SyntheticCurriculumError("train export requires a new local file")
-            if destination.parent.resolve() == args.dataset.resolve():
+            if destination.is_relative_to(args.dataset.resolve()):
                 raise SyntheticCurriculumError("cannot create export inside verified dataset")
             raw = (args.dataset / "train_corpus.txt").read_bytes()
             # Exclusive creation prevents clobbering another process' data.
-            with destination.open("xb") as writer:
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+            descriptor = os.open(destination, flags, 0o600)
+            with os.fdopen(descriptor, "wb") as writer:
                 writer.write(raw)
                 writer.flush()
                 os.fsync(writer.fileno())
-            if os.name == "posix":
-                os.chmod(destination, 0o600)
             report = {
                 **report,
                 "exported_train_only": str(destination),
