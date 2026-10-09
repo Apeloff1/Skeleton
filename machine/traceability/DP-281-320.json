@@ -4022,7 +4022,7 @@
       "volume_ref": "VOL-281",
       "title": "Doctor Command",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
@@ -4031,7 +4031,7 @@
       "volume_ref": "VOL-282",
       "title": "Self-Diagnosis",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
@@ -4040,7 +4040,7 @@
       "volume_ref": "VOL-283",
       "title": "Safe Repair",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
@@ -4049,7 +4049,7 @@
       "volume_ref": "VOL-284",
       "title": "System Digital Twin",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
@@ -4058,7 +4058,7 @@
       "volume_ref": "VOL-285",
       "title": "Deployment Planner",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
@@ -4067,7 +4067,7 @@
       "volume_ref": "VOL-286",
       "title": "Resource Scheduler",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
@@ -4076,7 +4076,7 @@
       "volume_ref": "VOL-287",
       "title": "Fairness / Starvation Control",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
@@ -4085,7 +4085,7 @@
       "volume_ref": "VOL-288",
       "title": "Backpressure",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
@@ -4094,7 +4094,7 @@
       "volume_ref": "VOL-289",
       "title": "Load Shedding",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
@@ -4103,7 +4103,7 @@
       "volume_ref": "VOL-290",
       "title": "Queue Congestion Control",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
@@ -4112,7 +4112,7 @@
       "volume_ref": "VOL-291",
       "title": "Retry Budgets",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
@@ -4121,7 +4121,7 @@
       "volume_ref": "VOL-292",
       "title": "Circuit Breaker Standard",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
@@ -4130,7 +4130,7 @@
       "volume_ref": "VOL-293",
       "title": "Bulkhead Architecture",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
@@ -4139,7 +4139,7 @@
       "volume_ref": "VOL-294",
       "title": "Dead-Letter Workflow",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
@@ -4148,7 +4148,7 @@
       "volume_ref": "VOL-295",
       "title": "Operation Replay",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
@@ -4157,7 +4157,7 @@
       "volume_ref": "VOL-296",
       "title": "Determinism Envelope",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
@@ -4166,7 +4166,7 @@
       "volume_ref": "VOL-297",
       "title": "Time Architecture",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
@@ -4175,7 +4175,7 @@
       "volume_ref": "VOL-298",
       "title": "Identifier Standard",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
@@ -4184,7 +4184,7 @@
       "volume_ref": "VOL-299",
       "title": "Logical Clocks / Event Ordering",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
