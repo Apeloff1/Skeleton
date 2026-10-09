@@ -85,3 +85,61 @@ def test_consumer_budget_validates_types_and_rejects_boolean_numbers(bad):
             ram_bytes=8 * GIB, physical_cpu_cores=4,
             kv_bytes_per_token=bad,
         )
+
+
+def test_consumer_hardware_probe_respects_available_memory_and_cgroup_quotas(monkeypatch):
+    import sys
+    from pathlib import Path
+    from types import SimpleNamespace
+    from skeleton.ai.runtime.inference import detect_consumer_hardware_budget
+    import skeleton.ai.runtime.inference.llama_cpp as module
+
+    monkeypatch.setitem(sys.modules, "psutil", SimpleNamespace(
+        virtual_memory=lambda: SimpleNamespace(available=12 * GIB),
+        cpu_count=lambda logical=False: 8,
+    ))
+    cgroups = {
+        "/sys/fs/cgroup/memory.max": str(6 * GIB),
+        "/sys/fs/cgroup/memory.current": str(2 * GIB),
+        "/sys/fs/cgroup/cpu.max": "250000 100000",
+    }
+
+    def read_mock(self, *args, **kwargs):
+        if str(self) in cgroups:
+            return cgroups[str(self)]
+        raise OSError("not a mocked system file")
+
+    monkeypatch.setattr(Path, "read_text", read_mock)
+    monkeypatch.setattr(module.os, "sched_getaffinity", lambda pid: set(range(8)), raising=False)
+    budget = detect_consumer_hardware_budget(
+        kv_bytes_per_token=128 * 1024, target_context_tokens=2048
+    )
+    assert budget.ram_bytes == 4 * GIB
+    assert budget.physical_cpu_cores == 3
+    assert budget.target_context_tokens == 2048
+
+
+def test_consumer_hardware_probe_never_uses_total_ram_as_available(monkeypatch):
+    import sys
+    from pathlib import Path
+    from types import SimpleNamespace
+    from skeleton.ai.runtime.inference import detect_consumer_hardware_budget
+
+    monkeypatch.setitem(sys.modules, "psutil", SimpleNamespace(
+        virtual_memory=lambda: SimpleNamespace(total=128 * GIB, available=2 * GIB),
+        cpu_count=lambda logical=False: 4,
+    ))
+    monkeypatch.setattr(Path, "read_text", lambda *args, **kw: (_ for _ in ()).throw(OSError()))
+    budget = detect_consumer_hardware_budget(kv_bytes_per_token=1000)
+    assert budget.ram_bytes == 2 * GIB
+
+
+def test_consumer_probe_fails_closed_without_memory_or_physical_core_evidence(monkeypatch):
+    import sys
+    from pathlib import Path
+    from skeleton.ai.runtime.inference import detect_consumer_hardware_budget
+
+    monkeypatch.setitem(sys.modules, "psutil", None)
+    monkeypatch.setattr(Path, "read_text", lambda *args, **kw: (_ for _ in ()).throw(OSError()))
+    with pytest.raises(LlamaCppRuntimeError, match="cannot determine available RAM"):
+        detect_consumer_hardware_budget(kv_bytes_per_token=1024)
