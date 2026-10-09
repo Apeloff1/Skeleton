@@ -102,6 +102,24 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.11.16"
+      - name: Parse-check offline Python sources before dependency installation
+        run: |
+          python -m compileall -q \
+            skeleton/app/offline_history.py \
+            skeleton/app/offline_workspace.py \
+            skeleton/app/offline_library.py \
+            skeleton/app/offline_index_queue.py \
+            skeleton/app/offline_snapshot.py \
+            skeleton/app/offline_audit.py \
+            skeleton/app/offline_readiness.py \
+            skeleton/app/offline_cli.py \
+            skeleton/app/local_ai.py \
+            skeleton/app/cli.py \
+            scripts/offline_kit.py \
+            skeleton/testing/test_offline_library.py \
+            skeleton/testing/test_offline_index_queue.py \
+            skeleton/testing/test_offline_snapshot.py \
+            skeleton/testing/test_offline_audit.py
       - name: Install focused test dependency
         run: >-
           python -m pip install --disable-pip-version-check
