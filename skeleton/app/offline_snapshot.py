@@ -34,7 +34,7 @@ class OfflineSnapshotError(RuntimeError):
 
 
 def _source(path: str | Path) -> Path:
-    source = Path(path).expanduser()
+    source = Path(os.path.abspath(Path(path).expanduser()))
     if source.is_symlink() or not source.is_file():
         raise OfflineSnapshotError("snapshot input must be a regular local SQLite database")
     if source.stat().st_size > MAX_DATABASE_BYTES:
@@ -58,7 +58,7 @@ def _digest(path: Path) -> str:
 
 
 def _verify_database(path: Path, kind: str) -> None:
-    _source(path)
+    path = _source(path)
     if kind not in KINDS:
         raise OfflineSnapshotError("unsupported offline SQLite data domain")
     # URI mode=ro prevents a validation probe from creating a missing DB.
@@ -83,6 +83,7 @@ def _verify_database(path: Path, kind: str) -> None:
 
 
 def _online_backup(source: Path, destination: Path, kind: str) -> None:
+    source = _source(source)
     _verify_database(source, kind)
     # sqlite backup creates a consistent image even with source WAL pages.
     try:
@@ -168,8 +169,7 @@ def verify_snapshot(folder: str | Path) -> dict[str, Any]:
     if base.is_symlink() or not base.is_dir():
         raise OfflineSnapshotError("snapshot must be a regular local directory")
     manifest_file = base / "manifest.json"
-    _source_file = manifest_file
-    if manifest_file.is_symlink() or not manifest_file.is_file():
+     if manifest_file.is_symlink() or not manifest_file.is_file():
         raise OfflineSnapshotError("snapshot manifest is missing or symlinked")
     if manifest_file.stat().st_size > MAX_MANIFEST_BYTES:
         raise OfflineSnapshotError("snapshot manifest exceeds limit")
@@ -264,7 +264,9 @@ def restore_snapshot(
         # If a later publish fails, delete only files made in this operation.
         for temporary, target, _kind in staged:
             _destination(target)
-            os.replace(temporary, target)
+            # Hard-link creation fails if target already exists, unlike
+            # os.replace which could silently overwrite a user database.
+            os.link(temporary, target)
             published.append(target)
     except BaseException:
         for produced in published:
