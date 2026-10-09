@@ -23,6 +23,10 @@ on:
       - "skeleton/testing/test_gameplay_capabilities.py"
       - "skeleton/ai/runtime/game_platform_catalog.py"
       - "skeleton/ai/runtime/game_rights.py"
+      - "skeleton/ai/runtime/homebrew_editor.py"
+      - "skeleton/app/homebrew_editor_ui.py"
+      - "scripts/game/homebrew_edit.py"
+      - "skeleton/testing/test_homebrew_editor.py"
       - "skeleton/ai/runtime/game_project_capsule.py"
       - "skeleton/ai/runtime/game_playability.py"
       - "skeleton/ai/runtime/chip8_machine.py"
@@ -109,6 +113,10 @@ on:
       - "skeleton/testing/test_gameplay_capabilities.py"
       - "skeleton/ai/runtime/game_platform_catalog.py"
       - "skeleton/ai/runtime/game_rights.py"
+      - "skeleton/ai/runtime/homebrew_editor.py"
+      - "skeleton/app/homebrew_editor_ui.py"
+      - "scripts/game/homebrew_edit.py"
+      - "skeleton/testing/test_homebrew_editor.py"
       - "skeleton/ai/runtime/game_project_capsule.py"
       - "skeleton/ai/runtime/game_playability.py"
       - "skeleton/ai/runtime/chip8_machine.py"
@@ -222,6 +230,10 @@ jobs:
             skeleton/ai/runtime/gameplay_capabilities.py \
             skeleton/ai/runtime/game_platform_catalog.py \
             skeleton/ai/runtime/game_rights.py \
+            skeleton/ai/runtime/homebrew_editor.py \
+            skeleton/app/homebrew_editor_ui.py \
+            scripts/game/homebrew_edit.py \
+            skeleton/testing/test_homebrew_editor.py \
             skeleton/ai/runtime/game_project_capsule.py \
             skeleton/ai/runtime/game_playability.py \
             skeleton/ai/runtime/chip8_machine.py \
@@ -319,6 +331,7 @@ jobs:
           skeleton/testing/test_capability_graph.py
           skeleton/testing/test_gameplay_capabilities.py
           skeleton/testing/test_cross_era_game_rights.py
+          skeleton/testing/test_homebrew_editor.py
           skeleton/testing/test_game_playability.py
           skeleton/testing/test_chip8_homebrew.py
           skeleton/testing/test_chip8_classic.py
