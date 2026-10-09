@@ -16,11 +16,10 @@ import secrets
 import threading
 from typing import Any
 
-from skeleton.ai.model_runtime.chat_protocol import ChatMessage, ChatTranscript
 from skeleton.ai.model_runtime.offline_chat import (
     OfflineChatStore, load_private_bundle, save_private_bundle,
 )
-from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig, RuntimeContractError
+from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig
 from skeleton.ai.runtime.inference.artifact import load_local_model_artifact
 from skeleton.ai.runtime.inference.deployment import LocalModelDeployment
 from skeleton.ai.runtime.inference.llama_cpp import LlamaCppModel
