@@ -403,7 +403,7 @@ def test_local_scan_refuses_symlinked_reference_and_binary_input(tmp_path):
     with pytest.raises(OriginalityError):
         scan_manifest(manifest, root)
     reference.unlink()
-    reference.write_bytes(b"hello\\x00world")
+    reference.write_bytes(b"hello\x00world")
     with pytest.raises(OriginalityError):
         scan_manifest(manifest, root)
 
