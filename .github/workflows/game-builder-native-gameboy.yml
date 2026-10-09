@@ -30,6 +30,7 @@ jobs:
             /skeleton/ai/__init__.py
             /skeleton/ai/capability_map.py
             /skeleton/ai/game_builder/
+            /skeleton/testing/test_game_builder_game_boy_memory_replay.py
             /scripts/game_builder/native_game_boy_ci.py
             /scripts/game_builder/emulate_game_boy_ci.py
       - uses: actions/setup-python@v5
