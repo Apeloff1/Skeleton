@@ -21,7 +21,7 @@ from .port_planner import (
 )
 
 _ID = re.compile(r"^[a-z][a-z0-9_]+$")
-_SIGNAL = re.compile(r"^[a-z][a-z0-9_]{1,70}$")
+_SIGNAL = re.compile(r"^[a-z0-9][a-z0-9_]{1,70}$")
 _MIN_YEAR, _MAX_YEAR = 1950, 2100
 
 
