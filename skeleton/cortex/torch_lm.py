@@ -42,6 +42,7 @@ class TorchAccel:
         self._E = self._P = self._Wout = self._bout = None
         self._layers: List[Dict[str, Any]] = []
         self._weights_modified = False
+        self._training_failed = False
         self._state_lock = threading.RLock()
         self.reset_decode_cache()
 
@@ -96,6 +97,13 @@ class TorchAccel:
             self._key_buffers.append(new_keys)
             self._value_buffers.append(new_values)
 
+    def _assert_training_integrity(self) -> None:
+        if self._training_failed:
+            raise RuntimeError(
+                "accelerator weights may contain a partial training update; "
+                "restore from a trusted checkpoint"
+            )
+
     def _t2(self, rows: List[List[float]], grad: bool = True):
         return self.torch.tensor(rows, dtype=self.torch.float32, device=self.device, requires_grad=grad)
 
@@ -108,6 +116,7 @@ class TorchAccel:
 
     def _pin_unlocked(self) -> "TorchAccel":
         """Upload canonical Python weights, saving trained device changes first."""
+        self._assert_training_integrity()
         if self._weights_modified:
             self.sync()
         lm = self.lm
@@ -169,6 +178,7 @@ class TorchAccel:
 
     def _sync_unlocked(self) -> None:
         """Python lists catch up. Snapshot / to() / fallback call this."""
+        self._assert_training_integrity()
         if not self.resident or self._E is None or not self._weights_modified:
             return
         # CPU Python weights are the canonical admission and checkpoint
@@ -385,6 +395,7 @@ class TorchAccel:
 
     def _logits_window_unlocked(self, ids: Sequence[int]) -> List[float]:
         """Prefill once, then decode with on-device per-layer K/V tensors."""
+        self._assert_training_integrity()
         if not self.resident:
             self.pin()
         lm = self.lm
@@ -421,11 +432,13 @@ class TorchAccel:
 
     def logits(self, ids: Sequence[int]) -> List[float]:
         with self._state_lock, self.torch.inference_mode():
+            self._assert_training_integrity()
             y, _ = self._forward_ids(ids)
             return y.detach().cpu().tolist()
 
     def hidden(self, ids: Sequence[int]) -> List[float]:
         with self._state_lock, self.torch.inference_mode():
+            self._assert_training_integrity()
             _, h = self._forward_ids(ids)
             return h.detach().cpu().tolist()
 
@@ -434,6 +447,7 @@ class TorchAccel:
             return self._sgd_unlocked(ids, target, lr)
 
     def _sgd_unlocked(self, ids: Sequence[int], target: int, lr: float) -> float:
+        self._assert_training_integrity()
         self.reset_decode_cache()
         torch = self.torch
         if not self.resident:
@@ -445,11 +459,19 @@ class TorchAccel:
         tgt = torch.tensor([int(target)], dtype=torch.long, device=self.device)
         loss = torch.nn.functional.cross_entropy(logits.unsqueeze(0), tgt)
         loss.backward()
-        with torch.no_grad():
-            for p in self._params():
-                if p.grad is not None:
-                    p.add_(p.grad, alpha=-float(lr))
+        # GPU updates are not automatically transactional. If an in-place
+        # write fails partway, any further inference or synchronization would
+        # treat a partially trained graph as an admitted immutable model.
         self._weights_modified = True
+        try:
+            with torch.no_grad():
+                for p in self._params():
+                    if p.grad is not None:
+                        p.add_(p.grad, alpha=-float(lr))
+        except Exception:
+            self._training_failed = True
+            self.reset_decode_cache()
+            raise
         self.lm.steps += 1
         return float(loss.detach().cpu())
 
