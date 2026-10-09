@@ -21,6 +21,8 @@ from skeleton.ai.model_runtime.offline_chat import (
 )
 from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig, RuntimeContractError
 from skeleton.ai.runtime.inference.artifact import load_local_model_artifact
+from skeleton.ai.runtime.inference.deployment import LocalModelDeployment
+from skeleton.ai.runtime.inference.llama_cpp import LlamaCppModel
 from skeleton.ai.runtime.inference.local import LocalInferenceRequest, LocalInferenceResult, LocalInferenceEngine
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
 
@@ -42,6 +44,27 @@ def load_native_checkpoint(source: str | Path) -> NativeRuntimeLocalModel:
     return loaded.model
 
 
+def load_gguf_deployment(source: str | Path) -> LlamaCppModel:
+    """Admit a preinstalled local GGUF and llama.cpp executable by SHA-256."""
+    deployment = LocalModelDeployment.load(source)
+    return LlamaCppModel(deployment.llama_cpp_config(
+        rehash_artifacts_each_run=True,
+    ))
+
+
+LocalDesktopModel = NativeRuntimeLocalModel | LlamaCppModel
+
+
+def _model_tokenizer_digest(backend: LocalDesktopModel) -> str:
+    if isinstance(backend, NativeRuntimeLocalModel):
+        return backend.tokenizer_digest
+    if isinstance(backend, LlamaCppModel):
+        # GGUF embeds its vocabulary; exact model bytes bind that tokenizer.
+        return sha256(b"skeleton.ai.gguf-tokenizer.v1:" +
+                      bytes.fromhex(backend.model_digest)).hexdigest()
+    raise OfflineAIError("unsupported desktop model backend")
+
+
 @dataclass(frozen=True)
 class OfflineAnswer:
     text: str
@@ -59,10 +82,13 @@ class OfflineAISession:
     assistant/workspace and terminal-turn authority instead.
     """
 
-    def __init__(self, backend: NativeRuntimeLocalModel) -> None:
-        if not isinstance(backend, NativeRuntimeLocalModel):
-            raise OfflineAIError("canonical native model backend required")
-        backend.assert_identity()
+    def __init__(self, backend: LocalDesktopModel) -> None:
+        if not isinstance(backend, (NativeRuntimeLocalModel, LlamaCppModel)):
+            raise OfflineAIError("canonical offline model backend required")
+        if isinstance(backend, NativeRuntimeLocalModel):
+            backend.assert_identity()
+        else:
+            backend._assert_artifacts_stable()
         self.backend = backend
         self.engine = LocalInferenceEngine(backend, cache_size=0)
         self.history: tuple[tuple[str, str], ...] = ()
@@ -75,19 +101,38 @@ class OfflineAISession:
     def model_digest(self) -> str:
         return self.backend.model_digest
 
+    @property
+    def tokenizer_digest(self) -> str:
+        return _model_tokenizer_digest(self.backend)
+
+    @property
+    def preferred_output_tokens(self) -> int:
+        if isinstance(self.backend, NativeRuntimeLocalModel):
+            runtime = self.backend.runtime
+            return min(32, runtime.limits.max_new_tokens,
+                       max(1, runtime.limits.max_context // 4))
+        return min(32, max(1, (self.backend.config.context_size or 4096) // 4))
+
     def _request(self, prompt: str, max_output_tokens: int) -> tuple[LocalInferenceRequest, tuple[tuple[str, str], ...]]:
         if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_USER_CHARS:
             raise OfflineAIError("message must contain 1-4096 characters")
-        runtime = self.backend.runtime
+        runtime = self.backend.runtime if isinstance(
+            self.backend, NativeRuntimeLocalModel
+        ) else None
+        context_limit = (
+            runtime.limits.max_context if runtime is not None
+            else self.backend.config.context_size or 4096
+        )
+        output_limit = runtime.limits.max_new_tokens if runtime is not None else 8192
         if (
             isinstance(max_output_tokens, bool)
             or not isinstance(max_output_tokens, int)
-            or not 1 <= max_output_tokens <= runtime.limits.max_new_tokens
+            or not 1 <= max_output_tokens <= output_limit
         ):
             raise OfflineAIError("output-token budget exceeds the loaded model limit")
-        # Leave enough context for the answer. Drop oldest full turns, never
-        # truncate a message mid-token or corrupt role framing.
-        available = runtime.limits.max_context - max_output_tokens
+        # Native has exact token counts; GGUF uses conservative UTF-8 bytes
+        # and delegates final token/context validation to llama.cpp.
+        available = context_limit - max_output_tokens
         if available < 1:
             raise OfflineAIError("checkpoint has insufficient context for this output budget")
         history = self.history
@@ -98,7 +143,11 @@ class OfflineAISession:
                 history=history,
                 max_output_tokens=max_output_tokens,
             )
-            observed = len(runtime.tokenizer.encode_ids(request.rendered_input))
+            observed = (
+                len(runtime.tokenizer.encode_ids(request.rendered_input))
+                if runtime is not None
+                else len(request.rendered_input.encode("utf-8")) + 16
+            )
             if observed <= available:
                 return request, history
             if not history:
@@ -138,7 +187,7 @@ class DurableOfflineAISession(OfflineAISession):
     receipts. The app shell can never silently substitute a different model.
     """
 
-    def __init__(self, backend: NativeRuntimeLocalModel, *,
+    def __init__(self, backend: LocalDesktopModel, *,
                  database: str | Path, session_id: str | None = None) -> None:
         super().__init__(backend)
         self.store = OfflineChatStore(database)
@@ -147,10 +196,10 @@ class DurableOfflineAISession(OfflineAISession):
         try:
             if session_id is None:
                 existing = self.store.list_sessions(
-                    backend.model_digest, backend.tokenizer_digest, limit=1
+                    backend.model_digest, self.tokenizer_digest, limit=1
                 )
                 session_id = existing[0][0] if existing else self.store.create(
-                    backend.model_digest, backend.tokenizer_digest
+                    backend.model_digest, self.tokenizer_digest
                 )
             self.session_id = session_id
             self._restore()
@@ -160,7 +209,7 @@ class DurableOfflineAISession(OfflineAISession):
 
     def _restore(self) -> None:
         record = self.store.load(
-            self.session_id, self.backend.model_digest, self.backend.tokenizer_digest
+            self.session_id, self.backend.model_digest, self.self.tokenizer_digest
         )
         messages = record.transcript.messages
         has_instruction = bool(messages and messages[0].role == "system")
@@ -180,7 +229,7 @@ class DurableOfflineAISession(OfflineAISession):
         if self._busy:
             raise OfflineAIError("cannot switch conversation during generation")
         self.session_id = self.store.create(
-            self.backend.model_digest, self.backend.tokenizer_digest
+            self.backend.model_digest, self.self.tokenizer_digest
         )
         self.history = ()
         self.instructions = ""
@@ -203,19 +252,19 @@ class DurableOfflineAISession(OfflineAISession):
 
     def list_conversations(self) -> tuple[tuple[str, int], ...]:
         return self.store.list_sessions(
-            self.backend.model_digest, self.backend.tokenizer_digest
+            self.backend.model_digest, self.self.tokenizer_digest
         )
 
     def export_conversation(self, session_id: str) -> bytes:
         return self.store.export_bundle(
-            session_id, self.backend.model_digest, self.backend.tokenizer_digest
+            session_id, self.backend.model_digest, self.self.tokenizer_digest
         )
 
     def import_conversation(self, payload: bytes) -> str:
         if self._busy:
             raise OfflineAIError("cannot import during model generation")
         session_id = self.store.import_bundle(
-            payload, self.backend.model_digest, self.backend.tokenizer_digest
+            payload, self.backend.model_digest, self.self.tokenizer_digest
         )
         self.resume(session_id)
         return session_id
@@ -224,7 +273,7 @@ class DurableOfflineAISession(OfflineAISession):
         if self._busy:
             raise OfflineAIError("cannot delete conversation during generation")
         self.store.delete(
-            session_id, self.backend.model_digest, self.backend.tokenizer_digest
+            session_id, self.backend.model_digest, self.self.tokenizer_digest
         )
         if session_id == self.session_id:
             self.create_conversation()
@@ -239,7 +288,7 @@ class DurableOfflineAISession(OfflineAISession):
             # Recheck durable authority immediately before inference so a
             # concurrent process cannot silently rewrite the prior context.
             saved = self.store.load(
-                self.session_id, self.backend.model_digest, self.backend.tokenizer_digest
+                self.session_id, self.backend.model_digest, self.self.tokenizer_digest
             )
             stored_messages = saved.transcript.messages
             stored_has_system = bool(stored_messages and stored_messages[0].role == "system")
