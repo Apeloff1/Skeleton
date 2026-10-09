@@ -229,7 +229,7 @@ def test_positive_eval_still_requires_minimum_variant_samples() -> None:
 
     with pytest.raises(
         FeedbackPromotionError,
-        match="minimum variant sample",
+        match="minimum (?:unique-subject )?variant sample",
     ):
         FeedbackPromotionPipeline().promote(
             spec,

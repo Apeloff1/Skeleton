@@ -13,19 +13,22 @@ export interface NativeAttempt {
 const digest=/^[a-f0-9]{64}$/;
 export function normalizeNativeTargets(input:unknown):NativeTarget[]{
  if(!Array.isArray(input))return [];
- return input.filter((t: unknown):t is NativeTarget=>!!t&&typeof t==='object'&&
-  typeof t.id==='string'&&/^[a-z0-9_]{2,64}$/.test(t.id)&&
-  typeof t.family==='string'&&t.family.length<80&&
-  typeof t.generation==='string'&&t.generation.length<80&&
-  Number.isInteger(t.year)&&t.year>=1970&&t.year<=2100&&
-  typeof t.toolchain==='string'&&t.toolchain.length<100&&
-  typeof t.output==='string'&&t.output.length<12&&
-  typeof t.cpu==='string'&&typeof t.graphics==='string'&&
-  typeof t.sound==='string'&&typeof t.input==='string'&&
-  ['native_source','toolchain_adapter','licensed_sdk'].includes(t.status)&&
-  (!t.supported_styles||(Array.isArray(t.supported_styles)&&
-   t.supported_styles.every((s: unknown)=>typeof s==='string'&&/^[a-z_]{2,64}$/.test(s))))
- ).slice(0,100);
+ const isTarget=(value:unknown):value is NativeTarget=>{
+  if(!value||typeof value!=='object')return false;
+  const t=value as Record<string,unknown>;
+  return typeof t.id==='string'&&/^[a-z0-9_]{2,64}$/.test(t.id)&&
+   typeof t.family==='string'&&t.family.length<80&&
+   typeof t.generation==='string'&&t.generation.length<80&&
+   typeof t.year==='number'&&Number.isInteger(t.year)&&t.year>=1970&&t.year<=2100&&
+   typeof t.toolchain==='string'&&t.toolchain.length<100&&
+   typeof t.output==='string'&&t.output.length<12&&
+   typeof t.cpu==='string'&&typeof t.graphics==='string'&&
+   typeof t.sound==='string'&&typeof t.input==='string'&&
+   (t.status==='native_source'||t.status==='toolchain_adapter'||t.status==='licensed_sdk')&&
+   (t.supported_styles===undefined||(Array.isArray(t.supported_styles)&&
+    t.supported_styles.every((s:unknown)=>typeof s==='string'&&/^[a-z_]{2,64}$/.test(s))));
+ };
+ return input.filter(isTarget).slice(0,100);
 }
 export function normalizeNativeAttempts(input:unknown):NativeAttempt[]{
  if(!Array.isArray(input))return [];

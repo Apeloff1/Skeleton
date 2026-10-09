@@ -31,7 +31,10 @@ class TestTemporalSignals(unittest.TestCase):
  def test_future_decade_signal_fails_closed(self):
   p=DecadePolicy("modern","runtime-safety",2020,500000,2,"b"*64)
   with self.assertRaisesRegex(TemporalSignalError,"future-observed|future-decade"):
-   assess_decade_signals((sig(1,2030,observed=2026),),policy=p,policy_year=2026)
+   assess_decade_signals((sig(1,2030,observed=2030),),policy=p,policy_year=2026)
+ def test_observation_cannot_predate_event(self):
+  with self.assertRaisesRegex(TemporalSignalError,"observation predates event"):
+   sig(1,2030,observed=2026)
  def test_cross_subject_decade_contamination_fails(self):
   p=DecadePolicy("modern","runtime-safety",2020,500000,2,"b"*64)
   with self.assertRaisesRegex(TemporalSignalError,"cross-subject"):

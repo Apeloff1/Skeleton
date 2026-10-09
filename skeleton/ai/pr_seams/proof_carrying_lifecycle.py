@@ -40,7 +40,7 @@ def _u(value: object, name: str) -> int:
     return value
 
 
-def card(hit: bool, **extra: object) -> dict:
+def card(hit: bool, /, **extra: object) -> dict:
     body = {
         "kind": KIND,
         "hit": bool(hit),
