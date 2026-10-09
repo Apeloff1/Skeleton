@@ -273,6 +273,32 @@ class OfflineDesktopPersistenceTests(unittest.TestCase):
             self.assertEqual(chat.list_conversations()[0][1], 0)
             chat.close()
 
+    def test_fork_after_exact_turn_preserves_parent_and_receipts(self):
+        chat = self._session()
+        sid = chat.session_id
+        asyncio.run(chat.ask("hello", max_output_tokens=2))
+        asyncio.run(chat.ask("world", max_output_tokens=2))
+        parent_history = chat.history
+        first_turn = parent_history[:2]
+        branched = chat.fork_conversation(sid, after_turn=1)
+        self.assertNotEqual(branched, sid)
+        self.assertEqual(chat.history, first_turn)
+        self.assertEqual(chat.store.load(
+            sid, self.backend.model_digest, chat.tokenizer_digest
+        ).revision, 2)
+        self.assertEqual(chat.store.load(
+            branched, self.backend.model_digest, chat.tokenizer_digest
+        ).revision, 1)
+        asyncio.run(chat.ask("hello", max_output_tokens=2))
+        self.assertEqual(chat.store.load(
+            branched, self.backend.model_digest, chat.tokenizer_digest
+        ).revision, 2)
+        chat.resume(sid)
+        self.assertEqual(chat.history, parent_history)
+        with self.assertRaisesRegex(RuntimeContractError, "fork turn"):
+            chat.fork_conversation(sid, after_turn=100)
+        chat.close()
+
     def test_private_database_directory_is_model_bound(self):
         with patch("pathlib.Path.home", return_value=Path(self.temp.name)):
             p = private_desktop_database(self.backend.model_digest)
