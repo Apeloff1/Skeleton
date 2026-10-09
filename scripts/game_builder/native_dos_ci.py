@@ -40,7 +40,7 @@ def verify_executable(path: Path) -> dict[str, object]:
     # .COM is a raw DOS executable with no PE/MZ header and 100h load origin.
     if not 256 < len(data) <= 0xFF00:
         raise ValueError("8086 COM image out of DOS 64KiB segment budget")
-    if not data.startswith(b"\x0E\x1F\xB8\x03\x00\xCD\x10"):
+    if not data.startswith(b"\x0E\x1F\xFC\xB8\x03\x00\xCD\x10"):
         raise ValueError("expected real 8086 CS->DS init and BIOS text-mode startup")
     if data.count(b"SKELDOSSTATE") != 1:
         raise ValueError("missing or duplicate real-mode state trace symbol table")
