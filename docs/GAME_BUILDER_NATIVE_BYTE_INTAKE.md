@@ -38,6 +38,26 @@ The staged pipeline now runs:
 
 The system distinguishes an *original homebrew game inspired by historical hardware ideas* from unauthorized copying of a protected game. A device license or technical exclusivity condition may affect publishing to particular hardware, without necessarily monopolizing its gameplay ideas on another independently built system. Whether a specific successor is infringing remains jurisdiction- and fact-dependent.
 
+## Complete combined native review gate
+
+`release_pipeline.run_native_release_gate(...)` now provides the executable
+orchestration entrypoint joining **byte inspection of real local outputs** and
+**three-role independent cryptographic reviewer decisions**. It requires the
+actual game source directory, binary path, author-rights credit package, build
+evidence file, gameplay evidence file, reviewed legal/originality objects and
+external Ed25519 signature set. The byte-level verifier runs **first**; only
+after hashes, rights notices, origin, selected machine and distribution
+territory match does the independent reviewer assessor run.
+
+The resulting `NativeReleaseGateReport` cryptographically binds the intake
+hash to the signed human review receipt and offers a JSON-safe public report.
+A full reviewer quorum produces `independent_reviews_complete: true` while
+**release_authorized, publisher_approval_granted, native_binary_boot_verified
+and legal_clearance_issued stay false**. The responsible publisher, real
+compiler/runtime validation and qualified legal decision are separate
+operations. This prevents any software component from treating a signed
+paper claim as verified machine output.
+
 ## CI and limitation
 
 The dedicated `Homebrew Historical Archive` workflow exercises both successful byte identification and rejection of modified C code, altered manifests/credits, binary substitutions, malformed format, symlinked inputs, mismatched rights packet/territories and attempts to forge release states. Its test binaries are **synthetic**, not real runnable Windows builds. A passing unit test demonstrates validation logic, *not real hardware acceptance*.
