@@ -114,6 +114,7 @@ class DevicePolicy:
     allow_fallback: bool = True
     kv_dtype: str = "fp32"
     kv_limit_bytes: int | None = None
+    prefill_query_chunk: int | None = None
 
     def __post_init__(self) -> None:
         if self.requested not in {"cpu", "auto", "cuda", "gpu", "mps", "torch", "torch-cpu"}:
@@ -127,6 +128,11 @@ class DevicePolicy:
             or self.kv_limit_bytes > MAX_KV_BYTES
         ):
             raise RuntimeContractError("KV cache byte ceiling out of bounds")
+        if self.prefill_query_chunk is not None and (
+            not is_int(self.prefill_query_chunk)
+            or not 1 <= self.prefill_query_chunk <= MAX_CONTEXT
+        ):
+            raise RuntimeContractError("prefill query chunk outside context bounds")
 
     def to_dict(self) -> dict[str, Any]:
         # Preserve historic checkpoint/device-policy digests by omitting
@@ -138,6 +144,8 @@ class DevicePolicy:
             result["kv_dtype"] = self.kv_dtype
         if self.kv_limit_bytes is not None:
             result["kv_limit_bytes"] = self.kv_limit_bytes
+        if self.prefill_query_chunk is not None:
+            result["prefill_query_chunk"] = self.prefill_query_chunk
         return result
 
 
@@ -149,6 +157,7 @@ class DeviceReceipt:
     degraded: bool
     kv_dtype: str = "fp32"
     kv_limit_bytes: int | None = None
+    prefill_query_chunk: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Return the canonical device receipt fields for runtime identity binding."""
@@ -162,6 +171,8 @@ class DeviceReceipt:
             result["kv_dtype"] = self.kv_dtype
         if self.kv_limit_bytes is not None:
             result["kv_limit_bytes"] = self.kv_limit_bytes
+        if self.prefill_query_chunk is not None:
+            result["prefill_query_chunk"] = self.prefill_query_chunk
         return result
 
     @property
