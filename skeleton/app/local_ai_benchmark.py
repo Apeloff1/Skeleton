@@ -220,11 +220,26 @@ def _exclude_leaked_training_cases(
     larger training line (or the inverse). This only checks the selected
     corpus; it cannot prove that all historical training data is disjoint.
     """
+    from skeleton.cortex.port import tokens
+
     raw, content = _read_corpus(source)
-    sentences = [
-        tuple(checkpoint.runtime.model._ids(line.strip()))
-        for line in content.splitlines() if line.strip()
-    ]
+    vocab = checkpoint.runtime.model.stoi
+    sentences: list[tuple[int, ...]] = []
+    for line in content.splitlines():
+        if not line.strip():
+            continue
+        words = tokens(line)
+        if any(word not in vocab for word in words):
+            # Mapping unknown text to UNK can hide an overlap in the
+            # exclusion set. A partial vocabulary cannot prove disjointness.
+            raise OfflineBenchmarkError(
+                "training exclusion has out-of-vocabulary tokens; disjointness unknown"
+            )
+        if not words:
+            raise OfflineBenchmarkError(
+                "training exclusion has a line with no recognized text tokens"
+            )
+        sentences.append(tuple(checkpoint.runtime.model._ids(line.strip())))
     if not sentences or len(sentences) > 512:
         raise OfflineBenchmarkError("training exclusion corpus has invalid line count")
     if sum(len(line) for line in sentences) > MAX_TOTAL_TOKENS:
