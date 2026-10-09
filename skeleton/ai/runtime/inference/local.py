@@ -575,10 +575,16 @@ class LocalInferenceEngine:
         cancel = threading.Event()
         worker = asyncio.create_task(asyncio.to_thread(self.model.infer, request, cancel))
         try:
-            result = await worker
+            # Never let asyncio task cancellation cancel the Future owning a
+            # native inference worker. Doing so marks the Future done while
+            # the OS thread (or subprocess) can remain alive. That allows
+            # SQLite/session shutdown while a previous inference still runs.
+            result = await asyncio.shield(worker)
         except asyncio.CancelledError:
             cancel.set()
             try:
+                # Drain the still-live worker after cooperative cancellation.
+                # A cancelled result is never returned to the caller or cache.
                 await asyncio.shield(worker)
             except (asyncio.CancelledError, Exception):
                 pass
