@@ -164,10 +164,20 @@ def improve_local_model(
     if not isinstance(original, NativeRuntimeLocalModel):
         raise OfflineImprovementError("only native transformer checkpoints can be improved")
     original.assert_identity()
-    model = original.runtime.model
-    if not isinstance(model, TinyTransformer):
+    source_model = original.runtime.model
+    if not isinstance(source_model, TinyTransformer):
         raise OfflineImprovementError("native transformer weights required")
     initial_digest = original.model_digest
+
+    # CPU fitting must NEVER mutate the original identity-bound runtime.
+    # Protected category evaluations, source receipts and rollback all
+    # depend on immutable baseline weights. Snapshot-clone into an isolated
+    # training model before taking any gradient steps.
+    model = TinyTransformer.from_snapshot(source_model.snapshot())
+    if NativeRuntimeLocalModel(NativeLLMRuntime(model)).model_digest != initial_digest:
+        raise OfflineImprovementError(
+            "training clone differs from the admitted parent checkpoint"
+        )
     vocab = set(model.stoi)
     train_raw, train_lines, _ = _read_lines(
         training_text, label="training", vocabulary=vocab, minimum_tokens=2,
