@@ -195,3 +195,49 @@ def test_read_only_history_does_not_change_synthetic_source_files(
     }
     assert before == after
     assert MAX_REPORTS == 500
+
+
+def test_capability_ledger_cli_records_and_displays_aggregate_status(
+    tmp_path: Path, capsys,
+) -> None:
+    from scripts.training.capability_ledger import main
+
+    predictions = _predictions(tmp_path / "val.jsonl", wrong_mode="inventory")
+    store = tmp_path / "capabilities.sqlite"
+    args = [
+        "--dataset", str(SOURCE), "--ledger", str(store),
+        "--model-tag", "candidate-v2",
+    ]
+    assert main([*args, "--record-predictions", str(predictions)]) == 0
+    receipt = json.loads(capsys.readouterr().out)
+    assert receipt["latest_correct"] == 99
+    assert receipt["raw_predictions_stored"] is False
+    assert receipt["training_corpus_mutated"] is False
+    assert receipt["added_receipt_digest"] is not None
+    assert main([*args, "--status"]) == 0
+    status = json.loads(capsys.readouterr().out)
+    assert status["latest_correct"] == 99
+    assert status["added_receipt_digest"] is None
+    assert status["last_prediction_sha256"] == receipt["last_prediction_sha256"]
+    assert "instruction" not in json.dumps(status)
+    assert "response" not in json.dumps(status)
+    assert "prediction" not in json.dumps(status).replace(
+        "last_prediction_sha256", ""
+    ).replace("raw_predictions_stored", "")
+
+
+def test_capability_ledger_cli_rejects_state_inside_source_directory(
+    tmp_path: Path, capsys,
+) -> None:
+    from scripts.training.capability_ledger import main
+    from shutil import copytree
+
+    copied = tmp_path / "copy"
+    copytree(SOURCE, copied)
+    dest = copied / "new-ledger.sqlite"
+    assert main([
+        "--dataset", str(copied), "--ledger", str(dest),
+        "--model-tag", "trial", "--status",
+    ]) == 1
+    assert not dest.exists()
+    assert "inside the source dataset" in capsys.readouterr().err
