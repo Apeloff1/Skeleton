@@ -157,3 +157,56 @@ def test_cli_refuses_ambiguous_or_missing_model_selection(
     assert run_app_cli(["local-ai", "--deployment", str(manifest)]) == 2
     assert run_app_cli(["local-ai", "--prompt", "hi"]) == 2
     assert "exactly one" in capsys.readouterr().out
+
+
+@pytest.mark.asyncio
+async def test_gguf_backup_restores_history_without_reexecution(
+    local_deployment: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    manifest, _, _ = local_deployment
+    first = OfflineGGUFSession(manifest)
+    await first.ask("Turn one", max_output_tokens=8)
+    backup = tmp_path / "conversation.json"
+    first.save_history_backup(backup)
+    recovered = OfflineGGUFSession(manifest)
+    assert recovered.restore_history_backup(backup) == 1
+    assert recovered.history == first.history
+    await recovered.ask("Turn two", max_output_tokens=8)
+    assert len(recovered.history) == 4
+    assert len(first.history) == 2
+
+
+def test_headless_gguf_backup_roundtrip(
+    local_deployment: tuple[Path, Path, Path], tmp_path: Path, capsys
+) -> None:
+    manifest, _, _ = local_deployment
+    backup = tmp_path / "chat.json"
+    assert run_app_cli([
+        "local-ai", "--deployment", str(manifest), "--prompt", "Turn one",
+        "--backup-out", str(backup),
+    ]) == 0
+    capsys.readouterr()
+    assert backup.exists()
+    assert run_app_cli([
+        "local-ai", "--deployment", str(manifest), "--prompt", "Turn two",
+        "--backup-in", str(backup), "--backup-out", str(backup), "--json",
+    ]) == 0
+    response = json.loads(capsys.readouterr().out)
+    assert response["text"] == "offline GGUF desktop answer"
+    from skeleton.app.offline_history import restore_history
+    history = restore_history(backup, hashlib.sha256(
+        local_deployment[2].read_bytes()
+    ).hexdigest())
+    assert [role for role, _ in history] == ["user", "assistant", "user", "assistant"]
+
+
+def test_corrupt_gguf_backup_is_rejected_before_inference(
+    local_deployment: tuple[Path, Path, Path], tmp_path: Path, capsys
+) -> None:
+    backup = tmp_path / "bad.json"
+    backup.write_text('{"invalid":true}', encoding="utf-8")
+    assert run_app_cli([
+        "local-ai", "--deployment", str(local_deployment[0]),
+        "--prompt", "Do not run", "--backup-in", str(backup),
+    ]) == 1
+    assert "request rejected" in capsys.readouterr().out
