@@ -25,6 +25,7 @@ SCHEMA = "skeleton.app.offline_index_queue.v1"
 MAX_ATTEMPTS = 3
 LEASE_SECONDS = 900
 MAX_RUN_BATCH = 20
+MAX_STORED_JOBS = 5000
 
 
 class OfflineQueueError(RuntimeError):
@@ -168,6 +169,13 @@ class OfflineIndexQueue:
                 if row is not None:
                     self._db.execute("COMMIT")
                     return _as_job(row)
+                total = self._db.execute(
+                    "SELECT COUNT(*) FROM offline_index_jobs"
+                ).fetchone()[0]
+                if total >= MAX_STORED_JOBS:
+                    raise OfflineQueueError(
+                        "local indexing queue storage quota is exhausted"
+                    )
                 job_id = secrets.token_hex(16)
                 self._db.execute(
                     "INSERT INTO offline_index_jobs "
