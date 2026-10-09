@@ -359,7 +359,7 @@ class NativeLLMRuntime:
         try:
             return self.tokenizer.encode_sequence(text)
         except TokenizerContractError as exc:
-            raise RuntimeContractError("native tokenizer encode failed") from exc
+            raise RuntimeContractError("tokenizer encode failed: prompt tokenization failed admission") from exc
 
     def decode_ids(self, token_ids: Sequence[int]) -> str:
         try:
@@ -387,7 +387,7 @@ class NativeLLMRuntime:
         try:
             self.tokenizer.assert_unchanged()
         except TokenizerContractError as exc:
-            raise RuntimeContractError("tokenizer mutated after admission") from exc
+            raise RuntimeContractError("tokenizer drift during inference: tokenizer mutated after admission") from exc
         if not hmac.compare_digest(sequence.tokenizer_digest, self.tokenizer.digest):
             raise RuntimeContractError("token sequence tokenizer identity mismatch")
         if not sequence.token_ids:
@@ -400,7 +400,7 @@ class NativeLLMRuntime:
         try:
             self.tokenizer.assert_unchanged()
         except TokenizerContractError as exc:
-            raise RuntimeContractError("tokenizer mutated after admission") from exc
+            raise RuntimeContractError("tokenizer drift during inference: tokenizer mutated after admission") from exc
         if use_cache and self.estimate_kv_bytes(len(sequence.token_ids)) > self.limits.max_kv_bytes:
             raise RuntimeContractError("inference exceeds KV memory budget")
         window = sequence.token_ids[-self.limits.max_context:]
@@ -465,7 +465,7 @@ class NativeLLMRuntime:
         try:
             self.tokenizer.assert_unchanged()
         except TokenizerContractError as exc:
-            raise RuntimeContractError("tokenizer mutated after admission") from exc
+            raise RuntimeContractError("tokenizer drift during inference: tokenizer mutated after admission") from exc
         if not hmac.compare_digest(sequence.tokenizer_digest, self.tokenizer.digest):
             raise RuntimeContractError("token sequence tokenizer identity mismatch")
         prompt_tokens = len(sequence.token_ids)
@@ -797,7 +797,7 @@ class NativeLLMRuntime:
         try:
             self.tokenizer.assert_unchanged()
         except TokenizerContractError as exc:
-            raise RuntimeContractError("tokenizer mutated before checkpoint") from exc
+            raise RuntimeContractError("tokenizer changed before checkpoint: tokenizer mutated before checkpoint") from exc
         return make_checkpoint(
             model=self.model,
             model_digest=self.model_digest,
