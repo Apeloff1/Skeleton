@@ -44,6 +44,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--session-id", default="default", help="revisioned conversation id inside the workspace")
     parser.add_argument("--json", action="store_true", dest="json_output")
     parser.add_argument("--doctor", action="store_true", help="verify local artifacts without generating text")
+    parser.add_argument("--qualify-model", action="store_true", help="perform two local inference turns with persisted context recovery")
     parser.add_argument("--library", help="user-owned local SQLite document search index")
     parser.add_argument("--index-dir", help="index an explicitly selected local text directory")
     parser.add_argument("--search", help="search indexed local documents without any model")
@@ -175,11 +176,40 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("Offline state integrity PASS: " + ", ".join(sorted(reports)))
         return 0
 
+    if args.qualify_model:
+        if (
+            not (args.model or args.deployment) or args.doctor
+            or args.native_smoke or args.prompt or args.backup_in
+            or args.backup_out or args.workspace or args.library
+            or args.use_library or library_mode or queue_mode
+            or snapshot_mode or audit_mode or args.queue_db
+        ):
+            print("model qualification requires one local model without other operations", file=sys.stderr)
+            return 2
+        from .offline_qualification import qualify_offline_model
+        try:
+            report = qualify_offline_model(
+                model=args.model, deployment=args.deployment,
+                max_output_tokens=args.max_output_tokens,
+            )
+        except (ValueError, RuntimeError, OSError, TypeError) as exc:
+            print(f"local model qualification rejected: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 1
+        if args.json_output:
+            print(json.dumps(report, sort_keys=True, ensure_ascii=False))
+        else:
+            print(
+                "Local qualification PASS: 2 bound inference turns with "
+                "session reopen; OS network isolation NOT VERIFIED"
+            )
+        return 0
+
     if args.native_smoke and args.doctor:
         print("--native-smoke and --doctor are mutually exclusive", file=sys.stderr)
         return 2
     if queue_mode:
         if (
+            args.qualify_model or
             not args.queue_db or args.model or args.deployment or args.prompt
             or args.backup_in or args.backup_out or args.workspace
             or args.doctor or args.native_smoke or library_mode
@@ -228,6 +258,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if library_mode:
         if (
+            args.qualify_model or
             args.doctor or args.native_smoke or args.model or args.deployment
             or args.prompt or args.backup_in or args.backup_out
             or args.workspace or args.use_library or not args.library
@@ -259,6 +290,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.native_smoke:
         if (
+            args.qualify_model or
             args.model or args.deployment or args.prompt or
             args.backup_in or args.backup_out or args.workspace or
             args.library or args.use_library or args.queue_db
@@ -275,6 +307,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.doctor:
         if (
+            args.qualify_model or
             not (args.model or args.deployment) or args.prompt or
             args.backup_in or args.backup_out or args.workspace or
             args.library or args.use_library or args.queue_db
