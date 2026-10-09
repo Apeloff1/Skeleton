@@ -48,9 +48,9 @@ DEF rLY EQU $FF44
 DEF rBGP EQU $FF47
 DEF rOBP0 EQU $FF48
 DEF rNR52 EQU $FF26
-DEF OAM EQU $FE00
+DEF SPRITE_OAM_BASE EQU $FE00
 DEF TILEMAP EQU $9800
-DEF VRAM EQU $8000
+DEF TILE_VRAM_BASE EQU $8000
 DEF BG_BYTE_COUNT EQU 576
 DEF LEVEL_COUNT EQU __LEVEL_COUNT__
 DEF MAZE_WIDTH EQU __WIDTH__
@@ -77,7 +77,7 @@ Boot:
     call LCDSafe
     xor a
     ldh [rLCDC], a
-    ld hl, OAM
+    ld hl, SPRITE_OAM_BASE
     ld bc, 160
 .clearOAM:
     xor a
@@ -86,7 +86,7 @@ Boot:
     ld a, b
     or c
     jr nz, .clearOAM
-    ld hl, VRAM
+    ld hl, TILE_VRAM_BASE
     ld de, Tiles
     ld bc, TilesEnd-Tiles
     call CopyBytes
@@ -94,9 +94,9 @@ Boot:
     ldh [rBGP], a
     ldh [rOBP0], a
     ld a, TILE_PLAYER
-    ld [OAM+2], a
+    ld [SPRITE_OAM_BASE+2], a
     xor a
-    ld [OAM+3], a
+    ld [SPRITE_OAM_BASE+3], a
     call LoadLevelWithoutWait
     ld a, $93
     ldh [rLCDC], a
@@ -202,13 +202,13 @@ DrawPlayer:
     add a
     add a
     add 16
-    ld [OAM], a
+    ld [SPRITE_OAM_BASE], a
     ld a, [PlayerX]
     add a
     add a
     add a
     add 8
-    ld [OAM+1], a
+    ld [SPRITE_OAM_BASE+1], a
     ret
 
 PollDpad:
