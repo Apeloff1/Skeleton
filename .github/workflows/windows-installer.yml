@@ -16,6 +16,9 @@ on:
       - "skeleton/ai/runtime/game_platform_catalog.py"
       - "skeleton/ai/runtime/game_rights.py"
       - "skeleton/ai/runtime/game_project_capsule.py"
+      - "skeleton/ai/runtime/chip8_machine.py"
+      - "scripts/game/export_chip8.py"
+      - "skeleton/testing/test_chip8_homebrew.py"
       - "skeleton/testing/test_game_playability.py"
       - "skeleton/testing/test_cross_era_game_rights.py"
       - "skeleton/testing/test_gameplay_capabilities.py"
@@ -40,6 +43,9 @@ on:
       - "skeleton/ai/runtime/game_platform_catalog.py"
       - "skeleton/ai/runtime/game_rights.py"
       - "skeleton/ai/runtime/game_project_capsule.py"
+      - "skeleton/ai/runtime/chip8_machine.py"
+      - "scripts/game/export_chip8.py"
+      - "skeleton/testing/test_chip8_homebrew.py"
       - "skeleton/testing/test_game_playability.py"
       - "skeleton/testing/test_cross_era_game_rights.py"
       - "skeleton/testing/test_gameplay_capabilities.py"
@@ -339,6 +345,46 @@ jobs:
           if ($generated.result_sha256 -ne $repeat.result_sha256) {
             throw "installed generated-game digest was nondeterministic"
           }
+
+          # First genuine vintage game-ROM target: legally original CHIP-8
+          # bytecode from installed SkeletonOffline.exe, verified by an
+          # independent CHIP-8 VM to reach WIN, then reproduced identically.
+          $chip8First = Join-Path $env:RUNNER_TEMP "SkeletonOriginalChip8A.ch8"
+          $chip8Second = Join-Path $env:RUNNER_TEMP "SkeletonOriginalChip8B.ch8"
+          $chip8ReceiptJson = & $offline --chip8-demo-output $chip8First
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $chip8First)) {
+            throw "installed offline console failed genuine CHIP-8 ROM export"
+          }
+          $chip8Receipt = $chip8ReceiptJson | ConvertFrom-Json
+          if ($chip8Receipt.target -ne "chip8-vip" -or
+              -not $chip8Receipt.acceptance.win_state_reached -or
+              -not $chip8Receipt.acceptance.actual_original_machine_rom_emitted -or
+              $chip8Receipt.rom_bytes -lt 64 -or
+              $chip8Receipt.rom_bytes -gt 3584 -or
+              $chip8Receipt.boot_rom_embedded -or
+              $chip8Receipt.licensed_sdk_embedded -or
+              $chip8Receipt.legal_publication_approved -or
+              $chip8Receipt.acceptance.real_hardware_tested -or
+              $chip8Receipt.training_examples_added -ne 0) {
+            throw "installed CHIP-8 homebrew is not a verified legal original ROM"
+          }
+          $chip8DiskHash = (Get-FileHash -LiteralPath $chip8First -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($chip8DiskHash -ne $chip8Receipt.rom_sha256) {
+            throw "installed CHIP-8 exporter ROM bytes failed digest acceptance"
+          }
+          $chip8RepeatJson = & $offline --chip8-demo-output $chip8Second
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed CHIP-8 reproducibility run failed"
+          }
+          $chip8Repeat = $chip8RepeatJson | ConvertFrom-Json
+          if ($chip8Repeat.rom_sha256 -ne $chip8Receipt.rom_sha256) {
+            throw "CHIP-8 ROM changed between independent frozen EXE runs"
+          }
+          $null = & $offline --chip8-demo-output $chip8First 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            throw "CHIP-8 exporter overwrote a previously created original ROM"
+          }
+
 
           # Unlike a GUI window smoke in headless CI, this runs the exact
           # native preview engine from the installed EXE and must actually
