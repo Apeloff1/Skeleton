@@ -9,7 +9,7 @@ and strips hosted-provider/proxy credentials from the child environment.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import hashlib
 import json
 import math
@@ -247,6 +247,104 @@ class LlamaCppConfig:
                 raise ValueError(f"invalid environment value for {key}")
             normalized_env[key] = value
         object.__setattr__(self, "environment", normalized_env)
+
+
+@dataclass(frozen=True, slots=True)
+class ConsumerHardwareBudget:
+    """Explicit RAM and KV budget for an offline quantized GGUF deployment.
+
+    kv_bytes_per_token MUST be supplied from the specific model/selected KV
+    representation. GGUF file size alone cannot determine attention memory.
+    ram_bytes is the operator's *available* machine/cgroup memory, not a
+    machine-class guess, and GPU offloading remains an independent backend
+    concern. This is conservative admission planning, not an OOM guarantee.
+    """
+
+    ram_bytes: int
+    physical_cpu_cores: int
+    kv_bytes_per_token: int
+    target_context_tokens: int = 4096
+    reserve_bytes: int = 512 * 1024 * 1024
+    runtime_scratch_bytes: int = 512 * 1024 * 1024
+    max_decode_threads: int = 16
+    prefill_batch_tokens: int = 256
+
+    def __post_init__(self) -> None:
+        for name in (
+            "ram_bytes", "physical_cpu_cores", "kv_bytes_per_token",
+            "target_context_tokens", "max_decode_threads", "prefill_batch_tokens",
+        ):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{name} must be a positive integer")
+        for name in ("reserve_bytes", "runtime_scratch_bytes"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"{name} must be non-negative")
+        if not 128 <= self.target_context_tokens <= 1_048_576:
+            raise ValueError("target_context_tokens outside llama.cpp bounds")
+
+
+@dataclass(frozen=True, slots=True)
+class ConsumerLlamaPlan:
+    """Auditable configuration chosen without claiming to measure performance."""
+
+    configuration: LlamaCppConfig
+    model_bytes: int
+    reserved_ram_bytes: int
+    reserved_kv_bytes: int
+    estimated_total_bytes: int
+    available_ram_bytes: int
+    context_clamped: bool
+
+
+def plan_consumer_llama_cpp(
+    config: LlamaCppConfig,
+    budget: ConsumerHardwareBudget,
+    *,
+    model_bytes: int,
+) -> ConsumerLlamaPlan:
+    """Choose context, batch and CPU threads before launching llama.cpp.
+
+    Reserves 20% RAM or the explicit floor for the OS, then charges full GGUF
+    bytes, configured scratch headroom and model-specific KV requirements.
+    Does not fabricate a GPU layer split, infer quantization from file size,
+    or promise that a backend will actually fit (other buffers may exist).
+    """
+    if not isinstance(config, LlamaCppConfig):
+        raise TypeError("config must be LlamaCppConfig")
+    if not isinstance(budget, ConsumerHardwareBudget):
+        raise TypeError("budget must be ConsumerHardwareBudget")
+    if isinstance(model_bytes, bool) or not isinstance(model_bytes, int) or model_bytes <= 0:
+        raise ValueError("model_bytes must be positive")
+    reserved = max(budget.reserve_bytes, budget.ram_bytes // 5)
+    fixed = reserved + budget.runtime_scratch_bytes + model_bytes
+    available_for_kv = budget.ram_bytes - fixed
+    minimum_kv = budget.kv_bytes_per_token * 128
+    if available_for_kv < minimum_kv:
+        raise LlamaCppRuntimeError(
+            "GGUF weights, KV cache and runtime headroom exceed consumer RAM budget"
+        )
+    requested = config.context_size or budget.target_context_tokens
+    possible = min(requested, available_for_kv // budget.kv_bytes_per_token)
+    context = (possible // 128) * 128
+    if context < 128:
+        raise LlamaCppRuntimeError("consumer RAM budget cannot support minimum context")
+    threads = min(config.threads or budget.physical_cpu_cores,
+                  budget.physical_cpu_cores, budget.max_decode_threads)
+    batch = min(config.batch_size or budget.prefill_batch_tokens,
+                budget.prefill_batch_tokens, context)
+    chosen = replace(config, context_size=context, threads=threads, batch_size=batch)
+    kv_total = context * budget.kv_bytes_per_token
+    return ConsumerLlamaPlan(
+        configuration=chosen,
+        model_bytes=model_bytes,
+        reserved_ram_bytes=reserved,
+        reserved_kv_bytes=kv_total,
+        estimated_total_bytes=fixed + kv_total,
+        available_ram_bytes=budget.ram_bytes,
+        context_clamped=context < requested,
+    )
 
 
 def _sha256_file(path: Path) -> str:
@@ -776,8 +874,17 @@ class LlamaCppModel:
 
 def build_llama_cpp_adapter(
     config: LlamaCppConfig, *, cache_size: int = 0, default_seed: int = 0,
+    consumer_budget: ConsumerHardwareBudget | None = None,
 ) -> LocalModelAdapter:
-    """Construct the canonical provider-neutral adapter around a llama.cpp model."""
+    """Build an offline adapter, optionally applying measured consumer limits."""
+    if consumer_budget is not None:
+        try:
+            model_bytes = Path(config.model_path).stat().st_size
+        except OSError as exc:
+            raise LlamaCppRuntimeError("cannot size local GGUF for consumer planning") from exc
+        config = plan_consumer_llama_cpp(
+            config, consumer_budget, model_bytes=model_bytes,
+        ).configuration
     return LocalModelAdapter(
         LocalInferenceEngine(LlamaCppModel(config), cache_size=cache_size),
         default_seed=default_seed,
@@ -790,6 +897,9 @@ __all__ = [
     "LlamaCppConfig",
     "LlamaCppModel",
     "LlamaCppRuntimeError",
+    "ConsumerHardwareBudget",
+    "ConsumerLlamaPlan",
+    "plan_consumer_llama_cpp",
     "build_llama_cpp_adapter",
     "inspect_gguf",
 ]
