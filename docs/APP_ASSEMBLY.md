@@ -44,6 +44,10 @@ does not download them.
 # On a machine with Python + Tk, without Docker/Mongo/hosted-provider tokens:
 python -m skeleton app local-ai
 
+# Headless model inference with a bound JSON receipt, for scripts/automation:
+python -m skeleton app local-ai --model ./native-runtime.json \\
+  --prompt "hello" --max-output-tokens 8 --json
+
 # From the Windows installer (no system Python required):
 Skeleton.exe --local-ai
 ```
