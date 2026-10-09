@@ -151,10 +151,22 @@ def _queue(conn: sqlite3.Connection) -> dict[str, int]:
             if state != "completed":
                 raise OfflineAuditError("non-completed indexing job has completion result")
             try:
-                parsed = json.loads(result)
+                parsed = json.loads(
+                    result,
+                    parse_constant=lambda _value: (_ for _ in ()).throw(
+                        ValueError("non-finite job receipt value")
+                    ),
+                )
             except (ValueError, TypeError) as exc:
                 raise OfflineAuditError("invalid offline indexing job result") from exc
-            if not isinstance(parsed, dict) or not {"indexed_files", "updated_files", "removed_files"}.issubset(parsed):
+            required = ("indexed_files", "updated_files", "removed_files", "indexed_bytes")
+            if (
+                not isinstance(parsed, dict)
+                or not all(field in parsed for field in required)
+                or any(type(parsed[field]) is not int or parsed[field] < 0
+                       for field in required)
+                or parsed["updated_files"] > parsed["indexed_files"]
+            ):
                 raise OfflineAuditError("completed indexing job has invalid result schema")
         elif state == "completed":
             raise OfflineAuditError("completed indexing job is missing its result")
