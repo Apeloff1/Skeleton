@@ -242,6 +242,9 @@ __all__ = [
 from importlib import import_module as _game_builder_import_module
 
 _KNOWLEDGE_EXPORTS = {
+    "editor_platform_options": ".editor_platforms",
+    "editor_portability_context": ".editor_platforms",
+    "editor_platform_form": ".editor_platforms",
     "PlatformProfile": ".platform_registry",
     "PlatformRegistry": ".platform_registry",
     "PlatformRegistryError": ".platform_registry",
