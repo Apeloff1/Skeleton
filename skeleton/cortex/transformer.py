@@ -512,6 +512,7 @@ class TinyTransformer:
         kv_dtype: str = "fp32",
         max_kv_bytes: int | None = None,
         prefill_query_chunk: int | None = None,
+        max_grad_norm: float | None = None,
     ) -> "TinyTransformer":
         """Bind CPU, CUDA or Metal with optional bounded reduced-precision KV.
 
@@ -533,6 +534,13 @@ class TinyTransformer:
             or not 1 <= prefill_query_chunk <= self.ctx
         ):
             raise ValueError("prefill_query_chunk must be between 1 and context length")
+        if max_grad_norm is not None and (
+            isinstance(max_grad_norm, bool)
+            or not isinstance(max_grad_norm, (int, float))
+            or not math.isfinite(float(max_grad_norm))
+            or max_grad_norm <= 0
+        ):
+            raise ValueError("max_grad_norm must be a finite positive number")
         from skeleton.cortex.device import resolve
         info = resolve(device)
         # Synchronization itself is transactional: it must finish before any
@@ -543,6 +551,7 @@ class TinyTransformer:
         constrained = (
             kv_dtype != "fp32" or max_kv_bytes is not None
             or prefill_query_chunk is not None
+            or max_grad_norm is not None
         )
         # A Torch projection without Mixture-of-Depths routing would silently
         # execute a different model. Keep the exact Python graph instead.
@@ -562,6 +571,7 @@ class TinyTransformer:
                     self, device=actual, kv_dtype=kv_dtype,
                     max_kv_bytes=max_kv_bytes,
                     prefill_query_chunk=prefill_query_chunk,
+                    max_grad_norm=max_grad_norm,
                 )
                 candidate.pin()
             except Exception as exc:
