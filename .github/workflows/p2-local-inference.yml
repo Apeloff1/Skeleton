@@ -26,6 +26,8 @@ on:
       - "skeleton/ai/runtime/game_project_capsule.py"
       - "skeleton/ai/runtime/game_playability.py"
       - "skeleton/testing/test_game_playability.py"
+      - "scripts/game/export_portable_c89.py"
+      - "skeleton/testing/test_game_c89_export.py"
       - "scripts/game/game_project.py"
       - "skeleton/testing/test_cross_era_game_rights.py"
       - "skeleton/app/offline_game_preview.py"
@@ -100,6 +102,8 @@ on:
       - "skeleton/ai/runtime/game_project_capsule.py"
       - "skeleton/ai/runtime/game_playability.py"
       - "skeleton/testing/test_game_playability.py"
+      - "scripts/game/export_portable_c89.py"
+      - "skeleton/testing/test_game_c89_export.py"
       - "scripts/game/game_project.py"
       - "skeleton/testing/test_cross_era_game_rights.py"
       - "skeleton/app/offline_game_preview.py"
@@ -201,6 +205,8 @@ jobs:
             skeleton/ai/runtime/game_project_capsule.py \
             skeleton/ai/runtime/game_playability.py \
             skeleton/testing/test_game_playability.py \
+            scripts/game/export_portable_c89.py \
+            skeleton/testing/test_game_c89_export.py \
             scripts/game/game_project.py \
             skeleton/testing/test_cross_era_game_rights.py \
             skeleton/testing/test_gameplay_capabilities.py \
@@ -227,6 +233,10 @@ jobs:
         run: |
           python scripts/training/sparse_capability.py --profile low-memory
           python scripts/training/probe_sparse_capabilities.py --per-mode 1
+      - name: Require portable C89 compilation for actual original-game acceptance
+        run: |
+          command -v cc
+          cc --version
       - name: Install focused test dependency
         run: >-
           python -m pip install --disable-pip-version-check
@@ -272,5 +282,6 @@ jobs:
           skeleton/testing/test_gameplay_capabilities.py
           skeleton/testing/test_cross_era_game_rights.py
           skeleton/testing/test_game_playability.py
+          skeleton/testing/test_game_c89_export.py
           skeleton/testing/test_offline_game_preview.py
           tests/flgb/test_desktop_offline_ai.py
