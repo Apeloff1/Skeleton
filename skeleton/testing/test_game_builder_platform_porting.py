@@ -13,6 +13,9 @@ import pytest
 from skeleton.ai.game_builder.platform_registry import (
     PlatformRegistryError, default_registry, list_platforms, lookup_platform, parse_registry,
 )
+from skeleton.ai.game_builder.editor_platforms import (
+    editor_platform_form, editor_platform_options, editor_portability_context,
+)
 from skeleton.ai.game_builder.port_planner import (
     HomebrewSource, PortMode, PortPlanningError, PortRequest, compile_port, compile_port_route,
 )
@@ -158,3 +161,39 @@ def test_changed_proof_or_target_changes_digest():
     two = compile_port(PortRequest((replace(original(), evidence_sha256=PROOF_2),), "windows_modern"))
     three = compile_port(PortRequest((original(),), "macos_modern"))
     assert one.digest != two.digest != three.digest
+
+
+def test_editor_exposes_all_platforms_without_fake_native_exporters():
+    registry = default_registry()
+    form = editor_platform_form()
+    assert len(form["source_options"]) == len(registry.profiles)
+    assert len(form["target_options"]) == len(registry.profiles)
+    assert len(form["port_modes"]) == 4
+    assert form["export_status"] == "no_native_target_verified"
+    assert all(not option["verified_native_exporter"] for option in form["target_options"])
+    assert all(not option["commercial_game_import_allowed"] for option in form["source_options"])
+    assert json.loads(json.dumps(form)) == form
+
+
+def test_editor_search_discovers_abandoned_regional_and_arcade_targets():
+    obscure = editor_platform_options(search="laseractive", as_source=True)
+    assert [item["id"] for item in obscure] == ["pioneer_laseractive"]
+    handheld = editor_platform_options(search="wonderswan", kind="handheld", legacy=True)
+    assert {item["id"] for item in handheld} == {"bandai_wonderswan", "bandai_wonderswan_color"}
+    assert editor_platform_options(verified_native_only=True) == ()
+    with pytest.raises(PlatformRegistryError):
+        editor_platform_options(kind="made_up")
+    with pytest.raises(PlatformRegistryError):
+        editor_platform_options(search="x" * 129)
+    with pytest.raises(PlatformRegistryError):
+        editor_platform_options(legacy="yes")
+
+
+def test_every_platform_can_be_original_design_basis_and_port_planning_target():
+    registry = default_registry()
+    for basis_id in ("nec_pc_fx", "funtech_super_acan", "tic80_fantasy", "commodore_64"):
+        result = editor_portability_context(basis_id)
+        assert result["possible_destination_count"] == len(registry.profiles)
+        assert result["native_export_destination_count"] == 0
+        assert len({x["target_platform_id"] for x in result["targets"]}) == len(registry.profiles)
+        assert all(x["design_reachable"] and not x["native_export_verified"] for x in result["targets"])
