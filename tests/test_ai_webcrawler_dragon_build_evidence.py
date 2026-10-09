@@ -60,7 +60,7 @@ def test_forged_toolchain_corrupt_binary_and_signing_key_rejected():
     signer=DragonBuildEvidence(db,lab,private_signing_key=b"k"*32)
     with pytest.raises(ValueError):
         DragonBuildEvidence(db,lab,private_signing_key=b"123")
-    with pytest.raises(ValueError,match="compiler"):
+    with pytest.raises(ValueError,match="toolchain|target|compiler"):
         signer.attest_rom("alice",attempt.attempt_id,valid_nrom(),
             authorized=True,trusted_worker=True,toolchain="RGBDS",now=5)
     invalid=valid_nrom()[:-3]

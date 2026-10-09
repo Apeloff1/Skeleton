@@ -679,6 +679,16 @@ def render_native_project(*,title:str,target_id:str,style:str,
         files["src/main.asm"]=enrich_native_gb_sound(
             files["src/main.asm"],
             scrolling=(target_id=="game_boy" and style=="side_scrolling_platformer"))
+    # RGBDS 1.0 reserves OAM/VRAM as lexer keywords.  Rename only the
+    # assembler's user-defined constants after sprite/APU enrichment, so
+    # existing semantic instruction matching still targets canonical source.
+    if target_id in ("game_boy","game_boy_color"):
+        asm=files["src/main.asm"]
+        asm=asm.replace("DEF OAM EQU","DEF DRAGON_OAM EQU")
+        asm=asm.replace("DEF VRAM EQU","DEF DRAGON_VRAM EQU")
+        asm=asm.replace("[OAM","[DRAGON_OAM")
+        asm=asm.replace("ld hl,VRAM","ld hl,DRAGON_VRAM")
+        files["src/main.asm"]=asm
     if any(PurePosixPath(p).is_absolute() or ".." in PurePosixPath(p).parts for p in files):
         raise ValueError("unsafe generated path")
     if any(len(v.encode())>120_000 for v in files.values()):
