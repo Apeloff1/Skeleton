@@ -5,6 +5,7 @@ trained weights and cannot qualify the output quality of a real llama model.
 """
 from __future__ import annotations
 
+import asyncio
 from contextlib import redirect_stdout
 from io import StringIO
 import hashlib
@@ -18,7 +19,7 @@ from unittest.mock import patch
 
 from skeleton.app.cli import run_app_cli
 from skeleton.app.local_ai_gguf import (
-    OfflineGGUFError, generate_local_gguf_sync,
+    OfflineGGUFError, OfflineGGUFSession, generate_local_gguf_sync,
 )
 from skeleton.app.windows_launcher import main as exe_main
 
@@ -111,6 +112,29 @@ class TestPublicGGUFCLI(unittest.TestCase):
                 ])
             self.assertEqual(code, 0, out.getvalue())
             self.assertEqual(json.loads(out.getvalue())["backend"], "llama.cpp")
+
+    @unittest.skipIf(os.name == "nt", "POSIX shebang subprocess fixture")
+    def test_operator_gguf_desktop_multiturn_session_is_ephemeral(self):
+        with tempfile.TemporaryDirectory() as directory:
+            llama, weights = self._fixtures(Path(directory))
+            session = OfflineGGUFSession(llama, weights)
+            first = asyncio.run(session.ask("SECRET_PROMPT_MARKER first", max_output_tokens=5))
+            second = asyncio.run(session.ask("SECRET_PROMPT_MARKER second", max_output_tokens=5))
+            self.assertEqual(len(session.history), 4)
+            self.assertEqual(session.model_digest, hashlib.sha256(weights.read_bytes()).hexdigest())
+            self.assertEqual(first.model_digest, second.model_digest)
+            self.assertIsNone(first.execution_receipt_digest)
+            self.assertEqual(session.ui_output_budget, 32)
+            self.assertFalse(hasattr(session, "export_transcript"))
+            self.assertFalse(hasattr(session, "import_transcript"))
+            session.clear()
+            self.assertEqual(session.history, ())
+
+    def test_gguf_desktop_requires_existing_local_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            _, weights = self._fixtures(Path(directory))
+            with self.assertRaises((OSError, ValueError, RuntimeError)):
+                OfflineGGUFSession(Path(directory) / "missing", weights)
 
     def test_explicit_model_runtime_and_prompt_are_all_required(self):
         missing = (
