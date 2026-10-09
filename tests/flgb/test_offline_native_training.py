@@ -216,6 +216,26 @@ class TestOfflineNativeTraining(unittest.TestCase):
             self.assertNotEqual(corpus.read_bytes(), initial)
             self.assertFalse(destination.exists())
 
+    def test_cli_rejects_tuning_flags_silently_ignored_by_wrong_mode(self) -> None:
+        from skeleton.app.cli import run_app_cli
+
+        invalid = (
+            ["--model", "model.json", "--inspect-model", "--epochs", "3"],
+            ["--benchmark-suite", "suite.json", "--model", "base.json", "--epochs", "2"],
+            ["--replay-improvement", "receipt.json", "--compare-model", "base.json",
+             "--candidate-model", "new.json", "--train-corpus", "train.txt",
+             "--eval-corpus", "heldout.txt", "--epochs", "3"],
+            ["--train-corpus", "train.txt", "--output-model", "new.json",
+             "--max-output-tokens", "17"],
+            ["--improve-model", "base.json", "--train-corpus", "train.txt",
+             "--eval-corpus", "heldout.txt", "--output-model", "new.json",
+             "--max-output-tokens", "17"],
+        )
+        for parameters in invalid:
+            with self.subTest(arguments=parameters):
+                with redirect_stdout(StringIO()):
+                    self.assertEqual(run_app_cli(["local-ai", *parameters]), 2)
+
     def test_training_is_explicit_never_implicit_and_requires_output_path(self) -> None:
         from skeleton.app.cli import run_app_cli
 
