@@ -16,7 +16,7 @@ import re
 
 REGISTRY_SCHEMA = 1
 _ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]+$")
-_KINDS = frozenset({"console", "handheld", "computer", "arcade", "calculator", "mobile", "educational", "micro", "fantasy"})
+_KINDS = frozenset({"console", "handheld", "computer", "arcade", "calculator", "mobile", "educational", "micro", "fantasy", "precursor", "electromechanical", "mechanical"})
 _ALLOWED_LIFECYCLE = frozenset({"legacy", "current"})
 _ALLOWED_RESEARCH = frozenset({"catalogued"})
 _ALLOWED_TOOLCHAIN = frozenset({"unverified"})
@@ -42,6 +42,8 @@ class PlatformProfile:
     input: str
     artifact: str
     constraints: tuple[str, ...]
+    first_year_candidate: int | None = None
+    archive_disposition: str | None = None
 
     @property
     def verified_for_native_export(self) -> bool:
@@ -135,6 +137,17 @@ def parse_registry(document: str | bytes) -> PlatformRegistry:
         fields = ("render", "sound", "input", "artifact")
         if any(not isinstance(preset.get(k), str) or not preset[k] for k in fields):
             raise PlatformRegistryError("incomplete capability preset")
+        first_year_candidate = item.get("first_year_candidate")
+        if first_year_candidate is not None and (
+            type(first_year_candidate) is not int or not 1800 <= first_year_candidate <= 2100
+        ):
+            raise PlatformRegistryError("invalid historical year candidate")
+        archive_disposition = item.get("archive_disposition")
+        if archive_disposition is not None and (
+            not isinstance(archive_disposition, str)
+            or not re.fullmatch(r"[a-z][a-z0-9_]{2,64}", archive_disposition)
+        ):
+            raise PlatformRegistryError("invalid archival disposition")
         constraints = preset.get("constraints")
         if (
             not isinstance(constraints, list) or not constraints
@@ -147,6 +160,7 @@ def parse_registry(document: str | bytes) -> PlatformRegistry:
             research_status=item["research_status"], toolchain_status=item["toolchain_status"],
             tier=tier, render=preset["render"], sound=preset["sound"],
             input=preset["input"], artifact=preset["artifact"], constraints=tuple(constraints),
+            first_year_candidate=first_year_candidate, archive_disposition=archive_disposition,
         )
     # Sorted, immutable identifiers and values make results reproducible.
     return PlatformRegistry(MappingProxyType(dict(sorted(profiles.items()))), REGISTRY_SCHEMA)
