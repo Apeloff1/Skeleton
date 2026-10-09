@@ -168,8 +168,12 @@ def test_editor_brush_line_rectangle_stamp_and_flood_modify_actual_tile_geometry
                      require_grid_route=False)
     assert commit["commands_spent"] == 5
     assert e.tiles[3][4] == "."
-    assert len(e.events) == 2
-    assert e.events[1]["parent_audit_sha256"] == e.events[0]["event_sha256"]
+    assert len(e.events) == 4
+    assert [e["operation"] for e in e.events[1:3]] == ["undo", "redo"]
+    assert all(
+        event["parent_audit_sha256"] == previous["event_sha256"]
+        for previous, event in zip(e.events, e.events[1:])
+    )
 
 
 def test_editor_noise_variants_are_reproducible_and_never_mutate_source():
@@ -379,6 +383,7 @@ def test_native_visual_editor_is_exclusive_homebrew_without_gui_in_headless_envi
         raise NoDisplay("no display")
     monkeypatch.setitem(sys.modules, "tkinter", SimpleNamespace(
         Tk=reject_desktop, TclError=NoDisplay,
+        messagebox=SimpleNamespace(showerror=lambda *a: None),
     ))
     with pytest.raises(HomebrewEditorError, match="display"):
         open_homebrew_editor(source)
