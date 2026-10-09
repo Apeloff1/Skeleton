@@ -299,6 +299,22 @@ class OfflineDesktopPersistenceTests(unittest.TestCase):
             chat.fork_conversation(sid, after_turn=100)
         chat.close()
 
+    def test_gguf_manifest_loader_enables_per_run_artifact_rehashing(self):
+        from unittest.mock import sentinel
+        from skeleton.app.local_ai import load_gguf_deployment
+        with (
+            patch("skeleton.app.local_ai.LocalModelDeployment.load") as loader,
+            patch("skeleton.app.local_ai.LlamaCppModel") as builder,
+        ):
+            loader.return_value.llama_cpp_config.return_value = sentinel.config
+            result = load_gguf_deployment(self.database)
+        loader.assert_called_once_with(self.database)
+        loader.return_value.llama_cpp_config.assert_called_once_with(
+            rehash_artifacts_each_run=True
+        )
+        builder.assert_called_once_with(sentinel.config)
+        self.assertIs(result, builder.return_value)
+
     def test_private_database_directory_is_model_bound(self):
         with patch("pathlib.Path.home", return_value=Path(self.temp.name)):
             p = private_desktop_database(self.backend.model_digest)
