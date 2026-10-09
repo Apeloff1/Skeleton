@@ -75,7 +75,12 @@ class OfflineWorkspace:
         self.path = target
         self._lock = threading.RLock()
         try:
-            self._db = sqlite3.connect(str(target), timeout=10.0, isolation_level=None)
+            # GUI inference runs in a worker thread; all SQLite connection use is
+            # serialized by _lock and busy_timeout guards other processes.
+            self._db = sqlite3.connect(
+                str(target), timeout=10.0, isolation_level=None,
+                check_same_thread=False,
+            )
             self._db.execute("PRAGMA busy_timeout=10000")
             self._db.execute("PRAGMA journal_mode=WAL")
             self._db.execute("PRAGMA synchronous=FULL")
@@ -193,6 +198,30 @@ class DurableOfflineSession:
     @property
     def model_digest(self) -> str:
         return self.session.model_digest
+
+    @property
+    def max_interactive_tokens(self) -> int:
+        return self.session.max_interactive_tokens
+
+    def save_history_backup(self, path: str | Path) -> str:
+        return self.session.save_history_backup(path)
+
+    def restore_history_backup(self, path: str | Path) -> int:
+        if self.session.history:
+            raise OfflineWorkspaceError(
+                "start a new conversation before importing a manual backup"
+            )
+        before = self.session.history
+        turns = self.session.restore_history_backup(path)
+        try:
+            next_revision = self.store.save(
+                self.session_id, self.model_digest, self.revision, self.session.history,
+            )
+        except BaseException:
+            self.session.history = before
+            raise
+        self.revision = next_revision
+        return turns
 
     async def ask(self, prompt: str, *, max_output_tokens: int = 32) -> Any:
         before = self.session.history
