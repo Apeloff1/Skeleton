@@ -76,6 +76,11 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--max-output-tokens", type=int, default=8)
     local_ai.add_argument("--json", action="store_true", dest="as_json", help="print a bound inference receipt")
     local_ai.add_argument("--doctor", action="store_true", help="verify local artifacts without running inference")
+    local_ai.add_argument("--library", help="local SQLite document index")
+    local_ai.add_argument("--index-dir", help="index an explicitly selected local text folder")
+    local_ai.add_argument("--search", help="search local indexed documents without a model")
+    local_ai.add_argument("--use-library", action="store_true", help="include bounded local excerpts as untrusted context")
+    local_ai.add_argument("--context-limit", type=int, default=3, help="local document hit budget")
     sub.add_parser("down", help="stop the assembled application")
     sub.add_parser("ps", help="show assembled service state")
 
@@ -217,6 +222,33 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if command == "local-ai":
+        if args.index_dir or args.search or args.use_library:
+            # A single command implementation ensures the GUI's CLI and the
+            # frozen console use identical offline document safety policies.
+            from skeleton.app.offline_cli import main as run_offline_console
+            local_args = []
+            for option, value in (
+                ("--model", args.model),
+                ("--deployment", args.deployment),
+                ("--prompt", args.prompt),
+                ("--backup-in", args.backup_in),
+                ("--backup-out", args.backup_out),
+                ("--workspace", args.workspace),
+                ("--session-id", args.session_id),
+                ("--library", args.library),
+                ("--index-dir", args.index_dir),
+                ("--search", args.search),
+            ):
+                if value is not None:
+                    local_args.extend((option, str(value)))
+            local_args.extend(("--max-output-tokens", str(args.max_output_tokens)))
+            local_args.extend(("--context-limit", str(args.context_limit)))
+            if args.use_library:
+                local_args.append("--use-library")
+            if args.as_json:
+                local_args.append("--json")
+            return run_offline_console(local_args)
+
         from skeleton.app.local_ai import (
             OfflineAISession, OfflineGGUFSession, load_native_checkpoint, run_offline_ai,
         )
