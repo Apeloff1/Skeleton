@@ -106,10 +106,6 @@ class ResearchEvidenceContractTests(unittest.TestCase):
         self.assertIn("conflicting_or_negative_evidence", result.limitations)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
     def test_required_evidence_text_rejects_unpaired_unicode_surrogates(self) -> None:
         for invalid in (chr(0xD800), chr(0xDFFF)):
             with self.subTest(codepoint=ord(invalid)), self.assertRaises(ResearchError):
@@ -119,3 +115,6 @@ if __name__ == "__main__":
                     scope="bounded pilot",
                     limitations=("known limitation",),
                 )
+
+if __name__ == "__main__":
+    unittest.main()
