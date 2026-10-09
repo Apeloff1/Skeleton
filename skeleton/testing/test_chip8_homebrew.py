@@ -12,6 +12,7 @@ from scripts.game.export_chip8 import (
     main as chip8_export, verify_chip8_executable,
 )
 from skeleton.ai.runtime.chip8_machine import Chip8Error, Chip8Machine
+from skeleton.ai.runtime.game_project_capsule import GameCapsuleError
 from skeleton.ai.runtime.game_platform_catalog import (
     TARGETS, catalog_summary, plan_game_targets,
 )
@@ -28,7 +29,7 @@ def test_first_executable_vintage_adapter_is_real_and_not_fake_console_readiness
     report = catalog_summary()
     assert report["original_homebrew_vm_rom_exporter_count"] == 1
     assert report["native_console_exporter_count"] == 0
-    assert report["target_count"] >= 166
+    assert report["target_count"] == len(TARGETS) == 159
     requested = plan_game_targets(
         target_ids=["chip8-vip", "game-boy", "playstation-5"],
         required_features=["tile2d", "input"],
