@@ -13,7 +13,10 @@ from pathlib import Path
 import sys
 from typing import Sequence
 
-from skeleton.ai.training.offline_foundations import SyntheticCurriculumError
+from skeleton.ai.training.offline_foundations import (
+    SyntheticCurriculumError, validate_curriculum,
+)
+from skeleton.ai.training.capability_ledger import OfflineCapabilityLedger
 from skeleton.ai.training.sparse_capability import (
     DEFAULT_BUDGET, HARDWARE_BUDGETS, HARDWARE_CORPUS_BYTE_BUDGETS,
     assess_heldout_capabilities, build_sparse_capability_plan,
@@ -71,8 +74,13 @@ def _parser() -> argparse.ArgumentParser:
                         help="maximum active samples, not an actual hardware benchmark")
     parser.add_argument("--budget", type=int, default=None,
                         help="36-72 samples; cannot exceed selected hardware profile")
-    parser.add_argument("--focus-validation", type=Path,
-                        help="validation predictions used only to prioritize additional train examples")
+    focus = parser.add_mutually_exclusive_group()
+    focus.add_argument("--focus-validation", type=Path,
+                       help="validation predictions used only to prioritize additional train examples")
+    focus.add_argument("--focus-ledger", type=Path,
+                       help="reuse aggregate local validation metrics; no prediction text loaded")
+    parser.add_argument("--model-tag",
+                        help="model identifier for --focus-ledger, not an authorization")
     operation = parser.add_mutually_exclusive_group()
     operation.add_argument("--export", type=Path,
                            help="write sparse train-only text, exclusive new file")
@@ -91,8 +99,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.split is not None and args.evaluate is None:
         print("--split requires --evaluate", file=sys.stderr)
         return 2
-    if args.focus_validation is not None and args.evaluate is not None:
-        print("--focus-validation is for sparse selection, not held-out scoring", file=sys.stderr)
+    if (
+        (args.focus_validation is not None or args.focus_ledger is not None)
+        and args.evaluate is not None
+    ):
+        print("validation focus is for sparse selection, not held-out scoring", file=sys.stderr)
+        return 2
+    if (args.focus_ledger is not None) != (args.model_tag is not None):
+        print("--focus-ledger requires --model-tag and vice versa", file=sys.stderr)
         return 2
     budget = HARDWARE_BUDGETS[args.profile] if args.budget is None else args.budget
     if (
@@ -113,6 +127,38 @@ def main(argv: Sequence[str] | None = None) -> int:
                     evidence["per_mode"][mode]["correct"], mode
                 ),
             ))
+        ledger_feedback = None
+        if args.focus_ledger is not None:
+            source = validate_curriculum(args.dataset)
+            ledger_file = args.focus_ledger.expanduser().absolute()
+            if (
+                ledger_file.is_symlink() or not ledger_file.is_file()
+                or ledger_file.is_relative_to(args.dataset.resolve())
+            ):
+                raise SyntheticCurriculumError(
+                    "capability focus must use an existing ledger outside source dataset"
+                )
+            with OfflineCapabilityLedger(ledger_file) as ledger:
+                matches = ledger.latest(
+                    args.model_tag,
+                    source_manifest_sha256=source["manifest_sha256"],
+                    limit=1,
+                )
+            if not matches:
+                raise SyntheticCurriculumError(
+                    "no admitted aggregate validation evidence for this model/dataset"
+                )
+            ledger_feedback = matches[0]
+            focus_modes = tuple(sorted(
+                (
+                    key for key, count in ledger_feedback["per_mode"].items()
+                    if count["correct"] < count["total"]
+                ),
+                key=lambda key: (
+                    ledger_feedback["per_mode"][key]["correct"],
+                    key,
+                ),
+            ))
         plan = build_sparse_capability_plan(
             args.dataset, budget=budget, focus_modes=focus_modes,
         )
@@ -126,6 +172,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.focus_validation is not None:
             report["adaptive_selection_source"] = "validation-only"
             report["adaptive_selection_did_not_copy_heldout_labels"] = True
+        elif ledger_feedback is not None:
+            report["adaptive_selection_source"] = "aggregate-validation-ledger"
+            report["adaptive_selection_feedback_sha256"] = ledger_feedback["prediction_sha256"]
+            report["adaptive_selection_did_not_copy_heldout_labels"] = True
+            report["raw_predictions_loaded"] = False
         report["hardware_profile"] = args.profile
         report["hardware_benchmark_run"] = False
         if args.export is not None:
