@@ -157,7 +157,10 @@ def train_local_text(
         raise OfflineTrainingError("training requires at least two meaningful text tokens")
     if len(normalized) > MAX_TRAINING_TOKENS:
         raise OfflineTrainingError("training corpus exceeds 512 tokens; divide into smaller text files")
-    vocabulary = tuple(sorted(set(normalized) | {"user:", "assistant:", "system:"}))
+    # The canonical tokenizer strips punctuation from role delimiters:
+    # "user:" is encoded as "user". Never reserve unreachable tokens
+    # that consume capacity while role prompts fall back to UNK.
+    vocabulary = tuple(sorted(set(normalized) | {"user", "assistant", "system"}))
     if len(vocabulary) > MAX_VOCABULARY:
         raise OfflineTrainingError("training vocabulary exceeds 256 tokens")
     # All hyperparameters are fixed to prevent CLI resource amplification. The
