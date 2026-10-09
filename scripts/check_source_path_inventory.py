@@ -106,6 +106,7 @@ FIRST_PARTY_PREFIXES = (
     "machine/",
     "packaging/",
     "complete/",
+    "volume_forge/",
     "apps/",
 )
 
