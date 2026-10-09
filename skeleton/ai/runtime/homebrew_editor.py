@@ -483,7 +483,7 @@ class HomebrewEditor:
                     if draft[y][x] in ("S", "G"):
                         continue
                     salt = hashlib.sha256(
-                        f"homebrew-variant-v1:{seed}:{x}:{y}".encode("ascii")
+                        f"homebrew-noise-v1:{seed}:{x}:{y}".encode("ascii")
                     ).digest()
                     draft[y][x] = "#" if int.from_bytes(salt[:4], "big") % 100 < density else "."
             candidate = _as_rows(draft)
