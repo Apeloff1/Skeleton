@@ -288,15 +288,18 @@ def test_native_desktop_exports_a_exact_three_level_replay_without_html() -> Non
 def test_editor_distinguishes_real_native_source_generation_from_certified_binaries():
     form = editor_platform_form()
     assert form["native_source_project_destinations"] == [
-        "linux_desktop", "macos_modern", "windows_modern",
+        "linux_desktop", "macos_modern", "nintendo_game_boy", "windows_modern",
     ]
-    assert form["source_export_status"] == "three_desktop_c11_source_exporters_unverified_binaries"
+    assert form["source_export_status"] == "three_desktop_c11_and_one_dmg_rgbds_native_source_project"
     assert form["export_status"] == "no_native_target_verified"
     native = {option["id"]: option for option in form["target_options"]}
     for target in form["native_source_project_destinations"]:
         option = native[target]
         assert option["native_source_project_available"] is True
-        assert option["native_source_project_kind"] == "sdl2_c11_cmake"
+        assert option["native_source_project_kind"] == (
+            "rgbds_dmg_2bpp_rom_source" if target == "nintendo_game_boy"
+            else "sdl2_c11_cmake"
+        )
         assert option["capability_status"] == "native_source_project_only"
         assert not option["native_binary_built"]
         assert not option["verified_native_exporter"]
@@ -305,6 +308,6 @@ def test_editor_distinguishes_real_native_source_generation_from_certified_binar
         assert native[target]["native_source_project_available"] is False
         assert native[target]["native_source_project_kind"] is None
     route = editor_portability_context("nec_pc_fx")
-    assert route["native_source_project_destination_count"] == 3
+    assert route["native_source_project_destination_count"] == 4
     assert route["native_export_destination_count"] == 0
-    assert sum(option["native_source_project_available"] for option in route["targets"]) == 3
+    assert sum(option["native_source_project_available"] for option in route["targets"]) == 4
