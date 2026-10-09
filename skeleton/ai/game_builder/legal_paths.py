@@ -15,6 +15,7 @@ import json
 import re
 
 from .platform_registry import PlatformRegistry, PlatformRegistryError, default_registry
+from .plagiarism_guard import OriginalityReport, OriginalityDisposition
 
 _SHA = re.compile(r"^[0-9a-f]{64}$")
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
@@ -147,6 +148,7 @@ class HomebrewLegalRequest:
     distinctive_visual_or_narrative_similarity: bool = False
     patent_or_design_rights_uncertain: bool = False
     confidential_information_used: bool = False
+    originality_report: OriginalityReport | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.project_id, str) or not _ID.fullmatch(self.project_id):
@@ -172,6 +174,11 @@ class HomebrewLegalRequest:
             or not _SHA.fullmatch(self.rights_packet_sha256)
         ):
             raise HomebrewPolicyError("rights evidence needs stable SHA-256")
+        if self.originality_report is not None and (
+            not isinstance(self.originality_report, OriginalityReport) or
+            self.originality_report.project_id != self.project_id
+        ):
+            raise HomebrewPolicyError("originality evidence is from another project")
         for name in (
             "release_requested", "uses_franchise_title_or_marks",
             "implies_official_affiliation",
@@ -262,6 +269,15 @@ def assess_homebrew(
             if not material.evidence_sha256:
                 review.add("ORIGINAL_AUTHORSHIP_NOT_DOCUMENTED:" + material.material_id)
 
+    if request.originality_report is not None:
+        scan = request.originality_report
+        if scan.blockers or scan.disposition is OriginalityDisposition.BLOCKED:
+            blocked.add("ORIGINALITY_PROTECTED_COPY_OR_FALSE_AUTHORSHIP_BLOCKED")
+        elif not scan.design_admissible or scan.overlap_findings or scan.media_overlap_findings:
+            review.add("ORIGINALITY_UNRESOLVED_SIMILARITY_OR_CREDIT_REVIEW")
+    elif request.release_requested:
+        review.add("ORIGINALITY_SCREEN_NOT_ATTACHED_TO_RELEASE_REQUEST")
+
     # Treat trademark / trade dress risks separately from copyright of mechanics.
     if request.implies_official_affiliation:
         blocked.add("MISLEADING_OFFICIAL_AFFILIATION")
@@ -327,6 +343,8 @@ def assess_homebrew(
         "interoperability":{k:getattr(request.interoperability,k)
                             for k in request.interoperability.__dataclass_fields__},
         "rights_packet_sha256":request.rights_packet_sha256,
+        "originality_screen_digest":request.originality_report.screen_digest if request.originality_report else None,
+        "originality_artifact_digest":request.originality_report.artifact_sha256 if request.originality_report else None,
         "release_requested":request.release_requested,
         "uses_franchise_title_or_marks":request.uses_franchise_title_or_marks,
         "implies_official_affiliation":request.implies_official_affiliation,
