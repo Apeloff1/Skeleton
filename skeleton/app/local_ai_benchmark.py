@@ -25,6 +25,7 @@ from typing import Any, Mapping
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
 from skeleton.app.local_ai import load_native_checkpoint
 from skeleton.app.local_ai_improvement import MIN_VALIDATION_IMPROVEMENT
+from skeleton.app.local_ai_training import _read_corpus
 
 
 SCHEMA = "skeleton.ai.offline.benchmark.v1"
@@ -207,6 +208,47 @@ def load_benchmark_suite(
     )
 
 
+def _exclude_leaked_training_cases(
+    suite: BenchmarkSuite,
+    *,
+    checkpoint: NativeRuntimeLocalModel,
+    source: str | Path,
+) -> str:
+    """Reject normalized evaluation lines seen in selected local training data.
+
+    Explicit source-binding also rejects sentence fragments copied into a
+    larger training line (or the inverse). This only checks the selected
+    corpus; it cannot prove that all historical training data is disjoint.
+    """
+    raw, content = _read_corpus(source)
+    sentences = [
+        tuple(checkpoint.runtime.model._ids(line.strip()))
+        for line in content.splitlines() if line.strip()
+    ]
+    if not sentences or len(sentences) > 512:
+        raise OfflineBenchmarkError("training exclusion corpus has invalid line count")
+    if sum(len(line) for line in sentences) > MAX_TOTAL_TOKENS:
+        raise OfflineBenchmarkError("training exclusion corpus exceeds token budget")
+
+    def contains(a: tuple[int, ...], b: tuple[int, ...]) -> bool:
+        if len(a) < len(b):
+            return False
+        return any(a[i:i + len(b)] == b for i in range(len(a) - len(b) + 1))
+
+    for case in suite.cases:
+        case_ids = tuple(checkpoint.runtime.model._ids(case.text))
+        for training_ids in sentences:
+            if (
+                training_ids == case_ids
+                or (len(case_ids) >= 3 and contains(training_ids, case_ids))
+                or (len(training_ids) >= 3 and contains(case_ids, training_ids))
+            ):
+                raise OfflineBenchmarkError(
+                    "held-out benchmark case overlaps normalized local training source"
+                )
+    return hashlib.sha256(raw).hexdigest()
+
+
 def _evaluate_backend(
     suite: BenchmarkSuite,
     backend: NativeRuntimeLocalModel,
@@ -288,14 +330,23 @@ def benchmark_native_models(
     *,
     baseline: str | Path,
     candidate: str | Path | None = None,
+    excluded_training_text: str | Path | None = None,
 ) -> dict[str, Any]:
     """Read-only benchmark: candidate must beat baseline and protect each lane."""
     original = load_native_checkpoint(baseline)
     suite = load_benchmark_suite(suite_path, backend=original)
+    excluded_source_sha256 = (
+        _exclude_leaked_training_cases(
+            suite, checkpoint=original, source=excluded_training_text,
+        )
+        if excluded_training_text is not None else None
+    )
     original_result = _evaluate_backend(suite, original)
     report: dict[str, Any] = {
         "schema": SCHEMA,
         "suite_digest": suite.suite_digest,
+        "excluded_training_source_sha256": excluded_source_sha256,
+        "historical_training_disjointness_proven": False,
         "case_count": len(suite.cases),
         "category_count": len(suite.categories),
         "predicted_tokens": suite.total_predicted_tokens,
