@@ -7,6 +7,7 @@ it cannot produce or automatically promote production model weights.
 from __future__ import annotations
 
 from collections import Counter
+from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -414,6 +415,7 @@ def register_with_training_registry(directory: str | Path, registry: Any) -> str
         classification="public",
         rights=("training", "evaluation"),
         trusted=True,
+        acquired_at=datetime(2026, 10, 9, tzinfo=timezone.utc),
     )
     registry.register_ingest(envelope)
     splits = (
