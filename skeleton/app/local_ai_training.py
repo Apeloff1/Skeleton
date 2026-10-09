@@ -151,7 +151,15 @@ def train_local_text(
     lines = [line.strip() for line in content.splitlines() if line.strip()]
     if not lines:
         raise OfflineTrainingError("training source has no usable lines")
-    corpus = [line for line in lines if len(tokens(line)) >= 2]
+    # Never silently discard corpus entries while claiming the entire
+    # source digest describes actual training inputs. A single-token or
+    # punctuation-only line would otherwise be ignored without a receipt
+    # entry, misleading provenance and potentially hiding data loss.
+    if any(len(tokens(line)) < 2 for line in lines):
+        raise OfflineTrainingError(
+            "each non-empty training line must contain at least two native text tokens"
+        )
+    corpus = lines
     normalized = [token for line in corpus for token in tokens(line)]
     if not normalized or len(normalized) < 2:
         raise OfflineTrainingError("training requires at least two meaningful text tokens")
