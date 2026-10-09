@@ -273,7 +273,11 @@ def improve_local_model(
         # A failed evaluation never calls the writer and cannot overwrite the
         # original model; evidence of training work alone is not promotion.
         raise OfflineImprovementError(
-            "no held-out improvement; candidate refused and parent checkpoint retained"
+            (
+                "no eligible improvement passed protected benchmark categories"
+                if protected_evidence is not None
+                else "no held-out improvement; candidate refused and parent checkpoint retained"
+            )
         )
     trained = TinyTransformer.from_snapshot(best_snapshot)
     candidate = NativeRuntimeLocalModel(NativeLLMRuntime(trained))
