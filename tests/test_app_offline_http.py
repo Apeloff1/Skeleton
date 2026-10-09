@@ -34,7 +34,7 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.folder = Path(self.temp.name)
         self.model = NativeRuntimeLocalModel(NativeLLMRuntime(TinyTransformer(
             vocab=("system:", "user:", "assistant:", "hello", "world", "answer"),
-            dim=8, ctx=96, seed=41, n_heads=2, n_layers=2, d_ff=16,
+            dim=8, ctx=1024, seed=41, n_heads=2, n_layers=2, d_ff=16,
         )))
         self.app = OfflineHTTPApplication(
             self.model, self.folder / "http.sqlite3", token=_TOKEN
