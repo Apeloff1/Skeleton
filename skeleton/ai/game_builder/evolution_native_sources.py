@@ -26,6 +26,7 @@ from .nes_native_export import (
     NativeNESError, NativeNESSourceProject, compile_native_nes, export_native_nes,
 )
 from .c64_native_export import NativeC64Error, NativeC64SourceProject, compile_native_c64, export_native_c64
+from .dos_native_export import NativeDOSError, NativeDOSSourceProject, compile_native_dos, export_native_dos
 from .port_planner import HomebrewSource
 
 _DESKTOP = frozenset({"windows_modern", "linux_desktop", "macos_modern"})
@@ -43,7 +44,7 @@ class EvolutionNativeStage:
     source_kind: str | None
     source_digest: str | None
     status: str
-    project: NativeDesktopSourceProject | GameBoySourceProject | NativeNESSourceProject | NativeC64SourceProject | None
+    project: NativeDesktopSourceProject | GameBoySourceProject | NativeNESSourceProject | NativeC64SourceProject | NativeDOSSourceProject | None
 
     def __post_init__(self):
         if self.status not in _STATUSES:
@@ -129,7 +130,7 @@ def compile_evolution_native_sources(
         if stage.native_binary_built or stage.target_adapter_state != "concept_prototype_not_native":
             raise GameEvolutionError("upstream practice has forged hardware build assertion")
         target = stage.intended_platform_id
-        project: NativeDesktopSourceProject | GameBoySourceProject | NativeNESSourceProject | NativeC64SourceProject | None = None
+        project: NativeDesktopSourceProject | GameBoySourceProject | NativeNESSourceProject | NativeC64SourceProject | NativeDOSSourceProject | None = None
         status = "design_only"
         if target in _DESKTOP:
             try:
@@ -156,6 +157,13 @@ def compile_evolution_native_sources(
             except NativeC64Error as exc:
                 if "screen envelope" not in str(exc):
                     raise GameEvolutionError("C64 compiler refused original practice stage") from exc
+                status = "budget_incompatible"
+        elif target == "dos_vga":
+            try:
+                project = compile_native_dos(stage.game_world, source, authorized=True)
+            except NativeDOSError as exc:
+                if "budget exceeded" not in str(exc):
+                    raise GameEvolutionError("DOS real-mode compiler refused practice stage") from exc
                 status = "budget_incompatible"
         if project is not None:
             status = "native_source_ready"
@@ -205,6 +213,8 @@ def export_evolution_native_sources(
             export_native_nes(stage.project, folder, authorized=True)
         elif isinstance(stage.project, NativeC64SourceProject):
             export_native_c64(stage.project, folder, authorized=True)
+        elif isinstance(stage.project, NativeDOSSourceProject):
+            export_native_dos(stage.project, folder, authorized=True)
         else:
             export_native_desktop_source(stage.project, folder, authorized=True)
     with (root / "evolution-native-manifest.json").open("x", encoding="utf-8", newline="\n") as output:
