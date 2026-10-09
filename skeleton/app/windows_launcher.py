@@ -398,6 +398,16 @@ def parser() -> argparse.ArgumentParser:
     mode.add_argument("--local-ai-smoke", action="store_true", help="verify bundled native CPU inference without Docker")
     mode.add_argument("--local-gguf-smoke", metavar="MANIFEST", type=Path,
                       help="execute operator GGUF/llama.cpp model and verify offline durable resume")
+    mode.add_argument("--local-http", action="store_true",
+                      help="serve authenticated offline AI web UI on numeric loopback only")
+    result.add_argument("--local-native-checkpoint", type=Path,
+                        help="with --local-http: native model checkpoint")
+    result.add_argument("--local-gguf-deployment", type=Path,
+                        help="with --local-http: digest-pinned GGUF deployment manifest")
+    result.add_argument("--local-token-file", type=Path,
+                        help="with --local-http: new, private bearer-token file")
+    result.add_argument("--local-port", type=int, default=0,
+                        help="with --local-http: local TCP port (0 = ephemeral)")
     result.add_argument(
         "--development",
         action="store_true",
@@ -411,6 +421,26 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     root = installation_root()
+    if args.local_http:
+        if (bool(args.local_native_checkpoint) ==
+                bool(args.local_gguf_deployment) or args.local_token_file is None):
+            print("Offline HTTP requires one local model and --local-token-file.")
+            return 2
+        from skeleton.app.offline_http import main as serve_local_http
+        model_arg = (
+            ["--native-checkpoint", str(args.local_native_checkpoint)]
+            if args.local_native_checkpoint is not None else
+            ["--gguf-deployment", str(args.local_gguf_deployment)]
+        )
+        return serve_local_http(
+            model_arg + ["--token-file", str(args.local_token_file),
+                         "--port", str(args.local_port)]
+        )
+    if (args.local_native_checkpoint is not None
+            or args.local_gguf_deployment is not None
+            or args.local_token_file is not None or args.local_port != 0):
+        print("Offline HTTP model/token flags require --local-http.")
+        return 2
     if args.local_ai:
         if os.name != "nt":
             print("Skeleton Windows launcher requires Windows.")
