@@ -225,7 +225,7 @@ def _c_literal(value: str) -> str:
 
 def compile_native_desktop(
     world: PlayableWorld, source: HomebrewSource, target_platform_id: str, *,
-    authorized: bool, 
+    authorized: bool,
 ) -> NativeDesktopSourceProject:
     """Produce deterministic SDL2/CMake source; compilation still needs SDL2."""
     if type(authorized) is not bool or not authorized:
