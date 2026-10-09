@@ -33,6 +33,7 @@ jobs:
             /scripts/game_builder/native_dos_ci.py
             /scripts/game_builder/emulate_dos_ci.py
             /skeleton/testing/test_game_builder_dos_native.py
+            /skeleton/testing/test_game_builder_dos_cpu_replay.py
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -63,7 +64,7 @@ jobs:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
         run: |
           python -m pip install --disable-pip-version-check "pytest>=8.4,<9"
-          python -m pytest -q --noconftest skeleton/testing/test_game_builder_dos_native.py
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_dos_native.py skeleton/testing/test_game_builder_dos_cpu_replay.py
       - name: Execute full original game on real 8086 machine-code emulator
         env:
           PYTHONPATH: .
