@@ -179,6 +179,8 @@ $OfflinePyInstallerArgs = @(
     "--hidden-import", "skeleton.app.offline_workspace",
     "--hidden-import", "skeleton.app.offline_readiness",
     "--hidden-import", "skeleton.app.offline_library",
+    "--hidden-import", "skeleton.app.offline_index_queue",
+    "--hidden-import", "skeleton.app.offline_snapshot",
     "--hidden-import", "skeleton.ai.runtime.inference.local",
     "--hidden-import", "skeleton.ai.runtime.inference.native_runtime",
     "--hidden-import", "skeleton.ai.runtime.inference.llama_cpp",
