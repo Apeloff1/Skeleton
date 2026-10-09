@@ -185,6 +185,35 @@ jobs:
             throw "standalone offline console help failed"
           }
 
+          # The fixture is built by CI Python, but the qualification itself is
+          # executed by the installed, frozen EXE without using system Python.
+          # This verifies two real native inference calls and SQLite resume;
+          # it is NOT a trained model or production quality qualification.
+          $nativeFixture = Join-Path $env:RUNNER_TEMP "SkeletonOfflineSyntheticNative.json"
+          $env:PYTHONPATH = "."
+          & python scripts/windows/create_offline_native_fixture.py --output $nativeFixture
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $nativeFixture)) {
+            throw "cannot prepare local synthetic offline qualification fixture"
+          }
+          $qualificationRaw = & $offline --model $nativeFixture --qualify-model --max-output-tokens 2 --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed frozen console failed real two-turn local inference"
+          }
+          $qualification = $qualificationRaw | ConvertFrom-Json
+          if (
+            $qualification.turns_completed -ne 2 -or
+            -not $qualification.sqlite_context_restored_and_verified -or
+            -not $qualification.artifacts_verified_before_and_after -or
+            $qualification.network_isolation_verified -or
+            $qualification.trained_model_quality_verified
+          ) {
+            throw "offline functional qualification receipt missing required evidence/boundaries"
+          }
+          if ($qualification.receipts.Count -ne 2) {
+            throw "expected two bound local generation receipts"
+          }
+
+
           # Exercise the installed console's actual local knowledge, durable
           # queue and portable database recovery without external Python.
           $offlineNotes = Join-Path $env:RUNNER_TEMP "SkeletonOfflineNotes"
