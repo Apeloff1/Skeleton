@@ -125,7 +125,7 @@ def _master_volumes(master: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
 
 
 def _expected_summary(master: Mapping[str, Any], field: str) -> list[Any]:
-    source_field = "implementation_paths" if field == "canonical_paths" else field
+    source_field = {"canonical_paths": "implementation_paths", "existing_evidence": "evidence"}.get(field, field)
     value = master.get(source_field, [])
     if not isinstance(value, list):
         raise ImplementationNotesError(

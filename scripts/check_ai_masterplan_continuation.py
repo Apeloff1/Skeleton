@@ -143,7 +143,7 @@ def validate(root:Path=ROOT)->dict[str,Any]:
         },
     }
     candidate_owners=[x.get("task_id") for x in owners if isinstance(x,dict) and x.get("implementation_candidate") is not None]
-    if candidate_owners!=list(expected_candidates): raise MasterplanContinuationError("P3-T2 implementation-candidate owner inventory drift")
+    if candidate_owners!=list(expected_candidates): raise MasterplanContinuationError("landed implementation-candidate owner inventory drift (P3-T2 implementation-candidate owner inventory drift)")
     if t2.get("implementation_candidate_count")!=5 or t2.get("branch_implementation_candidate_count")!=3 or t2.get("landed_unpromoted_owner_count")!=0: raise MasterplanContinuationError("P3-T2 implementation-candidate progress counts drift")
     for task_id,spec in expected_candidates.items():
         owner=owner_by_id.get(task_id)

@@ -107,6 +107,7 @@ FIRST_PARTY_PREFIXES = (
     "packaging/",
     "volume_forge/",  # repository-owned volume assembly tooling, not canonical runtime
     "complete/",
+    "volume_forge/",
     "apps/",
 )
 

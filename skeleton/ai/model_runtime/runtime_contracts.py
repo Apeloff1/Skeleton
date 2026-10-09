@@ -130,16 +130,18 @@ class DeviceReceipt:
     resident: bool
     degraded: bool
 
+    def to_dict(self) -> dict[str, str | bool]:
+        """Return the canonical device receipt fields for runtime identity binding."""
+        return {
+            "requested": self.requested,
+            "actual": self.actual,
+            "resident": self.resident,
+            "degraded": self.degraded,
+        }
+
     @property
     def digest(self) -> str:
-        return digest_json(
-            {
-                "requested": self.requested,
-                "actual": self.actual,
-                "resident": self.resident,
-                "degraded": self.degraded,
-            }
-        )
+        return digest_json(self.to_dict())
 
 
 @dataclass(frozen=True)

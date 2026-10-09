@@ -17,7 +17,9 @@ const hex = (bytes: ArrayBuffer) => Array.from(new Uint8Array(bytes))
   .map(x => x.toString(16).padStart(2, "0")).join("");
 
 async function digest(data: Uint8Array): Promise<string> {
-  return hex(await crypto.subtle.digest("SHA-256", data));
+  const owned = new Uint8Array(data.byteLength);
+  owned.set(data);
+  return hex(await crypto.subtle.digest("SHA-256", owned.buffer));
 }
 
 /** Decode low-resolution frames locally. Raw pixels never leave this function. */
