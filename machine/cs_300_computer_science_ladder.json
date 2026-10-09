@@ -1041,8 +1041,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1068,8 +1068,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1096,8 +1096,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1124,8 +1124,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1152,8 +1152,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1180,8 +1180,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1208,8 +1208,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1236,8 +1236,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1264,8 +1264,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1292,8 +1292,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1319,8 +1319,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1346,8 +1346,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1374,8 +1374,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1402,8 +1402,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1430,8 +1430,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1458,8 +1458,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1486,8 +1486,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1514,8 +1514,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1542,8 +1542,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1570,8 +1570,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1597,8 +1597,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1624,8 +1624,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1652,8 +1652,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1680,8 +1680,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1708,8 +1708,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1736,8 +1736,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1764,8 +1764,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1792,8 +1792,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1820,8 +1820,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1848,8 +1848,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1875,8 +1875,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1902,8 +1902,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1930,8 +1930,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1958,8 +1958,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -1986,8 +1986,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2014,8 +2014,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2042,8 +2042,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2070,8 +2070,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2098,8 +2098,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2126,8 +2126,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2153,8 +2153,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2180,8 +2180,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2208,8 +2208,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2236,8 +2236,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2264,8 +2264,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2292,8 +2292,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2320,8 +2320,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2348,8 +2348,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2376,8 +2376,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2404,8 +2404,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2431,8 +2431,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2458,8 +2458,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2486,8 +2486,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2514,8 +2514,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2542,8 +2542,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2570,8 +2570,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2598,8 +2598,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2626,8 +2626,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2654,8 +2654,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2682,8 +2682,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2709,8 +2709,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2736,8 +2736,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2764,8 +2764,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2792,8 +2792,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2820,8 +2820,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2848,8 +2848,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2876,8 +2876,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2904,8 +2904,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2932,8 +2932,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2960,8 +2960,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -2987,8 +2987,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3014,8 +3014,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3042,8 +3042,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3070,8 +3070,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3098,8 +3098,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3126,8 +3126,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3154,8 +3154,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3182,8 +3182,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3210,8 +3210,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3238,8 +3238,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3265,8 +3265,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3292,8 +3292,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3320,8 +3320,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3348,8 +3348,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3376,8 +3376,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3404,8 +3404,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3432,8 +3432,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3460,8 +3460,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3488,8 +3488,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3516,8 +3516,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3543,8 +3543,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3570,8 +3570,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3598,8 +3598,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3626,8 +3626,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3654,8 +3654,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3682,8 +3682,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3710,8 +3710,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3738,8 +3738,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3766,8 +3766,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3794,8 +3794,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3821,8 +3821,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3848,8 +3848,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3876,8 +3876,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3904,8 +3904,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3932,8 +3932,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3960,8 +3960,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -3988,8 +3988,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4016,8 +4016,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4044,8 +4044,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4072,8 +4072,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4099,8 +4099,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4126,8 +4126,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4154,8 +4154,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4182,8 +4182,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4210,8 +4210,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4238,8 +4238,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4266,8 +4266,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4294,8 +4294,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4322,8 +4322,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4350,8 +4350,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4377,8 +4377,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4404,8 +4404,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4432,8 +4432,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4460,8 +4460,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4488,8 +4488,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4516,8 +4516,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4544,8 +4544,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4572,8 +4572,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4600,8 +4600,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4628,8 +4628,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4655,8 +4655,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4682,8 +4682,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4710,8 +4710,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4738,8 +4738,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4766,8 +4766,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4794,8 +4794,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4822,8 +4822,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4850,8 +4850,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4878,8 +4878,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4906,8 +4906,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4933,8 +4933,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4960,8 +4960,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -4988,8 +4988,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5016,8 +5016,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5044,8 +5044,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5072,8 +5072,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5100,8 +5100,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5128,8 +5128,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5156,8 +5156,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5184,8 +5184,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5211,8 +5211,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5238,8 +5238,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5266,8 +5266,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5294,8 +5294,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5322,8 +5322,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5350,8 +5350,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5378,8 +5378,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5406,8 +5406,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5434,8 +5434,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5462,8 +5462,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5489,8 +5489,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5516,8 +5516,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5544,8 +5544,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5572,8 +5572,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5600,8 +5600,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5628,8 +5628,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5656,8 +5656,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5684,8 +5684,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5712,8 +5712,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5740,8 +5740,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5767,8 +5767,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5794,8 +5794,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5822,8 +5822,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5850,8 +5850,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5878,8 +5878,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5906,8 +5906,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5934,8 +5934,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5962,8 +5962,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -5990,8 +5990,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6018,8 +6018,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6045,8 +6045,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6072,8 +6072,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6100,8 +6100,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6128,8 +6128,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6156,8 +6156,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6184,8 +6184,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6212,8 +6212,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6240,8 +6240,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6268,8 +6268,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6296,8 +6296,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6323,8 +6323,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6350,8 +6350,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6378,8 +6378,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6406,8 +6406,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6434,8 +6434,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6462,8 +6462,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6490,8 +6490,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6518,8 +6518,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6546,8 +6546,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6574,8 +6574,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6601,8 +6601,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6628,8 +6628,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6656,8 +6656,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6684,8 +6684,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6712,8 +6712,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6740,8 +6740,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6768,8 +6768,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6796,8 +6796,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6824,8 +6824,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6852,8 +6852,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6879,8 +6879,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6906,8 +6906,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6934,8 +6934,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6962,8 +6962,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -6990,8 +6990,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7018,8 +7018,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7046,8 +7046,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7074,8 +7074,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7102,8 +7102,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7130,8 +7130,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7157,8 +7157,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7184,8 +7184,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7212,8 +7212,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7240,8 +7240,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7268,8 +7268,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7296,8 +7296,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7324,8 +7324,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7352,8 +7352,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7380,8 +7380,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7408,8 +7408,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7435,8 +7435,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7462,8 +7462,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7490,8 +7490,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7518,8 +7518,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7546,8 +7546,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7574,8 +7574,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7602,8 +7602,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7630,8 +7630,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7658,8 +7658,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7686,8 +7686,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7713,8 +7713,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7740,8 +7740,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7768,8 +7768,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7796,8 +7796,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7824,8 +7824,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7852,8 +7852,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7880,8 +7880,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7908,8 +7908,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7936,8 +7936,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7964,8 +7964,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -7991,8 +7991,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8018,8 +8018,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8046,8 +8046,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8074,8 +8074,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8102,8 +8102,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8130,8 +8130,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8158,8 +8158,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8186,8 +8186,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8214,8 +8214,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8242,8 +8242,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8269,8 +8269,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8296,8 +8296,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8324,8 +8324,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8352,8 +8352,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8380,8 +8380,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8408,8 +8408,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8436,8 +8436,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8464,8 +8464,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8492,8 +8492,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8520,8 +8520,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8547,8 +8547,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8574,8 +8574,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8602,8 +8602,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8630,8 +8630,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8658,8 +8658,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8686,8 +8686,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8714,8 +8714,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8742,8 +8742,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8770,8 +8770,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8798,8 +8798,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8825,8 +8825,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8852,8 +8852,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8880,8 +8880,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8908,8 +8908,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8936,8 +8936,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8964,8 +8964,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -8992,8 +8992,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -9020,8 +9020,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -9048,8 +9048,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -9076,8 +9076,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -9103,8 +9103,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -9130,8 +9130,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -9158,8 +9158,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -9186,8 +9186,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -9214,8 +9214,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -9242,8 +9242,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -9270,8 +9270,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -9298,8 +9298,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -9326,8 +9326,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py"
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py"
       ]
     },
     {
@@ -9354,8 +9354,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/domains/quad.py",
-        "tests/flgb/test_domain_quad.py",
+        "skeleton/cs300/layers.py",
+        "tests/flgb/test_cs300_layers.py",
         "finality:CS300-300"
       ]
     }
