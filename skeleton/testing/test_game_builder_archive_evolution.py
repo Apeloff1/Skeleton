@@ -187,7 +187,6 @@ def test_archive_parser_rejects_time_travel_unknown_nodes_and_fake_verification(
 
 
 def test_dated_evolution_campaign_produces_actual_solvable_original_game_worlds():
-    from skeleton.ai.game_builder.playable_simulation import verify_replay
     original = generate_playable_world(
         GameBuildIntent(
             project_id="fresh-evolution-game", title="Original evolution platformer",
