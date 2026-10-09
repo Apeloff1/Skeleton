@@ -98,10 +98,16 @@ class Chip8Machine:
             raise Chip8Error("invalid CHIP-8 execution instruction budget")
         consumed = False
         for _ in range(max_instructions):
-            state = self.step(key=None if consumed else key)
+            opcode = (self.memory[self.pc] << 8) | self.memory[self.pc + 1]
+            # Keys are events for Fx0A, not arbitrarily consumed by the
+            # first instruction in the program or display-redraw loop.
+            is_wait = opcode & 0xF0FF == 0xF00A
+            supply = key if is_wait and not consumed else None
+            state = self.step(key=supply)
             if self.waiting_for_key:
                 return state
-            consumed = True
+            if supply is not None:
+                consumed = True
         raise Chip8Error("CHIP-8 execution budget exhausted")
 
     def snapshot(self) -> dict[str, Any]:
