@@ -56,6 +56,27 @@ python -m skeleton app local-ai --model ./native-runtime.json \\
 Skeleton.exe --local-ai
 ```
 
+### Run native AI commands directly from the installed Windows executable
+
+No external Python executable, Docker daemon, hosted API credentials or
+additional terminal runtime is required for the native local AI commands
+in the Windows installer. The same canonical `skeleton.app.cli` operations
+can be invoked through the installed executable:
+
+```powershell
+# Run in PowerShell, from a directory with UTF-8 source data:
+Skeleton.exe --offline-command local-ai --train-corpus .\notes.txt --output-model .\checkpoint.json --epochs 1 --json
+Skeleton.exe --offline-command local-ai --model .\checkpoint.json --inspect-model --json
+Skeleton.exe --offline-command local-ai --model .\checkpoint.json --prompt "hello" --json
+Skeleton.exe --offline-command local-ai --benchmark-suite .\suite.json --model .\checkpoint.json --json
+```
+
+The `--offline-command` mode is deliberately restricted to `local-ai`:
+it cannot activate Docker services, arbitrary shell commands or Python
+modules. The Windows CI builds, installs and invokes this public CLI path
+for an actual CPU training/checkpoint/inspection round-trip. Full
+frontend/backend/Mongo service assembly still uses Docker separately.
+
 ### Train a small native checkpoint on your own text
 
 The desktop window's **Train small local model…** action can train a genuine,
