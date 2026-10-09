@@ -190,6 +190,19 @@ jobs:
           if (-not (Test-Path -LiteralPath $offline)) {
             throw "installed SkeletonOffline.exe missing"
           }
+          # The installer must include the actual one-click windowed game,
+          # not merely a command-line preview or source-only Tk module.
+          $gameExe = Join-Path $installDir "SkeletonGame.exe"
+          if (-not (Test-Path -LiteralPath $gameExe)) {
+            throw "installed SkeletonGame.exe native game is missing"
+          }
+          if ((Get-Item -LiteralPath $gameExe).Length -lt 100000) {
+            throw "installed native SkeletonGame.exe looks truncated"
+          }
+          # Desktop interaction itself is not verified on ephemeral CI
+          # hosts. --game-preview-check above executes the SAME engine
+          # through the installed headless console and must win twice.
+
           & $offline --native-smoke
           if ($LASTEXITCODE -ne 0) {
             throw "standalone offline console native graph smoke failed"
