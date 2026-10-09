@@ -244,8 +244,8 @@ def _event_order(args: dict[str, Any]) -> list[str]:
     ordered: list[tuple[int, str, int]] = []
     for n, item in enumerate(events):
         event = _keys(item, ("name", "tick"))
-        ordered.append((_n(event["tick"]), _str(event["name"], 64), n))
-    return [name for tick, name, original in sorted(ordered)]
+        ordered.append((_n(event["tick"]), n, _str(event["name"], 64)))
+    return [name for tick, original, name in sorted(ordered)]
 
 
 def _event_elapsed(args: dict[str, Any]) -> int:
@@ -262,9 +262,11 @@ def _json_select(args: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(obj, dict) or len(obj) > MAX_COLLECTION:
         raise CapabilityTaskError("source JSON must be bounded object")
     requested = _list(v["keys"])
-    if len(requested) != len(set(str(k) for k in requested)):
+    if any(not isinstance(k, str) or len(k) > 128 for k in requested):
+        raise CapabilityTaskError("selection keys must be bounded strings")
+    if len(requested) != len(set(requested)):
         raise CapabilityTaskError("selection keys must be unique")
-    if any(not isinstance(k, str) or k not in obj for k in requested):
+    if any(k not in obj for k in requested):
         raise CapabilityTaskError("requested source field is absent")
     return {key: obj[key] for key in requested}
 
@@ -342,16 +344,16 @@ def _strict_json(data: bytes) -> dict[str, Any]:
     if len(data) > MAX_INPUT_BYTES:
         raise CapabilityTaskError("task payload exceeds size limit")
     try:
-        pairs = json.loads(
+        parsed = json.loads(
             data.decode("utf-8", "strict"),
             object_pairs_hook=lambda entries: _pairs(entries),
             parse_constant=lambda token: _invalid_constant(token),
         )
     except (UnicodeError, ValueError, RecursionError) as exc:
         raise CapabilityTaskError("invalid task JSON") from exc
-    if not isinstance(pairs, dict):
+    if not isinstance(parsed, dict):
         raise CapabilityTaskError("task JSON must be an object")
-    return pairs
+    return parsed
 
 
 def _pairs(entries: list[tuple[str, Any]]) -> dict[str, Any]:
