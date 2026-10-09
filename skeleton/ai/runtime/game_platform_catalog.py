@@ -16,6 +16,12 @@ from typing import Any
 SCHEMA = "skeleton.game.platform_catalog.v1"
 ERA_GROUPS: tuple[tuple[str, str, str, str, str], ...] = (
     # Era, category, technical style, SDK gate, target list.
+    # Pre-commercial laboratory/game-computing history is planning-only:
+    # original executable media and functioning hardware are not bundled.
+    ("1950s", "historical_lab", "fixed_screen", "community_toolchain",
+     "edsac-oxo analog-tennis-for-two"),
+    ("1960s", "historical_lab", "fixed_screen", "community_toolchain",
+     "pdp1-spacewar mainframe-text-games analog-arcade-prototypes"),
     ("1970s", "arcade", "fixed_screen", "community_toolchain",
      "arcade-discrete arcade-early-cpu atari-pong magnvox-odyssey atari-2600"),
     ("1970s", "home_console", "tile2d", "community_toolchain",
@@ -163,7 +169,7 @@ CATALOG_SHA256 = hashlib.sha256(
 def catalog_summary() -> dict[str, Any]:
     by_era = {
         era: sum(target.era == era for target in TARGETS.values())
-        for era in ("1970s", "1980s", "1990s", "2000s", "2010s", "2020s")
+        for era in ("1950s", "1960s", "1970s", "1980s", "1990s", "2000s", "2010s", "2020s")
     }
     return {
         "schema_version": SCHEMA,
