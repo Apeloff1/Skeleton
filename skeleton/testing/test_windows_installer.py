@@ -208,3 +208,23 @@ def test_frozen_offline_console_is_packaged_and_smoke_tested():
     assert "& $offline --native-smoke" in workflow
     assert "SkeletonOffline.exe" in installer
     assert 'skeleton-offline = "skeleton.app.offline_cli:main"' in pyproject
+
+
+def test_installed_frozen_console_qualifies_two_local_inference_turns() -> None:
+    workflow = Path(".github/workflows/windows-installer.yml").read_text("utf-8")
+    build = Path("scripts/windows/build_installer.ps1").read_text("utf-8")
+    fixture = Path("scripts/windows/create_offline_native_fixture.py").read_text("utf-8")
+    source = Path("skeleton/app/offline_qualification.py").read_text("utf-8")
+
+    assert "scripts/windows/create_offline_native_fixture.py" in workflow
+    assert "& $offline --model $nativeFixture --qualify-model" in workflow
+    assert "sqlite_context_restored_and_verified" in workflow
+    assert "artifacts_verified_before_and_after" in workflow
+    assert "network_isolation_verified" in workflow
+    assert "trained_model_quality_verified" in workflow
+    assert '"skeleton.app.offline_qualification"' in build
+    assert "write_local_model_artifact" in fixture
+    assert "TinyTransformer" in fixture
+    assert "DurableOfflineSession" in source
+    assert "TemporaryDirectory" in source
+    assert '"trained_model_quality_verified": False' in source
