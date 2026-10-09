@@ -437,3 +437,53 @@ def test_rehashed_attacker_modification_cannot_strip_embedded_license_permission
         _resign(forged)
         with pytest.raises(GameCapsuleError):
             verify_game_capsule(forged)
+
+
+def test_authorized_edit_cli_produces_new_playable_game_without_touching_original(
+    tmp_path: Path, capsys,
+):
+    from skeleton.app.offline_game_preview import OfflineGamePreview
+    from skeleton.app.offline_cli import main as offline_console
+
+    tiles = list(OfflineGamePreview(seed=7).tiles)
+    evidence = rights(tiles=tiles, allowed_uses=["embed", "modify"])
+    original_digest = evidence["assets"][0]["sha256"]
+    x, y = 6, 4
+    selected_tile = "." if tiles[y][x] == "#" else "#"
+    # Edit an overhead cell without touching the guaranteed clear ground
+    # corridor or the unique spawn/goal.
+    assert y < len(tiles) - 2 and x > 1
+    authoring = {
+        "source_tiles": tiles,
+        "rights_manifest": evidence,
+        "target_ids": ["windows-11", "game-boy", "playstation-5"],
+        "required_features": ["tile2d", "input"],
+        "action": "original_game",
+        "jurisdiction": "NO",
+        "edits": [{"x": x, "y": y, "tile": selected_tile}],
+    }
+    source = tmp_path / "edit-request.json"
+    source.write_text(json.dumps(authoring), "utf-8")
+    completed = tmp_path / "authored-capsule.json"
+    assert game_cli([
+        "--compose", str(source), "--output", str(completed),
+    ]) == 0
+    authoring_receipt = json.loads(capsys.readouterr().out)
+    assert authoring_receipt["scene_recomputed"] is True
+    assert completed.exists()
+    result = json.loads(completed.read_text("utf-8"))
+    assert result["source_tile_sha256"] == original_digest
+    assert result["edited_tile_sha256"] != original_digest
+    assert result["modifications"] == authoring["edits"]
+    assert result["legal_release_authorized"] is False
+    assert result["rights_manifest"]["assets"][0]["sha256"] == original_digest
+    assert result["playability"]["actual_controller_replay_qualified"] is True
+    assert verify_game_capsule(result)["scene_recomputed"] is True
+    assert game_cli(["--compose", str(source)]) == 2
+    assert offline_console([
+        "--game-preview-check", "--game-project", str(completed), "--json",
+    ]) == 0
+    native_receipt = json.loads(capsys.readouterr().out)
+    assert native_receipt["terminal_won"] is True
+    assert native_receipt["project_source"] == "verified_portable_capsule"
+    assert source.read_text("utf-8") == json.dumps(authoring)
