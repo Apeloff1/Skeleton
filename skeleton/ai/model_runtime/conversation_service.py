@@ -30,7 +30,10 @@ class SessionRecord:
     pinned: bool
 
     def to_dict(self) -> dict[str, Any]:
-        return dict(vars(self))
+        return {"session_id": self.session_id, "created_at": self.created_at,
+                "updated_at": self.updated_at, "revision": self.revision,
+                "turns": self.turns, "context_tokens": self.context_tokens,
+                "pinned": self.pinned}
 
 
 @dataclass(frozen=True)
