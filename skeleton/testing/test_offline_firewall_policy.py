@@ -38,4 +38,3 @@ def test_rule_identity_is_path_scoped_and_status_read_only() -> None:
     assert 'elseif ($Mode -eq "Remove")' in data
     assert 'elseif ($null -ne $Current)' in data
     assert 'exit 1' in data
-    assert "offline_network_policy.ps1" in data or SCRIPT.name
