@@ -345,3 +345,35 @@ execution evidence.
 - PlatformIO Arduboy board: https://docs.platformio.org/en/latest/boards/atmelavr/arduboy.html
 
 **Source coverage revised:** 57/169; missing native source: 112.
+
+## Compatibility-aware homebrew build destinations: 11 exact-ABI revisions
+
+The source generator also now supports **11 explicit hardware revisions**
+where an existing source project can legitimately use the same native
+CPU execution model and build format, but must not claim that the parent
+device's emulator/binary checks certify the destination.
+
+- GB Pocket and GB Light (monochrome DMG RGBDS, including scrolling);
+- GBA Micro and Game Boy Player (GBA ARM7 cartridge, no DMG fallback);
+- PSP Go and PSP Street (PSPSDK Allegrex EBOOT, differing firmware/storage);
+- Nintendo DSi (Nintendo DS compatibility mode only, not DSi-only APIs);
+- Nintendo 2DS and New 3DS (existing libctru 3DSX source in compatible mode);
+- Atari 130XE (compatible Atari 8-bit XEX, no XE bank enhancements);
+- Sega Mark III (compatible Z80/Sega VDP SMS source, accessory/ROM format review).
+
+The new **dragon_compatible_revisions.py** checks matching parent and
+destination output types, generates the actual parent native project and
+preserves all original source bytes. The destination receives a separate
+original source-parent hash, explicit runtime mode and limits, and
+per-device compiler/emulator/hardware verification flags left FALSE.
+An existing parent hardware-budget report is preserved as a
+**parent-only** report rather than transplanted as a device certificate.
+Other machines such as CD32, Sega 32X, FDS, Switch Lite, PS5 Pro and
+Plus/4 cannot be falsely mapped to an incompatible source engine.
+
+**Revised hardware source access: 68/169 (40.2%)**, specifically
+**57 direct native source targets + 11 compatible hardware variants**.
+**101 cataloged identities lack source-capable build destinations.**
+Distinct engine count has NOT increased from compatibility mappings.
+No device-level execution or user-facing commercial game readiness
+is claimed for any of the mapped revisions.

@@ -12,6 +12,8 @@ from .dragon_desktop_abi import DESKTOP_NATIVE,ABI_PROFILES,apply_desktop_abi
 EMITTERS=frozenset({"game_boy","game_boy_color","nes","dos_vga","master_system","game_gear","snes","commodore_64","genesis","game_boy_advance","nintendo_64","nintendo_ds","psp","ps1","xbox_original","atari_2600","apple_ii","zx_spectrum","dos_8086","windows_95","pc_linux","pc_windows","pc_macos","steam_deck"})
 EMITTERS=EMITTERS|DESKTOP_NATIVE|frozenset(("gamecube","wii","nintendo_3ds","dreamcast","ps2","commodore_vic20","commodore_128","atari_400_800","msx1","amstrad_cpc"))
 EMITTERS=EMITTERS|frozenset(("playdate","arduboy"))
+from .dragon_compatible_revisions import COMPATIBILITY
+EMITTERS=EMITTERS|frozenset(COMPATIBILITY)
 
 @dataclass(frozen=True)
 class NativeProject:
@@ -493,6 +495,14 @@ def render_native_project(*,title:str,target_id:str,style:str,
                           candidate_id:str,mechanics:tuple[Mechanic,...],
                           authorized:bool,design=None)->NativeProject:
     if not authorized:raise PermissionError("native game build requires authorization")
+    if target_id in COMPATIBILITY:
+        from .dragon_compatible_revisions import revision_project
+        return revision_project(
+            target_id=target_id,title=title,style=style,
+            candidate_id=candidate_id,mechanics=mechanics,
+            authorized=authorized,design=design,
+            renderer=render_native_project,
+        )
     target=demand_target(target_id)
     if target_id not in EMITTERS:
         if target.status=="licensed_sdk":

@@ -62,6 +62,12 @@ SOURCE_RENDERERS.update({
     "playdate":"STM32F7 native Playdate C API 400x240 1bpp",
     "arduboy":"ATmega32u4 Arduboy2 OLED 128x64 1bpp",
 })
+from .dragon_compatible_revisions import REVISIONS
+SOURCE_RENDERERS.update({
+    r.target:"ABI-compatible original "+r.runtime_mode+
+       " (native source inherited from "+r.parent+")"
+    for r in REVISIONS
+})
 assert set(SOURCE_RENDERERS)==EMITTERS
 
 @dataclass(frozen=True)

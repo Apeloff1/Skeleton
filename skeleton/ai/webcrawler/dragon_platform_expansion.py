@@ -37,12 +37,12 @@ atari_5200|Atari|second generation|1982|6502|ANTIC GTIA|POKEY|analog controller|
 atari_7800|Atari|third generation|1984|6502C|MARIA|TIA|joystick|cc65 atari7800|a78|toolchain_adapter
 vectrex|GCE|second generation|1982|6809|vector CRT|AY-3-8912|analog stick|6809 assembler|bin|toolchain_adapter
 sega_sg1000|Sega|third generation|1983|Z80|TMS9918|SN76489|2-button pad|SDCC / z88dk|sg|toolchain_adapter
-sega_mark_iii|Sega|third generation|1985|Z80|Sega VDP|SN76489|2-button pad|SDCC / devkitSMS|sms|toolchain_adapter
+sega_mark_iii|Sega|third generation|1985|Z80|Sega VDP|SN76489|2-button pad|SDCC / devkitSMS|sms|native_source
 famicom_disk_system|Nintendo|8-bit disk add-on|1986|2A03|NES PPU|2C33|Famicom controller|ca65 FDS homebrew|fds|toolchain_adapter
-game_boy_pocket|Nintendo|handheld DMG revision|1996|SM83|2bpp OAM|DMG APU|D-pad AB|RGBDS DMG compatibility|gb|toolchain_adapter
-game_boy_light|Nintendo|handheld DMG revision|1998|SM83|2bpp OAM|DMG APU|D-pad AB|RGBDS DMG compatibility|gb|toolchain_adapter
-game_boy_micro|Nintendo|GBA revision|2005|ARM7TDMI|GBA 2D|GBA audio|D-pad AB LR|devkitARM libgba|gba|toolchain_adapter
-game_boy_player|Nintendo|GBA/GameCube peripheral|2003|GBA hardware|GBA LCD output|GBA audio|GameCube controller|devkitARM libgba|gba|toolchain_adapter
+game_boy_pocket|Nintendo|handheld DMG revision|1996|SM83|2bpp OAM|DMG APU|D-pad AB|RGBDS DMG compatibility|gb|native_source
+game_boy_light|Nintendo|handheld DMG revision|1998|SM83|2bpp OAM|DMG APU|D-pad AB|RGBDS DMG compatibility|gb|native_source
+game_boy_micro|Nintendo|GBA revision|2005|ARM7TDMI|GBA 2D|GBA audio|D-pad AB LR|devkitARM libgba|gba|native_source
+game_boy_player|Nintendo|GBA/GameCube peripheral|2003|GBA hardware|GBA LCD output|GBA audio|GameCube controller|devkitARM libgba|gba|native_source
 virtual_boy|Nintendo|stereo handheld|1995|NEC V810|dual red LED screens|stereo|dual D-pads|gccvb homebrew|vb|toolchain_adapter
 wonderswan|Bandai|handheld 16-bit|1999|V30MZ|2bpp LCD|digital|buttons|WSwan SDK|ws|toolchain_adapter
 wonderswan_color|Bandai|handheld 16-bit color|2000|V30MZ|color LCD|digital|buttons|WSwan SDK|wsc|toolchain_adapter
@@ -71,7 +71,7 @@ commodore_128|Commodore|8-bit home computer|1985|8502 / Z80|VIC-II|SID|keyboard|
 commodore_plus4|Commodore|8-bit home computer|1984|7501|TED|TED|keyboard|cc65 plus4|prg|toolchain_adapter
 commodore_pet|Commodore|8-bit home computer|1977|6502|text VDU|beeper|keyboard|cc65 pet|prg|toolchain_adapter
 atari_400_800|Atari|8-bit computer|1979|6502|ANTIC / GTIA|POKEY|joystick|cc65 atari|xex|native_source
-atari_130xe|Atari|8-bit computer|1985|6502C|ANTIC / GTIA|POKEY|joystick|cc65 atari|xex|toolchain_adapter
+atari_130xe|Atari|8-bit computer|1985|6502C|ANTIC / GTIA|POKEY|joystick|cc65 atari|xex|native_source
 apple_iigs|Apple|16-bit computer|1986|65816|Super Hi-Res|Ensoniq|keyboard|ORCA / cc65|sys|toolchain_adapter
 trs80_model_i|Tandy|8-bit computer|1977|Z80|text video|mono|keyboard|z88dk trs80|cmd|toolchain_adapter
 ti_99_4a|Texas Instruments|16-bit computer|1981|TMS9900|TMS9918|SN76489|joystick|TI99 homebrew GCC|bin|toolchain_adapter
@@ -93,14 +93,14 @@ pc_fx|NEC|32-bit CD console|1994|V810|HuC6273|ADPCM|pad|PC-FX SDK|iso|toolchain_
 neo_geo_cd|SNK|16-bit CD console|1994|68000|Neo Geo sprite|YM2610|pad|NGDEVKIT CD|iso|toolchain_adapter
 sega_naomi|Sega|arcade board|1998|SH-4|PowerVR2|AICA|arcade I/O|KallistiOS / Naomi SDK|bin|toolchain_adapter
 sega_atom_iswave|Sammy|arcade SH-4 board|2003|SH-4|PowerVR2|AICA|arcade I/O|KallistiOS homebrew|bin|toolchain_adapter
-nintendo_dsi|Nintendo|dual-screen DSi|2008|ARM9 / ARM7|DSi display|DSi audio|touch/buttons|devkitARM libnds|nds|toolchain_adapter
-nintendo_2ds|Nintendo|3DS family|2013|ARM11|PICA200|DSP|touch/circle|devkitARM libctru|3dsx|toolchain_adapter
-new_nintendo_3ds|Nintendo|enhanced 3DS|2014|ARM11 enhanced|PICA200|DSP|touch/circle|devkitARM libctru|3dsx|toolchain_adapter
+nintendo_dsi|Nintendo|dual-screen DSi|2008|ARM9 / ARM7|DSi display|DSi audio|touch/buttons|devkitARM libnds|nds|native_source
+nintendo_2ds|Nintendo|3DS family|2013|ARM11|PICA200|DSP|touch/circle|devkitARM libctru|3dsx|native_source
+new_nintendo_3ds|Nintendo|enhanced 3DS|2014|ARM11 enhanced|PICA200|DSP|touch/circle|devkitARM libctru|3dsx|native_source
 nintendo_switch_lite|Nintendo|Switch handheld|2019|Tegra X1|Maxwell|audio|Joy-Con built-in|devkitA64 libnx|nro|toolchain_adapter
 nintendo_switch_oled|Nintendo|Switch OLED revision|2021|Tegra X1|Maxwell|audio|Joy-Con|devkitA64 libnx|nro|toolchain_adapter
 nintendo_switch_2|Nintendo|hybrid 9th generation|2025|custom Nvidia ARM|Nvidia GPU|system audio|Joy-Con 2|licensed dev SDK|nso|licensed_sdk
-psp_go|Sony PlayStation|PSP revision|2009|Allegrex|GU|PSP audio|sliding controls|PSPSDK|pbp|toolchain_adapter
-psp_street|Sony PlayStation|PSP revision|2011|Allegrex|GU|PSP audio|buttons|PSPSDK|pbp|toolchain_adapter
+psp_go|Sony PlayStation|PSP revision|2009|Allegrex|GU|PSP audio|sliding controls|PSPSDK|pbp|native_source
+psp_street|Sony PlayStation|PSP revision|2011|Allegrex|GU|PSP audio|buttons|PSPSDK|pbp|native_source
 ps_vita_tv|Sony PlayStation|Vita TV|2013|Cortex-A9|SGX543|Vita audio|DualShock|VitaSDK|vpk|toolchain_adapter
 ps4_pro|Sony PlayStation|8th gen PS4 Pro|2016|x86-64|GCN enhanced|PS4 audio|DualShock 4|Sony licensed SDK|pkg|licensed_sdk
 ps5_pro|Sony PlayStation|9th gen PS5 Pro|2024|x86-64|enhanced RDNA GPU|Tempest|DualSense|Sony licensed SDK|pkg|licensed_sdk
