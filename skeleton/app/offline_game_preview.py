@@ -120,8 +120,10 @@ def verify_game_preview(seed: int = DEFAULT_SEED) -> dict[str, Any]:
     complete frame-by-frame trajectories, prove bounds and that no training
     data/model was required. This does NOT verify an actual visible desktop.
     """
+    # Distinct gameplay phases prove a player can descend the safe shaft,
+    # walk along the lower corridor and finish a seeded generated map.
     controls = [
-        {"left": False, "right": i % 9 < 7, "jump": i % 11 == 0}
+        {"left": False, "right": i >= 12, "jump": False}
         for i in range(32)
     ]
     trajectories: list[list[dict[str, Any]]] = []
@@ -146,6 +148,8 @@ def verify_game_preview(seed: int = DEFAULT_SEED) -> dict[str, Any]:
         trajectories.append(frames)
     if trajectories[0] != trajectories[1]:
         raise GameplayError("game preview simulation is nondeterministic")
+    if not trajectories[0][-1]["won"]:
+        raise GameplayError("seeded game preview failed playable-goal acceptance")
     raw = json.dumps(
         trajectories[0], sort_keys=True, separators=(",", ":"),
         ensure_ascii=True,
