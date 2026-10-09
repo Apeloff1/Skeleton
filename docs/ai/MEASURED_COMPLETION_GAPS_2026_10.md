@@ -77,22 +77,37 @@ check that every returned citation is traceable to its original full bytes.
 **Exit:** local inference CI and installed executable HTTP smoke must pass,
 including tamper tests. This closes the **searchable evidence** subgap only.
 
-### A-04 · Evidence-grounded answer generation — OPEN / product capability partial
+### A-04 · Evidence-grounded answer generation — PARTLY IMPLEMENTED / NOT QUALIFIED
 
-**Gap:** retrieved passages are intentionally **not yet supplied to the
-model with atomic evidence-to-turn manifests**. A retrieved citation is not
-proof that the model based its answer on it, and no answer-faithfulness
-evaluation has passed.
+**Delivered in this PR:** opt-in grounded turns now retrieve verified local
+passages, append their **exact supplied excerpts** to the model's user-input
+context (not its system instructions), and atomically commit a bounded,
+question/model/configuration-bound source snapshot with the assistant turn.
+SQLite stores an explicit per-turn grounded marker; deleting a required
+evidence receipt fails closed rather than silently downgrading history.
+Existing chat databases are migrated in place. Full source-custody snapshots
+survive exact-ID retries after document deletion, process restart, conversation
+forks and v2 backups/import. Legacy ungrounded v1 backups remain supported.
 
-**Implementation needed:** read-only evidence selection, bounded untrusted
-context, stable query/source fingerprints, request-ID replay across source
-updates, atomic turn/evidence receipts, export/import preserving lineage,
-and attribution/contradiction evaluations. Model responses must not inherit
-source text as system authority.
+The localhost browser exposes a voluntary **Include local evidence** control,
+saved per-turn source excerpts and a separate citation-identifier audit. The
+headless CLI offers `--grounded-message` and interactive `/ground QUESTION`.
+Response audits distinguish recognized identifiers, invented identifiers and
+answers that cite nothing. **This is NOT semantic or factual support
+verification**—an untrained model can copy a correct ID while making false
+claims. Grounding remains optional and does not grant retrieved text system
+authority, tools, filesystem access or remote connectivity.
 
-**Exit:** adversarial answer-grounding fixtures, citation verification after
-restart, drift-safe replay, no fabricated sources, and a trained-model
-acceptance run.
+**Residual gaps:** robust source-to-claim attribution and contradiction
+evaluation; trained-model quality and instruction-injection benchmarks;
+context-capacity adaptive source admission; freshness/staleness semantics for
+unselected material; independent model and Windows installer acceptance.
+
+**Exit:** a passing exact-head `test_app_offline_grounding.py` plus real
+localhost/CLI acceptance, source deletion and tamper/replay regressions,
+trained-model factual-support evaluation and installed Windows smoke. Do
+not promote `assistant.retrieval_grounded` to complete merely because
+citation identifiers are syntactically recognized.
 
 ### A-05 · Useful trained local weights and GGUF execution — OPEN / release-critical
 
@@ -171,6 +186,7 @@ rehashed.**
 - Rank work by missing user capability, data-loss risk, incorrect behavior and
   integration failure—not number of files, commits or lines.
 
-**Current next integration target:** A-04 grounded answer production with
-atomic evidence custody, followed by A-05 trained-model evaluation and the
-A-01 release gates. A-06 through A-09 remain separate major workstreams.
+**Current next integration target:** A-04 claim-level grounded-answer
+faithfulness and adversarial evaluation, A-05 qualified local model testing,
+then the A-01 exact-head release gates. A-06 through A-09 remain separate
+major workstreams.
