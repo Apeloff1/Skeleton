@@ -13,6 +13,12 @@ The UI-neutral selector in `editor_platforms.py` exposes every catalogued system
 
 The approximate tier and preset are **planning heuristics**, not machine-specific hardware specifications, verified instruction sets, video timings, RAM addresses or supported executable targets. Individual regional models, hardware revisions, add-ons, controllers, multiformat media and FPGA reimplementations need machine-specific adapters and test evidence.
 
+## Separate legal cross-reference for machine-bound games
+
+The published legal-source matrix and executable rights classifier are documented in [the homebrew and spiritual-successor legal cross-reference](GAME_BUILDER_LEGAL_CROSSREFERENCE.md). Hardware exclusivity of a third-party commercial game does not automatically grant a copyright monopoly over its underlying mechanics or genre. It **does** leave its protected expression, code, branding, sound, maps, software license and console technical-measure rules intact. Researching a platform's architecture or building an independent game does not itself require rights to that commercial game; commercial distribution and console access are independently gated.
+
+`legal_census.catalog_rights_census()` builds a policy review card for **every curated hardware record**. It reports catalogued systems with missing actual per-target SDK licence review, lack of individual legal release certification, potential TPM restrictions, and hardware/driver acceptance requirements. It does not assign unverified legal statuses as "approved" merely because a historical console is abandoned.
+
 ## Source and destination are separate
 
 A historical game design **basis** is not a permission to copy the original game's ROM, art, soundtrack, script, trademark or characters. Port planning accepts only an original/cleared homebrew project with a stable rights-evidence reference. User-provided SHA-256 is an *assertion/reference*, not proof of independent verification.
