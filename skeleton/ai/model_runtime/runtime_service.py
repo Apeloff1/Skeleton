@@ -107,6 +107,8 @@ class NativeModelService:
         if not isinstance(config, GenerationConfig):
             raise NativeServiceError("GenerationConfig required")
         try:
+            if any(0xD800 <= ord(char) <= 0xDFFF for char in prompt):
+                raise UnicodeEncodeError("utf-8", prompt, 0, len(prompt), "surrogate code point")
             prompt.encode("utf-8", errors="strict")
             return digest_json(
                 {
@@ -144,6 +146,10 @@ class NativeModelService:
         # Terminal accounting must not call model or tokenizer code again:
         # the original request may have failed because those contracts drifted.
         try:
+            if not isinstance(prompt, str) or any(
+                0xD800 <= ord(char) <= 0xDFFF for char in prompt
+            ):
+                raise UnicodeEncodeError("utf-8", prompt if isinstance(prompt, str) else "", 0, 1, "surrogate code point")
             prompt_bytes = prompt.encode("utf-8", errors="strict")
         except (AttributeError, UnicodeEncodeError) as exc:
             raise NativeServiceError("prompt is not valid UTF-8 text") from exc
