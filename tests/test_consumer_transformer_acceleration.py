@@ -490,3 +490,80 @@ def test_runtime_identity_refresh_rejects_partial_accelerator_rebind(monkeypatch
     assert model._accel is None and not model.resident
     with pytest.raises(RuntimeContractError, match="mutated"):
         runtime.assert_model_unchanged()
+
+
+def test_concurrent_transformer_inference_never_cross_contaminates_kv_history():
+    pytest.importorskip("torch")
+    from concurrent.futures import ThreadPoolExecutor
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = TinyTransformer(
+        vocab=("a", "b", "c"), dim=8, ctx=6, seed=199,
+        n_heads=2, n_layers=2, d_ff=12, norm="rms",
+        ffn_kind="swiglu",
+    )
+    accel = TorchAccel(model, device="cpu").pin()
+    windows = [
+        (1, 2, 3), (3, 2, 1), (1, 1, 1),
+        (1, 2, 3, 1), (3, 1, 2, 3), (2, 3, 1, 2),
+        (2, 2, 3, 1), (1, 3, 2, 1),
+    ] * 3
+    expected = [model._logits(window) for window in windows]
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        actual = list(pool.map(accel.logits_window, windows))
+    for result, reference in zip(actual, expected):
+        assert result == pytest.approx(reference, abs=2e-5, rel=2e-5)
+
+
+def test_training_serializes_against_resident_kv_decode(monkeypatch):
+    pytest.importorskip("torch")
+    from threading import Event, Thread
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = _model()
+    accel = TorchAccel(model, device="cpu").pin()
+    accel.logits_window((1, 2))
+    entered_step, release_step, training_done = Event(), Event(), Event()
+    errors = []
+    original_step = accel._cached_step
+
+    def blocked_step(token):
+        entered_step.set()
+        if not release_step.wait(timeout=5):
+            raise TimeoutError("test could not release blocked decoder")
+        return original_step(token)
+
+    monkeypatch.setattr(accel, "_cached_step", blocked_step)
+
+    def decode():
+        try:
+            accel.logits_window((1, 2, 3))
+        except Exception as exc:
+            errors.append(exc)
+
+    def train():
+        try:
+            accel.sgd((1, 2), target=3, lr=0.01)
+        except Exception as exc:
+            errors.append(exc)
+        finally:
+            training_done.set()
+
+    first = Thread(target=decode)
+    second = Thread(target=train)
+    try:
+        first.start()
+        assert entered_step.wait(timeout=5)
+        second.start()
+        # Training must not mutate weights while the decoder is executing.
+        assert not training_done.wait(timeout=0.05)
+    finally:
+        release_step.set()
+        first.join(timeout=5)
+        if second.ident is not None:
+            second.join(timeout=5)
+    assert not first.is_alive()
+    assert not second.is_alive()
+    assert not errors
+    assert training_done.is_set()
+    assert accel.cached_tokens == ()  # SGD invalidates the prior KV bank
