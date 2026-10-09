@@ -447,18 +447,33 @@ class HomebrewEditor:
             "training_examples_added": 0,
         }
 
+    def _record_navigation(self, operation: str, previous_sha: str) -> None:
+        event = {
+            "sequence": len(self.events) + 1,
+            "parent_audit_sha256": self.audit_sha256,
+            "operation": operation,
+            "old_tile_sha256": previous_sha,
+            "new_tile_sha256": self.tile_sha256,
+        }
+        self.audit_sha256 = _digest(event)
+        self.events.append({**event, "event_sha256": self.audit_sha256})
+
     def undo(self) -> list[str]:
         if self.cursor == 0:
             raise HomebrewEditorError("no additional edit to undo")
+        previous = self.tile_sha256
         self.cursor -= 1
         self.tiles = self.history[self.cursor][:]
+        self._record_navigation("undo", previous)
         return self.tiles[:]
 
     def redo(self) -> list[str]:
         if self.cursor >= len(self.history) - 1:
             raise HomebrewEditorError("no additional edit to redo")
+        previous = self.tile_sha256
         self.cursor += 1
         self.tiles = self.history[self.cursor][:]
+        self._record_navigation("redo", previous)
         return self.tiles[:]
 
     def analyze(self, *, target_ids: list[str] | None = None) -> dict[str, Any]:
