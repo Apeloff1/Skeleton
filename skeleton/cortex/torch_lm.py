@@ -12,6 +12,7 @@ only when a snapshot kind is torch-stack.
 """
 from __future__ import annotations
 
+import math
 import threading
 from typing import Any, Dict, Iterable, List, Sequence
 
@@ -36,7 +37,15 @@ class TorchAccel:
         kv_dtype: str = "fp32",
         max_kv_bytes: int | None = None,
         prefill_query_chunk: int | None = None,
+        max_grad_norm: float | None = None,
     ) -> None:
+        if max_grad_norm is not None and (
+            isinstance(max_grad_norm, bool)
+            or not isinstance(max_grad_norm, (int, float))
+            or not math.isfinite(float(max_grad_norm))
+            or max_grad_norm <= 0
+        ):
+            raise ValueError("max_grad_norm must be a finite positive number")
         torch = _torch()
         if prefill_query_chunk is not None and (
             isinstance(prefill_query_chunk, bool)
@@ -68,6 +77,8 @@ class TorchAccel:
         }[kv_dtype]
         self.max_kv_bytes = max_kv_bytes
         self.prefill_query_chunk = prefill_query_chunk
+        self.max_grad_norm = float(max_grad_norm) if max_grad_norm is not None else None
+        self.last_grad_norm: float | None = None
         self.resident = False
         self._E = self._P = self._Wout = self._bout = None
         self._layers: List[Dict[str, Any]] = []
@@ -582,24 +593,55 @@ class TorchAccel:
 
     def _sgd_unlocked(self, ids: Sequence[int], target: int, lr: float) -> float:
         self._assert_training_integrity()
+        if not isinstance(ids, (list, tuple)) or not 1 <= len(ids) <= self.lm.ctx:
+            raise ValueError("SGD input tokens must fit model context")
+        if any(
+            isinstance(token_id, bool) or not isinstance(token_id, int)
+            or not 0 <= token_id < self.lm.V
+            for token_id in ids
+        ):
+            raise ValueError("SGD input token ID outside vocabulary")
+        if isinstance(target, bool) or not isinstance(target, int) or not 0 <= target < self.lm.V:
+            raise ValueError("SGD target token ID outside vocabulary")
+        if (
+            isinstance(lr, bool) or not isinstance(lr, (int, float))
+            or not math.isfinite(float(lr)) or not 0 <= lr <= 1
+        ):
+            raise ValueError("SGD learning rate must be finite and within [0, 1]")
         self.reset_decode_cache()
+        self.last_grad_norm = None
         torch = self.torch
         if not self.resident:
             self.pin()
-        for p in self._params():
+        params = tuple(self._params())
+        for p in params:
             if p.grad is not None:
                 p.grad.zero_()
         logits, _ = self._forward_ids(ids)
-        tgt = torch.tensor([int(target)], dtype=torch.long, device=self.device)
+        tgt = torch.tensor([target], dtype=torch.long, device=self.device)
         loss = torch.nn.functional.cross_entropy(logits.unsqueeze(0), tgt)
+        loss_value = float(loss.detach().cpu())
+        if not math.isfinite(loss_value):
+            raise ValueError("SGD non-finite loss rejected before any weight update")
         loss.backward()
-        # GPU updates are not automatically transactional. If an in-place
-        # write fails partway, any further inference or synchronization would
-        # treat a partially trained graph as an admitted immutable model.
+        # torch's stable primitive checks the *global* norm and optionally
+        # clips it. A non-finite norm raises before the first in-place write.
+        # Infinite max_norm performs validation without changing gradients.
+        norm = torch.nn.utils.clip_grad_norm_(
+            params,
+            max_norm=self.max_grad_norm if self.max_grad_norm is not None else float("inf"),
+            error_if_nonfinite=True,
+        )
+        norm_value = float(norm.detach().cpu())
+        if not math.isfinite(norm_value):
+            raise ValueError("SGD non-finite gradient norm rejected")
+        self.last_grad_norm = norm_value
+        # Once the first write begins, any subsequent failure leaves an
+        # ambiguous graph. Poison it rather than replaying a CPU update.
         self._weights_modified = True
         try:
             with torch.no_grad():
-                for p in self._params():
+                for p in params:
                     if p.grad is not None:
                         p.add_(p.grad, alpha=-float(lr))
         except Exception:
@@ -607,7 +649,7 @@ class TorchAccel:
             self.reset_decode_cache()
             raise
         self.lm.steps += 1
-        return float(loss.detach().cpu())
+        return loss_value
 
     def decode(self, prefix: str, n: int = 14, seed: int = 0) -> str:
         """Decode atomically relative to other sessions sharing the model."""
