@@ -81,6 +81,13 @@ GPU drivers or the llama.cpp executable.
 
 ## Local SQLite conversation workspace
 
+In the desktop app, load a native checkpoint or GGUF deployment, then
+choose **Attach local workspace…** to select or create a local SQLite file.
+The existing conversation must be empty before attaching. Previously saved
+turns for the same model are restored into the desktop view. The **New
+conversation** action asks for confirmation before clearing the currently
+bound durable transcript. Model switches close the old workspace connection.
+
 For automatic headless transcript persistence, pass `--workspace` and an
 explicit `--session-id` (defaults to `default`). Both `skeleton-offline`
 and `python -m skeleton app local-ai` can use this feature:
@@ -200,9 +207,9 @@ Use an independently verified, trusted llama.cpp build and disable outbound
 network access using the OS firewall/sandbox for an air-gapped guarantee.
 Do not run unknown binaries just because their digest matches a manifest.
 
-**Data durability:** Live desktop turns remain in memory unless manually
-backed up; the headless CLI now supports an opt-in automatic local SQLite
-workspace. Neither backup format nor workspace is the production authoritative
+**Data durability:** Desktop turns remain in memory unless manually backed up
+or explicitly attached to a local SQLite workspace. The headless CLI also
+supports opt-in automatic local SQLite persistence. Neither backup format nor workspace is the production authoritative
 conversation database. Managed downloads, updates, encrypted local state,
 and offline system-completion attestation are not yet provided.
 
