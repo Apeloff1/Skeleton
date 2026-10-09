@@ -310,10 +310,19 @@ def _validate_plan_binding(
             resources[target.node_id] = target.resources
 
     try:
+        # A plan created with targets=None records the graph's topological order.
+        # Feeding that tuple back as an explicit target list changes scheduler
+        # normalization (explicit targets are sorted) and can create a false
+        # fingerprint mismatch. Preserve the originating call semantics.
+        replay_targets = (
+            None
+            if plan.requested_targets == tuple(graph.topological_order)
+            else plan.requested_targets
+        )
         expected = plan_parallel_build(
             graph,
             resources=resources,
-            targets=plan.requested_targets,
+            targets=replay_targets,
             capacity=plan.capacity,
             max_parallel=plan.max_parallel,
         )

@@ -22,8 +22,7 @@
       "volume_ref": "VOL-116",
       "title": "Architecture Fitness Functions",
       "required_gap_texts": [
-        "unify architecture check registry",
-        "bind rules to ADR/ownership"
+        "independent architecture-rule and waiver verification remains pending"
       ]
     }
   ],

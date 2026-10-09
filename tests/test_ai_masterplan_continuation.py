@@ -5,7 +5,7 @@ import pytest
 from scripts.check_ai_masterplan_continuation import MasterplanContinuationError,validate
 
 ROOT=Path(__file__).resolve().parents[1]
-FILES=("machine/ai_masterplan_continuation_frontier.json","machine/ai_app_construction.json","machine/ai_p1_terminal_closure.json","machine/ai_p2_functional_ai_closure.json","machine/ai_p3_expansion_closure.json","machine/ai_p3_engineering_closure.json","machine/ai_p3_engineering_execution_map.json","machine/ai_p3_execution_map.json","machine/ai_master_plan.json","machine/ai_p3t2_storage_candidate.json","machine/ai_p3t2_data_candidate.json")
+FILES=("machine/ai_masterplan_continuation_frontier.json","machine/ai_app_construction.json","machine/ai_p1_terminal_closure.json","machine/ai_p2_functional_ai_closure.json","machine/ai_p3_expansion_closure.json","machine/ai_p3_engineering_closure.json","machine/ai_p3_engineering_execution_map.json","machine/ai_p3_execution_map.json","machine/ai_master_plan.json","machine/ai_p3t2_storage_candidate.json","machine/ai_p3t2_data_candidate.json","machine/ai_p3t2_training_candidate.json","machine/ai_p3t2_learning_candidate.json","machine/ai_p3t2_multimodal_candidate.json")
 def _fixture(tmp_path:Path)->Path:
     for rel in FILES:
         dst=tmp_path/rel; dst.parent.mkdir(parents=True,exist_ok=True); shutil.copy2(ROOT/rel,dst)
