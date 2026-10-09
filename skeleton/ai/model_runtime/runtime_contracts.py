@@ -114,7 +114,7 @@ class DevicePolicy:
     allow_fallback: bool = True
 
     def __post_init__(self) -> None:
-        if self.requested not in {"cpu", "auto", "cuda", "gpu", "torch", "torch-cpu"}:
+        if self.requested not in {"cpu", "auto", "cuda", "gpu", "mps", "torch", "torch-cpu"}:
             raise RuntimeContractError("unsupported device request")
         if not isinstance(self.allow_fallback, bool):
             raise RuntimeContractError("allow_fallback must be boolean")
