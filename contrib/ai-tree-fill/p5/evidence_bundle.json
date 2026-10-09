@@ -1,0 +1,986 @@
+{
+  "completed_at_utc": "2026-10-09T14:52:57Z",
+  "confirmed": [
+    "AIFT-ADMISSION",
+    "AIFT-CAPABILITY-INDEX",
+    "AIFT-CLIPPED-G",
+    "AIFT-COGNITION",
+    "AIFT-COMPENSATION",
+    "AIFT-CONSENSUS",
+    "AIFT-COORDINATION",
+    "AIFT-DECISION",
+    "AIFT-ECONOMY-HARBOR",
+    "AIFT-ERA-BIND",
+    "AIFT-EVIDENCE",
+    "AIFT-HIVE-MERKLE",
+    "AIFT-LEARNING",
+    "AIFT-LINALG",
+    "AIFT-MEMORY",
+    "AIFT-MOBILE-BANK",
+    "AIFT-MODELING",
+    "AIFT-MULTIMODAL",
+    "AIFT-NUMERICS",
+    "AIFT-OPTIMIZE",
+    "AIFT-ORGAN-ACCUM",
+    "AIFT-ORGAN-ASCEND",
+    "AIFT-ORGAN-BEAM",
+    "AIFT-ORGAN-CONTACT",
+    "AIFT-ORGAN-CUT",
+    "AIFT-ORGAN-FORGE",
+    "AIFT-ORGAN-GENOS",
+    "AIFT-ORGAN-GOSSIP",
+    "AIFT-ORGAN-IMPROVE",
+    "AIFT-ORGAN-LORA",
+    "AIFT-ORGAN-OBSERVE",
+    "AIFT-ORGAN-PICK",
+    "AIFT-ORGAN-PLAN",
+    "AIFT-ORGAN-REFER",
+    "AIFT-ORGAN-SPEAK",
+    "AIFT-ORGAN-WALK",
+    "AIFT-OUTBOX",
+    "AIFT-POINTER-PARSE",
+    "AIFT-PROVIDERS",
+    "AIFT-QUEUE12",
+    "AIFT-RECOVERY",
+    "AIFT-RETRIEVAL",
+    "AIFT-ROUTER",
+    "AIFT-RUNTIME-CONTRACTS",
+    "AIFT-SECURITY-ACE",
+    "AIFT-SKILLS",
+    "AIFT-SPECDEC",
+    "AIFT-TRAINING"
+  ],
+  "faults": [
+    "F-01 specdec previously stamped mismatch without running accept-until-mismatch",
+    "F-02 decision previously stamped veto without suppressing pick",
+    "F-03 training previously stamped absorb_steps=4 without a loop",
+    "F-04 modeling previously stamped layers=2 without a residual pass",
+    "F-05 coordination previously stamped n_cap without a tournament",
+    "F-06 hive previously reused a memory root and had no root_history",
+    "F-07 security previously reported secret=false without a scan",
+    "F-08 mobile previously reported gpu=false without a refusal oracle",
+    "F-09 router previously stamped routes=1 without rejecting a third router",
+    "F-10 multimodal previously stamped data-only without hashing a frame",
+    "F-11 repeated corpus rows are not independent trials",
+    "F-12 contrib/ai-tree-fill is unowned in machine/ai_file_tree.json",
+    "F-13 a same-process probe is not independent verification"
+  ],
+  "ledger": {
+    "confirmed": 48,
+    "count": 51,
+    "name": "action",
+    "open": 0,
+    "plane": "p5",
+    "rule": "every task is placed in p5 before a receipt or a signature",
+    "tasks": [
+      {
+        "capability_id": "AIFT-NUMERICS",
+        "oracle": "numerics",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "fc6196bffd1be9bee1241b700781d705195672ebaf98202dd124171be76f597f",
+          "hit": 1,
+          "idempotent": true,
+          "law": "numerics",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-numerics"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-NUMERICS",
+        "tool_id": "p5.aift-numerics"
+      },
+      {
+        "capability_id": "AIFT-LINALG",
+        "oracle": "linalg",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "df88d98d1060e19b42b67eb50b6c3fd18537720e63db92da2f8864598a771402",
+          "hit": 1,
+          "idempotent": true,
+          "law": "linalg",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-linalg"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-LINALG",
+        "tool_id": "p5.aift-linalg"
+      },
+      {
+        "capability_id": "AIFT-OPTIMIZE",
+        "oracle": "optimize",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "83cd866441ad0edf20a0abf2741541d6cb2ace6dc1fb501416acd5cef1b9af28",
+          "hit": 1,
+          "idempotent": true,
+          "law": "optimize",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-optimize"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-OPTIMIZE",
+        "tool_id": "p5.aift-optimize"
+      },
+      {
+        "capability_id": "AIFT-POINTER-PARSE",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "ac28241daef904d4e0445331ff67c43850e847a2033cf991b7e21b9c0fa6f22f",
+          "hit": 1,
+          "idempotent": true,
+          "law": "pointer",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-pointer-parse"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-POINTER-PARSE",
+        "tool_id": "p5.aift-pointer-parse"
+      },
+      {
+        "capability_id": "AIFT-CLIPPED-G",
+        "oracle": "clipped",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "2535ed3a866b38a1b371a6da0410a8a3174d4146c7aa7dd2aba878d40bc4288f",
+          "hit": 1,
+          "idempotent": true,
+          "law": "clipped-g",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-clipped-g"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-CLIPPED-G",
+        "tool_id": "p5.aift-clipped-g"
+      },
+      {
+        "capability_id": "AIFT-MEMORY",
+        "oracle": "memory",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "95a6b7e51984a26a3b7f1a3fe3c705752740c669db79bb529a299e7bb99eec76",
+          "hit": 1,
+          "idempotent": true,
+          "law": "pointer-memory",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-memory"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-MEMORY",
+        "tool_id": "p5.aift-memory"
+      },
+      {
+        "capability_id": "AIFT-RETRIEVAL",
+        "oracle": "retrieval",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "5689b6897babe0eb4493591f652c3f8ff37986cbdd459030af61ea7babbd95bc",
+          "hit": 1,
+          "idempotent": true,
+          "law": "retrieval",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-retrieval"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-RETRIEVAL",
+        "tool_id": "p5.aift-retrieval"
+      },
+      {
+        "capability_id": "AIFT-SKILLS",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "ea801c774cfc6ccf23e66670e5f370864990336e85bb158e66bd19d81aff600d",
+          "hit": 1,
+          "idempotent": true,
+          "law": "skill-bind",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-skills"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-SKILLS",
+        "tool_id": "p5.aift-skills"
+      },
+      {
+        "capability_id": "AIFT-OUTBOX",
+        "oracle": "outbox",
+        "plane": "p5",
+        "receipt": {
+          "authority": "write",
+          "digest": "041d8ea419f29364cb321f24179ff5b5663c1a67d3ff1d9cafe4dc7d79efc57e",
+          "hit": 1,
+          "idempotent": true,
+          "law": "outbox",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-outbox"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-OUTBOX",
+        "tool_id": "p5.aift-outbox"
+      },
+      {
+        "capability_id": "AIFT-CONSENSUS",
+        "oracle": "consensus",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "8381dab5536900b27beac7bccfe54f1815b5e6bb6af1c376753b5a0fc19bc51f",
+          "hit": 1,
+          "idempotent": true,
+          "law": "failure-domain",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-consensus"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-CONSENSUS",
+        "tool_id": "p5.aift-consensus"
+      },
+      {
+        "capability_id": "AIFT-ADMISSION",
+        "oracle": "admission",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "02966d83c32dc578ed4b84b06e506fdcabff90e5b7d7d130699c888a012f7de2",
+          "hit": 1,
+          "idempotent": true,
+          "law": "admission",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-admission"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ADMISSION",
+        "tool_id": "p5.aift-admission"
+      },
+      {
+        "capability_id": "AIFT-COMPENSATION",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "6b777f4b4021b4ae9bf7e68dcee161b81f19ad9c508c9bee4c77cd19ddef66e2",
+          "hit": 1,
+          "idempotent": true,
+          "law": "compensation",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-compensation"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-COMPENSATION",
+        "tool_id": "p5.aift-compensation"
+      },
+      {
+        "capability_id": "AIFT-RECOVERY",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "fd71a0553b90336de90d44834ca97b592c00817c07377ec59a8721649fc5160e",
+          "hit": 1,
+          "idempotent": true,
+          "law": "recovery",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-recovery"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-RECOVERY",
+        "tool_id": "p5.aift-recovery"
+      },
+      {
+        "capability_id": "AIFT-PROVIDERS",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "3aab99987a471d9b39b30a8b4ca8ada03a836a38022a5ae1e049f018311f1e25",
+          "hit": 1,
+          "idempotent": true,
+          "law": "provider",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-providers"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-PROVIDERS",
+        "tool_id": "p5.aift-providers"
+      },
+      {
+        "capability_id": "AIFT-ERA-BIND",
+        "oracle": "run",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "e74f3d034ea185d611a1925dfbb063b6868d07a131d980e40e752a4ec9135a13",
+          "hit": 1,
+          "idempotent": true,
+          "law": "refer",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-era-bind"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ERA-BIND",
+        "tool_id": "p5.aift-era-bind"
+      },
+      {
+        "capability_id": "AIFT-ORGAN-SPEAK",
+        "oracle": "run",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "309b8af3eee1394c5b2771fdb52843b97c30e3e3c033fda14ad9b6c1470b7783",
+          "hit": 1,
+          "idempotent": true,
+          "law": "speak",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-organ-speak"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ORGAN-SPEAK",
+        "tool_id": "p5.aift-organ-speak"
+      },
+      {
+        "capability_id": "AIFT-ORGAN-REFER",
+        "oracle": "run",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "e74f3d034ea185d611a1925dfbb063b6868d07a131d980e40e752a4ec9135a13",
+          "hit": 1,
+          "idempotent": true,
+          "law": "refer",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-organ-refer"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ORGAN-REFER",
+        "tool_id": "p5.aift-organ-refer"
+      },
+      {
+        "capability_id": "AIFT-ORGAN-IMPROVE",
+        "oracle": "run",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "7b9fd72f5f635862ae506af8020486a8b9bac9d0bb33302a526c8286114ce4b2",
+          "hit": 1,
+          "idempotent": true,
+          "law": "improve",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-organ-improve"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ORGAN-IMPROVE",
+        "tool_id": "p5.aift-organ-improve"
+      },
+      {
+        "capability_id": "AIFT-ORGAN-ASCEND",
+        "oracle": "run",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "da227c9b27f9454e7e7a09710734a4b9aa557f4e0afdff26a2dee6754de56fb4",
+          "hit": 1,
+          "idempotent": true,
+          "law": "ascend",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-organ-ascend"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ORGAN-ASCEND",
+        "tool_id": "p5.aift-organ-ascend"
+      },
+      {
+        "capability_id": "AIFT-ORGAN-PLAN",
+        "oracle": "run",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "970b7393b0875e56d382e8fc87f5104f996084d47123e76037ab4f8a3aa1c758",
+          "hit": 1,
+          "idempotent": true,
+          "law": "plan",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-organ-plan"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ORGAN-PLAN",
+        "tool_id": "p5.aift-organ-plan"
+      },
+      {
+        "capability_id": "AIFT-ORGAN-WALK",
+        "oracle": "run",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "48d238f9523b4bae2c0f281df7bcab5b1bbec7119d8814004a5863c1bc3fdf76",
+          "hit": 1,
+          "idempotent": true,
+          "law": "walk",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-organ-walk"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ORGAN-WALK",
+        "tool_id": "p5.aift-organ-walk"
+      },
+      {
+        "capability_id": "AIFT-ORGAN-PICK",
+        "oracle": "run",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "ec6250cadf18353289a70fa7ea47fd61c5046766052ce0ab17fcc02aba6a57b5",
+          "hit": 1,
+          "idempotent": true,
+          "law": "pick",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-organ-pick"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ORGAN-PICK",
+        "tool_id": "p5.aift-organ-pick"
+      },
+      {
+        "capability_id": "AIFT-ORGAN-GENOS",
+        "oracle": "run",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "933d4b24ed48b5a47a9ec27bd9ad00d63c4c098fa7cca95409a0a6367c5a65a2",
+          "hit": 1,
+          "idempotent": true,
+          "law": "genos",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-organ-genos"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ORGAN-GENOS",
+        "tool_id": "p5.aift-organ-genos"
+      },
+      {
+        "capability_id": "AIFT-ORGAN-CUT",
+        "oracle": "run",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "b1a3178dafaa4eda587e10375a7a2b7a9f4d533683d9642606a5b6fcfbf67d24",
+          "hit": 1,
+          "idempotent": true,
+          "law": "cut",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-organ-cut"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ORGAN-CUT",
+        "tool_id": "p5.aift-organ-cut"
+      },
+      {
+        "capability_id": "AIFT-ORGAN-CONTACT",
+        "oracle": "run",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "ff7c5a18d45341b7c3f9a6f59a1e4b5b8dbd59b7d40dcb21928164108b0557d3",
+          "hit": 1,
+          "idempotent": true,
+          "law": "contact",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-organ-contact"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ORGAN-CONTACT",
+        "tool_id": "p5.aift-organ-contact"
+      },
+      {
+        "capability_id": "AIFT-ORGAN-GOSSIP",
+        "oracle": "run",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "82458f6a8f2e260a4933acc6c5121d3b21f90dbdc69d58deae972117ea8083a4",
+          "hit": 1,
+          "idempotent": true,
+          "law": "gossip",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-organ-gossip"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ORGAN-GOSSIP",
+        "tool_id": "p5.aift-organ-gossip"
+      },
+      {
+        "capability_id": "AIFT-ORGAN-OBSERVE",
+        "oracle": "run",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "f18eeebe83205ca39e464f92a97bd06c5d74ec4d638dc2597c3e5a2bee4b33e7",
+          "hit": 1,
+          "idempotent": true,
+          "law": "clipped-g",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-organ-observe"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ORGAN-OBSERVE",
+        "tool_id": "p5.aift-organ-observe"
+      },
+      {
+        "capability_id": "AIFT-ORGAN-FORGE",
+        "oracle": "run",
+        "plane": "p5",
+        "receipt": {
+          "authority": "write",
+          "digest": "8dfab35a58d9a8b4dc45512cb33361dc016c782eea5770f8edf4bfd580b4f926",
+          "hit": 1,
+          "idempotent": true,
+          "law": "forge",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-organ-forge"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ORGAN-FORGE",
+        "tool_id": "p5.aift-organ-forge"
+      },
+      {
+        "capability_id": "AIFT-ORGAN-LORA",
+        "oracle": "run",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "9715b38b76ae48feb6ac19553b1de3365b4b441221eb6e776330c83bf0684c79",
+          "hit": 1,
+          "idempotent": true,
+          "law": "attach_lora",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-organ-lora"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ORGAN-LORA",
+        "tool_id": "p5.aift-organ-lora"
+      },
+      {
+        "capability_id": "AIFT-ORGAN-BEAM",
+        "oracle": "run",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "900030a1ab65a1b998bc102a89514af847cd1f0db8bd4d6c4136d7e4fdd8bc58",
+          "hit": 1,
+          "idempotent": true,
+          "law": "beam",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-organ-beam"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ORGAN-BEAM",
+        "tool_id": "p5.aift-organ-beam"
+      },
+      {
+        "capability_id": "AIFT-ORGAN-ACCUM",
+        "oracle": "run",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "76b0096566b620d2c0c899e868d174980b21cef128db42e67da0e6e058cb196e",
+          "hit": 1,
+          "idempotent": true,
+          "law": "accumulate",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-organ-accum"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ORGAN-ACCUM",
+        "tool_id": "p5.aift-organ-accum"
+      },
+      {
+        "capability_id": "AIFT-HIVE-MERKLE",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "7d02d3547ddaf58887e5d418631809c00d19ac5ca41c2c346060f49e1cbdd5db",
+          "hit": 1,
+          "idempotent": true,
+          "law": "hive-merkle",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-hive-merkle"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-HIVE-MERKLE",
+        "tool_id": "p5.aift-hive-merkle"
+      },
+      {
+        "capability_id": "AIFT-CAPABILITY-INDEX",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "b786e663acbd48fb570768fd01802217209a89d5d5f7772c29f48d390a2310e1",
+          "hit": 1,
+          "idempotent": true,
+          "law": "index",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-capability-index"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-CAPABILITY-INDEX",
+        "tool_id": "p5.aift-capability-index"
+      },
+      {
+        "capability_id": "AIFT-ROUTER",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "5a1da07b338d09f7fb5d25f1c47c6ab668d65b83ab713a33de2d82798b565100",
+          "hit": 1,
+          "idempotent": true,
+          "law": "router",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-router"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ROUTER",
+        "tool_id": "p5.aift-router"
+      },
+      {
+        "capability_id": "AIFT-SPECDEC",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "d7f08963a215557515b8223b64ed6d057dde68b2dfb17c12c72444b757a2146a",
+          "hit": 1,
+          "idempotent": true,
+          "law": "specdec",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-specdec"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-SPECDEC",
+        "tool_id": "p5.aift-specdec"
+      },
+      {
+        "capability_id": "AIFT-ECONOMY-HARBOR",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "0c644e3dc7b73e5638388584cac6687dd7c6815cdc76754be87c5609ea6fef95",
+          "hit": 1,
+          "idempotent": true,
+          "law": "harbor",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-economy-harbor"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-ECONOMY-HARBOR",
+        "tool_id": "p5.aift-economy-harbor"
+      },
+      {
+        "capability_id": "AIFT-MOBILE-BANK",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "82f0ae293c0a7398778803e6d29e387e2fe2339ff45b5e94e37784e964269995",
+          "hit": 1,
+          "idempotent": true,
+          "law": "mobile-bank",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-mobile-bank"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-MOBILE-BANK",
+        "tool_id": "p5.aift-mobile-bank"
+      },
+      {
+        "capability_id": "AIFT-SECURITY-ACE",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "0e168925968985da381703787a76368f2c55f6ffe18829ff4016ad4d83af8f6a",
+          "hit": 1,
+          "idempotent": true,
+          "law": "security-ace",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-security-ace"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-SECURITY-ACE",
+        "tool_id": "p5.aift-security-ace"
+      },
+      {
+        "capability_id": "AIFT-QUEUE12",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "3c11620f1f6b273f652fdc51d30f6ebb5fbd3290e301c5bee289b52cefc1974d",
+          "hit": 1,
+          "idempotent": true,
+          "law": "queue12",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-queue12"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-QUEUE12",
+        "tool_id": "p5.aift-queue12"
+      },
+      {
+        "capability_id": "AIFT-COGNITION",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "a79e60e78dcf92ee62b29a1f3c0d4d900af8488e0f7f91712de97c08af1fd222",
+          "hit": 1,
+          "idempotent": true,
+          "law": "cognition",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-cognition"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-COGNITION",
+        "tool_id": "p5.aift-cognition"
+      },
+      {
+        "capability_id": "AIFT-LEARNING",
+        "oracle": "clipped",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "2535ed3a866b38a1b371a6da0410a8a3174d4146c7aa7dd2aba878d40bc4288f",
+          "hit": 1,
+          "idempotent": true,
+          "law": "clipped-g",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-learning"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-LEARNING",
+        "tool_id": "p5.aift-learning"
+      },
+      {
+        "capability_id": "AIFT-MODELING",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "a4cf9c0e79768b90f617cb5c6809437f803cb44fd57d78018caf479051b87321",
+          "hit": 1,
+          "idempotent": true,
+          "law": "modeling",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-modeling"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-MODELING",
+        "tool_id": "p5.aift-modeling"
+      },
+      {
+        "capability_id": "AIFT-TRAINING",
+        "oracle": "absorb",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "6de3615a5fbd0705f02297703a904f8f640af95b1857237a86654df62e4ac20a",
+          "hit": 1,
+          "idempotent": true,
+          "law": "clipped-g",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-training"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-TRAINING",
+        "tool_id": "p5.aift-training"
+      },
+      {
+        "capability_id": "AIFT-MULTIMODAL",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "d10cca64666b9149d2c157bfeb295e40595b79258fdcfc4ab525ca60d4e2fcbb",
+          "hit": 1,
+          "idempotent": true,
+          "law": "multimodal",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-multimodal"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-MULTIMODAL",
+        "tool_id": "p5.aift-multimodal"
+      },
+      {
+        "capability_id": "AIFT-RUNTIME-CONTRACTS",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "5f8056ed3d60304259a8bcdd5a69430db70a5ab6b92bee38521c683ac484a40f",
+          "hit": 0,
+          "idempotent": true,
+          "law": "unknown-organ",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-runtime-contracts"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-RUNTIME-CONTRACTS",
+        "tool_id": "p5.aift-runtime-contracts"
+      },
+      {
+        "capability_id": "AIFT-DECISION",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "a8a026bc3c526571a2e7ba2c1e3c2783f1c9d071839aa1661619c482ec9bf7ac",
+          "hit": 1,
+          "idempotent": true,
+          "law": "decision",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-decision"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-DECISION",
+        "tool_id": "p5.aift-decision"
+      },
+      {
+        "capability_id": "AIFT-EVIDENCE",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "bcbe5a8098f630ac350b683eb3b32d13d68c4aa25b000ab3dc850969651a786e",
+          "hit": 0,
+          "idempotent": true,
+          "law": "evidence",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-evidence"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-EVIDENCE",
+        "tool_id": "p5.aift-evidence"
+      },
+      {
+        "capability_id": "AIFT-COORDINATION",
+        "oracle": "<lambda>",
+        "plane": "p5",
+        "receipt": {
+          "authority": "read",
+          "digest": "cbc5d7e5b29d74c81f7dfc3cf04ecf4653299729a128b5971d824e732c4a6c85",
+          "hit": 1,
+          "idempotent": true,
+          "law": "coordination",
+          "sandbox": "cpu-no-network",
+          "timeout_ms": 2000,
+          "tool_id": "p5.aift-coordination"
+        },
+        "status": "confirmed",
+        "task_id": "P5-AIFT-COORDINATION",
+        "tool_id": "p5.aift-coordination"
+      },
+      {
+        "capability_id": "P5-F11",
+        "oracle": "adversarial-fault",
+        "plane": "p5",
+        "receipt": {
+          "reason": "repeated corpus rows are not independent trials"
+        },
+        "status": "withheld",
+        "task_id": "P5-F11",
+        "tool_id": "p5.structural"
+      },
+      {
+        "capability_id": "P5-F12",
+        "oracle": "adversarial-fault",
+        "plane": "p5",
+        "receipt": {
+          "reason": "contrib/ai-tree-fill is unowned in machine/ai_file_tree.json"
+        },
+        "status": "withheld",
+        "task_id": "P5-F12",
+        "tool_id": "p5.structural"
+      },
+      {
+        "capability_id": "P5-F13",
+        "oracle": "adversarial-fault",
+        "plane": "p5",
+        "receipt": {
+          "reason": "same-process verifier is not an independent sign-off"
+        },
+        "status": "withheld",
+        "task_id": "P5-F13",
+        "tool_id": "p5.structural"
+      }
+    ],
+    "withheld": 3
+  },
+  "parent_sha": "3897b961",
+  "plane": "p5",
+  "signoff_ref": "feaf13b12744fb96",
+  "started_at_utc": "2026-10-09T14:52:57Z",
+  "verifier": "p5-adversarial-verifier",
+  "withheld": {
+    "P5-F11": "repeated corpus rows are not independent trials",
+    "P5-F12": "contrib/ai-tree-fill is unowned in machine/ai_file_tree.json",
+    "P5-F13": "same-process verifier is not an independent sign-off"
+  }
+}
