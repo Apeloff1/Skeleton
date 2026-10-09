@@ -6,6 +6,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import patch
+from contextlib import redirect_stdout
+from io import StringIO
 from tempfile import TemporaryDirectory
 import unittest
 
@@ -126,6 +129,64 @@ class OfflineNativeChatTests(unittest.TestCase):
             self.config,
         )
         self.assertEqual(len(response.generation.generated_ids), 2)
+
+    def test_list_and_delete_session_cascades_receipts(self):
+        sid = self.product.create()
+        other = self.product.create(system="Stay precise.")
+        self.product.turn(sid, "hello", self.config, request_id="receipt-1")
+        self.assertEqual({entry[0] for entry in self.product.list_sessions()},
+                         {sid, other})
+        self.product.delete(sid)
+        self.assertIsNone(self.store.replay(sid, "receipt-1", "b" * 64))
+        self.assertEqual(tuple(x[0] for x in self.product.list_sessions()),
+                         (other,))
+        with self.assertRaises(RuntimeContractError):
+            self.product.delete(sid)
+
+    def test_generation_failure_preserves_previous_durable_state(self):
+        sid = self.product.create()
+        saved_method = self.engine.turn
+        def broken(*args, **kwargs):
+            raise RuntimeContractError("simulated local inference failure")
+        self.engine.turn = broken
+        try:
+            with self.assertRaisesRegex(RuntimeContractError, "simulated"):
+                self.product.turn(sid, "hello", self.config, request_id="failure")
+        finally:
+            self.engine.turn = saved_method
+        stored = self.store.load(sid, self.product.model_digest,
+                                 self.product.tokenizer_digest)
+        self.assertEqual(stored.revision, 0)
+        self.assertEqual(stored.transcript.messages, ())
+        self.assertIsNone(self.store.replay(sid, "failure", "a" * 64))
+
+    def test_interactive_cli_supports_multiple_turns_and_listing(self):
+        checkpoint = self.root / "model.json"
+        database = self.root / "terminal.sqlite"
+        checkpoint.write_text(self.engine.runtime.checkpoint_json(), encoding="utf-8")
+        output = StringIO()
+        with patch("builtins.input", side_effect=["hello", "again", "/exit"]):
+            with redirect_stdout(output):
+                result = main(["--checkpoint", str(checkpoint),
+                               "--database", str(database), "--interactive",
+                               "--max-new-tokens", "2"])
+        self.assertEqual(result, 0)
+        self.assertIn("AI>", output.getvalue())
+        listing = StringIO()
+        with redirect_stdout(listing):
+            self.assertEqual(main(["--checkpoint", str(checkpoint),
+                                   "--database", str(database),
+                                   "--list", "--json"]), 0)
+        rows = json.loads(listing.getvalue())
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["revision"], 2)
+        with redirect_stdout(StringIO()):
+            self.assertEqual(main(["--checkpoint", str(checkpoint),
+                                   "--database", str(database),
+                                   "--delete-session", rows[0]["session_id"]]), 0)
+        with OfflineChatStore(database) as reopened:
+            self.assertEqual(reopened.list_sessions(
+                self.product.model_digest, self.product.tokenizer_digest), ())
 
     def test_corrupt_checkpoint_is_rejected_before_inference(self):
         p = self.root / "model.json"
