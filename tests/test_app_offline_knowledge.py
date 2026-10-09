@@ -6,16 +6,12 @@ All data stays in the existing model-scoped SQLite application database.
 from __future__ import annotations
 
 from pathlib import Path
-import os
-import sqlite3
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import patch
 
 from skeleton.ai.model_runtime.offline_chat import OfflineChatStore
 from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
 from skeleton.app.offline_knowledge import (
-    MAX_CHUNKS_PER_MODEL, MAX_DOCUMENTS_PER_MODEL,
     MAX_DOCUMENT_BYTES, OfflineKnowledgeLibrary,
 )
 
