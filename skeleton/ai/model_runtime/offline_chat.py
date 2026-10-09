@@ -248,6 +248,25 @@ class OfflineChatStore:
                     REFERENCES offline_turns(session_id, request_id)
                     ON DELETE CASCADE
             )""")
+            # Upgrade existing chat stores in place, including databases
+            # created by early grounding prototypes. Once present, this
+            # durable marker makes dropped evidence detectable on every load.
+            columns = {
+                info[1] for info in self._db.execute(
+                    "PRAGMA table_info(offline_turns)"
+                ).fetchall()
+            }
+            if "grounded" not in columns:
+                self._db.execute(
+                    "ALTER TABLE offline_turns ADD COLUMN grounded INTEGER "
+                    "NOT NULL DEFAULT 0 CHECK (grounded IN (0,1))"
+                )
+                self._db.execute(
+                    "UPDATE offline_turns SET grounded=1 WHERE EXISTS ("
+                    "SELECT 1 FROM offline_turn_evidence e "
+                    "WHERE e.session_id=offline_turns.session_id "
+                    "AND e.request_id=offline_turns.request_id)"
+                )
 
             if self._db.execute("PRAGMA foreign_keys").fetchone() != (1,):
                 raise RuntimeContractError("SQLite foreign-key enforcement unavailable")
@@ -327,7 +346,7 @@ class OfflineChatStore:
                 ).fetchone()
                 rows = self._db.execute(
                     "SELECT request_id, request_digest, revision, text, output_digest, "
-                    "prompt_tokens, generated_tokens FROM offline_turns "
+                    "prompt_tokens, generated_tokens, grounded FROM offline_turns "
                     "WHERE session_id=? ORDER BY revision", (sid,),
                 ).fetchall()
                 evidence_rows = self._db.execute(
@@ -370,6 +389,14 @@ class OfflineChatStore:
             ))
         _validate_complete_history(transcript, turns)
         evidence_index = {item["request_id"]: item for item in turns}
+        evidence_ids = {receipt_id for receipt_id, _, _ in evidence_rows}
+        for item in rows:
+            if type(item[7]) is not int or item[7] not in (0, 1):
+                raise RuntimeContractError("invalid grounded turn marker")
+            if bool(item[7]) != (item[0] in evidence_ids):
+                raise RuntimeContractError(
+                    "grounded turn evidence missing or unexpectedly attached"
+                )
         for receipt_id, encoded, claimed in evidence_rows:
             turn = evidence_index.get(receipt_id)
             if turn is None:
