@@ -1,7 +1,7 @@
 # Game hardware history, spiritual successors and lawful independent homebrew
-**Scope:** Project policy and traceable research references, not legal advice, legal clearance, or a representation that all historical systems are fully inventoried.  
-**Reference review date:** 2026-10-09. Verify changes in law and policy before release.  
-**Executable policy:** `skeleton/ai/game_builder/legal_paths.py`; `legal_port_bridge.py`.  
+**Scope:** Project policy and traceable research references, not legal advice, legal clearance, or a representation that all historical systems are fully inventoried.
+**Reference review date:** 2026-10-09. Verify changes in law and policy before release.
+**Executable policy:** `skeleton/ai/game_builder/legal_paths.py`; `legal_port_bridge.py`.
 **Source matrix:** `skeleton/ai/game_builder/legal_authorities.json`; `skeleton/ai/game_builder/rights.py`.
 
 ## The central distinction — games are not consoles
