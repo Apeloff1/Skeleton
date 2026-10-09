@@ -373,7 +373,7 @@ class OfflineAIWindow:
 
     def improve_model(self) -> None:
         """Consent-bound learning never modifies the loaded checkpoint itself."""
-        if self.active or self.session is None:
+        if self.active or not isinstance(self.session, OfflineAISession):
             return
         from tkinter import messagebox
 
@@ -453,7 +453,7 @@ class OfflineAIWindow:
 
     def benchmark_model(self) -> None:
         """Evaluate active weights with a user-chosen category suite, read-only."""
-        if self.active or self.session is None:
+        if self.active or not isinstance(self.session, OfflineAISession):
             return
         from tkinter import messagebox
 
@@ -530,7 +530,7 @@ class OfflineAIWindow:
 
     def open_history(self) -> None:
         """Import is explicit and never modifies the session on bad input."""
-        if self.active or self.session is None:
+        if self.active or not isinstance(self.session, OfflineAISession):
             return
         selected = self.filedialog.askopenfilename(
             parent=self.window, title="Open an offline Skeleton chat",
@@ -552,7 +552,7 @@ class OfflineAIWindow:
 
     def save_history(self) -> None:
         """The chosen file is readable local plaintext; no background upload."""
-        if self.active or self.session is None:
+        if self.active or not isinstance(self.session, OfflineAISession):
             return
         selected = self.filedialog.asksaveasfilename(
             parent=self.window, title="Save offline chat as plaintext JSON",
