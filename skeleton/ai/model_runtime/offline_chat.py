@@ -341,12 +341,19 @@ class OfflineChatStore:
             raise RuntimeContractError("conversation bundle messages must be a list")
         transcript = ChatTranscript.parse(messages)
         transcript.validate_turn_order()
-        if len(transcript.messages) % 2 or any(
+        # The native CLI permits one initial system instruction; the desktop
+        # app preserves it when restoring the same model-bound conversation.
+        instruction_offset = (
+            1 if transcript.messages and transcript.messages[0].role == "system"
+            else 0
+        )
+        dialogue = transcript.messages[instruction_offset:]
+        if len(dialogue) % 2 or any(
             m.role != ("user" if i % 2 == 0 else "assistant")
             or not m.content.strip()
-            for i, m in enumerate(transcript.messages)
+            for i, m in enumerate(dialogue)
         ):
-            raise RuntimeContractError("bundle contains invalid desktop dialogue")
+            raise RuntimeContractError("bundle contains invalid dialogue roles")
         rev = body["revision"]
         turns = body["turns"]
         if (type(rev) is not int or rev < 0 or rev > MAX_EXPORTED_TURNS
