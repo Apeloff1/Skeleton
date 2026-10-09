@@ -1,0 +1,61 @@
+name: Homebrew Historical Archive
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "skeleton/ai/game_builder/platform_catalog.json"
+      - "skeleton/ai/game_builder/platform_registry.py"
+      - "skeleton/ai/game_builder/port_planner.py"
+      - "skeleton/ai/game_builder/editor_platforms.py"
+      - "skeleton/ai/game_builder/archive_import.py"
+      - "skeleton/ai/game_builder/evolution_lineages.json"
+      - "skeleton/ai/game_builder/evolution_archive.py"
+      - "skeleton/ai/game_builder/evolution_practice.py"
+      - "skeleton/ai/game_builder/desktop_native_export.py"
+      - "skeleton/ai/game_builder/archive_cli.py"
+      - "skeleton/testing/test_game_builder_platform_porting.py"
+      - "skeleton/testing/test_game_builder_archive_evolution.py"
+      - ".github/workflows/game-hardware-archive.yml"
+      - "pyproject.toml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: game-hardware-archive-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  archive-and-evolution-tests:
+    name: Historical metadata and playable homebrew evolutions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install isolated test runner
+        run: python -m pip install "pytest>=8,<10"
+      - name: Compile archival module syntax
+        run: |
+          python -m compileall -q skeleton/ai/game_builder/platform_registry.py skeleton/ai/game_builder/port_planner.py skeleton/ai/game_builder/editor_platforms.py skeleton/ai/game_builder/archive_import.py skeleton/ai/game_builder/evolution_archive.py skeleton/ai/game_builder/evolution_practice.py skeleton/ai/game_builder/desktop_native_export.py skeleton/ai/game_builder/archive_cli.py
+      - name: Run focused historical archive and homebrew output regressions
+        run: |
+          python -m pytest -q skeleton/testing/test_game_builder_platform_porting.py skeleton/testing/test_game_builder_archive_evolution.py
+      - name: Confirm packaged platform archive is executable offline
+        run: |
+          python -m skeleton.ai.game_builder.archive_cli summary > /tmp/game_archive_summary.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          summary = json.loads(Path("/tmp/game_archive_summary.json").read_text())
+          assert summary["platform_registry"]["platform_count"] >= 500
+          assert summary["coverage"]["complete_historical_census"] is False
+          assert summary["coverage"]["native_platform_toolchains_verified"] == 0
+          print("Historical archive read-only summary: PASS")
+          PY
