@@ -291,6 +291,17 @@ class DurableOfflineAISession(OfflineAISession):
         self.resume(session_id)
         return session_id
 
+    def fork_conversation(self, session_id: str, *,
+                          after_turn: int | None = None) -> str:
+        if self._busy:
+            raise OfflineAIError("cannot fork during model generation")
+        forked_id = self.store.fork(
+            session_id, self.backend.model_digest, self.tokenizer_digest,
+            after_turn=after_turn,
+        )
+        self.resume(forked_id)
+        return forked_id
+
     def delete_conversation(self, session_id: str) -> None:
         if self._busy:
             raise OfflineAIError("cannot delete conversation during generation")
@@ -441,6 +452,10 @@ class OfflineAIWindow:
             sessions, text="Delete", command=self.delete_selected
         )
         self.delete_button.pack(side="left", padx=6)
+        self.fork_button = ttk.Button(
+            sessions, text="Fork", command=self.fork_selected
+        )
+        self.fork_button.pack(side="left", padx=3)
         self.export_button = ttk.Button(
             sessions, text="Export…", command=self.export_selected
         )
@@ -470,6 +485,7 @@ class OfflineAIWindow:
         can_switch = isinstance(self.session, DurableOfflineAISession) and not self.active
         self.resume_button.configure(state="normal" if can_switch else "disabled")
         self.delete_button.configure(state="normal" if can_switch else "disabled")
+        self.fork_button.configure(state="normal" if can_switch else "disabled")
         self.export_button.configure(state="normal" if can_switch else "disabled")
         self.import_button.configure(state="normal" if can_switch else "disabled")
 
@@ -508,6 +524,21 @@ class OfflineAIWindow:
             self.status.set("Restored saved conversation: " + sid[:18] + "…")
         except Exception as exc:
             self.status.set("Cannot restore conversation: " + str(exc))
+        self._refresh()
+
+    def fork_selected(self) -> None:
+        if self.active or not isinstance(self.session, DurableOfflineAISession):
+            return
+        sid = self.session_choices.get(self.session_picker.get())
+        if sid is None:
+            return
+        try:
+            forked = self.session.fork_conversation(sid)
+            self._display_history()
+            self._update_sessions()
+            self.status.set("Forked saved conversation: " + forked[:18] + "…")
+        except Exception as exc:
+            self.status.set("Cannot fork conversation: " + str(exc))
         self._refresh()
 
     def delete_selected(self) -> None:
