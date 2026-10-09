@@ -155,6 +155,21 @@ jobs:
             throw "installed Skeleton.exe native offline inference smoke exited $($nativeSmoke.ExitCode)"
           }
 
+          # A genuinely console-capable binary is required for automated
+          # local inference. It must work without system Python or Docker.
+          $offline = Join-Path $installDir "SkeletonOffline.exe"
+          if (-not (Test-Path -LiteralPath $offline)) {
+            throw "installed SkeletonOffline.exe missing"
+          }
+          & $offline --native-smoke
+          if ($LASTEXITCODE -ne 0) {
+            throw "standalone offline console native graph smoke failed"
+          }
+          & $offline --help
+          if ($LASTEXITCODE -ne 0) {
+            throw "standalone offline console help failed"
+          }
+
           $uninstaller = Join-Path $installDir "unins000.exe"
           if (-not (Test-Path -LiteralPath $uninstaller)) {
             throw "uninstaller missing"
