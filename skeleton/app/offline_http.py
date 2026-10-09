@@ -448,9 +448,8 @@ def smoke_offline_http_inference() -> bool:
     backend = NativeRuntimeLocalModel(runtime)
     token = secrets.token_urlsafe(48)
     with TemporaryDirectory(prefix="skeleton-local-http-accept-") as folder:
-        app = OfflineHTTPApplication(
-            backend, Path(folder) / "acceptance.sqlite3", token=token,
-        )
+        database = Path(folder) / "acceptance.sqlite3"
+        app = OfflineHTTPApplication(backend, database, token=token)
         try:
             with LocalOnlyHTTPServer(app, port=0) as server:
                 port = server.server_port
@@ -502,7 +501,7 @@ def smoke_offline_http_inference() -> bool:
                     read_status, saved = request(
                         "GET", "/v1/sessions/" + sid, None
                     )
-                    return bool(
+                    accepted = bool(
                         status == again_status == read_status == 200
                         and first["revision"] == replay["revision"] == saved["revision"] == 1
                         and first["output_digest"] == replay["output_digest"]
@@ -517,6 +516,29 @@ def smoke_offline_http_inference() -> bool:
                         raise RuntimeError("offline HTTP smoke worker failed to terminate")
         finally:
             app.close()
+        if not accepted:
+            return False
+        # A read using the live HTTP connection is NOT a recovery test.
+        # Drop the entire service and its SQLite connection, then independently
+        # open the store and verify the two-message turn and original receipt.
+        with OfflineChatStore(database) as reopened:
+            restored = reopened.load(
+                sid, backend.model_digest, app.tokenizer_digest
+            )
+            receipt = reopened.replay(
+                sid, payload["request_id"],
+                _digest_request("hello", GenerationConfig(max_new_tokens=2))
+            )
+            return bool(
+                restored.revision == 1
+                and len(restored.transcript.messages) == 2
+                and restored.transcript.messages[0].content == "hello"
+                and restored.transcript.messages[1].content == first["text"]
+                and receipt is not None
+                and receipt.revision == 1
+                and receipt.text == first["text"]
+                and receipt.output_digest == first["output_digest"]
+            )
 
 
 def create_token_file(path: str | Path, *, token: str | None = None) -> str:
