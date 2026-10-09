@@ -241,9 +241,11 @@ def observe_resources(
                     memory_source = "sysconf_physical"
         except (AttributeError, OSError, ValueError, TypeError):
             pass
-    # Physical RAM is a bound, not an estimate of actually free memory.
+    # Physical RAM is a ceiling, never proof of *available* memory.
+    # macOS and unknown platforms without a free-memory probe stay on the
+    # smallest profile, even if total installed RAM is large.
     limits = [value for value in (available, cgroup) if value is not None]
-    if physical is not None:
+    if limits and physical is not None:
         limits.append(physical)
     conservative = min(limits) if limits else None
     return ResourceObservation(
