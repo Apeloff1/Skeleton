@@ -167,7 +167,7 @@ class TorchAccel:
             self.pin()
         idx = torch.tensor(list(ids), dtype=torch.long, device=self.device)
         pos = torch.arange(len(ids), device=self.device).clamp(max=lm.ctx - 1)
-        X = self._E[idx] + self._P[pos]
+        X = self._E[idx] if getattr(lm, "position_mode", "learned_rope") == "rope" else self._E[idx] + self._P[pos]
         D = int(lm.dim)
         heads = max(1, int(lm.n_heads))
         dh = D // heads
