@@ -71,11 +71,12 @@ CSS = r"""*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family
 JAVASCRIPT = r"""'use strict';
 (() => {
   const get = id => document.getElementById(id);
-  const state = {token: '', session: '', revision: 0, busy: false, connected: false};
+  const state = {token: '', session: '', revision: 0, busy: false, connected: false,
+                 pending: null};
   const status = message => {get('status').textContent = message;};
   const setBusy = busy => {
     state.busy = busy;
-    ['send','new','fork','export','delete','connect'].forEach(id => {
+    ['send','new','fork','export','delete','connect','disconnect'].forEach(id => {
       get(id).disabled = busy;
     });
   };
@@ -126,6 +127,7 @@ JAVASCRIPT = r"""'use strict';
   }
   async function selectSession(id) {
     const result = await api('GET', '/v1/sessions/' + encodeURIComponent(id));
+    if (state.session !== result.session_id) state.pending = null;
     state.session = result.session_id;
     state.revision = result.revision;
     get('revision').textContent = 'Saved turns: ' + result.revision;
@@ -152,7 +154,9 @@ JAVASCRIPT = r"""'use strict';
     status('Authenticated locally. No remote provider is involved.');
   }));
   get('disconnect').addEventListener('click', () => {
+    if (state.busy) return;
     state.token = ''; state.connected = false; state.session = '';
+    state.pending = null;
     get('indicator').textContent = 'LOCKED';
     get('model').textContent = 'Not connected';
     get('secret').value = ''; get('sessions').replaceChildren(); showMessages([]);
@@ -170,13 +174,31 @@ JAVASCRIPT = r"""'use strict';
     if (!Number.isInteger(budget) || budget < 1 || budget > 8192) {
       throw new Error('Output tokens must be 1–8192.');
     }
-    const requestId = crypto.randomUUID().replace(/-/g,'');
-    status('Running the locally selected model…');
-    await api('POST', '/v1/sessions/' + state.session + '/turn', {
-      message: prompt, max_output_tokens: budget, request_id: requestId
-    });
-    get('prompt').value = '';
-    await selectSession(state.session);
+    // Preserve the EXACT request identity across an ambiguous network loss.
+    // A response may have committed even when fetch() reports failure.
+    // Changing the prompt, budget or session intentionally creates a new turn.
+    const same = state.pending &&
+      state.pending.session === state.session &&
+      state.pending.prompt === prompt &&
+      state.pending.budget === budget;
+    if (!same) state.pending = {
+      session: state.session, prompt, budget,
+      id: crypto.randomUUID().replace(/-/g, '')
+    };
+    const attempted = state.pending;
+    status('Running locally; repeat an unchanged prompt to safely recover a lost response…');
+    try {
+      await api('POST', '/v1/sessions/' + attempted.session + '/turn', {
+        message: attempted.prompt, max_output_tokens: attempted.budget,
+        request_id: attempted.id
+      });
+      state.pending = null;
+      get('prompt').value = '';
+      await selectSession(attempted.session);
+    } catch (error) {
+      status('Not confirmed. Retrying this unchanged prompt uses the same request ID.');
+      throw error;
+    }
   }));
   get('fork').addEventListener('click', () => run(async () => {
     if (!state.session) throw new Error('Select a conversation.');
