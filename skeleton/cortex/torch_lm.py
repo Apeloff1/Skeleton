@@ -12,6 +12,7 @@ only when a snapshot kind is torch-stack.
 """
 from __future__ import annotations
 
+import threading
 from typing import Any, Dict, Iterable, List, Sequence
 
 from skeleton.cortex.port import tokens
@@ -41,15 +42,22 @@ class TorchAccel:
         self._E = self._P = self._Wout = self._bout = None
         self._layers: List[Dict[str, Any]] = []
         self._weights_modified = False
+        self._state_lock = threading.RLock()
         self.reset_decode_cache()
 
     @property
     def cached_tokens(self) -> tuple[int, ...]:
         """Expose countable decode occupancy without exporting device tensors."""
-        return tuple(self._cached_ids)
+        with self._state_lock:
+            return tuple(self._cached_ids)
 
     def reset_decode_cache(self) -> None:
         """Drop all accelerator-local decode history after weight changes."""
+        with self._state_lock:
+            self._reset_decode_cache_unlocked()
+
+    def _reset_decode_cache_unlocked(self) -> None:
+        """Mutate resident cache only while holding the accelerator lock."""
         self._cached_ids: List[int] = []
         self._cached_keys: List[Any] = []
         self._cached_values: List[Any] = []
@@ -95,6 +103,10 @@ class TorchAccel:
         return self.torch.tensor(row, dtype=self.torch.float32, device=self.device, requires_grad=grad)
 
     def pin(self) -> "TorchAccel":
+        with self._state_lock:
+            return self._pin_unlocked()
+
+    def _pin_unlocked(self) -> "TorchAccel":
         """Upload canonical Python weights, saving trained device changes first."""
         if self._weights_modified:
             self.sync()
@@ -152,6 +164,10 @@ class TorchAccel:
                     yield value
 
     def sync(self) -> None:
+        with self._state_lock:
+            self._sync_unlocked()
+
+    def _sync_unlocked(self) -> None:
         """Python lists catch up. Snapshot / to() / fallback call this."""
         if not self.resident or self._E is None or not self._weights_modified:
             return
@@ -350,6 +366,11 @@ class TorchAccel:
         return x @ self._Wout.T + self._bout
 
     def logits_window(self, ids: Sequence[int]) -> List[float]:
+        """Serialize resident KV mutation across concurrent local requests."""
+        with self._state_lock:
+            return self._logits_window_unlocked(ids)
+
+    def _logits_window_unlocked(self, ids: Sequence[int]) -> List[float]:
         """Prefill once, then decode with on-device per-layer K/V tensors."""
         if not self.resident:
             self.pin()
@@ -384,16 +405,20 @@ class TorchAccel:
             return result.detach().cpu().tolist()
 
     def logits(self, ids: Sequence[int]) -> List[float]:
-        with self.torch.no_grad():
+        with self._state_lock, self.torch.no_grad():
             y, _ = self._forward_ids(ids)
             return y.detach().cpu().tolist()
 
     def hidden(self, ids: Sequence[int]) -> List[float]:
-        with self.torch.no_grad():
+        with self._state_lock, self.torch.no_grad():
             _, h = self._forward_ids(ids)
             return h.detach().cpu().tolist()
 
     def sgd(self, ids: Sequence[int], target: int, lr: float) -> float:
+        with self._state_lock:
+            return self._sgd_unlocked(ids, target, lr)
+
+    def _sgd_unlocked(self, ids: Sequence[int], target: int, lr: float) -> float:
         self.reset_decode_cache()
         torch = self.torch
         if not self.resident:
@@ -414,6 +439,11 @@ class TorchAccel:
         return float(loss.detach().cpu())
 
     def decode(self, prefix: str, n: int = 14, seed: int = 0) -> str:
+        """Decode atomically relative to other sessions sharing the model."""
+        with self._state_lock:
+            return self._decode_unlocked(prefix, n=n, seed=seed)
+
+    def _decode_unlocked(self, prefix: str, n: int = 14, seed: int = 0) -> str:
         """Sample next tokens on the bound device."""
         torch = self.torch
         lm = self.lm
