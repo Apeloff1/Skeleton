@@ -28,7 +28,7 @@ Source systems that are difficult to target directly may still serve as inspirat
 | `reverse_constrained` | Modern -> earlier hardware | Quantize/retarget tiles, sprites, palette, sound channels, world scale, performance and inputs |
 | `cross_hybrid` | Two cleared homebrews -> any | Combine authorized mechanics, transform expressive assets and give the result an independently authored identity |
 
-Portability is a directed **planning graph**. The same source project may have multiple target blueprints, each with its own constraints and digest. Multi-target planning is not evidence that an intermediate port exists. A true build pipeline must hand each verified artifact to the next independently qualified target adapter.
+Portability is a directed **planning graph**. The same source project may have multiple independent target blueprints, each with its own constraints and digest. `compile_port_route` is a multi-destination fan-out from the original platform, **not** a verified multi-hop build chain. Multi-target planning is not evidence that an intermediate port exists. A true build pipeline must hand each verified artifact to the next independently qualified target adapter.
 
 ## Example
 
@@ -52,7 +52,7 @@ Portability is a directed **planning graph**. The same source project may have m
     assert not design.releasable
 
     variations = compile_port_route(owned, (
-        "windows_modern", "sega_dreamcast", "nec_pc_fx", "ardu boy".replace(" ", ""),
+        "windows_modern", "sega_dreamcast", "nec_pc_fx", "arduboy",
     ))
 
 ## Build adapter qualification still required
