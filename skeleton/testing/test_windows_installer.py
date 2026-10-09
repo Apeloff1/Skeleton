@@ -286,3 +286,25 @@ def test_installer_contains_dedicated_one_click_offline_game_executable():
     assert "tampered legal-release flag" in workflow
     assert "SkeletonGame.exe" in build
     assert "run_game_preview(project_tiles=load_game_project(args.project))" in entry
+
+
+def test_frozen_game_app_builds_an_original_executable_chip8_rom_without_sdk():
+    """Windows acceptance must run the VM, not just list CHIP-8 platforms."""
+    build = Path("scripts/windows/build_installer.ps1").read_text("utf-8")
+    workflow = Path(".github/workflows/windows-installer.yml").read_text("utf-8")
+    offline = Path("skeleton/app/offline_cli.py").read_text("utf-8")
+    unified = Path("skeleton/app/cli.py").read_text("utf-8")
+
+    assert '"skeleton.ai.runtime.chip8_machine"' in build
+    assert '"scripts.game.export_chip8"' in build
+    assert '"scripts.game.game_project"' in build
+    assert "--chip8-demo-output" in offline
+    assert "--chip8-export-capsule" in offline
+    assert "--chip8-demo-output" in unified
+    assert "& $offline --chip8-demo-output $chip8First" in workflow
+    assert "& $offline --chip8-demo-output $chip8Second" in workflow
+    assert "$chip8Receipt.acceptance.win_state_reached" in workflow
+    assert "$chip8Receipt.boot_rom_embedded" in workflow
+    assert "$chip8Receipt.licensed_sdk_embedded" in workflow
+    assert "Get-FileHash -LiteralPath $chip8First -Algorithm SHA256" in workflow
+    assert "installed CHIP-8 homebrew is not a verified legal original ROM" in workflow
