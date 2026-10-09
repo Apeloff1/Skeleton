@@ -273,6 +273,59 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
             create_token_file(path, token="weak")
         self.assertFalse(path.exists())
 
+    def test_standalone_server_deletes_only_its_own_ephemeral_token_on_exit(self):
+        from skeleton.app.offline_http import main
+        from unittest.mock import patch
+        secret_path = self.folder / "session.secret"
+        arguments = [
+            "--native-checkpoint", str(self.folder / "model.json"),
+            "--database", str(self.folder / "separate.sqlite3"),
+            "--token-file", str(secret_path), "--port", "0",
+        ]
+        with (
+            patch("skeleton.app.offline_http.load_native_checkpoint",
+                  return_value=self.model),
+            patch("skeleton.app.offline_http.LocalOnlyHTTPServer.serve_forever",
+                  return_value=None),
+        ):
+            self.assertEqual(main(arguments), 0)
+        self.assertFalse(secret_path.exists())
+        secret_path.write_text("existing-operator-file", encoding="utf-8")
+        with (
+            patch("skeleton.app.offline_http.load_native_checkpoint",
+                  return_value=self.model),
+            patch("skeleton.app.offline_http.LocalOnlyHTTPServer.serve_forever",
+                  return_value=None),
+        ):
+            self.assertEqual(main(arguments), 1)
+        self.assertEqual(secret_path.read_text(encoding="utf-8"),
+                         "existing-operator-file")
+
+    def test_frozen_windowless_stdout_none_still_binds_and_cleans_up(self):
+        from skeleton.app.offline_http import main
+        from unittest.mock import patch
+        secret_path = self.folder / "headless.secret"
+        arguments = [
+            "--native-checkpoint", str(self.folder / "model.json"),
+            "--database", str(self.folder / "windowless.sqlite3"),
+            "--token-file", str(secret_path), "--port", "0",
+        ]
+        with (
+            patch("skeleton.app.offline_http.load_native_checkpoint",
+                  return_value=self.model),
+            patch("skeleton.app.offline_http.LocalOnlyHTTPServer.serve_forever",
+                  return_value=None),
+            patch("skeleton.app.offline_http.sys.stdout", None),
+            patch("skeleton.app.offline_http.sys.stderr", None),
+            patch("webbrowser.open", return_value=True) as opened,
+        ):
+            self.assertEqual(main(arguments), 0)
+            opened.assert_called_once()
+            self.assertTrue(opened.call_args.args[0].startswith(
+                "http://127.0.0.1:"
+            ))
+        self.assertFalse(secret_path.exists())
+
     def test_owner_only_token_file_is_create_once(self) -> None:
         path = self.folder / "bearer.secret"
         token = create_token_file(path)
