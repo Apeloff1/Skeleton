@@ -43,9 +43,9 @@ class TestNativeModelService(unittest.TestCase):
         service = NativeModelService(self.runtime())
         config = GenerationConfig(max_new_tokens=1)
         with self.assertRaisesRegex(NativeServiceError, "canonically encodable"):
-            service.request("bad-unicode", "\\ud800", config, deadline_ms=1000)
+            service.request("bad-unicode", "\ud800", config, deadline_ms=1000)
         with self.assertRaisesRegex(NativeServiceError, "canonically encodable"):
-            service.input_digest("\\udfff", config)
+            service.input_digest("\udfff", config)
 
     def test_deadline_budget_includes_request_validation(self):
         from unittest.mock import patch
@@ -91,7 +91,7 @@ class TestNativeModelService(unittest.TestCase):
     def test_failure_usage_rejects_malformed_unicode(self):
         service = NativeModelService(self.runtime())
         with self.assertRaisesRegex(NativeServiceError, "valid UTF-8"):
-            service._usage_digest(prompt="\\ud800", generated_events=0, terminal_reason="model_error")
+            service._usage_digest(prompt="\ud800", generated_events=0, terminal_reason="model_error")
 
     def test_failure_usage_digest_survives_tokenizer_rejection(self):
         from unittest.mock import patch
