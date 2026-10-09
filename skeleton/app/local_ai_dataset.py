@@ -618,3 +618,41 @@ def verify_native_dataset(
         "historical_data_disjointness_proven": False,
         "model_quality_certified": False,
     }
+
+
+
+def smoke_offline_native_dataset() -> bool:
+    """Frozen-app smoke: local documents → verified split → real trained weights."""
+    import tempfile
+
+    from skeleton.app.local_ai_training import train_local_text
+    from skeleton.app.local_ai import load_native_checkpoint
+
+    with tempfile.TemporaryDirectory(prefix="skeleton-native-corpus-smoke-") as folder:
+        root = Path(folder)
+        source = root / "sources"
+        source.mkdir()
+        for name, lines in (
+            ("a.txt", "user hello assistant alpha\nuser world assistant beta\n"),
+            ("b.txt", "world beta alpha hello\nworld assistant user alpha\n"),
+            ("c.txt", "assistant beta world user\nbeta hello alpha world\n"),
+            ("d.txt", "hello alpha user beta\nbeta assistant hello world\n"),
+        ):
+            (source / name).write_text(lines, encoding="utf-8")
+        curated = prepare_native_dataset(source, root / "curated")
+        receipt = verify_native_dataset(
+            root / "curated", original_sources=source,
+        )
+        checkpoint = root / "native-checkpoint.json"
+        trained = train_local_text(curated["train_file"], checkpoint)
+        runtime = load_native_checkpoint(checkpoint)
+        return bool(
+            receipt["prepared_outputs_verified"]
+            and receipt["original_sources_verified"]
+            and receipt["dataset_id"] == curated["dataset_id"]
+            and trained.source_sha256 == curated["training_sha256"]
+            and trained.model_digest == runtime.model_digest
+            and trained.training_steps > 0
+            and trained.tokenizer_digest == runtime.tokenizer_digest
+            and not receipt["model_quality_certified"]
+        )
