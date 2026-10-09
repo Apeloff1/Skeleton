@@ -250,6 +250,8 @@ _KNOWLEDGE_EXPORTS = {
     "CreditsBundle": ".asset_credits",
     "compile_game_credits": ".asset_credits",
     "export_game_credits": ".asset_credits",
+    "NativeReleaseGateReport": ".release_pipeline",
+    "run_native_release_gate": ".release_pipeline",
     "NativeIntakeError": ".native_release_intake",
     "NativeIntakeReceipt": ".native_release_intake",
     "verify_native_release_intake": ".native_release_intake",
