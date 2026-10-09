@@ -203,6 +203,8 @@ class OfflineAIWindow:
         self.train_button.pack(side="left", padx=4)
         self.improve_button = ttk.Button(toolbar, text="Improve model…", command=self.improve_model)
         self.improve_button.pack(side="left", padx=4)
+        self.benchmark_button = ttk.Button(toolbar, text="Evaluate…", command=self.benchmark_model)
+        self.benchmark_button.pack(side="left", padx=4)
         self.clear_button = ttk.Button(toolbar, text="New conversation", command=self.clear)
         self.clear_button.pack(side="left", padx=8)
         self.open_history_button = ttk.Button(toolbar, text="Open chat…", command=self.open_history)
@@ -227,6 +229,9 @@ class OfflineAIWindow:
         self.load_button.configure(state="disabled" if self.active else "normal")
         self.train_button.configure(state="disabled" if self.active else "normal")
         self.improve_button.configure(
+            state="normal" if self.session is not None and not self.active else "disabled"
+        )
+        self.benchmark_button.configure(
             state="normal" if self.session is not None and not self.active else "disabled"
         )
         self.send_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
@@ -377,6 +382,57 @@ class OfflineAIWindow:
             target=work, daemon=True, name="skeleton-evaluated-local-learning",
         ).start()
 
+    def benchmark_model(self) -> None:
+        """Evaluate active weights with a user-chosen category suite, read-only."""
+        if self.active or self.session is None:
+            return
+        from tkinter import messagebox
+
+        source = self.filedialog.askopenfilename(
+            parent=self.window, title="Select active native checkpoint",
+            filetypes=[("Native checkpoint", "*.json"), ("All files", "*.*")],
+        )
+        if not source:
+            return
+        suite = self.filedialog.askopenfilename(
+            parent=self.window, title="Select JSON multi-category evaluation suite",
+            filetypes=[("Evaluation suite", "*.json"), ("All files", "*.*")],
+        )
+        if not suite:
+            return
+        compare = messagebox.askyesno(
+            "Compare checkpoints", "Compare a second model without training or promotion?",
+            parent=self.window,
+        )
+        candidate = None
+        if compare:
+            candidate = self.filedialog.askopenfilename(
+                parent=self.window, title="Select candidate checkpoint",
+                filetypes=[("Native checkpoint", "*.json"), ("All files", "*.*")],
+            )
+            if not candidate:
+                return
+        current_digest = self.session.model_digest
+        self.active = True
+        self.status.set("Evaluating category-aware offline benchmark…")
+        self._refresh()
+
+        def work() -> None:
+            try:
+                from skeleton.app.local_ai_benchmark import benchmark_native_models
+
+                parent = load_native_checkpoint(source)
+                if parent.model_digest != current_digest:
+                    raise OfflineAIError("benchmark baseline is not the active model")
+                result = benchmark_native_models(suite, baseline=source, candidate=candidate)
+                self.events.put(("benchmark", result))
+            except Exception as exc:
+                self.events.put(("error", str(exc)))
+
+        threading.Thread(
+            target=work, daemon=True, name="skeleton-local-category-evaluation",
+        ).start()
+
     def clear(self) -> None:
         if self.active or self.session is None:
             return
@@ -474,7 +530,33 @@ class OfflineAIWindow:
             while True:
                 kind, value = self.events.get_nowait()
                 self.active = False
-                if kind == "improved":
+                if kind == "benchmark":
+                    result = value
+                    summary = (
+                        "Suite " + result["suite_digest"][:16] + "… · "
+                        + str(result["case_count"]) + " cases / "
+                        + str(result["category_count"]) + " categories\n"
+                        + "Baseline perplexity: "
+                        + f"{result['baseline']['overall_perplexity']:.3f}"
+                    )
+                    if result["candidate"] is not None:
+                        summary += (
+                            "\nCandidate perplexity: "
+                            + f"{result['candidate']['overall_perplexity']:.3f}"
+                            + "\nLocal regression gate: "
+                            + ("PASS" if result["passes_local_regression_gate"] else "FAIL")
+                        )
+                        for name, comparison in sorted(result["category_comparisons"].items()):
+                            summary += (
+                                "\n" + name + ": "
+                                + f"{comparison['baseline_perplexity']:.3f} → "
+                                + f"{comparison['candidate_perplexity']:.3f}"
+                                + (" [OK]" if comparison["perplexity_nonregression"]
+                                   and comparison["top1_nonregression"] else " [REGRESSION]")
+                            )
+                    self._append("Read-only native evaluation", summary)
+                    self.status.set("Offline benchmark complete · model unchanged.")
+                elif kind == "improved":
                     self.session, receipt = value  # type: ignore[misc]
                     # Different weight identity means old turns are not silently
                     # assigned to the newly evaluated model.
