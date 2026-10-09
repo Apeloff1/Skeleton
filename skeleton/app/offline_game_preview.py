@@ -106,9 +106,14 @@ def run_game_preview(seed: int = DEFAULT_SEED) -> int:
     game = OfflineGamePreview(seed=seed)
     # Tk is stdlib, but optional on Linux/headless systems; keep the CLI's
     # non-UI game operations fully usable without display libraries.
-    import tkinter as tk
-
-    root = tk.Tk()
+    try:
+        import tkinter as tk
+    except ImportError as exc:
+        raise GameplayError("native Tk support is not installed") from exc
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        raise GameplayError("native desktop display is unavailable") from exc
     root.title("Skeleton - Offline Game Preview")
     root.resizable(False, False)
     canvas = tk.Canvas(
