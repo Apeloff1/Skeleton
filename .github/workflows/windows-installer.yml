@@ -18,6 +18,8 @@ on:
       - "skeleton/ai/runtime/game_project_capsule.py"
       - "skeleton/ai/runtime/chip8_machine.py"
       - "scripts/game/export_chip8.py"
+      - "skeleton/app/offline_chip8_preview.py"
+      - "skeleton/testing/test_offline_chip8_preview.py"
       - "skeleton/testing/test_chip8_homebrew.py"
       - "skeleton/testing/test_game_playability.py"
       - "skeleton/testing/test_cross_era_game_rights.py"
@@ -45,6 +47,8 @@ on:
       - "skeleton/ai/runtime/game_project_capsule.py"
       - "skeleton/ai/runtime/chip8_machine.py"
       - "scripts/game/export_chip8.py"
+      - "skeleton/app/offline_chip8_preview.py"
+      - "skeleton/testing/test_offline_chip8_preview.py"
       - "skeleton/testing/test_chip8_homebrew.py"
       - "skeleton/testing/test_game_playability.py"
       - "skeleton/testing/test_cross_era_game_rights.py"
@@ -380,6 +384,26 @@ jobs:
           if ($chip8Repeat.rom_sha256 -ne $chip8Receipt.rom_sha256) {
             throw "CHIP-8 ROM changed between independent frozen EXE runs"
           }
+
+          # The separate native SkeletonGame.exe exposes a real CHIP-8
+          # framebuffer/keypad mode. Its headless simulation must independently
+          # execute the ROM all the way to victory in the installed console.
+          $chip8GameCheckRaw = & $offline --chip8-demo-check --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed CHIP-8 native game player failed real-controller WIN qualification"
+          }
+          $chip8GameCheck = $chip8GameCheckRaw | ConvertFrom-Json
+          if (-not $chip8GameCheck.original_player_won -or
+              -not $chip8GameCheck.win_state_reached -or
+              $chip8GameCheck.native_window_was_opened -or
+              $chip8GameCheck.real_vintage_hardware_verified -or
+              $chip8GameCheck.copyrighted_firmware_included -or
+              $chip8GameCheck.model_inference_used -or
+              $chip8GameCheck.training_examples_added -ne 0 -or
+              $chip8GameCheck.rom_sha256 -ne $chip8Receipt.rom_sha256) {
+            throw "installed native CHIP-8 player produced unverified or inconsistent win receipt"
+          }
+
           $null = & $offline --chip8-demo-output $chip8First 2>&1
           if ($LASTEXITCODE -eq 0) {
             throw "CHIP-8 exporter overwrote a previously created original ROM"
