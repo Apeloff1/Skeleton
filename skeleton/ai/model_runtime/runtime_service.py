@@ -145,13 +145,13 @@ class NativeModelService:
     ) -> str:
         # Terminal accounting must not call model or tokenizer code again:
         # the original request may have failed because those contracts drifted.
+        if not isinstance(prompt, str):
+            raise NativeServiceError("prompt is not valid UTF-8 text")
+        if any(0xD800 <= ord(char) <= 0xDFFF for char in prompt):
+            raise NativeServiceError("prompt is not valid UTF-8 text")
         try:
-            if not isinstance(prompt, str) or any(
-                0xD800 <= ord(char) <= 0xDFFF for char in prompt
-            ):
-                raise UnicodeEncodeError("utf-8", prompt if isinstance(prompt, str) else "", 0, 1, "surrogate code point")
             prompt_bytes = prompt.encode("utf-8", errors="strict")
-        except (AttributeError, UnicodeEncodeError) as exc:
+        except UnicodeEncodeError as exc:
             raise NativeServiceError("prompt is not valid UTF-8 text") from exc
         return digest_json(
             {
