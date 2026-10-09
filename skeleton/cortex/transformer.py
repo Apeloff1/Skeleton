@@ -626,6 +626,11 @@ class TinyTransformer:
                 logits, resident_ids = self._accel.logits_window_with_cache(window)
                 cache.tokens.extend(resident_ids)
                 return list(logits)
+            except MemoryError:
+                # An explicit KV allocation ceiling is an admission limit,
+                # not a hint to silently allocate an unbudgeted Python cache.
+                cache.reset()
+                raise
             except Exception:
                 self._sync_accelerator()
                 self._accel = None
