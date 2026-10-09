@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 import json
+import re
 from typing import Any
 
 from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
@@ -155,7 +156,44 @@ def validate_evidence(value: Any, question: str, request_digest: str,
     return encoded
 
 
+_CITATION_TOKEN = re.compile(
+    r"local:[A-Za-z0-9_-]{1,128}:[0-9]+:[0-9a-f]{16}"
+)
+
+
+def audit_answer_citations(answer: str, manifest: dict[str, Any]) -> dict[str, Any]:
+    """Check identifiers explicitly quoted by an answer, *not* truth.
+
+    No lexical heuristic can certify semantic support or contradiction. Make
+    it impossible to mistake a known source identifier for an independently
+    verified factual claim.
+    """
+    if not isinstance(answer, str):
+        raise RuntimeContractError("cannot audit non-text assistant answer")
+    if not isinstance(manifest, dict) or not isinstance(
+        manifest.get("citations"), list
+    ):
+        raise RuntimeContractError("grounding manifest required for citation audit")
+    expected = {
+        item["citation"] for item in manifest["citations"]
+        if isinstance(item, dict) and isinstance(item.get("citation"), str)
+    }
+    used = set(_CITATION_TOKEN.findall(answer))
+    recognized = sorted(used & expected)
+    unknown = sorted(used - expected)
+    status = ("unknown_identifiers" if unknown else
+              "recognized_identifiers" if recognized else "no_identifiers")
+    return {
+        "status": status,
+        "recognized": recognized,
+        "unknown": unknown,
+        "supplied_count": len(expected),
+        "interpretation": "source_identifier_check_only_not_factual_verification",
+    }
+
+
 __all__ = [
     "SCHEMA", "MAX_EVIDENCE_HITS", "MAX_EVIDENCE_BYTES",
     "grounded_request_digest", "prepare_evidence", "validate_evidence",
+    "audit_answer_citations",
 ]
