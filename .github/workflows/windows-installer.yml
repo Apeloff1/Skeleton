@@ -180,6 +180,8 @@ jobs:
           try {
             $cliSource = Join-Path $cliDir "train.txt"
             $cliModel = Join-Path $cliDir "checkpoint.json"
+            $cliTrainReceipt = Join-Path $cliDir "trained-receipt.json"
+            $cliInspectReceipt = Join-Path $cliDir "inspected-receipt.json"
             Set-Content -LiteralPath $cliSource -Value @(
               "user hello assistant world",
               "user world assistant hello"
@@ -189,7 +191,7 @@ jobs:
               "--train-corpus", ('"' + $cliSource + '"'),
               "--output-model", ('"' + $cliModel + '"'),
               "--epochs", "1", "--json"
-            ) -Wait -PassThru
+            ) -Wait -PassThru -RedirectStandardOutput $cliTrainReceipt
             if ($cliTrain.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $cliModel)) {
               throw "installed Skeleton.exe offline command training failed"
             }
@@ -197,9 +199,27 @@ jobs:
               "--offline-command", "local-ai",
               "--model", ('"' + $cliModel + '"'),
               "--inspect-model", "--json"
-            ) -Wait -PassThru
+            ) -Wait -PassThru -RedirectStandardOutput $cliInspectReceipt
             if ($cliInspect.ExitCode -ne 0) {
-              throw "installed Skeleton.exe offline model inspection failed"
+              throw "installed SkeletonCLI.exe offline model inspection failed"
+            }
+            # A nonzero exit alone is not proof that training, model receipt
+            # identity and native inspection all belong to the same weights.
+            $trainedReceipt = Get-Content -LiteralPath $cliTrainReceipt -Raw | ConvertFrom-Json
+            $inspectedReceipt = Get-Content -LiteralPath $cliInspectReceipt -Raw | ConvertFrom-Json
+            if (
+              $trainedReceipt.schema_version -ne 1 -or
+              $trainedReceipt.model_digest -notmatch "^[0-9a-f]{64}$" -or
+              $trainedReceipt.tokenizer_digest -notmatch "^[0-9a-f]{64}$" -or
+              $trainedReceipt.checkpoint_sha256 -notmatch "^[0-9a-f]{64}$" -or
+              $trainedReceipt.training_steps -lt 1 -or
+              $trainedReceipt.model_quality_certified -ne $false -or
+              $inspectedReceipt.model_digest -ne $trainedReceipt.model_digest -or
+              $inspectedReceipt.tokenizer_digest -ne $trainedReceipt.tokenizer_digest -or
+              $inspectedReceipt.model_quality_certified -ne $false -or
+              $inspectedReceipt.network_required -ne $false
+            ) {
+              throw "installed SkeletonCLI.exe failed native model/receipt identity qualification"
             }
           } finally {
             Remove-Item -LiteralPath $cliDir -Recurse -Force -ErrorAction SilentlyContinue
