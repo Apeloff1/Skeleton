@@ -1,0 +1,81 @@
+name: Game Builder All-Native Homebrew Portfolio
+
+on:
+  pull_request:
+    paths:
+      - 'skeleton/ai/game_builder/**'
+      - 'skeleton/testing/test_game_builder_native_portfolio.py'
+      - '.github/workflows/game-builder-native-portfolio.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: game-builder-native-portfolio-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ten-original-native-targets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /skeleton/__init__.py
+            /skeleton/ai/__init__.py
+            /skeleton/ai/capability_map.py
+            /skeleton/ai/game_builder/
+            /skeleton/testing/test_game_builder_native_portfolio.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate original source portfolios and transactional safety
+        env:
+          PYTHONPATH: .
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+        run: |
+          python -m pip install --disable-pip-version-check "pytest>=8.4,<9"
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_native_portfolio.py
+      - name: Actually author all historical and desktop native source projects
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          printf '%s\n' 'All artwork, puzzle structure and mechanics are original to this Skeleton game.' > original-authorship-evidence.txt
+          python -m skeleton.ai.game_builder.native_portfolio_cli \
+            --basis bandai_wonderswan \
+            --project-id skeleton-ten-original-native \
+            --title 'Star Voyage Original' --seed 198610 \
+            --rights-evidence original-authorship-evidence.txt \
+            --identity 'original star labyrinth' \
+            --identity 'original authored artwork' \
+            --out native-original-portfolio \
+            --authorize-original-homebrew > native-portfolio-authoring-receipt.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.load(open("native-portfolio-authoring-receipt.json",encoding="utf-8"))
+          assert report["target_count"]>=10
+          assert report["binary_compilation_executed"] is False
+          assert report["independent_legal_clearance_verified"] is False
+          assert len(report["portfolio_digest"])==64
+          for row in report["native_projects"]:
+              root=Path("native-original-portfolio")/row["relative_source_directory"]
+              assert root.joinpath("manifest.json").is_file()
+          assert Path("native-original-portfolio/targets/nintendo_game_boy_color/main.asm").is_file()
+          assert Path("native-original-portfolio/targets/apple_ii/game.c").is_file()
+          print("TEN_ACTUAL_NATIVE_SOURCE_PROJECTS_AUTHORED",report["target_count"])
+          PY
+      - name: Upload authored original machine-specific source portfolio
+        uses: actions/upload-artifact@v4
+        with:
+          name: skeleton-original-all-native-source-portfolio
+          path: |
+            native-original-portfolio/
+            native-portfolio-authoring-receipt.json
+          if-no-files-found: error
+          retention-days: 7
