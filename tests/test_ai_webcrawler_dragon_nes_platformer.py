@@ -71,6 +71,9 @@ def test_true_ppu_scroll_vblank_controller_and_collision_code():
     ):
         assert fragment in code,fragment
     assert "SDL_" not in code and "WinMain" not in code
+    # ca65 treats one-letter CPU register names as reserved tokens.
+    assert "\nHeroY: .res 1\n" in code
+    assert "\nY: .res 1\n" not in code
     assert "__CHR__" not in code and "__BG0__" not in code
 
 def test_original_tilemaps_chrs_are_bounded_and_reproducible():

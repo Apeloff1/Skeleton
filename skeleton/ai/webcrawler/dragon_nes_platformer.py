@@ -36,7 +36,7 @@ Frame: .res 1
 Last: .res 1
 XLo: .res 1
 XHi: .res 1
-Y: .res 1
+HeroY: .res 1
 Jump: .res 1
 OnFloor: .res 1
 BtnA: .res 1
@@ -163,7 +163,7 @@ Restart:
     sta Score
     sta Damage
     lda #200
-    sta Y
+    sta HeroY
     lda #1
     sta Stage
     sta OnFloor
@@ -185,7 +185,7 @@ NextStage:
     sta CamHi
     sta Jump
     lda #200
-    sta Y
+    sta HeroY
     lda #1
     sta OnFloor
     lda GemLo
@@ -252,20 +252,20 @@ JumpEnded:
     lda Jump
     beq Falling
     dec Jump
-    lda Y
+    lda HeroY
     sec
     sbc #3
-    sta Y
+    sta HeroY
     jmp CheckGoal
 Falling:
     lda #0
     sta OnFloor
-    lda Y
+    lda HeroY
     cmp #200
     bcs Land
     clc
     adc #2
-    sta Y
+    sta HeroY
     cmp #136
     bcc CheckGoal
     cmp #139
@@ -278,13 +278,13 @@ Falling:
     cmp #196
     bcs CheckGoal
     lda #136
-    sta Y
+    sta HeroY
     lda #1
     sta OnFloor
     jmp CheckGoal
 Land:
     lda #200
-    sta Y
+    sta HeroY
     lda #1
     sta OnFloor
 CheckGoal:
@@ -294,7 +294,7 @@ CheckGoal:
     lda XLo
     cmp GemLo
     bcc MoveDone
-    lda Y
+    lda HeroY
     cmp #160
     bcc MoveDone
     inc Score
@@ -372,7 +372,7 @@ Collide:
     cmp #12
     bcs EndEnemy
 Touch:
-    lda Y
+    lda HeroY
     cmp #185
     bcc EndEnemy
     lda Damage
@@ -385,7 +385,7 @@ Touch:
 EndEnemy:
     rts
 Sprites:
-    lda Y
+    lda HeroY
     sta $0200
     lda Frame
     and #8
