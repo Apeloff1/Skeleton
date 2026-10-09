@@ -110,6 +110,14 @@ python -m skeleton app local-ai --benchmark-suite ./suite.json \
   --model ./my-native.json --candidate-model ./my-native-v2.json --json
 ```
 
+To test against an explicitly known training corpus, supply
+`--exclude-train-corpus ./train.txt`. The benchmark fails closed when a
+case is identical to a training line after tokenization or copied as a
+contiguous multi-token fragment. The receipt includes the training-source
+digest without echoing the raw training text. The check cannot prove
+disjointness from unknown, historical, third-party or otherwise unavailable
+training data.
+
 The suite is limited to 64 cases, 16 categories, 128 KiB and 1024 total
 tokens, with strict duplicate-key / non-finite / symlink rejection. Every case
 is evaluated against the same verified tokenizer identity and its metrics
@@ -134,6 +142,13 @@ candidate with no output file. This is a bounded local improvement trial,
 python -m skeleton app local-ai --improve-model ./my-native.json \
   --train-corpus ./train.txt --eval-corpus ./heldout.txt \
   --output-model ./my-native-v2.json --epochs 3 --json
+
+# Optional stricter training: require a THIRD, independent benchmark
+# suite (disjoint from training and held-out epoch-selection text).
+python -m skeleton app local-ai --improve-model ./my-native.json \
+  --train-corpus ./train.txt --eval-corpus ./heldout.txt \
+  --protect-suite ./protected-suite.json \
+  --output-model ./my-native-v2-protected.json --epochs 3 --json
 ```
 
 After saving a candidate, run a **read-only comparative evaluation** using the
