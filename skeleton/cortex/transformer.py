@@ -332,11 +332,13 @@ class KVCache:
         self.K: List[List[List[float]]] = [[] for _ in range(self.n_layers)]
         self.V: List[List[List[float]]] = [[] for _ in range(self.n_layers)]
         self.tokens: List[int] = []
+        self.next_position = 0
 
     def reset(self) -> None:
         self.K = [[] for _ in range(self.n_layers)]
         self.V = [[] for _ in range(self.n_layers)]
         self.tokens = []
+        self.next_position = 0
 
     def primed_for(self, window: Sequence[int]) -> bool:
         """True iff cache holds window[:-1] and can extend by window[-1]."""
@@ -360,6 +362,7 @@ class TinyTransformer:
         d_ff: int = 0,
         norm: str = "ln",
         ffn_kind: str = "gelu",
+        position_mode: str = "learned_rope",
         use_mod: bool = False,
         mod_deep: float = 0.25,
         mod_shallow: float = 0.25,
@@ -382,6 +385,9 @@ class TinyTransformer:
         ff = max(0, int(d_ff))
         self.norm = "rms" if str(norm).lower() == "rms" else "ln"
         self.ffn_kind = "swiglu" if str(ffn_kind).lower() == "swiglu" else "gelu"
+        if position_mode not in {"learned_rope", "rope"}:
+            raise ValueError("position_mode must be learned_rope or rope")
+        self.position_mode = position_mode
         self.layers: List[TransformerBlock] = [
             TransformerBlock(D, ff, rng, s, norm=self.norm, ffn_kind=self.ffn_kind)
             for _ in range(nL)
@@ -485,7 +491,7 @@ class TinyTransformer:
     def _encode(self, ids: Sequence[int]) -> List[List[float]]:
         X: List[List[float]] = []
         for t, idx in enumerate(ids):
-            X.append(add(self.E[idx], self.P[t]))
+            X.append(list(self.E[idx]) if self.position_mode == "rope" else add(self.E[idx], self.P[t]))
         return X
 
     def to(self, device: str = "cpu") -> "TinyTransformer":
@@ -563,12 +569,13 @@ class TinyTransformer:
 
     def _step(self, idx: int, cache: KVCache) -> List[float]:
         """Extend the cache by one id. RoPE position is window-relative."""
-        t = len(cache.tokens)
+        t = cache.next_position if self.position_mode == "rope" else len(cache.tokens)
         ei = int(idx) if 0 <= int(idx) < self.V else self.unk
-        x = add(self.E[ei], self.P[min(t, self.ctx - 1)])
+        x = list(self.E[ei]) if self.position_mode == "rope" else add(self.E[ei], self.P[min(t, self.ctx - 1)])
         for li, layer in enumerate(self.layers):
             x = layer.step(x, cache.K[li], cache.V[li], self.n_heads, t)
         cache.tokens.append(ei)
+        cache.next_position += 1
         return self._unembed(x)
 
     def _logits_window(self, ids: Sequence[int], cache: Optional[KVCache] = None) -> List[float]:
@@ -581,6 +588,20 @@ class TinyTransformer:
                 cache.reset()
             return self._logits(window)
         if cache.primed_for(window):
+            return self._step(window[-1], cache)
+        # Pure rotary positions are shift-equivariant: once the cache reaches
+        # the context limit, only the oldest K/V slot needs eviction. Learned
+        # absolute position embeddings are NOT shift-equivariant and retain
+        # their conservative re-prime behavior for checkpoint compatibility.
+        if (
+            self.position_mode == "rope"
+            and len(cache.tokens) == self.ctx
+            and cache.tokens[1:] == window[:-1]
+        ):
+            for keys, values in zip(cache.K, cache.V):
+                del keys[0]
+                del values[0]
+            del cache.tokens[0]
             return self._step(window[-1], cache)
         cache.reset()
         for idx in window[:-1]:
@@ -662,7 +683,8 @@ class TinyTransformer:
             dx = dH[t]
             for d in range(D):
                 self.E[idx][d] -= lr * dx[d]
-                self.P[t][d] -= lr * dx[d]
+                if self.position_mode != "rope":
+                    self.P[t][d] -= lr * dx[d]
         self.steps += 1
         return loss
 
@@ -804,7 +826,7 @@ class TinyTransformer:
             except Exception:
                 pass
         L0 = self.layers[0]
-        return {
+        snapshot = {
             "dim": self.dim,
             "ctx": self.ctx,
             "n_heads": self.n_heads,
@@ -834,6 +856,11 @@ class TinyTransformer:
             "use_mod": bool(self.use_mod),
             "mod": None if self.mod is None else self.mod.snapshot(),
         }
+        # Keep all legacy learned-position snapshot bytes and digests stable.
+        # A new rotary-only model includes an explicit architecture identity.
+        if self.position_mode == "rope":
+            snapshot["position_mode"] = "rope"
+        return snapshot
 
     @classmethod
     def from_snapshot(cls, data: Dict[str, Any]) -> "TinyTransformer":
@@ -849,6 +876,7 @@ class TinyTransformer:
             d_ff=int((data or {}).get("d_ff") or 0),
             norm=str((data or {}).get("norm") or "ln"),
             ffn_kind=str((data or {}).get("ffn_kind") or "gelu"),
+            position_mode=str((data or {}).get("position_mode") or "learned_rope"),
             use_mod=bool((data or {}).get("use_mod")),
             mod_deep=float(((data or {}).get("mod") or {}).get("router", {}).get("deep_capacity") or 0.25),
             mod_shallow=float(((data or {}).get("mod") or {}).get("router", {}).get("shallow_capacity") or 0.25),
