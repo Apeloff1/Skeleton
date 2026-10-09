@@ -16,6 +16,10 @@ on:
       - "skeleton/ai/runtime/game_platform_catalog.py"
       - "skeleton/ai/runtime/game_rights.py"
       - "skeleton/ai/runtime/homebrew_editor.py"
+      - "skeleton/ai/runtime/homebrew_porting.py"
+      - "skeleton/app/homebrew_port_ui.py"
+      - "scripts/game/port_homebrew.py"
+      - "skeleton/testing/test_homebrew_porting.py"
       - "skeleton/app/homebrew_editor_ui.py"
       - "scripts/game/homebrew_edit.py"
       - "skeleton/testing/test_homebrew_editor.py"
@@ -49,6 +53,10 @@ on:
       - "skeleton/ai/runtime/game_platform_catalog.py"
       - "skeleton/ai/runtime/game_rights.py"
       - "skeleton/ai/runtime/homebrew_editor.py"
+      - "skeleton/ai/runtime/homebrew_porting.py"
+      - "skeleton/app/homebrew_port_ui.py"
+      - "scripts/game/port_homebrew.py"
+      - "skeleton/testing/test_homebrew_porting.py"
       - "skeleton/app/homebrew_editor_ui.py"
       - "scripts/game/homebrew_edit.py"
       - "skeleton/testing/test_homebrew_editor.py"
@@ -523,6 +531,51 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $authoredGame)) {
             throw "cannot build original authorized game fixture"
           }
+          # ORIGINAL source -> destination-aware enhanced Windows version:
+          # actively combine platformer, collectibles, keyquest, speedrun,
+          # exploration and combo; preserve the exact source physics route.
+          $windowsPort = Join-Path $env:RUNNER_TEMP "SkeletonOriginalEnhancedWindowsPort.json"
+          $windowsPortRaw = & python scripts/game/port_homebrew.py --capsule $authoredGame --output $windowsPort --creative-mode hybrid_original --art-direction neon_noir --quality cinematic --hybrids collectathon,keyquest,speedrun,exploration,combo --seed 42 --scale 40 --decor-budget 36 --high-contrast
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $windowsPort)) {
+            throw "could not compose enhanced Windows-native original homebrew"
+          }
+          $portReceipt = $windowsPortRaw | ConvertFrom-Json
+          if (-not $portReceipt.source_is_original_homebrew -or
+              -not $portReceipt.actual_hybrid_gameplay.hybrid_gameplay_proven -or
+              $portReceipt.actual_hybrid_gameplay.remaining_collectibles -ne 0 -or
+              -not $portReceipt.actual_hybrid_gameplay.deterministic -or
+              -not $portReceipt.rights_review_still_needed -or
+              $portReceipt.training_examples_added -ne 0) {
+            throw "Windows homebrew enhancement did not prove actual hybrid gameplay"
+          }
+          $installedPortRaw = & $offline --homebrew-port-check --homebrew-port-project $authoredGame --homebrew-port-blueprint $windowsPort --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed offline executable could not verify Windows original game port"
+          }
+          $installedPort = $installedPortRaw | ConvertFrom-Json
+          if (-not $installedPort.hybrid_gameplay_proven -or
+              -not $installedPort.original_gameplay_proven -or
+              $installedPort.remaining_collectibles -ne 0 -or
+              $installedPort.legal_release_authorized -or
+              $installedPort.training_examples_added -ne 0 -or
+              $installedPort.trace_sha256 -ne $portReceipt.actual_hybrid_gameplay.trace_sha256) {
+            throw "installed enhanced Windows gameplay changed source physics or falsely authorized release"
+          }
+          $tamperedPort = Join-Path $env:RUNNER_TEMP "SkeletonForbiddenClonePort.json"
+          $portContent = Get-Content -LiteralPath $windowsPort -Raw -Encoding utf8
+          $modifiedPort = $portContent.Replace(
+            '"third_party_asset_import_allowed":false',
+            '"third_party_asset_import_allowed":true'
+          )
+          if ($modifiedPort -eq $portContent) {
+            throw "port fixture did not expose commercial game import policy"
+          }
+          Set-Content -LiteralPath $tamperedPort -Value $modifiedPort -Encoding utf8
+          $null = & $offline --homebrew-port-check --homebrew-port-project $authoredGame --homebrew-port-blueprint $tamperedPort --json 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            throw "installed Windows game port accepted forged commercial-clone permission"
+          }
+
           $authoredReceiptRaw = & $offline --game-preview-check --game-project $authoredGame --json
           if ($LASTEXITCODE -ne 0) {
             throw "installed original game capsule failed real-controller gameplay"
