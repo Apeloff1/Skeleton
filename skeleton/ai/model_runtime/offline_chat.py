@@ -262,15 +262,25 @@ class OfflineChatStore:
              tokenizer_digest: str) -> StoredChat:
         sid = _identifier("session id", session_id)
         with self._lock:
-            row = self._db.execute(
-                "SELECT model_digest, tokenizer_digest, revision, transcript_json "
-                "FROM offline_sessions WHERE session_id=?", (sid,)
-            ).fetchone()
-            rows = self._db.execute(
-                "SELECT request_id, request_digest, revision, text, output_digest, "
-                "prompt_tokens, generated_tokens FROM offline_turns "
-                "WHERE session_id=? ORDER BY revision", (sid,),
-            ).fetchall()
+            # Other store instances/processes have distinct Python locks.
+            # A single SQLite read transaction supplies a consistent snapshot
+            # across *both* tables even if another process commits meanwhile.
+            own_snapshot = not self._db.in_transaction
+            if own_snapshot:
+                self._db.execute("BEGIN")
+            try:
+                row = self._db.execute(
+                    "SELECT model_digest, tokenizer_digest, revision, transcript_json "
+                    "FROM offline_sessions WHERE session_id=?", (sid,)
+                ).fetchone()
+                rows = self._db.execute(
+                    "SELECT request_id, request_digest, revision, text, output_digest, "
+                    "prompt_tokens, generated_tokens FROM offline_turns "
+                    "WHERE session_id=? ORDER BY revision", (sid,),
+                ).fetchall()
+            finally:
+                if own_snapshot:
+                    self._db.execute("ROLLBACK")
         if row is None:
             raise RuntimeContractError("unknown offline conversation")
         if row[0] != model_digest or row[1] != tokenizer_digest:
