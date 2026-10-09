@@ -52,6 +52,8 @@ def _parser() -> argparse.ArgumentParser:
     capabilities.add_argument("--capability-file", help="selected JSON task for offline deterministic execution")
     capabilities.add_argument("--capability-graph-file", help="execute a bounded local graph of deterministic capability operations")
     capabilities.add_argument("--capability-list", action="store_true", help="list available model-free deterministic operations")
+    capabilities.add_argument("--game-preview", action="store_true", help="open native Tk offline playable game preview")
+    parser.add_argument("--game-seed", type=int, help="deterministic seed for explicit native game preview")
     parser.add_argument("--library", help="user-owned local SQLite document search index")
     parser.add_argument("--index-dir", help="index an explicitly selected local text directory")
     parser.add_argument("--search", help="search indexed local documents without any model")
@@ -97,6 +99,35 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.enqueue_dir or args.run_queue or args.queue_status
         or args.cancel_queue_job or args.retry_queue_job
     )
+    if args.game_seed is not None and not args.game_preview:
+        print("--game-seed requires --game-preview", file=sys.stderr)
+        return 2
+    if args.game_preview:
+        if (
+            args.model or args.deployment or args.prompt or args.backup_in
+            or args.backup_out or args.workspace or args.native_smoke
+            or args.doctor or args.qualify_model or args.library
+            or args.use_library or library_mode or queue_mode or snapshot_mode
+            or audit_mode or args.queue_db or args.queue_library
+            or args.snapshot_workspace or args.snapshot_library
+            or args.snapshot_queue or args.json_output
+        ):
+            print("native game preview must run without model, state or JSON modes",
+                  file=sys.stderr)
+            return 2
+        from .offline_game_preview import DEFAULT_SEED, run_game_preview
+        try:
+            return run_game_preview(
+                seed=DEFAULT_SEED if args.game_seed is None else args.game_seed
+            )
+        except (ValueError, RuntimeError, OSError, ImportError) as exc:
+            print(
+                "native offline game preview unavailable: "
+                + type(exc).__name__ + ": " + str(exc),
+                file=sys.stderr,
+            )
+            return 1
+
     if args.capability_file is not None or args.capability_graph_file is not None or args.capability_list:
         # Model-free deterministic engine is strictly separate from all state,
         # network, training, inference and OS-permission controls.
