@@ -24,6 +24,7 @@ from .desktop_native_export import compile_native_desktop, export_native_desktop
 from .game_boy_native_export import compile_native_game_boy, export_native_game_boy
 from .nes_native_export import compile_native_nes, export_native_nes
 from .c64_native_export import compile_native_c64, export_native_c64
+from .dos_native_export import compile_native_dos, export_native_dos
 from .platform_registry import default_registry
 from .playable_simulation import demonstrate_solvable
 from .playable_world import GameBuildIntent, generate_playable_world
@@ -36,6 +37,7 @@ _NATIVE = {
     "nintendo_game_boy": "gb_rgbds",
     "nintendo_famicom": "nes_ca65",
     "commodore_64": "c64_cc65",
+    "dos_vga": "dos_nasm_8086",
 }
 
 _MAX_EVIDENCE_FILE = 8 * 1024 * 1024
@@ -93,6 +95,11 @@ def build_game(
         project = compile_native_c64(world, source, authorized=True)
         folder = export_native_c64(project, output, authorized=True)
         artifact_type = "native_c64_6510_vic_ii_sid_cc65_prg_source"
+        digest = project.content_digest
+    elif kind == "dos_nasm_8086":
+        project = compile_native_dos(world, source, authorized=True)
+        folder = export_native_dos(project, output, authorized=True)
+        artifact_type = "native_dos_8086_pc_textmode_com_source"
         digest = project.content_digest
     else:
         project = compile_native_desktop(world, source, target, authorized=True)
