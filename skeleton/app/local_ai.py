@@ -16,7 +16,9 @@ import threading
 from typing import Any
 
 from skeleton.ai.model_runtime.chat_protocol import ChatMessage, ChatTranscript
-from skeleton.ai.model_runtime.offline_chat import OfflineChatStore
+from skeleton.ai.model_runtime.offline_chat import (
+    OfflineChatStore, load_private_bundle, save_private_bundle,
+)
 from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig, RuntimeContractError
 from skeleton.ai.runtime.inference.artifact import load_local_model_artifact
 from skeleton.ai.runtime.inference.local import LocalInferenceRequest, LocalInferenceResult, LocalInferenceEngine
@@ -196,6 +198,20 @@ class DurableOfflineAISession(OfflineAISession):
             self.backend.model_digest, self.backend.tokenizer_digest
         )
 
+    def export_conversation(self, session_id: str) -> bytes:
+        return self.store.export_bundle(
+            session_id, self.backend.model_digest, self.backend.tokenizer_digest
+        )
+
+    def import_conversation(self, payload: bytes) -> str:
+        if self._busy:
+            raise OfflineAIError("cannot import during model generation")
+        session_id = self.store.import_bundle(
+            payload, self.backend.model_digest, self.backend.tokenizer_digest
+        )
+        self.resume(session_id)
+        return session_id
+
     def delete_conversation(self, session_id: str) -> None:
         if self._busy:
             raise OfflineAIError("cannot delete conversation during generation")
@@ -262,12 +278,14 @@ def private_desktop_database(model_digest: str) -> Path:
     if (not isinstance(model_digest, str) or len(model_digest) != 64
             or any(c not in "0123456789abcdef" for c in model_digest)):
         raise OfflineAIError("invalid model identity for local conversation store")
-    folder = Path.home() / ".skeleton" / "offline-ai"
-    if folder.is_symlink():
-        raise OfflineAIError("offline data directory must not be a symlink")
-    folder.mkdir(parents=True, exist_ok=True, mode=0o700)
-    if folder.is_symlink():
-        raise OfflineAIError("offline data directory must not be a symlink")
+    root = Path.home() / ".skeleton"
+    folder = root / "offline-ai"
+    for directory in (root, folder):
+        if directory.is_symlink():
+            raise OfflineAIError("offline data directory must not be a symlink")
+        directory.mkdir(exist_ok=True, mode=0o700)
+        if directory.is_symlink():
+            raise OfflineAIError("offline data directory must not be a symlink")
     return folder / (model_digest + ".sqlite3")
 
 
@@ -323,6 +341,14 @@ class OfflineAIWindow:
             sessions, text="Delete", command=self.delete_selected
         )
         self.delete_button.pack(side="left", padx=6)
+        self.export_button = ttk.Button(
+            sessions, text="Export…", command=self.export_selected
+        )
+        self.export_button.pack(side="left", padx=3)
+        self.import_button = ttk.Button(
+            sessions, text="Import…", command=self.import_selected
+        )
+        self.import_button.pack(side="left", padx=3)
         self.status = tk.StringVar(value="Choose a local native model checkpoint to begin.")
         ttk.Label(frame, textvariable=self.status, wraplength=790).pack(anchor="w", pady=8)
         self.transcript = scrolledtext.ScrolledText(frame, state="disabled", wrap="word", height=18, font=("Segoe UI", 10))
@@ -343,6 +369,8 @@ class OfflineAIWindow:
         can_switch = isinstance(self.session, DurableOfflineAISession) and not self.active
         self.resume_button.configure(state="normal" if can_switch else "disabled")
         self.delete_button.configure(state="normal" if can_switch else "disabled")
+        self.export_button.configure(state="normal" if can_switch else "disabled")
+        self.import_button.configure(state="normal" if can_switch else "disabled")
 
     def _update_sessions(self) -> None:
         if not isinstance(self.session, DurableOfflineAISession):
@@ -401,6 +429,43 @@ class OfflineAIWindow:
             self.status.set("Local conversation deleted.")
         except Exception as exc:
             self.status.set("Cannot delete conversation: " + str(exc))
+        self._refresh()
+
+    def export_selected(self) -> None:
+        if self.active or not isinstance(self.session, DurableOfflineAISession):
+            return
+        sid = self.session_choices.get(self.session_picker.get())
+        if sid is None:
+            return
+        selected = self.filedialog.asksaveasfilename(
+            parent=self.window, title="Export private offline chat",
+            defaultextension=".json",
+            filetypes=[("Conversation backup", "*.json")],
+        )
+        if not selected:
+            return
+        try:
+            save_private_bundle(selected, self.session.export_conversation(sid))
+            self.status.set("Conversation and retry receipts exported.")
+        except Exception as exc:
+            self.status.set("Conversation export failed: " + str(exc))
+
+    def import_selected(self) -> None:
+        if self.active or not isinstance(self.session, DurableOfflineAISession):
+            return
+        selected = self.filedialog.askopenfilename(
+            parent=self.window, title="Import private offline chat",
+            filetypes=[("Conversation backup", "*.json"), ("All files", "*.*")],
+        )
+        if not selected:
+            return
+        try:
+            sid = self.session.import_conversation(load_private_bundle(selected))
+            self._display_history()
+            self._update_sessions()
+            self.status.set("Imported conversation: " + sid[:18] + "…")
+        except Exception as exc:
+            self.status.set("Conversation import failed: " + str(exc))
         self._refresh()
 
     def _append(self, speaker: str, text: str) -> None:
@@ -501,6 +566,8 @@ class OfflineAIWindow:
                 kind, value = self.events.get_nowait()
                 self.active = False
                 if kind == "loaded":
+                    if isinstance(self.session, DurableOfflineAISession):
+                        self.session.close()
                     self.session = value  # type: ignore[assignment]
                     self._display_history()
                     self._update_sessions()
