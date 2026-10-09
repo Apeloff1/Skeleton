@@ -650,11 +650,37 @@ def smoke_offline_native_inference() -> bool:
         vocab=("system:", "user:", "assistant:", "hello", "world", "answer"),
         dim=8, ctx=48, seed=41, n_heads=2, n_layers=2, d_ff=16,
     ))
+    from tempfile import TemporaryDirectory
+
     session = OfflineAISession(NativeRuntimeLocalModel(runtime))
     answer = asyncio.run(session.ask("hello", max_output_tokens=2))
-    return (
+    if not (
         bool(answer.text)
         and answer.model_digest == runtime.model_digest
         and len(answer.execution_receipt_digest) == 64
         and len(session.history) == 2
-    )
+    ):
+        return False
+    # Release packaging must prove the same native backend survives a
+    # complete in-process window/store teardown and fresh SQLite reopen.
+    with TemporaryDirectory(prefix="skeleton-offline-smoke-") as directory:
+        path = Path(directory) / "local.sqlite3"
+        durable = DurableOfflineAISession(
+            NativeRuntimeLocalModel(runtime), database=path
+        )
+        sid = durable.session_id
+        completed = asyncio.run(durable.ask("hello", max_output_tokens=2))
+        expected_history = durable.history
+        durable.close()
+        restored = DurableOfflineAISession(
+            NativeRuntimeLocalModel(runtime), database=path, session_id=sid
+        )
+        try:
+            return (
+                bool(completed.text)
+                and completed.model_digest == runtime.model_digest
+                and restored.history == expected_history
+                and restored.list_conversations() == ((sid, 1),)
+            )
+        finally:
+            restored.close()
