@@ -84,6 +84,9 @@ class OfflineImprovementReceipt:
     total_training_steps: int
     attempted_epochs: int
     validation_tokens: int
+    protected_suite_digest: str | None = None
+    protected_suite_passed: bool = False
+    protected_suite_cases: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -106,6 +109,9 @@ class OfflineImprovementReceipt:
             "attempted_epochs": self.attempted_epochs,
             "training_steps": self.total_training_steps,
             "validation_tokens": self.validation_tokens,
+            "protected_suite_digest": self.protected_suite_digest,
+            "protected_suite_passed": self.protected_suite_passed,
+            "protected_suite_cases": self.protected_suite_cases,
             "new_checkpoint_only": True,
             "rollback_checkpoint_retained": True,
             "hosted_provider_used": False,
@@ -143,6 +149,7 @@ def improve_local_model(
     destination: str | Path,
     *,
     epochs: int = 1,
+    protected_suite: str | Path | None = None,
 ) -> OfflineImprovementReceipt:
     """Create a new checkpoint only after finite, positive held-out improvement."""
     if type(epochs) is not int or not 1 <= epochs <= MAX_EPOCHS:
@@ -180,6 +187,26 @@ def improve_local_model(
     }:
         raise OfflineImprovementError("held-out evaluation overlaps normalized training tokens")
 
+    protected_evidence = None
+    protected_baseline = None
+    if protected_suite is not None:
+        # A third explicit source protects capabilities beyond the scalar
+        # epoch-selection corpus. Reject overlaps with either the training
+        # or epoch-selection data before *any* SGD mutates in-memory weights.
+        from skeleton.app.local_ai_benchmark import (
+            _evaluate_backend, _exclude_leaked_training_cases,
+            load_benchmark_suite,
+        )
+
+        protected_evidence = load_benchmark_suite(protected_suite, backend=original)
+        _exclude_leaked_training_cases(
+            protected_evidence, checkpoint=original, source=training_text,
+        )
+        _exclude_leaked_training_cases(
+            protected_evidence, checkpoint=original, source=validation_text,
+        )
+        protected_baseline = _evaluate_backend(protected_evidence, original)
+
     baseline = _token_weighted_perplexity(model, heldout_lines)
     if not math.isfinite(baseline) or baseline <= 0:
         raise OfflineImprovementError("baseline held-out perplexity is invalid")
@@ -213,6 +240,19 @@ def improve_local_model(
     independently_rechecked = _token_weighted_perplexity(trained, heldout_lines)
     if not math.isclose(independently_rechecked, best_score, abs_tol=1e-9, rel_tol=1e-9):
         raise OfflineImprovementError("candidate replay differs from selected held-out epoch")
+    if protected_evidence is not None:
+        from skeleton.app.local_ai_benchmark import (
+            _evaluate_backend, compare_benchmark_results,
+        )
+
+        guarded_result = _evaluate_backend(protected_evidence, candidate)
+        guarded_verdict = compare_benchmark_results(
+            protected_baseline, guarded_result,
+        )
+        if not guarded_verdict["passes_local_regression_gate"]:
+            raise OfflineImprovementError(
+                "protected benchmark category regression: candidate not published"
+            )
     written = publish_native_checkpoint_no_replace(candidate, output)
     restored = load_native_checkpoint(output)
     if (
@@ -234,6 +274,13 @@ def improve_local_model(
         attempted_epochs=epochs,
         total_training_steps=step_count,
         validation_tokens=heldout_count,
+        protected_suite_digest=(
+            protected_evidence.suite_digest if protected_evidence else None
+        ),
+        protected_suite_passed=protected_evidence is not None,
+        protected_suite_cases=(
+            len(protected_evidence.cases) if protected_evidence else 0
+        ),
     )
 
 
