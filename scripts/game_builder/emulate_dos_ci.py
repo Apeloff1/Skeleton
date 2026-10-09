@@ -31,7 +31,7 @@ class DOSExecutionError(ValueError):
 
 
 def parse_guest_offsets(blob: bytes) -> dict[str, int]:
-    if not 256 < len(blob) <= 0xFF00 or not blob.startswith(b"\x0e\x1f\xb8\x03\x00\xcd\x10"):
+    if not 256 < len(blob) <= 0xFF00 or not blob.startswith(b"\x0e\x1f\xfc\xb8\x03\x00\xcd\x10"):
         raise DOSExecutionError("not an 8086 real-mode DOS COM image")
     if blob.count(_STATE_MARKER) != 1:
         raise DOSExecutionError("DOS RAM address marker missing or ambiguous")
