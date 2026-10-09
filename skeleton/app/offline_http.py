@@ -34,6 +34,9 @@ from skeleton.app.local_ai import (
 )
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
 from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary, MAX_DOCUMENT_BYTES
+from skeleton.app.offline_grounding import (
+    grounded_request_digest, prepare_evidence,
+)
 
 
 MAX_JSON_BYTES = 16 * 1024 * 1024
@@ -119,8 +122,11 @@ class OfflineHTTPApplication:
 
     def _perform_turn(self, session_id: str,
                       request: dict[str, Any]) -> dict[str, Any]:
-        _fields(request, {"message", "request_id", "max_output_tokens"},
+        _fields(request, {"message", "request_id", "max_output_tokens", "grounded"},
                 {"message", "request_id"})
+        grounded = request.get("grounded", False)
+        if type(grounded) is not bool:
+            raise OfflineHTTPError(400, "grounded must be a boolean")
         text = request["message"]
         if (not isinstance(text, str) or not text.strip()
                 or len(text.encode("utf-8", errors="strict")) > 4096):
@@ -129,10 +135,15 @@ class OfflineHTTPApplication:
         rid = _identifier("request id", request["request_id"])
         budget = _budget(request, self.default_output_tokens)
         digest = _digest_request(text, GenerationConfig(max_new_tokens=budget))
+        if grounded:
+            digest = grounded_request_digest(digest)
         with self._lock:
             current = self._session(session_id)
             replay = self._store.replay(session_id, rid, digest)
             if replay is not None:
+                previous = self._store.turn_evidence(
+                    session_id, self.model_digest, self.tokenizer_digest,
+                )
                 return {
                     "session_id": session_id, "request_id": rid,
                     "revision": replay.revision, "text": replay.text,
@@ -140,19 +151,38 @@ class OfflineHTTPApplication:
                     "input_tokens": replay.prompt_tokens,
                     "output_tokens": replay.generated_tokens,
                     "replayed": True, "model_digest": self.model_digest,
+                    "evidence": previous[replay.revision - 1],
                 }
+            manifest = None
+            if grounded:
+                if len(text.encode("utf-8")) > 1024:
+                    raise OfflineHTTPError(400, "grounded query exceeds 1024 bytes")
+                hits = self.knowledge.search(text, limit=2)
+                if not hits:
+                    raise OfflineHTTPError(
+                        422, "no local reference passages match this question"
+                    )
+                manifest = prepare_evidence(
+                    text, digest, hits, self.model_digest, self.tokenizer_digest,
+                )
             chat = DurableOfflineAISession(
                 self.backend, database=self.database, session_id=session_id
             )
             try:
                 # Runtime adaptation and durability CAS are controlled by
                 # DurableOfflineAISession. A failed turn leaves no partial text.
-                asyncio.run(chat.ask(text, max_output_tokens=budget, request_id=rid))
+                asyncio.run(chat.ask(
+                    text, max_output_tokens=budget, request_id=rid,
+                    evidence_manifest=manifest,
+                ))
             finally:
                 chat.close()
             receipt = self._store.replay(session_id, rid, digest)
             if receipt is None or receipt.revision != current.revision + 1:
                 raise RuntimeContractError("local generation receipt was not committed")
+            committed_evidence = self._store.turn_evidence(
+                session_id, self.model_digest, self.tokenizer_digest,
+            )[receipt.revision - 1]
             return {
                 "session_id": session_id, "request_id": rid,
                 "revision": receipt.revision, "text": receipt.text,
@@ -160,6 +190,7 @@ class OfflineHTTPApplication:
                 "input_tokens": receipt.prompt_tokens,
                 "output_tokens": receipt.generated_tokens,
                 "replayed": False, "model_digest": self.model_digest,
+                "evidence": committed_evidence,
             }
 
     def dispatch(self, method: str, path: str,
@@ -234,6 +265,9 @@ class OfflineHTTPApplication:
                 return 200, {
                     "session_id": sid, "revision": stored.revision,
                     "messages": stored.transcript.to_list(),
+                    "evidence": self._store.turn_evidence(
+                        sid, self.model_digest, self.tokenizer_digest,
+                    ),
                 }
             if method == "DELETE":
                 self._store.delete(sid, self.model_digest,
