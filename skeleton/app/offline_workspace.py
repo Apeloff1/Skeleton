@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import json
 from pathlib import Path
+import os
 import re
 import sqlite3
 import threading
@@ -74,6 +75,7 @@ class OfflineWorkspace:
             raise OfflineWorkspaceError("workspace path must be a regular file")
         self.path = target
         self._lock = threading.RLock()
+        was_present = target.exists()
         try:
             # GUI inference runs in a worker thread; all SQLite connection use is
             # serialized by _lock and busy_timeout guards other processes.
@@ -81,6 +83,10 @@ class OfflineWorkspace:
                 str(target), timeout=10.0, isolation_level=None,
                 check_same_thread=False,
             )
+            # Never leave newly created user conversation data world-readable
+            # on POSIX. Do not silently modify the permissions of existing DBs.
+            if not was_present and os.name == "posix":
+                os.chmod(target, 0o600)
             self._db.execute("PRAGMA busy_timeout=10000")
             self._db.execute("PRAGMA journal_mode=WAL")
             self._db.execute("PRAGMA synchronous=FULL")
