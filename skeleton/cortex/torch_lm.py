@@ -158,20 +158,24 @@ class TorchAccel:
             return self._pin_unlocked()
 
     def _pin_unlocked(self) -> "TorchAccel":
-        """Upload canonical Python weights, saving trained device changes first."""
+        """Stage every tensor before atomically publishing a new weight set.
+
+        A failed upload previously replaced embeddings and some layers while
+        the accelerator still claimed resident=True, allowing a hybrid graph.
+        The old graph remains fully intact until *all* allocations complete.
+        An explicit rebind still invalidates old KV, but only on success.
+        """
         self._assert_training_integrity()
         if self._weights_modified:
-            self.sync()
+            self._sync_unlocked()
         lm = self.lm
         if getattr(lm, "use_mod", False):
             raise ValueError("accelerator does not implement Mixture of Depths routing")
-        self.reset_decode_cache()
-        self._weights_modified = False
-        self._E = self._t2(lm.E)
-        self._P = self._t2(lm.P)
-        self._Wout = self._E if getattr(lm, "tied", False) else self._t2(lm.Wout)
-        self._bout = self._t1(lm.bout)
-        self._layers = []
+        embedding = self._t2(lm.E)
+        positions = self._t2(lm.P)
+        projection = embedding if getattr(lm, "tied", False) else self._t2(lm.Wout)
+        bias = self._t1(lm.bout)
+        staged_layers: List[Dict[str, Any]] = []
         blocks = getattr(lm, "layers", None) or []
         if not blocks:
             blocks = [lm]
@@ -196,7 +200,15 @@ class TorchAccel:
                 blob["b2"] = self._t1(getattr(L, "b2", [0.0] * lm.dim))
                 blob["ln2_g"] = self._t1(getattr(L, "ln2_g", [1.0] * lm.dim))
                 blob["ln2_b"] = self._t1(getattr(L, "ln2_b", [0.0] * lm.dim))
-            self._layers.append(blob)
+            staged_layers.append(blob)
+        # This is the single publish point. All steps above are fallible;
+        # nothing below allocates device tensors or computes gradients.
+        self._E, self._P, self._Wout, self._bout = (
+            embedding, positions, projection, bias,
+        )
+        self._layers = staged_layers
+        self._reset_decode_cache_unlocked()
+        self._weights_modified = False
         self.resident = True
         lm.resident = True
         lm.device = self.device_name
