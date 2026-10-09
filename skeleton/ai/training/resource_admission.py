@@ -118,12 +118,83 @@ def _read_cgroup_free(read_text: Callable[[str], str]) -> int | None:
     return None
 
 
+def _windows_memory_status() -> tuple[int | None, int | None]:
+    """Read Windows RAM with a native read-only API; no shell process."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [
+                ("dwLength", wintypes.DWORD),
+                ("dwMemoryLoad", wintypes.DWORD),
+                ("ullTotalPhys", ctypes.c_ulonglong),
+                ("ullAvailPhys", ctypes.c_ulonglong),
+                ("ullTotalPageFile", ctypes.c_ulonglong),
+                ("ullAvailPageFile", ctypes.c_ulonglong),
+                ("ullTotalVirtual", ctypes.c_ulonglong),
+                ("ullAvailVirtual", ctypes.c_ulonglong),
+                ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+            ]
+
+        status = MEMORYSTATUSEX()
+        status.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+        if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+            return None, None
+        total, free = _positive(int(status.ullTotalPhys)), _positive(int(status.ullAvailPhys))
+        if total is None or free is None:
+            return None, None
+        return total, min(free, total)
+    except (AttributeError, OSError, TypeError, ValueError):
+        return None, None
+
+
+def _linux_effective_cpus(
+    read_text: Callable[[str], str],
+    *,
+    affinity: Callable[[], int | None] | None = None,
+) -> int | None:
+    """Clamp logical CPUs to cpuset/affinity and cgroup quota when known."""
+    upper: list[int] = []
+    if affinity is not None:
+        try:
+            usable = _positive(affinity())
+            if usable is not None:
+                upper.append(usable)
+        except (OSError, ValueError, TypeError):
+            pass
+    for path in ("/sys/fs/cgroup/cpu.max",):
+        try:
+            parts = read_text(path).strip().split()
+        except (OSError, UnicodeError):
+            continue
+        if len(parts) != 2 or parts[0] == "max":
+            continue
+        try:
+            quota, period = map(int, parts)
+        except ValueError:
+            continue
+        if quota > 0 and period > 0:
+            upper.append(max(1, quota // period))
+    # The v1 cgroup CPU quota format uses two independent paths.
+    try:
+        quota = int(read_text("/sys/fs/cgroup/cpu/cpu.cfs_quota_us").strip())
+        period = int(read_text("/sys/fs/cgroup/cpu/cpu.cfs_period_us").strip())
+        if quota > 0 and period > 0:
+            upper.append(max(1, quota // period))
+    except (OSError, UnicodeError, ValueError):
+        pass
+    return min(upper) if upper else None
+
+
 def observe_resources(
     *,
     platform: str | None = None,
     read_text: Callable[[str], str] | None = None,
     cpu_count: Callable[[], int | None] | None = None,
     sysconf: Callable[[str], int] | None = None,
+    windows_memory: Callable[[], tuple[int | None, int | None]] | None = None,
+    cpu_affinity: Callable[[], int | None] | None = None,
 ) -> ResourceObservation:
     """Observe device resources with injectable probes; no shell/network/GPU calls."""
     current_platform = platform or sys.platform
@@ -143,6 +214,23 @@ def observe_resources(
         cgroup = _read_cgroup_free(reader)
         if physical is not None:
             memory_source = "linux_proc"
+        if cpu_affinity is None:
+            def _actual_affinity() -> int | None:
+                try:
+                    return len(os.sched_getaffinity(0))
+                except (AttributeError, OSError):
+                    return None
+            cpu_affinity = _actual_affinity
+        constrained = _linux_effective_cpus(reader, affinity=cpu_affinity)
+        if constrained is not None:
+            cpus = min(cpus, constrained) if cpus is not None else constrained
+    elif current_platform == "win32":
+        probe = windows_memory or _windows_memory_status
+        physical, available = probe()
+        if physical is not None and available is not None and 0 < available <= physical:
+            memory_source = "windows_global_memory_status"
+        else:
+            physical = available = None
     if physical is None:
         try:
             pages = sysconf("SC_PHYS_PAGES")
