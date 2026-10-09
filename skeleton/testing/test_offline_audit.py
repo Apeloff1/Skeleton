@@ -142,3 +142,18 @@ def test_doctor_cannot_silently_ignore_mutating_flags(
         "--audit-queue", str(database), "--queue-db", str(database), "--queue-status",
     ]) == 2
     assert capsys.readouterr().out == ""
+
+def test_fresh_local_sqlite_databases_are_private_on_posix(tmp_path: Path) -> None:
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX file mode protection only")
+    workspace, library, queue = _fixtures(tmp_path)
+    for file in (workspace, library, queue):
+        assert file.stat().st_mode & 0o077 == 0
+
+
+def test_readonly_semantic_audit_never_creates_missing_database(tmp_path: Path) -> None:
+    absent = tmp_path / "missing.sqlite"
+    with pytest.raises(OfflineAuditError, match="real local SQLite"):
+        audit_database(absent, "workspace")
+    assert not absent.exists()
