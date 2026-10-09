@@ -228,6 +228,8 @@ class NativeLLMRuntime:
             resident = bool(getattr(self.model, "resident", False))
         if requested in {"cuda", "gpu"}:
             degraded = actual != "cuda"
+        elif requested == "mps":
+            degraded = actual != "mps"
         elif requested in {"torch", "torch-cpu"}:
             degraded = not resident
         else:
@@ -269,6 +271,9 @@ class NativeLLMRuntime:
             raise RuntimeContractError("mutated model context below runtime limit")
         if self.estimate_kv_bytes(self.limits.max_context) > self.limits.max_kv_bytes:
             raise RuntimeContractError("mutated model exceeds KV memory budget")
+        # Compute the digest before mutating admission state. An identity
+        # refresh is atomic: failed validation never partially commits it.
+        digest = snapshot_digest(snapshot)
         self._model_snapshot = snapshot
         self._model_digest = digest
         self._model_bytes = size
