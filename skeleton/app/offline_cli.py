@@ -89,6 +89,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.enqueue_dir or args.run_queue or args.queue_status
         or args.cancel_queue_job or args.retry_queue_job
     )
+    if not queue_mode and (args.queue_db or args.queue_library):
+        print("queue database paths require a queue operation", file=sys.stderr)
+        return 2
+    if not snapshot_mode and (
+        args.snapshot_workspace or args.snapshot_library or args.snapshot_queue
+    ):
+        print("snapshot database paths require a snapshot operation", file=sys.stderr)
+        return 2
+    if snapshot_mode and audit_mode:
+        print("snapshots and read-only audits must be invoked separately", file=sys.stderr)
+        return 2
+    if queue_mode and audit_mode:
+        print("queue mutation and data audits must be invoked separately", file=sys.stderr)
+        return 2
     if snapshot_mode:
         actions = sum(bool(x) for x in (
             args.snapshot_to, args.restore_from, args.verify_snapshot,
