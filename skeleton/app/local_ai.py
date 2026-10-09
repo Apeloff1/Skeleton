@@ -745,6 +745,46 @@ def run_offline_ai() -> int:
     return 0
 
 
+def smoke_offline_gguf_deployment(manifest_path: str | Path) -> bool:
+    """Execute an actual operator-provided GGUF model and verify durable resume.
+
+    Unlike the tiny synthetic native smoke, this command runs the admitted
+    llama.cpp executable against real supplied model weights. It never
+    downloads an artifact or contacts a remote model provider.
+    """
+    from tempfile import TemporaryDirectory
+
+    model = load_gguf_deployment(manifest_path)
+    with TemporaryDirectory(prefix="skeleton-gguf-smoke-") as root:
+        database = Path(root) / "gguf.sqlite3"
+        chat = DurableOfflineAISession(model, database=database)
+        sid = chat.session_id
+        try:
+            answer = asyncio.run(chat.ask(
+                "Reply with a short greeting.", max_output_tokens=chat.preferred_output_tokens
+            ))
+            history = chat.history
+            if (
+                not answer.text.strip()
+                or len(answer.execution_receipt_digest) != 64
+                or answer.model_digest != model.model_digest
+                or chat.list_conversations() != ((sid, 1),)
+            ):
+                return False
+        finally:
+            chat.close()
+        recovered = DurableOfflineAISession(
+            model, database=database, session_id=sid
+        )
+        try:
+            return (
+                recovered.history == history
+                and recovered.tokenizer_digest == _model_tokenizer_digest(model)
+            )
+        finally:
+            recovered.close()
+
+
 def smoke_offline_native_inference() -> bool:
     """Exercise the native inference graph in an isolated tiny fixture.
 
