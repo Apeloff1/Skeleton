@@ -70,6 +70,9 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--inspect-model", action="store_true", help="validate model weights and report offline runtime limits")
     local_ai.add_argument("--train-corpus", help="train a bounded CPU native checkpoint from a local UTF-8 text file")
     local_ai.add_argument("--improve-model", help="previous native checkpoint for independent held-out improvement")
+    local_ai.add_argument("--compare-model", help="baseline checkpoint for read-only held-out comparison")
+    local_ai.add_argument("--candidate-model", help="candidate checkpoint for read-only held-out comparison")
+
     local_ai.add_argument("--eval-corpus", help="separate held-out UTF-8 evaluation text (required for improvement)")
 
     local_ai.add_argument("--output-model", help="new native checkpoint filename for --train-corpus")
@@ -224,11 +227,39 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if command == "local-ai":
         from skeleton.app.local_ai import OfflineAISession, inspect_local_model, load_native_checkpoint, run_offline_ai
 
+        if args.compare_model or args.candidate_model:
+            if (
+                not args.compare_model or not args.candidate_model or not args.eval_corpus
+                or args.improve_model or args.train_corpus or args.output_model
+                or args.model or args.prompt or args.load_chat or args.save_chat
+                or args.inspect_model
+            ):
+                print("local-ai comparison requires --compare-model, --candidate-model, --eval-corpus only")
+                return 2
+            from skeleton.app.local_ai_improvement import compare_local_models
+
+            try:
+                verdict = compare_local_models(
+                    args.compare_model, args.candidate_model, args.eval_corpus,
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local-ai comparison rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(verdict.to_dict(), ensure_ascii=False, sort_keys=True))
+            else:
+                print("Baseline held-out perplexity: " + f"{verdict.baseline_perplexity:.3f}")
+                print("Candidate held-out perplexity: " + f"{verdict.candidate_perplexity:.3f}")
+                print("Improvement: " + ("yes" if verdict.improves else "no"))
+                print("No weight mutation, no release promotion")
+            # A comparison is a release gate, not a best-effort status query.
+            return 0 if verdict.improves else 1
         if args.improve_model:
             if (
                 not args.train_corpus or not args.eval_corpus or not args.output_model
                 or args.model or args.prompt or args.inspect_model
                 or args.load_chat or args.save_chat
+                or args.compare_model or args.candidate_model
             ):
                 print("local-ai improvement requires --improve-model, --train-corpus, --eval-corpus and --output-model only")
                 return 2
@@ -255,6 +286,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 not args.output_model or args.model or args.prompt
                 or args.inspect_model or args.load_chat or args.save_chat
                 or args.eval_corpus or args.improve_model
+                or args.compare_model or args.candidate_model
             ):
                 print("local-ai training requires --train-corpus and --output-model without chat/inference options")
                 return 2
