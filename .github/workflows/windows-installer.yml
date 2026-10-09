@@ -286,6 +286,53 @@ jobs:
             throw "installed graph evaluator accepted a self-referencing task"
           }
 
+          # Native deterministic game-building without downloaded weights:
+          # generate a solvable level, compile geometry, simulate player state.
+          $gameTask = Join-Path $env:RUNNER_TEMP "SkeletonOfflineProceduralLevel.json"
+          '{"operation":"game.level_generate","args":{"seed":1729,"width":12,"height":8,"wall_percent":45}}' |
+            Set-Content -LiteralPath $gameTask -Encoding utf8
+          $generatedRaw = & $offline --capability-file $gameTask --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed frozen console failed original level generation"
+          }
+          $generated = $generatedRaw | ConvertFrom-Json
+          if ($generated.operation -ne "game.level_generate" -or
+              -not $generated.result.goal_reachable -or
+              $generated.result.tiles.Count -ne 8 -or
+              $generated.result.training_examples_added -ne 0 -or
+              $generated.model_inference_used -or
+              $generated.authority_granted) {
+            throw "installed frozen console game-generation contract mismatch"
+          }
+          $repeatRaw = & $offline --capability-file $gameTask --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed frozen console failed replay of seeded game generation"
+          }
+          $repeat = $repeatRaw | ConvertFrom-Json
+          if ($generated.result_sha256 -ne $repeat.result_sha256) {
+            throw "installed generated-game digest was nondeterministic"
+          }
+
+          # The typed graph can feed the generated tilemap into the compiler
+          # and simulator without shell execution or adding training rows.
+          $gameGraph = Join-Path $env:RUNNER_TEMP "SkeletonOfflineGameplayGraph.json"
+          '{"schema_version":"skeleton.offline_capability_graph.v1","nodes":[{"id":"level","operation":"game.level_generate","args":{"seed":42,"width":10,"height":8,"wall_percent":50}},{"id":"compiled","operation":"game.level_compile","args":{"tiles":{"$ref":"level","path":["tiles"]}}},{"id":"step","operation":"game.platformer_step","args":{"tiles":{"$ref":"compiled","path":["tiles"]},"avatar":{"x":1,"y":1,"vx":0,"vy":0},"control":{"left":false,"right":true,"jump":false}}}],"outputs":["compiled","step"]}' |
+            Set-Content -LiteralPath $gameGraph -Encoding utf8
+          $gameGraphRaw = & $offline --capability-graph-file $gameGraph --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed frozen console failed procedural gameplay graph"
+          }
+          $gameGraphReport = $gameGraphRaw | ConvertFrom-Json
+          if ($gameGraphReport.node_count -ne 3 -or
+              -not $gameGraphReport.outputs.compiled.goal_reachable -or
+              $gameGraphReport.outputs.step.avatar.x -lt 1 -or
+              $gameGraphReport.training_examples_added -ne 0 -or
+              $gameGraphReport.model_inference_used -or
+              $gameGraphReport.network_access_used) {
+            throw "installed procedural gameplay graph contract mismatch"
+          }
+
+
 
 
 
