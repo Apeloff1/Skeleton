@@ -1263,3 +1263,112 @@ def test_legacy_unconstrained_device_probe_can_still_fall_back_to_cpu(monkeypatc
     assert model._logits((1, 2)) == pytest.approx(
         TinyTransformer.from_snapshot(model.snapshot())._logits((1, 2))
     )
+
+
+@pytest.mark.parametrize("lr", [-1.0, 1.01, float("nan"), float("inf"), True, "0.2"])
+def test_sgd_rejects_unbounded_or_nonfinite_learning_rates_before_mutation(lr):
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = _model()
+    accel = TorchAccel(model).pin()
+    embedding = accel._E.detach().clone()
+    initial_steps = model.steps
+    with pytest.raises(ValueError, match="learning rate"):
+        accel.sgd((1, 2), target=3, lr=lr)
+    assert model.steps == initial_steps
+    assert not accel._weights_modified
+    assert not accel._training_failed
+    assert (accel._E == embedding).all().item()
+
+
+@pytest.mark.parametrize("sequence,target", [
+    ((-1, 2), 3), ((True, 2), 3), ((1, 9999), 3),
+    ((1, 2), -1), ((1, 2), True), ((1, 2), 9999),
+    ((), 2),
+])
+def test_sgd_rejects_invalid_vocabulary_before_mutation(sequence, target):
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = _model()
+    accel = TorchAccel(model).pin()
+    with pytest.raises(ValueError, match="SGD"):
+        accel.sgd(sequence, target=target, lr=0.02)
+    assert model.steps == 0
+    assert not accel._weights_modified
+
+
+def test_nonfinite_sgd_loss_never_touches_device_weights(monkeypatch):
+    torch = pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = _model()
+    accel = TorchAccel(model).pin()
+    previous = accel._E.detach().clone()
+
+    def bad_logits(_):
+        bad = torch.full(
+            (model.V,), float("nan"),
+            dtype=torch.float32, requires_grad=True,
+        )
+        return bad, None
+
+    monkeypatch.setattr(accel, "_forward_ids", bad_logits)
+    with pytest.raises(ValueError, match="non-finite loss"):
+        accel.sgd((1, 2), target=3, lr=0.02)
+    assert not accel._weights_modified
+    assert not accel._training_failed
+    assert (accel._E == previous).all().item()
+    assert model.steps == 0
+
+
+def test_gradient_check_failure_occurs_before_first_sgd_weight_write(monkeypatch):
+    torch = pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = _model()
+    accel = TorchAccel(model).pin()
+    previous = accel._E.detach().clone()
+    original = torch.nn.utils.clip_grad_norm_
+
+    def invalid_norm(*args, **kwargs):
+        assert kwargs["error_if_nonfinite"] is True
+        raise RuntimeError("injected nonfinite gradient detected")
+
+    monkeypatch.setattr(torch.nn.utils, "clip_grad_norm_", invalid_norm)
+    with pytest.raises(RuntimeError, match="nonfinite gradient"):
+        accel.sgd((1, 2), target=3, lr=0.02)
+    assert model.steps == 0
+    assert not accel._weights_modified
+    assert not accel._training_failed
+    assert (accel._E == previous).all().item()
+    monkeypatch.setattr(torch.nn.utils, "clip_grad_norm_", original)
+    assert accel.sgd((1, 2), target=3, lr=0.02) > 0
+    assert model.steps == 1
+
+
+def test_gradient_clipping_is_opt_in_and_reports_measured_global_norm():
+    pytest.importorskip("torch")
+    model = _model(norm="rms", ffn_kind="swiglu")
+    model.to("torch", max_grad_norm=0.05)
+    accel = model._accel
+    assert accel is not None
+    assert accel.max_grad_norm == 0.05
+    loss = accel.sgd((1, 2, 3), target=3, lr=0.02)
+    assert 0 < loss < 100
+    assert accel.last_grad_norm is not None
+    assert 0 < accel.last_grad_norm < float("inf")
+    assert accel._weights_modified
+    accel.sync()
+    assert model.steps == 1
+
+
+@pytest.mark.parametrize("bad", [0, -1, True, float("nan"), float("inf"), "0.5"])
+def test_gradient_clip_config_is_rejected_before_device_transition(bad):
+    pytest.importorskip("torch")
+    model = _model()
+    with pytest.raises(ValueError, match="max_grad_norm"):
+        model.to("torch", max_grad_norm=bad)
+    assert model._accel is None
+    assert not model.resident
