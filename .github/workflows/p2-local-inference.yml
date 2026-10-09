@@ -13,6 +13,8 @@ on:
       - "skeleton/testing/test_offline_kit.py"
       - "skeleton/app/offline_cli.py"
       - "skeleton/app/offline_workspace.py"
+      - "skeleton/app/offline_readiness.py"
+      - "skeleton/testing/test_offline_readiness.py"
       - "skeleton/testing/test_offline_workspace.py"
       - "skeleton/testing/test_offline_console.py"
       - "tests/flgb/test_desktop_offline_ai.py"
@@ -41,6 +43,8 @@ on:
       - "skeleton/testing/test_offline_kit.py"
       - "skeleton/app/offline_cli.py"
       - "skeleton/app/offline_workspace.py"
+      - "skeleton/app/offline_readiness.py"
+      - "skeleton/testing/test_offline_readiness.py"
       - "skeleton/testing/test_offline_workspace.py"
       - "skeleton/testing/test_offline_console.py"
       - "tests/flgb/test_desktop_offline_ai.py"
@@ -106,4 +110,5 @@ jobs:
           skeleton/testing/test_offline_kit.py
           skeleton/testing/test_offline_console.py
           skeleton/testing/test_offline_workspace.py
+          skeleton/testing/test_offline_readiness.py
           tests/flgb/test_desktop_offline_ai.py
