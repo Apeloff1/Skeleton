@@ -354,6 +354,37 @@ class OfflineNativeChatTests(unittest.TestCase):
             self.assertEqual(current.revision, 1)
             self.assertEqual(current.transcript.messages[-2].content, "hello")
 
+    def test_world_readable_wal_and_shm_sidecars_are_denied(self):
+        import os
+        if os.name == "nt":
+            self.skipTest("POSIX SQLite journal privacy test")
+        path = self.root / "sidecar.sqlite"
+        with OfflineChatStore(path):
+            pass
+        for suffix in ("-wal", "-shm", "-journal"):
+            sidecar = self.root / ("sidecar.sqlite" + suffix)
+            sidecar.write_bytes(b"canary")
+            sidecar.chmod(0o644)
+            with self.assertRaisesRegex(RuntimeContractError, "owner-only permissions"):
+                OfflineChatStore(path)
+            sidecar.unlink()
+
+    def test_sidecar_symlink_is_denied_before_sqlite_open(self):
+        import os
+        if os.name == "nt":
+            self.skipTest("POSIX SQLite symlink privacy test")
+        path = self.root / "private-main.sqlite"
+        with OfflineChatStore(path):
+            pass
+        target = self.root / "secret-external.txt"
+        target.write_text("unrelated sensitive content", encoding="utf-8")
+        journal = self.root / "private-main.sqlite-wal"
+        journal.symlink_to(target)
+        with self.assertRaisesRegex(RuntimeContractError, "symlinks"):
+            OfflineChatStore(path)
+        self.assertEqual(target.read_text(encoding="utf-8"),
+                         "unrelated sensitive content")
+
     def test_existing_world_readable_sqlite_is_rejected(self):
         import os
         if os.name == "nt":
