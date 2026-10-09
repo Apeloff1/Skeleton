@@ -18,6 +18,7 @@ import re
 
 from .legal_paths import HomebrewLegalAssessment
 from .plagiarism_guard import OriginalityReport
+from .platform_registry import PlatformRegistryError, default_registry
 
 _SHA = re.compile(r"^[0-9a-f]{64}$")
 _IDENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
@@ -312,7 +313,12 @@ def evaluate_independent_review(
         blockers.add("MISMATCHED_PROJECT_IDENTITY")
     if candidate.target_platform_id != legal.target_platform_id:
         blockers.add("TARGET_HARDWARE_CHANGED")
+    try:
+        default_registry().get(candidate.target_platform_id)
+    except PlatformRegistryError:
+        blockers.add("TARGET_PLATFORM_NOT_IN_VERIFIED_CATALOGUE")
     if (candidate.legal_assessment_sha256 != legal.assessment_digest or
+        candidate.rights_evidence_sha256 != legal.rights_packet_sha256 or
         candidate.originality_screen_sha256 != originality.screen_digest or
         candidate.world_sha256 != originality.artifact_sha256):
         blockers.add("REVIEW_EVIDENCE_DOES_NOT_BIND_TO_BUILT_GAME")
