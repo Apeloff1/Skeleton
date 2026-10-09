@@ -318,10 +318,14 @@ TryMove:
     sta Cooldown
     lda NextX
     cmp #MAZE_WIDTH
-    bcs .blocked
+    bcc .xInside
+    rts
+.xInside:
     lda NextY
     cmp #MAZE_HEIGHT
-    bcs .blocked
+    bcc .yInside
+    rts
+.yInside:
     lda NextY
     sta CalcPtr
     lda #0
