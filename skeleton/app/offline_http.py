@@ -32,6 +32,7 @@ from skeleton.app.local_ai import (
     private_desktop_database,
 )
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
+from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary, MAX_DOCUMENT_BYTES
 
 
 MAX_JSON_BYTES = 16 * 1024 * 1024
@@ -83,6 +84,13 @@ class OfflineHTTPApplication:
         self.tokenizer_digest = _model_tokenizer_digest(backend)
         self._lock = threading.RLock()
         self._store = OfflineChatStore(database)
+        try:
+            self.knowledge = OfflineKnowledgeLibrary(
+                self._store, self.model_digest, self.tokenizer_digest
+            )
+        except BaseException:
+            self._store.close()
+            raise
 
     def close(self) -> None:
         self._store.close()
@@ -170,6 +178,22 @@ class OfflineHTTPApplication:
                 "session_list_limit": 100,
                 "default_output_tokens": self.default_output_tokens,
             }
+        if path == "/v1/knowledge/documents":
+            if method == "GET":
+                return 200, {"documents": self.knowledge.list_documents()}
+            if method == "POST":
+                _fields(body, {"title", "text"}, {"title", "text"})
+                item = self.knowledge.add_text(body["title"], body["text"])
+                return (200 if item["reused"] else 201), item
+        if path == "/v1/knowledge/search" and method == "POST":
+            _fields(body, {"query", "limit"}, {"query"})
+            return 200, {"hits": self.knowledge.search(
+                body["query"], limit=body.get("limit", 6)
+            )}
+        if path.startswith("/v1/knowledge/documents/") and method == "DELETE":
+            document_id = path[len("/v1/knowledge/documents/"):]
+            self.knowledge.delete(document_id)
+            return 200, {"deleted_document_id": document_id}
         if path == "/v1/sessions":
             if method == "GET":
                 return 200, {"sessions": [
@@ -345,7 +369,11 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         declared = self.headers.get("Content-Length")
         if declared is None or not declared.isascii() or not declared.isdecimal():
             raise OfflineHTTPError(411, "numeric request length required")
-        limit = MAX_JSON_BYTES if path == "/v1/sessions/import" else MAX_CHAT_REQUEST_BYTES
+        limit = (
+            MAX_JSON_BYTES if path == "/v1/sessions/import"
+            else MAX_DOCUMENT_BYTES + 8192 if path == "/v1/knowledge/documents"
+            else MAX_CHAT_REQUEST_BYTES
+        )
         length = int(declared)
         if not 1 <= length <= limit:
             raise OfflineHTTPError(413, "request byte budget exceeded")
