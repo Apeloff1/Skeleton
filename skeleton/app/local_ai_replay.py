@@ -82,7 +82,7 @@ def _read_receipt(path: str | Path) -> tuple[bytes, dict[str, Any]]:
         )
     except (UnicodeError, json.JSONDecodeError, RecursionError) as exc:
         raise OfflineReplayError("invalid UTF-8 JSON improvement receipt") from exc
-    if not isinstance(item, dict) or item.get("schema_version") != 1:
+    if not isinstance(item, dict) or type(item.get("schema_version")) is not int or item["schema_version"] != 1:
         raise OfflineReplayError("unsupported improvement receipt schema")
     mandatory = {
         "schema_version", "parent_model_digest", "candidate_model_digest",
@@ -135,6 +135,11 @@ def _read_receipt(path: str | Path) -> tuple[bytes, dict[str, Any]]:
         or any(ch not in "0123456789abcdef" for ch in protected_hash)
     ):
         raise OfflineReplayError("protected suite digest invalid")
+    if (
+        (not item["protected_suite_passed"] and item["protected_suite_cases"] != 0)
+        or (item["protected_suite_passed"] and item["protected_suite_cases"] < 1)
+    ):
+        raise OfflineReplayError("protected benchmark case count inconsistent")
     if bool(protected_hash) != item["protected_suite_passed"]:
         raise OfflineReplayError("protected benchmark claim inconsistent")
     return raw, item
