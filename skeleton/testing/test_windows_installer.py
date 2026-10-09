@@ -237,7 +237,7 @@ def test_installed_offline_capability_engine_is_bundled_and_actually_exercised()
 
     assert '"skeleton.ai.runtime.deterministic_capabilities"' in build
     assert "& $offline --capability-list --json" in workflow
-    assert "$capabilityCatalog.operations.Count -ne 30" in workflow
+    assert "$capabilityCatalog.operations.Count -ne 31" in workflow
     assert "& $offline --capability-file $capabilityTask --json" in workflow
     assert '$capabilityReport.result.steps -ne 5' in workflow
     assert "$capabilityReport.model_inference_used" in workflow
