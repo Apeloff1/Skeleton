@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import math
 import os
 from pathlib import Path
 import stat
@@ -40,6 +41,8 @@ class OfflineTrainingReceipt:
     training_tokens: int
     training_steps: int
     epochs: int
+    initial_perplexity: float
+    final_perplexity: float
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -52,6 +55,9 @@ class OfflineTrainingReceipt:
             "training_tokens": self.training_tokens,
             "training_steps": self.training_steps,
             "epochs": self.epochs,
+            "initial_perplexity": self.initial_perplexity,
+            "final_perplexity": self.final_perplexity,
+            "training_loss_improved": self.final_perplexity < self.initial_perplexity,
             "provider_credentials_required": False,
             "network_required": False,
             "foundation_model": False,
@@ -128,9 +134,13 @@ def train_local_text(
         vocab=vocabulary, dim=16, ctx=96, seed=seed, n_heads=2,
         n_layers=1, d_ff=32,
     )
+    initial_perplexity = model.perplexity(corpus)
     steps = 0
     for _ in range(epochs):
         steps += model.fit(corpus, lr=0.025, schedule="cosine")
+    final_perplexity = model.perplexity(corpus)
+    if not math.isfinite(initial_perplexity) or not math.isfinite(final_perplexity):
+        raise OfflineTrainingError("native training produced non-finite quality diagnostics")
     if steps < 1:
         raise OfflineTrainingError("training produced no gradient steps")
     native = NativeLLMRuntime(model)
@@ -153,4 +163,6 @@ def train_local_text(
         training_tokens=len(normalized),
         training_steps=steps,
         epochs=epochs,
+        initial_perplexity=initial_perplexity,
+        final_perplexity=final_perplexity,
     )
