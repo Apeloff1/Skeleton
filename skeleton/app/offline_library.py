@@ -238,6 +238,18 @@ class OfflineDocumentLibrary:
                         )
                         self._db.execute("DELETE FROM offline_documents WHERE id=?", (docid,))
                         removed += 1
+                # FTS5 is a derived projection. Drop orphaned rowids that
+                # cannot be attributed to any currently admitted document.
+                # Repair runs only during an explicit local folder scan.
+                orphans = self._db.execute(
+                    "SELECT rowid FROM offline_document_fts "
+                    "WHERE rowid NOT IN (SELECT id FROM offline_documents)"
+                ).fetchall()
+                for (orphan_id,) in orphans:
+                    self._db.execute(
+                        "DELETE FROM offline_document_fts WHERE rowid=?",
+                        (orphan_id,),
+                    )
                 self._db.execute("COMMIT")
             except BaseException:
                 self._db.execute("ROLLBACK")
@@ -247,6 +259,7 @@ class OfflineDocumentLibrary:
             "indexed_files": len(staged),
             "updated_files": changed,
             "removed_files": removed,
+            "repaired_orphan_fts_rows": len(orphans),
             "indexed_bytes": sum(item[3] for item in staged),
         }
 
