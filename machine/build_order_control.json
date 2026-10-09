@@ -6,9 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-109",
     "title": "Build Order",
-    "required_gap_texts": [
-      "independent construction-DAG cycle and blocked-state verification remains pending"
-    ]
+    "required_gap_texts": []
   },
   "sources": [
     "machine/ai_master_build_sequence.json",

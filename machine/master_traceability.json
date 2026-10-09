@@ -10,10 +10,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-112",
     "title": "Master Traceability Matrix",
-    "required_gap_texts": [
-      "repository-wide trace population remains separate",
-      "independent completeness audit remains pending"
-    ]
+    "required_gap_texts": []
   },
   "policy": {
     "stable_id_rule": "Node IDs are deterministic from masterplan volume key, field class, and one-based zero-padded source position.",

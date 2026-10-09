@@ -6,10 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-122",
     "title": "Requirements Engineering",
-    "required_gap_texts": [
-      "materialize canonical requirement IDs",
-      "bind requirements to tests/evidence"
-    ]
+    "required_gap_texts": []
   },
   "source": "machine/ai_master_plan.json",
   "policy": {
@@ -2825,7 +2822,7 @@
       "volume_ref": "VOL-022",
       "volume_title": "Autonomous Repository Engineering",
       "ordinal": 1,
-      "text": "Use inspect→plan→lease→edit→build→test→review→verify as the canonical repository mutation flow.",
+      "text": "Use inspect\u2192plan\u2192lease\u2192edit\u2192build\u2192test\u2192review\u2192verify as the canonical repository mutation flow.",
       "status": "specified",
       "acceptance": {
         "test_refs": [

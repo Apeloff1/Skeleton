@@ -6,9 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-054",
     "title": "Machine Architecture Manifests",
-    "required_gap_texts": [
-      "independent manifest-reference drift, schema-downgrade, and doc-digest verification remains pending"
-    ]
+    "required_gap_texts": []
   },
   "reference_groups": [
     {

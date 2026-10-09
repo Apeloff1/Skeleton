@@ -7,17 +7,12 @@
     {
       "volume_ref": "VOL-002",
       "title": "System Architecture",
-      "required_gap_texts": [
-        "automate owner lookup for newly created paths"
-      ]
+      "required_gap_texts": []
     },
     {
       "volume_ref": "VOL-051",
       "title": "Repository Architecture",
-      "required_gap_texts": [
-        "bind all AI roots to one ownership graph",
-        "materialize relocation parity gate"
-      ]
+      "required_gap_texts": []
     }
   ],
   "sources": {

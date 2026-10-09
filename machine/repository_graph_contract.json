@@ -6,9 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-021",
     "title": "Code Intelligence",
-    "required_gap_texts": [
-      "independent cross-language repository-graph, ownership/test impact, and change-planner verification remains pending"
-    ]
+    "required_gap_texts": []
   },
   "sources": [
     {

@@ -6,9 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-108",
     "title": "Anti-Patterns",
-    "required_gap_texts": [
-      "independent anti-pattern detector and exception-expiry verification remains pending"
-    ]
+    "required_gap_texts": []
   },
   "source": "machine/ai_edge_case_catalog.json",
   "entries": [
@@ -98,7 +96,7 @@
     {
       "id": "AP-HIST-SYS-020",
       "source_case_id": "HIST-SYS-020",
-      "title": "Saltzer–Schroeder principles",
+      "title": "Saltzer\u2013Schroeder principles",
       "domain": "security",
       "criticality": "critical",
       "failure_history": "Least privilege, fail-safe defaults, complete mediation and economy of mechanism remain central AI-tool security lessons.",

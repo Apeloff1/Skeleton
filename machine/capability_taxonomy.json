@@ -7,18 +7,12 @@
     {
       "volume_ref": "VOL-113",
       "title": "Capability Map",
-      "required_gap_texts": [
-        "unify capability descriptors",
-        "bind runtime discovery to registry"
-      ]
+      "required_gap_texts": []
     },
     {
       "volume_ref": "VOL-124",
       "title": "Capability Taxonomy",
-      "required_gap_texts": [
-        "normalize capability naming",
-        "map all volumes to capability classes"
-      ]
+      "required_gap_texts": []
     }
   ],
   "sources": {

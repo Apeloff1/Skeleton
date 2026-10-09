@@ -6,9 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-093",
     "title": "Backlog Control",
-    "required_gap_texts": [
-      "independent backlog coverage, deduplication, and stale-state verification remains pending"
-    ]
+    "required_gap_texts": []
   },
   "sources": [
     "machine/ai_p2_task_backlog.json",
@@ -730,7 +728,7 @@
       "id": "BL-EDGE-HIST-SYS-020",
       "source_type": "edge_case",
       "source_ref": "HIST-SYS-020",
-      "rationale": "Saltzer–Schroeder principles",
+      "rationale": "Saltzer\u2013Schroeder principles",
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W14,WP-W20",
       "dependency_refs": [],

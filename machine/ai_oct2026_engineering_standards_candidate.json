@@ -7,8 +7,20 @@
   "ai_file_tree": "machine/ai_file_tree.json",
   "source_queue_state": "queued_unmodified",
   "volume_refs": [
-    "VOL-221","VOL-222","VOL-223","VOL-224","VOL-225","VOL-226","VOL-227",
-    "VOL-228","VOL-229","VOL-230","VOL-231","VOL-232","VOL-233","VOL-234"
+    "VOL-221",
+    "VOL-222",
+    "VOL-223",
+    "VOL-224",
+    "VOL-225",
+    "VOL-226",
+    "VOL-227",
+    "VOL-228",
+    "VOL-229",
+    "VOL-230",
+    "VOL-231",
+    "VOL-232",
+    "VOL-233",
+    "VOL-234"
   ],
   "primary_implementation_by_volume": {
     "VOL-221": "skeleton/ai/governance/cards.py",
@@ -52,14 +64,38 @@
     "skeleton/testing/test_security_boundaries.py"
   ],
   "security_mirror_pairs": [
-    ["skeleton/security/air_gap.py","skeleton/ai/runtime/security/air_gap.py"],
-    ["skeleton/security/identity_federation.py","skeleton/ai/runtime/security/identity_federation.py"]
+    [
+      "skeleton/security/air_gap.py",
+      "skeleton/ai/runtime/security/air_gap.py"
+    ],
+    [
+      "skeleton/security/identity_federation.py",
+      "skeleton/ai/runtime/security/identity_federation.py"
+    ]
   ],
   "owner_contract": {
-    "AIFT-NATIVE-GOVERNANCE-ROOT": ["VOL-221","VOL-222","VOL-223","VOL-224","VOL-225","VOL-226","VOL-234"],
-    "AIFT-NATIVE-PROVIDERS-ROOT": ["VOL-227","VOL-228","VOL-229"],
-    "AIFT-SECURITY": ["VOL-230","VOL-233"],
-    "AIFT-NATIVE-RUNTIME-ROOT": ["VOL-231","VOL-232"]
+    "AIFT-NATIVE-GOVERNANCE-ROOT": [
+      "VOL-221",
+      "VOL-222",
+      "VOL-223",
+      "VOL-224",
+      "VOL-225",
+      "VOL-226",
+      "VOL-234"
+    ],
+    "AIFT-NATIVE-PROVIDERS-ROOT": [
+      "VOL-227",
+      "VOL-228",
+      "VOL-229"
+    ],
+    "AIFT-SECURITY": [
+      "VOL-230",
+      "VOL-233"
+    ],
+    "AIFT-NATIVE-RUNTIME-ROOT": [
+      "VOL-231",
+      "VOL-232"
+    ]
   },
   "evidence_policy": {
     "exact_head_ci_required": true,

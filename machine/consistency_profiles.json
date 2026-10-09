@@ -6,10 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-132",
     "title": "Consistency Model",
-    "required_gap_texts": [
-      "classify state domains",
-      "bind guarantees to stores"
-    ]
+    "required_gap_texts": []
   },
   "sources": {
     "state_topology": {

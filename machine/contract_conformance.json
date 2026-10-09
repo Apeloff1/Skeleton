@@ -545,7 +545,7 @@
     {
       "id": "JSON-UNICODE-ROUNDTRIP",
       "kind": "raw_json",
-      "payload": "{\"text\":\"Ångström — 東京 — 😀\"}",
+      "payload": "{\"text\":\"\u00c5ngstr\u00f6m \u2014 \u6771\u4eac \u2014 \ud83d\ude00\"}",
       "expected": "accept",
       "reason": "UTF-8 Unicode round-trips without authority changes"
     },

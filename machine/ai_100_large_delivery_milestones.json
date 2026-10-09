@@ -34,61 +34,61 @@
   "delivery_trains": [
     {
       "id": "MDT-01",
-      "name": "Delivery train 1 — Assured cognitive substrate",
+      "name": "Delivery train 1 \u2014 Assured cognitive substrate",
       "milestone_range": "MDM-001..MDM-010",
       "scope_rule": "Ten major milestones with 4-5 canonical volumes each; no shadow owner or premature promotion"
     },
     {
       "id": "MDT-02",
-      "name": "Delivery train 2 — Contextual intelligence",
+      "name": "Delivery train 2 \u2014 Contextual intelligence",
       "milestone_range": "MDM-011..MDM-020",
       "scope_rule": "Ten major milestones with 4-5 canonical volumes each; no shadow owner or premature promotion"
     },
     {
       "id": "MDT-03",
-      "name": "Delivery train 3 — Persistent knowledge intelligence",
+      "name": "Delivery train 3 \u2014 Persistent knowledge intelligence",
       "milestone_range": "MDM-021..MDM-030",
       "scope_rule": "Ten major milestones with 4-5 canonical volumes each; no shadow owner or premature promotion"
     },
     {
       "id": "MDT-04",
-      "name": "Delivery train 4 — Deliberative intelligence",
+      "name": "Delivery train 4 \u2014 Deliberative intelligence",
       "milestone_range": "MDM-031..MDM-040",
       "scope_rule": "Ten major milestones with 4-5 canonical volumes each; no shadow owner or premature promotion"
     },
     {
       "id": "MDT-05",
-      "name": "Delivery train 5 — Governed agency",
+      "name": "Delivery train 5 \u2014 Governed agency",
       "milestone_range": "MDM-041..MDM-050",
       "scope_rule": "Ten major milestones with 4-5 canonical volumes each; no shadow owner or premature promotion"
     },
     {
       "id": "MDT-06",
-      "name": "Delivery train 6 — Organizational intelligence",
+      "name": "Delivery train 6 \u2014 Organizational intelligence",
       "milestone_range": "MDM-051..MDM-060",
       "scope_rule": "Ten major milestones with 4-5 canonical volumes each; no shadow owner or premature promotion"
     },
     {
       "id": "MDT-07",
-      "name": "Delivery train 7 — Adaptive intelligence",
+      "name": "Delivery train 7 \u2014 Adaptive intelligence",
       "milestone_range": "MDM-061..MDM-070",
       "scope_rule": "Ten major milestones with 4-5 canonical volumes each; no shadow owner or premature promotion"
     },
     {
       "id": "MDT-08",
-      "name": "Delivery train 8 — Bounded autonomous operations",
+      "name": "Delivery train 8 \u2014 Bounded autonomous operations",
       "milestone_range": "MDM-071..MDM-080",
       "scope_rule": "Ten major milestones with 4-5 canonical volumes each; no shadow owner or premature promotion"
     },
     {
       "id": "MDT-09",
-      "name": "Delivery train 9 — Advanced scientific/metacognitive intelligence",
+      "name": "Delivery train 9 \u2014 Advanced scientific/metacognitive intelligence",
       "milestone_range": "MDM-081..MDM-090",
       "scope_rule": "Ten major milestones with 4-5 canonical volumes each; no shadow owner or premature promotion"
     },
     {
       "id": "MDT-10",
-      "name": "Delivery train 10 — Frontier governed evolution",
+      "name": "Delivery train 10 \u2014 Frontier governed evolution",
       "milestone_range": "MDM-091..MDM-100",
       "scope_rule": "Ten major milestones with 4-5 canonical volumes each; no shadow owner or premature promotion"
     }
@@ -98,7 +98,7 @@
       "id": "MDM-001",
       "ordinal": 1,
       "delivery_train": "MDT-01",
-      "title": "Plan Constitution → Kernel & Execution Foundation",
+      "title": "Plan Constitution \u2192 Kernel & Execution Foundation",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: Plan Constitution; Scientific & Historical Foundation; System Architecture; Canonical Contract System; Kernel & Execution Foundation.",
       "volumes": [
         {
@@ -208,7 +208,7 @@
       "id": "MDM-002",
       "ordinal": 2,
       "delivery_train": "MDT-01",
-      "title": "Data & Persistence → Context Engineering",
+      "title": "Data & Persistence \u2192 Context Engineering",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: Data & Persistence; Model Development Program; Inference Engine; Model Routing; Context Engineering.",
       "volumes": [
         {
@@ -318,7 +318,7 @@
       "id": "MDM-003",
       "ordinal": 3,
       "delivery_train": "MDT-01",
-      "title": "Memory System → Planning Engine",
+      "title": "Memory System \u2192 Planning Engine",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: Memory System; Retrieval System; Knowledge System; Cognitive Core; Planning Engine.",
       "volumes": [
         {
@@ -428,7 +428,7 @@
       "id": "MDM-004",
       "ordinal": 4,
       "delivery_train": "MDT-01",
-      "title": "Tool & Action System → World Models & Simulation",
+      "title": "Tool & Action System \u2192 World Models & Simulation",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: Tool & Action System; Agent Runtime; Multi-Agent Orchestration; Long-Horizon Autonomy; World Models & Simulation.",
       "volumes": [
         {
@@ -537,7 +537,7 @@
       "id": "MDM-005",
       "ordinal": 5,
       "delivery_train": "MDT-01",
-      "title": "Multimodal Intelligence → Learning & Evolution",
+      "title": "Multimodal Intelligence \u2192 Learning & Evolution",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: Multimodal Intelligence; Code Intelligence; Autonomous Repository Engineering; Forge; Learning & Evolution.",
       "volumes": [
         {
@@ -587,7 +587,7 @@
             "skeleton/testing/test_vol022_independent_review.py"
           ],
           "required_outcome": [
-            "Use inspect→plan→lease→edit→build→test→review→verify as the canonical repository mutation flow.",
+            "Use inspect\u2192plan\u2192lease\u2192edit\u2192build\u2192test\u2192review\u2192verify as the canonical repository mutation flow.",
             "Isolate workspaces and mutation leases to prevent concurrent destructive edits."
           ]
         },
@@ -647,7 +647,7 @@
       "id": "MDM-006",
       "ordinal": 6,
       "delivery_train": "MDT-01",
-      "title": "Safety Architecture → Reliability",
+      "title": "Safety Architecture \u2192 Reliability",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: Safety Architecture; Cybersecurity; Privacy & Data Protection; Governance & Authority; Reliability.",
       "volumes": [
         {
@@ -757,7 +757,7 @@
       "id": "MDM-007",
       "ordinal": 7,
       "delivery_train": "MDT-01",
-      "title": "Distributed Systems → Observability",
+      "title": "Distributed Systems \u2192 Observability",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: Distributed Systems; Compute & Hardware; High-Performance Native Core; Java / JVM Plane; Observability.",
       "volumes": [
         {
@@ -865,7 +865,7 @@
       "id": "MDM-008",
       "ordinal": 8,
       "delivery_train": "MDT-01",
-      "title": "Evaluation Program → Event Architecture",
+      "title": "Evaluation Program \u2192 Event Architecture",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: Evaluation Program; Adversarial Evaluation; Verification Plane; Provenance; Event Architecture.",
       "volumes": [
         {
@@ -975,7 +975,7 @@
       "id": "MDM-009",
       "ordinal": 9,
       "delivery_train": "MDT-01",
-      "title": "Streaming → Web Application",
+      "title": "Streaming \u2192 Web Application",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: Streaming; API Architecture; Product Shell; Desktop Application; Web Application.",
       "volumes": [
         {
@@ -1085,7 +1085,7 @@
       "id": "MDM-010",
       "ordinal": 10,
       "delivery_train": "MDT-01",
-      "title": "UX for Long-Running AI → Repair System",
+      "title": "UX for Long-Running AI \u2192 Repair System",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: UX for Long-Running AI; Multi-Tenancy; Installer; Updater; Repair System.",
       "volumes": [
         {
@@ -1193,7 +1193,7 @@
       "id": "MDM-011",
       "ordinal": 11,
       "delivery_train": "MDT-02",
-      "title": "Uninstaller → Machine Architecture Manifests",
+      "title": "Uninstaller \u2192 Machine Architecture Manifests",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: Uninstaller; Repository Architecture; Internal Python Architecture; Import Architecture; Machine Architecture Manifests.",
       "volumes": [
         {
@@ -1302,7 +1302,7 @@
       "id": "MDM-012",
       "ordinal": 12,
       "delivery_train": "MDT-02",
-      "title": "Architecture Linter → CI",
+      "title": "Architecture Linter \u2192 CI",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: Architecture Linter; Gap Ledger; Risk Register; ADR Program; CI.",
       "volumes": [
         {
@@ -1412,7 +1412,7 @@
       "id": "MDM-013",
       "ordinal": 13,
       "delivery_train": "MDT-02",
-      "title": "Release Engineering → Backup",
+      "title": "Release Engineering \u2192 Backup",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: Release Engineering; Deployment; Environment Management; Configuration; Backup.",
       "volumes": [
         {
@@ -1518,7 +1518,7 @@
       "id": "MDM-014",
       "ordinal": 14,
       "delivery_train": "MDT-02",
-      "title": "Disaster Recovery → Cost Engineering",
+      "title": "Disaster Recovery \u2192 Cost Engineering",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: Disaster Recovery; Incident Response; Performance Program; Capacity Planning; Cost Engineering.",
       "volumes": [
         {
@@ -1624,7 +1624,7 @@
       "id": "MDM-015",
       "ordinal": 15,
       "delivery_train": "MDT-02",
-      "title": "Quality Vector → Education & Teaching",
+      "title": "Quality Vector \u2192 Education & Teaching",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: Quality Vector; Specialized Intelligence; Jeeves Domain System; Game & Simulation Intelligence; Education & Teaching.",
       "volumes": [
         {
@@ -1730,7 +1730,7 @@
       "id": "MDM-016",
       "ordinal": 16,
       "delivery_train": "MDT-02",
-      "title": "Artifact System → Software Quality",
+      "title": "Artifact System \u2192 Software Quality",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: Artifact System; Content-Addressed Storage; Experiment Platform; Reproducibility; Software Quality.",
       "volumes": [
         {
@@ -1838,7 +1838,7 @@
       "id": "MDM-017",
       "ordinal": 17,
       "delivery_train": "MDT-02",
-      "title": "Test Architecture → Human Control",
+      "title": "Test Architecture \u2192 Human Control",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: Test Architecture; Formal Methods; Benchmark Lab; Red Team; Human Control.",
       "volumes": [
         {
@@ -1947,7 +1947,7 @@
       "id": "MDM-018",
       "ordinal": 18,
       "delivery_train": "MDT-02",
-      "title": "Explainability → Documentation Engine",
+      "title": "Explainability \u2192 Documentation Engine",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: Explainability; Accessibility; Internationalization; Compliance & Legal Engineering; Documentation Engine.",
       "volumes": [
         {
@@ -2054,7 +2054,7 @@
       "id": "MDM-019",
       "ordinal": 19,
       "delivery_train": "MDT-02",
-      "title": "Generated Documentation → Priority Engine",
+      "title": "Generated Documentation \u2192 Priority Engine",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: Generated Documentation; Operations Manual; Repository Maintenance; Backlog Control; Priority Engine.",
       "volumes": [
         {
@@ -2158,7 +2158,7 @@
       "id": "MDM-020",
       "ordinal": 20,
       "delivery_train": "MDT-02",
-      "title": "Build Work Packages → VS-003 Scientific Researcher",
+      "title": "Build Work Packages \u2192 VS-003 Scientific Researcher",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: Build Work Packages; VS-000 Foundation Recovery Slice; VS-001 Functional AI; VS-002 Engineering Agent; VS-003 Scientific Researcher.",
       "volumes": [
         {
@@ -2260,7 +2260,7 @@
       "id": "MDM-021",
       "ordinal": 21,
       "delivery_train": "MDT-03",
-      "title": "VS-004 Multi-Agent Engineering → Acceptance: Functional AI",
+      "title": "VS-004 Multi-Agent Engineering \u2192 Acceptance: Functional AI",
       "scope": "Deliver and independently qualify 5 canonical masterplan volumes: VS-004 Multi-Agent Engineering; VS-005 Self-Improvement; VS-006 Distributed Execution; VS-007 Desktop Product; Acceptance: Functional AI.",
       "volumes": [
         {
@@ -2365,7 +2365,7 @@
       "id": "MDM-022",
       "ordinal": 22,
       "delivery_train": "MDT-03",
-      "title": "Acceptance: Autonomous AI Worker → Anti-Patterns",
+      "title": "Acceptance: Autonomous AI Worker \u2192 Anti-Patterns",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Acceptance: Autonomous AI Worker; Acceptance: Research System; Acceptance: SOTA Candidate; Anti-Patterns.",
       "volumes": [
         {
@@ -2450,7 +2450,7 @@
       "id": "MDM-023",
       "ordinal": 23,
       "delivery_train": "MDT-03",
-      "title": "Build Order → Master Traceability Matrix",
+      "title": "Build Order \u2192 Master Traceability Matrix",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Build Order; Definition of Done; Full Construction Manual Format; Master Traceability Matrix.",
       "volumes": [
         {
@@ -2538,7 +2538,7 @@
       "id": "MDM-024",
       "ordinal": 24,
       "delivery_train": "MDT-03",
-      "title": "Capability Map → Architecture Fitness Functions",
+      "title": "Capability Map \u2192 Architecture Fitness Functions",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Capability Map; Technology Radar; Technical Debt Ledger; Architecture Fitness Functions.",
       "volumes": [
         {
@@ -2627,7 +2627,7 @@
       "id": "MDM-025",
       "ordinal": 25,
       "delivery_train": "MDT-03",
-      "title": "Project Metrics → Final Assembly Test",
+      "title": "Project Metrics \u2192 Final Assembly Test",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Project Metrics; Roadmap Control; Completion Model; Final Assembly Test.",
       "volumes": [
         {
@@ -2716,7 +2716,7 @@
       "id": "MDM-026",
       "ordinal": 26,
       "delivery_train": "MDT-03",
-      "title": "Master Appendices → Capability Taxonomy",
+      "title": "Master Appendices \u2192 Capability Taxonomy",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Master Appendices; Requirements Engineering; Non-Functional Requirements; Capability Taxonomy.",
       "volumes": [
         {
@@ -2805,7 +2805,7 @@
       "id": "MDM-027",
       "ordinal": 27,
       "delivery_train": "MDT-03",
-      "title": "Capability Maturity Model → Interface Design Standard",
+      "title": "Capability Maturity Model \u2192 Interface Design Standard",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Capability Maturity Model; Behavior Specifications; State Machine Catalogue; Interface Design Standard.",
       "volumes": [
         {
@@ -2894,7 +2894,7 @@
       "id": "MDM-028",
       "ordinal": 28,
       "delivery_train": "MDT-03",
-      "title": "Schema Registry → Consistency Model",
+      "title": "Schema Registry \u2192 Consistency Model",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Schema Registry; Compatibility Model; Internal Protocols; Consistency Model.",
       "volumes": [
         {
@@ -2983,7 +2983,7 @@
       "id": "MDM-029",
       "ordinal": 29,
       "delivery_train": "MDT-03",
-      "title": "Distributed Transaction Strategy → Content Addressing",
+      "title": "Distributed Transaction Strategy \u2192 Content Addressing",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Distributed Transaction Strategy; Outbox / Inbox Patterns; Cache Architecture; Content Addressing.",
       "volumes": [
         {
@@ -3072,7 +3072,7 @@
       "id": "MDM-030",
       "ordinal": 30,
       "delivery_train": "MDT-03",
-      "title": "Data Ingestion Engine → Data Quality Engine",
+      "title": "Data Ingestion Engine \u2192 Data Quality Engine",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Data Ingestion Engine; Document Intelligence; Data Lineage; Data Quality Engine.",
       "volumes": [
         {
@@ -3161,7 +3161,7 @@
       "id": "MDM-031",
       "ordinal": 31,
       "delivery_train": "MDT-04",
-      "title": "Dataset Registry → Distributed Training",
+      "title": "Dataset Registry \u2192 Distributed Training",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Dataset Registry; Synthetic Data Factory; Training Control Plane; Distributed Training.",
       "volumes": [
         {
@@ -3248,7 +3248,7 @@
       "id": "MDM-032",
       "ordinal": 32,
       "delivery_train": "MDT-04",
-      "title": "Training Checkpointing → Training Evaluation Gates",
+      "title": "Training Checkpointing \u2192 Training Evaluation Gates",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Training Checkpointing; Elastic Training Recovery; Training Observability; Training Evaluation Gates.",
       "volumes": [
         {
@@ -3333,7 +3333,7 @@
       "id": "MDM-033",
       "ordinal": 33,
       "delivery_train": "MDT-04",
-      "title": "Post-Training Lab → Verifier Model Program",
+      "title": "Post-Training Lab \u2192 Verifier Model Program",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Post-Training Lab; Reinforcement Learning Environments; Curriculum Engine; Verifier Model Program.",
       "volumes": [
         {
@@ -3418,7 +3418,7 @@
       "id": "MDM-034",
       "ordinal": 34,
       "delivery_train": "MDT-04",
-      "title": "Multimodal Ingestion Core → Audio Pipeline",
+      "title": "Multimodal Ingestion Core \u2192 Audio Pipeline",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Multimodal Ingestion Core; Vision Pipeline; Document Vision; Audio Pipeline.",
       "volumes": [
         {
@@ -3504,7 +3504,7 @@
       "id": "MDM-035",
       "ordinal": 35,
       "delivery_train": "MDT-04",
-      "title": "Live Speech Runtime → Tool SDK",
+      "title": "Live Speech Runtime \u2192 Tool SDK",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Live Speech Runtime; Video Pipeline; Multimodal Retrieval; Tool SDK.",
       "volumes": [
         {
@@ -3589,7 +3589,7 @@
       "id": "MDM-036",
       "ordinal": 36,
       "delivery_train": "MDT-04",
-      "title": "Connector Framework → Sandbox Runtime",
+      "title": "Connector Framework \u2192 Sandbox Runtime",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Connector Framework; Plugin Ecosystem; Tool Marketplace Security; Sandbox Runtime.",
       "volumes": [
         {
@@ -3676,7 +3676,7 @@
       "id": "MDM-037",
       "ordinal": 37,
       "delivery_train": "MDT-04",
-      "title": "Policy Language → AI-Specific Threats",
+      "title": "Policy Language \u2192 AI-Specific Threats",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Policy Language; Policy Simulation; Threat Model; AI-Specific Threats.",
       "volumes": [
         {
@@ -3767,7 +3767,7 @@
       "id": "MDM-038",
       "ordinal": 38,
       "delivery_train": "MDT-04",
-      "title": "Security Boundaries → Egress Control",
+      "title": "Security Boundaries \u2192 Egress Control",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Security Boundaries; Zero-Trust Internal Model; Network Architecture; Egress Control.",
       "volumes": [
         {
@@ -3857,7 +3857,7 @@
       "id": "MDM-039",
       "ordinal": 39,
       "delivery_train": "MDT-04",
-      "title": "Secret Security → Privacy Engine",
+      "title": "Secret Security \u2192 Privacy Engine",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Secret Security; Key Management; Tenant Isolation; Privacy Engine.",
       "volumes": [
         {
@@ -3947,7 +3947,7 @@
       "id": "MDM-040",
       "ordinal": 40,
       "delivery_train": "MDT-04",
-      "title": "Data Deletion → Service Level Objectives",
+      "title": "Data Deletion \u2192 Service Level Objectives",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Data Deletion; Software Bill of Materials; Model Bill of Materials; Service Level Objectives.",
       "volumes": [
         {
@@ -4037,7 +4037,7 @@
       "id": "MDM-041",
       "ordinal": 41,
       "delivery_train": "MDT-05",
-      "title": "Error Budgets → Performance Profiling",
+      "title": "Error Budgets \u2192 Performance Profiling",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Error Budgets; Observability Cardinality Control; Trace Model; Performance Profiling.",
       "volumes": [
         {
@@ -4130,7 +4130,7 @@
       "id": "MDM-042",
       "ordinal": 42,
       "delivery_train": "MDT-05",
-      "title": "Latency Budgeting → Chaos Engineering",
+      "title": "Latency Budgeting \u2192 Chaos Engineering",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Latency Budgeting; Cost Governor; Energy / Compute Efficiency; Chaos Engineering.",
       "volumes": [
         {
@@ -4222,7 +4222,7 @@
       "id": "MDM-043",
       "ordinal": 43,
       "delivery_train": "MDT-05",
-      "title": "Recovery Drills → Feature Flags",
+      "title": "Recovery Drills \u2192 Feature Flags",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Recovery Drills; Release Qualification Matrix; Canary Deployment; Feature Flags.",
       "volumes": [
         {
@@ -4311,7 +4311,7 @@
       "id": "MDM-044",
       "ordinal": 44,
       "delivery_train": "MDT-05",
-      "title": "Rollback Architecture → Test Fixture Platform",
+      "title": "Rollback Architecture \u2192 Test Fixture Platform",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Rollback Architecture; Developer Experience; Local Development; Test Fixture Platform.",
       "volumes": [
         {
@@ -4401,7 +4401,7 @@
       "id": "MDM-045",
       "ordinal": 45,
       "delivery_train": "MDT-05",
-      "title": "Simulation Mode → Formal Verification Candidates",
+      "title": "Simulation Mode \u2192 Formal Verification Candidates",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Simulation Mode; Contract Fuzzing; Property-Based Invariant Testing; Formal Verification Candidates.",
       "volumes": [
         {
@@ -4490,7 +4490,7 @@
       "id": "MDM-046",
       "ordinal": 46,
       "delivery_train": "MDT-05",
-      "title": "Agent Communication Protocol → Agent Economics",
+      "title": "Agent Communication Protocol \u2192 Agent Economics",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Agent Communication Protocol; Agent Handoff; Agent Performance Evidence; Agent Economics.",
       "volumes": [
         {
@@ -4581,7 +4581,7 @@
       "id": "MDM-047",
       "ordinal": 47,
       "delivery_train": "MDT-05",
-      "title": "Delegation Budgets → Independent Verifier",
+      "title": "Delegation Budgets \u2192 Independent Verifier",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Delegation Budgets; Consensus & Disagreement; Adversarial Reviewer; Independent Verifier.",
       "volumes": [
         {
@@ -4673,7 +4673,7 @@
       "id": "MDM-048",
       "ordinal": 48,
       "delivery_train": "MDT-05",
-      "title": "Artifact Review Workflow → Citation Graph Analytics",
+      "title": "Artifact Review Workflow \u2192 Citation Graph Analytics",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Artifact Review Workflow; Research Agent Team; Literature Watch System; Citation Graph Analytics.",
       "volumes": [
         {
@@ -4762,7 +4762,7 @@
       "id": "MDM-049",
       "ordinal": 49,
       "delivery_train": "MDT-05",
-      "title": "Reproduction Packages → Model Evaluation Harness",
+      "title": "Reproduction Packages \u2192 Model Evaluation Harness",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Reproduction Packages; Experiment Comparison; Statistical Analysis; Model Evaluation Harness.",
       "volumes": [
         {
@@ -4851,7 +4851,7 @@
       "id": "MDM-050",
       "ordinal": 50,
       "delivery_train": "MDT-05",
-      "title": "Agent Evaluation Harness → Human Evaluation",
+      "title": "Agent Evaluation Harness \u2192 Human Evaluation",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Agent Evaluation Harness; Long-Horizon Benchmarks; Contamination Auditor; Human Evaluation.",
       "volumes": [
         {
@@ -4940,7 +4940,7 @@
       "id": "MDM-051",
       "ordinal": 51,
       "delivery_train": "MDT-06",
-      "title": "Model Card System → Agent Card System",
+      "title": "Model Card System \u2192 Agent Card System",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Model Card System; Dataset Card System; Tool Card System; Agent Card System.",
       "volumes": [
         {
@@ -5029,7 +5029,7 @@
       "id": "MDM-052",
       "ordinal": 52,
       "delivery_train": "MDT-06",
-      "title": "Component Health Scorecard → Provider Failover",
+      "title": "Component Health Scorecard \u2192 Provider Failover",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Component Health Scorecard; Dependency Health; Vendor / Provider Risk; Provider Failover.",
       "volumes": [
         {
@@ -5118,7 +5118,7 @@
       "id": "MDM-053",
       "ordinal": 53,
       "delivery_train": "MDT-06",
-      "title": "Offline Mode → Enterprise Deployment",
+      "title": "Offline Mode \u2192 Enterprise Deployment",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Offline Mode; Air-Gapped Profile; Edge Deployment; Enterprise Deployment.",
       "volumes": [
         {
@@ -5207,7 +5207,7 @@
       "id": "MDM-054",
       "ordinal": 54,
       "delivery_train": "MDT-06",
-      "title": "Identity Federation → Operations Dashboard",
+      "title": "Identity Federation \u2192 Operations Dashboard",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Identity Federation; Administration Plane; Audit UI; Operations Dashboard.",
       "volumes": [
         {
@@ -5296,7 +5296,7 @@
       "id": "MDM-055",
       "ordinal": 55,
       "delivery_train": "MDT-06",
-      "title": "Agent Operations Dashboard → Model Rollback",
+      "title": "Agent Operations Dashboard \u2192 Model Rollback",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Agent Operations Dashboard; Research Dashboard; Model Operations; Model Rollback.",
       "volumes": [
         {
@@ -5385,7 +5385,7 @@
       "id": "MDM-056",
       "ordinal": 56,
       "delivery_train": "MDT-06",
-      "title": "Prompt / Instruction Registry → Memory Policy Registry",
+      "title": "Prompt / Instruction Registry \u2192 Memory Policy Registry",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Prompt / Instruction Registry; Prompt Regression Testing; Routing Policy Registry; Memory Policy Registry.",
       "volumes": [
         {
@@ -5474,7 +5474,7 @@
       "id": "MDM-057",
       "ordinal": 57,
       "delivery_train": "MDT-06",
-      "title": "Retrieval Policy Registry → Uncertainty Representation",
+      "title": "Retrieval Policy Registry \u2192 Uncertainty Representation",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Retrieval Policy Registry; Knowledge Refresh; Temporal Knowledge; Uncertainty Representation.",
       "volumes": [
         {
@@ -5564,7 +5564,7 @@
       "id": "MDM-058",
       "ordinal": 58,
       "delivery_train": "MDT-06",
-      "title": "Hypothesis Engine → Value of Information",
+      "title": "Hypothesis Engine \u2192 Value of Information",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Hypothesis Engine; Causal Knowledge; Search Strategy Engine; Value of Information.",
       "volumes": [
         {
@@ -5655,7 +5655,7 @@
       "id": "MDM-059",
       "ordinal": 59,
       "delivery_train": "MDT-06",
-      "title": "Stopping Policies → Human-in-the-Loop Gates",
+      "title": "Stopping Policies \u2192 Human-in-the-Loop Gates",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Stopping Policies; Answer Quality Pipeline; Artifact Quality Pipeline; Human-in-the-Loop Gates.",
       "volumes": [
         {
@@ -5748,7 +5748,7 @@
       "id": "MDM-060",
       "ordinal": 60,
       "delivery_train": "MDT-06",
-      "title": "Reversibility Classification → Migration Engine",
+      "title": "Reversibility Classification \u2192 Migration Engine",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Reversibility Classification; Blast-Radius Model; Changeset Budgeting; Migration Engine.",
       "volumes": [
         {
@@ -5840,7 +5840,7 @@
       "id": "MDM-061",
       "ordinal": 61,
       "delivery_train": "MDT-07",
-      "title": "Legacy Compatibility → Repository Consolidation Engine",
+      "title": "Legacy Compatibility \u2192 Repository Consolidation Engine",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Legacy Compatibility; Deprecation Process; Architecture Archaeology; Repository Consolidation Engine.",
       "volumes": [
         {
@@ -5929,7 +5929,7 @@
       "id": "MDM-062",
       "ordinal": 62,
       "delivery_train": "MDT-07",
-      "title": "Code Provenance → CODEOWNERS Generation",
+      "title": "Code Provenance \u2192 CODEOWNERS Generation",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Code Provenance; Duplication Detector; Module Ownership; CODEOWNERS Generation.",
       "volumes": [
         {
@@ -6018,7 +6018,7 @@
       "id": "MDM-063",
       "ordinal": 63,
       "delivery_train": "MDT-07",
-      "title": "Documentation as Code → Release Reproducibility",
+      "title": "Documentation as Code \u2192 Release Reproducibility",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Documentation as Code; Diagram as Code; Architecture Snapshots; Release Reproducibility.",
       "volumes": [
         {
@@ -6107,7 +6107,7 @@
       "id": "MDM-064",
       "ordinal": 64,
       "delivery_train": "MDT-07",
-      "title": "Build Hermeticity → Installer Security",
+      "title": "Build Hermeticity \u2192 Installer Security",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Build Hermeticity; Build Cache; Binary Provenance; Installer Security.",
       "volumes": [
         {
@@ -6196,7 +6196,7 @@
       "id": "MDM-065",
       "ordinal": 65,
       "delivery_train": "MDT-07",
-      "title": "Update Security → Support Bundle",
+      "title": "Update Security \u2192 Support Bundle",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Update Security; Bootstrap Recovery; Crash Diagnostics; Support Bundle.",
       "volumes": [
         {
@@ -6285,7 +6285,7 @@
       "id": "MDM-066",
       "ordinal": 66,
       "delivery_train": "MDT-07",
-      "title": "Doctor Command → System Digital Twin",
+      "title": "Doctor Command \u2192 System Digital Twin",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Doctor Command; Self-Diagnosis; Safe Repair; System Digital Twin.",
       "volumes": [
         {
@@ -6374,7 +6374,7 @@
       "id": "MDM-067",
       "ordinal": 67,
       "delivery_train": "MDT-07",
-      "title": "Deployment Planner → Backpressure",
+      "title": "Deployment Planner \u2192 Backpressure",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Deployment Planner; Resource Scheduler; Fairness / Starvation Control; Backpressure.",
       "volumes": [
         {
@@ -6463,7 +6463,7 @@
       "id": "MDM-068",
       "ordinal": 68,
       "delivery_train": "MDT-07",
-      "title": "Load Shedding → Circuit Breaker Standard",
+      "title": "Load Shedding \u2192 Circuit Breaker Standard",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Load Shedding; Queue Congestion Control; Retry Budgets; Circuit Breaker Standard.",
       "volumes": [
         {
@@ -6552,7 +6552,7 @@
       "id": "MDM-069",
       "ordinal": 69,
       "delivery_train": "MDT-07",
-      "title": "Bulkhead Architecture → Determinism Envelope",
+      "title": "Bulkhead Architecture \u2192 Determinism Envelope",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Bulkhead Architecture; Dead-Letter Workflow; Operation Replay; Determinism Envelope.",
       "volumes": [
         {
@@ -6641,7 +6641,7 @@
       "id": "MDM-070",
       "ordinal": 70,
       "delivery_train": "MDT-07",
-      "title": "Time Architecture → Final Master Control Plane",
+      "title": "Time Architecture \u2192 Final Master Control Plane",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Time Architecture; Identifier Standard; Logical Clocks / Event Ordering; Final Master Control Plane.",
       "volumes": [
         {
@@ -6730,7 +6730,7 @@
       "id": "MDM-071",
       "ordinal": 71,
       "delivery_train": "MDT-08",
-      "title": "System Objective Model → Decision Engine",
+      "title": "System Objective Model \u2192 Decision Engine",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: System Objective Model; Objective Normalization; Constraint Engine; Decision Engine.",
       "volumes": [
         {
@@ -6819,7 +6819,7 @@
       "id": "MDM-072",
       "ordinal": 72,
       "delivery_train": "MDT-08",
-      "title": "Decision Record Graph → Workflow Compiler",
+      "title": "Decision Record Graph \u2192 Workflow Compiler",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Decision Record Graph; Workflow Intermediate Representation; Workflow DSL; Workflow Compiler.",
       "volumes": [
         {
@@ -6908,7 +6908,7 @@
       "id": "MDM-073",
       "ordinal": 73,
       "delivery_train": "MDT-08",
-      "title": "Workflow Versioning → Task Complexity Estimator",
+      "title": "Workflow Versioning \u2192 Task Complexity Estimator",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Workflow Versioning; Workflow Migration; Semantic Task Types; Task Complexity Estimator.",
       "volumes": [
         {
@@ -6997,7 +6997,7 @@
       "id": "MDM-074",
       "ordinal": 74,
       "delivery_train": "MDT-08",
-      "title": "Task Decomposition Engine → Scheduling Simulator",
+      "title": "Task Decomposition Engine \u2192 Scheduling Simulator",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Task Decomposition Engine; Critical Path Analysis; Scheduling Algorithms; Scheduling Simulator.",
       "volumes": [
         {
@@ -7086,7 +7086,7 @@
       "id": "MDM-075",
       "ordinal": 75,
       "delivery_train": "MDT-08",
-      "title": "Control Theory for Autonomy → Autonomy De-Escalation",
+      "title": "Control Theory for Autonomy \u2192 Autonomy De-Escalation",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Control Theory for Autonomy; Autonomy Levels; Autonomy Escalation; Autonomy De-Escalation.",
       "volumes": [
         {
@@ -7177,7 +7177,7 @@
       "id": "MDM-076",
       "ordinal": 76,
       "delivery_train": "MDT-08",
-      "title": "Human Override Plane → Specification Gaming Tests",
+      "title": "Human Override Plane \u2192 Specification Gaming Tests",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Human Override Plane; Interrupt Handling; Goal Drift Detector; Specification Gaming Tests.",
       "volumes": [
         {
@@ -7270,7 +7270,7 @@
       "id": "MDM-077",
       "ordinal": 77,
       "delivery_train": "MDT-08",
-      "title": "Alignment Between Plan and Execution → Trust Calibration",
+      "title": "Alignment Between Plan and Execution \u2192 Trust Calibration",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Alignment Between Plan and Execution; Human Factors; Approval Fatigue Control; Trust Calibration.",
       "volumes": [
         {
@@ -7360,7 +7360,7 @@
       "id": "MDM-078",
       "ordinal": 78,
       "delivery_train": "MDT-08",
-      "title": "User Intent Continuity → Resource Namespace",
+      "title": "User Intent Continuity \u2192 Resource Namespace",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: User Intent Continuity; Project Memory; Workspace Model; Resource Namespace.",
       "volumes": [
         {
@@ -7449,7 +7449,7 @@
       "id": "MDM-079",
       "ordinal": 79,
       "delivery_train": "MDT-08",
-      "title": "Resource Resolution Service → Impact Analysis Engine",
+      "title": "Resource Resolution Service \u2192 Impact Analysis Engine",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Resource Resolution Service; Artifact Dependency Graph; Artifact Rebuild Engine; Impact Analysis Engine.",
       "volumes": [
         {
@@ -7538,7 +7538,7 @@
       "id": "MDM-080",
       "ordinal": 80,
       "delivery_train": "MDT-08",
-      "title": "Change Risk Estimator → Code Generation from Contracts",
+      "title": "Change Risk Estimator \u2192 Code Generation from Contracts",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Change Risk Estimator; Safe Change Planner; System Compiler Concept; Code Generation from Contracts.",
       "volumes": [
         {
@@ -7627,7 +7627,7 @@
       "id": "MDM-081",
       "ordinal": 81,
       "delivery_train": "MDT-09",
-      "title": "API Client SDK Generator → Storage SDK",
+      "title": "API Client SDK Generator \u2192 Storage SDK",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: API Client SDK Generator; Internal SDK; Provider SDK; Storage SDK.",
       "volumes": [
         {
@@ -7716,7 +7716,7 @@
       "id": "MDM-082",
       "ordinal": 82,
       "delivery_train": "MDT-09",
-      "title": "Event SDK → Data Contracts",
+      "title": "Event SDK \u2192 Data Contracts",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Event SDK; Evaluation SDK; Benchmark Plugin System; Data Contracts.",
       "volumes": [
         {
@@ -7805,7 +7805,7 @@
       "id": "MDM-083",
       "ordinal": 83,
       "delivery_train": "MDT-09",
-      "title": "Data Service SLOs → Search Index Lifecycle",
+      "title": "Data Service SLOs \u2192 Search Index Lifecycle",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Data Service SLOs; Embedding Lifecycle; Vector Index Migration; Search Index Lifecycle.",
       "volumes": [
         {
@@ -7894,7 +7894,7 @@
       "id": "MDM-084",
       "ordinal": 84,
       "delivery_train": "MDT-09",
-      "title": "Retrieval Freshness Engine → Claim Deduplication",
+      "title": "Retrieval Freshness Engine \u2192 Claim Deduplication",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Retrieval Freshness Engine; Source Trust Model; Source Diversity Engine; Claim Deduplication.",
       "volumes": [
         {
@@ -7983,7 +7983,7 @@
       "id": "MDM-085",
       "ordinal": 85,
       "delivery_train": "MDT-09",
-      "title": "Claim Scope → Knowledge Snapshots",
+      "title": "Claim Scope \u2192 Knowledge Snapshots",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Claim Scope; Claim Expiration; Knowledge Reconciliation; Knowledge Snapshots.",
       "volumes": [
         {
@@ -8072,7 +8072,7 @@
       "id": "MDM-086",
       "ordinal": 86,
       "delivery_train": "MDT-09",
-      "title": "Memory Garbage Collection → Memory Versioning",
+      "title": "Memory Garbage Collection \u2192 Memory Versioning",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Memory Garbage Collection; Memory Quality Evaluation; Memory Interference Testing; Memory Versioning.",
       "volumes": [
         {
@@ -8165,7 +8165,7 @@
       "id": "MDM-087",
       "ordinal": 87,
       "delivery_train": "MDT-09",
-      "title": "Memory Reconciliation → Reasoning Cost Accounting",
+      "title": "Memory Reconciliation \u2192 Reasoning Cost Accounting",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Memory Reconciliation; Cognitive Strategy Registry; Strategy Selection; Reasoning Cost Accounting.",
       "volumes": [
         {
@@ -8255,7 +8255,7 @@
       "id": "MDM-088",
       "ordinal": 88,
       "delivery_train": "MDT-09",
-      "title": "Reasoning Regression Tests → Plan Simulation",
+      "title": "Reasoning Regression Tests \u2192 Plan Simulation",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Reasoning Regression Tests; Plan Verifier; Plan Static Analyzer; Plan Simulation.",
       "volumes": [
         {
@@ -8346,7 +8346,7 @@
       "id": "MDM-089",
       "ordinal": 89,
       "delivery_train": "MDT-09",
-      "title": "Tool Composition Engine → Tool Capability Discovery",
+      "title": "Tool Composition Engine \u2192 Tool Capability Discovery",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Tool Composition Engine; Tool Dependency Graph; Tool Health; Tool Capability Discovery.",
       "volumes": [
         {
@@ -8435,7 +8435,7 @@
       "id": "MDM-090",
       "ordinal": 90,
       "delivery_train": "MDT-09",
-      "title": "Tool Result Trust → Saga Workflows",
+      "title": "Tool Result Trust \u2192 Saga Workflows",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Tool Result Trust; Side-Effect Ledger; Compensation Engine; Saga Workflows.",
       "volumes": [
         {
@@ -8524,7 +8524,7 @@
       "id": "MDM-091",
       "ordinal": 91,
       "delivery_train": "MDT-10",
-      "title": "Distributed Inference Control Plane → Model Eviction",
+      "title": "Distributed Inference Control Plane \u2192 Model Eviction",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Distributed Inference Control Plane; Model Placement; GPU Memory Manager; Model Eviction.",
       "volumes": [
         {
@@ -8613,7 +8613,7 @@
       "id": "MDM-092",
       "ordinal": 92,
       "delivery_train": "MDT-10",
-      "title": "Model Warming → Prefix Cache",
+      "title": "Model Warming \u2192 Prefix Cache",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Model Warming; Continuous Batching Scheduler; KV Cache Service; Prefix Cache.",
       "volumes": [
         {
@@ -8703,7 +8703,7 @@
       "id": "MDM-093",
       "ordinal": 93,
       "delivery_train": "MDT-10",
-      "title": "Speculative Inference → Hardware Topology Model",
+      "title": "Speculative Inference \u2192 Hardware Topology Model",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Speculative Inference; Inference Autoscaling; Inference Load Testing; Hardware Topology Model.",
       "volumes": [
         {
@@ -8793,7 +8793,7 @@
       "id": "MDM-094",
       "ordinal": 94,
       "delivery_train": "MDT-10",
-      "title": "NUMA Awareness → Data Locality",
+      "title": "NUMA Awareness \u2192 Data Locality",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: NUMA Awareness; GPU Interconnect Awareness; Storage Tiering; Data Locality.",
       "volumes": [
         {
@@ -8882,7 +8882,7 @@
       "id": "MDM-095",
       "ordinal": 95,
       "delivery_train": "MDT-10",
-      "title": "Network Topology Awareness → Build Farm",
+      "title": "Network Topology Awareness \u2192 Build Farm",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Network Topology Awareness; Remote Execution Protocol; Worker Attestation; Build Farm.",
       "volumes": [
         {
@@ -8971,7 +8971,7 @@
       "id": "MDM-096",
       "ordinal": 96,
       "delivery_train": "MDT-10",
-      "title": "Evaluation Farm → Budget Accounting Ledger",
+      "title": "Evaluation Farm \u2192 Budget Accounting Ledger",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Evaluation Farm; Research Compute Queue; Compute Quotas; Budget Accounting Ledger.",
       "volumes": [
         {
@@ -9060,7 +9060,7 @@
       "id": "MDM-097",
       "ordinal": 97,
       "delivery_train": "MDT-10",
-      "title": "Forecasting Engine → Data Usage Rights",
+      "title": "Forecasting Engine \u2192 Data Usage Rights",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Forecasting Engine; Cost Anomaly Detection; License Intelligence; Data Usage Rights.",
       "volumes": [
         {
@@ -9151,7 +9151,7 @@
       "id": "MDM-098",
       "ordinal": 98,
       "delivery_train": "MDT-10",
-      "title": "Attribution Engine → Model Deprecation",
+      "title": "Attribution Engine \u2192 Model Deprecation",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Attribution Engine; Research Ethics Review; Model Lifecycle Governance; Model Deprecation.",
       "volumes": [
         {
@@ -9241,7 +9241,7 @@
       "id": "MDM-099",
       "ordinal": 99,
       "delivery_train": "MDT-10",
-      "title": "Provider Migration → Experimental Feature Sandbox",
+      "title": "Provider Migration \u2192 Experimental Feature Sandbox",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Provider Migration; Shadow Traffic; Champion / Challenger Registry; Experimental Feature Sandbox.",
       "volumes": [
         {
@@ -9331,7 +9331,7 @@
       "id": "MDM-100",
       "ordinal": 100,
       "delivery_train": "MDT-10",
-      "title": "Research Branching Model → Architecture Scope Freeze",
+      "title": "Research Branching Model \u2192 Architecture Scope Freeze",
       "scope": "Deliver and independently qualify 4 canonical masterplan volumes: Research Branching Model; Technique Retirement; Knowledge of Failure; Architecture Scope Freeze.",
       "volumes": [
         {
