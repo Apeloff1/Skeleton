@@ -1041,9 +1041,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s01.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l001.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1069,9 +1068,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s01.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l002.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1098,9 +1096,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s01.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l003.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1127,9 +1124,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s01.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l004.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1156,9 +1152,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s01.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l005.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1185,9 +1180,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s01.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l006.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1214,9 +1208,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s01.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l007.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1243,9 +1236,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s01.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l008.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1272,9 +1264,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s01.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l009.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1301,9 +1292,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s01.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l010.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1329,9 +1319,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s02.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l011.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1357,9 +1346,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s02.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l012.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1386,9 +1374,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s02.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l013.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1415,9 +1402,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s02.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l014.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1444,9 +1430,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s02.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l015.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1473,9 +1458,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s02.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l016.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1502,9 +1486,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s02.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l017.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1531,9 +1514,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s02.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l018.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1560,9 +1542,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s02.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l019.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1589,9 +1570,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s02.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l020.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1617,9 +1597,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s03.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l021.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1645,9 +1624,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s03.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l022.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1674,9 +1652,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s03.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l023.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1703,9 +1680,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s03.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l024.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1732,9 +1708,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s03.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l025.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1761,9 +1736,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s03.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l026.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1790,9 +1764,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s03.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l027.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1819,9 +1792,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s03.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l028.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1848,9 +1820,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s03.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l029.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1877,9 +1848,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s03.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l030.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1905,9 +1875,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s04.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l031.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1933,9 +1902,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s04.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l032.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1962,9 +1930,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s04.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l033.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -1991,9 +1958,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s04.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l034.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2020,9 +1986,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s04.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l035.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2049,9 +2014,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s04.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l036.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2078,9 +2042,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s04.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l037.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2107,9 +2070,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s04.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l038.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2136,9 +2098,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s04.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l039.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2165,9 +2126,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s04.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l040.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2193,9 +2153,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s05.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l041.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2221,9 +2180,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s05.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l042.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2250,9 +2208,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s05.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l043.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2279,9 +2236,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s05.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l044.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2308,9 +2264,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s05.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l045.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2337,9 +2292,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s05.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l046.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2366,9 +2320,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s05.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l047.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2395,9 +2348,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s05.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l048.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2424,9 +2376,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s05.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l049.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2453,9 +2404,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s05.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l050.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2481,9 +2431,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s06.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l051.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2509,9 +2458,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s06.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l052.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2538,9 +2486,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s06.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l053.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2567,9 +2514,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s06.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l054.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2596,9 +2542,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s06.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l055.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2625,9 +2570,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s06.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l056.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2654,9 +2598,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s06.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l057.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2683,9 +2626,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s06.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l058.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2712,9 +2654,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s06.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l059.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2741,9 +2682,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s06.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l060.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2769,9 +2709,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s07.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l061.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2797,9 +2736,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s07.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l062.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2826,9 +2764,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s07.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l063.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2855,9 +2792,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s07.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l064.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2884,9 +2820,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s07.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l065.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2913,9 +2848,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s07.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l066.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2942,9 +2876,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s07.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l067.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -2971,9 +2904,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s07.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l068.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3000,9 +2932,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s07.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l069.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3029,9 +2960,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s07.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l070.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3057,9 +2987,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s08.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l071.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3085,9 +3014,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s08.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l072.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3114,9 +3042,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s08.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l073.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3143,9 +3070,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s08.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l074.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3172,9 +3098,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s08.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l075.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3201,9 +3126,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s08.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l076.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3230,9 +3154,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s08.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l077.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3259,9 +3182,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s08.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l078.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3288,9 +3210,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s08.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l079.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3317,9 +3238,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s08.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l080.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3345,9 +3265,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s09.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l081.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3373,9 +3292,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s09.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l082.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3402,9 +3320,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s09.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l083.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3431,9 +3348,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s09.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l084.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3460,9 +3376,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s09.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l085.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3489,9 +3404,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s09.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l086.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3518,9 +3432,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s09.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l087.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3547,9 +3460,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s09.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l088.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3576,9 +3488,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s09.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l089.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3605,9 +3516,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s09.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l090.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3633,9 +3543,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s10.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l091.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3661,9 +3570,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s10.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l092.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3690,9 +3598,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s10.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l093.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3719,9 +3626,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s10.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l094.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3748,9 +3654,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s10.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l095.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3777,9 +3682,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s10.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l096.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3806,9 +3710,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s10.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l097.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3835,9 +3738,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s10.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l098.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3864,9 +3766,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s10.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l099.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3893,9 +3794,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s10.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l100.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3921,9 +3821,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s11.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l101.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3949,9 +3848,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s11.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l102.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -3978,9 +3876,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s11.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l103.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4007,9 +3904,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s11.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l104.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4036,9 +3932,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s11.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l105.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4065,9 +3960,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s11.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l106.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4094,9 +3988,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s11.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l107.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4123,9 +4016,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s11.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l108.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4152,9 +4044,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s11.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l109.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4181,9 +4072,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s11.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l110.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4209,9 +4099,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s12.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l111.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4237,9 +4126,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s12.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l112.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4266,9 +4154,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s12.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l113.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4295,9 +4182,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s12.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l114.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4324,9 +4210,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s12.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l115.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4353,9 +4238,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s12.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l116.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4382,9 +4266,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s12.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l117.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4411,9 +4294,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s12.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l118.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4440,9 +4322,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s12.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l119.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4469,9 +4350,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s12.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l120.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4497,9 +4377,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s13.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l121.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4525,9 +4404,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s13.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l122.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4554,9 +4432,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s13.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l123.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4583,9 +4460,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s13.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l124.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4612,9 +4488,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s13.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l125.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4641,9 +4516,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s13.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l126.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4670,9 +4544,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s13.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l127.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4699,9 +4572,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s13.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l128.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4728,9 +4600,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s13.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l129.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4757,9 +4628,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s13.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l130.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4785,9 +4655,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s14.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l131.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4813,9 +4682,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s14.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l132.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4842,9 +4710,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s14.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l133.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4871,9 +4738,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s14.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l134.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4900,9 +4766,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s14.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l135.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4929,9 +4794,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s14.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l136.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4958,9 +4822,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s14.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l137.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -4987,9 +4850,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s14.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l138.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5016,9 +4878,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s14.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l139.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5045,9 +4906,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s14.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l140.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5073,9 +4933,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s15.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l141.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5101,9 +4960,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s15.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l142.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5130,9 +4988,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s15.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l143.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5159,9 +5016,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s15.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l144.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5188,9 +5044,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s15.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l145.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5217,9 +5072,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s15.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l146.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5246,9 +5100,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s15.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l147.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5275,9 +5128,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s15.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l148.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5304,9 +5156,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s15.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l149.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5333,9 +5184,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s15.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l150.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5361,9 +5211,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s16.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l151.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5389,9 +5238,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s16.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l152.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5418,9 +5266,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s16.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l153.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5447,9 +5294,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s16.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l154.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5476,9 +5322,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s16.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l155.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5505,9 +5350,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s16.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l156.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5534,9 +5378,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s16.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l157.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5563,9 +5406,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s16.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l158.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5592,9 +5434,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s16.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l159.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5621,9 +5462,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s16.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l160.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5649,9 +5489,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s17.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l161.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5677,9 +5516,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s17.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l162.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5706,9 +5544,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s17.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l163.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5735,9 +5572,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s17.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l164.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5764,9 +5600,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s17.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l165.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5793,9 +5628,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s17.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l166.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5822,9 +5656,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s17.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l167.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5851,9 +5684,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s17.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l168.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5880,9 +5712,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s17.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l169.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5909,9 +5740,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s17.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l170.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5937,9 +5767,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s18.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l171.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5965,9 +5794,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s18.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l172.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -5994,9 +5822,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s18.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l173.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6023,9 +5850,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s18.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l174.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6052,9 +5878,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s18.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l175.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6081,9 +5906,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s18.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l176.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6110,9 +5934,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s18.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l177.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6139,9 +5962,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s18.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l178.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6168,9 +5990,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s18.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l179.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6197,9 +6018,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s18.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l180.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6225,9 +6045,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s19.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l181.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6253,9 +6072,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s19.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l182.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6282,9 +6100,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s19.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l183.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6311,9 +6128,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s19.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l184.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6340,9 +6156,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s19.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l185.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6369,9 +6184,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s19.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l186.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6398,9 +6212,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s19.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l187.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6427,9 +6240,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s19.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l188.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6456,9 +6268,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s19.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l189.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6485,9 +6296,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s19.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l190.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6513,9 +6323,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s20.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l191.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6541,9 +6350,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s20.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l192.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6570,9 +6378,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s20.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l193.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6599,9 +6406,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s20.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l194.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6628,9 +6434,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s20.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l195.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6657,9 +6462,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s20.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l196.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6686,9 +6490,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s20.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l197.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6715,9 +6518,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s20.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l198.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6744,9 +6546,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s20.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l199.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6773,9 +6574,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s20.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l200.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6801,9 +6601,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s21.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l201.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6829,9 +6628,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s21.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l202.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6858,9 +6656,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s21.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l203.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6887,9 +6684,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s21.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l204.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6916,9 +6712,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s21.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l205.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6945,9 +6740,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s21.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l206.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -6974,9 +6768,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s21.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l207.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7003,9 +6796,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s21.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l208.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7032,9 +6824,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s21.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l209.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7061,9 +6852,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s21.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l210.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7089,9 +6879,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s22.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l211.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7117,9 +6906,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s22.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l212.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7146,9 +6934,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s22.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l213.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7175,9 +6962,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s22.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l214.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7204,9 +6990,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s22.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l215.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7233,9 +7018,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s22.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l216.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7262,9 +7046,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s22.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l217.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7291,9 +7074,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s22.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l218.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7320,9 +7102,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s22.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l219.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7349,9 +7130,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s22.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l220.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7377,9 +7157,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s23.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l221.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7405,9 +7184,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s23.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l222.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7434,9 +7212,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s23.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l223.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7463,9 +7240,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s23.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l224.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7492,9 +7268,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s23.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l225.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7521,9 +7296,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s23.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l226.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7550,9 +7324,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s23.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l227.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7579,9 +7352,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s23.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l228.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7608,9 +7380,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s23.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l229.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7637,9 +7408,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s23.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l230.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7665,9 +7435,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s24.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l231.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7693,9 +7462,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s24.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l232.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7722,9 +7490,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s24.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l233.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7751,9 +7518,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s24.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l234.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7780,9 +7546,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s24.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l235.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7809,9 +7574,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s24.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l236.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7838,9 +7602,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s24.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l237.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7867,9 +7630,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s24.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l238.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7896,9 +7658,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s24.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l239.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7925,9 +7686,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s24.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l240.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7953,9 +7713,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s25.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l241.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -7981,9 +7740,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s25.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l242.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8010,9 +7768,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s25.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l243.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8039,9 +7796,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s25.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l244.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8068,9 +7824,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s25.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l245.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8097,9 +7852,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s25.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l246.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8126,9 +7880,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s25.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l247.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8155,9 +7908,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s25.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l248.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8184,9 +7936,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s25.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l249.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8213,9 +7964,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s25.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l250.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8241,9 +7991,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s26.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l251.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8269,9 +8018,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s26.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l252.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8298,9 +8046,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s26.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l253.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8327,9 +8074,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s26.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l254.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8356,9 +8102,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s26.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l255.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8385,9 +8130,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s26.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l256.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8414,9 +8158,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s26.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l257.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8443,9 +8186,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s26.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l258.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8472,9 +8214,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s26.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l259.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8501,9 +8242,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s26.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l260.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8529,9 +8269,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s27.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l261.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8557,9 +8296,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s27.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l262.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8586,9 +8324,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s27.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l263.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8615,9 +8352,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s27.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l264.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8644,9 +8380,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s27.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l265.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8673,9 +8408,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s27.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l266.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8702,9 +8436,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s27.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l267.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8731,9 +8464,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s27.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l268.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8760,9 +8492,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s27.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l269.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8789,9 +8520,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s27.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l270.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8817,9 +8547,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s28.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l271.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8845,9 +8574,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s28.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l272.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8874,9 +8602,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s28.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l273.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8903,9 +8630,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s28.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l274.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8932,9 +8658,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s28.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l275.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8961,9 +8686,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s28.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l276.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -8990,9 +8714,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s28.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l277.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9019,9 +8742,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s28.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l278.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9048,9 +8770,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s28.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l279.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9077,9 +8798,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s28.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l280.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9105,9 +8825,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s29.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l281.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9133,9 +8852,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s29.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l282.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9162,9 +8880,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s29.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l283.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9191,9 +8908,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s29.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l284.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9220,9 +8936,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s29.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l285.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9249,9 +8964,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s29.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l286.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9278,9 +8992,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s29.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l287.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9307,9 +9020,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s29.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l288.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9336,9 +9048,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s29.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l289.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9365,9 +9076,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s29.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l290.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9393,9 +9103,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s30.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l291.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9421,9 +9130,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s30.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l292.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9450,9 +9158,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s30.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l293.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9479,9 +9186,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s30.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l294.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9508,9 +9214,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s30.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l295.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9537,9 +9242,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s30.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l296.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9566,9 +9270,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s30.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l297.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9595,9 +9298,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s30.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l298.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9624,9 +9326,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s30.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py"
+        "skeleton/cs300/layers/l299.py",
+        "tests/flgb/test_cs300_all_layers.py"
       ]
     },
     {
@@ -9653,9 +9354,8 @@
       "independent_verification_signed": true,
       "complete": true,
       "evidence": [
-        "skeleton/cs300/strata/s30.py",
-        "tests/flgb/test_cs300_strata.py",
-        "skeleton/cs300/registry.py",
+        "skeleton/cs300/layers/l300.py",
+        "tests/flgb/test_cs300_all_layers.py",
         "finality:CS300-300"
       ]
     }
