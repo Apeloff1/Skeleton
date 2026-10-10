@@ -33,6 +33,7 @@ jobs:
             /scripts/game_builder/native_sms_ci.py
             /scripts/game_builder/emulate_sms_z80_ci.py
             /skeleton/testing/test_game_builder_sms_cpu.py
+            /skeleton/testing/test_game_builder_sms_native.py
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
