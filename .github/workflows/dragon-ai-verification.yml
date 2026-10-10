@@ -7,6 +7,13 @@ on:
       - "skeleton/ai/game_builder/**"
       - "backend/routes/dragon_academy.py"
       - "backend/tests/test_dragon_academy_routes.py"
+      - "backend/core/dragon_*.py"
+      - "backend/core/conversations.py"
+      - "backend/server.py"
+      - "scripts/check_provider_bootstrap.py"
+      - "backend/routes/ai.py"
+      - "backend/tests/test_dragon_runtime_bridge.py"
+      - "backend/tests/test_dragon_conversation_binding.py"
       - "tests/test_dragon_*.py"
       - "tests/test_game_niche_research.py"
       - "frontend/features/Jeeves/companion/**"
@@ -26,6 +33,13 @@ on:
       - "skeleton/ai/game_builder/**"
       - "backend/routes/dragon_academy.py"
       - "backend/tests/test_dragon_academy_routes.py"
+      - "backend/core/dragon_*.py"
+      - "backend/core/conversations.py"
+      - "backend/server.py"
+      - "scripts/check_provider_bootstrap.py"
+      - "backend/routes/ai.py"
+      - "backend/tests/test_dragon_runtime_bridge.py"
+      - "backend/tests/test_dragon_conversation_binding.py"
       - "tests/test_dragon_*.py"
       - "tests/test_game_niche_research.py"
       - "frontend/features/Jeeves/companion/**"
@@ -99,6 +113,10 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check "fastapi==0.142.2" "httpx==0.28.1" "bcrypt>=4,<6" "PyJWT>=2,<3" "email-validator>=2,<3"
           PYTHONPATH=.:backend PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest backend/tests/test_dragon_academy_routes.py
+      - name: Canonical Dragon resource and conversation lifecycle
+        run: |
+          python -m pip install --disable-pip-version-check "pymongo>=4,<5" "motor>=3,<4" "pytest-asyncio>=0.24,<2" "python-dotenv>=1,<2" "pydantic-settings>=2,<3"
+          PYTHONPATH=.:backend PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest -p pytest_asyncio.plugin backend/tests/test_dragon_runtime_bridge.py backend/tests/test_dragon_conversation_binding.py backend/tests/test_conversation_storage_admission.py backend/tests/test_conversation_regeneration.py backend/tests/test_conversation_governance.py
   frontend:
     name: Dragon Frontend
     runs-on: ubuntu-latest

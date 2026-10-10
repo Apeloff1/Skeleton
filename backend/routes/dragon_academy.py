@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 
 from routes.gameforge_auth import get_current_user
 from skeleton.ai.game_builder.dragon_review_store import DragonReviewStore
+from skeleton.ai.webcrawler.dragon_execution_pool import DragonExecutionPool, DragonPoolCapacityError
 from skeleton.ai.game_builder.reviewed_knowledge import ReviewedKnowledgeStore, KnowledgeError
 from skeleton.ai.game_builder.dragon_wisdom_pyramid import DragonWisdomPyramid
 from skeleton.ai.game_builder.dragon_wisdom_custody import DragonCustodyAnchor
@@ -72,7 +73,7 @@ def _principal(user: dict | None = Depends(get_current_user)) -> str:
         raise HTTPException(status_code=403, detail="Tenant identity unavailable")
     # Exactly one opaque owner ID per tenant/principal pair, independent of
     # user-supplied parameters; avoid exposing the email in SQLite keys.
-    return sha256((tenant.strip()+"\x00"+email.strip().lower()).encode()).hexdigest()
+    return DragonExecutionPool.owner_key(tenant, email)
 
 def _database_path() -> Path:
     raw=os.environ.get("SKL_DRAGON_PRACTICE_DB_PATH","").strip()
@@ -351,7 +352,10 @@ def pulse_practice(request: Request, owner: str = Depends(_principal)) -> dict:
     factory = getattr(request.app.state, "dragon_practice_executor_factory", None)
     if not callable(factory):
         raise HTTPException(status_code=503, detail="Dragon resource runtime not configured")
-    executor = factory(owner)
+    try:
+        executor = factory(owner)
+    except DragonPoolCapacityError:
+        raise HTTPException(status_code=503, detail="Dragon resource capacity unavailable") from None
     if not isinstance(executor, DragonChunkExecutor) or executor.session.tenant != owner:
         raise HTTPException(status_code=503, detail="Dragon owner resource runtime unavailable")
     with _lab() as (lab, cycles):

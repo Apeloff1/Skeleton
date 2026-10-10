@@ -903,16 +903,16 @@
       "id": "dragon-conversation-micro-projection",
       "owner_plane": "retrieval",
       "physical_store": "backend-data-volume",
-      "logical_location": "Existing Dragon SQLite connection / dragon_conversation_micro_logs and dragon_conversation_micro_terms",
+      "logical_location": "Existing Dragon SQLite connection / dragon_conversation_micro_logs and dragon_conversation_micro_terms and short-lived dragon_conversation_micro_fences",
       "authority": "derived",
       "source_of_truth": false,
-      "status": "library-adapter-implemented-production-binding-pending",
+      "status": "canonical-lifecycle-hooks-implemented-consent-runtime-binding-required",
       "data_classes": [
         "confidential"
       ],
       "transaction_scope": "SQLite transactional checkpoint identity and postings; writer lock precedes capacity checks",
       "consistency": "Ten committed canonical message references plus caller-bound topic facets; authorized tenant/owner/thread/active-branch lookup; expiry and digest checks; never transcript or training authority",
-      "retention": "Explicit retention consent and caller-supplied expiry; thread deletion and expire adapters remove projections and postings; production lifecycle hook pending",
+      "retention": "Explicit fresh canonical retention policy; separate training consent; expiry and governed-delete hook; 300-second negative-only deletion fence for bounded in-flight callbacks",
       "backup_restore": "Discard/rebuild only from currently authorized canonical conversation windows; on-disk reopen regression verifies projection restart; projection loss does not alter canonical messages",
       "migration": "Additive create-if-absent projection tables; disable adapter and delete/rebuild derived tables on rollback",
       "derived_from": [
@@ -923,7 +923,10 @@
       "evidence": [
         "skeleton/ai/webcrawler/dragon_conversation_micro_logs.py",
         "tests/test_ai_dragon_resource_cognition.py",
-        "docs/ai/dragon-resource-cognition-2026-10-10.md"
+        "docs/ai/dragon-resource-cognition-2026-10-10.md",
+        "backend/core/dragon_conversation_binding.py",
+        "backend/core/conversations.py",
+        "backend/tests/test_dragon_conversation_binding.py"
       ]
     }
   ],
@@ -1095,6 +1098,14 @@
       "mode": "fail-closed lifecycle registration",
       "rule": "GovernedMemoryWriter commits canonical memory then reconciles tenant-bound lifecycle metadata; if governance persistence fails the committed memory is tombstoned fail-closed and a canonical delete projection intent is emitted",
       "failure": "active ungoverned memory is forbidden; governance registration failure forces canonical memory tombstone and surfaces a typed writeback error"
+    },
+    {
+      "id": "canonical-commit-to-dragon-micro-projection",
+      "from": "conversation-message-state",
+      "to": "dragon-conversation-micro-projection",
+      "mode": "consented-derived-ten-step-checkpoint",
+      "rule": "After canonical commit, bounded reference-only windows may produce derived topic checkpoints under current tenant/owner/thread retention policy; inference keeps them untrusted and governed deletion clears/fences them before acknowledgement",
+      "failure": "Unavailable, expired or revoked consent, branch gaps, callback failure and projection corruption never grant context/training authority or roll back the canonical message; bounded reauthorization repairs retained windows"
     }
   ],
   "recovery_order": [

@@ -10,6 +10,7 @@ from hashlib import sha256
 import json
 from math import isfinite
 import sqlite3
+import time
 
 from skeleton.contracts.conversation import ConversationMessage, ConversationThread
 
@@ -28,12 +29,15 @@ class DragonConversationMicroLogs:
             tenant TEXT NOT NULL,owner TEXT NOT NULL,thread TEXT NOT NULL,
             branch TEXT NOT NULL,end_sequence INTEGER NOT NULL,term TEXT NOT NULL,
             PRIMARY KEY(tenant,owner,thread,branch,term,end_sequence))""")
+        db.execute("""CREATE TABLE IF NOT EXISTS dragon_conversation_micro_fences(
+            tenant TEXT NOT NULL,owner TEXT NOT NULL,thread TEXT NOT NULL,blocked_until REAL NOT NULL,
+            PRIMARY KEY(tenant,owner,thread))""")
         db.commit()
 
     def checkpoint(self, thread: ConversationThread, messages: tuple[ConversationMessage, ...],
                    factors: dict[str, str], *, tenant: str, owner: str,
                    expires_at: float, authorized: bool, retention_consent: bool,
-                   training_consent: bool = False) -> str | None:
+                   training_consent: bool = False, now: float | None = None) -> str | None:
         if authorized is not True or retention_consent is not True:
             raise PermissionError("conversation projection requires authorization and retention consent")
         if not isinstance(training_consent, bool):
@@ -65,11 +69,17 @@ class DragonConversationMicroLogs:
             sort_keys=True, separators=(",", ":"), ensure_ascii=True)
         if len(payload.encode()) > 4096:
             raise ValueError("conversation micro log exceeds byte budget")
+        now = time.time() if now is None else now
+        if isinstance(now, bool) or not isfinite(now):
+            raise ValueError("invalid checkpoint clock")
         digest = sha256(payload.encode()).hexdigest()
         key = (tenant, owner, thread.thread_id, thread.active_branch_id, end)
         with self.db:
             # Serialize capacity/identity decisions across SQLite connections.
             self.db.execute("UPDATE dragon_conversation_micro_logs SET digest=digest WHERE tenant=? AND owner=? AND thread=? AND branch=? AND end_sequence=?", key)
+            blocked = self.db.execute("SELECT 1 FROM dragon_conversation_micro_fences WHERE tenant=? AND owner=? AND thread IN (?,'*') AND blocked_until>?", (tenant, owner, thread.thread_id, now)).fetchone()
+            if blocked:
+                raise PermissionError("conversation checkpoint deletion fence active")
             prior = self.db.execute("SELECT digest FROM dragon_conversation_micro_logs WHERE tenant=? AND owner=? AND thread=? AND branch=? AND end_sequence=?", key).fetchone()
             if prior:
                 if prior[0] != digest:
@@ -94,7 +104,8 @@ class DragonConversationMicroLogs:
         terms = _terms(query)[:16]
         if not terms:
             return ()
-        rows = self.db.execute(f"""SELECT DISTINCT l.payload,l.digest FROM dragon_conversation_micro_logs l
+        rows = self.db.execute(f"""SELECT DISTINCT CASE WHEN length(CAST(l.payload AS BLOB))<=4096 THEN l.payload ELSE NULL END,
+            CASE WHEN length(l.digest)=64 THEN l.digest ELSE NULL END FROM dragon_conversation_micro_logs l
             JOIN dragon_conversation_micro_terms t ON t.tenant=l.tenant AND t.owner=l.owner
             AND t.thread=l.thread AND t.branch=l.branch AND t.end_sequence=l.end_sequence
             WHERE l.tenant=? AND l.owner=? AND l.thread=? AND l.branch=? AND l.expires_at>?
@@ -103,17 +114,31 @@ class DragonConversationMicroLogs:
             thread.active_branch_id, now, thread.message_sequence, *terms, limit)).fetchall()
         result = []
         for payload, digest in rows:
+            if not isinstance(payload, str) or not isinstance(digest, str):
+                raise ValueError("conversation micro log exceeds bounded storage contract")
             if sha256(payload.encode()).hexdigest() != digest:
                 raise ValueError("conversation micro log integrity failure")
             result.append(json.loads(payload))
         return tuple(result)
 
-    def delete_thread(self, tenant: str, owner: str, thread: str, *, authorized: bool) -> None:
+    def delete_thread(self, tenant: str, owner: str, thread: str, *, authorized: bool, now: float | None = None) -> None:
         if authorized is not True:
             raise PermissionError("conversation projection deletion denied")
         for value in (tenant, owner, thread):
-            _id(value)
+            if not isinstance(value, str) or not 1 <= len(value) <= 1024 or any(ord(c) < 32 for c in value):
+                raise ValueError("invalid canonical conversation identity")
+        now = time.time() if now is None else now
+        if isinstance(now, bool) or not isfinite(now):
+            raise ValueError("invalid deletion clock")
         with self.db:
+            self.db.execute("DELETE FROM dragon_conversation_micro_fences WHERE blocked_until<=?", (now,))
+            count = self.db.execute("SELECT count(*) FROM dragon_conversation_micro_fences WHERE tenant=? AND owner=?", (tenant, owner)).fetchone()[0]
+            fence_thread = thread
+            if count >= 1000:
+                # Coarsen negative-only fencing rather than denying deletion.
+                self.db.execute("DELETE FROM dragon_conversation_micro_fences WHERE tenant=? AND owner=?", (tenant, owner))
+                fence_thread = "*"
+            self.db.execute("INSERT INTO dragon_conversation_micro_fences VALUES(?,?,?,?) ON CONFLICT(tenant,owner,thread) DO UPDATE SET blocked_until=MAX(blocked_until,excluded.blocked_until)", (tenant,owner,fence_thread,now+300))
             for table in ("dragon_conversation_micro_logs", "dragon_conversation_micro_terms"):
                 self.db.execute(f"DELETE FROM {table} WHERE tenant=? AND owner=? AND thread=?", (tenant, owner, thread))
 
@@ -121,6 +146,7 @@ class DragonConversationMicroLogs:
         if isinstance(now, bool) or not isfinite(now):
             raise ValueError("invalid expiry timestamp")
         with self.db:
+            self.db.execute("DELETE FROM dragon_conversation_micro_fences WHERE blocked_until<=?", (now,))
             count = self.db.execute("DELETE FROM dragon_conversation_micro_logs WHERE expires_at<=?", (now,)).rowcount
             self.db.execute("""DELETE FROM dragon_conversation_micro_terms AS t WHERE NOT EXISTS(
                 SELECT 1 FROM dragon_conversation_micro_logs l WHERE l.tenant=t.tenant AND l.owner=t.owner
