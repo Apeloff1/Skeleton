@@ -311,6 +311,10 @@ def emit_route_game(world:World,traveller:Traveller,*,authorized:bool,
             for index,trace in enumerate(proof.doubleback_witnesses[:8])
         })
         named_routes.update({
+            f"impractical_{index}":trace
+            for index,trace in enumerate(proof.impractical_witnesses[:4])
+        })
+        named_routes.update({
             f"scenic_{index}":trace
             for index,trace in enumerate(proof.scenic_witnesses[:8])
         })
