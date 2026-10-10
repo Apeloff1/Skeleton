@@ -9,8 +9,10 @@ from __future__ import annotations
 import argparse
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import re
+import stat
 
 from skeleton.ai.game_builder.playable_world import GameBuildIntent, generate_playable_world
 from skeleton.ai.game_builder.playable_simulation import demonstrate_solvable
@@ -19,6 +21,7 @@ from skeleton.ai.game_builder.sega_8bit_native_export import (
     compile_native_sega_8bit, export_native_sega_8bit,
 )
 from skeleton.ai.game_builder.sega_8bit_rom import validate_rom_file
+from skeleton.ai.game_builder.native_release_intake import _open_directory, _read_bounded, _json
 
 
 _TARGETS = {"sega_master_system": "sms", "sega_game_gear": "gg"}
@@ -82,26 +85,38 @@ def emit(target: str, output: Path, authorship_file: Path) -> dict[str, object]:
 
 def verify(
     target: str, directory: Path, rom: Path, *,
-    toolchain_revision: str,
+    toolchain_revision: str, expected_source_sha256: str | None = None,
 ) -> dict[str, object]:
     """Verify *actual* bytes, not just strings in a source generation report."""
     if target not in _TARGETS:
         raise ValueError("unknown emulator/console hardware target")
     if not isinstance(toolchain_revision, str) or not _GIT_REVISION.fullmatch(toolchain_revision):
         raise ValueError("exact 40-hex SHA-1 or 64-hex SHA-256 Git revision is required")
-    if directory.is_symlink() or not directory.is_dir():
-        raise ValueError("expected ordinary generated source directory")
-    expected = {"game.c", "Makefile", "manifest.json"}
-    if not expected.issubset({path.name for path in directory.iterdir()}):
-        raise ValueError("generated source project incomplete")
-    parts = []
-    for filename in ("game.c", "Makefile", "manifest.json"):
-        path = directory / filename
-        if not path.is_file() or path.is_symlink() or path.stat().st_size > 1024 * 1024:
-            raise ValueError("source input missing, symlinked or oversized")
-        parts.append(path.read_bytes())
-    source_digest = sha256(b"\0".join(parts)).hexdigest()
-    manifest = json.loads(parts[2])
+    if expected_source_sha256 is not None and (
+        not isinstance(expected_source_sha256, str)
+        or not _SHA.fullmatch(expected_source_sha256)
+    ):
+        raise ValueError("independently supplied source digest must be SHA-256")
+    rootfd = _open_directory(directory)
+    try:
+        expected = {"game.c", "Makefile", "manifest.json"}
+        present = set(os.listdir(rootfd))
+        if not expected.issubset(present) or present - expected - {"build"}:
+            raise ValueError("generated source project has missing or unreviewed extra files")
+        if "build" in present:
+            build_meta = os.stat("build", dir_fd=rootfd, follow_symlinks=False)
+            if not stat.S_ISDIR(build_meta.st_mode):
+                raise ValueError("compiler output directory cannot be linked or replaced")
+        parts = [
+            _read_bounded(Path(filename), max_bytes=1024*1024, root_fd=rootfd)
+            for filename in ("game.c", "Makefile", "manifest.json")
+        ]
+    finally:
+        os.close(rootfd)
+    source_digest = sha256(b"\\0".join(parts)).hexdigest()
+    if expected_source_sha256 is not None and source_digest != expected_source_sha256:
+        raise ValueError("generated source has changed since independently pinned evidence")
+    manifest = _json(parts[2], "native Sega source")
     if not isinstance(manifest, dict):
         raise ValueError("native source manifest must be a JSON object")
     if (
@@ -131,6 +146,7 @@ def verify(
         "reference_safe_replay_digest": manifest["reference_safe_replay_digest"],
         "original_project_id": manifest.get("project_id"),
         "source_sha256": source_digest,
+        "source_digest_independently_pinned": expected_source_sha256 is not None,
         "rom_sha256": measured["sha256"],
         "rom_size": measured["bytes"],
         "toolchain_revision": toolchain_revision,
@@ -155,6 +171,7 @@ def main() -> None:
     ap.add_argument("--author-evidence", type=Path)
     ap.add_argument("--source-dir", type=Path)
     ap.add_argument("--toolchain-revision")
+    ap.add_argument("--expected-source-sha256")
     ap.add_argument("--receipt-out", type=Path)
     args = ap.parse_args()
     if args.emit is not None:
@@ -167,6 +184,7 @@ def main() -> None:
         receipt = verify(
             args.target, args.source_dir, args.verify_rom,
             toolchain_revision=args.toolchain_revision,
+            expected_source_sha256=args.expected_source_sha256,
         )
     if args.receipt_out is not None:
         if args.receipt_out.exists() or args.receipt_out.is_symlink():
