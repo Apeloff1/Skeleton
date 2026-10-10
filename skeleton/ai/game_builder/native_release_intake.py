@@ -183,6 +183,52 @@ def _read_bounded(path: Path, *, max_bytes: int, root_fd: int | None = None) -> 
         os.close(fd)
 
 
+def _fingerprint_binary(path: str | Path, *, max_bytes: int = _MAX_BINARY) -> tuple[str, int, bytes]:
+    """Stream large native executables without materializing 256 MB in RAM."""
+    path = Path(path)
+    parent_fd = _open_directory(path.parent)
+    try:
+        try:
+            fd = os.open(
+                path.name,
+                os.O_RDONLY | _no_follow() | getattr(os, "O_NONBLOCK", 0)
+                | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=parent_fd,
+            )
+        except OSError as exc:
+            raise NativeIntakeError("native binary missing or linked outside trusted workspace") from exc
+        try:
+            info = os.fstat(fd)
+            if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
+                or info.st_size < 256 or info.st_size > max_bytes):
+                raise NativeIntakeError("native executable is not a bounded private file")
+            digest = sha256()
+            count = 0
+            header = bytearray()
+            while True:
+                part = os.read(fd, min(256 * 1024, max_bytes + 1 - count))
+                if not part:
+                    break
+                if len(header) < 64:
+                    header.extend(part[:64 - len(header)])
+                digest.update(part)
+                count += len(part)
+                if count > max_bytes:
+                    raise NativeIntakeError("native executable exceeded byte budget during read")
+            after = os.fstat(fd)
+            if (count != info.st_size or
+                (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+                != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)):
+                raise NativeIntakeError("native executable changed while hashing")
+            return digest.hexdigest(), count, bytes(header)
+        except OSError as exc:
+            raise NativeIntakeError("native binary failed streaming verification") from exc
+        finally:
+            os.close(fd)
+    finally:
+        os.close(parent_fd)
+
+
 def _json(data: bytes, label: str) -> dict[str, object]:
     def pairs_no_dupes(pairs: list[tuple[str, object]]) -> dict[str, object]:
         mapping: dict[str, object] = {}
@@ -215,8 +261,10 @@ def _sha(data: bytes) -> str:
     return sha256(data).hexdigest()
 
 
-def _require_binary_format(data: bytes, target_platform_id: str) -> None:
-    if len(data) < 256:
+def _require_binary_format(
+    data: bytes, target_platform_id: str, *, file_size: int | None = None,
+) -> None:
+    if (len(data) if file_size is None else file_size) < 256:
         raise NativeIntakeError("empty or stub binary cannot be an admitted release candidate")
     if target_platform_id in _NATIVE_PREFIX:
         if not data.startswith(_NATIVE_PREFIX[target_platform_id]):
@@ -341,9 +389,11 @@ def verify_native_release_intake(
     if policy.get("combined_sha256") != combined:
         raise NativeIntakeError("legal-review envelope not bound to real source and credits")
 
-    binary = _read_bounded(Path(compiled_binary), max_bytes=_MAX_BINARY)
-    _require_binary_format(binary, candidate.target_platform_id)
-    if _sha(binary) != candidate.native_binary_sha256:
+    binary_sha256, binary_length, binary_header = _fingerprint_binary(compiled_binary)
+    _require_binary_format(
+        binary_header, candidate.target_platform_id, file_size=binary_length,
+    )
+    if binary_sha256 != candidate.native_binary_sha256:
         raise NativeIntakeError("reviewed native executable bytes differ from actual file")
     build = _read_bounded(Path(build_evidence), max_bytes=_MAX_EVIDENCE)
     gameplay = _read_bounded(Path(gameplay_evidence), max_bytes=_MAX_EVIDENCE)
@@ -359,7 +409,7 @@ def verify_native_release_intake(
         "rights/CREDITS.md": _sha(rights_files[0]),
         "rights/THIRD_PARTY_NOTICES.txt": _sha(rights_files[1]),
         "rights/material_inventory.json": _sha(rights_files[2]),
-        "compiled_binary": _sha(binary),
+        "compiled_binary": binary_sha256,
         "build_evidence": _sha(build),
         "gameplay_evidence": _sha(gameplay),
     }
@@ -370,11 +420,11 @@ def verify_native_release_intake(
     }, sort_keys=True, separators=(",", ":")).encode()
     return NativeIntakeReceipt(
         candidate_sha256=candidate.digest,
-        native_binary_sha256=_sha(binary),
+        native_binary_sha256=binary_sha256,
         native_source_sha256=project_digest,
         rights_notices_sha256=credits.bundle_sha256,
         bound_world_sha256=candidate.world_sha256,
         byte_verified_files=tuple(sorted(file_ids)),
         intake_sha256=_sha(canonical),
-        bin_bytes=len(binary),
+        bin_bytes=binary_length,
     )
