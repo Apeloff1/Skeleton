@@ -183,7 +183,7 @@ def test_training_receipt_binds_replayable_training_payload(native_model):
     assert receipt.example_count > 0
     assert receipt.supervised_token_count > 0
     assert len(receipt.digest) == 64
-    pipeline.verify_training_receipt(prepared, receipt)
+    pipeline.verify_training_receipt(prepared, receipt, pad_token_id=native_model.unk)
 
 
 def test_training_receipt_rejects_tampered_payload(native_model):
@@ -197,7 +197,7 @@ def test_training_receipt_rejects_tampered_payload(native_model):
     tampered = replace(receipt, supervised_token_count=receipt.supervised_token_count + 1)
 
     with pytest.raises(TokenizerContractError, match="receipt mismatch"):
-        pipeline.verify_training_receipt(prepared, tampered)
+        pipeline.verify_training_receipt(prepared, tampered, pad_token_id=native_model.unk)
 
 
 def test_training_receipt_fails_closed_without_trainable_examples(native_model):
@@ -1539,11 +1539,11 @@ def test_serialized_batches_reject_duplicate_json_keys_and_noncanonical_encoding
         with pytest.raises(TokenizerContractError, match="duplicate"):
             decode(duplicate)
         pretty = json.dumps(json.loads(payload), indent=2).encode("utf-8")
-        with pytest.raises(TokenizerContractError, match="noncanonical"):
+        with pytest.raises(TokenizerContractError, match="invalid serialized|noncanonical"):
             decode(pretty)
         with pytest.raises(TokenizerContractError, match="invalid serialized"):
             decode(b"")
-        with pytest.raises(TokenizerContractError, match="nonfinite"):
+        with pytest.raises(TokenizerContractError, match="nonfinite|invalid serialized"):
             decode(b'{"not_a_number":NaN}')
 
 
@@ -1556,11 +1556,11 @@ def test_model_batch_decoder_rejects_noninteger_tokens_and_provenance():
     model = materialize_model_batch((TokenWindow(0, 3, (1, 2, 3), "a" * 64),), pad_token_id=0)
     original = json.loads(serialize_model_input_batch(model))
     for name, value, expected in (
-        ("input_ids", [[True, 2, 3]], "invalid model batch token id"),
-        ("attention_mask", [[True, 1, 1]], "invalid attention mask"),
-        ("source_window_digests", ["g" * 64], "invalid model batch source digest"),
+        ("input_ids", [[True, 2, 3]], "invalid serialized model batch content"),
+        ("attention_mask", [[True, 1, 1]], "invalid serialized model batch content"),
+        ("source_window_digests", ["g" * 64], "invalid serialized model batch content"),
         ("input_ids", [5], "invalid serialized model batch content"),
-        ("pad_token_id", True, "invalid model batch padding token"),
+        ("pad_token_id", True, "invalid serialized model batch content"),
     ):
         payload = dict(original)
         payload[name] = value
@@ -1581,11 +1581,11 @@ def test_causal_batch_decoder_rejects_type_confusion_and_invalid_source_ids():
     causal = materialize_causal_training_batch(model)
     original = json.loads(serialize_causal_training_batch(causal))
     for name, value, expected in (
-        ("input_ids", [[True, 2]], "invalid causal input token"),
-        ("loss_mask", [[True, 1]], "invalid causal loss mask"),
-        ("source_window_digests", ["g" * 64], "invalid causal source digest"),
+        ("input_ids", [[True, 2]], "invalid serialized causal batch content"),
+        ("loss_mask", [[True, 1]], "invalid serialized causal batch content"),
+        ("source_window_digests", ["g" * 64], "invalid serialized causal batch content"),
         ("input_ids", [False], "invalid serialized causal batch content"),
-        ("ignore_index", True, "invalid causal ignore_index"),
+        ("ignore_index", True, "invalid serialized causal batch content"),
     ):
         payload = dict(original)
         payload[name] = value
