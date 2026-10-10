@@ -142,6 +142,15 @@ def gate_catalog(address:CodexAddress,state:CodexState)->list[dict]:
 
 def available_actions(address:CodexAddress,state:CodexState)->list[dict]:
     root,codex=_valid(address,state)
+    from .dragon_world_genome import genome_world
+    world,_=genome_world(root)
+    terminal=(not state.player.base.alive or (
+        state.player.base.endings_seen and not world.allows_continuation
+    ))
+    if terminal:
+        return [{"name":"restart_world","available":True,
+                 "reason":"player_run_completed_or_life_ended",
+                 "kind":"explicit_original_world_restart"}]
     result=[{
         "name":"wait_world","available":True,
         "reason":"open","kind":"advance_world_time",
@@ -217,6 +226,21 @@ def step(address:CodexAddress,state:CodexState,action:str)->CodexState:
     if state.actions>=2**31-2:
         raise ValueError("original world history counter exhausted")
     player=state.player
+    from .dragon_world_genome import genome_world
+    underlying,_=genome_world(root)
+    terminal=(not player.base.alive or (
+        player.base.endings_seen and not underlying.allows_continuation))
+    if terminal and action!="restart_world":
+        raise ValueError("finished or dead original world run must restart")
+    if action=="restart_world":
+        if not terminal:
+            raise ValueError("current original world is still playable; reset via new seed")
+        reset=start(address)
+        return replace(reset,actions=state.actions+1,
+            history_digest=_sha([
+                SCHEMA,address.codex_digest,state.history_digest,
+                "authored_restart",reset.history_digest,
+            ]))
     new_mastery=list(state.axis_mastery)
     new_rep=list(state.domain_reputation)
     opened=list(state.opened_gates)
@@ -260,13 +284,18 @@ def step(address:CodexAddress,state:CodexState,action:str)->CodexState:
         target=(old.x+delta[0],old.y+delta[1])
         if any(abs(n)>MAX_ABS_COORD for n in target):
             raise ValueError("authored destination beyond valid original world")
-        player=replace(player,base=replace(
+        base=replace(
             old,x=target[0],y=target[1],
             history_digest=_sha([
                 old.history_digest,"codex_delayed_route",
                 address.codex_digest,action,target,old.turn,
             ]),
-        ))
+        )
+        player=replace(player,base=base,
+            history_digest=_sha([
+                player.history_digest,"codex_delayed_route",
+                action,base.history_digest,target,
+            ]))
         if action not in opened:opened.append(action)
         journeys=(journeys+[action])[-64:]
         new_rep[index]=min(MAX_INTENSITY,new_rep[index]+2)
