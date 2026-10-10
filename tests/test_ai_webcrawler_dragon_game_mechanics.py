@@ -492,3 +492,19 @@ def test_fully_confirmed_unopposed_taste_is_reviewed():
     store.record(session(store, observations=(positive,)), authorized=True)
     assert store.distill("alice", authorized=True).review_required is False
 
+
+def test_taste_fingerprint_binds_quoted_examples_not_just_score():
+    store = setup()
+    first = session(store)
+    store.record(first, authorized=True)
+    one = store.distill("alice", authorized=True)
+    store.erase("alice", authorized=True)
+    from dataclasses import replace
+    changed = replace(observation(), description="Entirely different original gameplay")
+    second = session(store, observations=(changed,))
+    store.record(second, authorized=True)
+    two = store.distill("alice", authorized=True)
+    assert one.insights[0].preference_score == two.insights[0].preference_score
+    assert one.insights[0].confidence == two.insights[0].confidence
+    assert one.fingerprint != two.fingerprint
+
