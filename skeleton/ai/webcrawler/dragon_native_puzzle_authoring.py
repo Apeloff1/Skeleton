@@ -175,6 +175,7 @@ def preview_authored_levels(levels:tuple[tuple[str,...],...])->dict:
         "stages":[{
             "stage":x.order+1,"layout_sha256":x.layout_sha256,
             "shortest_moves":x.shortest_moves,
+            "shortest_solution":x.shortest_solution,
             "solver_states":x.explored_states,
             "crates":x.crate_count,
         } for x in campaign.levels],
