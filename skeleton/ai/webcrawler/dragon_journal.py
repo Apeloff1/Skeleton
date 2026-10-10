@@ -167,6 +167,27 @@ class DragonEventJournal:
             (session_id, after, limit)).fetchall()
         if [row[0] for row in proof] != [event["sequence"] for event in result["events"]]:
             raise ValueError("journal page changed after chain verification")
+        # Bind every returned record to the verified database digest. A
+        # replacement/mutation between the verification and page read must
+        # never be represented as an already-verified evidence event.
+        for event, (seq, parent, digest) in zip(result["events"], proof):
+            if event.get("event_id") != digest or event.get("schema") != SCHEMA:
+                raise ValueError("journal page evidence changed after verification")
+            record = {
+                "session_id": session_id, "sequence": seq,
+                "kind": event.get("kind"), "url": event.get("url"),
+                "at": event.get("at"), "payload": event.get("payload"),
+                "previous_digest": parent,
+            }
+            try:
+                calculated = hashlib.sha256(_canonical(record).encode("utf-8")).hexdigest()
+                if calculated != digest and isinstance(record["at"], float) and record["at"].is_integer():
+                    record["at"] = int(record["at"])
+                    calculated = hashlib.sha256(_canonical(record).encode("utf-8")).hexdigest()
+                if calculated != digest:
+                    raise ValueError("journal page evidence digest mismatch")
+            except (TypeError, UnicodeError, OverflowError, RecursionError) as exc:
+                raise ValueError("journal page evidence cannot be verified") from exc
         return {
             **result,
             "chain_verified": True,
