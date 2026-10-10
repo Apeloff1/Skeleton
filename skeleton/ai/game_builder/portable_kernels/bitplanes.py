@@ -71,3 +71,10 @@ def decode_snes_4bpp(data: bytes) -> tuple[tuple[int, ...], ...]:
                            for plane in range(4))
                        for x in range(8)) for y in range(8))
 
+
+def encode_sms_4bpp(tile: Sequence[Sequence[int]]) -> bytes:
+    """Sega Master System/Game Gear Mode 4: four bitplanes per scanline."""
+    rows = _pixels(tile, 15)
+    return bytes(sum(((row[x] >> plane) & 1) << (7-x) for x in range(8))
+                 for row in rows for plane in range(4))
+
