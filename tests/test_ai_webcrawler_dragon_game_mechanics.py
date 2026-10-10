@@ -610,3 +610,18 @@ def test_mechanic_insight_cannot_publish_invalid_evidence_numbers():
     ):
         with pytest.raises(ValueError, match="mechanic insight"):
             replace(base, **update)
+
+def test_taste_profile_rejects_duplicate_evidence_and_forged_review_flags():
+    from dataclasses import replace
+    store = setup()
+    store.record(session(store), authorized=True)
+    good = store.distill("alice", authorized=True)
+    for kwargs in (
+        {"owner": "alice" + chr(10)},
+        {"insights": (good.insights[0], good.insights[0])},
+        {"review_required": 1},
+        {"fingerprint": "not-a-digest"},
+        {"design_directives": ("bad" + chr(0) + "directive",)},
+    ):
+        with pytest.raises(ValueError, match="taste profile"):
+            replace(good, **kwargs)
