@@ -978,6 +978,7 @@ def verify_published_production(destination: Path, index_name: str) -> dict:
     if index_name != "dragon-production-" + index["request_id"][:20] + ".json":
         raise ValueError("portfolio index name diverges from approved request")
     return {"schema": INDEX_SCHEMA, "status": "verified",
+            "index_sha256": _hash(data),
             "request_id": index["request_id"],
             "archives_verified": len(entries),
             "archive_hashes": hashes,
@@ -998,8 +999,13 @@ def compare_verified_portfolios(
     """
     before = verify_published_production(left_directory, left_index)
     after = verify_published_production(right_directory, right_index)
-    first = json.loads((Path(left_directory) / left_index).read_text("utf-8"))
-    second = json.loads((Path(right_directory) / right_index).read_text("utf-8"))
+    previous_raw = (Path(left_directory) / left_index).read_bytes()
+    current_raw = (Path(right_directory) / right_index).read_bytes()
+    if (_hash(previous_raw) != before["index_sha256"] or
+            _hash(current_raw) != after["index_sha256"]):
+        raise ValueError("production index changed after verification")
+    first = json.loads(previous_raw)
+    second = json.loads(current_raw)
     left = {row["target"]: row for row in first["entries"]}
     right = {row["target"]: row for row in second["entries"]}
     deltas = []
