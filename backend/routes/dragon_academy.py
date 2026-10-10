@@ -687,7 +687,7 @@ def native_living_world_checkpoint_advance(
         from skeleton.ai.webcrawler.dragon_living_world_checkpoint import open_checkpoint
         state=open_checkpoint(world,signed["new_checkpoint"],owner)
         nearby=[
-            terrain(world,state.realm,state.x+dx,state.y+dy)
+            terrain_for_state(world,state,state.realm,state.x+dx,state.y+dy)
             for dy in range(-2,3) for dx in range(-2,3)
             if abs(state.x+dx)<=1_000_000 and abs(state.y+dy)<=1_000_000
         ]
@@ -712,12 +712,12 @@ def native_living_world_checkpoint_inspect(
     owner:str=Depends(_native_source_editor),
 )->dict:
     from skeleton.ai.webcrawler.dragon_living_world_checkpoint import open_checkpoint
-    from skeleton.ai.webcrawler.dragon_living_world import describe,terrain
+    from skeleton.ai.webcrawler.dragon_living_world import describe,terrain_for_state
     try:
         world=_dragon_living_world(body)
         state=open_checkpoint(world,body.token,owner)
         nearby=[
-            terrain(world,state.realm,state.x+dx,state.y+dy)
+            terrain_for_state(world,state,state.realm,state.x+dx,state.y+dy)
             for dy in range(-2,3) for dx in range(-2,3)
             if abs(state.x+dx)<=1_000_000 and abs(state.y+dy)<=1_000_000
         ]
