@@ -598,6 +598,7 @@ def compile_native_coleco(world:PlayableWorld,rights:HomebrewSource,*,authorized
         "redistribution_licensed":False,
         "original_8x8_tile_count":len(_ORIGINAL_8X8_TILES),
         "original_tile_sha256":sha256(bytes(v for tile in _ORIGINAL_8X8_TILES for v in tile)).hexdigest(),
+        "original_palette_sha256":sha256(bytes(_ORIGINAL_COLOR_GROUPS)).hexdigest(),
         "color_table_base":"0x2000",
         "graphics_pattern_base":"0x0000",
         "distinct_background_color_groups":len(_ORIGINAL_COLOR_GROUPS),
