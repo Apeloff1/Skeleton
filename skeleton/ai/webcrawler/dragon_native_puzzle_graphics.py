@@ -195,7 +195,10 @@ def enable_puzzle_graphics(
         raise ValueError("graphical C99 source cannot find original engine state")
     result=dict(files)
     from .dragon_native_puzzle_capture import enable_sdl_original_game_capture
-    result["src/graphics.c"]=enable_sdl_original_game_capture(C_GRAPHICS)
+    from .dragon_native_puzzle_hud import enable_original_native_hud
+    result["src/graphics.c"]=enable_sdl_original_game_capture(
+        enable_original_native_hud(C_GRAPHICS)
+    )
     result["include/dragon_puzzle_pixels.h"]=pixel_header(
         hero=hero,theme=theme,palette=palette,seed=seed,
     )
