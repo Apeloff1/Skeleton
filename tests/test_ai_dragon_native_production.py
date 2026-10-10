@@ -558,3 +558,120 @@ def test_index_path_and_request_prefix_bound(tmp_path):
     substitute.write_bytes(original.read_bytes())
     with pytest.raises(ValueError, match="index name"):
         verify_published_production(tmp_path, substitute.name)
+
+
+
+def test_portable_native_design_converts_to_real_target_specific_game_source(tmp_path):
+    from skeleton.ai.webcrawler.dragon_native_production import (
+        PortableGameDesign, _adapt_portable_design,
+    )
+    profile = PortableGameDesign(
+        palette="modern_neon", hero="robot", quest_theme="space",
+        difficulty=7, stages=6, candidates=12,
+    )
+    spec = request(targets=("game_boy", "pc_linux"), seed=981,
+                   portable_design=profile)
+    cartridge, degraded = _adapt_portable_design(spec, "game_boy")
+    desktop, native = _adapt_portable_design(spec, "pc_linux")
+    assert cartridge.seed == desktop.seed == 981
+    assert cartridge.title == desktop.title == spec.title
+    assert cartridge.hero == desktop.hero == "robot"
+    assert cartridge.quest_theme == desktop.quest_theme == "space"
+    assert cartridge.palette == "handheld"
+    assert cartridge.stages == cartridge.candidates == 1
+    assert desktop.palette == "modern_neon"
+    assert desktop.stages == 6 and desktop.candidates == 12
+    assert desktop.difficulty == cartridge.difficulty == 7
+    assert "palette_adapted_to_cartridge_safe_class" in degraded["port_adjustments"]
+    assert "hero_theme_and_difficulty_not_runtime_applied_by_cartridge_emitter" in degraded["port_adjustments"]
+    assert not native["port_adjustments"]
+
+    produced = publish_production(spec, tmp_path, authorized=True)
+    assert produced["status"] == "published"
+    assert len(produced["artifacts"]) == 2
+    assert all(x["port_profile_digest"] for x in produced["artifacts"])
+    assert verify_published_production(tmp_path, produced["index"])["archives_verified"] == 2
+    for entry in produced["artifacts"]:
+        receipt = verify_source_release((tmp_path / entry["archive_name"]).read_bytes())
+        plan = receipt["port_plan"]
+        assert plan["production_seed"] == 981
+        assert plan["production_title"] == spec.title
+        assert plan["portable_profile_digest"] == entry["port_profile_digest"]
+        assert plan["target"] == entry["target"]
+
+
+def test_portable_profile_revisions_materially_change_native_sources(tmp_path):
+    from skeleton.ai.webcrawler.dragon_native_production import PortableGameDesign
+    base = PortableGameDesign(palette="modern_neon", hero="robot", stages=5)
+    next_profile = replace(base, hero="astronaut", stages=7, difficulty=9)
+    first = request(targets=("pc_linux",), portable_design=base)
+    next_spec = request(targets=("pc_linux",), portable_design=next_profile)
+    assert first.request_id != next_spec.request_id
+    a = publish_production(first, tmp_path / "a", authorized=True)
+    b = publish_production(next_spec, tmp_path / "b", authorized=True)
+    assert a["artifacts"][0]["source_fingerprint"] != b["artifacts"][0]["source_fingerprint"]
+    assert a["artifacts"][0]["port_profile_digest"] != b["artifacts"][0]["port_profile_digest"]
+
+
+@pytest.mark.parametrize("changes", [
+    {"palette": "commercial_console_palette"},
+    {"hero": "third_party_character"},
+    {"quest_theme": "../../payload"},
+    {"stages": 9},
+    {"stages": True},
+    {"candidates": 25},
+    {"difficulty": 0},
+    {"project_notes": "$(command)"},
+    {"project_notes": "x" * 201},
+])
+def test_portable_design_rejects_unsupported_or_executable_inputs(changes):
+    from skeleton.ai.webcrawler.dragon_native_production import PortableGameDesign
+    with pytest.raises(ValueError):
+        PortableGameDesign(**changes).validate()
+
+
+def test_portable_design_source_bundle_survives_nested_evidence_replay():
+    from skeleton.ai.webcrawler.dragon_native_production import (
+        PortableGameDesign, build_source_bundle, verify_source_bundle,
+    )
+    spec = request(
+        targets=("game_boy", "pc_linux"), seed=1337,
+        max_portfolio_bytes=3_000_000,
+        portable_design=PortableGameDesign(
+            palette="modern_neon", hero="pilot", quest_theme="ice",
+            difficulty=8, stages=5, candidates=6,
+        ),
+    )
+    binary, index = build_source_bundle(spec, authorized=True)
+    assert verify_source_bundle(binary)["status"] == "verified_source_bundle"
+    assert index["target_count"] == 2
+    assert all(item["port_profile_digest"] for item in index["entries"])
+    with ZipFile(BytesIO(binary)) as outer:
+        for name in outer.namelist():
+            if name.startswith("releases/"):
+                receipt = verify_source_release(outer.read(name))
+                assert receipt["port_plan"]["claims"].endswith("gameplay certification")
+
+
+def test_forged_cartridge_port_downgrade_detected_without_modifying_source():
+    from skeleton.ai.webcrawler.dragon_native_production import (
+        PortableGameDesign, build_source_bundle,
+    )
+    spec = request(max_portfolio_bytes=3_000_000, seed=42,
+                   portable_design=PortableGameDesign(
+                       stages=7, palette="modern_neon"))
+    outer, _ = build_source_bundle(spec, authorized=True)
+    with ZipFile(BytesIO(outer)) as archive:
+        filename = next(name for name in archive.namelist() if name.startswith("releases/"))
+        inner = archive.read(filename)
+    with ZipFile(BytesIO(inner)) as native:
+        receipt = json.loads(native.read("release-receipt.json"))
+    receipt["port_plan"]["port_adjustments"] = []
+    modified = rezip({"release-receipt.json": json.dumps(receipt).encode()}, inner)
+    with pytest.raises(ValueError, match="portable game port evidence"):
+        verify_source_release(modified)
+
+
+def test_portable_request_never_accepts_untyped_arbitrary_profile():
+    with pytest.raises(ValueError, match="typed portable"):
+        request(portable_design={"stage": 200}).validate()
