@@ -154,3 +154,17 @@ def test_novelty_is_exact_complement_of_overlap():
     assert route_diversity_ppm(a, a) == 0
     assert route_diversity_ppm(a, b) == 1_000_000 - route_overlap_ppm(a, b)
 
+
+def test_route_portfolio_finds_real_distinct_routes_and_caps_work():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    portfolio = route_portfolio(p, max_routes=4)
+    assert 2 <= len(portfolio) <= 4
+    assert portfolio == route_portfolio(p, max_routes=4)
+    assert len({route.actions for route in portfolio}) == len(portfolio)
+    assert all(evaluate_route(p, r.actions).positions == r.positions
+               for r in portfolio)
+    assert any(route_diversity_ppm(portfolio[0], route) > 0
+               for route in portfolio[1:])
+    with pytest.raises(MultipathError):
+        route_portfolio(p, max_routes=0)
+
