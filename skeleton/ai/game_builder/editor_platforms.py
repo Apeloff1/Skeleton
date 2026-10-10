@@ -143,7 +143,7 @@ def editor_platform_form(*, registry: PlatformRegistry | None = None) -> dict[st
             {"value": PortMode.CROSS_HYBRID.value, "label": "Original, independently cleared two-source hybrid"},
         ],
         "export_status": "no_native_target_verified",
-        "source_export_status": "three_desktop_three_rom_one_c64_one_dos_one_atari8_one_apple2_one_zx48_one_msx1_one_sms_one_gamegear_one_coleco_native_sources",
+        "source_export_status": "three_desktop_three_rom_one_c64_one_dos_one_atari8_one_apple2_one_zx48_one_msx1_one_sms_one_gamegear_one_coleco_one_vectrex_native_sources",
         "native_source_project_destinations": sorted(_NATIVE_SOURCE_TARGETS & set(catalog.profiles)),
         "atomic_all_native_original_portfolio_supported": True,
         "portfolio_target_count": len(_NATIVE_SOURCE_TARGETS & set(catalog.profiles)),
