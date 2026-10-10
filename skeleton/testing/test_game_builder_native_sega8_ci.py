@@ -50,6 +50,8 @@ def test_compilation_receipt_does_not_forge_build_or_legal_approval(
     assert evidence["source_sha256"]==emitted["source_content_digest"]
     assert evidence["toolchain_revision_hash_algorithm"]=="git-sha1"
     assert evidence["toolchain_source_authenticated"] is False
+    assert evidence["source_rights_evidence_sha256"]==emitted["rights_evidence_sha256"]
+    assert evidence["source_rights_independently_proven"] is False
 
 
 def test_wrong_hardware_manifest_or_forged_claim_fails_closed(tmp_path):
@@ -149,9 +151,12 @@ def test_real_build_directory_is_accepted_without_adding_false_source_integrity(
     receipt=verify(
         "sega_master_system",source,rom,toolchain_revision=REVISION,
         expected_source_sha256=evidence["source_content_digest"],
+        expected_authorship_sha256=evidence["rights_evidence_sha256"],
     )
     assert receipt["source_digest_matches_expected"] is True
     assert receipt["source_digest_independently_attested"] is False
+    assert receipt["source_authorship_hash_matches_expected"] is True
+    assert receipt["source_rights_independently_proven"] is False
     assert receipt["source_sha256"]==evidence["source_content_digest"]
     assert receipt["native_rom_compiled"] is False
 
@@ -208,3 +213,39 @@ def test_sega_source_ancestor_symlink_cannot_redirect_code_to_unreviewed_disk(tm
     rom.write_bytes(_rom("sega_master_system"))
     with pytest.raises(ValueError):
         verify("sega_master_system",alias,rom,toolchain_revision=REVISION)
+
+
+
+def test_author_rights_receipt_invalidated_if_evidence_is_substituted(tmp_path):
+    author=tmp_path/"authorship.txt"
+    author.write_text("Independent original star-hero puzzles and music",encoding="utf-8")
+    src=tmp_path/"source"
+    claim=emit("sega_master_system",src,author)
+    rom=tmp_path/"native.sms"
+    rom.write_bytes(_rom("sega_master_system"))
+    with pytest.raises(ValueError,match="authorship evidence changed"):
+        verify(
+            "sega_master_system",src,rom,toolchain_revision=REVISION,
+            expected_authorship_sha256=sha256(b"another author rights packet").hexdigest(),
+        )
+    validated=verify(
+        "sega_master_system",src,rom,toolchain_revision=REVISION,
+        expected_authorship_sha256=claim["rights_evidence_sha256"],
+    )
+    assert validated["source_authorship_hash_matches_expected"] is True
+    assert validated["source_rights_independently_proven"] is False
+
+
+@pytest.mark.parametrize("not_a_hash",["short","-1"*32,"0000","F"*64])
+def test_malformed_author_provenance_refused(tmp_path,not_a_hash):
+    author=tmp_path/"authors.txt"
+    author.write_text("new game ideas, expression and rights",encoding="utf-8")
+    src=tmp_path/"source"
+    emit("sega_master_system",src,author)
+    rom=tmp_path/"native.sms"
+    rom.write_bytes(_rom("sega_master_system"))
+    with pytest.raises(ValueError,match="authorship evidence"):
+        verify(
+            "sega_master_system",src,rom,toolchain_revision=REVISION,
+            expected_authorship_sha256=not_a_hash,
+        )
