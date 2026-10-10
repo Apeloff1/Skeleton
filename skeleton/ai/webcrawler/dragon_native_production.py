@@ -984,6 +984,83 @@ def verify_published_production(destination: Path, index_name: str) -> dict:
             "scope": "sources-and-optional-ROM-structure; not hardware or legal certification"}
 
 
+
+
+def compare_verified_portfolios(
+    left_directory: Path, left_index: str,
+    right_directory: Path, right_index: str,
+) -> dict:
+    """Compare *verified* native portfolios to guide meaningful rebuild work.
+
+    The comparison consumes receipts only after full source/hardware/evidence
+    replay has succeeded for BOTH editions. It does not issue a knowledge
+    promotion or claim a gameplay regression from changed bytes alone.
+    """
+    before = verify_published_production(left_directory, left_index)
+    after = verify_published_production(right_directory, right_index)
+    first = json.loads((Path(left_directory) / left_index).read_text("utf-8"))
+    second = json.loads((Path(right_directory) / right_index).read_text("utf-8"))
+    left = {row["target"]: row for row in first["entries"]}
+    right = {row["target"]: row for row in second["entries"]}
+    deltas = []
+    for target in sorted(set(left) | set(right)):
+        a = left.get(target)
+        b = right.get(target)
+        if a is None:
+            status = "target_added"
+        elif b is None:
+            status = "target_removed"
+        elif a["source_fingerprint"] != b["source_fingerprint"]:
+            status = "source_changed"
+        elif a["binary_sha256"] != b["binary_sha256"]:
+            status = "binary_changed_only"
+        elif a["archive_sha256"] != b["archive_sha256"]:
+            status = "release_receipt_changed_only"
+        else:
+            status = "identical"
+        reasons = []
+        if a is not None and b is not None:
+            if a["gameplay_mode"] != b["gameplay_mode"]:
+                reasons.append("runtime_gameplay_mode_changed")
+            if a["campaign_stages"] != b["campaign_stages"]:
+                reasons.append("campaign_stage_count_changed")
+            if a.get("port_profile_digest") != b.get("port_profile_digest"):
+                reasons.append("portable_game_design_changed")
+            if a["compiler_state"] != b["compiler_state"]:
+                reasons.append("build_toolchain_evidence_changed")
+            if a["evidence"] != b["evidence"]:
+                reasons.append("verification_level_changed")
+        deltas.append({
+            "target": target,
+            "state": status,
+            "source_before": a["source_fingerprint"] if a else None,
+            "source_after": b["source_fingerprint"] if b else None,
+            "binary_before": a["binary_sha256"] if a else None,
+            "binary_after": b["binary_sha256"] if b else None,
+            "causes_to_review": reasons,
+            "requires_new_compile_review": status not in ("identical",),
+            "requires_new_gameplay_review": status in (
+                "target_added", "target_removed", "source_changed"
+            ),
+        })
+    changes = [row for row in deltas if row["state"] != "identical"]
+    return {
+        "schema": "skeleton.ai.dragon.native_portfolio_comparison.v1",
+        "previous_request_id": before["request_id"],
+        "current_request_id": after["request_id"],
+        "previous_verified": before["archives_verified"],
+        "current_verified": after["archives_verified"],
+        "changes": len(changes),
+        "unchanged": len(deltas) - len(changes),
+        "targets": deltas,
+        "claim_boundary": (
+            "Verified source and release differences only; no automatic "
+            "functional equivalence, emulator proof, licensing or approval"
+        ),
+    }
+
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = ArgumentParser(description="Dragon offline original native production lane")
     subs = parser.add_subparsers(dest="command", required=True)
@@ -1006,11 +1083,21 @@ def main(argv: list[str] | None = None) -> int:
     audit = subs.add_parser("verify")
     audit.add_argument("--out", type=Path, required=True)
     audit.add_argument("--index", required=True)
+    delta = subs.add_parser("compare", help="Audit and diff two verified native portfolios")
+    delta.add_argument("--previous-dir", type=Path, required=True)
+    delta.add_argument("--previous-index", required=True)
+    delta.add_argument("--current-dir", type=Path, required=True)
+    delta.add_argument("--current-index", required=True)
     args = parser.parse_args(argv)
     if args.command == "capabilities":
         output = {"schema": SCHEMA, "targets": capability_matrix()}
     elif args.command == "verify":
         output = verify_published_production(args.out, args.index)
+    elif args.command == "compare":
+        output = compare_verified_portfolios(
+            args.previous_dir, args.previous_index,
+            args.current_dir, args.current_index,
+        )
     else:
         request = ProductionRequest(
             title=args.title, style=args.style,
