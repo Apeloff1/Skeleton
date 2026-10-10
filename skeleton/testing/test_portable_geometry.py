@@ -52,3 +52,10 @@ def test_astar_is_shortest_deterministic_and_refuses_wall_endpoints():
     assert astar_path(("S#G",),(0,0),(2,0))==()
     with pytest.raises(GeometryError):
         astar_path(grid,(1,1),(2,2))
+
+def test_rect_collision_uses_half_open_nonpenetrating_boundaries():
+    assert rect_intersects((0,0,3,3),(2,2,3,3))
+    assert not rect_intersects((0,0,2,2),(2,0,2,2))
+    assert not rect_intersects((0,0,2,2),(0,2,2,2))
+    with pytest.raises(GeometryError):
+        rect_intersects((0,0,0,2),(0,0,1,1))
