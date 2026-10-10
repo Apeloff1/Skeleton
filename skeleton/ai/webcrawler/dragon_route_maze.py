@@ -70,6 +70,7 @@ class MazeCertificate:
 
 @dataclass(frozen=True)
 class MazeCreation:
+    request:MazeRequest
     world:World
     traveller:Traveller
     certificate:MazeCertificate
@@ -151,8 +152,7 @@ def build_maze(request:MazeRequest=MazeRequest())->MazeCreation:
     for row,col in all_cells:
         side_room=(row,col) not in indexed
         clue=clue_at.get((row,col))
-        unique=number if (number:=row*request.width+col)>=0 else 0
-        scenery=(35+rng.randrange(66) if side_room else rng.randrange(36))
+         scenery=(35+rng.randrange(66) if side_room else rng.randrange(36))
         biome=BIOMES[(row+col+request.seed)%len(BIOMES)]
         places.append(Place(
             _place(row,col),region="maze",biome=biome,
@@ -309,7 +309,6 @@ def build_maze(request:MazeRequest=MazeRequest())->MazeCreation:
         if not result.success:
             raise ValueError("constructed world lost its safe route in "+climate)
         weather_verified.append(climate)
-    from .dragon_route_world_factory import structural_report
     deadends=tuple(sorted(_place(*x) for x in side))
     report={
         "schema":SCHEMA,"world_digest":_fingerprint(world),
@@ -336,7 +335,7 @@ def build_maze(request:MazeRequest=MazeRequest())->MazeCreation:
             "arbitrary resource/time/action exhaustion. Vehicle-specific physics "
             "and player enjoyment are not certified."),
     }
-    return MazeCreation(world,traveller,MazeCertificate(
+    return MazeCreation(request,world,traveller,MazeCertificate(
         **report,certificate_digest=_final_digest(report),
     ))
 
@@ -349,14 +348,19 @@ def verify_maze(creation:MazeCreation)->dict:
     validate_world(world)
     if cert.schema!=SCHEMA or cert.world_digest!=_fingerprint(world):
         raise ValueError("maze identity differs from claimed world")
-    expected=build_maze(MazeRequest(
-        width=cert.dimensions[0],height=cert.dimensions[1],
-        seed=cert.source_seed,
-        scenic_density=_density_from_maze(creation,"scenic"),
-        detour_density=_density_from_maze(creation,"detour"),
-        secret_count=len(cert.secret_witnesses),
-        weather=world.environment[0],
-    )) if False else None
+    _bounded(creation.request)
+    if (cert.source_seed!=creation.request.seed or
+            cert.dimensions!=(creation.request.width,creation.request.height) or
+            world.environment!=(creation.request.weather,)):
+        raise ValueError("maze design configuration differs from its completion proof")
+    # Regeneration is deliberately independent of the claimed certificate.
+    # A changed door, missing dead end, shortened path, consumed clue or
+    # reclassified scenic route cannot pass merely by updating its digest.
+    original=build_maze(creation.request)
+    if (asdict(world)!=asdict(original.world) or
+            asdict(traveller)!=asdict(original.traveller) or
+            asdict(cert)!=asdict(original.certificate)):
+        raise ValueError("maze world, difficulty, topology or witnesses were modified")
     # No trust is placed in claimed certificates, including a source-only
     # graph with the same route labels but different gates or time costs.
     witnesses=(
@@ -367,6 +371,8 @@ def verify_maze(creation:MazeCreation)->dict:
         journey=replay(world,trace,traveller)
         if not journey.success or journey.places[-1]!=world.goal:
             raise ValueError("maze route evidence does not reach the goal")
+    if cert.all_climates_backbone_verified!=WEATHERS:
+        raise ValueError("maze did not certify every supported environmental condition")
     for climate in cert.all_climates_backbone_verified:
         if climate not in WEATHERS:
             raise ValueError("maze claims unknown climate evidence")
