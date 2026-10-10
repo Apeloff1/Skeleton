@@ -661,3 +661,41 @@ replay, Suzy/Mikey frame/audio timing, player enjoyment, or compatibility
 on physical Lynx devices. Those stages are explicitly false in the
 build report and require later separate validation. No publisher
 license or proprietary assets are inferred.
+
+## Native binary build expansion — cross-compiled Atari 2600, Apple II and Win32
+
+**Build pipeline, not a renamed extension:** the new trusted local command
+`python -m skeleton.ai.webcrawler.dragon_retro_binary_release --out
+_dragon_evidence/historical-build --seed 2600` uses *three distinct real
+cross compilers*: DASM 6507 for the Atari 2600, cc65 6502 targeting Apple
+II ProDOS loadable output, and i686 MinGW producing a PE32 Win32 GUI game.
+It invokes the target-specific project's real Makefile, requires actual
+build artifacts, bounds the output size and rejects non-native file headers.
+
+The Atari cartridge must occupy exactly 4096 bytes and contain reset and
+IRQ vectors pointing inside the mapped cartridge bank; the 32-bit Win32
+program must have DOS MZ and PE headers, Intel i386 machine type, PE32
+optional header and GUI subsystem. Apple II output is separately labeled
+a linked ProDOS-loadable program, **not** a self-booting disk image.
+Apple II has no reliable universal file magic, so source-and-toolchain
+provenance is essential.
+
+Every binary is SHA-256 bound to its exact source files and observed
+compiler signature. A deterministic ZIP includes the source, binaries,
+and explicit source-compile receipts. All operations are local and
+opt-in, never triggered by visiting a public source or using the
+browser crawler. Existing output directories must be empty.
+
+`.github/workflows/dragon-historical-native-release.yml` provisions
+the genuine DASM, cc65 and MinGW compilers on Ubuntu 24.04, executes
+actual native builds and regression tests, and uploads the ZIP and
+JSON artifact if and only if the checks succeed. Source generated is
+not the same as binary emitted; a newly pushed workflow is **unverified**
+until the exact-head CI run succeeds.
+
+The output receipt explicitly marks emulator/controller gameplay,
+physical hardware compatibility and legal distribution authorization
+as **not verified**. Windows 95 compatibility is not certified by
+producing modern i386 PE32 bytes; this requires Win95 runtime testing.
+Atari 2600 TIA scanline timing and Apple II ProDOS execution also require
+representative emulator/device validation before release.
