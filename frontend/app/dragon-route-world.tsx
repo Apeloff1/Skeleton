@@ -25,18 +25,22 @@ const WEATHER:readonly Weather[]=['clear','rain','windy','storm','snow','high_ti
 type NextRoute={
   edge:string;to:string;mode:string;family:string;shape:string[];
   time_minutes:number;waiting_minutes:number;price:number;fatigue:number;
+  fuel:number;oxygen:number;mana:number;
   danger:number;scenic:number;access:string;available:boolean;
 };
 type GameState={
   world_position:string;goal:string;completed:boolean;
   visited_places:string[];played_edges:string[];known_tokens:string[];
-  remaining_cash:number;remaining_energy:number;elapsed_minutes:number;
+  remaining_cash:number;remaining_energy:number;
+  remaining_fuel:number;remaining_oxygen:number;remaining_mana:number;
+  elapsed_minutes:number;
   clock_minute:number;options:NextRoute[];
 };
 type WinningRoute={
   edges:string[];places:string[];modes:string[];shapes:string[];
   objective:string;elapsed_minutes:number;money_spent:number;
-  risk:number;energy_used:number;secret_edges:number;unlockable_edges:number;
+  risk:number;energy_used:number;fuel_used:number;oxygen_used:number;
+  mana_used:number;secret_edges:number;unlockable_edges:number;
   loops:number;sights:number;digest:string;
 };
 type WorldPreview={
@@ -275,7 +279,8 @@ function RouteWorldEditor(){
             </Text>
             <Text style={s.copy}>
               {game.elapsed_minutes} min elapsed · {game.remaining_cash} currency ·
-              {' '}{game.remaining_energy} stamina
+              {' '}{game.remaining_energy} stamina · {game.remaining_fuel} fuel ·
+              {' '}{game.remaining_oxygen} oxygen · {game.remaining_mana} mana
             </Text>
             <Text style={s.hint}>
               Inventory: {game.known_tokens.map(label).join(', ')}
@@ -291,7 +296,8 @@ function RouteWorldEditor(){
                 <Text style={s.actionText}>{label(option.mode)} → {label(option.to)}</Text>
                 <Text style={s.copy}>
                   {option.time_minutes} min + {option.waiting_minutes} wait ·
-                  {' '}{option.price} fare · {option.fatigue} fatigue
+                  {' '}{option.price} fare · {option.fatigue} fatigue ·
+                  {' '}{option.fuel} fuel · {option.oxygen} O₂ · {option.mana} mana
                 </Text>
                 <Text style={s.hint}>
                   {option.available?option.shape.map(label).join(' / '):
@@ -331,7 +337,9 @@ function RouteWorldEditor(){
                 </Text>
                 <Text style={s.copy}>
                   {route.edges.length} segments · {route.money_spent} fare ·
-                  {' '}{route.risk} risk · {route.sights} scenic
+                  {' '}{route.risk} risk · {route.sights} scenic ·
+                  {' '}{route.fuel_used} fuel · {route.oxygen_used} O₂ ·
+                  {' '}{route.mana_used} mana
                 </Text>
                 <Text style={s.hint}>
                   {route.modes.map(label).join(' → ')}
