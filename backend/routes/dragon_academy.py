@@ -657,6 +657,84 @@ def native_living_world_journal(
     return {"ok":True,**report}
 
 
+class NativeLivingCheckpointRequest(NativeLivingWorldRequest):
+    """Stateless signed progression across sequential bounded action batches."""
+    token:str|None=Field(
+        default=None,strict=True,min_length=100,max_length=12000,
+        pattern=r"^[A-Za-z0-9_.-]+$")
+    moves:list[str]=Field(default_factory=list,max_length=192)
+
+
+class NativeLivingCheckpointInspectRequest(NativeLivingWorldRequest):
+    token:str=Field(strict=True,min_length=100,max_length=12000,
+                    pattern=r"^[A-Za-z0-9_.-]+$")
+
+
+@router.post("/native/production/worlds/checkpoint/advance")
+def native_living_world_checkpoint_advance(
+    body:NativeLivingCheckpointRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_living_world_checkpoint import continue_world
+    from skeleton.ai.webcrawler.dragon_living_world import describe,terrain
+    try:
+        world=_dragon_living_world(body)
+        signed=continue_world(
+            world,owner,previous_token=body.token,
+            actions=tuple(body.moves),
+        )
+        from skeleton.ai.webcrawler.dragon_living_world_checkpoint import open_checkpoint
+        state=open_checkpoint(world,signed["new_checkpoint"],owner)
+        nearby=[
+            terrain(world,state.realm,state.x+dx,state.y+dy)
+            for dy in range(-2,3) for dx in range(-2,3)
+            if abs(state.x+dx)<=1_000_000 and abs(state.y+dy)<=1_000_000
+        ]
+        return {
+            "ok":True,**signed,"current":describe(world,state),
+            "surroundings":nearby,
+        }
+    except RuntimeError:
+        raise HTTPException(status_code=503,
+            detail="Owner-bound persistent world checkpoint signing not configured") from None
+    except PermissionError:
+        raise HTTPException(status_code=403,
+            detail="Original living-world checkpoint is expired or belongs to another player") from None
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original living-world checkpoint or subsequent move is invalid") from None
+
+
+@router.post("/native/production/worlds/checkpoint/inspect")
+def native_living_world_checkpoint_inspect(
+    body:NativeLivingCheckpointInspectRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_living_world_checkpoint import open_checkpoint
+    from skeleton.ai.webcrawler.dragon_living_world import describe,terrain
+    try:
+        world=_dragon_living_world(body)
+        state=open_checkpoint(world,body.token,owner)
+        nearby=[
+            terrain(world,state.realm,state.x+dx,state.y+dy)
+            for dy in range(-2,3) for dx in range(-2,3)
+            if abs(state.x+dx)<=1_000_000 and abs(state.y+dy)<=1_000_000
+        ]
+        return {
+            "ok":True,"current":describe(world,state),
+            "surroundings":nearby,"checkpoint_bound_to_authenticated_owner":True,
+        }
+    except RuntimeError:
+        raise HTTPException(status_code=503,
+            detail="World checkpoint signing unavailable") from None
+    except PermissionError:
+        raise HTTPException(status_code=403,
+            detail="World checkpoint expired or not authorized for this user") from None
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="World checkpoint verification failed") from None
+
+
 class NativeAtlasWorldRequest(BaseModel):
     """Multi-region original world: bounded multi-maze compositional gameplay."""
     model_config=ConfigDict(extra="forbid")
