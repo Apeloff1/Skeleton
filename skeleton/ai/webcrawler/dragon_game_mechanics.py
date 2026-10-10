@@ -101,7 +101,7 @@ class GameMechanicsMemory:
             raise ValueError("CapturePolicy required")
         if type(policy.max_session_seconds) is not int or not 1 <= policy.max_session_seconds <= 14400:
             raise ValueError("invalid capture duration budget")
-        if not 1 <= policy.max_observations <= 100000:
+        if type(policy.max_observations) is not int or not 1 <= policy.max_observations <= 100000:
             raise ValueError("invalid observation budget")
         if not 1 <= policy.max_note_chars <= 5000:
             raise ValueError("invalid note budget")
