@@ -428,3 +428,15 @@ def test_astar_returns_same_optimal_length_as_bfs_with_replay_proof():
     with pytest.raises(MultipathError):
         solve_route_astar(p, heuristic_weight_ppm=0)
 
+
+def test_temporary_corridor_closure_forces_replanning_without_editing_map():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    alternate = solve_avoid_cells(p, ((2, 1),))
+    assert (2, 1) not in alternate.positions
+    assert verify_route_proof(p, alternate)
+    assert p.rows == OPEN_LEVEL
+    with pytest.raises(MultipathError):
+        solve_avoid_cells(p, (p.goal,))
+    with pytest.raises(MultipathError):
+        solve_avoid_cells(p, ((0, 0),))
+
