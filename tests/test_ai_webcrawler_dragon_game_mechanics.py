@@ -162,7 +162,7 @@ def test_policy_confidence_rejects_boolean_and_nonfinite():
 
 def test_owner_identity_rejects_control_and_whitespace():
     store = setup()
-    for bad in (" alice", "alice ", ""alice" + chr(10) + "other"", ""alice" + chr(0) + "shadow""):
+    for bad in (" alice", "alice ", "alice" + chr(10) + "other", "alice" + chr(0) + "shadow"):
         with pytest.raises(ValueError, match="owner"):
             store.sessions(bad, authorized=True)
 
@@ -188,7 +188,7 @@ def test_raw_video_retention_flag_requires_explicit_false():
 def test_game_labels_reject_embedded_control_characters():
     from dataclasses import replace
     store = setup()
-    for name in (""Example" + chr(0) + "Game"", ""Example" + chr(10) + "Game""):
+    for name in ("Example" + chr(0) + "Game", "Example" + chr(10) + "Game"):
         with pytest.raises(ValueError, match="game label"):
             store.record(replace(session(store), game_label=name), authorized=True)
 
