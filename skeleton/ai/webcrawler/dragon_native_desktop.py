@@ -432,7 +432,10 @@ def main(argv: list[str] | None = None) -> int:
     build.add_argument("--title", default="Original Dragon Puzzle")
     build.add_argument("--seed", type=int, default=1)
     build.add_argument("--difficulty", type=int, default=4)
-    build.add_argument("--stages", type=int, default=4)
+    build.add_argument("--stages", type=int, default=None)
+    build.add_argument("--procedural-levels", action="store_true")
+    build.add_argument("--authored-levels", type=Path,
+                       help="canonical JSON original board pack; no source-code imports")
     build.add_argument("--out", type=Path, required=True)
     build.add_argument("--attest-original-rights", action="store_true")
     build.add_argument("--authorize-local-build", action="store_true")
@@ -442,15 +445,26 @@ def main(argv: list[str] | None = None) -> int:
     if args.operation == "verify":
         output = verify_native_puzzle_executable(args.archive.read_bytes())
     else:
+        if args.authored_levels is not None and args.procedural_levels:
+            raise ValueError("original authored maps and procedural mode are mutually exclusive")
+        custom = None
+        if args.authored_levels is not None:
+            from .dragon_native_puzzle_authoring import load_authored_level_pack
+            custom = load_authored_level_pack(args.authored_levels)
+        stages = len(custom.levels) if custom is not None else (args.stages or 4)
+        if args.stages is not None and args.stages != stages:
+            raise ValueError("explicit campaign count disagrees with authored map count")
         design = PortableGameDesign(
-            stages=args.stages, difficulty=args.difficulty,
+            stages=stages, difficulty=args.difficulty,
             candidates=8, hero="explorer", quest_theme="ancient_ruins",
+            procedural_levels=args.procedural_levels,
         )
         request = ProductionRequest(
             title=args.title, style="fixed_screen_puzzle",
             targets=("pc_linux",), seed=args.seed,
             original_work_attested=args.attest_original_rights,
             portable_design=design,
+            authored_puzzles=custom.rows if custom is not None else None,
         )
         output = publish_native_puzzle_executable(
             request, args.out, authorized=args.authorize_local_build,
