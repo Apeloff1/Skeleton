@@ -213,6 +213,137 @@ def compile_port(request: PortRequest, registry: PlatformRegistry | None = None)
     )
 
 
+
+@dataclass(frozen=True, slots=True)
+class ProgressivePortHop:
+    """One hypothetical technical transformation, never an owned game artifact."""
+    step: int
+    from_platform_id: str
+    to_platform_id: str
+    mode: str
+    actions: tuple[PortAction, ...]
+    target_constraints: tuple[str, ...]
+    prior_hop_digest: str | None
+    original_rights_evidence_sha256: str
+    pending_release_gates: tuple[str, ...]
+    digest: str
+    planning_status: str = "hypothetical_source_only_no_intermediate_artifact"
+
+    @property
+    def native_build_verified(self) -> bool:
+        return False
+
+    @property
+    def releasable(self) -> bool:
+        return False
+
+
+@dataclass(frozen=True, slots=True)
+class ProgressivePortRoute:
+    """Technical route with original-source custody and explicit hop lineage."""
+    original_project_id: str
+    original_platform_id: str
+    original_rights_basis: str
+    original_evidence_sha256: str
+    creative_identity: tuple[str, ...]
+    hops: tuple[ProgressivePortHop, ...]
+    digest: str
+    planning_status: str = "design_only_requires_independent_intermediate_builds"
+
+    @property
+    def releasable(self) -> bool:
+        return False
+
+
+def compile_progressive_port_route(
+    source: HomebrewSource, destinations: tuple[str, ...], *,
+    mode: PortMode = PortMode.ENHANCED,
+    registry: PlatformRegistry | None = None,
+) -> ProgressivePortRoute:
+    """Plan consecutive platform adaptations without inventing intermediate rights.
+
+    Unlike compile_port_route (independent target alternatives), this evaluates
+    each technical hop against the prior destination. The rights proof always
+    remains bound to the REAL original homebrew. The proposed intermediate
+    output is not a new cleared source, installed binary or authorized release.
+    """
+    if (not isinstance(source, HomebrewSource)
+            or not isinstance(destinations, tuple)
+            or not 1 <= len(destinations) <= 5
+            or not isinstance(mode, PortMode)
+            or mode is PortMode.CROSS_HYBRID):
+        raise PortPlanningError("progressive route requires original homebrew, 1–5 destinations and non-hybrid mode")
+    if (any(not isinstance(item, str) or not item for item in destinations)
+            or len(set((source.platform_id, *destinations))) != len(destinations) + 1):
+        raise PortPlanningError("repeated or invalid progressive route destination")
+    catalog = default_registry() if registry is None else registry
+    if not isinstance(catalog, PlatformRegistry):
+        raise PortPlanningError("registry must be validated")
+    try:
+        previous = catalog.get(source.platform_id)
+        targets = tuple(catalog.get(item) for item in destinations)
+    except PlatformRegistryError as exc:
+        raise PortPlanningError("progressive route contains unknown hardware") from exc
+
+    hops: list[ProgressivePortHop] = []
+    previous_digest = None
+    for step, target in enumerate(targets, start=1):
+        actions = _actions(target, (previous,), mode)
+        gates = _RELEASE_GATES + (
+            "intermediate_source_build_and_custody_verification",
+            "independent_intermediate_rights_and_originality_review",
+        )
+        payload = {
+            "schema_version": 1,
+            "step": step,
+            "from_platform_id": previous.id,
+            "to_platform_id": target.id,
+            "mode": mode.value,
+            "original_project_id": source.project_id,
+            "original_platform_id": source.platform_id,
+            "original_rights_basis": source.rights_basis,
+            "original_evidence_sha256": source.evidence_sha256,
+            "creative_identity": list(source.creative_identity),
+            "prior_hop_digest": previous_digest,
+            "actions": [
+                {"phase": a.phase, "disposition": a.disposition, "work": a.work}
+                for a in actions
+            ],
+            "target_constraints": list(target.constraints),
+            "pending_release_gates": list(gates),
+            "planning_status": "hypothetical_source_only_no_intermediate_artifact",
+        }
+        digest = _deterministic_digest(payload)
+        hops.append(ProgressivePortHop(
+            step=step, from_platform_id=previous.id, to_platform_id=target.id,
+            mode=mode.value, actions=actions,
+            target_constraints=target.constraints, prior_hop_digest=previous_digest,
+            original_rights_evidence_sha256=source.evidence_sha256,
+            pending_release_gates=gates, digest=digest,
+        ))
+        previous = target
+        previous_digest = digest
+
+    route_digest = _deterministic_digest({
+        "schema_version": 1,
+        "original_project_id": source.project_id,
+        "original_platform_id": source.platform_id,
+        "original_rights_basis": source.rights_basis,
+        "original_evidence_sha256": source.evidence_sha256,
+        "creative_identity": list(source.creative_identity),
+        "hop_digests": [hop.digest for hop in hops],
+        "planning_status": "design_only_requires_independent_intermediate_builds",
+    })
+    return ProgressivePortRoute(
+        original_project_id=source.project_id,
+        original_platform_id=source.platform_id,
+        original_rights_basis=source.rights_basis,
+        original_evidence_sha256=source.evidence_sha256,
+        creative_identity=source.creative_identity,
+        hops=tuple(hops), digest=route_digest,
+    )
+
+
 def compile_port_route(
     source: HomebrewSource, destinations: tuple[str, ...], *,
     mode: PortMode = PortMode.FAITHFUL, registry: PlatformRegistry | None = None,
