@@ -180,6 +180,7 @@ class ProductionRequest:
     require_compiled: bool = False
     max_portfolio_bytes: int = MAX_PORTFOLIO_BYTES
     portable_design: PortableGameDesign | None = None
+    authored_puzzles: tuple[tuple[str, ...], ...] | None = None
 
     def validate(self) -> None:
         if not isinstance(self.title, str) or not 2 <= len(self.title.strip()) <= 80:
@@ -211,6 +212,17 @@ class ProductionRequest:
             raise ValueError("required native build needs compile_roms")
         if type(self.max_portfolio_bytes) is not int or not 1_024 <= self.max_portfolio_bytes <= MAX_PORTFOLIO_BYTES:
             raise ValueError("invalid bounded portfolio budget")
+        if self.authored_puzzles is not None:
+            from .dragon_native_puzzle_authoring import validate_authored_levels
+            pack=validate_authored_levels(self.authored_puzzles)
+            if (self.style!="fixed_screen_puzzle" or
+                    any(target not in ("pc_linux","pc_windows","pc_macos","steam_deck")
+                        for target in self.targets)):
+                raise ValueError("authored levels require native desktop Sokoban game")
+            if (self.portable_design is None or
+                    self.portable_design.procedural_levels or
+                    self.portable_design.stages!=len(pack.levels)):
+                raise ValueError("authored stage count must match approved design")
         if self.portable_design is not None:
             if not isinstance(self.portable_design, PortableGameDesign):
                 raise ValueError("typed portable design required")
@@ -233,6 +245,7 @@ class ProductionRequest:
             "attested": True, "compile_roms": self.compile_roms,
             "require_compiled": self.require_compiled,
             "portable_design": asdict(self.portable_design) if self.portable_design else None,
+            "authored_puzzles": digest(self.authored_puzzles) if self.authored_puzzles else None,
         })
 
 
@@ -455,6 +468,7 @@ def _render(request: ProductionRequest, target_id: str) -> NativeProject:
         authorized=True,
         design=adapted_design,
         procedural_puzzles=bool(request.portable_design and request.portable_design.procedural_levels),
+        authored_puzzles=request.authored_puzzles,
     )
 
 
