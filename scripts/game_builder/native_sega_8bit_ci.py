@@ -146,7 +146,8 @@ def verify(
         "reference_safe_replay_digest": manifest["reference_safe_replay_digest"],
         "original_project_id": manifest.get("project_id"),
         "source_sha256": source_digest,
-        "source_digest_independently_pinned": expected_source_sha256 is not None,
+        "source_digest_matches_expected": expected_source_sha256 is not None,
+        "source_digest_independently_attested": False,  # Caller-provided hash is not trusted external authority.
         "rom_sha256": measured["sha256"],
         "rom_size": measured["bytes"],
         "toolchain_revision": toolchain_revision,
