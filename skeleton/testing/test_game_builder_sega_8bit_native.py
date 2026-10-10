@@ -232,3 +232,55 @@ def test_artifact_must_not_forge_machine_execution_or_release_flags():
     forged_hash=sha256((p.game_c+"\0"+p.makefile+"\0"+forged_manifest).encode()).hexdigest()
     with pytest.raises(Sega8BitNativeError,match="cannot claim release"):
         replace(p,manifest_json=forged_manifest,content_digest=forged_hash)
+
+
+
+@pytest.mark.parametrize("target",("sega_master_system","sega_game_gear"))
+def test_animated_original_familiar_has_actual_native_sprite_graphics_and_audio(target):
+    """Features must exist in compiled game source, not a decorative roadmap."""
+    import re
+    from skeleton.ai.game_builder.sega_8bit_native_export import _tiles
+
+    world=_world()
+    result=compile_native_sega_8bit(world,_rights(world),target,authorized=True)
+    code=result.game_c
+    tile_words=re.findall(r"0x[0-9a-f]{2}",_tiles())
+    assert len(tile_words)==22*32
+    assert "#define HERO_ALT 16" in code
+    assert "#define BUDDY_IDLE 17" in code
+    assert "#define BUDDY_BLINK 18" in code
+    assert "#define BUDDY_HAPPY 19" in code
+    assert "#define BUDDY_SAD 20" in code
+    assert "#define BUDDY_CHEER 21" in code
+    assert "__sfr __at (0x7F) PSG_PORT;" in code
+    assert "PSG_PORT=0x9C;" in code
+    assert "static void psg_start" in code
+    assert "static void psg_tick" in code
+    assert "static void render_following_sprite" in code
+    assert "SMS_useFirstHalfTilesforSprites(1)" in code
+    assert "SMS_initSprites();" in code
+    assert "SMS_addSprite(" in code
+    assert "SMS_copySpritestoSAT();" in code
+    assert "SMS_setSpritePaletteColor(" in code
+    assert "GG_setSpritePaletteColor(" in code
+    assert "static void animate_companion" in code
+    assert "static void grant_companion_bond" in code
+    assert "bond_goal[7] = { 3, 7, 12, 18, 25, 33, 42 }" in code
+    assert "score+=10;" in code
+    assert "grant_companion_bond();" in code
+    assert "VRAM_WRITES_PER_FRAME 3" in code
+    assert code.index("SMS_waitForVBlank();",code.index("for (;;) {")) < code.index(
+        "render_following_sprite();",code.index("for (;;) {"),
+    )
+    for forbidden in ("SDL_", "requestAnimationFrame", "document.querySelector"):
+        assert forbidden not in code
+    manifest=json.loads(result.manifest_json)
+    assert manifest["native_psg_reactive_audio"] is True
+    assert manifest["native_animated_companion"] is True
+    assert manifest["native_sprite_familiar_source_present"] is True
+    assert manifest["native_sprite_collision_authority"] is False
+    assert manifest["companion_bond_ranks"]==8
+    assert manifest["companion_progression_changes_core_gameplay"] is False
+    assert manifest["emulator_playthrough_verified"] is False
+    assert manifest["physical_hardware_verified"] is False
+    assert manifest["release_approved"] is False
