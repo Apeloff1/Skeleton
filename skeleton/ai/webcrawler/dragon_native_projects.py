@@ -565,9 +565,31 @@ def render_native_project(*,title:str,target_id:str,style:str,
         from .dragon_game_fitness import choose_campaign,selection_report
         from .dragon_native_arcade_runtime import render_sdl_campaign
         if style not in GENRES and style not in (
-                "rhythm_game","fixed_screen_puzzle","world_route_adventure"):
+                "rhythm_game","fixed_screen_puzzle","world_route_adventure","maze_route_adventure"):
             raise ValueError("gameplay genre does not yet have an implemented native mode")
-        if style=="world_route_adventure":
+        if style=="maze_route_adventure":
+            from .dragon_route_maze import MazeRequest,build_maze
+            from .dragon_route_native_game import emit_route_game
+            creation=build_maze(MazeRequest(
+                seed=seed,width=6,height=6,
+                scenic_density=65,detour_density=70,
+                secret_count=2,challenge=challenge_profile,
+                weather="clear",
+            ))
+            files=emit_route_game(
+                creation.world,creation.traveller,authorized=True,
+                maze_creation=creation,
+            )
+            files["README.routes.md"]=(
+                "# Constructively complete original multi-path maze adventure\n\n"
+                "A complete C99 original playable game whose source includes "
+                "proof of a winning path from every room and for every supported "
+                "climate. Optional scenic cycles, long doublebacks, key-bearing "
+                "dead ends, hidden secret shortcuts and conditional travel "
+                "are real graph actions, not copied game content. A restart "
+                "is available after deliberate exhaustion of time/actions.\n"
+            )
+        elif style in ("world_route_adventure","maze_route_adventure"):
             from .dragon_route_world_factory import make_frontier
             from .dragon_route_native_game import emit_route_game
             world,visitor=make_frontier(seed=seed,weather="clear",hour=8)
@@ -760,7 +782,7 @@ def render_native_project(*,title:str,target_id:str,style:str,
               "runtime_gameplay_mode": (
                   ("native_dda_first_person" if style in ("first_person_shooter","immersive_sim")
                    else "native_turn_based_rpg" if style=="turn_based_rpg"
-                   else "native_original_world_routes" if style=="world_route_adventure"
+                   else "native_original_world_routes" if style in ("world_route_adventure","maze_route_adventure")
                    else "native_original_sokoban" if style=="fixed_screen_puzzle"
                    else "native_timing_rhythm" if style=="rhythm_game"
                    else GENRES[style]) if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck")
