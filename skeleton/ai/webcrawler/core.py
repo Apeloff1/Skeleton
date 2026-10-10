@@ -494,9 +494,9 @@ class CrawlEngine:
             return None
         if not self.robots.allowed(item.url):
             return None
-        host = urlsplit(item.url).hostname or ""
-        delay = max(self.policy.min_host_delay_seconds, self.robots.crawl_delay(item.url) or 0.0)
-        self._host_ready[host] = now + delay
+        # fetch_with_policy owns the per-hop host cooldown. Reserving the
+        # first hop here would make fetch_with_policy reject this same request
+        # as premature, even after the scheduled frontier/robots delay.
         try:
             from .redirects import fetch_with_policy
             response = fetch_with_policy(self, item.url, now=now)
