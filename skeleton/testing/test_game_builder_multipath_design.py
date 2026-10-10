@@ -214,3 +214,11 @@ def test_objective_reachability_identifies_missing_collectibles():
     good = objective_reachability(RouteProblem.from_rows(OPEN_LEVEL))
     assert good["all_collectibles_reachable"] and good["exit_reachable"]
 
+
+def test_branch_histogram_accounts_for_each_safe_tile():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    h = degree_histogram(p)
+    assert set(h) == {0, 1, 2, 3, 4}
+    assert sum(h.values()) == len(walkable_cells(p))
+    assert h[4] > 0
+
