@@ -595,3 +595,58 @@ fingerprint, unequal gameplay traces, absence of real Z80 demonstration
 activation or a cancelled exhibition that fails to restore user control.
 The receipts still never claim physical hardware testing or legal
 publication approval without independent verification.
+
+## Extended original campaigns and stage-specific physical palette adaptation
+
+The independently authored native hardware exporter supports a full
+**eight-level campaign** alongside the earlier three-level demonstration.
+Each stage includes six original collectible objectives, an independently
+solved safe route, optional authored hazards and original sprite/audio
+interactions. Forty-eight total collectibles unlock all seven cosmetic
+companion progress ranks and yield a **1,280-point** winning game. Stage
+progression is still performed by the same collision-and-reward engine;
+there is no host-side game-state mutation or shortcut to victory.
+
+Example creation without any proprietary ROM, BIOS or commercial artwork:
+
+```bash
+python -m scripts.game_builder.native_sega_8bit_ci \
+  --target sega_master_system \
+  --profile full_campaign \
+  --emit ./my-original-eight-stage-sms \
+  --author-evidence ./my-original-authorship.txt \
+  --host-reference-out ./my-original-route.json
+```
+
+The dedicated native CI matrix now also creates this full campaign for
+**both** Master System and Game Gear, executes its native C against the
+complete independently generated reference, compiles real cartridges with
+the pinned legal toolchain, validates their genuine 32 KiB Sega ROM
+structures and boots their compiled Z80 instructions. The eight-stage
+campaign's complete *Z80 winning route* remains separately unverified;
+its **host C full-playthrough** and **native Z80 boot** have their own
+required gates. The compiled ROM is intentionally not uploaded or
+distributed as an artifact.
+
+## Hardware-native stage color progression
+
+Each original visual theme (forest, space, desert, ocean and arcade) now
+generates deterministic **per-stage color accents** for both hardware
+palettes: Master System RGB222 and Game Gear RGB444. Native level
+transitions call the console video palette APIs rather than altering
+collision, collectible, health or score state. Stage zero retains
+the originally authored theme, and later stages rotate and harmonize
+accent channels. Contrast protection prevents physical color quantization
+from collapsing two different world accents to the same or nearly
+indistinguishable color, especially in the 2-bit Master System palette.
+
+Exact stage colors are included in the signed-source candidate manifest.
+Host tests validate five original themes across eight stages, and the
+instruction-level acceptance runner inspects actual CRAM palette bytes
+after every human-controlled and autonomous demonstration move. Cross-
+console parity rejects missing palette data, invalid RGB222/RGB444 values,
+mismatched original color plans and absent real Z80 stage-color checks.
+
+This work neither uses copyrighted third-party palettes nor certifies
+rights, distribution permission, physical hardware timing or compatibility
+with proprietary games. Those independent release gates remain closed.
