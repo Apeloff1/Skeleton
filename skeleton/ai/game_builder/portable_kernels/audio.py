@@ -21,3 +21,8 @@ def gameboy_pulse_period(hertz: int) -> int:
     hz=_integer(hertz,"Game Boy tone Hz",64,131072)
     return max(0,min(2047,2048-(131072+hz//2)//hz))
 
+
+def gameboy_pulse_frequency(period: int) -> float:
+    """Recover an actual Game Boy pulse tone's frequency from 11-bit period."""
+    return round(131072/(2048-_integer(period,"Game Boy tone period",0,2047)),6)
+
