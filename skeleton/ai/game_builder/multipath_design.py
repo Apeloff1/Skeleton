@@ -550,4 +550,18 @@ def route_branch_choices(problem: RouteProblem, proof: RouteProof) -> tuple[int,
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices"]
+def hazard_proximity(
+    problem: RouteProblem, *, radius: int = 2,
+) -> dict[Position, int]:
+    """For each safe tile count hazards within Manhattan awareness radius."""
+    if not isinstance(problem, RouteProblem) or type(radius) is not int or not 1 <= radius <= 6:
+        raise MultipathError("invalid hazard awareness radius")
+    return {
+        p: sum(abs(p[0] - h[0]) + abs(p[1] - h[1]) <= radius
+               for h in problem.hazards)
+        for p in walkable_cells(problem)
+    }
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity"]
