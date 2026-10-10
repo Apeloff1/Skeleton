@@ -56,3 +56,7 @@ class PhysicsReplayError(PhysicsError):
 
 class PhysicsReplayDivergenceError(PhysicsReplayError):
     """Raised when deterministic physics replay diverges from recorded evidence."""
+
+
+class PhysicsStabilityError(PhysicsError):
+    """Raised when the energy guard detects runaway energy in RAISE mode."""
