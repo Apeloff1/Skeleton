@@ -492,6 +492,8 @@ def verify_native_puzzle_executable(package: bytes) -> dict:
         evidence = json.loads(archive.read("native-executable-evidence.json"))
     receipt, source_inventory = _puzzle_proof(source)
     proof = json.loads(source_inventory["dragon-puzzle-proof.json"])
+    from .dragon_native_campaign_paths import verify_graph_report
+    graph = verify_graph_report(proof["campaign_graph"])
     if (evidence.get("schema") != SCHEMA or
             evidence.get("native_target") not in ("pc_linux","steam_deck") or
             evidence.get("native_target") != receipt["target"] or
