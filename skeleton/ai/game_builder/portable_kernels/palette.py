@@ -105,3 +105,12 @@ def ordered_luma_dither(rows: object, *, levels: int=4) -> tuple[tuple[int,...],
         output.append(tuple(result))
     return tuple(output)
 
+
+def contrast_ratio(first: object, second: object) -> float:
+    """WCAG sRGB contrast of candidate foreground/background palette colors."""
+    def luminance(rgb: tuple[int,int,int]) -> float:
+        linear=tuple((v/255)/12.92 if v/255<=0.04045
+                     else ((v/255+0.055)/1.055)**2.4 for v in rgb)
+        return linear[0]*0.2126+linear[1]*0.7152+linear[2]*0.0722
+    a,b=luminance(_rgb(first)),luminance(_rgb(second))
+    return round((max(a,b)+0.05)/(min(a,b)+0.05),6)
