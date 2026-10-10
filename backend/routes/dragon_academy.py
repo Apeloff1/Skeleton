@@ -890,6 +890,154 @@ def native_living_world_temporal_maze(
     }
 
 
+class NativeGenomicWorldRequest(BaseModel):
+    """Arbitrary-precision design address is a DECIMAL STRING, never a float."""
+    model_config=ConfigDict(extra="forbid")
+    index:str=Field(default="0",strict=True,min_length=1,max_length=80,
+                    pattern=r"^(0|[1-9][0-9]*)$")
+
+
+class NativeGenomicWorldPlayRequest(NativeGenomicWorldRequest):
+    actions:list[str]=Field(default_factory=list,max_length=128)
+
+
+class NativeGenomicWorldEditRequest(NativeGenomicWorldRequest):
+    changes:dict[str,StrictInt]=Field(default_factory=dict,max_length=24)
+
+
+class NativeGenomicPathRequest(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    path_index:str=Field(default="0",strict=True,min_length=1,max_length=100,
+                         pattern=r"^(0|[1-9][0-9]*)$")
+
+
+class NativeGenomicPathSampleRequest(NativeGenomicWorldRequest):
+    limit:StrictInt=Field(default=4,ge=1,le=6)
+
+
+@router.get("/native/production/worlds/genome/capabilities")
+def native_genomic_world_capabilities(
+    owner:str=Depends(_principal),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_world_genome import lattice_summary
+    from skeleton.ai.webcrawler.dragon_genomic_paths import pathspace_summary
+    return {
+        "ok":True,
+        "genomic_world_space":lattice_summary(),
+        "real_choice_path_space":pathspace_summary(),
+        "claim":"exact compositional address space; not a count of completed "
+                "games, unique artistic expressions or reviewed game releases",
+    }
+
+
+@router.post("/native/production/worlds/genome/inspect")
+def native_genomic_world_inspect(
+    body:NativeGenomicWorldRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from dataclasses import asdict
+    from skeleton.ai.webcrawler.dragon_world_genome import (
+        unrank_genome_address,
+    )
+    from skeleton.ai.webcrawler.dragon_genomic_world import (
+        initial_genomic_state,report,
+    )
+    try:
+        addr=unrank_genome_address(body.index)
+        now=initial_genomic_state(addr)
+        snapshot=report(addr,now,radius=2)
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Unknown original world genome or noncanonical huge address") from None
+    return {
+        "ok":True,
+        "source_address":asdict(addr),
+        "actual_game_state":snapshot,
+        "materialized_cells":len(snapshot["local_terrain"]),
+        "goal_required":snapshot["has_mandatory_win"],
+    }
+
+
+@router.post("/native/production/worlds/genome/play")
+def native_genomic_world_play(
+    body:NativeGenomicWorldPlayRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_world_genome import unrank_genome_address
+    from skeleton.ai.webcrawler.dragon_genomic_world import replay_genomic,report
+    try:
+        addr=unrank_genome_address(body.index)
+        current=replay_genomic(addr,tuple(body.actions))
+        actual=report(addr,current,radius=2)
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Real original world action history cannot be replayed") from None
+    return {
+        "ok":True,
+        "replayed_actions":list(body.actions),
+        "actual_game_state":actual,
+        "final_history_digest":current.history_digest,
+        "source_fingerprint":addr.genome_digest,
+        "claim":"each action changes real original world mechanics; "
+                "no mandatory win condition for endless worlds",
+    }
+
+
+@router.post("/native/production/worlds/genome/edit")
+def native_genomic_world_edit(
+    body:NativeGenomicWorldEditRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from dataclasses import asdict
+    from skeleton.ai.webcrawler.dragon_world_genome import (
+        edit_genome,
+    )
+    try:
+        next_address=edit_genome(body.index,body.changes)
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Unknown world genome axis or out-of-range physical level") from None
+    return {
+        "ok":True,"updated_source":asdict(next_address),
+        "reversible_decimal_address":next_address.decimal_index,
+        "modified_actual_simulation_controls":sorted(body.changes),
+    }
+
+
+@router.post("/native/production/worlds/genome/path")
+def native_genomic_world_path(
+    body:NativeGenomicPathRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from dataclasses import asdict
+    from skeleton.ai.webcrawler.dragon_genomic_paths import (
+        materialize_path,verify_path,
+    )
+    try:
+        action_program=materialize_path(body.path_index)
+        verdict=verify_path(action_program)
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original large-address path has no verified physical gameplay") from None
+    return {
+        "ok":True,"source_path":asdict(action_program),
+        "independent_verification":verdict,
+    }
+
+
+@router.post("/native/production/worlds/genome/sample-paths")
+def native_genomic_world_sample_paths(
+    body:NativeGenomicPathSampleRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_genomic_paths import sample_paths
+    try:
+        return {"ok":True,**sample_paths(body.index,limit=body.limit)}
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original world path sample is not validly replayable") from None
+
+
 class NativeIndexedLivingDesignRequest(BaseModel):
     """One actual generated design and a replayable route, never bulk minting."""
     model_config=ConfigDict(extra="forbid")
