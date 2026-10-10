@@ -679,6 +679,16 @@ def render_native_project(*,title:str,target_id:str,style:str,
         files["src/main.asm"]=enrich_native_gb_sound(
             files["src/main.asm"],
             scrolling=(target_id=="game_boy" and style=="side_scrolling_platformer"))
+    # Physically install original 2bpp actor/theme sprite tiles into the
+    # ROM source before canonical hardware budgeting. Existing frame/tile
+    # IDs and game logic remain stable; no proprietary assets are involved.
+    if design is not None and target_id in ("game_boy", "game_boy_color", "nes"):
+        from .dragon_native_artforge import make_art, apply_original_art
+        art, tiles = make_art(
+            hero=design.hero, theme=design.quest_theme,
+            palette=design.palette, seed=design.seed, target=target_id,
+        )
+        files = apply_original_art(files, art=art, tiles=tiles, style=style)
     if any(PurePosixPath(p).is_absolute() or ".." in PurePosixPath(p).parts for p in files):
         raise ValueError("unsafe generated path")
     if any(len(v.encode())>120_000 for v in files.values()):
