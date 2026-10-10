@@ -207,3 +207,19 @@ def shelf_pack_rectangles(sizes: object, atlas_width: int) -> tuple[tuple[int,in
         cursor_x+=w
         row_height=max(row_height,h)
     return tuple(placed)
+
+def camera_clamp(center: object, world_size: object,
+                 viewport_size: object) -> tuple[int,int]:
+    """Clamp a 2D camera to the original world's actual scrollable extent."""
+    def dimension_pair(value: object, label: str, low: int, high: int) -> tuple[int,int]:
+        if not isinstance(value,(tuple,list)) or len(value)!=2:
+            raise GeometryError(f"{label} must contain two dimensions")
+        return (_int(value[0],label+" width",low,high),
+                _int(value[1],label+" height",low,high))
+    world_w,world_h=dimension_pair(world_size,"world",1,65535)
+    view_w,view_h=dimension_pair(viewport_size,"viewport",1,4096)
+    x,y=dimension_pair(center,"camera center",0,65535)
+    if x>=world_w or y>=world_h:
+        raise GeometryError("camera center outside source world")
+    return (min(max(0,x-view_w//2),max(0,world_w-view_w)),
+            min(max(0,y-view_h//2),max(0,world_h-view_h)))
