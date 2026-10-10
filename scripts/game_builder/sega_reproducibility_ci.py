@@ -26,6 +26,7 @@ def emit_receipt(destination: str | Path, receipt: dict[str, object]) -> None:
         raise ValueError("invalid native provenance output basename")
     rootfd = _open_directory(destination.parent)
     fd = -1
+    created = False
     try:
         fd = os.open(
             destination.name,
@@ -34,6 +35,7 @@ def emit_receipt(destination: str | Path, receipt: dict[str, object]) -> None:
             0o600,
             dir_fd=rootfd,
         )
+        created = True
         data = json.dumps(
             receipt, sort_keys=True, indent=2, ensure_ascii=False, allow_nan=False,
         ).encode("utf-8") + b"\n"
@@ -49,10 +51,11 @@ def emit_receipt(destination: str | Path, receipt: dict[str, object]) -> None:
             os.close(fd)
         # In the event of an exception after creation, do not leave a
         # truncated/trustworthy-looking JSON artifact in CI output.
-        try:
-            os.unlink(destination.name, dir_fd=rootfd)
-        except FileNotFoundError:
-            pass
+        if created:
+            try:
+                os.unlink(destination.name, dir_fd=rootfd)
+            except FileNotFoundError:
+                pass
         raise
     finally:
         os.close(rootfd)
