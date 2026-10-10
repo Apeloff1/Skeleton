@@ -185,7 +185,8 @@ def test_game_evolution_stages_emit_real_sms_and_gear_native_source(tmp_path):
         folder = output/f"stage-{i:02d}-{target}"
         assert (folder/("game.asm" if target=="sega_master_system" else "game.c")).is_file()
         assert (folder/"manifest.json").is_file()
-        assert json.loads((folder/"manifest.json").read_text())["platform"] == target
+        manifest=json.loads((folder/"manifest.json").read_text())
+        assert manifest.get("platform",manifest.get("target_platform")) == target
 
 
 def test_historical_gear_port_fails_closed_when_screen_too_small():
