@@ -111,6 +111,7 @@ jobs:
             tests/test_ai_dragon_route_world_batch.py \
             tests/test_ai_dragon_route_maze.py \
             tests/test_ai_dragon_route_maze_native.py \
+            tests/test_ai_dragon_route_maze_integration.py \
             tests/test_ai_dragon_route_world_assurance.py \
             tests/test_ai_dragon_native_puzzle_graphics.py \
             tests/test_ai_webcrawler_dragon_native_projects.py \
@@ -517,7 +518,8 @@ jobs:
             tests/test_ai_dragon_route_native_game.py \
             tests/test_ai_dragon_route_native_integration.py \
             tests/test_ai_dragon_route_maze.py \
-            tests/test_ai_dragon_route_maze_native.py
+            tests/test_ai_dragon_route_maze_native.py \
+            tests/test_ai_dragon_route_maze_integration.py
       - name: Require every-room, all-climate and secret C99 maze gameplay
         run: |
           set -euo pipefail
