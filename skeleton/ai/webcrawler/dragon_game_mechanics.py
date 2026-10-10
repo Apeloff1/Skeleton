@@ -163,7 +163,10 @@ class GameMechanicsMemory:
             previous_timestamp = obs.timestamp_ms
             if not isinstance(obs.mechanic, Mechanic) or not isinstance(obs.preference, PreferenceSignal):
                 raise ValueError("unknown game mechanic or preference")
-            if not isinstance(obs.description, str) or not 1 <= len(obs.description) <= self.policy.max_note_chars:
+            if (not isinstance(obs.description, str)
+                    or not 1 <= len(obs.description) <= self.policy.max_note_chars
+                    or not obs.description.isprintable()
+                    or len(obs.description.encode("utf-8")) > self.policy.max_note_chars * 4):
                 raise ValueError("invalid observation note")
             if (type(obs.confidence) not in (int, float)
                     or not 0 <= obs.confidence <= 1
