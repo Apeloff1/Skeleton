@@ -181,6 +181,68 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
             separators=(",", ":"),
         ).encode("utf-8")).hexdigest()
         content["reproducibility"] = comparable
+        # Synthetic provenance fixtures only: these JSON numbers are not
+        # actual compiled ROM execution. Production CI generates its own.
+        content["ext_source"] = {
+            "schema": "skeleton.game_builder.native_sega8_original_source_receipt.v1",
+            "target": target, "original_campaign_profile": "full_campaign",
+            "world_digest": "8"*64,
+            "winning_replay_digest": "7"*64,
+            "source_content_digest": str(index+6)*64,
+            "rights_evidence_sha256": RIGHTS,
+            "native_binary_built": False, "emulator_verified": False,
+            "physical_hardware_verified": False,
+            "rights_independently_verified": False,
+            "distribution_licensed": False,
+        }
+        content["ext_host"] = {
+            "schema": "skeleton.game_builder.sega8_c_gameplay_differential.v1",
+            "target": target, "world_digest": "8"*64,
+            "source_content_digest": str(index+6)*64,
+            "authoritative_reference_sha256": str(index+3)*64,
+            "original_levels_verified": 8,
+            "original_controller_actions_verified": 1100,
+            "original_demo_controller_actions_verified": 1100,
+            "original_demo_screen_trace_sha256": "5"*64,
+            "original_native_solution_attract_mode_host_verified": True,
+            "all_level_completion_verified": True,
+            "native_z80_rom_executed": False,
+            "physical_hardware_verified": False,
+            "full_console_emulator_playthrough_verified": False,
+            "release_approved": False,
+            "rights_independently_verified": False,
+        }
+        content["ext_boot"] = {
+            "schema": "skeleton.game_builder.sega8_real_z80_boot_smoke.v1",
+            "target": target, "rom_sha256": str(index+1)*64,
+            "hardware_boot_smoke_verified": True,
+            "game_hero_rendered": True, "original_companion_rendered": True,
+            "entire_game_playthrough_verified": False,
+            "physical_hardware_verified": False,
+            "independent_cycle_exact_emulator_verified": False,
+            "release_approved": False,
+        }
+        content["ext_guest"] = {
+            "schema": "skeleton.game_builder.sega8_actual_z80_gameplay_replay.v1",
+            "target": target, "rom_sha256": str(index+1)*64,
+            "original_world_digest": "8"*64,
+            "source_content_digest": str(index+6)*64,
+            "original_route_sha256": str(index+3)*64,
+            "original_levels_replayed": 8,
+            "controller_actions_replayed": 1100,
+            "hardware_screen_states_verified": 1101,
+            "semantic_controller_screen_trace_sha256": "6"*64,
+            "native_attract_demo_semantic_trace_sha256": "6"*64,
+            "native_attract_demo_controller_free_actions_verified": 1100,
+            "original_hardware_stage_color_accents_verified": True,
+            "original_companion_rank_and_reward_verified": True,
+            "native_attract_demo_full_solution_verified_on_guest_z80": True,
+            "independent_cycle_exact_full_console_emulator_verified": False,
+            "physical_hardware_verified": False,
+            "rights_independently_verified": False,
+            "distribution_licensed": False,
+            "release_approved": False,
+        }
         paths = {
             "manifest": source / "manifest.json",
             "compile": root / (target + "-compilation-evidence.json"),
@@ -188,6 +250,10 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
             "boot": root / (target + "-real-z80-boot.json"),
             "reproducibility": root / (target + "-reproducibility.json"),
             "native_route": root / (target + "-native-z80-gameplay.json"),
+            "ext_source": root / (target + "-eight-worlds-source.json"),
+            "ext_host": root / (target + "-eight-worlds-host-replay.json"),
+            "ext_boot": root / (target + "-eight-worlds-z80-boot.json"),
+            "ext_guest": root / (target + "-eight-worlds-z80-gameplay.json"),
         }
         for name, path in paths.items():
             path.write_text(json.dumps(content[name], indent=2), encoding="utf-8")
