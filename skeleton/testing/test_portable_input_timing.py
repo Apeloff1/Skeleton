@@ -47,3 +47,10 @@ def test_axis_deadzone_preserves_sign_and_no_center_drift():
     with pytest.raises(InputTimingError):
         deadzone_axis(1,threshold=32767)
 
+
+def test_trigger_hysteresis_eliminates_oscillating_threshold_clicks():
+    samples=(0,21000,19000,15000,13999,18000,22000)
+    assert digital_hysteresis(samples)==(False,True,True,True,False,False,True)
+    with pytest.raises(InputTimingError):
+        digital_hysteresis((100,),press=10000,release=12000)
+
