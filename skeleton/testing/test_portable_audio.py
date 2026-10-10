@@ -63,3 +63,11 @@ def test_triangle_pcm_has_symmetric_ramp_and_clamped_amplitude():
     with pytest.raises(AudioKernelError):
         triangle_pcm(4001,8000,8)
 
+
+def test_lfsr_noise_replays_seed_without_unbounded_state():
+    first=noise_lfsr_pcm(1,256)
+    assert first==noise_lfsr_pcm(1,256)
+    assert first!=noise_lfsr_pcm(2,256)
+    assert set(first)=={-32767,32767}
+    with pytest.raises(AudioKernelError):
+        noise_lfsr_pcm(0,1)
