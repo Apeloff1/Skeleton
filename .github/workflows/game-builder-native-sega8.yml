@@ -14,6 +14,8 @@ on:
       - "scripts/game_builder/native_sega_8bit_ci.py"
       - "scripts/game_builder/sega8_source_replay.py"
       - "scripts/game_builder/emulate_sega8_sdcc_boot.py"
+      - "scripts/game_builder/sega8_real_z80_gameplay.py"
+      - "skeleton/testing/test_game_builder_sega8_real_z80_gameplay.py"
       - "scripts/game_builder/sega8_port_parity.py"
       - "skeleton/testing/test_game_builder_sega8_port_parity.py"
       - "skeleton/testing/test_game_builder_sega8_sdcc_cpu_boot.py"
@@ -42,7 +44,7 @@ jobs:
       matrix:
         platform: [sega_master_system, sega_game_gear]
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - name: Checkout original homebrew source
         uses: actions/checkout@v4
@@ -175,6 +177,36 @@ jobs:
           assert receipt["physical_hardware_verified"] is False
           assert receipt["release_approved"] is False
           PY
+      - name: Run complete original winning route in actual native Z80 CPU cartridge
+        env:
+          TARGET: ${{ matrix.platform }}
+        run: |
+          set -eu
+          case "$TARGET" in
+            sega_master_system) EXT=sms ;;
+            sega_game_gear) EXT=gg ;;
+            *) exit 3 ;;
+          esac
+          python -m scripts.game_builder.sega8_real_z80_gameplay \
+            --rom "output/$TARGET/build/skeleton-original.$EXT" \
+            --source-dir "output/$TARGET" \
+            --route "/tmp/$TARGET-source-game-route.json" \
+            --target "$TARGET" \
+            --receipt-out "/tmp/$TARGET-native-z80-gameplay.json"
+          python - <<'PY'
+          import json,os
+          target=os.environ["TARGET"]
+          with open("/tmp/"+target+"-native-z80-gameplay.json",encoding="utf-8") as stream:
+              r=json.load(stream)
+          assert r["original_source_game_verified_on_instruction_level_cpu"] is True
+          assert r["controller_actions_replayed"] > 50
+          assert r["hardware_screen_states_verified"] == r["controller_actions_replayed"] + 1
+          assert r["original_companion_rank_and_reward_verified"] is True
+          assert r["actual_victory_palette_verified"] is True
+          assert r["independent_cycle_exact_full_console_emulator_verified"] is False
+          assert r["physical_hardware_verified"] is False
+          assert r["release_approved"] is False
+          PY
       - name: Verify binary bytes and bind exact source/target/commit evidence
         env:
           TARGET: ${{ matrix.platform }}
@@ -263,6 +295,7 @@ jobs:
             /tmp/${{ matrix.platform }}-source-game-route.json
             /tmp/${{ matrix.platform }}-host-gameplay-receipt.json
             /tmp/${{ matrix.platform }}-real-z80-boot.json
+            /tmp/${{ matrix.platform }}-native-z80-gameplay.json
           if-no-files-found: error
           retention-days: 7
       # No ROM is published: legal review and real emulator or hardware
