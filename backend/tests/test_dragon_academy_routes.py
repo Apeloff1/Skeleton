@@ -268,3 +268,75 @@ def test_adaptive_practice_subscriptions_preserve_opt_in_and_finite_ticks(
     assert len(created)==1
     assert created[0].target_id=="game_boy"
     assert route.academy_status(owner=owner)["native_attempts"]
+
+
+
+def test_creator_source_bundle_auth_requires_editor_and_no_dev_bypass():
+    for user in (
+        None,
+        {"email": "a@example.test", "role": "editor", "dev_mode": True},
+        {"email": "a@example.test", "role": "viewer"},
+    ):
+        with pytest.raises(HTTPException) as denied:
+            route._native_source_editor(user)
+        assert denied.value.status_code in (401, 403)
+    good = {"email": "maker@example.test", "tenant_id": "studio-x", "role": "editor"}
+    assert route._native_source_editor(good) == route._principal(good)
+
+
+def test_creator_bundle_emits_real_native_source_without_build_or_database():
+    from io import BytesIO
+    from zipfile import ZipFile
+    from skeleton.ai.webcrawler.dragon_native_production import verify_source_bundle
+
+    owner = identity()
+    catalog = route.native_production_capabilities(owner=owner)
+    assert catalog["ok"]
+    assert any(x["id"] == "game_boy" and x["native_source_emitter"]
+               for x in catalog["targets"])
+    assert all("certificate" not in str(x.get("claims", "")).lower()
+               for x in catalog["targets"])
+
+    body = route.NativeProductionSourceRequest(
+        title="Original Lunar Drifter",
+        style="arcade_score_attack", targets=["game_boy", "nes"],
+        original_work_attested=True, approved=True,
+    )
+    response = route.native_production_source_bundle(body, owner=owner)
+    assert response.media_type == "application/zip"
+    assert response.headers["cache-control"] == "private, no-store"
+    assert response.headers["x-dragon-claim"] == "source-only-not-a-compiled-game"
+    assert hashlib.sha256(response.body).hexdigest() == response.headers["x-content-sha256"]
+    audit = verify_source_bundle(response.body)
+    assert audit["status"] == "verified_source_bundle"
+    assert audit["target_count"] == 2
+    with ZipFile(BytesIO(response.body)) as payload:
+        assert "production-index.json" in payload.namelist()
+        assert sum(x.startswith("releases/dragon-") for x in payload.namelist()) == 2
+
+
+def test_creator_bundle_fail_closed_on_rights_and_unimplemented_platform():
+    owner = identity()
+    no_rights = route.NativeProductionSourceRequest(
+        title="Original Lantern", style="arcade_score_attack",
+        targets=["game_boy"], original_work_attested=False, approved=True,
+    )
+    with pytest.raises(HTTPException) as denied:
+        route.native_production_source_bundle(no_rights, owner=owner)
+    assert denied.value.status_code == 403
+
+    unsupported = route.NativeProductionSourceRequest(
+        title="Original Lantern", style="arcade_score_attack",
+        targets=["ps5"], original_work_attested=True, approved=True,
+    )
+    with pytest.raises(HTTPException) as denied:
+        route.native_production_source_bundle(unsupported, owner=owner)
+    assert denied.value.status_code == 422
+
+    no_publication = route.NativeProductionSourceRequest(
+        title="Original Lantern", style="arcade_score_attack",
+        targets=["game_boy"], original_work_attested=True, approved=False,
+    )
+    with pytest.raises(HTTPException) as denied:
+        route.native_production_source_bundle(no_publication, owner=owner)
+    assert denied.value.status_code == 403
