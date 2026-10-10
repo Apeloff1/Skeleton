@@ -342,6 +342,13 @@ def emit_native_puzzle(*,seed:int,stages:int=4,difficulty:int=4,
         proofs.append(LevelProof(index,path,len(path),states,len(boxes),
              sha256("\n".join(grid).encode()).hexdigest(),
              sha256(path.encode()).hexdigest()))
+    from .dragon_native_challenge_director import (
+        make_challenge_plan,challenge_report,
+    )
+    challenge=make_challenge_plan(
+        tuple(alternatives),profile=challenge_profile,
+        branching=campaign.mode=="branching" and stages>=3,
+    )
     rows=["  {\n"+",\n".join('    "'+row+'"' for row in grid)+"\n  }"
           for grid in layouts]
     header=(
@@ -396,6 +403,7 @@ clean:
       "level_proofs":[asdict(p) for p in proofs],
       "route_analysis":[{"stage":index,**record}
                         for index,record in enumerate(alternatives)],
+      "challenge_director":challenge_report(challenge),
       "native_runtime_test_required":True,
       "proof_scope":"optimal abstract grid moves, not C executable verification",
     }
