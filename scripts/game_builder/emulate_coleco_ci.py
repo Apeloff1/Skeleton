@@ -200,13 +200,14 @@ def _frame(cpu:Any,machine:ColecoMachine,button:str|None)->int:
     return 1+_wait_halt(cpu)
 
 
-def play(rom_path:Path,route_path:Path,manifest_path:Path)->dict[str,object]:
-    if not rom_path.is_file() or not route_path.is_file() or not manifest_path.is_file():
+def play(rom_path:Path,route_path:Path,manifest_path:Path,source_binary_path:Path)->dict[str,object]:
+    if not rom_path.is_file() or not route_path.is_file() or not manifest_path.is_file() or not source_binary_path.is_file():
         raise ColecoCPUError("compiled Coleco ROM, safe source route and author manifest required")
     if route_path.stat().st_size>8*1024*1024 or manifest_path.stat().st_size>256*1024:
         raise ColecoCPUError("unbounded external Coleco gameplay or rights input")
     rom=rom_path.read_bytes()
-    proof=verify_col(rom)
+    assembled=source_binary_path.read_bytes()
+    proof=verify_col(rom,source=assembled)
     route=_reference(json.loads(route_path.read_text(encoding="utf-8")),
                      json.loads(manifest_path.read_text(encoding="utf-8")))
     from z80_python import Z80CPU
@@ -246,6 +247,8 @@ def play(rom_path:Path,route_path:Path,manifest_path:Path)->dict[str,object]:
     return {
         "schema":"skeleton.game_builder.coleco_cpu_os7_bounded_replay.v1",
         "rom_sha256":proof["native_cartridge_sha256"],
+        "independent_assembled_z80_sha256":sha256(assembled).hexdigest(),
+        "native_binary_matches_source_exactly":True,
         "original_world_digest":route["world_digest"],
         "safe_reference_digest":route["route_sha256"],
         "real_z80_cpu_instructions_executed":instructions,
@@ -269,11 +272,12 @@ def main()->None:
     ap.add_argument("--rom",type=Path,required=True)
     ap.add_argument("--reference",type=Path,required=True)
     ap.add_argument("--manifest",type=Path,required=True)
+    ap.add_argument("--source-bin",type=Path,required=True)
     ap.add_argument("--out",type=Path,required=True)
     args=ap.parse_args()
     if args.out.exists() or args.out.is_symlink():
         raise FileExistsError(str(args.out))
-    receipt=play(args.rom,args.reference,args.manifest)
+    receipt=play(args.rom,args.reference,args.manifest,args.source_bin)
     with args.out.open("x",encoding="utf-8",newline="\n") as handle:
         json.dump(receipt,handle,sort_keys=True,indent=2)
         handle.write("\n")
