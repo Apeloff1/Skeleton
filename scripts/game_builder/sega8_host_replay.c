@@ -45,7 +45,10 @@ int main(void) {
         if (level_index!=demo_stage || won || lost
             || original_demo_lengths[demo_stage]==0U) abort();
         for (demo_index=0; demo_index<original_demo_lengths[demo_stage]; ++demo_index) {
-            unsigned char direction=original_demo_routes[demo_stage][demo_index];
+            unsigned char direction=(unsigned char)(
+                (original_demo_routes[demo_stage][demo_index >> 2] >>
+                  ((demo_index & 3U) * 2U)) & 3U
+            );
             if (direction>=4U) abort();
             action="UDLR"[direction];
 #else
