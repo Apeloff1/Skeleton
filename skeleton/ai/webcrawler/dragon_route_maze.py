@@ -383,6 +383,87 @@ def build_maze(request:MazeRequest=MazeRequest())->MazeCreation:
     ))
 
 
+def recover_maze(
+    creation:MazeCreation,history:tuple[str,...]=(),
+)->dict:
+    """Proof-directed recovery from the ACTUAL current original game state.
+
+    Only zero-cost unconditional spine/return edges are considered. Their
+    suffix is replayed *after* all real previous decisions, so depleted
+    action/time limits are detected rather than papered over with a
+    physically impossible "everything is fine" result.
+    """
+    if not isinstance(creation,MazeCreation):
+        raise ValueError("current maze recovery requires a proven world")
+    if not isinstance(history,tuple) or len(history)>MAX_HOPS or any(
+            type(token) is not str or not 1<=len(token)<=48
+            for token in history):
+        raise ValueError("current original maze history exceeds playable bounds")
+    state=experience(
+        creation.world,creation.traveller,path=history,
+    )
+    start=state["world_position"]
+    if start==creation.world.goal:
+        return {
+            "schema":SCHEMA,"current":start,"goal":creation.world.goal,
+            "reachable_now":True,"next_move":None,
+            "recovery_suffix":[],"remaining_actions":0,
+            "reset_required":False,
+            "proof":"actual already completed game-state journey",
+        }
+    from collections import deque
+    protected={}
+    for edge in creation.world.connections:
+        if "spine" not in edge.shapes and "recovery" not in edge.shapes:
+            continue
+        if (edge.price!=0 or edge.fatigue!=0 or edge.fuel!=0 or
+                edge.oxygen!=0 or edge.mana!=0 or edge.requires or
+                edge.requires_one or edge.secret_token or
+                edge.weather_any or edge.weather_none or edge.departures):
+            raise ValueError("supposedly guaranteed maze return changed into a locked passage")
+        protected.setdefault(edge.origin,[]).append(edge)
+    queue=deque([(start,())])
+    seen={start}
+    safe=None
+    while queue:
+        here,steps=queue.popleft()
+        if here==creation.world.goal:
+            safe=steps
+            break
+        for edge in protected.get(here,()):
+            if edge.destination not in seen:
+                seen.add(edge.destination)
+                queue.append((edge.destination,steps+(edge.id,)))
+    if safe is None:
+        raise ValueError("protected original maze goal is disconnected")
+    try:
+        original=replay(
+            creation.world,history+safe,creation.traveller,
+            objective="actual_player_state_recovery",
+        )
+        if not original.success:
+            raise ValueError("maze recovery route did not finish")
+        possible=True
+    except ValueError:
+        # A depleted 80-move/time budget cannot be repaired by pretending
+        # to mint energy or rewind the clock. Restart restores the
+        # constructively guaranteed original player state.
+        possible=False
+    return {
+        "schema":SCHEMA,"current":start,"goal":creation.world.goal,
+        "reachable_now":possible,
+        "next_move":safe[0] if possible and safe else None,
+        "recovery_suffix":list(safe) if possible else [],
+        "remaining_actions":len(safe) if possible else 0,
+        "reset_required":not possible,
+        "proof":(
+            "independent exact movement replay from current position"
+            if possible else
+            "restart required after resource, time or bounded action exhaustion"
+        ),
+    }
+
+
 def verify_maze(creation:MazeCreation)->dict:
     """Never trust receipt claims; re-execute every route and climate."""
     if not isinstance(creation,MazeCreation):
