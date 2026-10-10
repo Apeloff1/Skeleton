@@ -76,3 +76,19 @@ def line_of_sight(rows: object, start: object, target: object) -> bool:
     if grid[a[1]][a[0]]=="#":
         raise GeometryError("ray starts inside opaque wall")
     return all(grid[y][x]!="#" for x,y in bresenham_line(a,b)[1:])
+
+def flood_fill(rows: object, origin: object) -> tuple[tuple[int,int],...]:
+    """Bounded flood fill for validating accessible levels and spawn islands."""
+    grid=_grid(rows)
+    start=_point(origin)
+    if start[1]>=len(grid) or start[0]>=len(grid[0]) or grid[start[1]][start[0]]=="#":
+        raise GeometryError("flood origin must be traversable")
+    seen={start}
+    queue=deque((start,))
+    while queue:
+        current=queue.popleft()
+        for neighbor in walkable_tile_neighbors(grid,current):
+            if neighbor not in seen:
+                seen.add(neighbor)
+                queue.append(neighbor)
+    return tuple(sorted(seen,key=lambda point:(point[1],point[0])))
