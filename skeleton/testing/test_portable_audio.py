@@ -29,3 +29,11 @@ def test_nes_pulse_apu_timer_and_valid_frequency():
     with pytest.raises(AudioKernelError):
         nes_pulse_timer(-1)
 
+
+def test_sn76489_period_is_bounded_and_recoverable():
+    timer=sn76489_tone_period(440)
+    assert 1<=timer<=1023
+    assert abs(3579545/(32*timer)-440)<3
+    with pytest.raises(AudioKernelError):
+        sn76489_tone_period(440,master_clock=True)
+
