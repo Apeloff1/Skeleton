@@ -53,6 +53,16 @@ def test_each_original_stage_has_real_hardware_color_envelope(
     ][1:3]
     assert all(isinstance(item,list) and len(item)==2 for item in expected)
     assert all(0<=v<=bound for colors in expected for v in colors)
+    # The RGB222 ocean/forest case exposed visually identical accents after
+    # rotation and saturation; enforce a minimum physical channel distance.
+    minimum_delta=2 if bits==2 else 4
+    mask=(1<<bits)-1
+    for first,second in expected:
+        distance=sum(
+            abs(((first>>(bits*n))&mask)-((second>>(bits*n))&mask))
+            for n in range(3)
+        )
+        assert distance>=minimum_delta
     assert len({tuple(color) for color in expected})>=3
     assert meta["native_per_stage_hardware_bg_palette_accents"] is True
     assert meta["native_stage_palettes_change_core_gameplay"] is False
