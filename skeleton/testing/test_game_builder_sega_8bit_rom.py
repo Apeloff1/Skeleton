@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from hashlib import sha256
+import os
 
 import pytest
 
@@ -82,3 +83,49 @@ def test_invalid_digest_symlink_and_blank_cartridge_rejected(tmp_path):
     blank[0x7fff]=0x4c
     with pytest.raises(Sega8BitROMError,match="no executable payload"):
         validate_rom(bytes(blank),"sega_master_system")
+
+
+
+@pytest.mark.parametrize("target",("sega_master_system","sega_game_gear"))
+def test_source_rom_ancestor_symlink_refused_not_just_final_filename(tmp_path,target):
+    real_dir=tmp_path/"actual-generated-homebrew"
+    real_dir.mkdir()
+    binary=_synthetic_header(target)
+    rom=real_dir/"game.sms"
+    rom.write_bytes(binary)
+    redirect=tmp_path/"unreviewed-link"
+    redirect.symlink_to(real_dir,target_is_directory=True)
+    with pytest.raises(Sega8BitROMError,match="ordinary"):
+        validate_rom_file(
+            redirect/"game.sms",target,
+            expected_sha256=sha256(binary).hexdigest(),
+        )
+
+
+@pytest.mark.parametrize("target",("sega_master_system","sega_game_gear"))
+def test_source_rom_hardlinked_inodes_are_refused(tmp_path,target):
+    original=tmp_path/"original"
+    source=_synthetic_header(target)
+    original.write_bytes(source)
+    linked=tmp_path/"another"
+    os.link(original,linked)
+    with pytest.raises(Sega8BitROMError,match="ordinary"):
+        validate_rom_file(linked,target,expected_sha256=sha256(source).hexdigest())
+
+
+@pytest.mark.parametrize("target",("sega_master_system","sega_game_gear"))
+def test_source_rom_rejects_sparse_over_budget_without_allocating_the_file(tmp_path,target):
+    oversized=tmp_path/"too-big.sms"
+    with oversized.open("wb") as stream:
+        stream.truncate(16 * 1024 * 1024)
+    with pytest.raises(Sega8BitROMError,match="ordinary"):
+        validate_rom_file(oversized,target)
+
+
+def test_source_rom_fifo_is_rejected_without_hanging(tmp_path):
+    if not hasattr(os,"mkfifo"):
+        pytest.skip("POSIX FIFO required")
+    pipe=tmp_path/"fake-cartridge"
+    os.mkfifo(pipe)
+    with pytest.raises(Sega8BitROMError,match="ordinary"):
+        validate_rom_file(pipe,"sega_master_system")
