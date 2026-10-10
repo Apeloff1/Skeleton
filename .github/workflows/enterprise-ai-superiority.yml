@@ -47,15 +47,21 @@ jobs:
           python -m py_compile
           scripts/check_enterprise_ai_superiority.py
           scripts/check_enterprise_ai_implementation_notes.py
+          scripts/reconcile_enterprise_ai_implementation_notes.py
           scripts/report_enterprise_ai_progress.py
           tests/test_enterprise_ai_superiority.py
           tests/test_enterprise_ai_implementation_notes.py
+          tests/test_enterprise_dossier_reconciliation.py
+          tests/test_enterprise_dossier_reconciliation.py
 
       - name: Validate machine authority
         run: python scripts/check_enterprise_ai_superiority.py --json
 
       - name: Validate canonical AI construction integration
         run: python scripts/check_ai_app_construction.py --json
+
+      - name: Reject source-derived dossier drift without rewriting evidence
+        run: python scripts/reconcile_enterprise_ai_implementation_notes.py
 
       - name: Validate October 2026 implementation dossiers
         run: python scripts/check_enterprise_ai_implementation_notes.py --json
