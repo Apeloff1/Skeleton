@@ -47,6 +47,7 @@ on:
       - 'skeleton/ai/webcrawler/dragon_practice_lab.py'
       - 'skeleton/ai/webcrawler/dragon_practice_cycles.py'
       - 'tests/test_ai_webcrawler_dragon_native_*.py'
+      - 'tests/test_ai_dragon_native_*.py'
       - '.github/workflows/dragon-native-build.yml'
   workflow_dispatch:
 
