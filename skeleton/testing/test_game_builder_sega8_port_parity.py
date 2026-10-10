@@ -43,6 +43,7 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
                 "binary_compiled": False, "emulator_playthrough_verified": False,
                 "physical_hardware_verified": False, "release_approved": False,
                 "distribution_licensed": False,
+                "third_party_game_or_firmware_redistributed": False,
             },
             "compile": {
                 "schema": "skeleton.game_builder.sega8_actual_compilation_evidence.v1",
@@ -56,6 +57,9 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
                 "rom_sha256": str(index + 3) * 64,
                 "physical_hardware_verified": False,
                 "distribution_licensed": False, "release_approved": False,
+                "native_rom_compiled": False,
+                "emulator_playthrough_verified": False,
+                "rights_independently_verified": False,
             },
             "host": {
                 "schema": "skeleton.game_builder.sega8_c_gameplay_differential.v1",
@@ -70,6 +74,8 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
                 "authoritative_reference_sha256": str(index + 6) * 64,
                 "full_console_emulator_playthrough_verified": False,
                 "physical_hardware_verified": False, "release_approved": False,
+                "native_z80_rom_executed": False,
+                "rights_independently_verified": False,
             },
             "boot": {
                 "schema": "skeleton.game_builder.sega8_real_z80_boot_smoke.v1",
@@ -82,6 +88,7 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
                 "entire_game_playthrough_verified": False,
                 "independent_cycle_exact_emulator_verified": False,
                 "physical_hardware_verified": False,
+                "distribution_licensed": False,
                 "release_approved": False,
             },
         }
