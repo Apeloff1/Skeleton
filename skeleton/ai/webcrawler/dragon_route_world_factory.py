@@ -53,7 +53,7 @@ def make_frontier(*,seed:int=1,weather:str="clear",
     place("bazaar",gifts=("fare_card","raincoat"),scenery=12)
     place("citadel",region="highlands",biome="stone",scenery=15,
           tags=("objective",))
-    place("forest",biome="woodland",gifts=("hiking_kit",),scenery=32)
+    place("forest",biome="woodland",gifts=("hiking_kit","climbing_kit"),scenery=32)
     place("meadow",biome="grassland",refill=10,scenery=50)
     place("river",biome="riparian",scenery=34)
     place("cliff",biome="mountain",gifts=("climbing_kit",),scenery=72)
@@ -139,6 +139,12 @@ def make_frontier(*,seed:int=1,weather:str="clear",
     connect("river_to_goal","river","citadel","kayak",59,fatigue=15,
             spectacle=66,shapes=("alternate","scenic"),
             requires=("hiking_kit",))
+    connect("desert_ruins_access","bazaar","ruins_approach","dune",55,
+            fatigue=22,danger=8,spectacle=62,
+            shapes=("detour","scenic","impractical"))
+    connect("desert_to_ruins","ruins_approach","ruined_archive","desert",30,
+            fatigue=16,danger=12,spectacle=60,
+            shapes=("alternate","free_roam"))
     connect("forest_to_ruins","forest","ruined_archive","trail",42,
             fatigue=15,spectacle=65,shapes=("detour","optional"))
     connect("ruins_return","ruined_archive","crossroads","tunnel",29,
