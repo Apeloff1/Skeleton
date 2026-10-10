@@ -78,6 +78,8 @@ static void keyboard(SDL_Keycode k){
  else if(k==SDLK_u||k==SDLK_BACKSPACE)rollback();
  else if(k==SDLK_r)load_level(chapter);
  else if(k==SDLK_n&&level_done()&&chapter+1<LEVEL_COUNT)load_level(chapter+1);
+ else if(k==SDLK_F5||k==SDLK_k)write_local_original_save();
+ else if(k==SDLK_F9||k==SDLK_l)read_local_original_save();
  else if(k==SDLK_h){
   char move=shortest_hint();
   if(move)printf("DRAGON_SDL_HINT move=%c\n",move);
@@ -90,6 +92,8 @@ static void gamepad(uint8_t button){
  else if(button==SDL_CONTROLLER_BUTTON_DPAD_DOWN)perform('s');
  else if(button==SDL_CONTROLLER_BUTTON_B)rollback();
  else if(button==SDL_CONTROLLER_BUTTON_X)load_level(chapter);
+ else if(button==SDL_CONTROLLER_BUTTON_START)write_local_original_save();
+ else if(button==SDL_CONTROLLER_BUTTON_BACK)read_local_original_save();
  else if(button==SDL_CONTROLLER_BUTTON_A&&level_done()&&chapter+1<LEVEL_COUNT)
   load_level(chapter+1);
 }
