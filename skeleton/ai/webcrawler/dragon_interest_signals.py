@@ -123,15 +123,24 @@ def build_interest_profile(
     now: float,
     policy: SignalPolicy = SignalPolicy(),
 ) -> InterestProfile:
-    if not isfinite(now):
+    if (isinstance(now, bool) or not isinstance(now, (int, float))
+            or not isfinite(now) or now < 0):
         raise ValueError("invalid clock")
-    if not (0 < policy.half_life_days <= 3650 and
-            0 < policy.max_age_days <= 36500 and
-            1 <= policy.max_signals <= 100000 and
-            1 <= policy.max_topics <= 10000 and
-            isfinite(policy.min_abs_weight) and policy.min_abs_weight >= 0 and
-            isfinite(policy.negative_floor) and isfinite(policy.positive_ceiling) and
-            policy.negative_floor < 0 < policy.positive_ceiling):
+    if not isinstance(policy, SignalPolicy):
+        raise ValueError("SignalPolicy required")
+    scalars = (
+        policy.half_life_days, policy.max_age_days, policy.min_abs_weight,
+        policy.negative_floor, policy.positive_ceiling,
+    )
+    if (any(isinstance(x, bool) or not isinstance(x, (int, float))
+            or not isfinite(x) for x in scalars)
+            or any(type(x) is not int for x in (policy.max_signals, policy.max_topics))
+            or not (0 < policy.half_life_days <= 3650)
+            or not (0 < policy.max_age_days <= 36500)
+            or not (1 <= policy.max_signals <= 100000)
+            or not (1 <= policy.max_topics <= 10000)
+            or policy.min_abs_weight < 0
+            or not (policy.negative_floor < 0 < policy.positive_ceiling)):
         raise ValueError("invalid signal policy")
 
     deduplicated: dict[str, tuple[InterestSignal, tuple[str, ...]]] = {}
@@ -189,6 +198,6 @@ def build_interest_profile(
 
 
 def signal_search_terms(profile: InterestProfile, *, limit: int = 8) -> tuple[str, ...]:
-    if not 1 <= limit <= 32:
-        raise ValueError("invalid search budget")
+    if not isinstance(profile, InterestProfile) or type(limit) is not int or not 1 <= limit <= 32:
+        raise ValueError("invalid interest profile or search budget")
     return tuple(topic.tag for topic in profile.topics if topic.score > 0)[:limit]
