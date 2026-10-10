@@ -234,3 +234,13 @@ def test_dead_end_report_distinguishes_objective_endpoints():
     assert dead_end_cells(p, include_objectives=True) == ((1, 1), (7, 1))
     assert degree_histogram(p)[1] == 2
 
+
+def test_tarjan_identifies_real_single_corridor_chokepoints():
+    p = RouteProblem.from_rows((
+        "#########", "#S.C...G#", "#########", "#########",
+        "#########", "#########", "#########", "#########", "#########",
+    ))
+    assert articulation_cells(p) == tuple((x, 1) for x in range(2, 7))
+    assert (1, 1) not in articulation_cells(p)
+    assert (7, 1) not in articulation_cells(p)
+
