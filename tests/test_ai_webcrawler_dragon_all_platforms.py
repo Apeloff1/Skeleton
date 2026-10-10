@@ -7,6 +7,7 @@ import shutil,subprocess
 import pytest
 
 from skeleton.ai.webcrawler.dragon_platform_expansion import SUPPLEMENTAL_TARGETS
+from collections import Counter
 from skeleton.ai.webcrawler.dragon_native_targets import (
     BASE_TARGETS,TARGETS,CATALOG,target_catalog,demand_target,STYLES,practice_matrix,
 )
@@ -20,12 +21,26 @@ from skeleton.ai.webcrawler.dragon_game_mechanics import Mechanic
 
 LEGACY_NEW=("atari_2600","apple_ii","zx_spectrum","dos_8086","windows_95")
 
+def test_canonical_colecovision_is_single_source_ready_identity():
+    entries=[t for t in TARGETS if t.id=="colecovision"]
+    assert len(entries)==1
+    item=entries[0]
+    assert item.status=="native_source"
+    assert item.toolchain=="z88dk +coleco"
+    assert "colecovision" not in (e.id for e in SUPPLEMENTAL_TARGETS)
+    assert Counter(t.id for t in TARGETS)["colecovision"]==1
+    source=readiness_for("colecovision")
+    assert source.source_emitter
+    assert source.claimed_stage=="native_source_generated"
+    assert source.compiler_verified is False
+    assert source.distribution_approved is False
+
 def test_comprehensive_hardware_inventory_has_no_duplicates_or_lost_eras():
     assert len(BASE_TARGETS)==47
-    assert len(SUPPLEMENTAL_TARGETS)==123
-    assert len(TARGETS)==len(CATALOG)==170
-    assert len({t.id for t in TARGETS})==170
-    assert len({t.id for t in SUPPLEMENTAL_TARGETS})==123
+    assert len(SUPPLEMENTAL_TARGETS)==122
+    assert len(TARGETS)==len(CATALOG)==169
+    assert len({t.id for t in TARGETS})==169
+    assert len({t.id for t in SUPPLEMENTAL_TARGETS})==122
     assert len(EMITTERS)==76
     assert all(t.year>=1972 and t.year<=2026 for t in TARGETS)
     for ident in ("vectrex","atari_5200","atari_7800","zx_spectrum_next",
@@ -63,22 +78,22 @@ def test_every_identified_system_has_actionable_truthful_readiness(target):
 
 def test_curated_platform_report_never_claims_all_consumer_devices_implemented():
     report=coverage_report()
-    assert report["catalog_count"]==170
+    assert report["catalog_count"]==169
     assert report["native_source_count"]==76
-    assert report["missing_native_source_count"]==94
-    assert report["source_coverage_fraction"]==round(76/170,6)
+    assert report["missing_native_source_count"]==93
+    assert report["source_coverage_fraction"]==round(76/169,6)
     assert report["compiler_verified_count"]==0
     assert report["emulator_verified_count"]==0
     assert report["physical_hardware_verified_count"]==0
-    assert len(report["hardware_ids"])==170
+    assert len(report["hardware_ids"])==169
     assert len(report["source_ids"])==76
-    assert len(report["next_unimplemented"])==94
+    assert len(report["next_unimplemented"])==93
     assert "not literally every SKU" in report["coverage_scope"]
     digest=report.pop("digest")
     assert sha256(json.dumps(report,sort_keys=True,separators=(",",":"),
               ensure_ascii=True).encode()).hexdigest()==digest
     export=json.loads(readiness_json())
-    assert len(export["targets"])==170
+    assert len(export["targets"])==169
     assert export["coverage"]["digest"]==digest
     assert all(t["schema"]=="skeleton.ai.dragon.target_readiness.v1"
                for t in export["targets"])

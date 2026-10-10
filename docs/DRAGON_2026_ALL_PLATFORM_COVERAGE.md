@@ -507,3 +507,18 @@ validation stages remain separate. The new tests exercise deterministic
 source, intentional style refusal, target-specific hardware APIs and exact
 output types. The CI cross-compiles the Atari 5200 source on its installed
 cc65 and optionally cross-compiles z88dk targets if their toolchain exists.
+
+## Inventory canonicalization — October 10, 2026
+
+A GitHub CI run revealed a duplicate ColecoVision identity: the original
+47-target catalog contained it as adapter-only, while the supplemental list
+contained the same system as source-ready. The canonical registry now keeps
+**one** ColecoVision entry with its z88dk source backend and removes the
+duplicate supplemental row. The authoritative count is **169 unique
+hardware identities, 76 source emitters, 93 without native source**
+(76/169 = 45.0% source-emitter coverage). An import-time diagnostic
+identifies any future duplicate names precisely, and the targeted
+regression checks the source status, expected SDK and complete registry.
+These numbers supersede inconsistent historical interim counts above.
+Compiled, emulator-tested and physical-hardware-complete counts are not
+inferred from native source coverage.

@@ -40,8 +40,9 @@ TARGETS: tuple[ConsoleTarget,...] = (
        "joystick","DASM / cc65","bin","native_source",colors=128,width=160,height=192),
     _t("intellivision","Mattel","2nd generation",1979,"CP1610","STIC","AY-3-8914",
        "disc controller","as1600","bin",colors=16,width=160,height=96),
-    _t("colecovision","Coleco","2nd generation",1982,"Z80","TMS9928A","SN76489",
-       "keypad joystick","SDCC / z88dk","rom",colors=16,width=256,height=192),
+    _t("colecovision","Coleco","2nd/3rd generation",1982,"Z80","TMS9928A VDP","SN76489",
+       "joystick keypad","z88dk +coleco","rom","native_source",colors=16,width=256,height=192,
+       notes="Original z88dk homebrew source; compile, controller and device verification pending"),
     _t("commodore_64","Commodore","8-bit home computer",1982,"6510","VIC-II","SID",
        "keyboard / joystick","cc65","prg","native_source",colors=16,width=320,height=200),
     _t("zx_spectrum","Sinclair","8-bit home computer",1982,"Z80","attribute bitmap","beeper / AY",
@@ -143,8 +144,19 @@ TARGETS=TARGETS+tuple(ConsoleTarget(
     e.toolchain,e.output,e.status,0,0,0,
     "Hardware identity only. Native build adapter not implemented."
 ) for e in SUPPLEMENTAL_TARGETS)
+# Fail with actionable duplicate IDs rather than letting every module importing
+# this catalog fail with a generic assertion.
+from collections import Counter
+_duplicate_target_ids=tuple(sorted(
+    target_id for target_id,count in Counter(x.id for x in TARGETS).items()
+    if count>1
+))
+if _duplicate_target_ids:
+    raise ValueError(
+        "duplicate platform identity: "+", ".join(_duplicate_target_ids)
+    )
 CATALOG = {target.id: target for target in TARGETS}
-assert len(CATALOG)==len(TARGETS), "duplicate platform identity"
+assert len(CATALOG)==len(TARGETS), "catalog cardinality invariant"
 
 STYLES = (
     "arcade_score_attack","fixed_screen_puzzle","top_down_adventure",

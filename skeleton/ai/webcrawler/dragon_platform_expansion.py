@@ -36,7 +36,6 @@ bally_astrocade|Bally|second generation|1977|Z80|160x102 bitmap|3 voices|joystic
 atari_5200|Atari|second generation|1982|6502|ANTIC GTIA|POKEY|analog controller|cc65 atari5200|bin|native_source
 atari_7800|Atari|third generation|1984|6502C|MARIA|TIA|joystick|cc65 atari7800|a78|toolchain_adapter
 vectrex|GCE|second generation|1982|6809|vector CRT|AY-3-8912|analog stick|6809 assembler|bin|toolchain_adapter
-colecovision|Coleco|third generation|1982|Z80|TMS9928A VDP|SN76489|joystick keypad|z88dk +coleco|rom|native_source
 sega_sg1000|Sega|third generation|1983|Z80|TMS9918|SN76489|2-button pad|SDCC / z88dk|sg|toolchain_adapter
 sega_mark_iii|Sega|third generation|1985|Z80|Sega VDP|SN76489|2-button pad|SDCC / devkitSMS|sms|native_source
 famicom_disk_system|Nintendo|8-bit disk add-on|1986|2A03|NES PPU|2C33|Famicom controller|ca65 FDS homebrew|fds|toolchain_adapter
