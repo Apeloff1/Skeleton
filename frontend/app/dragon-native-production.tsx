@@ -294,7 +294,12 @@ function NativeSourceEditor() {
       if (!/^[a-f0-9]{64}$/.test(identity)) {
         throw new Error('Source bundle lacks canonical production identity.');
       }
-      await saveBundle(blob, 'dragon-original-' + identity.slice(0, 20) + '.zip');
+      const digest = response.headers.get('x-content-sha256') || '';
+      if (!/^[a-f0-9]{64}$/.test(digest)) {
+        throw new Error('Source archive lacks its canonical content digest.');
+      }
+      await saveBundle(blob,
+        'dragon-original-' + identity.slice(0, 12) + '-' + digest.slice(0, 12) + '.zip');
       if (!controller.signal.aborted) {
         setSuccess('Original source ZIP delivered. Compile with an authorized local toolchain. Emulator and hardware playtesting are still required.');
       }
