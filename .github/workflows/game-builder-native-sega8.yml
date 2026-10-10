@@ -404,6 +404,10 @@ jobs:
             /tmp/${{ matrix.platform }}-host-gameplay-receipt.json
             /tmp/${{ matrix.platform }}-real-z80-boot.json
             /tmp/${{ matrix.platform }}-native-z80-gameplay.json
+            /tmp/${{ matrix.platform }}-eight-worlds-source.json
+            /tmp/${{ matrix.platform }}-eight-worlds-host-replay.json
+            /tmp/${{ matrix.platform }}-eight-worlds-z80-boot.json
+            /tmp/${{ matrix.platform }}-eight-worlds-z80-gameplay.json
           if-no-files-found: error
           retention-days: 7
       # No ROM is published: legal review and real emulator or hardware
