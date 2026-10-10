@@ -235,14 +235,14 @@ export default function DragonOriginalPuzzleEditor({
   const saveOriginalPack = async () => {
     if (!validated || validated.total_stages !== boards.length ||
         !/^[a-f0-9]{64}$/.test(validated.digest)) return;
-    const document = {
+    const packDocument = {
       schema: 'skeleton.ai.dragon.original_puzzle_level_pack.v1',
       level_count: boards.length,
       levels: boards,
       digest: validated.digest,
       claim: 'source-only original authored grids, proved solvable, not legally cleared',
     };
-    const raw = JSON.stringify(document, null, 2) + '\n';
+    const raw = JSON.stringify(packDocument, null, 2) + '\n';
     if (raw.length > 8192) {
       setStatus('Level pack exceeds local game design archive limit.');
       return;
