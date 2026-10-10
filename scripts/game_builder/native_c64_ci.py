@@ -6,6 +6,8 @@ from hashlib import sha256
 import json
 from pathlib import Path
 
+from skeleton.ai.game_builder.native_release_intake import _read_bounded
+from skeleton.ai.game_builder.native_retro_artifact import parse_original_c64_prg
 from skeleton.ai.game_builder.c64_native_export import compile_native_c64, export_native_c64
 from skeleton.ai.game_builder.playable_world import GameBuildIntent, generate_playable_world
 from skeleton.ai.game_builder.port_planner import HomebrewSource
@@ -40,14 +42,10 @@ def emit_source(output: Path) -> dict[str, object]:
 
 
 def verify_prg(binary: Path) -> dict[str, object]:
-    blob = binary.read_bytes()
-    if not 1024 < len(blob) < 62_000:
-        raise ValueError("C64 binary missing or invalid length")
-    if blob[:2] != bytes((0x01, 0x08)):
-        raise ValueError("C64 PRG lacks standard BASIC load address $0801")
-    if 0x9E not in blob[2:48]:
-        raise ValueError("C64 PRG missing BASIC SYS launcher token")
+    blob = _read_bounded(binary, max_bytes=0xD000-0x0801+2)
+    layout = parse_original_c64_prg(blob)
     result = {
+        **layout,
         "format": "c64_6510_loadable_prg",
         "target": "commodore_64",
         "prg_sha256": sha256(blob).hexdigest(),

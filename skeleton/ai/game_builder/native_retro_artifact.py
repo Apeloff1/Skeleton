@@ -1,4 +1,4 @@
-"""Original-homebrew cartridge and tape format checks across six retro systems.
+"""Original-homebrew cartridge, tape and loader checks across eight retro systems.
 
 No commercial ROM, firmware, official boot-logo bytes or proprietary toolchain
 is supplied. File examination is limited to local, no-follow, bounded bytes.
@@ -6,7 +6,8 @@ Header recognition, checksum validation and reset-vector inspection are NOT
 evidence of gameplay, hardware acceptance, title ownership or release rights.
 
 Implemented formats: DMG, CGB, NES NROM mapper 0, SMS 32 KiB, MSX1 page-1
-16 KiB and ZX Spectrum 48K native two-record CODE tape.
+16 KiB, ZX Spectrum 48K native two-record CODE tape, default cc65 C64 PRG
+and Atari 400/800 48KB-class segmented XEX.
 """
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
 import struct
+import re
 
 from .native_release_intake import _read_bounded
 from .msx1_rom import verify_msx1_rom, MSX1ROMError
@@ -28,6 +30,8 @@ _SUPPORTED = {
     "sega_master_system":"SMS_Z80_32K",
     "msx1":"MSX1_Z80_16K",
     "sinclair_zx_spectrum":"SPECTRUM_TAP",
+    "commodore_64":"C64_6510_PRG",
+    "atari_400_800":"ATARI_6502_XEX",
 }
 _MAX_RETRO = 9 * 1024 * 1024
 
@@ -146,6 +150,94 @@ def _nes(data: bytes) -> None:
              "NES cartridge lacks plausible original CPU instruction bytes")
 
 
+def parse_original_c64_prg(data: bytes) -> dict[str, object]:
+    """Strict default cc65 BASIC SYS launcher, not arbitrary BASIC programs."""
+    _require(isinstance(data, bytes) and 32 <= len(data) <= 0xD000 - 0x0801 + 2,
+             "C64 PRG exceeds default native RAM envelope")
+    load, link = struct.unpack_from("<HH", data)
+    _require(load == 0x0801, "C64 PRG lacks BASIC load address $0801")
+    next_offset = 2 + link - load
+    _require(7 < next_offset <= min(66, len(data) - 2),
+             "C64 BASIC launcher line link outside bounded header")
+    _require(data[next_offset-1] == 0 and data[next_offset:next_offset+2] == b"\x00\x00",
+             "C64 BASIC launcher line/end pointer invalid")
+    body = data[6:next_offset-1]
+    sys = re.fullmatch(rb"\x9e *([0-9]{1,5}) *", body)
+    _require(sys is not None, "C64 BASIC launcher must contain one numeric SYS target")
+    entry = int(sys.group(1))
+    entry_offset = 2 + entry - load
+    _require(next_offset + 2 <= entry_offset < len(data)
+             and data[entry_offset] not in (0, 0xFF),
+             "C64 SYS target is not file-backed native code")
+    return {"load_address": load, "sys_entry_address": entry,
+            "entry_file_offset": entry_offset, "basic_sys_stub_found": True}
+
+
+def parse_original_atari_xex(data: bytes) -> dict[str, object]:
+    """Bounded cc65 48KB-class loader layout with ordered INITAD/RUNAD.
+
+    INITAD must point into code already loaded at that step. Its temporary
+    segment may subsequently be overlaid, as in cc65's system-check chunk.
+    Other overlapping writes and partial/repeated RUNAD records are rejected.
+    This interprets loader metadata, never executes arbitrary 6502 instructions.
+    """
+    _require(isinstance(data, bytes) and 32 <= len(data) < 48*1024,
+             "Atari XEX exceeds native 48KB-class byte envelope")
+    _require(data[:2] == b"\xff\xff", "Atari XEX lacks binary sentinel")
+    position, run = 2, None
+    memory = bytearray(65536)
+    loaded = bytearray(65536)
+    segments, retired, initializers = [], set(), []
+    while position < len(data):
+        _require(len(segments) < 64 and position + 4 <= len(data),
+                 "Atari XEX segment table truncated or over budget")
+        start = struct.unpack_from("<H", data, position)[0]
+        if start == 0xFFFF:
+            position += 2
+            _require(position + 4 <= len(data), "Atari XEX extended header truncated")
+            start = struct.unpack_from("<H", data, position)[0]
+        end = struct.unpack_from("<H", data, position+2)[0]
+        position += 4
+        length = end-start+1
+        _require(length > 0 and position + length <= len(data),
+                 "Atari XEX reversed or truncated memory segment")
+        chunk = data[position:position+length]
+        position += length
+        if start in (0x02E0, 0x02E2):
+            _require(length == 2, "Atari XEX requires complete separate vector records")
+            address = struct.unpack_from("<H", chunk)[0]
+            if start == 0x02E0:
+                _require(run is None, "Atari XEX RUNAD is ambiguous or repeated")
+                run = address
+            else:
+                _require(0x0600 <= address < 0xC000 and loaded[address]
+                         and memory[address] not in (0, 0xFF),
+                         "Atari INITAD targets absent or empty previously loaded code")
+                candidates = [i for i, segment in enumerate(segments)
+                              if segment["load_address"] <= address <= segment["end_address"]
+                              and i not in retired]
+                _require(bool(candidates), "Atari INITAD has no current code segment")
+                retired.add(candidates[-1])
+                initializers.append(address)
+        else:
+            _require(0x0600 <= start <= end < 0xC000,
+                     "Atari XEX writes system, I/O or ROM address space")
+            for i, segment in enumerate(segments):
+                if segment["load_address"] < 0x0600 or i in retired:
+                    continue
+                _require(end < segment["load_address"] or start > segment["end_address"],
+                         "Atari XEX has unreviewed overlapping program segments")
+            memory[start:end+1] = chunk
+            loaded[start:end+1] = b"\x01" * length
+        segments.append({"load_address":start, "end_address":end, "length":length})
+    _require(run is not None and 0x0600 <= run < 0xC000
+             and loaded[run] and memory[run] not in (0, 0xFF),
+             "Atari RUNAD targets absent or empty final native code")
+    return {"segment_count":len(segments), "segments":segments,
+            "autostart_runad_present":True, "run_address":run,
+            "init_addresses":initializers}
+
+
 def inspect_original_retro_artifact(
     path: str | Path, *, target_platform_id: str, expected_sha256: str,
 ) -> RetroArtifactReceipt:
@@ -166,6 +258,8 @@ def inspect_original_retro_artifact(
         "sega_master_system":32768,
         "msx1":16384,
         "sinclair_zx_spectrum":26000,
+        "commodore_64":0xD000-0x0801+2,
+        "atari_400_800":48*1024-1,
     }[target_platform_id]
     try:
         data=_read_bounded(Path(path),max_bytes=size_cap)
@@ -185,6 +279,10 @@ def inspect_original_retro_artifact(
             verify_sms(data)
         elif target_platform_id=="msx1":
             verify_msx1_rom(data)
+        elif target_platform_id=="commodore_64":
+            parse_original_c64_prg(data)
+        elif target_platform_id=="atari_400_800":
+            parse_original_atari_xex(data)
         else:
             verify_tape(data)
     except (SMSROMError,MSX1ROMError,SpectrumTapeError) as exc:
