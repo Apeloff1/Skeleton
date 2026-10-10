@@ -69,3 +69,14 @@ def triangle_pcm(hertz: int, sample_rate: int, count: int) -> tuple[int,...]:
     return tuple(32767 - (65534*abs(2*((i*hz)%rate)-rate)+rate//2)//rate
                  for i in range(samples))
 
+
+def noise_lfsr_pcm(seed: int, count: int) -> tuple[int,...]:
+    """Deterministic 15-bit PSG-style XOR feedback noise from an explicit seed."""
+    state=_integer(seed,"LFSR seed",1,0x7fff)
+    samples=_integer(count,"PCM sample count",1,32768)
+    out=[]
+    for _ in range(samples):
+        out.append(32767 if state&1 else -32767)
+        feedback=(state^(state>>1))&1
+        state=(state>>1)|(feedback<<14)
+    return tuple(out)
