@@ -97,6 +97,8 @@ def _adapt_portable_design(request: "ProductionRequest", target_id: str):
         "portable_profile": asdict(profile),
         "portable_profile_digest": digest(asdict(profile)),
         "target": target_id,
+        "production_title": request.title,
+        "production_seed": request.seed,
         "target_design_digest": actual.digest,
         "target_palette": actual.palette,
         "target_stages": actual.stages,
@@ -542,34 +544,26 @@ def verify_source_release(payload: bytes) -> dict:
                 raise ValueError("portable port plan must be structured")
             try:
                 profile = PortableGameDesign(**port_plan["portable_profile"])
-                profile.validate()
-                reconstruction = ProductionRequest(
-                    title=native.get("title", "Original port"),
-                    style=receipt["style"], targets=(receipt["target"],),
+                original = ProductionRequest(
+                    title=port_plan["production_title"],
+                    style=receipt["style"],
+                    targets=(receipt["target"],),
                     original_work_attested=True,
-                    seed=port_plan["portable_profile"].get("seed", 1),
+                    seed=port_plan["production_seed"],
                     portable_design=profile,
                 )
-                # The original production title/seed are identity-bound only
-                # through the output metadata when a per-target design is used.
-                from .dragon_game_design import parse_design
+                expected_design, expected_port = _adapt_portable_design(
+                    original, receipt["target"]
+                )
+                if port_plan != expected_port or expected_design is None:
+                    raise ValueError("portable port transformation was altered")
                 if "dragon-game-design.json" in recovered_sources:
                     embedded = json.loads(recovered_sources["dragon-game-design.json"])
-                    parsed = parse_design({k: embedded[k] for k in (
-                        "schema", "title", "target", "genre", "palette",
-                        "stages", "candidates", "seed", "difficulty", "hero",
-                        "quest_theme", "project_notes"
-                    )})
-                    if parsed.digest != embedded["digest"] or parsed.digest != port_plan["target_design_digest"]:
-                        raise ValueError("portable embedded design disagrees with release")
-                if port_plan.get("portable_profile_digest") != digest(asdict(profile)):
-                    raise ValueError("portable profile digest invalid")
-                if port_plan.get("target") != receipt["target"]:
-                    raise ValueError("ported target disagrees with verified release")
-                if port_plan.get("claims") != (
-                    "platform-specific native source; no equivalent-port or gameplay certification"
-                ):
-                    raise ValueError("unsafe port certification claim")
+                    from .dragon_game_design import design_manifest
+                    if embedded != design_manifest(expected_design):
+                        raise ValueError("native game design differs from transformed specification")
+                elif receipt["target"] in ("pc_linux", "pc_windows", "pc_macos", "steam_deck"):
+                    raise ValueError("desktop native design manifest absent")
             except (KeyError, TypeError, ValueError) as exc:
                 raise ValueError("portable game port evidence cannot be replayed") from exc
             if receipt.get("port_profile_digest") != port_plan["portable_profile_digest"]:
