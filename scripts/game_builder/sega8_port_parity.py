@@ -243,6 +243,10 @@ def verify_ports(root: Path) -> dict[str, object]:
         "independent_native_rom_formats_verified": True,
         "real_z80_startup_checked_per_platform": True,
         "native_cartridge_rebuild_byte_equality_checked_per_platform": True,
+        "native_rebuild_provenance_sha256_by_platform": {
+            target: records[target]["reproducibility"]["comparison_sha256"]
+            for target in sorted(_TARGETS)
+        },
         "full_native_z80_gameplay_replay_verified": False,
         "physical_hardware_verified": False,
         "rights_independently_verified": False,
@@ -261,11 +265,8 @@ def main() -> None:
     args = p.parse_args()
     result = verify_ports(args.evidence_root)
     if args.output is not None:
-        if args.output.exists() or args.output.is_symlink():
-            raise FileExistsError(str(args.output))
-        with args.output.open("x", encoding="utf-8") as fp:
-            json.dump(result, fp, indent=2, sort_keys=True)
-            fp.write("\n")
+        from scripts.game_builder.sega_reproducibility_ci import emit_receipt
+        emit_receipt(args.output, result)
     print(json.dumps(result, sort_keys=True))
 
 
