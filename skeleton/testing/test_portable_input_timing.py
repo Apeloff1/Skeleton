@@ -13,3 +13,11 @@ def test_rational_50_to_60_refresh_is_driven_by_integer_cumulative_clock():
     assert frame_schedule(60,50,60).count(0)==10
     with pytest.raises(InputTimingError):
         frame_schedule(0,60,1)
+
+def test_target_display_samples_original_frame_without_time_inflation():
+    sampled=tuple(source_frame_at(i,50,60) for i in range(120))
+    assert sampled[0]==0 and sampled[-1]==99
+    assert sampled==tuple(sorted(sampled))
+    with pytest.raises(InputTimingError):
+        source_frame_at(-1,50,60)
+
