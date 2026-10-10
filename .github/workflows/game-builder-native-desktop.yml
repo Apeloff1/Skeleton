@@ -92,6 +92,40 @@ jobs:
             --verify-binary native-build/skeleton_homebrew --target "${{ matrix.platform }}" \
             > binary-validation.json
 
+      - name: Verify actual Linux/macOS executable structure and image hash
+        if: runner.os != 'Windows'
+        env:
+          PYTHONPATH: .
+          NATIVE_TARGET: ${{ matrix.platform }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          from skeleton.ai.game_builder.native_binary_structure import verify_native_executable_structure
+
+          executable = Path("native-build/skeleton_homebrew")
+          hasher = hashlib.sha256()
+          with executable.open("rb") as stream:
+              for block in iter(lambda: stream.read(256 * 1024), b""):
+                  hasher.update(block)
+          record = verify_native_executable_structure(
+              executable, target_platform_id=os.environ["NATIVE_TARGET"],
+              expected_sha256=hasher.hexdigest(),
+          )
+          result = record.public_receipt()
+          assert result["format_structure_checked"] is True
+          assert result["executable_boot_verified"] is False
+          assert result["legal_distribution_permitted"] is False
+          Path("native-structure.json").write_text(
+              json.dumps(result, sort_keys=True, indent=2) + "\\n", encoding="utf-8",
+          )
+          print("STRUCTURALLY_VALID_NATIVE_HOME_BREW", record.architecture)
+          PY
+
       - name: Generate, compile, replay and fingerprint Windows .exe
         if: runner.os == 'Windows'
         env:
@@ -122,5 +156,6 @@ jobs:
             native-src/manifest.json
             native-replay.txt
             binary-validation.json
+            native-structure.json
           if-no-files-found: error
           retention-days: 7
