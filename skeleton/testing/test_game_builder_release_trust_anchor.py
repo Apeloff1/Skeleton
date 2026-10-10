@@ -198,3 +198,66 @@ def test_trust_policy_supports_only_explicit_scoped_territories():
         replace(root,policy_epoch=0)
     with pytest.raises(ReleaseReviewError):
         replace(root,reviewers=())
+
+
+
+def _pinned_native_args(tmp_path):
+    from skeleton.testing.test_game_builder_native_release_intake import (
+        _setup, _review_panel,
+    )
+    inputs = _setup(tmp_path)
+    reviewers, signatures = _review_panel(inputs["candidate"])
+    root, pin = signed_root(inputs["candidate"], reviewers)
+    return dict(
+        **inputs, registry=root, attestations=signatures,
+        expected_root_key_sha256=pin, minimum_policy_epoch=45,
+        evaluation_utc="2026-10-11T12:00:00Z",
+    )
+
+
+def test_complete_native_evidence_pipeline_requires_pinned_external_review_root(tmp_path):
+    from skeleton.ai.game_builder.release_pipeline import run_pinned_native_release_gate
+    args = _pinned_native_args(tmp_path)
+    result = run_pinned_native_release_gate(**args)
+    assert result.independent_reviews_complete is True
+    assert result.pinned_review.externally_root_key_pinned is True
+    assert result.intake.exhaustive_payload_inventory_verified is True
+    assert result.public_receipt()["external_reviewer_root_pinned"] is True
+    assert result.public_receipt()["real_file_bytes_checked"] is True
+    assert result.public_receipt()["publisher_approval_granted"] is False
+    assert result.public_receipt()["release_authorized"] is False
+    assert result.release_authorized is False
+    assert result == run_pinned_native_release_gate(**args)
+
+
+def test_pinned_game_review_refuses_evil_root_even_when_game_bytes_match(tmp_path):
+    from skeleton.ai.game_builder.release_pipeline import run_pinned_native_release_gate
+    args = _pinned_native_args(tmp_path)
+    fake, _ = signed_root(args["candidate"], args["registry"].reviewers)
+    args["registry"] = fake
+    with pytest.raises(ReleaseReviewError,match="pinned"):
+        run_pinned_native_release_gate(**args)
+
+
+def test_pinned_game_review_refuses_binary_replacement_before_legal_signature_check(tmp_path):
+    from skeleton.ai.game_builder.native_release_intake import NativeIntakeError
+    from skeleton.ai.game_builder.release_pipeline import run_pinned_native_release_gate
+    args = _pinned_native_args(tmp_path)
+    binary = args["compiled_binary"]
+    binary.write_bytes(binary.read_bytes() + b"Unapproved executable")
+    with pytest.raises(NativeIntakeError):
+        run_pinned_native_release_gate(**args)
+
+
+def test_pinned_combined_report_cannot_forge_authority_or_review_binding(tmp_path):
+    from skeleton.ai.game_builder.release_pipeline import run_pinned_native_release_gate
+    args = _pinned_native_args(tmp_path)
+    report = run_pinned_native_release_gate(**args)
+    with pytest.raises(ValueError):
+        replace(report, release_authorized=True)
+    with pytest.raises(ValueError):
+        replace(report, executable_boot_verified=True)
+    with pytest.raises(ValueError):
+        replace(report, legal_noninfringement_certified=True)
+    with pytest.raises(ValueError):
+        replace(report, report_sha256="0"*64)
