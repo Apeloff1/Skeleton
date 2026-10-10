@@ -31,6 +31,7 @@ from .apple2_native_export import compile_native_apple2, export_native_apple2
 from .spectrum_native_export import compile_native_spectrum, export_native_spectrum
 from .sega_8bit_native_export import compile_native_sega_8bit, export_native_sega_8bit
 from .msx1_native_export import compile_native_msx1, export_native_msx1
+from .coleco_native_export import compile_native_coleco, export_native_coleco
 from .sms_native_export import compile_native_sms, export_native_sms
 from .platform_registry import default_registry
 from .playable_simulation import demonstrate_solvable
@@ -51,6 +52,7 @@ _NATIVE = {
     "sinclair_zx_spectrum": "spectrum_z80asm",
     "sega_game_gear": "gg_sdcc_z80",
     "msx1": "msx1_z80asm",
+    "colecovision": "coleco_z80asm",
     "sega_master_system": "sms_z80asm",
 }
 
@@ -144,6 +146,11 @@ def build_game(
         project = compile_native_msx1(world, source, authorized=True)
         folder = export_native_msx1(project, output, authorized=True)
         artifact_type = "native_msx1_z80_16kb_bios_rom_source"
+        digest = project.content_digest
+    elif kind == "coleco_z80asm":
+        project = compile_native_coleco(world, source, authorized=True)
+        folder = export_native_coleco(project, output, authorized=True)
+        artifact_type = "native_colecovision_32kb_z80_tms9918_source"
         digest = project.content_digest
     elif kind == "sms_z80asm":
         project = compile_native_sms(world, source, authorized=True)
