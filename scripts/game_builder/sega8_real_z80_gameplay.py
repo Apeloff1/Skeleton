@@ -157,7 +157,7 @@ def observe_actual_gameplay(machine: Sega8Machine, *, width: int, height: int) -
         raise Sega8NativeGameplayError("native game shows invalid active stage")
     rank = _digits(machine, (12,), hud, left)
     if rank > 7:
-        raise Sega8NativeGameplayError("native companion progressed past cap")
+        raise Sega8NativeGameplayError("native companion rank progressed past cap")
     return {
         "level": stage,
         "x": x, "y": y,
