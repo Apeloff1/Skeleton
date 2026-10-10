@@ -1023,6 +1023,51 @@ def native_world_codex_platforms(
             detail="Original world codex platform discovery failed") from None
 
 
+class NativeCodexStoryRequest(NativeCodexWorldRequest):
+    decisions:list[str]=Field(default_factory=list,max_length=96)
+
+
+@router.post("/native/production/worlds/codex/story")
+def native_world_codex_story(
+    body:NativeCodexStoryRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_world_codex import unrank
+    from skeleton.ai.webcrawler.dragon_world_story_grammar import (
+        replay_story,story_report,
+    )
+    try:
+        source=unrank(body.index)
+        narrative=replay_story(source,tuple(body.decisions))
+        return {"ok":True,"actual_decisions":list(body.decisions),
+                "original_story_world":story_report(source,narrative)}
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original narrative option locked by history, discovery or world time") from None
+
+
+@router.post("/native/production/worlds/codex/native-desktop-source")
+def native_world_codex_desktop_source(
+    body:NativeCodexWorldRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from dataclasses import asdict
+    from skeleton.ai.webcrawler.dragon_world_codex import unrank
+    from skeleton.ai.webcrawler.dragon_codex_desktop import (
+        emit_codex_c99,inspect_c99_source,
+    )
+    try:
+        source=unrank(body.index)
+        game=emit_codex_c99(source)
+        return {"ok":True,"project":asdict(game),
+                "independent_source_verification":inspect_c99_source(source,game),
+                "execution_claim":"C99 host-platform playable source. "
+                    "No compiled binary, hardware run or third-party SDK claim."}
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original source world cannot emit native C99 game safely") from None
+
+
 class NativeGenomicWorldRequest(BaseModel):
     """Arbitrary-precision design address is a DECIMAL STRING, never a float."""
     model_config=ConfigDict(extra="forbid")
