@@ -119,14 +119,31 @@ def _puzzle_proof(source_archive: bytes) -> tuple[dict, dict[str, str]]:
     procedural = proof.get("procedural", False)
     if type(procedural) is not bool:
         raise ValueError("procedural source level claim is not a boolean")
+    authoring_mode=proof.get("authoring_mode", "generated")
+    authored=None
+    if authoring_mode=="authored":
+        from .dragon_native_puzzle_authoring import validate_authored_levels
+        rows=proof.get("authored_level_rows")
+        if (not isinstance(rows,list) or
+                any(not isinstance(x,list) for x in rows)):
+            raise ValueError("authored source level rows missing")
+        authored=validate_authored_levels(
+            tuple(tuple(line for line in level) for level in rows)
+        )
+        if (procedural or authored.digest!=proof.get("authoring_digest") or
+                len(authored.levels)!=proof["stages"]):
+            raise ValueError("authored campaign integrity or stage count changed")
+    elif authoring_mode!="generated" or proof.get("authored_level_rows") is not None:
+        raise ValueError("unexpected original level authoring claim")
     if (type(expected_seed) is not int or not 0 <= expected_seed <= 0xffffffff or
             type(difficulty) is not int or not 1 <= difficulty <= 10):
         raise ValueError("invalid puzzle replay parameters")
     for number, row in enumerate(rows):
         if not isinstance(row, dict) or row.get("stage") != number:
             raise ValueError("puzzle stages are not canonical or contiguous")
-        layout = transformed_level(number, expected_seed, difficulty,
-                                   procedural=procedural)
+        layout=(authored.levels[number].rows if authored is not None else
+                transformed_level(number, expected_seed, difficulty,
+                                  procedural=procedural))
         solution, explored = solve_grid(layout)
         if row.get("solution") != solution or row.get("steps") != len(solution):
             raise ValueError("native puzzle solution does not replay")
@@ -244,10 +261,12 @@ def build_native_puzzle_executable(
         from .dragon_native_puzzle_trace import simulate_grid, parse_native_state_line
         transcripts = []
         for level in range(1, proof["stages"] + 1):
-            puzzle = transformed_level(
-                level - 1, proof["seed"], proof["difficulty"],
-                procedural=proof.get("procedural", False),
-            )
+            puzzle=(tuple(proof["authored_level_rows"][level-1])
+                    if proof.get("authoring_mode")=="authored" else
+                    transformed_level(
+                        level - 1, proof["seed"], proof["difficulty"],
+                        procedural=proof.get("procedural", False),
+                    ))
             solution, _ = solve_grid(puzzle)
             for commands in (
                 solution, "r" + solution, solution[:4] + "r" + solution,
