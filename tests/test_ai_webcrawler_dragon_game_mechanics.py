@@ -227,3 +227,11 @@ def test_observation_confidence_rejects_boolean_nonfinite_and_string():
         with pytest.raises(ValueError, match="confidence"):
             store.record(session(store, observations=(observation(confidence=bad),)), authorized=True)
 
+
+def test_observation_confirmation_rejects_numeric_truthiness():
+    from dataclasses import replace
+    store = setup()
+    item = observation(preference=PreferenceSignal.ENJOYED, confirmed=True)
+    with pytest.raises(ValueError, match="confirmation must be boolean"):
+        store.record(session(store, observations=(replace(item, user_confirmed=1),)), authorized=True)
+
