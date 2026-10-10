@@ -113,6 +113,35 @@ async function saveBundle(blob: Blob, name: string): Promise<void> {
   }
 }
 
+type PixelPreview = {
+  ok: boolean;
+  target: string;
+  applied_palette: string;
+  frames: { hero: readonly string[]; hero_blink: readonly string[];
+    collectible: readonly string[]; enemy: readonly string[] };
+  gb_tiles_sha256: string;
+  nes_tiles_sha256: string;
+};
+
+function OriginalSprite({ label, bitmap }: {
+  label: string; bitmap: readonly string[];
+}) {
+  const tones = ['#09131b', '#38505c', '#84a8a3', '#f3e5c9'];
+  return (
+    <View style={{ alignItems: 'center', gap: 8 }}>
+      <View accessibilityLabel={label + ': original eight-by-eight native pixel art'}
+        style={stylesUi.pixelCanvas}>
+        {bitmap.map((row, y) => row.split('').map((index, x) => (
+          <View key={y * 8 + x} style={{
+            width: 15, height: 15, backgroundColor: tones[Number(index)] || tones[0],
+          }} />
+        )))}
+      </View>
+      <Text style={stylesUi.hint}>{label}</Text>
+    </View>
+  );
+}
+
 function NativeSourceEditor() {
   const router = useRouter();
   const { role } = useStudioAuth();
@@ -133,6 +162,8 @@ function NativeSourceEditor() {
   const [failure, setFailure] = React.useState('');
   const [success, setSuccess] = React.useState('');
   const [preview, setPreview] = React.useState<NativePlan | null>(null);
+  const [artPreview, setArtPreview] = React.useState<PixelPreview | null>(null);
+  const [artLoading, setArtLoading] = React.useState(false);
   const active = React.useRef<AbortController | null>(null);
   const isEditor = role === 'editor' || role === 'admin';
 
@@ -185,6 +216,44 @@ function NativeSourceEditor() {
     () => catalog.filter(item => supported(item, style)),
     [catalog, style],
   );
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+    const representative = targets.find(id =>
+      ['game_boy', 'game_boy_color', 'nes'].includes(id)) || 'game_boy';
+    const payload = {
+      hero, quest_theme: questTheme, palette, seed: 1, target: representative,
+    };
+    setArtPreview(null);
+    setArtLoading(true);
+    void (async () => {
+      try {
+        const response = await fetch(ENDPOINT + '/art-preview', {
+          method: 'POST', cache: 'no-store',
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
+          signal: controller.signal, body: JSON.stringify(payload),
+        });
+        if (!response.ok) throw new Error('Original sprite preview is unavailable.');
+        const result = await response.json() as PixelPreview;
+        const bitmaps = result?.frames;
+        const artValid = !!result?.ok && !!bitmaps &&
+          ['hero', 'hero_blink', 'collectible', 'enemy'].every(key => {
+            const frame = bitmaps[key as keyof typeof bitmaps];
+            return Array.isArray(frame) && frame.length === 8 &&
+              frame.every(line => typeof line === 'string' && /^[0-3]{8}$/.test(line));
+          }) && /^[a-f0-9]{64}$/.test(result.gb_tiles_sha256) &&
+          /^[a-f0-9]{64}$/.test(result.nes_tiles_sha256);
+        if (!artValid) throw new Error('Native artwork response failed validation.');
+        if (!controller.signal.aborted) setArtPreview(result);
+      } catch {
+        // Artwork preview is optional; source/build authority still belongs
+        // to the verified backend. Never invent preview pixels on failure.
+      } finally {
+        if (!controller.signal.aborted) setArtLoading(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [hero, questTheme, palette, targets]);
 
   const chooseStyle = (next: string) => {
     if (busy) return;
@@ -413,6 +482,36 @@ function NativeSourceEditor() {
             </TouchableOpacity>
           ))}
         </ScrollView>
+        <View style={stylesUi.preview}>
+          <Text style={stylesUi.label}>Actual original cartridge sprite source</Text>
+          <Text style={stylesUi.hint}>
+            Eight-by-eight 2bpp actor, collectible and enemy tiles generated
+            by Dragon's native art compiler. Tones below illustrate pixel
+            indices, not certified device color output.
+          </Text>
+          {artLoading && <ActivityIndicator color="#84a8a3" />}
+          {artPreview && (
+            <>
+              <View style={stylesUi.artSprites}>
+                <OriginalSprite label="Hero" bitmap={artPreview.frames.hero} />
+                <OriginalSprite label="Blink" bitmap={artPreview.frames.hero_blink} />
+                <OriginalSprite label="Collectible" bitmap={artPreview.frames.collectible} />
+                <OriginalSprite label="Enemy" bitmap={artPreview.frames.enemy} />
+              </View>
+              <Text style={stylesUi.hint}>
+                Target: {artPreview.target.replace(/_/g, ' ')}
+                {' · '}applied 2bpp palette: {formatStyle(artPreview.applied_palette)}
+              </Text>
+            </>
+          )}
+          {!artLoading && !artPreview && (
+            <Text style={stylesUi.hint}>
+              Native sprite preview unavailable; no artwork or playable ROM
+              is being assumed.
+            </Text>
+          )}
+        </View>
+
         {([
           ['Difficulty', difficulty, 1, 10, setDifficulty],
           ['Campaign stages', stageCount, 1, 8, setStageCount],
@@ -551,6 +650,9 @@ const stylesUi = StyleSheet.create({
   platform: { backgroundColor: '#192a34', borderRadius: 12, padding: 12, gap: 5 },
   preview: { backgroundColor: '#142834', borderWidth: 1, borderColor: '#345660',
     borderRadius: 14, padding: 14, gap: 10 },
+  artSprites: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, justifyContent: 'space-around' },
+  pixelCanvas: { width: 120, height: 120, flexDirection: 'row', flexWrap: 'wrap',
+    borderWidth: 1, borderColor: '#4e756e', backgroundColor: '#09131b' },
   counter: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
   counterButton: { backgroundColor: '#326f56', borderRadius: 10, minWidth: 42,
     padding: 10, alignItems: 'center' },
