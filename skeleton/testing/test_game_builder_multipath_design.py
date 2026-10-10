@@ -145,3 +145,12 @@ def test_corridor_overlap_is_symmetric_and_identity_exact():
     with pytest.raises(MultipathError, match="same verified world"):
         route_overlap_ppm(a, solve_route(RouteProblem.from_rows(HAZARD_LEVEL)))
 
+
+def test_novelty_is_exact_complement_of_overlap():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    a = solve_route(p)
+    b = solve_route(p, algorithm="dijkstra",
+                    edge_penalties={((1, 1), (2, 1)): 30})
+    assert route_diversity_ppm(a, a) == 0
+    assert route_diversity_ppm(a, b) == 1_000_000 - route_overlap_ppm(a, b)
+
