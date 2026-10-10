@@ -25,26 +25,44 @@ from skeleton.ai.game_builder.native_release_intake import _open_directory, _rea
 
 
 _TARGETS = {"sega_master_system": "sms", "sega_game_gear": "gg"}
-_SHA = re.compile(r"^[0-9a-f]{64}$")
-_GIT_REVISION = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
-
-
-def emit(target: str, output: Path, authorship_file: Path, *, reference_out: Path | None = None) -> dict[str, object]:
-    if target not in _TARGETS:
-        raise ValueError("unsupported real Z80 console target")
-    try:
-        declared_author_bytes = _read_bounded(Path(authorship_file), max_bytes=8*1024*1024)
-    except (ValueError, OSError) as exc:
-        raise ValueError("original author evidence must be an ordinary, private, bounded local file") from exc
-    author_reference = sha256(declared_author_bytes).hexdigest()
-    intent = GameBuildIntent(
+# Extended profile is an independently authored real console campaign rather
+# than a synthetic header fixture. It reaches native maximum world/rank count.
+_ORIGINAL_PROFILES = {
+    "standard": dict(
         project_id="skeleton-original-sega-evolution",
         title="Original Stardust Exploration",
         subtitle="Self-authored console game, not commercial-content replication",
         seed=198701, width=17, height=15, levels=3,
         collectibles_per_level=3, hazards_per_level=4,
         starting_health=4, theme="space",
-    )
+    ),
+    "full_campaign": dict(
+        project_id="skeleton-original-sega-eight-worlds",
+        title="Original Eight World Expedition",
+        subtitle="Eight original stages, 48 gems and all companion bond ranks",
+        seed=90210, width=17, height=15, levels=8,
+        collectibles_per_level=6, hazards_per_level=4,
+        starting_health=4, theme="arcade",
+    ),
+}
+_SHA = re.compile(r"^[0-9a-f]{64}$")
+_GIT_REVISION = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+
+
+def emit(
+    target: str, output: Path, authorship_file: Path, *,
+    reference_out: Path | None = None, profile: str = "standard",
+) -> dict[str, object]:
+    if target not in _TARGETS:
+        raise ValueError("unsupported real Z80 console target")
+    if not isinstance(profile, str) or profile not in _ORIGINAL_PROFILES:
+        raise ValueError("unrecognized independently authored native campaign profile")
+    try:
+        declared_author_bytes = _read_bounded(Path(authorship_file), max_bytes=8*1024*1024)
+    except (ValueError, OSError) as exc:
+        raise ValueError("original author evidence must be an ordinary, private, bounded local file") from exc
+    author_reference = sha256(declared_author_bytes).hexdigest()
+    intent = GameBuildIntent(**_ORIGINAL_PROFILES[profile])
     world = generate_playable_world(intent, authorized=True)
     rights = HomebrewSource(
         project_id=intent.project_id,
@@ -68,6 +86,7 @@ def emit(target: str, output: Path, authorship_file: Path, *, reference_out: Pat
     proof = {
         "schema": "skeleton.game_builder.native_sega8_original_source_receipt.v1",
         "target": target, "output_directory": str(folder),
+        "original_campaign_profile": profile,
         "source_content_digest": project.content_digest,
         "world_digest": world.digest,
         "winning_replay_digest": replay.digest,
@@ -195,6 +214,7 @@ def main() -> None:
     mode.add_argument("--emit", type=Path)
     mode.add_argument("--verify-rom", type=Path)
     ap.add_argument("--target", choices=sorted(_TARGETS), required=True)
+    ap.add_argument("--profile", choices=sorted(_ORIGINAL_PROFILES), default="standard")
     ap.add_argument("--author-evidence", type=Path)
     ap.add_argument("--source-dir", type=Path)
     ap.add_argument("--toolchain-revision")
@@ -207,7 +227,8 @@ def main() -> None:
         if args.author_evidence is None:
             ap.error("--author-evidence required with --emit")
         receipt = emit(args.target, args.emit, args.author_evidence,
-                       reference_out=args.host_reference_out)
+                       reference_out=args.host_reference_out,
+                       profile=args.profile)
     else:
         if args.source_dir is None or args.toolchain_revision is None:
             ap.error("--source-dir and --toolchain-revision required with --verify-rom")
