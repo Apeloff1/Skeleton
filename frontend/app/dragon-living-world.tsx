@@ -287,12 +287,31 @@ function LivingWorldEditor(){
         caught instanceof Error?caught.message:'Route analysis failed.');
     }finally{if(ticket===runId.current)setBusy(false);}
   };
-  const beginExample=(alternative:Alternative)=>{
+  const beginExample=async(alternative:Alternative)=>{
     if(!preview||busy)return;
-    setGuided(alternative);setGame(preview.player);
-    setTerrain(preview.tiles);setHistory([]);
-    setNotice('Follow an original replay-proven route. Every step remains a real game decision.');
-    setFailure('');
+    const ticket=++runId.current;
+    setBusy(true);
+    try{
+      let token:string|null=null;
+      if(sessionMode){
+        const resumed=await apiPost<SignedAdvance>('/checkpoint/advance',{
+          ...config,moves:[],
+        });
+        if(!resumed.ok||!resumed.new_checkpoint)
+          throw new Error('New original replay session could not be verified.');
+        token=resumed.new_checkpoint;
+      }
+      if(ticket===runId.current){
+        setSessionToken(token);setPreviousTokens([]);
+        setGuided(alternative);setGame(preview.player);
+        setTerrain(preview.tiles);setHistory([]);
+        setNotice('Follow an original replay-proven route. Every step remains a real game decision.');
+        setFailure('');
+      }
+    }catch(caught){
+      if(ticket===runId.current)setFailure(
+        caught instanceof Error?caught.message:'Could not start original alternative.');
+    }finally{if(ticket===runId.current)setBusy(false);}
   };
   const advance=()=>{
     if(!guided||!game||busy||history.length>=guided.actions.length)return;
@@ -304,6 +323,7 @@ function LivingWorldEditor(){
     const exported={
       schema:'skeleton.ai.dragon.living_world_local_save.v1',
       world_id:id,variation,style,lifecycle,history,
+      signed_checkpoint:sessionToken,
       final_digest:game.player.history_digest,
       original_world_fingerprint:preview.world.world_fingerprint,
     };
@@ -319,7 +339,7 @@ function LivingWorldEditor(){
     }
   };
   const restore=async()=>{
-    if(busy||!valid||!FileSystem.documentDirectory)return;
+    if(busy||!valid||!preview||!FileSystem.documentDirectory)return;
     const ticket=++runId.current;
     setBusy(true);setFailure('');
     try{
@@ -330,6 +350,7 @@ function LivingWorldEditor(){
       const saved=JSON.parse(raw) as {
         schema:string;world_id:number;variation:number;
         style:string;lifecycle:string;history:string[];
+        signed_checkpoint?:string|null;
         final_digest:string;original_world_fingerprint:string;
       };
       if(saved.schema!=='skeleton.ai.dragon.living_world_local_save.v1'||
@@ -338,15 +359,31 @@ function LivingWorldEditor(){
          !Array.isArray(saved.history)||saved.history.length>192||
          saved.original_world_fingerprint!==preview?.world.world_fingerprint)
         throw new Error('Saved original world belongs to another source design.');
-      const response=await apiPost<Play>('/play',{
-        ...config,moves:saved.history,
-      });
-      if(!response.ok||
-         response.current.player.history_digest!==saved.final_digest)
+      let current:GameState;
+      let nearby:Tile[];
+      if(typeof saved.signed_checkpoint==='string'){
+        const verified=await apiPost<SignedInspect>('/checkpoint/inspect',{
+          ...config,token:saved.signed_checkpoint,
+        });
+        if(!verified.ok||!verified.checkpoint_bound_to_authenticated_owner)
+          throw new Error('Saved checkpoint has no valid owner proof.');
+        current=verified.current;nearby=verified.surroundings;
+      }else{
+        const response=await apiPost<Play>('/play',{
+          ...config,moves:saved.history,
+        });
+        if(!response.ok)
+          throw new Error('Saved bounded choices did not replay.');
+        current=response.current;nearby=response.surroundings;
+      }
+      if(current.player.history_digest!==saved.final_digest)
         throw new Error('Saved choices failed independent gameplay replay.');
       if(ticket===runId.current){
-        setHistory(saved.history);setGame(response.current);
-        setTerrain(response.surroundings);
+        setHistory(saved.history);setGame(current);
+        setTerrain(nearby);
+        setSessionToken(saved.signed_checkpoint||null);
+        setSessionMode(!!saved.signed_checkpoint);
+        setPreviousTokens([]);
         setNotice('Original choices and endings restored after server verification.');
       }
     }catch(caught){
