@@ -84,3 +84,25 @@ def axis_to_eightway(x: int, y: int, *, threshold: int=8192) -> str:
     ew="w" if horizontal < -dead else "e" if horizontal > dead else ""
     return ns+ew if ns or ew else "neutral"
 
+
+def debounce_buttons(samples: object, *, stable_frames: int=2) -> tuple[int,...]:
+    """Suppress noisy mechanical switch chatter before updating button state."""
+    needed=_int(stable_frames,"button debounce frames",1,120)
+    if not isinstance(samples,(tuple,list)) or not 1<=len(samples)<=4096:
+        raise InputTimingError("bounded button samples required")
+    masks=tuple(_buttons(s) for s in samples)
+    accepted=0
+    candidate=0
+    streak=0
+    result=[]
+    for state in masks:
+        if state!=candidate:
+            candidate=state
+            streak=1
+        else:
+            streak+=1
+        if streak>=needed:
+            accepted=candidate
+        result.append(accepted)
+    return tuple(result)
+
