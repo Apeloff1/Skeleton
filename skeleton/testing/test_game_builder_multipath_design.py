@@ -475,3 +475,12 @@ def test_shortest_dag_enumeration_never_pads_with_worse_routes():
     assert all(q.steps == solve_route(p).steps for q in choices)
     assert all(verify_route_proof(p, q) for q in choices)
 
+
+def test_objective_progress_has_monotonic_collectible_unlocks():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    proof = solve_route(p)
+    trace = route_progress_trace(p, proof)
+    assert trace[0] == (0, p.start, 0)
+    assert trace[-1] == (proof.steps, p.goal, 1)
+    assert [state[2] for state in trace] == sorted(state[2] for state in trace)
+
