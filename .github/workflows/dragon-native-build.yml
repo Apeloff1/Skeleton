@@ -370,3 +370,57 @@ jobs:
             tests/test_ai_webcrawler_dragon_native_sega_snes.py \
             tests/test_ai_webcrawler_dragon_chip_music.py \
             tests/test_ai_webcrawler_dragon_native_variants.py
+
+
+  build-actual-original-windows-executable:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install real native x64 MinGW-w64 compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64
+          python -m pip install --disable-pip-version-check pytest
+          x86_64-w64-mingw32-gcc --version
+      - name: Compile actual Windows .exe and verify PE game source
+        run: |
+          set -euo pipefail
+          python -m pytest -q tests/test_ai_dragon_native_windows.py
+          python -m skeleton.ai.webcrawler.dragon_native_windows build \
+            --title "Original Dragon Windows Adventure" \
+            --seed 1977 --stages 4 --difficulty 7 \
+            --attest-original-rights --authorize-cross-compile \
+            --out /tmp/original-dragon-windows \
+            > /tmp/original-dragon-windows-result.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from io import BytesIO
+          from zipfile import ZipFile
+          from skeleton.ai.webcrawler.dragon_native_windows import verify_windows_executable,pe64_format
+          receipt=json.loads(Path("/tmp/original-dragon-windows-result.json").read_text())
+          assert receipt["status"]=="native_windows_executable_cross_compiled"
+          assert receipt["windows_runtime_tested"] is False
+          file=Path("/tmp/original-dragon-windows")/receipt["filename"]
+          payload=file.read_bytes()
+          verification=verify_windows_executable(payload)
+          assert verification["levels_proven"]==4
+          assert verification["windows_runtime_tested"] is False
+          with ZipFile(BytesIO(payload)) as archive:
+              exe=archive.read("binary/dragon_game.exe")
+              assert pe64_format(exe).startswith("PE32+ x86_64")
+          print("ORIGINAL_NATIVE_WIN64_PE_BUILT",verification["exe_sha256"])
+          PY
+      - name: Publish original Win64 game source and executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-original-win64-game
+          path: /tmp/original-dragon-windows/dragon-original-win64-*.zip
+          if-no-files-found: error
+          retention-days: 7
