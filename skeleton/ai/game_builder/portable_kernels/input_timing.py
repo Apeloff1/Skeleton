@@ -123,3 +123,27 @@ def button_auto_repeat(pressed: object, *, delay: int=20,
         result.append(bool(held and (held==1 or (age>=wait and (age-wait)%period==0))))
     return tuple(result)
 
+
+def remap_buttons(mask: int, mapping: object) -> int:
+    """Injective 16-button port remapping; refuse dropped or colliding actions."""
+    value=_buttons(mask)
+    if not isinstance(mapping,Mapping) or not 1<=len(mapping)<=16:
+        raise InputTimingError("bounded button mapping required")
+    used_from=0
+    used_to=0
+    for source,target in mapping.items():
+        start=_int(source,"mapping source bit",1,32768)
+        destination=_int(target,"mapping destination bit",1,32768)
+        if (start&(start-1)) or (destination&(destination-1)):
+            raise InputTimingError("button mapping requires exact one-hot masks")
+        if used_from&start or used_to&destination:
+            raise InputTimingError("ambiguous mapping collision")
+        used_from|=start
+        used_to|=destination
+    if value&~used_from:
+        raise InputTimingError("controller state has unmapped held actions")
+    out=0
+    for source,destination in mapping.items():
+        if value&source:
+            out|=destination
+    return out
