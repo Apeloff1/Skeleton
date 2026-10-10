@@ -39,7 +39,7 @@ type Validation = {
   total_stages: number;
   stages: Array<{
     stage: number; layout_sha256: string;
-    shortest_moves: number; solver_states: number; crates: number;
+    shortest_moves: number; shortest_solution: string; solver_states: number; crates: number;
   }>;
 };
 
@@ -81,6 +81,7 @@ export default function DragonOriginalPuzzleEditor({
   const [status, setStatus] = React.useState('');
   const [validated, setValidated] = React.useState<Validation | null>(null);
   const [play, setPlay] = React.useState<EditorPreviewState | null>(null);
+  const [demoCursor, setDemoCursor] = React.useState(-1);
   const fetchEpoch = React.useRef(0);
 
   React.useEffect(() => {
@@ -94,6 +95,7 @@ export default function DragonOriginalPuzzleEditor({
     onApprovedLevels(null);
     setValidated(null);
     setPlay(null);
+    setDemoCursor(-1);
     setCurrent(0);
     setBoards([]);
     setStatus('');
@@ -152,6 +154,7 @@ export default function DragonOriginalPuzzleEditor({
     setBoards(next);
     setValidated(null);
     setPlay(null);
+    setDemoCursor(-1);
     setStatus('');
     onApprovedLevels(null);
   };
@@ -180,7 +183,10 @@ export default function DragonOriginalPuzzleEditor({
           !Array.isArray(result.stages) ||
           result.stages.length !== stages ||
           result.stages.some(row => row.shortest_moves < 1 ||
-            row.shortest_moves > 400 || row.crates < 1 || row.crates > 3)) {
+            row.shortest_moves > 400 || row.crates < 1 || row.crates > 3 ||
+            typeof row.shortest_solution !== 'string' ||
+            !/^[wasd]{1,400}$/.test(row.shortest_solution) ||
+            row.shortest_solution.length !== row.shortest_moves)) {
         throw new Error('Puzzle validation returned incomplete evidence.');
       }
       if (fetchEpoch.current === generation) {
@@ -231,6 +237,7 @@ export default function DragonOriginalPuzzleEditor({
       const rows = (parsed.levels as string[][]).map(grid => [...grid]);
       setBoards(rows);
       setPlay(null);
+      setDemoCursor(-1);
       setValidated(null);
       setCurrent(0);
       onApprovedLevels(null);
@@ -292,10 +299,12 @@ export default function DragonOriginalPuzzleEditor({
     if (busy || validating) return;
     if (play) {
       setPlay(null);
+      setDemoCursor(-1);
       setStatus('');
       return;
     }
     try {
+      setDemoCursor(-1);
       setPlay(parseNativeBoard(boards[current]));
       setStatus('Local design playtest only. Exact solver validation remains required before export.');
     } catch {
@@ -305,8 +314,42 @@ export default function DragonOriginalPuzzleEditor({
 
   const movePlaytest = (action: PuzzleMove | 'undo' | 'reset') => {
     if (busy || validating || !play) return;
-    try { setPlay(stepNativePreview(play, action)); }
+    try { setDemoCursor(-1); setPlay(stepNativePreview(play, action)); }
     catch { setStatus('Original game preview rejected this move.'); }
+  };
+
+  const walkthrough = validated?.stages[current]?.shortest_solution ?? '';
+  const beginWalkthrough = () => {
+    if (busy || validating || !validated || !boards[current] || !walkthrough) return;
+    try {
+      setPlay(parseNativeBoard(boards[current]));
+      setDemoCursor(0);
+      setStatus('Follow the independently solved shortest route, one actual game move at a time.');
+    } catch {
+      setStatus('The original game board could not be replayed.');
+    }
+  };
+
+  const stepWalkthrough = () => {
+    if (!play || demoCursor < 0 || demoCursor >= walkthrough.length) return;
+    const next = stepNativePreview(play, walkthrough[demoCursor] as PuzzleMove);
+    // The backend shortest-path proof must make a real valid movement at
+    // every step. If a grid changed or a client replay diverges, stop.
+    if (next.moves !== play.moves + 1) {
+      setDemoCursor(-1);
+      setStatus('The optimal walkthrough diverged. Revalidate this board.');
+      return;
+    }
+    setPlay(next);
+    setDemoCursor(demoCursor + 1);
+    if (demoCursor + 1 === walkthrough.length) {
+      if (!next.completed) {
+        setDemoCursor(-1);
+        setStatus('The original level proof did not complete in this preview.');
+      } else {
+        setStatus('Shortest original route completed in ' + next.moves + ' real moves.');
+      }
+    }
   };
 
   const active = play ? visibleNativeBoard(play) : boards[current] || newBoard();
@@ -335,7 +378,7 @@ export default function DragonOriginalPuzzleEditor({
         {boards.map((_, index) => (
           <TouchableOpacity key={index} accessibilityRole="button"
             accessibilityState={{ selected: index === current }}
-            onPress={() => { setCurrent(index); setPlay(null); }}
+            onPress={() => { setCurrent(index); setPlay(null); setDemoCursor(-1); }}
             style={[styles.tool, index === current && styles.selected]}>
             <Text style={styles.toolText}>Stage {index + 1}</Text>
           </TouchableOpacity>
@@ -373,6 +416,30 @@ export default function DragonOriginalPuzzleEditor({
           {play ? 'Exit local game playtest' : 'Play-test my original game board'}
         </Text>
       </TouchableOpacity>
+      {validated && !!walkthrough && (
+        <TouchableOpacity accessibilityRole="button"
+          disabled={busy || validating}
+          onPress={beginWalkthrough} style={styles.fileButton}>
+          <Text style={styles.actionText}>
+            Replay exact shortest solution — Stage {current + 1} ({walkthrough.length} moves)
+          </Text>
+        </TouchableOpacity>
+      )}
+      {play && demoCursor >= 0 && (
+        <View style={styles.results}>
+          <Text style={styles.accepted}>
+            Optimal walkthrough {demoCursor}/{walkthrough.length} moves
+            {demoCursor < walkthrough.length
+              ? ' · Next: ' + ({w:'↑',a:'←',s:'↓',d:'→'} as Record<string,string>)[walkthrough[demoCursor]]
+              : ' · Solved'}
+          </Text>
+          <TouchableOpacity accessibilityRole="button"
+            disabled={demoCursor >= walkthrough.length}
+            onPress={stepWalkthrough} style={styles.fileButton}>
+            <Text style={styles.actionText}>Advance one proven move</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       {play && (
         <View style={styles.results}>
           <Text style={play.completed ? styles.accepted : styles.help}>
