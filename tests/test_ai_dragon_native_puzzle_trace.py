@@ -110,3 +110,39 @@ def test_compiled_game_state_exactly_matches_original_grid_physics(
                 f"DRAGON_NATIVE_LIVE_HINT level={level} "
                 f"next={expected_next} solved={expected_solved} digest={current.digest}"
             )
+
+
+
+@pytest.mark.parametrize("events", [
+    "d","dd","swu","dssuur","aaaa", "rdd","sud",
+])
+def test_authoritative_bfs_solves_exact_mutated_game_states(events):
+    grid=transformed_level(0,1977,7)
+    played=simulate_grid(grid,events)
+    suffix,_=solve_grid(
+        grid,current_player=played.player,current_crates=played.crates,
+    )
+    replay=simulate_grid(grid,events+suffix)
+    assert replay.solved
+    assert 0<=len(suffix)<=400
+
+
+@pytest.mark.parametrize("hero,crates",[
+    (-1,(65,)),(120,(65,)),(0,(65,)),
+    (52,(52,)),(52,(0,)),(True,(65,)),(52,[65]),
+    (52,(65,65)),(52,()),
+])
+def test_mutated_state_hint_rejects_unbounded_untrusted_grid_states(hero,crates):
+    grid=transformed_level(0,17,4)
+    with pytest.raises(ValueError):
+        solve_grid(grid,current_player=hero,current_crates=crates)
+
+
+def test_native_hint_does_not_manufacture_a_move_after_real_original_win():
+    grid=transformed_level(0,1977,5)
+    solution,_=solve_grid(grid)
+    completed=simulate_grid(grid,solution)
+    assert completed.solved
+    path,count=solve_grid(grid,current_player=completed.player,
+                          current_crates=completed.crates)
+    assert path=="" and count==1
