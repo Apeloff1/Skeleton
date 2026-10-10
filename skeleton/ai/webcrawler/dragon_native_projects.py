@@ -564,9 +564,29 @@ def render_native_project(*,title:str,target_id:str,style:str,
         from .dragon_game_blueprints import GENRES, campaign_dict
         from .dragon_game_fitness import choose_campaign,selection_report
         from .dragon_native_arcade_runtime import render_sdl_campaign
-        if style not in GENRES and style not in ("rhythm_game","fixed_screen_puzzle"):
+        if style not in GENRES and style not in (
+                "rhythm_game","fixed_screen_puzzle","world_route_adventure"):
             raise ValueError("gameplay genre does not yet have an implemented native mode")
-        if style=="fixed_screen_puzzle":
+        if style=="world_route_adventure":
+            from .dragon_route_world_factory import make_frontier
+            from .dragon_route_native_game import emit_route_game
+            world,visitor=make_frontier(seed=seed,weather="clear",hour=8)
+            files=emit_route_game(world,visitor,authorized=True)
+            files["README.routes.md"]=(
+                "# Original World Routes — Native Adventure\n\n"
+                "This C99 world is a real playable routing game with clues, "
+                "public transport, maritime, flight, magic, space, cycles, "
+                "dead ends, weather, money and stamina. Its original "
+                "state transitions are source-emitted and locally testable. "
+                "Build with make, or CMake; run dragon_route_game interactively "
+                "or --selftest. 3D vehicles, genre-specific physics, "
+                "hardware execution and human enjoyment remain unverified.\n"
+            )
+            if design is not None:
+                from .dragon_game_design import design_manifest
+                files["dragon-game-design.json"]=json.dumps(
+                    design_manifest(design),sort_keys=True,indent=2)+"\n"
+        elif style=="fixed_screen_puzzle":
             from .dragon_native_puzzle import emit_native_puzzle
             files=emit_native_puzzle(
                 seed=seed,stages=design.stages if design is not None else 4,
@@ -740,6 +760,7 @@ def render_native_project(*,title:str,target_id:str,style:str,
               "runtime_gameplay_mode": (
                   ("native_dda_first_person" if style in ("first_person_shooter","immersive_sim")
                    else "native_turn_based_rpg" if style=="turn_based_rpg"
+                   else "native_original_world_routes" if style=="world_route_adventure"
                    else "native_original_sokoban" if style=="fixed_screen_puzzle"
                    else "native_timing_rhythm" if style=="rhythm_game"
                    else GENRES[style]) if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck")
