@@ -122,3 +122,55 @@ def test_independent_z80_core_exercises_actual_opcode_bus_callbacks(target):
     assert machine.vdp_read_status == 1
     assert machine.io_reads == 1
     assert cpu.pc >= 7
+
+
+
+@pytest.mark.parametrize("target", ("sega_master_system", "sega_game_gear"))
+def test_real_vdp_scanline_counter_drives_devkitsms_boot_without_fake_io(target):
+    """Real SDK startup waits for B0 then C8 on port 7E before touching CRAM.
+
+    The old constant-FF fake port made valid cartridges spin forever even
+    though native SDCC builds and 256-action C differential replays passed.
+    """
+    machine=Sega8Machine(bytes(32768),target=target)
+    assert machine.read_port(0x7E)==0
+    assert machine.vcounter_b0_seen is False
+    assert machine.vcounter_c8_seen is False
+    for scanline in range(1,263):
+        # Account for machine clock, not I/O reads; repeated IN must not
+        # artificially advance time or make impossible timings pass.
+        for _ in range(4):
+            machine.advance_tstates(57)
+        expected=scanline % 262
+        if expected >= 219:
+            expected=0xD5 + (expected-219)
+        assert machine.read_port(0x7E)==expected
+    assert machine.vcounter_b0_seen is True
+    assert machine.vcounter_c8_seen is True
+    assert machine.vcounter_reads==263
+    assert machine.z80_tstates==262*228
+    assert machine.vdp_writes==0 and machine.cram_writes==0
+    assert machine.psg_writes==0
+    for value in (0,-1,True,65,1000,3.1):
+        with pytest.raises(SDCCSegaBootError,match="cycle"):
+            machine.advance_tstates(value)
+    assert machine.read_port(0x7E)==0
+
+
+@pytest.mark.parametrize("target", ("sega_master_system", "sega_game_gear"))
+def test_real_z80_instruction_clock_advances_vcounter_without_polling(target):
+    z80_python=pytest.importorskip("z80_python")
+    program=bytes((0x00,0x00,0x00,0x00,0x76))
+    machine=Sega8Machine(program+bytes(32768-len(program)),target=target)
+    cpu=z80_python.Z80CPU(
+        machine.read,machine.write,
+        read_port=machine.read_port,write_port=machine.write_port,
+    )
+    cpu.pc=0
+    for _ in range(5):
+        machine.advance_tstates(cpu.step())
+    assert cpu.halted is True
+    assert machine.z80_tstates>=20
+    assert machine.vcounter_reads==0
+    assert machine.vcounter==0
+    assert machine.interrupts_issued==0
