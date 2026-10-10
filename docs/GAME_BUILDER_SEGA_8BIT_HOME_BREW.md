@@ -701,3 +701,55 @@ physical hardware pass, or distribution license is asserted.
 The same profile can target `sega_master_system` instead of Game Gear
 while retaining original world identity and adapting actual palette,
 viewport and sprite interfaces to the destination hardware.
+
+## One original project to two independent native Sega source ports
+
+To produce both *actual console-specific native source packages* from
+the same new original game, provide a bounded author-owned JSON game
+configuration and use the dedicated dual target exporter:
+
+```json
+{
+  "project_id": "my-original-ocean-quest",
+  "title": "My Original Ocean Quest",
+  "seed": 271828,
+  "theme": "ocean",
+  "levels": 4,
+  "width": 17,
+  "height": 15,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 4,
+  "starting_health": 4
+}
+```
+
+```bash
+python -m scripts.game_builder.sega8_dual_homebrew_cli \
+  --profile custom_original \
+  --original-config ./original-game.json \
+  --author-evidence ./authorship-evidence.txt \
+  --output ./my-original-native-ports
+```
+
+The fresh output directory contains a real native C/SDCC console
+project under `sega_master_system/`, a distinct native project under
+`sega_game_gear/`, a separate independently generated complete original
+safe replay for each, and `portability.json`. The receipt binds
+project identity, author-evidence fingerprint, original world digest,
+original solution hash and each generated package's exact byte digest.
+Each console's source records its *actual generation target* as its
+authoring platform, rather than inventing a historical WonderSwan, NES
+or other third-party port-of-origin story.
+
+Neither branch's commercial ROM, proprietary BIOS, outside game
+assets nor a simulated binary is included. A valid source export is
+not a successfully compiled cartridge or an emulator/hardware test;
+`actual_native_rom_built`, `full_hardware_emulator_verified`,
+`physical_hardware_verified`, `original_rights_independently_verified`
+and `release_approved` remain false. Supplying an authorship declaration
+does not independently establish legal title or publication rights.
+
+The exporter requires an unused output path, refuses symlinked or
+unbounded inputs, validates all original world constraints, and writes
+the final portability receipt only after both console projects are
+present and their independent source identities match.
