@@ -588,3 +588,13 @@ def test_route_evolver_carves_only_evidence_backed_new_corridor():
     with pytest.raises(PermissionError):
         carve_for_diversity(p, authorized=False)
 
+
+def test_level_dossier_separates_solvability_from_human_enjoyment():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    dossier = evaluate_level_challenge(p, portfolio_size=3)
+    assert dossier == evaluate_level_challenge(p, portfolio_size=3)
+    assert dossier["safe_solution_steps"] == 6
+    assert dossier["structural_multiple_paths_verified"]
+    assert not dossier["human_enjoyment_verified"]
+    assert not dossier["frustration_calibrated_with_players"]
+
