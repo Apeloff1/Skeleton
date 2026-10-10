@@ -95,3 +95,30 @@ def test_native_z80_emulator_fails_on_unsupported_io_and_invalid_bounds(tmp_path
     for count in (0, -1, MAX_INSTRUCTIONS + 1, True):
         with pytest.raises(SDCCSegaBootError, match="instruction limit"):
             boot_rom(bad, target="sega_master_system", max_instructions=count)
+
+
+
+@pytest.mark.parametrize("target", ("sega_master_system", "sega_game_gear"))
+def test_independent_z80_core_exercises_actual_opcode_bus_callbacks(target):
+    """Isolate a broken CPU/I/O adapter from a defective full cartridge boot.
+
+    The tiny instruction fixture is not real original-game proof; it merely
+    proves the independently sourced CPU is connected to the device callbacks.
+    """
+    z80_python = pytest.importorskip("z80_python")
+    rom = bytearray(32768)
+    # Real opcodes: LD A,9Fh; OUT (7Fh),A; IN A,(BFh); HALT.
+    rom[0:7] = bytes((0x3E, 0x9F, 0xD3, 0x7F, 0xDB, 0xBF, 0x76))
+    machine = Sega8Machine(bytes(rom), target=target)
+    cpu = z80_python.Z80CPU(
+        machine.read, machine.write,
+        read_port=machine.read_port, write_port=machine.write_port,
+    )
+    cpu.pc = 0
+    for _ in range(4):
+        cpu.step()
+    assert cpu.halted is True
+    assert machine.psg_writes == 1
+    assert machine.vdp_read_status == 1
+    assert machine.io_reads == 1
+    assert cpu.pc >= 7
