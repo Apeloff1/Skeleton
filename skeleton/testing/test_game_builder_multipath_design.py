@@ -484,3 +484,18 @@ def test_objective_progress_has_monotonic_collectible_unlocks():
     assert trace[-1] == (proof.steps, p.goal, 1)
     assert [state[2] for state in trace] == sorted(state[2] for state in trace)
 
+
+def test_authorized_map_edit_has_replayable_custody_and_atomic_failure():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    receipt = make_level_edit(p, {(2, 3): "."}, operation="open_passage", authorized=True)
+    assert receipt.after.digest != p.digest
+    assert receipt.before_digest == p.digest
+    assert receipt.after.tile((2, 3)) == "."
+    assert verify_route_proof(receipt.after, receipt.safe_proof)
+    assert p.tile((2, 3)) == "#"
+    assert receipt.digest == make_level_edit(
+        p, {(2, 3): "."}, operation="open_passage", authorized=True,
+    ).digest
+    with pytest.raises(PermissionError):
+        make_level_edit(p, {(2, 3): "."}, operation="open_passage", authorized=False)
+
