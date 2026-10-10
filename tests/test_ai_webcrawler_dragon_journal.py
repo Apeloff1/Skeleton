@@ -112,3 +112,37 @@ def test_verified_journal_paging_rejects_invalid_limits_and_cursors(kwargs):
     journal = DragonEventJournal(sqlite3.connect(":memory:"))
     with pytest.raises(ValueError, match="page parameters"):
         journal.verified_page("s", **kwargs)
+
+
+def test_verified_journal_page_catches_modified_payload_between_check_and_return():
+    from unittest.mock import patch
+    journal = DragonEventJournal(sqlite3.connect(":memory:"))
+    journal.append("s", "fetch_started", "https://example.org", at=1,
+                   payload={"content_sha256": "a" * 64})
+    original_page = journal.page
+
+    def corrupted_page(*args, **kwargs):
+        page = original_page(*args, **kwargs)
+        page["events"][0]["payload"] = {"content_sha256": "b" * 64}
+        return page
+
+    assert journal.verify("s")
+    with patch.object(journal, "page", side_effect=corrupted_page):
+        with pytest.raises(ValueError, match="evidence digest mismatch"):
+            journal.verified_page("s")
+
+
+def test_verified_journal_page_rejects_swapped_receipt_after_chain_verification():
+    from unittest.mock import patch
+    journal = DragonEventJournal(sqlite3.connect(":memory:"))
+    journal.append("s", "fetch_started", "https://example.org", at=1)
+    real = journal.page
+
+    def changed_identity(*args, **kwargs):
+        p = real(*args, **kwargs)
+        p["events"][0]["event_id"] = "f" * 64
+        return p
+
+    with patch.object(journal, "page", side_effect=changed_identity):
+        with pytest.raises(ValueError, match="evidence changed"):
+            journal.verified_page("s")
