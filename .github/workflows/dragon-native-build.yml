@@ -90,6 +90,7 @@ jobs:
             tests/test_ai_dragon_native_evolution.py \
             tests/test_ai_dragon_native_puzzle_hints.py \
             tests/test_ai_dragon_native_puzzle_trace.py \
+            tests/test_ai_dragon_native_puzzle_variants.py \
             tests/test_ai_webcrawler_dragon_native_projects.py \
             tests/test_ai_webcrawler_dragon_native_compile.py \
             tests/test_ai_webcrawler_dragon_native_cycles.py \
