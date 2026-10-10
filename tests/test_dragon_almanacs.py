@@ -245,6 +245,53 @@ def test_rehashed_weight_pack_cannot_change_rank_or_claim_authority(library, tam
         retrieve_weight_pack(forged, library, "owner", "jump", authorized=True)
 
 
+@pytest.mark.parametrize("change", ["omit", "duplicate", "reorder"])
+def test_rehashed_weight_pack_must_preserve_full_canonical_note_sequence(library, change):
+    library.import_document(document(), expected_parent_digest=None, authorized=True)
+    library.import_document(
+        document(source="two", url="https://example.com/two", stance="challenges"),
+        expected_parent_digest=None, authorized=True,
+    )
+    pack = build_weight_pack(library, "owner", authorized=True)
+    body = json.loads(zlib.decompress(pack.payload))
+    assert len(body["documents"]) == 2
+    if change == "omit":
+        body["documents"].pop()
+        body["postings"] = {
+            term: [pair for pair in entries if pair[0] < 1]
+            for term, entries in body["postings"].items()
+        }
+    elif change == "duplicate":
+        body["documents"].append(dict(body["documents"][0]))
+        for entries in body["postings"].values():
+            match = next((weight for number, weight in entries if number == 0), None)
+            if match is not None:
+                entries.append([2, match])
+    else:
+        body["documents"].reverse()
+        for entries in body["postings"].values():
+            entries[:] = sorted(([1-number, weight] for number, weight in entries))
+    raw = canonical_json(body).encode("utf-8")
+    payload = zlib.compress(raw)
+    forged = replace(
+        pack, payload=payload, raw_bytes=len(raw),
+        payload_digest=sha256(payload).hexdigest(),
+        documents=len(body["documents"]),
+    )
+    with pytest.raises(ValueError, match="document sequence differs"):
+        retrieve_weight_pack(forged, library, "owner", "jump", authorized=True)
+
+
+def test_corrupted_weight_pack_compression_is_a_safe_rejection(library):
+    library.import_document(document(), expected_parent_digest=None, authorized=True)
+    pack = build_weight_pack(library, "owner", authorized=True)
+    payload = b"not-a-zlib-stream"
+    forged = replace(pack, payload=payload,
+                     payload_digest=sha256(payload).hexdigest())
+    with pytest.raises(ValueError, match="compression stream invalid"):
+        retrieve_weight_pack(forged, library, "owner", "jump", authorized=True)
+
+
 def test_original_experiment_is_reproducible_and_holdout_disjoint():
     result = run_original_experiment(samples=40)
     assert result == run_original_experiment(samples=40)
