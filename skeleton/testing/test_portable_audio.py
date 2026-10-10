@@ -21,3 +21,11 @@ def test_gb_tone_decoder_rounds_and_refuses_reserved_bits():
     with pytest.raises(AudioKernelError):
         gameboy_pulse_frequency(2048)
 
+
+def test_nes_pulse_apu_timer_and_valid_frequency():
+    timer=nes_pulse_timer(440)
+    assert 0 <= timer <= 2047
+    assert abs(1789773/(16*(timer+1))-440)<2
+    with pytest.raises(AudioKernelError):
+        nes_pulse_timer(-1)
+
