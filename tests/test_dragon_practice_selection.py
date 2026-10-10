@@ -152,3 +152,46 @@ def test_game_comparison_reports_factual_delta_not_quality_judgment():
         compare_practice_challenges(a.game_id, a.game_id, authorized=True)
     with pytest.raises(PermissionError):
         compare_practice_challenges(a.game_id, b.game_id, authorized=1)
+
+
+def test_offline_cli_exposes_playable_catalog_progression_and_no_clobber_export():
+    from scripts.game_builder.practice_games_cli import main
+    out = io.StringIO()
+    with redirect_stdout(out):
+        assert main(["--catalog"]) == 0
+    catalog = json.loads(out.getvalue())
+    assert catalog["game_count"] == 100
+    assert catalog["release_authorized"] is False
+    out = io.StringIO()
+    with redirect_stdout(out):
+        assert main(["--progression", "3", "--theme", "forest"]) == 0
+    route = json.loads(out.getvalue())
+    assert len(route["games"]) == 3
+    assert route["training_authorized"] is False
+    assert all(item["theme"] == "forest" for item in route["games"])
+    out = io.StringIO()
+    with redirect_stdout(out):
+        assert main(["--verify"]) == 0
+    assert "verified 100 original games" in out.getvalue()
+    with TemporaryDirectory() as temp:
+        with redirect_stdout(io.StringIO()):
+            assert main([
+                "--game", "dragon-practice-001", "--output", temp,
+            ]) == 0
+        target = Path(temp) / "dragon-practice-001.html"
+        original = target.read_bytes()
+        assert original.startswith(b"<!doctype html>")
+        with pytest.raises(SystemExit):
+            main(["--game", "dragon-practice-001", "--output", temp])
+        assert target.read_bytes() == original
+    with pytest.raises(SystemExit):
+        main(["--catalog", "--all", "--output", "/tmp"])
+
+
+def test_cli_rejects_unbounded_progression_without_writing_files():
+    from scripts.game_builder.practice_games_cli import main
+    for args in (["--progression", "0"], ["--progression", "21"],
+                 ["--verify", "--game", "dragon-practice-001"],
+                 ["--list", "--all"]):
+        with pytest.raises((SystemExit, PracticeSelectionError)):
+            main(args)
