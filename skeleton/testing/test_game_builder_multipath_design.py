@@ -222,3 +222,15 @@ def test_branch_histogram_accounts_for_each_safe_tile():
     assert sum(h.values()) == len(walkable_cells(p))
     assert h[4] > 0
 
+
+def test_dead_end_report_distinguishes_objective_endpoints():
+    rows = (
+        "#########", "#S.C...G#", "#########",
+        "#########", "#########", "#########",
+        "#########", "#########", "#########",
+    )
+    p = RouteProblem.from_rows(rows)
+    assert dead_end_cells(p) == ()
+    assert dead_end_cells(p, include_objectives=True) == ((1, 1), (7, 1))
+    assert degree_histogram(p)[1] == 2
+
