@@ -317,3 +317,11 @@ def test_navigation_friction_changes_with_extra_turns_and_revisits():
     with pytest.raises(MultipathError):
         route_friction_ppm(p, clean, turn_weight=-1)
 
+
+def test_route_coverage_is_fraction_of_safe_map_not_elapsed_steps():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    proof = solve_route(p)
+    expected = len(set(proof.positions)) * 1_000_000 // len(walkable_cells(p))
+    assert route_coverage_ppm(p, proof) == expected
+    assert 0 < expected < 1_000_000
+
