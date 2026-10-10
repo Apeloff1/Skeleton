@@ -44,6 +44,10 @@ _ORIGINAL_PROFILES = {
         collectibles_per_level=6, hazards_per_level=4,
         starting_health=4, theme="arcade",
     ),
+    # No prepackaged world data: user-authored game identity and world
+    # parameters are mandatory for this route, and new content is generated
+    # algorithmically from the supplied original seed.
+    "custom_original": None,
 }
 _SHA = re.compile(r"^[0-9a-f]{64}$")
 _GIT_REVISION = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
@@ -52,17 +56,48 @@ _GIT_REVISION = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 def emit(
     target: str, output: Path, authorship_file: Path, *,
     reference_out: Path | None = None, profile: str = "standard",
+    original_config: dict[str, object] | None = None,
 ) -> dict[str, object]:
     if target not in _TARGETS:
         raise ValueError("unsupported real Z80 console target")
     if not isinstance(profile, str) or profile not in _ORIGINAL_PROFILES:
         raise ValueError("unrecognized independently authored native campaign profile")
+    if profile == "custom_original":
+        required = frozenset((
+            "project_id", "title", "seed", "theme", "levels",
+        ))
+        allowed = required | frozenset((
+            "subtitle", "width", "height",
+            "collectibles_per_level", "hazards_per_level", "starting_health",
+        ))
+        if (not isinstance(original_config, dict)
+                or not required.issubset(original_config)
+                or frozenset(original_config) - allowed):
+            raise ValueError("custom original game requires bounded project, title, seed, theme and stages")
+        # Explicit console defaults are smaller than the shared generic
+        # world engine's 41x41 grid to fit physical SMS/GG video memory.
+        custom = dict(
+            subtitle="Independent original homebrew game",
+            width=17, height=15, collectibles_per_level=3,
+            hazards_per_level=4, starting_health=4,
+        )
+        custom.update(original_config)
+        intent = GameBuildIntent(**custom)
+        if (
+            intent.width > 19 or intent.height > 15
+            or intent.levels > 8
+            or intent.levels * intent.collectibles_per_level > 48
+        ):
+            raise ValueError("original game exceeds Sega native screen or campaign capacity")
+    elif original_config is not None:
+        raise ValueError("fixed native profiles cannot silently accept custom game overrides")
     try:
         declared_author_bytes = _read_bounded(Path(authorship_file), max_bytes=8*1024*1024)
     except (ValueError, OSError) as exc:
         raise ValueError("original author evidence must be an ordinary, private, bounded local file") from exc
     author_reference = sha256(declared_author_bytes).hexdigest()
-    intent = GameBuildIntent(**_ORIGINAL_PROFILES[profile])
+    if profile != "custom_original":
+        intent = GameBuildIntent(**_ORIGINAL_PROFILES[profile])
     world = generate_playable_world(intent, authorized=True)
     rights = HomebrewSource(
         project_id=intent.project_id,
@@ -215,6 +250,17 @@ def main() -> None:
     mode.add_argument("--verify-rom", type=Path)
     ap.add_argument("--target", choices=sorted(_TARGETS), required=True)
     ap.add_argument("--profile", choices=sorted(_ORIGINAL_PROFILES), default="standard")
+    ap.add_argument("--original-project-id")
+    ap.add_argument("--original-title")
+    ap.add_argument("--original-subtitle")
+    ap.add_argument("--original-seed", type=int)
+    ap.add_argument("--original-theme", choices=("forest", "space", "desert", "ocean", "arcade"))
+    ap.add_argument("--original-levels", type=int)
+    ap.add_argument("--original-width", type=int)
+    ap.add_argument("--original-height", type=int)
+    ap.add_argument("--original-collectibles", type=int)
+    ap.add_argument("--original-hazards", type=int)
+    ap.add_argument("--original-health", type=int)
     ap.add_argument("--author-evidence", type=Path)
     ap.add_argument("--source-dir", type=Path)
     ap.add_argument("--toolchain-revision")
@@ -226,9 +272,28 @@ def main() -> None:
     if args.emit is not None:
         if args.author_evidence is None:
             ap.error("--author-evidence required with --emit")
-        receipt = emit(args.target, args.emit, args.author_evidence,
-                       reference_out=args.host_reference_out,
-                       profile=args.profile)
+        overrides = {
+            key: getattr(args, field)
+            for key, field in (
+                ("project_id", "original_project_id"),
+                ("title", "original_title"),
+                ("subtitle", "original_subtitle"),
+                ("seed", "original_seed"),
+                ("theme", "original_theme"),
+                ("levels", "original_levels"),
+                ("width", "original_width"),
+                ("height", "original_height"),
+                ("collectibles_per_level", "original_collectibles"),
+                ("hazards_per_level", "original_hazards"),
+                ("starting_health", "original_health"),
+            )
+            if getattr(args, field) is not None
+        }
+        receipt = emit(
+            args.target, args.emit, args.author_evidence,
+            reference_out=args.host_reference_out,
+            profile=args.profile, original_config=overrides or None,
+        )
     else:
         if args.source_dir is None or args.toolchain_revision is None:
             ap.error("--source-dir and --toolchain-revision required with --verify-rom")
