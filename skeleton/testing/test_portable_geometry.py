@@ -21,3 +21,10 @@ def test_bresenham_line_exact_integer_pixel_coverage():
     assert bresenham_line((3,0),(0,0))==tuple(reversed(bresenham_line((0,0),(3,0))))
     with pytest.raises(GeometryError):
         bresenham_line((-1,0),(0,0))
+
+def test_line_of_sight_blocks_wall_and_bounds_endpoints():
+    grid=("S..G",".##.","....")
+    assert line_of_sight(grid,(0,0),(3,0))
+    assert not line_of_sight(grid,(0,2),(3,0))
+    with pytest.raises(GeometryError):
+        line_of_sight(grid,(0,0),(10,10))
