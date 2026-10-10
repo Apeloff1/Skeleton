@@ -540,4 +540,14 @@ def tile_distances(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances"]
+def route_branch_choices(problem: RouteProblem, proof: RouteProof) -> tuple[int, ...]:
+    """Return action choices at each visited route cell, excluding terminal."""
+    if not isinstance(proof, RouteProof) or proof.problem_digest != problem.digest:
+        raise MultipathError("route choice analysis needs current world proof")
+    evaluate_route(problem, proof.actions, allow_hazards=proof.hazard_visits > 0)
+    return tuple(len(problem.neighbors(pos, allow_hazards=False))
+                 for pos in proof.positions[:-1])
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices"]
