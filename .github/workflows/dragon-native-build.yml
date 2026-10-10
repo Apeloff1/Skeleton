@@ -485,12 +485,13 @@ jobs:
         run: |
           set -euo pipefail
           cd frontend
-          node --test scripts/test-dragon-native-puzzle-preview.mjs
+          npm run test:dragon-native-editor
       - name: Verify original puzzle editor route and API implementation
         run: |
           set -euo pipefail
           test -s frontend/src/components/DragonOriginalPuzzleEditor.tsx
           test -s frontend/src/product/dragonPuzzlePreview.ts
+          test -s frontend/src/product/dragonPuzzleHistory.ts
           test -s frontend/app/dragon-native-production.tsx
           test -s backend/routes/dragon_academy.py
 
