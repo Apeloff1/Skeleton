@@ -65,6 +65,8 @@ class PuzzleBuildEvidence:
     replay_transcripts_sha256: str
     native_challenge_selftest: str
     challenge_output_sha256: str
+    native_save_resume_selftest: str
+    save_output_sha256: str
     runtime_output_sha256: str
     runtime_stages_verified: int
     abstract_levels_verified: int
@@ -337,6 +339,10 @@ def build_native_puzzle_executable(
                     challenge_lines[index-1],
                 ) for index in range(1,proof["stages"]+1))):
             raise ValueError("native optimal-path challenge score selftest failed")
+        save=_invoke([str(executable),"--save-selftest"],root=root,
+                     timeout=timeout_seconds)
+        if save.stdout.strip()!="DRAGON_NATIVE_SAVE_SELFTEST PASS":
+            raise ValueError("native save/resume mutation validation failed")
         # Exercise a separate real executable route beyond the selftest.
         listing = _invoke([str(executable), "--list"], root=root,
                           timeout=timeout_seconds)
@@ -360,6 +366,8 @@ def build_native_puzzle_executable(
         replay_transcripts_sha256=_hash(_canonical(transcripts)),
         native_challenge_selftest="optimal_route_three_stars_all_stages",
         challenge_output_sha256=_hash(challenge.stdout.encode("utf-8")),
+        native_save_resume_selftest="original_level_bound_save_reload_and_corruption_denial",
+        save_output_sha256=_hash(save.stdout.encode("utf-8")),
         runtime_output_sha256=_hash(passed.stdout.encode("utf-8")),
         runtime_stages_verified=proof["stages"],
         abstract_levels_verified=proof["stages"],
@@ -431,6 +439,10 @@ def verify_native_puzzle_executable(package: bytes) -> dict:
             evidence.get("runtime_selftest") != "native_executable_all_stages_passed" or
             evidence.get("native_hint_selftest") != "current_position_bfs_all_stages_passed" or
             evidence.get("native_challenge_selftest") != "optimal_route_three_stars_all_stages" or
+            evidence.get("native_save_resume_selftest") !=
+                "original_level_bound_save_reload_and_corruption_denial" or
+            not re.fullmatch(r"[a-f0-9]{64}",
+                             str(evidence.get("save_output_sha256", ""))) or
             not re.fullmatch(r"[a-f0-9]{64}",str(evidence.get("challenge_output_sha256", ""))) or
             not re.fullmatch(r"[a-f0-9]{64}", str(evidence.get("hint_output_sha256", ""))) or
             not re.fullmatch(r"[a-f0-9]{64}", str(evidence.get("runtime_output_sha256", ""))) or
