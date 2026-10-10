@@ -9,8 +9,6 @@ never creates signing keys, grants publishing rights or uploads game content.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
-from enum import Enum
 from hashlib import sha256
 import json
 import re
@@ -19,7 +17,7 @@ from .legal_paths import HomebrewLegalAssessment
 from .plagiarism_guard import OriginalityReport
 from .release_assurance import (
     ReleaseCandidate, ReleaseChannel, ReleaseReviewError, ReleaseReviewReceipt,
-    ReviewAttestation, TrustedReviewer, _utc, evaluate_independent_review,
+    ReviewAttestation, TrustedReviewer, _is_ident, _utc, evaluate_independent_review,
 )
 
 
@@ -69,11 +67,8 @@ class SignedReviewerRegistry:
     root_signature_hex: str
 
     def __post_init__(self) -> None:
-        if (not isinstance(self.project_id, str) or
-            not isinstance(self.target_platform_id, str) or
-            not 1 <= len(self.project_id) <= 128 or
-            not 1 <= len(self.target_platform_id) <= 128):
-            raise ReleaseReviewError("missing trust-policy project and target scope")
+        if not _is_ident(self.project_id) or not _is_ident(self.target_platform_id):
+            raise ReleaseReviewError("missing or unsafe trust-policy project and target scope")
         if not isinstance(self.channel, ReleaseChannel):
             raise ReleaseReviewError("trust-policy channel invalid")
         if (not isinstance(self.jurisdictions, tuple) or not self.jurisdictions
@@ -81,7 +76,7 @@ class SignedReviewerRegistry:
             or any(not isinstance(x, str) or not x for x in self.jurisdictions)
             or len({x.casefold() for x in self.jurisdictions}) != len(self.jurisdictions)):
             raise ReleaseReviewError("trust policy needs exact unambiguous legal territories")
-        if type(self.policy_epoch) is not int or self.policy_epoch < 1:
+        if type(self.policy_epoch) is not int or not 1 <= self.policy_epoch <= 2**63 - 1:
             raise ReleaseReviewError("signed reviewer policy epoch must be positive")
         if not isinstance(self.root_public_key_hex, str) or not _HEX32.fullmatch(self.root_public_key_hex):
             raise ReleaseReviewError("trust root requires an Ed25519 32-byte public key")
@@ -93,6 +88,8 @@ class SignedReviewerRegistry:
             or len(self.reviewers) > 128
             or any(not isinstance(r, TrustedReviewer) for r in self.reviewers)):
             raise ReleaseReviewError("nonempty typed reviewer trust registry required")
+        if any(r.public_key_hex == self.root_public_key_hex for r in self.reviewers):
+            raise ReleaseReviewError("reviewer signing key cannot equal administrative policy root")
         if (
             len({r.key_id.casefold() for r in self.reviewers}) != len(self.reviewers)
             or len({r.reviewer_id.casefold() for r in self.reviewers}) != len(self.reviewers)
@@ -193,6 +190,12 @@ def evaluate_pinned_independent_review(
     now = _utc(evaluation_utc)
     if not (_utc(registry.issued_utc) <= now <= _utc(registry.expires_utc)):
         raise ReleaseReviewError("signed reviewer registry has not started or has expired")
+    if not isinstance(attestations, tuple) or any(
+        not isinstance(a, ReviewAttestation) for a in attestations
+    ):
+        raise ReleaseReviewError("typed reviewer evidence required")
+    if any(_utc(a.issued_utc) < _utc(registry.issued_utc) for a in attestations):
+        raise ReleaseReviewError("review signature predates its independently authorized trust policy")
     try:
         from cryptography.exceptions import InvalidSignature
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
