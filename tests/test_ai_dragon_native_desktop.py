@@ -197,3 +197,28 @@ def test_solver_proven_generated_new_levels_compile_and_replay_real_C99_game():
         proof=json.loads(original.read("source/dragon-puzzle-proof.json"))
         assert proof["procedural"] is True
         assert proof["authoring_mode"]=="generated"
+
+
+
+@pytest.mark.skipif(sys.platform != "linux" or not shutil.which("cc"),
+                    reason="requires local Linux C99 compiler")
+def test_original_steam_deck_target_produces_an_executed_linux_game_not_fake_rom():
+    specification=spec(targets=("steam_deck",),
+                       portable_design=PortableGameDesign(stages=2,difficulty=7))
+    package,receipt=build_native_puzzle_executable(specification,authorized=True)
+    assert receipt["native_target"]=="steam_deck"
+    assert receipt["runtime_stages_verified"]==2
+    assert receipt["independent_replays_verified"]==8
+    report=verify_native_puzzle_executable(package)
+    assert report["source_level_proofs"]==2
+    assert report["scope"].startswith("source and ELF")
+    with ZipFile(BytesIO(package)) as archive:
+        executable=archive.read("binary/dragon_game")
+        assert executable.startswith(b"\x7fELF")
+        assert "verified" in report["status"]
+
+
+def test_original_linux_and_deck_targets_are_not_falsely_the_same_release_identity():
+    linux=spec(targets=("pc_linux",))
+    deck=spec(targets=("steam_deck",))
+    assert linux.request_id!=deck.request_id
