@@ -173,6 +173,10 @@ def verify_ports(root: Path) -> dict[str, object]:
             or native_route.get("native_pause_blocks_gameplay_and_mutes_psg_verified") is not True
             or native_route.get("native_restart_restores_original_theme_verified") is not True
             or native_route.get("actual_victory_palette_verified") is not True
+            or native_route.get("original_hardware_stage_color_accents_verified") is not True
+            or type(native_route.get("original_hardware_stage_accents_verified_per_move")) is not int
+            or native_route.get("original_hardware_stage_accents_verified_per_move")
+               != native_route.get("hardware_screen_states_verified")
             or native_route.get("native_attract_demo_chord_started_from_victory") is not True
             or native_route.get("native_attract_demo_full_solution_verified_on_guest_z80") is not True
             or type(native_route.get("native_attract_demo_controller_free_actions_verified")) is not int
@@ -266,6 +270,24 @@ def verify_ports(root: Path) -> dict[str, object]:
         ):
             raise Sega8PortParityError("native Z80 replay not bound to every expected game action")
         _sha(native_route.get("semantic_controller_screen_trace_sha256"), "actual Z80 semantic trace")
+        stage_colors = (
+            ("game_gear_original_stage_rgb444_accents", 4095),
+            ("master_system_original_stage_rgb222_accents", 63),
+        )
+        if (meta.get("native_per_stage_hardware_bg_palette_accents") is not True
+                or meta.get("native_stage_palettes_change_core_gameplay") is not False):
+            raise Sega8PortParityError("stage color adaptation may not change original gameplay")
+        for palette_key, channel_limit in stage_colors:
+            accents = meta.get(palette_key)
+            if (not isinstance(accents, list)
+                    or len(accents) != meta.get("levels")
+                    or any(
+                        not isinstance(pair, list) or len(pair) != 2
+                        or any(type(c) is not int or not 0 <= c <= channel_limit
+                               for c in pair)
+                        for pair in accents
+                    )):
+                raise Sega8PortParityError("invalid original hardware stage color identity")
         if (
             meta.get("original_native_solution_attract_mode") is not True
             or meta.get("original_demo_uses_identical_game_rules") is not True
@@ -299,6 +321,8 @@ def verify_ports(root: Path) -> dict[str, object]:
     identity = ("project_id", "world_digest", "reference_safe_replay_digest",
                 "source_rights_evidence_sha256", "original_color_theme",
                 "original_demo_solution_sha256",
+                "game_gear_original_stage_rgb444_accents",
+                "master_system_original_stage_rgb222_accents",
                 "levels", "width", "height", "title")
     for key in identity:
         if sms["manifest"].get(key) != gg["manifest"].get(key):
@@ -345,6 +369,9 @@ def verify_ports(root: Path) -> dict[str, object]:
         "independent_native_rom_formats_verified": True,
         "real_z80_startup_checked_per_platform": True,
         "original_on_cartridge_demo_equivalent_across_platforms": True,
+        "original_stage_hardware_color_parity_verified": True,
+        "original_stage_color_accents_verified_per_console":
+            sms["native_route"]["original_hardware_stage_accents_verified_per_move"],
         "native_attract_demo_entry_and_cancel_verified_on_both_platforms": True,
         "native_autonomous_full_game_replayed_on_both_platforms": True,
         "native_autonomous_guest_semantic_trace_sha256":
