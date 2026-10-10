@@ -228,7 +228,7 @@ class Sega8BitSourceProject:
                 or self.physical_hardware_verified is not False):
             raise Sega8BitNativeError("native source cannot self-certify real machine execution")
         digest = sha256((
-            self.game_c + "\\0" + self.makefile + "\\0" + self.manifest_json
+            self.game_c + "\0" + self.makefile + "\0" + self.manifest_json
         ).encode("utf-8")).hexdigest()
         if digest != self.content_digest:
             raise Sega8BitNativeError("native source bytes changed after generation")
