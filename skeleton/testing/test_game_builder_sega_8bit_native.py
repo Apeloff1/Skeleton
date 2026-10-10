@@ -151,3 +151,65 @@ def test_native_cli_and_portfolio_registration_export_real_target(target,tmp_pat
     assert report["emulator_verified"] is False
     assert report["distribution_licensed"] is False
     assert (tmp_path/target/"game.c").is_file()
+
+
+
+def test_game_evolution_stages_emit_real_sms_and_gear_native_source(tmp_path):
+    from skeleton.ai.game_builder.evolution_practice import (
+        EvolutionPractice, EvolutionPracticePack,
+    )
+    from skeleton.ai.game_builder.evolution_native_sources import (
+        compile_evolution_native_sources, export_evolution_native_sources,
+    )
+    from skeleton.ai.game_builder.playable_simulation import demonstrate_solvable
+
+    root = _world(seed=44)
+    destinations = ("sega_master_system", "sega_game_gear")
+    demos = []
+    for index, target in enumerate(destinations,1):
+        world = _world(seed=44+index)
+        demos.append(EvolutionPractice(
+            stage_number=index, intended_platform_id=target,
+            original_world_id=root.digest, game_world=world,
+            winning_replay=demonstrate_solvable(world,authorized=True),
+            design_signal_goals=("more_color",),
+            hardware_profile="historical_reference",
+        ))
+    practice = EvolutionPracticePack(root.intent.project_id,root.digest,tuple(demos))
+    pack = compile_evolution_native_sources(practice,_rights(root),authorized=True)
+    assert pack.summary()["native_source_stages"] == 2
+    assert pack.summary()["compiled_binaries"] == 0
+    assert [s.status for s in pack.stages] == ["native_source_ready","native_source_ready"]
+    output = export_evolution_native_sources(pack,tmp_path/"authored-evolution",authorized=True)
+    for i,target in enumerate(destinations,1):
+        folder = output/f"stage-{i:02d}-{target}"
+        assert (folder/"game.c").is_file()
+        assert (folder/"manifest.json").is_file()
+        assert json.loads((folder/"manifest.json").read_text())["platform"] == target
+
+
+def test_historical_gear_port_fails_closed_when_screen_too_small():
+    from skeleton.ai.game_builder.evolution_practice import (
+        EvolutionPractice, EvolutionPracticePack,
+    )
+    from skeleton.ai.game_builder.evolution_native_sources import compile_evolution_native_sources
+    from skeleton.ai.game_builder.playable_simulation import demonstrate_solvable
+
+    root = _world(seed=66,width=21,height=17)
+    demos=[]
+    for index,target in enumerate(("sega_game_gear","sega_master_system"),1):
+        world=_world(seed=66+index,width=21,height=17)
+        demos.append(EvolutionPractice(
+            stage_number=index,intended_platform_id=target,
+            original_world_id=root.digest,game_world=world,
+            winning_replay=demonstrate_solvable(world,authorized=True),
+            design_signal_goals=("preserve_originality",),hardware_profile="historical_reference",
+        ))
+    pack=compile_evolution_native_sources(
+        EvolutionPracticePack(root.intent.project_id,root.digest,tuple(demos)),
+        _rights(root),authorized=True,
+    )
+    assert [stage.status for stage in pack.stages] == [
+        "budget_incompatible","native_source_ready",
+    ]
+    assert pack.stages[0].project is None
