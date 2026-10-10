@@ -269,6 +269,7 @@ class NativeLLMRuntime:
             raise RuntimeContractError("mutated model context below runtime limit")
         if self.estimate_kv_bytes(self.limits.max_context) > self.limits.max_kv_bytes:
             raise RuntimeContractError("mutated model exceeds KV memory budget")
+        digest = snapshot_digest(snapshot)
         self._model_snapshot = snapshot
         self._model_digest = digest
         self._model_bytes = size
@@ -459,6 +460,8 @@ class NativeLLMRuntime:
             raise RuntimeContractError("GenerationConfig required")
         try:
             sequence = self.encode(prompt)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("prompt tokenization failed admission") from exc
         except RuntimeContractError as exc:
             if isinstance(exc.__cause__, TokenizerContractError):
                 raise RuntimeContractError("prompt tokenization failed admission") from exc.__cause__
