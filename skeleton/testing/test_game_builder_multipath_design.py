@@ -380,3 +380,14 @@ def test_route_exclusive_edges_identify_actual_alternative_geometry():
     assert all(edge not in route_exclusive_edges(second, (first,))
                for edge in exclusive)
 
+
+def test_portfolio_profile_is_evidence_only_and_deterministic():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    routes = route_portfolio(p, max_routes=3)
+    profile = portfolio_profile(p, routes)
+    assert profile == portfolio_profile(p, routes)
+    assert profile["route_count"] == len(routes)
+    assert profile["distinct_action_sequences"] == len(routes)
+    assert profile["human_playtest_verified"] is False
+    assert profile["has_structural_loops"] is True
+
