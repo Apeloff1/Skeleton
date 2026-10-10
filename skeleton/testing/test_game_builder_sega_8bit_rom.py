@@ -76,7 +76,7 @@ def test_invalid_digest_symlink_and_blank_cartridge_rejected(tmp_path):
     path.write_bytes(binary)
     link=tmp_path/"link.sms"
     link.symlink_to(path)
-    with pytest.raises(Sega8BitROMError,match="ordinary"):
+    with pytest.raises(Sega8BitROMError,match="unlinked|regular"):
         validate_rom_file(link,"sega_master_system")
     blank=bytearray(32768)
     blank[0x7ff0:0x7ff8]=b"TMR SEGA"
@@ -95,7 +95,7 @@ def test_source_rom_ancestor_symlink_refused_not_just_final_filename(tmp_path,ta
     rom.write_bytes(binary)
     redirect=tmp_path/"unreviewed-link"
     redirect.symlink_to(real_dir,target_is_directory=True)
-    with pytest.raises(Sega8BitROMError,match="ordinary"):
+    with pytest.raises(Sega8BitROMError,match="unlinked|regular"):
         validate_rom_file(
             redirect/"game.sms",target,
             expected_sha256=sha256(binary).hexdigest(),
@@ -109,7 +109,7 @@ def test_source_rom_hardlinked_inodes_are_refused(tmp_path,target):
     original.write_bytes(source)
     linked=tmp_path/"another"
     os.link(original,linked)
-    with pytest.raises(Sega8BitROMError,match="ordinary"):
+    with pytest.raises(Sega8BitROMError,match="unlinked|regular"):
         validate_rom_file(linked,target,expected_sha256=sha256(source).hexdigest())
 
 
@@ -118,7 +118,7 @@ def test_source_rom_rejects_sparse_over_budget_without_allocating_the_file(tmp_p
     oversized=tmp_path/"too-big.sms"
     with oversized.open("wb") as stream:
         stream.truncate(16 * 1024 * 1024)
-    with pytest.raises(Sega8BitROMError,match="ordinary"):
+    with pytest.raises(Sega8BitROMError,match="unlinked|regular"):
         validate_rom_file(oversized,target)
 
 
@@ -127,5 +127,5 @@ def test_source_rom_fifo_is_rejected_without_hanging(tmp_path):
         pytest.skip("POSIX FIFO required")
     pipe=tmp_path/"fake-cartridge"
     os.mkfifo(pipe)
-    with pytest.raises(Sega8BitROMError,match="ordinary"):
+    with pytest.raises(Sega8BitROMError,match="unlinked|regular"):
         validate_rom_file(pipe,"sega_master_system")
