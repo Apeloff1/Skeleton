@@ -240,14 +240,14 @@ def build_native_puzzle_executable(
     if type(timeout_seconds) is not int or not 5 <= timeout_seconds <= 120:
         raise ValueError("invalid bounded native build timeout")
     request.validate()
-    if (request.targets != ("pc_linux",) or
+    if (request.targets not in (("pc_linux",), ("steam_deck",)) or
             request.style != "fixed_screen_puzzle" or
             request.compile_roms or request.require_compiled):
         raise ValueError("Linux native puzzle source request required; ROM options forbidden")
     compiler = shutil.which("cc")
     if compiler is None:
         raise EnvironmentError("native Linux C compiler cc is not installed")
-    project = _render(request, "pc_linux")
+    project = _render(request, request.targets[0])
     source, _ = make_source_release(project, request)
     original_receipt, source_inventory = _puzzle_proof(source)
     proof = json.loads(source_inventory["dragon-puzzle-proof.json"])
@@ -325,7 +325,7 @@ def build_native_puzzle_executable(
         schema=SCHEMA,
         source_sha256=_hash(source),
         source_fingerprint=original_receipt["source_fingerprint"],
-        native_target="pc_linux", gameplay_mode="native_original_sokoban",
+        native_target=request.targets[0], gameplay_mode="native_original_sokoban",
         executable_sha256=_hash(binary), executable_bytes=len(binary),
         executable_format=binary_format,
         compiler_executable="cc",
@@ -390,7 +390,8 @@ def verify_native_puzzle_executable(package: bytes) -> dict:
     receipt, source_inventory = _puzzle_proof(source)
     proof = json.loads(source_inventory["dragon-puzzle-proof.json"])
     if (evidence.get("schema") != SCHEMA or
-            evidence.get("native_target") != "pc_linux" or
+            evidence.get("native_target") not in ("pc_linux","steam_deck") or
+            evidence.get("native_target") != receipt["target"] or
             evidence.get("gameplay_mode") != "native_original_sokoban" or
             evidence.get("source_sha256") != _hash(source) or
             evidence.get("source_fingerprint") != receipt["source_fingerprint"] or
@@ -462,6 +463,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="operation", required=True)
     build = sub.add_parser("build", help="Compile and exercise the real native C game")
     build.add_argument("--title", default="Original Dragon Puzzle")
+    build.add_argument("--target", choices=("pc_linux","steam_deck"), default="pc_linux")
     build.add_argument("--seed", type=int, default=1)
     build.add_argument("--difficulty", type=int, default=4)
     build.add_argument("--stages", type=int, default=None)
@@ -493,7 +495,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         request = ProductionRequest(
             title=args.title, style="fixed_screen_puzzle",
-            targets=("pc_linux",), seed=args.seed,
+            targets=(args.target,), seed=args.seed,
             original_work_attested=args.attest_original_rights,
             portable_design=design,
             authored_puzzles=custom.rows if custom is not None else None,
