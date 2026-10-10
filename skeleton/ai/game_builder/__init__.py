@@ -411,6 +411,7 @@ _KNOWLEDGE_EXPORTS = {
     "editor_platform_options": ".editor_platforms",
     "editor_portability_context": ".editor_platforms",
     "editor_platform_form": ".editor_platforms",
+    "editor_progressive_route_preview": ".editor_platforms",
     "PlatformProfile": ".platform_registry",
     "PlatformRegistry": ".platform_registry",
     "PlatformRegistryError": ".platform_registry",
