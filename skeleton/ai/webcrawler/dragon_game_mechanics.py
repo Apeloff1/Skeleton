@@ -242,9 +242,14 @@ class GameMechanicsMemory:
         sessions = []
         total_bytes = 0
         for session_id, label, duration, raw in rows:
-            if (not isinstance(raw, str)
-                    or len(raw.encode("utf-8")) > MAX_STORED_SESSION_BYTES):
+            if not isinstance(raw, str):
                 raise ValueError("stored game observations exceed byte budget")
+            encoded_bytes = len(raw.encode("utf-8"))
+            if encoded_bytes > MAX_STORED_SESSION_BYTES:
+                raise ValueError("stored game observations exceed byte budget")
+            total_bytes += encoded_bytes
+            if total_bytes > MAX_HISTORY_BYTES:
+                raise ValueError("game observation history memory budget exceeded")
             try:
                 recorded = json.loads(raw)
             except (TypeError, ValueError, RecursionError) as exc:
