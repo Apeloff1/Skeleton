@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 import json
+import math
 import os
 from pathlib import Path
 import stat
@@ -194,9 +195,15 @@ def _json(data: bytes, label: str) -> dict[str, object]:
     def reject_constant(value: str) -> None:
         raise NativeIntakeError("non-finite number " + value + " in " + label)
 
+    def finite_float(value: str) -> float:
+        parsed = float(value)
+        if not math.isfinite(parsed):
+            raise NativeIntakeError("overflowed JSON number in " + label)
+        return parsed
+
     try:
         obj = json.loads(data.decode("utf-8"), object_pairs_hook=pairs_no_dupes,
-                         parse_constant=reject_constant)
+                         parse_constant=reject_constant, parse_float=finite_float)
     except (UnicodeError, ValueError) as exc:
         raise NativeIntakeError("invalid " + label + " JSON") from exc
     if not isinstance(obj, dict):
