@@ -566,3 +566,65 @@ def test_original_creator_procedural_option_rejects_coerced_input(bad):
     from pydantic import ValidationError
     with pytest.raises(ValidationError):
         route.NativeProductionDesignBody(**bad)
+
+
+
+def test_original_game_board_editor_validates_user_drawn_source_before_compilation():
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    from skeleton.ai.webcrawler.dragon_native_puzzle_authoring import validate_authored_levels
+    boards=[list(BASE_LEVELS[0]),list(BASE_LEVELS[2])]
+    payload=route.NativePuzzleGridValidationRequest(levels=boards)
+    result=route.native_production_validate_puzzle(payload,owner=identity())
+    assert result["ok"] and result["total_stages"]==2
+    assert len(result["digest"])==64
+    assert all(row["shortest_moves"]>0 for row in result["stages"])
+    assert result["digest"]==validate_authored_levels(
+        tuple(tuple(x) for x in boards)).digest
+
+
+def test_starter_level_api_produces_real_solvable_non_duplicate_boards():
+    from skeleton.ai.webcrawler.dragon_native_puzzle_authoring import parse_authored_document
+    response=route.native_production_puzzle_starter(stages=6,owner=identity())
+    assert response["ok"]
+    original={k:v for k,v in response.items() if k!="ok"}
+    parsed=parse_authored_document(original)
+    assert len(parsed.levels)==6
+    assert len(set(row.layout_sha256 for row in parsed.levels))==6
+
+
+def test_user_authored_source_export_uses_exact_requested_original_grid():
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    from skeleton.ai.webcrawler.dragon_native_production import verify_source_bundle
+    from zipfile import ZipFile
+    from io import BytesIO
+    import json
+    body=route.NativeProductionSourceRequest(
+        title="Original User Level Campaign",
+        style="fixed_screen_puzzle",
+        targets=["pc_linux"], seed=19,
+        approved=True,original_work_attested=True,
+        portable_design=route.NativeProductionDesignBody(stages=2),
+        authored_puzzles=[list(BASE_LEVELS[0]),list(BASE_LEVELS[3])],
+    )
+    result=route.native_production_source_bundle(body,owner=identity())
+    assert verify_source_bundle(result.body)["target_count"]==1
+    with ZipFile(BytesIO(result.body)) as outer:
+        zipname=next(x for x in outer.namelist() if x.startswith("releases/"))
+        with ZipFile(BytesIO(outer.read(zipname))) as native:
+            proof=json.loads(native.read("source/dragon-puzzle-proof.json"))
+            assert proof["authored_level_rows"]==[
+                list(BASE_LEVELS[0]),list(BASE_LEVELS[3])]
+            assert proof["authoring_mode"]=="authored"
+
+
+@pytest.mark.parametrize("bad",[
+    {"levels":[["#"]*10]},
+    {"levels":[["."*12]*11]},
+    {"levels":[["x"*12]*10]},
+    {"levels":[["@"*12]*10]},
+    {"levels":[["."*12]*10]*9},
+])
+def test_native_original_level_editor_rejects_malformed_or_unbounded_canvas(bad):
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        route.NativePuzzleGridValidationRequest(**bad)
