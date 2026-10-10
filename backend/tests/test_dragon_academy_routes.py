@@ -449,3 +449,122 @@ def test_guarded_pulse_runs_native_subscription_and_defers_under_heat(tmp_path,m
         route.pulse_practice(request,owner=identity('other@example.test'))
     assert exc.value.status_code==503
 
+
+
+
+def test_signed_custody_and_memory_route_fail_closed_on_rollback(tmp_path, monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from skeleton.ai.game_builder.reviewed_knowledge import (
+        ReviewedDocument, ReviewedKnowledgeStore, ReviewedNote,
+    )
+    from skeleton.ai.game_builder.dragon_wisdom_authority import DragonWisdomAuthority
+    from skeleton.ai.game_builder.dragon_wisdom_memory import DragonWisdomMemory
+    from skeleton.ai.game_builder.dragon_wisdom_pyramid import DragonWisdomPyramid
+    from skeleton.ai.game_builder.dragon_wisdom_custody import DragonCustodyAnchor
+
+    owner = identity()
+    now = 1791644400
+    db_path = tmp_path / "source-evidence.sqlite"
+    anchor_dir = tmp_path / "external-anchors"
+    anchor_dir.mkdir()
+    monkeypatch.setenv("SKL_DRAGON_KNOWLEDGE_DB_PATH", str(db_path))
+    monkeypatch.setenv("SKL_DRAGON_WISDOM_CUSTODY_REQUIRED", "1")
+    monkeypatch.setenv("SKL_DRAGON_WISDOM_ANCHOR_DIR", str(anchor_dir))
+    monkeypatch.setenv("SKL_DRAGON_WISDOM_ANCHOR_KEY_HEX", "cd"*32)
+    monkeypatch.setattr(route.time, "time", lambda: now+3)
+
+    with ReviewedKnowledgeStore(db_path) as library:
+        pyramid = DragonWisdomPyramid(library)
+        for suffix in ("a", "b"):
+            text = "Original input delay measurements and game design."
+            library.import_document(ReviewedDocument(
+                owner=owner, source_id="source-"+suffix,
+                source_url="https://example.org/"+suffix,
+                title="Original mechanics study", text=text,
+                observed_at="2026-10-10T12:00:00Z",
+                license_id="approved-design-reference",
+                allowed_scopes=("design_reference",),
+                reviewer_id="source-reviewer-"+suffix, approved=True,
+                notes=(ReviewedNote(
+                    note_id="note-"+suffix, mechanic="platforming",
+                    statement="Input timing has measurable constraints.",
+                    start=0, end=len("Original input delay"),
+                    stance="supports", confidence_ppm=900000,
+                    dependence_group="publisher-"+suffix,
+                    tags=("input", "delay"),
+                ),),
+            ), expected_parent_digest=None, authorized=True)
+        brief = library.build_brief(
+            owner, "input", authorized=True, min_independent_groups=2,
+        )
+        auth = DragonWisdomAuthority(
+            pyramid, wiki_signing_key=b"r"*32,
+            approval_signing_key=b"a"*32, issuer="studio-identity",
+        )
+        wiki_grant = auth.issue_grant(
+            owner, "wiki-reviewer", "neutral-lab", "wiki_reviewer",
+            brief.to_payload()["brief_digest"], now=now, expires_at=now+60,
+            identity_verified=True, authorized=True,
+        )
+        review = auth.review(
+            owner, brief, mechanic="platforming", disposition="accepted",
+            review_evidence_digest="e"*64, grant=wiki_grant,
+            now=now, expires_at=now+3600,
+            authorized=True, trusted_worker=True,
+        )
+        approve_grant = auth.issue_grant(
+            owner, "human-approver", "governance", "memory_approver",
+            review["digest"], now=now, expires_at=now+60,
+            identity_verified=True, authorized=True,
+        )
+        auth.approve(
+            owner, review["digest"], grant=approve_grant,
+            now=now+1, authorized=True, trusted_worker=True,
+        )
+        DragonWisdomMemory(pyramid).reconcile(
+            owner, now=now+2, authorized=True, trusted_worker=True,
+        )
+
+    app = FastAPI()
+    app.include_router(route.router)
+    app.dependency_overrides[route.get_current_user] = lambda: {
+        "email": "alice@example.test", "tenant_id": "tenant-a", "role": "viewer",
+    }
+    with TestClient(app) as client:
+        # Even correctly signed approvals cannot be served without a separate
+        # externally anchored journal head when strict custody is configured.
+        assert client.get("/api/dragon-academy/knowledge/hoag").status_code == 409
+        assert client.get("/api/dragon-academy/knowledge/memory").status_code == 409
+        with ReviewedKnowledgeStore(db_path) as library:
+            pyramid = DragonWisdomPyramid(library)
+            DragonCustodyAnchor(anchor_dir, signing_key=bytes.fromhex("cd"*32)).checkpoint(
+                pyramid, owner, now=now+2, authorized=True,
+                trusted_worker=True, allow_initial_bootstrap=True,
+            )
+        response = client.get("/api/dragon-academy/knowledge/memory")
+        assert response.status_code == 200
+        assert response.headers["cache-control"] == "private, no-store"
+        assert len(response.json()["items"]) == 1
+        assert response.json()["items"][0]["training_authorized"] is False
+        assert client.get("/api/dragon-academy/knowledge/memory?mechanic=other").json()["items"] == []
+        assert client.post("/api/dragon-academy/knowledge/memory", json={}).status_code == 405
+        app.dependency_overrides[route.get_current_user] = lambda: {
+            "email": "bob@example.test", "tenant_id": "tenant-a", "role": "viewer",
+        }
+        assert client.get("/api/dragon-academy/knowledge/memory").status_code == 409
+        app.dependency_overrides[route.get_current_user] = lambda: {
+            "email": "alice@example.test", "tenant_id": "tenant-a", "role": "viewer",
+        }
+        with ReviewedKnowledgeStore(db_path) as library:
+            pyramid = DragonWisdomPyramid(library)
+            pyramid.revoke(owner, review["digest"], reason="rights_change",
+                           now=now+3, authorized=True, trusted_worker=True)
+        assert client.get("/api/dragon-academy/knowledge/memory").status_code == 409
+        with ReviewedKnowledgeStore(db_path) as library:
+            pyramid = DragonWisdomPyramid(library)
+            DragonCustodyAnchor(anchor_dir, signing_key=bytes.fromhex("cd"*32)).checkpoint(
+                pyramid, owner, now=now+4, authorized=True,
+                trusted_worker=True,
+            )
+        assert client.get("/api/dragon-academy/knowledge/memory").json()["items"] == []
