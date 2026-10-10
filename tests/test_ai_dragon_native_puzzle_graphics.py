@@ -89,7 +89,10 @@ def test_original_graphics_source_is_covered_by_independent_release_replay():
     receipt,sources=_puzzle_proof(package)
     assert receipt["target"]=="pc_linux"
     from skeleton.ai.webcrawler.dragon_native_puzzle_capture import enable_sdl_original_game_capture
-    assert sources["src/graphics.c"]==enable_sdl_original_game_capture(C_GRAPHICS)
+    from skeleton.ai.webcrawler.dragon_native_puzzle_hud import enable_original_native_hud
+    assert sources["src/graphics.c"]==enable_sdl_original_game_capture(
+        enable_original_native_hud(C_GRAPHICS)
+    )
     assert sources["include/dragon_puzzle_pixels.h"]==pixel_header()
 
 
@@ -180,3 +183,27 @@ def test_native_visual_replay_detects_a_replaced_hero_tile_even_in_valid_source_
     source,_=make_source_release(manipulated,game)
     with pytest.raises(ValueError,match="native runnable source"):
         _puzzle_proof(source)
+
+
+
+def test_sdl_native_hud_uses_actual_game_state_not_simulated_reward_values():
+    from skeleton.ai.webcrawler.dragon_native_puzzle_hud import enable_original_native_hud
+    runtime=enable_original_native_hud(C_GRAPHICS)
+    assert "int stars=native_puzzle_stars();" in runtime
+    assert "for(int i=0;i<state.count;i++)" in runtime
+    assert "if(goals[state.boxes[i]])placed++;" in runtime
+    assert "int minimum=dragon_solution_length[chapter];" in runtime
+    assert "if(level_done())" in runtime
+    assert "for(int i=0;i<LEVEL_COUNT;i++)" in runtime
+    assert "paint=n<stars?completed:missing" in runtime
+    with pytest.raises(ValueError):
+        enable_original_native_hud(runtime)
+
+
+def test_all_original_graphical_games_ship_native_hud_and_true_pixel_frame_capture():
+    from skeleton.ai.webcrawler.dragon_native_puzzle_hud import HUD_C
+    generated=source_game(seed=2026,stages=3)
+    runtime=generated["src/graphics.c"]
+    assert HUD_C in runtime
+    assert "capture_solver_frames" in runtime
+    assert "DRAGON_SDL_RENDER_GAMEPLAY_PASS" in runtime
