@@ -478,3 +478,42 @@ implemented native target destinations** across historical computers,
 console cartridges and modern desktop systems. The historical
 catalogue retains design-only entries until their own hardware-specific
 code generators and independently verified format controls exist.
+
+## MSX1 Z80 native cartridge — actual BIOS VDP, joystick, sound and RAM
+
+The new `msx1_native_export.py` independently compiles original authored
+games to the **MSX1 Z80 16KB page-1 cartridge** format, not a ZX Spectrum
+tape renamed `.rom`. An authentic cartridge begins with the `AB` header
+and executes its original INIT routine inside address range $4000–$7FFF.
+It uses real MSX1 BIOS interfaces: INITXT ($006C) configures the 40x24
+VDP text display; CHPUT ($00A2), POSIT ($00C6) and CLS ($00C3) draw the
+original tile map and score; CHSNS ($009C) and CHGET ($009F) acquire
+keyboard input without blocking joystick polling; GTSTCK ($00D5) reads
+joystick 1; BEEP ($00C0) synthesizes original hardware output. A bounded
+page-3 RAM scratch region at $C000/$C100 holds mutable game state and
+prevents accidental writes to ROM.
+
+The native game includes a full playable original story of discrete maze
+levels, interactive keyboard/joystick movement, collisions, collectibles,
+hazard damage, health, four-digit score, victory/restart and 50/60 Hz
+interrupt-frame timing. No MSX BIOS, commercial cartridge assets,
+modified third-party game ROM, or copyrighted example binaries are included.
+
+`msx1_rom.py` wraps the assembled Z80 source into a deterministic
+**16KB .rom** with verified AB header, zeroed unused hooks, in-page
+INIT address, actual BIOS CALL opcodes, original source signature,
+deterministic FF padding and a byte-for-byte match with the Z80 assembler
+output. The native MSX1 GitHub workflow compiles the ROM with `z80asm`,
+checks the genuine machine format, runs original rights and hardware-budget
+regressions, and uploads source and compiled artifacts.
+
+Neither the source-export stage nor ROM validation automatically asserts
+the game passed an MSX1 CPU emulator, ran on actual hardware, or has been
+approved for distribution by third-party rightsholders. Those are separate
+verification obligations. MSX2, MSX2+ and turbo R remain **distinct hardware
+design targets**, not additional independently qualified native exporters.
+
+The editor-facing real source reachability inventory and transactional
+all-platform original-homebrew portfolio now include **12 separate native
+machine targets**. Candidate historical hardware remains represented,
+without inventing code generators for systems that are not implemented.
