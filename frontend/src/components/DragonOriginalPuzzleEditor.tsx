@@ -675,7 +675,7 @@ export default function DragonOriginalPuzzleEditor({
       {validated && !!walkthrough && (
         <TouchableOpacity accessibilityRole="button"
           disabled={busy || validating}
-          onPress={beginWalkthrough} style={styles.fileButton}>
+          onPress={() => beginWalkthrough()} style={styles.fileButton}>
           <Text style={styles.actionText}>
             Replay exact shortest solution — Stage {current + 1} ({walkthrough.length} moves)
           </Text>
