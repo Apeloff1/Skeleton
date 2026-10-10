@@ -302,3 +302,12 @@ def test_session_byte_budget_accepts_regular_observations():
     store.record(value, authorized=True)
     assert store.sessions("alice", authorized=True)[0].session_id == value.session_id
 
+
+def test_corrupted_stored_payload_over_budget_fails_before_decode(monkeypatch):
+    import skeleton.ai.webcrawler.dragon_game_mechanics as module
+    store = setup()
+    store.record(session(store), authorized=True)
+    monkeypatch.setattr(module, "MAX_STORED_SESSION_BYTES", 4)
+    with pytest.raises(ValueError, match="byte budget"):
+        store.sessions("alice", authorized=True)
+
