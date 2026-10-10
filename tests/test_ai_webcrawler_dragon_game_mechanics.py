@@ -278,3 +278,11 @@ def test_session_reads_require_explicit_boolean_true():
         with pytest.raises(PermissionError, match="authorization"):
             store.sessions("alice", authorized=authorization)
 
+
+def test_session_erasure_requires_explicit_boolean_true():
+    store = setup()
+    store.record(session(store), authorized=True)
+    with pytest.raises(PermissionError, match="authorization"):
+        store.erase("alice", authorized=1)
+    assert len(store.sessions("alice", authorized=True)) == 1
+
