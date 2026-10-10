@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+from datetime import datetime
 from collections.abc import Callable
 from typing import Any
 
@@ -215,6 +216,9 @@ class DragonWisdomPyramid:
         citations = tuple(hit for hit in brief.citations if hit.mechanic == mechanic)
         if not citations:
             raise ValueError("no citations for reviewed mechanic")
+        if any(int(datetime.fromisoformat(h.observed_at.replace("Z", "+00:00")).timestamp()) > now
+               for h in citations):
+            raise ValueError("future-dated source cannot support Wiki review")
         refs = sorted({(h.source_id, h.revision_digest, h.note_id, h.dependence_group)
                        for h in citations})
         groups = {h.dependence_group for h in citations if h.stance == "supports"}
