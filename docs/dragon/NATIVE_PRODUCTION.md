@@ -433,6 +433,38 @@ Imported maps must be revalidated by the authenticated backend before
 source generation can resume. Raw arbitrary files and script execution
 are not accepted.
 
+### Native macOS original-game executable and real host playtest
+
+\`dragon_native_macos.py\` provides an explicitly authorized, macOS-host-only
+game builder. It uses the existing canonical original C99 Sokoban generator
+for \`pc_macos\`, invokes the installed Apple C compiler, checks that the
+output is a valid bounded 64-bit Mach-O native executable for the actual
+host CPU (x86_64 or arm64), then **runs that executable**.
+
+The local builder exercises its \`--selftest\`, \`--hint-selftest\`,
+\`--challenge-selftest\`, and three independent movement/undo/reset
+simulation traces for *each* level. It compares native executable states
+to the independent Python puzzle physics before publication. The ZIP
+includes the original-source release, actual Mach-O executable and
+scoped runtime evidence.
+
+\`\`\`sh
+# Run on an authorized macOS host with Xcode command-line C tools installed:
+python -m skeleton.ai.webcrawler.dragon_native_macos build \
+  --title "Original Dragon Mac Adventure" --stages 4 \
+  --seed 1977 --difficulty 6 --attest-original-rights \
+  --authorize-local-build --out ./original-macos-game
+\`\`\`
+
+\`verify\` checks the Mach-O header/architecture, load command bounds and
+entry point, original source and grid proofs and the builder's reported
+runtime results **without executing a downloaded executable**. The
+macOS-15 CI job must actually build and execute the generated game;
+the response must not claim Apple Silicon or physical-device testing unless
+the selected runner genuinely provides that hardware. Mac App Store
+signing, notarization, OS compatibility across versions, and controller
+support remain separate operational releases and are not asserted here.
+
 ### Release verification and index integrity
 
 A release index is **not trusted merely because its archive hashes match**.
