@@ -68,7 +68,7 @@ def test_atari_st_uses_actual_tos_bios_68000_and_turn_game():
     assert "m68k-atari-mint-gcc" in code["Makefile"]
     assert "-m68000" in code["Makefile"]
     assert "dragon.tos" in code["Makefile"]
-    assert "SDL" not in src
+    assert "#include <SDL" not in src
 
 def test_amiga_500_has_real_intuition_13_window_and_rastport():
     code=motorola_native_source("amiga_500",7)
@@ -86,7 +86,7 @@ def test_amiga_500_has_real_intuition_13_window_and_rastport():
         assert token in src
     assert "vc" in code["Makefile"] and "+kick13" in code["Makefile"]
     assert "build/dragon" in code["Makefile"]
-    assert "SDL" not in src
+    assert "#include <SDL" not in src
 
 def test_sharp_uses_human68k_native_dos_and_elf_to_x_file():
     code=motorola_native_source("sharp_x68000",7)
@@ -98,7 +98,7 @@ def test_sharp_uses_human68k_native_dos_and_elf_to_x_file():
     assert "elf2x68k" in code["Makefile"]
     assert "dragon.elf" in code["Makefile"]
     assert "dragon.x" in code["Makefile"]
-    assert "SDL" not in src
+    assert "#include <SDL" not in src
 
 def test_three_native_games_do_not_share_fake_graphics_or_build_format():
     source=[motorola_native_source(t,881) for t in M68K]

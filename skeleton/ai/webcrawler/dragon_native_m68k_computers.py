@@ -300,7 +300,7 @@ def motorola_native_source(target:str,seed:int)->dict[str,str]:
             "clean:\n\trm -rf build\n"),
         }
         tool="vbcc +kick13 / Kickstart Intuition graphics"
-        output="amiga_hunk"
+        output="hunk"
     elif target=="sharp_x68000":
         files={
           "src/main.c":X68000.replace("__SEED__",str(n)),

@@ -126,8 +126,19 @@ def test_unauthorized_compatibility_calls_fail_closed():
 def test_classic_68000_os_compatibility_without_claiming_enhanced_chipsets(
     target,parent,output,
 ):
-    source=_game(target)
-    original=_game(parent)
+    # Compare actual parent/child gameplay under a single canonical source
+    # candidate. Two different candidate IDs intentionally change RNG seeds.
+    candidate=sha256(("68000-revision:"+target).encode()).hexdigest()
+    def same_seed_game(system):
+        return render_native_project(
+            title="Original Dragon Legacy Compatibility",
+            target_id=system,style="arcade_score_attack",
+            candidate_id=candidate,
+            mechanics=(Mechanic.MOVEMENT,Mechanic.EXPLORATION),
+            authorized=True,
+        )
+    source=same_seed_game(target)
+    original=same_seed_game(parent)
     assert source.output==original.output==output
     assert source.files["src/main.c"]==original.files["src/main.c"]
     assert source.files["Makefile"]==original.files["Makefile"]
