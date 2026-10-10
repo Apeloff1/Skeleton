@@ -96,6 +96,7 @@ function Editor(){
   const [target,setTarget]=React.useState('game_boy');
   const [story,setStory]=React.useState<StoryView|null>(null);
   const [storyDecisions,setStoryDecisions]=React.useState<string[]>([]);
+  const [rightsAttested,setRightsAttested]=React.useState(false);
   const [art,setArt]=React.useState<Artwork|null>(null);
   const [access,setAccess]=React.useState<OptionalAccessPreview|null>(null);
   const [accessProof,setAccessProof]=React.useState<OptionalAccessProof|null>(null);
@@ -120,6 +121,7 @@ function Editor(){
     generation.current++;setOpened(null);setWorld(null);
     setHistory([]);setGuide([]);setPlatforms(null);setPack(null);
     setAccess(null);setAccessProof(null);setStory(null);setArt(null);
+    setRightsAttested(false);
     setStoryDecisions([]);
     setError('');setNotice('');
   };
@@ -134,6 +136,7 @@ function Editor(){
         throw Error('World source identity or playable rules failed verification.');
       if(ticket===generation.current){
         setOpened(result);setWorld(result.game);setAddress(index);
+        setRightsAttested(false);setArt(null);
         setHistory([]);setGuide([]);setPlatforms(null);setPack(null);
         setAccess(null);setAccessProof(null);
       }
@@ -155,6 +158,7 @@ function Editor(){
         throw Error('Changed game design did not round-trip.');
       if(ticket===generation.current){
         setAddress(result.new_decimal_index);setOpened(next);setWorld(next.game);
+        setRightsAttested(false);setArt(null);
         setHistory([]);setGuide([]);setPlatforms(null);setPack(null);
         setNotice('Actual environment and access conditions regenerated.');
       }
@@ -329,6 +333,44 @@ function Editor(){
       if(ticket===generation.current)setPlatforms(result);
     }catch(e){if(ticket===generation.current)setError(
       e instanceof Error?e.message:'Cannot evaluate platform options.');}
+    finally{if(ticket===generation.current)setBusy(false);}
+  };
+  const exportOriginalCodexBundle=async()=>{
+    if(!opened||busy||!rightsAttested)return;
+    const ticket=++generation.current;setBusy(true);setError('');
+    try{
+      const issued=await api<{
+        ok:boolean;filename:string;archive_base64:string;
+        source_bundle:{compressed_bytes:number;rights_attested:boolean;
+          game_binary_included:boolean;sha256:string};
+        independent_source_verification:{verified:boolean;
+          game_binary_present:boolean};
+      }>('/source-bundle',{
+        index:address,target,chunks:2,rights_attested:true,
+      });
+      if(!issued.ok||!issued.independent_source_verification.verified||
+         issued.independent_source_verification.game_binary_present||
+         issued.source_bundle.game_binary_included||
+         !issued.source_bundle.rights_attested||
+         issued.source_bundle.compressed_bytes>2000000||
+         !/^dragon-original-codex-[a-f0-9]{12}-[a-z0-9_]+\.zip$/.test(issued.filename)||
+         !/^[a-zA-Z0-9+/=]+$/.test(issued.archive_base64)||
+         !FileSystem.documentDirectory)
+        throw Error('Source-only original game ZIP did not meet legal or format controls.');
+      const destination=FileSystem.documentDirectory+issued.filename;
+      await FileSystem.writeAsStringAsync(destination,issued.archive_base64,{
+        encoding:FileSystem.EncodingType.Base64,
+      });
+      if(Platform.OS!=='web'&&await Sharing.isAvailableAsync()){
+        await Sharing.shareAsync(destination,{
+          mimeType:'application/zip',
+          dialogTitle:'Original Dragon console or PC game-world sources',
+        });
+      }
+      if(ticket===generation.current)setNotice(
+        'Original source world saved with verified hardware assets. ROM and publication approval remain separate.');
+    }catch(e){if(ticket===generation.current)setError(
+      e instanceof Error?e.message:'Original game source bundle cannot be exported.');}
     finally{if(ticket===generation.current)setBusy(false);}
   };
   const createOriginalArt=async()=>{
@@ -674,6 +716,26 @@ function Editor(){
               {' '}{platforms.platforms.find(x=>x.target===target)?.capability.active_axes}
               {' '}axes in source projection
             </Text>}
+          <TouchableOpacity style={s.choice}
+            disabled={busy} onPress={()=>setRightsAttested(v=>!v)}>
+            <Text style={s.actionText}>
+              {rightsAttested?'☑':'□'} I attest I have rights to all
+              original content supplied for this game.
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.action,
+            (!rightsAttested||busy)&&s.disabled]}
+            disabled={busy||!rightsAttested}
+            onPress={exportOriginalCodexBundle}>
+            <Text style={s.actionText}>
+              Export verified original console or PC source ZIP
+            </Text>
+          </TouchableOpacity>
+          <Text style={s.hint}>
+            ZIP includes original world data and graphics, plus C99 source
+            on supported PCs. Native ROMs, proprietary SDK permissions
+            and publication clearance are separate release gates.
+          </Text>
           <TouchableOpacity style={s.chip} disabled={busy}
             onPress={createOriginalArt}>
             <Text style={s.actionText}>Generate real original world tiles</Text>
