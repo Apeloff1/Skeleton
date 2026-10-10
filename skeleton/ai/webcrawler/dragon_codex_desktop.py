@@ -76,7 +76,7 @@ static int study_skill(int index) {
  if (index<0||index>=AXES||turns>=MAX_TURNS)return 0;
  if (skills[index]<100000)skills[index]++;
  turns++;
- if ((index/8)==11 && skills[index]%4==0)era++;
+ if (((index/8)==11||(index/8)==15) && skills[index]%4==0)era++;
  return 1;
 }
 static int wait_world(void) {
