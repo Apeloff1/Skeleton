@@ -13,3 +13,11 @@ def test_encode_gb_2bpp_reference_and_bounds():
     with pytest.raises(PortableCodecError):
         encode_gb_2bpp(((4,) * 8,) * 8)
 
+
+def test_decode_gb_2bpp_roundtrip_and_length_rejection():
+    tile = tuple(tuple((x+y) % 4 for x in range(8)) for y in range(8))
+    assert decode_gb_2bpp(encode_gb_2bpp(tile)) == tile
+    for blob in (b"", b"\x00"*15, b"\x00"*17):
+        with pytest.raises(PortableCodecError):
+            decode_gb_2bpp(blob)
+
