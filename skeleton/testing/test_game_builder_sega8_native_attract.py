@@ -6,6 +6,7 @@ games, BIOS, graphics or learned media are incorporated in its code.
 """
 from __future__ import annotations
 
+from hashlib import sha256
 import json
 import re
 
@@ -56,6 +57,10 @@ def test_on_cartridge_demo_bytes_are_exact_authoritative_solved_game(target,leve
         total+=len(actual)
     assert manifest["original_native_solution_attract_mode"] is True
     assert manifest["original_demo_playback_steps"]==total
+    assert manifest["original_demo_solution_sha256"] == sha256(json.dumps(
+        [list(level.safe_solution) for level in world.levels],
+        separators=(",",":"),ensure_ascii=True,
+    ).encode("ascii")).hexdigest()
     assert manifest["reference_safe_moves"]==total
     assert manifest["original_demo_chord_frames"]==25
     assert manifest["original_demo_uses_identical_game_rules"] is True
