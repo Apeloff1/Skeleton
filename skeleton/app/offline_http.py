@@ -706,11 +706,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--port", type=int, default=0,
                         help="localhost TCP port, default: OS-assigned ephemeral port")
     args = parser.parse_args(argv)
-    token_path = args.token_file.expanduser()
     app = None
     token_created = False
     token_identity: tuple[int, int, int, int] | None = None
     try:
+        token_path = args.token_file.expanduser()
         backend = (load_native_checkpoint(args.native_checkpoint)
                    if args.native_checkpoint is not None
                    else load_gguf_deployment(args.gguf_deployment))
