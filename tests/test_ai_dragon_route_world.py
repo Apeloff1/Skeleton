@@ -10,7 +10,7 @@ from skeleton.ai.webcrawler.dragon_route_taxonomy import (
 )
 from skeleton.ai.webcrawler.dragon_route_world import (
     SCHEMA,MAX_EXPANSIONS,Place,Traverse,World,Traveller,
-    Journey,plan,replay,portfolio,route_dictionary,verify_portfolio,
+    Journey,plan,replay,experience,portfolio,route_dictionary,verify_portfolio,
     validate_world,
 )
 from skeleton.ai.webcrawler.dragon_route_world_factory import (
