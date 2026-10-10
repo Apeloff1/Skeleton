@@ -80,3 +80,26 @@ def noise_lfsr_pcm(seed: int, count: int) -> tuple[int,...]:
         feedback=(state^(state>>1))&1
         state=(state>>1)|(feedback<<14)
     return tuple(out)
+
+def adsr_envelope(count: int, *, attack: int, decay: int,
+                  sustain: int, release: int) -> tuple[int,...]:
+    """Bounded PCM amplitude envelope with exact finite stage lengths."""
+    length=_integer(count,"ADSR sample count",1,32768)
+    a=_integer(attack,"ADSR attack",0,length)
+    d=_integer(decay,"ADSR decay",0,length)
+    r=_integer(release,"ADSR release",0,length)
+    level=_integer(sustain,"ADSR sustain level",0,32767)
+    if a+d+r>length:
+        raise AudioKernelError("ADSR stages exceed available samples")
+    result=[]
+    for i in range(length):
+        if i<a:
+            gain=32767*(i+1)//a
+        elif i<a+d:
+            gain=32767+(level-32767)*(i-a+1)//d
+        elif r and i>=length-r:
+            gain=level*(length-i-1)//r
+        else:
+            gain=level
+        result.append(max(0,min(32767,gain)))
+    return tuple(result)
