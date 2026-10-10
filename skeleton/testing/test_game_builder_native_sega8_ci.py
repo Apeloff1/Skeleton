@@ -300,7 +300,7 @@ def test_real_extended_eight_stage_native_campaign_source_is_solvable_and_distin
     assert manifest["levels"]==8
     assert manifest["companion_bond_ranks"]==8
     assert manifest["original_native_solution_attract_mode"] is True
-    assert manifest["original_demo_playback_steps"]>standard["source_content_digest"].count("!")
+    assert manifest["original_demo_playback_steps"]>100
     assert manifest["original_demo_compressed_rom_bytes"] >= (
         manifest["original_demo_playback_steps"] + 3
     ) // 4
@@ -313,7 +313,7 @@ def test_real_extended_eight_stage_native_campaign_source_is_solvable_and_distin
     assert code.count("static const unsigned char stage_")==8
     assert code.count("static const unsigned char demo_")==8
     assert "original_stage_accent_1[level_index]" in code
-    assert "--" not in extended["source_content_digest"]
+    assert len(extended["source_content_digest"])==64
 
 
 @pytest.mark.parametrize("invalid",(None,True,False,12,{},[],"", "third_party_game", "full_campaign " ))
