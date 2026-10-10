@@ -79,3 +79,10 @@ def test_adsr_envelope_respects_phase_lengths_and_release_zero():
     assert env[5]==16384 and env[-1]==0
     with pytest.raises(AudioKernelError):
         adsr_envelope(4,attack=2,decay=2,sustain=1000,release=1)
+
+def test_resampling_preserves_bounded_pcm_and_integer_midpoints():
+    assert resample_linear((0,1000,0,-1000),8000,16000)[:4]==(0,500,1000,500)
+    assert len(resample_linear((0,1000,0,-1000),16000,8000))==2
+    assert resample_linear((-32768,),8000,16000)==(-32768,-32768)
+    with pytest.raises(AudioKernelError):
+        resample_linear((0,)*32768,4000,96000)
