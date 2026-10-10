@@ -375,11 +375,8 @@ def main() -> None:
         args.rom,args.source_dir,args.route,target=args.target,
     )
     if args.receipt_out is not None:
-        if args.receipt_out.exists() or args.receipt_out.is_symlink():
-            raise FileExistsError(str(args.receipt_out))
-        with args.receipt_out.open("x",encoding="utf-8") as fp:
-            json.dump(report,fp,indent=2,sort_keys=True)
-            fp.write("\n")
+        from scripts.game_builder.sega_reproducibility_ci import emit_receipt
+        emit_receipt(args.receipt_out, report)
     print(json.dumps(report,sort_keys=True))
 
 
