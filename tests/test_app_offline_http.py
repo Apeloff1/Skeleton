@@ -602,6 +602,30 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertEqual(secret_path.read_text(encoding="utf-8"),
                          "existing-operator-file")
 
+    def test_shutdown_keeps_operator_replacement_of_live_secret_file(self):
+        from skeleton.app.offline_http import main
+        secret_path = self.folder / "replacement.secret"
+        arguments = [
+            "--native-checkpoint", str(self.folder / "model.json"),
+            "--database", str(self.folder / "replacement.sqlite3"),
+            "--token-file", str(secret_path), "--port", "0",
+        ]
+
+        def replace_during_service(*args, **kwargs):
+            self.assertTrue(secret_path.exists())
+            secret_path.unlink()
+            secret_path.write_text("new-owner-content", encoding="utf-8")
+
+        with (
+            patch("skeleton.app.offline_http.load_native_checkpoint",
+                  return_value=self.model),
+            patch("skeleton.app.offline_http.LocalOnlyHTTPServer.serve_forever",
+                  side_effect=replace_during_service),
+        ):
+            self.assertEqual(main(arguments), 0)
+        self.assertEqual(secret_path.read_text(encoding="utf-8"),
+                         "new-owner-content")
+
     def test_frozen_windowless_stdout_none_still_binds_and_cleans_up(self):
         from skeleton.app.offline_http import main
         from unittest.mock import patch
