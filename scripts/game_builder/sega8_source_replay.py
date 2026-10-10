@@ -99,11 +99,11 @@ def export_host_reference(
     world: PlayableWorld, source_digest: str, output: Path,
 ) -> dict[str, object]:
     route = plan_host_reference(world, source_digest)
-    if output.exists() or output.is_symlink():
-        raise FileExistsError(str(output))
-    with output.open("x", encoding="utf-8", newline="\n") as stream:
-        json.dump(route, stream, indent=2, sort_keys=True)
-        stream.write("\n")
+    # A reference is larger than short release receipts (up to 20k states),
+    # but must still be bounded and created without following any directory
+    # or basename link, in a mode that never overwrites existing evidence.
+    from scripts.game_builder.sega_reproducibility_ci import emit_receipt
+    emit_receipt(output, route, max_bytes=_MAX_DATA_BYTES)
     return route
 
 
