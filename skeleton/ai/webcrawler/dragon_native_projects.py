@@ -756,8 +756,12 @@ def render_native_project(*,title:str,target_id:str,style:str,
         files = apply_original_art(files, art=art, tiles=tiles, style=style)
     if any(PurePosixPath(p).is_absolute() or ".." in PurePosixPath(p).parts for p in files):
         raise ValueError("unsafe generated path")
-    if any(len(v.encode())>120_000 for v in files.values()):
-        raise ValueError("native project source exceeds budget")
+    source_file_cap=(300_000 if style in (
+        "world_route_adventure","maze_route_adventure") and
+        target_id in ("pc_linux","pc_windows","pc_macos","steam_deck")
+        else 120_000)
+    if any(len(v.encode())>source_file_cap for v in files.values()):
+        raise ValueError("native project source exceeds platform-specific budget")
     from .dragon_hardware_budget import analyze_project_budget
     from dataclasses import asdict as _asdict
     hardware=_asdict(analyze_project_budget(target_id,files))
