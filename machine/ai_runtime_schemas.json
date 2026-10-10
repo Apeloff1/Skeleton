@@ -2432,6 +2432,111 @@
         "unknown freshness always fails closed",
         "numeric staleness bounds are not invented without a domain NFR"
       ]
+    },
+    "DragonDeliveryBrief": {
+      "schema_version": 1,
+      "owner_plane": "application-api",
+      "fields": {
+        "schema": {
+          "type": "string",
+          "const": "skeleton.dragon.delivery_brief.v1"
+        },
+        "owner": {
+          "type": "OpaqueId"
+        },
+        "design": {
+          "type": "JsonObject"
+        },
+        "design_digest": {
+          "type": "Digest256"
+        },
+        "query": {
+          "type": "string",
+          "max_length": 300
+        },
+        "knowledge_root": {
+          "type": "Digest256"
+        },
+        "plan_digest": {
+          "type": "Digest256"
+        },
+        "prepared_at": {
+          "type": "NonNegativeInt"
+        },
+        "expires_at": {
+          "type": "NonNegativeInt"
+        },
+        "citations": {
+          "type": "array",
+          "max_items": 32
+        },
+        "independent_groups": {
+          "type": "NonNegativeInt"
+        },
+        "blockers": {
+          "type": "array"
+        },
+        "conflicts": {
+          "type": "array"
+        },
+        "controls": {
+          "type": "JsonObject"
+        },
+        "ready_for_source_generation": {
+          "type": "boolean"
+        },
+        "training_authorized": {
+          "type": "boolean",
+          "const": false
+        },
+        "release_authorized": {
+          "type": "boolean",
+          "const": false
+        }
+      },
+      "invariants": [
+        "timestamps are integer UTC Unix seconds for compatibility with canonical Dragon evidence",
+        "plan_digest binds canonical brief excluding itself; it is integrity identity, not an approval signature",
+        "lifetime at most 300 seconds and no later than any cited approval expiry",
+        "every cited claim matches exact source/revision/note/dependence-group in a current signed review",
+        "generation recomputes the brief against current owner evidence before native artifact commit",
+        "two independent approved supporting groups and no unresolved contradictions are required",
+        "brief does not authorize acquisition, training, compilation, distribution or permanent-memory promotion"
+      ]
+    },
+    "DragonDeliveryGenerateRequest": {
+      "schema_version": 1,
+      "owner_plane": "application-api",
+      "fields": {
+        "design": {
+          "type": "JsonObject"
+        },
+        "query": {
+          "type": "string",
+          "max_length": 300
+        },
+        "approved": {
+          "type": "boolean"
+        },
+        "plan_digest": {
+          "type": "Digest256"
+        },
+        "prepared_at": {
+          "type": "NonNegativeInt"
+        },
+        "request_id": {
+          "type": "string",
+          "min_length": 16,
+          "max_length": 80
+        }
+      },
+      "invariants": [
+        "unknown fields rejected",
+        "owner is derived solely from authenticated principal and tenant, never request data",
+        "strict explicit approval plus shared scheduler admission precedes source generation",
+        "request id is owner-scoped and a changed payload cannot reuse a committed identity",
+        "same committed request returns the original artifact without adding another attempt or XP"
+      ]
     }
   },
   "cross_record_invariants": [

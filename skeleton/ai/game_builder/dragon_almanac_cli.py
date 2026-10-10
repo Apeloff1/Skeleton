@@ -15,20 +15,42 @@ from .reviewed_knowledge import ReviewedKnowledgeStore
 
 def main():
     parser = argparse.ArgumentParser(description="Import, inspect and seed sequential Dragon almanacs")
-    parser.add_argument("command", choices=("bootstrap", "status", "experiment"))
+    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief"))
     parser.add_argument("--database", required=True)
     parser.add_argument("--owner", required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
     parser.add_argument("--registry", default=str(Path(__file__).parent / "catalogs/dragon_sources_20261010"))
     parser.add_argument("--output")
     parser.add_argument("--now", type=int)
+    parser.add_argument("--query", help="Reviewed mechanic or design research question")
+    parser.add_argument("--design", type=Path, help="Strict native game design JSON")
     args = parser.parse_args()
     if not args.trusted_local_operator:
         parser.error("local authenticated operator acknowledgement required")
     with ReviewedKnowledgeStore(args.database) as library:
         almanacs = DragonAlmanacs(library)
         worker = SequentialAlmanacWorker(almanacs)
-        if args.command == "bootstrap":
+        if args.command.startswith("delivery-"):
+            from .dragon_delivery import DragonDelivery
+            from ..webcrawler.dragon_game_design import load_design
+            if args.now is None:
+                parser.error("delivery projections require --now for evidence freshness")
+            delivery = DragonDelivery(almanacs)
+            library.db.execute("BEGIN")
+            try:
+                if args.command == "delivery-status":
+                    result = delivery.overview(args.owner, now=args.now, authorized=True)
+                elif args.command == "delivery-search":
+                    if not args.query:
+                        parser.error("delivery-search requires --query")
+                    result = delivery.search(args.owner, args.query, now=args.now, authorized=True)
+                else:
+                    if not args.query or not args.design:
+                        parser.error("delivery-brief requires --query and --design")
+                    result = delivery.brief(args.owner, load_design(args.design), args.query, now=args.now, authorized=True)
+            finally:
+                library.db.execute("ROLLBACK")
+        elif args.command == "bootstrap":
             registry = read_source_registry(args.registry)
             ingestion = almanacs.ingest_sources(args.owner, registry, authorized=True)
             for niche in NICHES:

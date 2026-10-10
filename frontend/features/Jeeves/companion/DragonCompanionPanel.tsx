@@ -7,6 +7,7 @@ import { extractConversationInterests, proposeResearchMission } from './conversa
 import { Ionicons } from '@expo/vector-icons';
 import DragonCompanion from './DragonCompanion';
 import DragonQuestBoard from './DragonQuestBoard';
+import DragonDeliveryWorkbench from './DragonDeliveryWorkbench';
 import DragonWisdomSquares from './DragonWisdomSquares';
 import DragonKnowledgePyramid from './DragonKnowledgePyramid';
 import { dragonWaitingBubble } from './dragonMagicEightBall';
@@ -33,6 +34,7 @@ export interface CompanionAcademyInput {
   nativeTargets?:readonly NativeTarget[];
   nativeStyles?:readonly string[];
   nativeCurriculum?:NativeCurriculum|null;
+  onDeliveryGenerated?:()=>void;
   onGenerateCurriculum?:()=>void;
   onGenerateNative?:(target:string,style:string)=>void;
   onDownloadNative?:(attemptId:string)=>void;
@@ -91,6 +93,7 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry, a
     <Pressable accessibilityRole="button" accessibilityLabel="Inspect suggested research interests" onPress={() => setShowResearch(v => !v)} style={s.metric}><Ionicons name="bulb-outline" size={16} color="#fb923c" /><Text style={s.value}>{showResearch ? 'Hide research interests' : 'Inspect research interests'}</Text></Pressable>
     {showResearch && <View style={s.metric}><Text style={s.value}>{proposal ? proposal.query : 'No research interest yet'}</Text><Text style={s.note}>Suggestion only · no web crawl starts without a separate explicit command.</Text></View>}
     <Pressable accessibilityRole="button" accessibilityLabel="Toggle Dragon Academy" onPress={()=>setShowAcademy(x=>!x)} style={s.academyButton}><Ionicons name="trophy-outline" color="#fbbf24" size={16}/><Text style={s.academyText}>{showAcademy?"Hide":"Show"} Dragon Academy · capability levels & game practice</Text></Pressable>
+    {showAcademy&&<DragonDeliveryWorkbench targets={academy?.nativeTargets} onGenerated={academy?.onDeliveryGenerated}/>}
     {showAcademy&&<DragonQuestBoard progress={academy?.progress} attempts={academy?.attempts}
       nativeAttempts={academy?.nativeAttempts} nativeTargets={academy?.nativeTargets}
       nativeStyles={academy?.nativeStyles}

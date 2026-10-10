@@ -296,6 +296,7 @@ export function useDragonAcademy(){
  const view:CompanionAcademyInput={
   progress,attempts,subscription,practiceBusy:busy,wisdomReview,knowledgeView,
   nativeAttempts,nativeTargets,nativeStyles,nativeCurriculum:curriculum,
+  onDeliveryGenerated:()=>{void load();},
   onGenerateCurriculum:authenticated?generateCurriculum:undefined,
   onGenerateNative:authenticated?generateNative:undefined,
   onDownloadNative:authenticated?downloadNative:undefined,

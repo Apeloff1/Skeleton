@@ -416,3 +416,203 @@ def practice_artifact(
             "sha256": sha256(html.encode("utf-8")).hexdigest(),
             "sandbox_required": True,
         }
+
+
+class DeliveryBriefRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+    design: dict = Field(max_length=13)
+    query: str = Field(min_length=1, max_length=300)
+
+
+class DeliveryGenerateRequest(DeliveryBriefRequest):
+    approved: bool = Field(default=False, strict=True)
+    plan_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    prepared_at: int = Field(ge=0, le=4_102_444_800, strict=True)
+    request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{16,80}$")
+
+
+def _delivery(library):
+    from skeleton.ai.game_builder.dragon_almanacs import DragonAlmanacs
+    from skeleton.ai.game_builder.dragon_delivery import DragonDelivery
+    return DragonDelivery(DragonAlmanacs(library))
+
+
+@router.get("/delivery/overview")
+def delivery_overview(request: Request, response: Response,
+                      owner: str = Depends(_principal)) -> dict:
+    response.headers["Cache-Control"] = "private, no-store"
+    with _wisdom_library() as library:
+        delivery = _delivery(library)
+        library.db.execute("BEGIN")
+        try:
+            _verify_wisdom_custody(library, owner)
+            result = delivery.overview(owner, now=int(time.time()), authorized=True)
+        finally:
+            library.db.execute("ROLLBACK")
+    result["resource_runtime_ready"] = isinstance(getattr(request.app.state, "dragon_execution_pool", None), DragonExecutionPool)
+    try:
+        _database_path()
+        result["practice_storage_ready"] = True
+    except HTTPException:
+        result["practice_storage_ready"] = False
+    return {"ok": True, **result}
+
+
+@router.get("/delivery/knowledge")
+def delivery_knowledge(response: Response,
+                       query: str = Query(min_length=1, max_length=300),
+                       owner: str = Depends(_principal)) -> dict:
+    response.headers["Cache-Control"] = "private, no-store"
+    with _wisdom_library() as library:
+        delivery = _delivery(library)
+        library.db.execute("BEGIN")
+        try:
+            _verify_wisdom_custody(library, owner)
+            return {"ok": True, **delivery.search(owner, query, now=int(time.time()), authorized=True)}
+        finally:
+            library.db.execute("ROLLBACK")
+
+
+@router.get("/delivery/almanacs")
+def delivery_almanacs(response: Response, offset: int = Query(default=0, ge=0, le=100000),
+                      owner: str = Depends(_principal)) -> dict:
+    response.headers["Cache-Control"] = "private, no-store"
+    with _wisdom_library() as library:
+        delivery = _delivery(library)
+        _verify_wisdom_custody(library, owner)
+        return {"ok": True, **delivery.almanacs.report(owner, authorized=True, limit=32, offset=offset)}
+
+
+@router.post("/delivery/brief")
+def delivery_brief(body: DeliveryBriefRequest, response: Response,
+                   owner: str = Depends(_principal)) -> dict:
+    from skeleton.ai.webcrawler.dragon_game_design import parse_design
+    response.headers["Cache-Control"] = "private, no-store"
+    try:
+        design = parse_design(body.design)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid native game design") from None
+    with _wisdom_library() as library:
+        delivery = _delivery(library)
+        library.db.execute("BEGIN")
+        try:
+            _verify_wisdom_custody(library, owner)
+            return {"ok": True, **delivery.brief(owner, design, body.query,
+                        now=int(time.time()), authorized=True)}
+        finally:
+            library.db.execute("ROLLBACK")
+
+
+@router.post("/delivery/generate")
+def delivery_generate(body: DeliveryGenerateRequest, request: Request, response: Response,
+                      owner: str = Depends(_principal)) -> dict:
+    from skeleton.ai.webcrawler.dragon_game_design import parse_design
+    from skeleton.ai.webcrawler.dragon_native_projects import digest
+    from skeleton.ai.webcrawler.dragon_chunk_executor import DragonChunkExecutor, ChunkResult
+    from skeleton.ai.webcrawler.dragon_resource_session import SessionTask
+    from skeleton.ai.game_builder.resource_governor import ResourceDelta
+    response.headers["Cache-Control"] = "private, no-store"
+    if body.approved is not True:
+        raise HTTPException(status_code=403, detail="Confirm this cited design before generating source")
+    try:
+        design = parse_design(body.design)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid native game design") from None
+    pool = getattr(request.app.state, "dragon_execution_pool", None)
+    if not isinstance(pool, DragonExecutionPool):
+        raise HTTPException(status_code=503, detail="Shared Dragon resource runtime is not configured")
+    try:
+        executor = pool.executor(owner)
+    except DragonPoolCapacityError:
+        raise HTTPException(status_code=503, detail="Dragon resource capacity unavailable") from None
+    if not isinstance(executor, DragonChunkExecutor) or executor.session.tenant != owner:
+        raise HTTPException(status_code=503, detail="Owner-bound resource runtime unavailable")
+    created = []
+    learning = []
+    with _wisdom_library() as library:
+        delivery = _delivery(library)
+        with _lab() as (lab, cycles):
+            native = DragonNativePracticeLab(lab.db, lab)
+            def generate(plan, stop):
+                if stop():
+                    return ChunkResult(False, "delivery:deferred", ResourceDelta())
+                # Hold the current knowledge revision through artifact commit.
+                # No source update or revocation can race this bounded operation.
+                library.db.execute("BEGIN IMMEDIATE")
+                try:
+                    _verify_wisdom_custody(library, owner)
+                    now = int(time.time())
+                    brief = delivery.brief(owner, design, body.query, now=now,
+                                prepared_at=body.prepared_at, authorized=True)
+                    if brief["plan_digest"] != body.plan_digest or not brief["ready_for_source_generation"]:
+                        raise HTTPException(status_code=409, detail="Knowledge or design changed; prepare a fresh brief")
+                    previous = lab.db.execute("SELECT 1 FROM dragon_native_game_attempts WHERE owner=? AND attempt_id=?",
+                        (owner, digest([owner, "delivery", body.request_id]))).fetchone()
+                    item = native.generate(owner, target_id=design.target, style=design.genre,
+                        now=now, authorized=True, consent=True, design=design,
+                        source_context=brief, request_id=body.request_id)
+                    created.append(item)
+                    # Artifact commit is authoritative. A projection failure
+                    # cannot turn a committed source project into a failed build.
+                    try:
+                        learning.append(delivery.record_project_learning(owner, native, item.attempt_id, authorized=True))
+                        library.db.execute("COMMIT")
+                    except (ValueError, LookupError, sqlite3.DatabaseError):
+                        if library.db.in_transaction:
+                            library.db.execute("ROLLBACK")
+                    return ChunkResult(True, "delivery:" + item.attempt_id,
+                        ResourceDelta(artifact_bytes=0 if previous else lab.policy.max_artifact_bytes))
+                finally:
+                    if library.db.in_transaction:
+                        library.db.execute("ROLLBACK")
+            try:
+                run = executor.run(SessionTask("delivery:" + body.request_id, "user", 8 * 1024**2, 1, io_tokens=1),
+                    generate, authorized=True, consent=True,
+                    reserved_usage=ResourceDelta(artifact_bytes=lab.policy.max_artifact_bytes))
+            except PermissionError:
+                raise HTTPException(status_code=403, detail="Current approved practice lesson required") from None
+            except ValueError:
+                raise HTTPException(status_code=409, detail="Delivery context expired, changed, or exceeded its practice budget") from None
+            if not created:
+                return {"ok": True, "created_native": None, "resource_execution": asdict(run),
+                        "retryable": True, "delivery_state": "deferred"}
+            return {**_snapshot(lab, cycles, owner), "created_native": asdict(created[0]),
+                    "resource_execution": asdict(run), "delivery_state": "source_generated",
+                    "plan_digest": body.plan_digest, "compiled": False, "gameplay_verified": False,
+                    "project_learning": learning[0] if learning else None,
+                    "learning_recovery_required": not bool(learning)}
+
+
+@router.get("/delivery/almanacs/{topic_id}/learning")
+def delivery_learning(response: Response,
+                      topic_id: str = URLPath(pattern=r"^topic-[a-f0-9]{64}$"),
+                      owner: str = Depends(_principal)) -> dict:
+    response.headers["Cache-Control"] = "private, no-store"
+    with _wisdom_library() as library:
+        delivery = _delivery(library)
+        _verify_wisdom_custody(library, owner)
+        return {"ok": True, **delivery.almanacs.learning_view(owner, topic_id, authorized=True, limit=32)}
+
+
+@router.post("/delivery/{attempt_id}/learning")
+def recover_delivery_learning(response: Response,
+                              attempt_id: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
+                              owner: str = Depends(_principal)) -> dict:
+    # Reconcile a committed artifact after a crash between the two existing
+    # stores; this cannot generate source or grant memory/training authority.
+    response.headers["Cache-Control"] = "private, no-store"
+    with _wisdom_library() as library:
+        delivery = _delivery(library)
+        with _lab() as (lab, _):
+            native = DragonNativePracticeLab(lab.db, lab)
+            library.db.execute("BEGIN IMMEDIATE")
+            try:
+                _verify_wisdom_custody(library, owner)
+                result = delivery.record_project_learning(owner, native, attempt_id, authorized=True)
+                library.db.execute("COMMIT")
+                return {"ok": True, "project_learning": result, "new_source_generated": False}
+            except LookupError:
+                raise HTTPException(status_code=404, detail="Native project unavailable") from None
+            finally:
+                if library.db.in_transaction:
+                    library.db.execute("ROLLBACK")
