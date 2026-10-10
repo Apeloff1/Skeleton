@@ -28,3 +28,11 @@ def test_encode_nes_2bpp_matches_chr_plane_order():
     with pytest.raises(PortableCodecError):
         encode_nes_2bpp(((0,)*8,)*7)
 
+
+def test_decode_nes_2bpp_roundtrip_and_cross_console_order():
+    tile = tuple(tuple((x*3+y) % 4 for x in range(8)) for y in range(8))
+    assert decode_nes_2bpp(encode_nes_2bpp(tile)) == tile
+    assert encode_nes_2bpp(tile) != encode_gb_2bpp(tile)
+    with pytest.raises(PortableCodecError):
+        decode_nes_2bpp(bytearray(16))
+
