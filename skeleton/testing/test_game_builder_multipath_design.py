@@ -539,3 +539,12 @@ def test_moved_exit_is_new_required_completion_not_a_renamed_receipt():
     assert edited.safe_proof.positions[-1] == (7, 3)
     assert verify_route_proof(edited.after, edited.safe_proof)
 
+
+def test_adding_threat_keeps_safe_route_and_rejects_start_blocking():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    changed = add_solvable_hazard(p, (3, 2), authorized=True)
+    assert len(changed.after.hazards) == 2
+    assert changed.safe_proof.hazard_visits == 0
+    with pytest.raises(MultipathError):
+        add_solvable_hazard(p, p.start, authorized=True)
+
