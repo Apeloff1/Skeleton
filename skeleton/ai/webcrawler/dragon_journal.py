@@ -29,6 +29,41 @@ def _validate_source_url(url: object) -> str:
     return url
 ALLOWED = frozenset(("frontier_discovered","dragon_travel","visual_probe","robots_check","fetch_started","fetch_received","policy_rejected","acquisition_accepted","burn_started","burn_chunk","burn_complete","retry_wait","crawl_complete"))
 
+
+def _bounded_json_tree(value: Mapping[str, Any]) -> None:
+    """Admit finite canonical JSON before serialization allocates large strings.
+
+    Caps depth and entries, including for malicious Mapping subclasses and
+    deeply nested arrays whose encoded result might otherwise exhaust memory.
+    """
+    stack = [(value, 0)]
+    visited = 0
+    while stack:
+        current, depth = stack.pop()
+        visited += 1
+        if visited > 4096 or depth > 24:
+            raise ValueError("journal payload node/depth budget exceeded")
+        if isinstance(current, Mapping):
+            if len(current) > 4096:
+                raise ValueError("journal payload field budget exceeded")
+            for key, child in current.items():
+                if not isinstance(key, str) or len(key) > 256:
+                    raise ValueError("journal JSON object keys must be bounded text")
+                stack.append((child, depth + 1))
+        elif isinstance(current, list):
+            if len(current) > 4096:
+                raise ValueError("journal array budget exceeded")
+            stack.extend((child, depth + 1) for child in current)
+        elif current is None or isinstance(current, (str, bool, int)):
+            if isinstance(current, str) and len(current) > 32768:
+                raise ValueError("journal string budget exceeded")
+        elif isinstance(current, float):
+            if not math.isfinite(current):
+                raise ValueError("non-finite journal payload value")
+        else:
+            raise ValueError("non-JSON journal payload value")
+
+
 def _canonical(value: Mapping[str, Any]) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
 
@@ -76,6 +111,7 @@ class DragonEventJournal:
             raise ValueError("journal payload must be a JSON object")
         try:
             data = dict(payload) if payload is not None else {}
+            _bounded_json_tree(data)
             encoded = _canonical(data)
             size = len(encoded.encode("utf-8", errors="strict"))
         except (TypeError, ValueError, UnicodeError, OverflowError, RecursionError) as exc:
