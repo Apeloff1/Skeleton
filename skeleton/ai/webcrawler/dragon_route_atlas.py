@@ -12,6 +12,7 @@ emitted as a separate native C99 game with its own proof.
 """
 from __future__ import annotations
 from dataclasses import asdict,dataclass,replace
+from functools import lru_cache
 from hashlib import sha256
 import json
 
@@ -180,6 +181,7 @@ def _digest_without_signature(proof:dict)->str:
     return sha256(_canonical(proof)).hexdigest()
 
 
+@lru_cache(maxsize=4)
 def build_atlas(req:AtlasRequest=AtlasRequest())->Atlas:
     _validate_request(req)
     sectors=[]
