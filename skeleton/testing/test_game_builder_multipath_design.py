@@ -187,3 +187,17 @@ def test_flood_fill_respects_hazards_and_real_connectivity():
     with pytest.raises(MultipathError):
         flood_fill(p, (0, 0))
 
+
+def test_regions_find_unreachable_pockets_and_cover_grid():
+    rows = list(OPEN_LEVEL)
+    rows[4] = "#########"
+    rows[1] = "#S.....G#"
+    rows[5] = "#..C....#"
+    p = RouteProblem.from_rows(rows)
+    pieces = connected_regions(p)
+    assert len(pieces) == 2
+    assert p.start in pieces[0] and p.collectibles[0] in pieces[1]
+    assert set().union(*pieces) == set(walkable_cells(p))
+    with pytest.raises(MultipathError):
+        solve_route(p)
+
