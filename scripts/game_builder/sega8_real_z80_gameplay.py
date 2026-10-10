@@ -404,6 +404,21 @@ def verify_original_z80_gameplay(
         machine,width=meta["width"],height=meta["height"],
     )
     _assert_state(after_cancel,reference["initial"],0)
+    # Native reset must clear victory tint and restore the authored palette.
+    palette=meta[
+        "master_system_original_rgb222_palette"
+        if target=="sega_master_system" else "game_gear_original_rgb12_palette"
+    ]
+    if not isinstance(palette,list) or len(palette)!=4:
+        raise Sega8NativeGameplayError("authored color palette evidence unavailable")
+    if target=="sega_master_system":
+        actual_restore=(machine.cram[3],)
+        expected_restore=(palette[3],)
+    else:
+        actual_restore=(machine.cram[6],machine.cram[7])
+        expected_restore=(palette[3]&255,palette[3]>>8)
+    if actual_restore!=expected_restore:
+        raise Sega8NativeGameplayError("native reset failed to restore original theme colors")
 
     return {
         "schema": "skeleton.game_builder.sega8_actual_z80_gameplay_replay.v1",
@@ -427,6 +442,10 @@ def verify_original_z80_gameplay(
         "real_z80_directions_seen_as_active_low_buttons":
             machine.active_joypad_bits_observed,
         "original_companion_rank_and_reward_verified": True,
+        "native_companion_pet_verified_on_guest_z80": True,
+        "native_pet_preserves_gameplay_verified": True,
+        "native_pause_blocks_gameplay_and_mutes_psg_verified": True,
+        "native_restart_restores_original_theme_verified": True,
         "native_attract_demo_chord_started_from_victory": True,
         "native_attract_demo_performed_first_original_move": True,
         "native_attract_demo_user_cancel_restored_game": True,
