@@ -363,3 +363,15 @@ def test_stored_observation_bool_confidence_and_timestamp_are_rejected():
         with pytest.raises(ValueError, match="cell validation failed"):
             store.sessions("alice", authorized=True)
 
+
+def test_persisted_event_order_is_validated():
+    import json
+    store = setup()
+    observations = (observation(timestamp=100), observation(timestamp=200))
+    store.record(session(store, observations=observations), authorized=True)
+    raw = store.db.execute("SELECT observations_json FROM dragon_game_sessions").fetchone()[0]
+    entries = list(reversed(json.loads(raw)))
+    store.db.execute("UPDATE dragon_game_sessions SET observations_json=?",
+                     (json.dumps(entries),))
+    with pytest.raises(ValueError, match="time order"):
+        store.sessions("alice", authorized=True)
