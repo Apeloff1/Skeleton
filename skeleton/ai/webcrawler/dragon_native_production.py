@@ -118,6 +118,43 @@ HEX = re.compile(r"[a-f0-9]{64}\Z")
 SAFE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.\-/]*\Z")
 
 
+
+
+def load_portable_design(path: Path) -> PortableGameDesign:
+    """Load an intentionally small exact-field original design specification."""
+    path = Path(path).expanduser().absolute()
+    if any(parent.is_symlink() for parent in (path, *path.parents)):
+        raise ValueError("symlinked portable design path not allowed")
+    if not path.is_file() or path.stat().st_size > 4096:
+        raise ValueError("portable design must be a small local regular JSON file")
+    raw = path.read_bytes()
+    if len(raw) > 4096:
+        raise ValueError("portable design exceeds bounded input size")
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate portable design key")
+            result[key] = value
+        return result
+    document = json.loads(raw.decode("utf-8"), object_pairs_hook=unique)
+    if not isinstance(document, dict) or set(document) != (
+        {"schema"} | set(PortableGameDesign.__dataclass_fields__)
+    ):
+        raise ValueError("portable design needs all canonical keys and schema")
+    if document.pop("schema") != "skeleton.ai.dragon.portable_game_design.v1":
+        raise ValueError("unknown portable game design schema")
+    design = PortableGameDesign(**document)
+    design.validate()
+    return design
+
+
+def portable_design_document(design: PortableGameDesign) -> dict:
+    design.validate()
+    return {"schema": "skeleton.ai.dragon.portable_game_design.v1", **asdict(design)}
+
+
+
 def _canonical(value: object) -> bytes:
     return (json.dumps(value, sort_keys=True, separators=(",", ":"),
                        ensure_ascii=True, allow_nan=False) + "\n").encode("ascii")
@@ -1101,6 +1138,7 @@ def main(argv: list[str] | None = None) -> int:
         sub.add_argument("--style", required=True)
         sub.add_argument("--targets", required=True, help="comma-separated target IDs")
         sub.add_argument("--seed", type=int, default=1)
+        sub.add_argument("--portable-design", type=Path, help="strict JSON original game design")
         sub.add_argument("--rights-basis", choices=sorted(RIGHTS_BASES),
                          default="original_homebrew")
         sub.add_argument("--rights-reference", default="")
@@ -1136,6 +1174,8 @@ def main(argv: list[str] | None = None) -> int:
             rights_basis=args.rights_basis, rights_reference=args.rights_reference,
             seed=args.seed, compile_roms=args.compile_roms,
             require_compiled=args.require_compiled,
+            portable_design=load_portable_design(args.portable_design)
+                            if args.portable_design else None,
         )
         if args.command == "plan":
             output = {"schema": SCHEMA, "request_id": request.request_id,
