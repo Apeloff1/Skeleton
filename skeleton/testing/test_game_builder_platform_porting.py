@@ -19,6 +19,7 @@ from skeleton.ai.game_builder.desktop_native_export import (
 from skeleton.ai.game_builder.playable_world import GameBuildIntent, generate_playable_world
 from skeleton.ai.game_builder.editor_platforms import (
     editor_platform_form, editor_platform_options, editor_portability_context,
+    editor_progressive_route_preview,
 )
 from skeleton.ai.game_builder.port_planner import (
     HomebrewSource, PortMode, PortPlanningError, PortRequest, compile_port, compile_port_route,
@@ -163,6 +164,40 @@ def test_homebrew_plan_admission_limits_identity_resource_costs(bad):
         return
     with pytest.raises(PortPlanningError):
         replace(original(), **bad)
+
+
+def test_progressive_editor_preview_carries_full_step_provenance_without_false_exports():
+    import json
+    from skeleton.ai.game_builder import editor_progressive_route_preview as public_preview
+
+    homebrew = original(platform="bandai_wonderswan")
+    stops = ("windows_modern", "nintendo_game_boy", "linux_desktop")
+    data = editor_progressive_route_preview(homebrew, stops)
+    assert data == public_preview(homebrew, stops)
+    assert len(json.dumps(data)) < 25_000
+    assert data["schema"] == "skeleton.game_builder.progressive_route_preview.v1"
+    assert data["original_rights_basis"] == "project_owned"
+    assert data["original_evidence_sha256"] == homebrew.evidence_sha256
+    assert data["native_binary_built"] is False
+    assert data["rights_independently_verified"] is False
+    assert data["distribution_authorized"] is False
+    assert [row["to"] for row in data["hops"]] == list(stops)
+    assert all(row["original_rights_evidence_sha256"] == homebrew.evidence_sha256
+               for row in data["hops"])
+    assert data["hops"][1]["previous_design_digest"] == data["hops"][0]["design_digest"]
+    assert data["hops"][2]["previous_design_digest"] == data["hops"][1]["design_digest"]
+    assert all(row["pending_release_gates"] and not row["distribution_authorized"]
+               for row in data["hops"])
+
+
+def test_editor_form_exposes_only_legal_three_mode_multi_hop_preview():
+    spec = editor_platform_form()["progressive_route_preview"]
+    assert spec["supported"]
+    assert spec["max_destinations"] == 5
+    assert "cross_hybrid" not in spec["modes"]
+    assert spec["original_source_custody_preserved"]
+    assert not spec["preview_is_release_authorization"]
+    assert spec["independent_hop_rights_reviews_required"]
 
 
 def test_progressive_route_is_true_hop_chain_without_forged_intermediate_rights():
