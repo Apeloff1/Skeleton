@@ -157,6 +157,10 @@ function NativeSourceEditor() {
   const [stageCount, setStageCount] = React.useState(4);
   const [searchBudget, setSearchBudget] = React.useState(8);
   const [proceduralLevels, setProceduralLevels] = React.useState(false);
+  const [campaignPathing, setCampaignPathing] = React.useState<'branching' | 'linear'>('branching');
+  const [challengeProfile, setChallengeProfile] = React.useState<
+    'gentle' | 'balanced' | 'challenging' | 'spicy'
+  >('balanced');
   const [customGame, setCustomGame] = React.useState(false);
   const [validatedBoards, setValidatedBoards] = React.useState<string[][] | null>(null);
   const handleApprovedBoards = React.useCallback((next: string[][] | null) => {
@@ -293,6 +297,8 @@ function NativeSourceEditor() {
       stages: stageCount, candidates: searchBudget,
       project_notes: 'Original native homebrew; platform-scaled design',
       procedural_levels: style === 'fixed_screen_puzzle' && proceduralLevels && !customGame,
+      campaign_pathing: campaignPathing,
+      challenge_profile: challengeProfile,
     },
     authored_puzzles: customGame && style === 'fixed_screen_puzzle'
       ? validatedBoards : null,
@@ -300,7 +306,7 @@ function NativeSourceEditor() {
 
   React.useEffect(() => { setPreview(null); }, [
     title, style, targets, palette, hero, questTheme,
-    difficulty, stageCount, searchBudget, proceduralLevels, customGame, validatedBoards, attested,
+    difficulty, stageCount, searchBudget, proceduralLevels, campaignPathing, challengeProfile, customGame, validatedBoards, attested,
   ]);
 
   const previewTargets = async () => {
@@ -567,6 +573,44 @@ function NativeSourceEditor() {
               This may increase source generation time.
             </Text>
           </TouchableOpacity>
+        )}
+        {style === 'fixed_screen_puzzle' && !usesCartridgeTargets && (
+          <View style={stylesUi.section}>
+            <Text style={stylesUi.label}>Campaign path topology</Text>
+            <Text style={stylesUi.copy}>
+              Branching chapters provide real optional stages, different endings and
+              independent player choices. The native game follows those same forks.
+            </Text>
+            <View style={stylesUi.chips}>
+              {(['branching','linear'] as const).map(mode => (
+                <TouchableOpacity key={mode} accessibilityRole="button"
+                  accessibilityState={{selected:campaignPathing===mode}}
+                  disabled={busy}
+                  onPress={() => { setCampaignPathing(mode); setSuccess(''); }}
+                  style={[stylesUi.chip, campaignPathing===mode && stylesUi.selected]}>
+                  <Text style={stylesUi.copy}>{mode === 'branching'
+                    ? 'Branching game + alternate endings' : 'Single linear campaign'}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={stylesUi.label}>Player challenge and tension profile</Text>
+            <View style={stylesUi.chips}>
+              {(['gentle','balanced','challenging','spicy'] as const).map(mode => (
+                <TouchableOpacity key={mode} accessibilityRole="button"
+                  accessibilityState={{selected:challengeProfile===mode}}
+                  disabled={busy}
+                  onPress={() => { setChallengeProfile(mode); setSuccess(''); }}
+                  style={[stylesUi.chip, challengeProfile===mode && stylesUi.selected]}>
+                  <Text style={stylesUi.copy}>{mode}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={stylesUi.copy}>
+              Spicy requests deliberate tension peaks with recoveries and optional paths.
+              Solver complexity is measurable; actual player enjoyment and frustration
+              require playtests and consent—not assumed AI certainty.
+            </Text>
+          </View>
         )}
         {style === 'fixed_screen_puzzle' && !usesCartridgeTargets && (
           <>
