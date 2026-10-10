@@ -243,3 +243,20 @@ def test_nonexistent_native_game_image_fails_without_synthesizing_receipt(tmp_pa
             tmp_path/"no-game",
             target_platform_id="windows_modern",expected_sha256="f"*64,
         )
+
+
+
+def test_pe_entrypoint_in_zero_fill_virtual_section_is_not_admitted(tmp_path):
+    data=pe_image()
+    opt=0x98
+    section=opt+240
+    # Virtual section claims 0x1000 bytes, actual code file has only 0x200.
+    struct.pack_into("<I",data,section+8,0x1000)
+    struct.pack_into("<I",data,opt+16,0x1300)
+    path=tmp_path/"virtual-only-entry.exe"
+    path.write_bytes(data)
+    with pytest.raises(ExecutableFormatError,match="file-backed"):
+        verify_native_executable_structure(
+            path,target_platform_id="windows_modern",
+            expected_sha256=sha256(data).hexdigest(),
+        )
