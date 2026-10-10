@@ -911,4 +911,51 @@ def solve_avoid_cells(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells"]
+def solve_hazard_budget(
+    problem: RouteProblem, *, max_hazard_visits: int = 0,
+    max_expansions: int = 250_000,
+) -> RouteProof:
+    """Find fewest steps subject to a strict count of entered hazard tiles."""
+    if (not isinstance(problem, RouteProblem)
+            or type(max_hazard_visits) is not int
+            or not 0 <= max_hazard_visits <= 12
+            or type(max_expansions) is not int or not 1 <= max_expansions <= 250_000):
+        raise MultipathError("invalid bounded hazard-exposure budget")
+    bits = {p: 1 << i for i, p in enumerate(problem.collectibles)}
+    target = (1 << len(bits)) - 1
+    initial = (*problem.start, 0, 0)
+    queue = deque([initial])
+    parents: dict[tuple[int, int, int, int],
+                  tuple[tuple[int, int, int, int], str] | None] = {initial: None}
+    expanded = 0
+    terminal = None
+    while queue:
+        state = queue.popleft()
+        expanded += 1
+        if expanded > max_expansions:
+            raise MultipathError("hazard-budget search expansion limit exceeded")
+        x, y, mask, exposure = state
+        if (x, y) == problem.goal and mask == target:
+            terminal = state
+            break
+        for action, pos in problem.neighbors((x, y), allow_hazards=True):
+            used = exposure + int(pos in problem.hazards)
+            if used > max_hazard_visits:
+                continue
+            nxt = (*pos, mask | bits.get(pos, 0), used)
+            if nxt not in parents:
+                parents[nxt] = (state, action)
+                queue.append(nxt)
+    if terminal is None:
+        raise MultipathError("no route satisfies the strict hazard exposure budget")
+    steps = []
+    while parents[terminal] is not None:
+        terminal, action = parents[terminal]
+        steps.append(action)
+    return evaluate_route(problem, tuple(reversed(steps)),
+                          allow_hazards=max_hazard_visits > 0,
+                          solver="hazard_budget", expanded_states=expanded)
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget"]
