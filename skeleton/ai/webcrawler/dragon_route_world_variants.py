@@ -36,7 +36,7 @@ OPTIONS=(
     ("deep_cavern_join","labyrinth","old_mine","tunnel",39,0,11,10,19,
      ("detour","free_roam"),(),()),
     ("moon_dream_shortcut","moon_outpost","dream_plane","wormhole",68,15,4,30,99,
-     ("secret","world_transition"),("stargate_key",),()),
+     ("secret","world_transition"),("stellar_gate_key",),()),
     ("reef_sky_current","reef","sky_lane","updraft",58,0,10,27,72,
      ("weather_gated","challenge"),("diving_kit",),("windy",)),
     ("metro_market_return","underground_metro","bazaar","metro",8,3,0,0,5,
@@ -91,7 +91,7 @@ def mutate_original_world(world:World,*,seed:int)->World:
             price=price,fatigue=fatigue,danger=danger,
             spectacle=scenery,requires=tuple(keys),
             weather_any=tuple(weather),
-            secret_token="stargate_key" if secret else "",
+            secret_token="stellar_gate_key" if secret else "",
             mana=25 if mode=="wormhole" else 15 if mode=="magic_gate" else 0,
         ))
     changed=replace(world,connections=tuple(edges))
