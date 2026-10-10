@@ -56,10 +56,10 @@ def _read_project(source_dir: Path, target: str) -> dict[str, Any]:
         meta.get("schema") != "skeleton.game_builder.native_sega8_source.v1"
         or meta.get("platform") != target
         or meta.get("target_rom_suffix") != _MAP_NAMES[target]
-        or meta.get("width", 0) > (31 if target == "sega_master_system" else 19)
-        or meta.get("height", 0) > (21 if target == "sega_master_system" else 15)
         or type(meta.get("width")) is not int
         or type(meta.get("height")) is not int
+        or meta["width"] > (31 if target == "sega_master_system" else 19)
+        or meta["height"] > (21 if target == "sega_master_system" else 15)
         or meta.get("width", 0) < 9
         or meta.get("height", 0) < 9
         or type(meta.get("levels")) is not int
