@@ -329,7 +329,7 @@ class GameMechanicsMemory:
                 mechanic, len(observations),
                 len({sid for _, sid in observations}),
                 round(score, 4), round(confidence, 4), examples,
-                bool(confirmed),
+                bool(confirmed) and all(obs.user_confirmed for obs, _ in observations),
             ))
             if confirmed and score >= 0.25:
                 directives.append(
