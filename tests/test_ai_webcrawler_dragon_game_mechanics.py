@@ -199,3 +199,12 @@ def test_duration_bool_cannot_cross_recording_boundary():
     with pytest.raises(ValueError, match="duration"):
         store.record(replace(session(store), duration_ms=True), authorized=True)
 
+
+def test_observation_collection_requires_typed_bounded_tuple():
+    from dataclasses import replace
+    store = setup()
+    base = session(store)
+    for bad in ([observation()], ("not-an-observation",), ()):
+        with pytest.raises(ValueError, match="observation collection"):
+            store.record(replace(base, observations=bad), authorized=True)
+
