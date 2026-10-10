@@ -74,3 +74,13 @@ def digital_hysteresis(samples: object, *, press: int=20000,
         result.append(pressed)
     return tuple(result)
 
+
+def axis_to_eightway(x: int, y: int, *, threshold: int=8192) -> str:
+    """Map analog axes to original eight-way pads with stable neutral zone."""
+    horizontal=_int(x,"horizontal axis",-32768,32767)
+    vertical=_int(y,"vertical axis",-32768,32767)
+    dead=_int(threshold,"eightway deadzone",0,32766)
+    ns="n" if vertical < -dead else "s" if vertical > dead else ""
+    ew="w" if horizontal < -dead else "e" if horizontal > dead else ""
+    return ns+ew if ns or ew else "neutral"
+
