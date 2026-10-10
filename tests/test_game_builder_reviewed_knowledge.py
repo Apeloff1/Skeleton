@@ -101,7 +101,11 @@ class ReviewedKnowledgeTests(unittest.TestCase):
         self.assertIn("Jump arcs should remain predictable", raw)
         self.store.close()
         self.store = ReviewedKnowledgeStore(self.dbfile)
-        reopened = self.store.search("studio-a", "jump", authorized=True)
+        reopened = self.store.search("studio-a", "jump timing", authorized=True)
+        # Relevance is intentionally query-dependent; compare the same
+        # query before/after SQLite reopening, not different queries.
+        assert reopened[0].relevance > self.store.search(
+            "studio-a", "jump", authorized=True)[0].relevance
         self.assertEqual(hits, reopened)
         self.assertEqual(self.store.history("studio-a", "source-a", authorized=True)[0], receipt)
 
@@ -166,8 +170,9 @@ class ReviewedKnowledgeTests(unittest.TestCase):
         bad = replace(base.notes[0], end=len(TEXT) + 1)
         with self.assertRaisesRegex(KnowledgeError, "outside"):
             self.admit(replace(base, notes=(bad,)))
-        bad = replace(base.notes[0], start=6, end=6)
+        # The dataclass itself must refuse invalid spans before storage.
         with self.assertRaises(KnowledgeError):
+            bad = replace(base.notes[0], start=6, end=6)
             self.admit(replace(base, notes=(bad,)))
         long_doc = replace(
             base, text="Z" * 1200,

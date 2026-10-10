@@ -7,8 +7,17 @@ import json
 import re
 from .dragon_game_mechanics import Mechanic
 from .dragon_native_targets import demand_target, STYLES
+from .dragon_desktop_abi import DESKTOP_NATIVE,ABI_PROFILES,apply_desktop_abi
 
-EMITTERS=frozenset({"game_boy","game_boy_color","nes","dos_vga","master_system","game_gear","snes","commodore_64","genesis","game_boy_advance","nintendo_64","nintendo_ds","psp","ps1","xbox_original","pc_linux","pc_windows","pc_macos","steam_deck"})
+EMITTERS=frozenset({"game_boy","game_boy_color","nes","dos_vga","master_system","game_gear","snes","commodore_64","genesis","game_boy_advance","nintendo_64","nintendo_ds","psp","ps1","xbox_original","atari_2600","apple_ii","zx_spectrum","dos_8086","windows_95","pc_linux","pc_windows","pc_macos","steam_deck"})
+EMITTERS=EMITTERS|DESKTOP_NATIVE|frozenset(("gamecube","wii","nintendo_3ds","dreamcast","ps2","commodore_vic20","commodore_128","atari_400_800","msx1","amstrad_cpc"))
+EMITTERS=EMITTERS|frozenset(("playdate","arduboy"))
+from .dragon_compatible_revisions import COMPATIBILITY
+EMITTERS=EMITTERS|frozenset(COMPATIBILITY)|frozenset(("commodore_pet","commodore_plus4","bbc_micro","oric_atmos"))
+EMITTERS=EMITTERS|frozenset(("atari_5200","colecovision","zx81","msx2","thumby"))
+EMITTERS=EMITTERS|frozenset(("lynx","saturn","ps_vita","nintendo_switch","wii_u"))
+EMITTERS=EMITTERS|frozenset(("vectrex","atari_7800"))
+EMITTERS=EMITTERS|frozenset(("intellivision","atari_st","amiga_500","sharp_x68000"))
 
 @dataclass(frozen=True)
 class NativeProject:
@@ -490,6 +499,14 @@ def render_native_project(*,title:str,target_id:str,style:str,
                           candidate_id:str,mechanics:tuple[Mechanic,...],
                           authorized:bool,design=None)->NativeProject:
     if not authorized:raise PermissionError("native game build requires authorization")
+    if target_id in COMPATIBILITY:
+        from .dragon_compatible_revisions import revision_project
+        return revision_project(
+            target_id=target_id,title=title,style=style,
+            candidate_id=candidate_id,mechanics=mechanics,
+            authorized=authorized,design=design,
+            renderer=render_native_project,
+        )
     target=demand_target(target_id)
     if target_id not in EMITTERS:
         if target.status=="licensed_sdk":
@@ -498,8 +515,8 @@ def render_native_project(*,title:str,target_id:str,style:str,
     if style not in STYLES:raise ValueError("unknown game style")
     # Console renderers below are real CPU/SDK code, but currently provide
     # ONLY a collectible chase; do not advertise an unimplemented RPG/RTS.
-    if target_id not in ("pc_linux","pc_windows","pc_macos","steam_deck"):
-        allowed = ("arcade_score_attack","side_scrolling_platformer") if target_id=="game_boy" else ("arcade_score_attack",)
+    if target_id not in DESKTOP_NATIVE:
+        allowed = ("arcade_score_attack","side_scrolling_platformer") if target_id in ("game_boy","nes") else ("arcade_score_attack",)
         if style not in allowed:
             raise ValueError("target has not implemented the requested gameplay style")
     if not isinstance(title,str) or not 2<=len(title.strip())<=80:
@@ -522,6 +539,9 @@ def render_native_project(*,title:str,target_id:str,style:str,
     if target_id=="game_boy" and style=="side_scrolling_platformer":
         from .dragon_gb_platformer import gb_platformer_source
         files=gb_platformer_source(seed)
+    elif target_id=="nes" and style=="side_scrolling_platformer":
+        from .dragon_nes_platformer import nes_platformer_source
+        files=nes_platformer_source(seed)
     elif target_id=="game_boy_color":
         from .dragon_native_gbc import color_game_boy
         files=color_game_boy(_gameboy(seed)["src/main.asm"],_gameboy(seed)["Makefile"],seed)
@@ -531,13 +551,60 @@ def render_native_project(*,title:str,target_id:str,style:str,
     elif target_id=="snes":
         from .dragon_native_snes import snes_source
         files=snes_source(seed)
+    elif target_id in ("lynx","saturn","ps_vita"):
+        from .dragon_native_lynx import lynx_source
+        from .dragon_native_vita_saturn import vita_source,saturn_source
+        files=(lynx_source(seed) if target_id=="lynx" else
+               saturn_source(seed) if target_id=="saturn" else vita_source(seed))
     elif target_id in ("nintendo_64","nintendo_ds","psp"):
         from .dragon_native_3d_era import n64_source,ds_source,psp_source
         files=(n64_source(seed) if target_id=="nintendo_64" else
                ds_source(seed) if target_id=="nintendo_ds" else psp_source(seed))
+    elif target_id in ("gamecube","wii","nintendo_3ds"):
+        from .dragon_native_nintendo_ppc_3ds import (
+            gamecube_source,wii_source,three_ds_source,
+        )
+        files=(gamecube_source(seed) if target_id=="gamecube" else
+               wii_source(seed) if target_id=="wii" else three_ds_source(seed))
+    elif target_id=="intellivision":
+        from .dragon_native_intellivision import intellivision_source
+        files=intellivision_source(seed)
+    elif target_id in ("vectrex","atari_7800"):
+        from .dragon_native_vector_maria import native_vector_maria_source
+        files=native_vector_maria_source(target_id,seed)
+    elif target_id in ("nintendo_switch","wii_u"):
+        from .dragon_native_switch_wiiu import original_nintendo_source
+        files=original_nintendo_source(target_id,seed)
+    elif target_id in ("dreamcast","ps2"):
+        from .dragon_native_dreamcast_ps2 import dreamcast_source,ps2_source
+        files=dreamcast_source(seed) if target_id=="dreamcast" else ps2_source(seed)
+    elif target_id in ("atari_5200","colecovision","zx81","msx2"):
+        from .dragon_native_atari_z80_new import native_machine_source
+        files=native_machine_source(target_id,seed)
+    elif target_id in ("commodore_vic20","commodore_128","atari_400_800","msx1","amstrad_cpc"):
+        from .dragon_native_8bit_computers import computer_source
+        files=computer_source(target_id,seed)
+    elif target_id=="playdate":
+        from .dragon_native_playdate import playdate_source
+        files=playdate_source(seed)
+    elif target_id=="arduboy":
+        from .dragon_native_arduboy import arduboy_source
+        files=arduboy_source(seed)
+    elif target_id=="thumby":
+        from .dragon_native_thumby import thumby_source
+        files=thumby_source(seed)
+    elif target_id in ("commodore_pet","commodore_plus4","bbc_micro","oric_atmos"):
+        from .dragon_native_cc65_classics import classic_cc65_source
+        files=classic_cc65_source(target_id,seed)
+    elif target_id in ("atari_st","amiga_500","sharp_x68000"):
+        from .dragon_native_m68k_computers import motorola_native_source
+        files=motorola_native_source(target_id,seed)
     elif target_id=="commodore_64":
         from .dragon_native_c64 import commodore64_source
         files=commodore64_source(seed)
+    elif target_id in ("atari_2600","apple_ii","zx_spectrum","dos_8086","windows_95"):
+        from .dragon_native_legacy_expansion import native_legacy_source
+        files=native_legacy_source(target_id,seed)
     elif target_id in ("genesis","game_boy_advance","ps1","xbox_original"):
         from .dragon_native_sdk_emitters import (
             genesis_source,gba_source,ps1_source,xbox_original_source,
@@ -548,7 +615,7 @@ def render_native_project(*,title:str,target_id:str,style:str,
             ps1_source(seed) if target_id=="ps1" else
             xbox_original_source(seed,style)
         )
-    elif target_id in ("pc_linux","pc_windows","pc_macos","steam_deck"):
+    elif target_id in DESKTOP_NATIVE:
         from .dragon_game_blueprints import GENRES, campaign_dict
         from .dragon_game_fitness import choose_campaign,selection_report
         from .dragon_native_arcade_runtime import render_sdl_campaign
@@ -621,8 +688,10 @@ def render_native_project(*,title:str,target_id:str,style:str,
         files=(_gameboy(seed) if target_id=="game_boy" else
                _nes(seed) if target_id=="nes" else
                _dos(seed) if target_id=="dos_vga" else _desktop(seed,style))
+    if target_id in ABI_PROFILES:
+        files=apply_desktop_abi(target_id,files)
     if target_id in ("game_boy","game_boy_color","nes") and not (
-        target_id=="game_boy" and style=="side_scrolling_platformer"
+        style=="side_scrolling_platformer" and target_id in ("game_boy","nes")
     ):
         from .dragon_retro_assets import (
             asset_tiles,enrich_gb_asm,enrich_nes_asm,
@@ -706,7 +775,8 @@ def render_native_project(*,title:str,target_id:str,style:str,
     files["dragon-hardware-budget.json"]=json.dumps(
         hardware,sort_keys=True,indent=2)+"\n"
     implemented={Mechanic.MOVEMENT,Mechanic.EXPLORATION}
-    if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck","xbox_original"):
+    if (target_id in DESKTOP_NATIVE or target_id=="xbox_original" or
+        (target_id=="nes" and style=="side_scrolling_platformer")):
         implemented|={Mechanic.PLATFORMING,Mechanic.PHYSICS}
     supported=tuple(sorted(m.value for m in mechanics if m in implemented))
     deferred=tuple(sorted(m.value for m in mechanics if m not in implemented))
@@ -730,12 +800,13 @@ def render_native_project(*,title:str,target_id:str,style:str,
                    else "native_turn_based_rpg" if style=="turn_based_rpg"
                    else "native_original_sokoban" if style=="fixed_screen_puzzle"
                    else "native_timing_rhythm" if style=="rhythm_game"
-                   else GENRES[style]) if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck")
+                   else GENRES[style]) if target_id in DESKTOP_NATIVE
                   else "game_boy_scrolling_platformer" if target_id=="game_boy" and style=="side_scrolling_platformer"
+                  else "nes_horizontal_scroll_platformer" if target_id=="nes" and style=="side_scrolling_platformer"
                   else "original_collectible_chase"
               ),"campaign_stages": (
                   (design.stages if design is not None else 4)
-                  if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck")
+                  if target_id in DESKTOP_NATIVE or (target_id=="nes" and style=="side_scrolling_platformer")
                   else 1
               )}
     files["dragon-native-manifest.json"]=json.dumps(manifest,sort_keys=True,indent=2)+"\n"

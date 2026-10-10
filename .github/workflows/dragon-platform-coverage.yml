@@ -1,0 +1,186 @@
+name: Dragon All-Era Platform Coverage
+
+on:
+  pull_request:
+    paths:
+      - 'skeleton/ai/webcrawler/dragon_platform_expansion.py'
+      - 'skeleton/ai/webcrawler/dragon_platform_readiness.py'
+      - 'skeleton/ai/webcrawler/dragon_native_legacy_expansion.py'
+      - 'skeleton/ai/webcrawler/dragon_native_cc65_classics.py'
+      - 'skeleton/ai/webcrawler/dragon_cc65_release.py'
+      - 'skeleton/ai/webcrawler/dragon_native_nintendo_ppc_3ds.py'
+      - 'skeleton/ai/webcrawler/dragon_native_vector_maria.py'
+      - 'skeleton/ai/webcrawler/dragon_native_intellivision.py'
+      - 'skeleton/ai/webcrawler/dragon_native_m68k_computers.py'
+      - 'skeleton/ai/webcrawler/dragon_native_switch_wiiu.py'
+      - 'skeleton/ai/webcrawler/dragon_native_dreamcast_ps2.py'
+      - 'skeleton/ai/webcrawler/dragon_native_8bit_computers.py'
+      - 'skeleton/ai/webcrawler/dragon_native_atari_z80_new.py'
+      - 'skeleton/ai/webcrawler/dragon_native_playdate.py'
+      - 'skeleton/ai/webcrawler/dragon_compatible_revisions.py'
+      - 'skeleton/ai/webcrawler/dragon_native_arduboy.py'
+      - 'skeleton/ai/webcrawler/dragon_native_thumby.py'
+      - 'skeleton/ai/webcrawler/dragon_native_lynx.py'
+      - 'skeleton/ai/webcrawler/dragon_lynx_release.py'
+      - 'skeleton/ai/webcrawler/dragon_build_evidence.py'
+      - 'skeleton/ai/webcrawler/dragon_native_compile.py'
+      - 'skeleton/ai/webcrawler/dragon_native_curriculum.py'
+      - 'skeleton/ai/webcrawler/dragon_native_vita_saturn.py'
+      - 'skeleton/ai/webcrawler/dragon_vic20_tiny.py'
+      - 'skeleton/ai/webcrawler/dragon_desktop_abi.py'
+      - 'skeleton/ai/webcrawler/dragon_native_targets.py'
+      - 'skeleton/ai/webcrawler/dragon_native_projects.py'
+      - 'skeleton/ai/webcrawler/dragon_hardware_budget.py'
+      - 'tests/test_ai_webcrawler_dragon_all_platforms.py'
+      - 'tests/test_ai_webcrawler_dragon_native_cc65_classics.py'
+      - 'tests/test_ai_webcrawler_dragon_cc65_release.py'
+      - 'tests/test_ai_webcrawler_dragon_native_nintendo_ppc_3ds.py'
+      - 'tests/test_ai_webcrawler_dragon_native_vector_maria.py'
+      - 'tests/test_ai_webcrawler_dragon_native_intellivision.py'
+      - 'tests/test_ai_webcrawler_dragon_native_m68k_computers.py'
+      - 'tests/test_ai_webcrawler_dragon_native_switch_wiiu.py'
+      - 'tests/test_ai_webcrawler_dragon_native_dreamcast_ps2.py'
+      - 'tests/test_ai_webcrawler_dragon_native_8bit_computers.py'
+      - 'tests/test_ai_webcrawler_dragon_atari_z80_new.py'
+      - 'tests/test_ai_webcrawler_dragon_micro_handhelds.py'
+      - 'tests/test_ai_webcrawler_dragon_native_thumby.py'
+      - 'tests/test_ai_webcrawler_dragon_lynx_vita_saturn.py'
+      - 'tests/test_ai_webcrawler_dragon_lynx_release.py'
+      - 'tests/test_ai_webcrawler_dragon_lynx_evidence.py'
+      - 'tests/test_ai_webcrawler_dragon_compatible_revisions.py'
+      - 'tests/test_ai_webcrawler_dragon_desktop_abi.py'
+      - 'tests/test_ai_webcrawler_dragon_platform_matrix.py'
+      - 'tests/test_ai_webcrawler_dragon_native_projects.py'
+      - '.github/workflows/dragon-platform-coverage.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dragon-all-platforms-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  catalog-and-toolchain-truth:
+    name: Every named console and PC has an exact capability boundary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install tests and original Apple II cross compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cc65 make build-essential
+          python -m pip install --disable-pip-version-check pytest
+      - name: Verify entire 169-target matrix and native source eligibility
+        run: |
+          python -m pytest -q \
+            tests/test_ai_webcrawler_dragon_all_platforms.py \
+            tests/test_ai_webcrawler_dragon_native_cc65_classics.py \
+            tests/test_ai_webcrawler_dragon_cc65_release.py \
+            tests/test_ai_webcrawler_dragon_native_nintendo_ppc_3ds.py \
+            tests/test_ai_webcrawler_dragon_native_vector_maria.py \
+            tests/test_ai_webcrawler_dragon_native_intellivision.py \
+            tests/test_ai_webcrawler_dragon_native_m68k_computers.py \
+            tests/test_ai_webcrawler_dragon_native_switch_wiiu.py \
+            tests/test_ai_webcrawler_dragon_native_dreamcast_ps2.py \
+            tests/test_ai_webcrawler_dragon_native_8bit_computers.py \
+            tests/test_ai_webcrawler_dragon_atari_z80_new.py \
+            tests/test_ai_webcrawler_dragon_micro_handhelds.py \
+            tests/test_ai_webcrawler_dragon_native_thumby.py \
+            tests/test_ai_webcrawler_dragon_lynx_vita_saturn.py \
+            tests/test_ai_webcrawler_dragon_lynx_release.py \
+            tests/test_ai_webcrawler_dragon_lynx_evidence.py \
+            tests/test_ai_webcrawler_dragon_compatible_revisions.py \
+            tests/test_ai_webcrawler_dragon_desktop_abi.py \
+            tests/test_ai_webcrawler_dragon_platform_matrix.py \
+            tests/test_ai_webcrawler_dragon_native_projects.py
+      - name: Compile source-bound original PET, Plus/4, Atmos and BBC objects or binaries
+        run: |
+          python -m skeleton.ai.webcrawler.dragon_cc65_release \
+            --out _dragon_evidence/cc65-native
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          r=Path("_dragon_evidence/cc65-native")
+          m=json.loads((r/"dragon-cc65-build-bundle.json").read_text())
+          assert len(m["records"])==4
+          assert m["linked_count"]>=3
+          assert m["linked_count"]+m["unlinked_count"]==4
+          assert not m["emulator_or_physical_play_confirmed"]
+          assert (r/"dragon-original-cc65-builds.zip").stat().st_size>0
+          print("DRAGON_ORIGINAL_6502_BUILD_PASS",m["linked_count"],
+                "linked",m["unlinked_count"],"unlinked")
+          PY
+      - name: Build real original Atari Lynx 65C02 cartridge and verify binary provenance
+        run: |
+          python -m skeleton.ai.webcrawler.dragon_lynx_release \
+            --out _dragon_evidence/lynx-native --seed 1989
+          python - <<'PY'
+          from pathlib import Path
+          from hashlib import sha256
+          import json
+          root=Path("_dragon_evidence/lynx-native")
+          r=json.loads((root/"dragon-lynx-release.json").read_text())
+          binary=(root/"build/dragon.lnx").read_bytes()
+          assert binary[:4]==b"LYNX"
+          assert sha256(binary).hexdigest()==r["cartridge_sha256"]
+          assert sha256((root/"dragon-original-lynx.zip").read_bytes()).hexdigest()==r["package_sha256"]
+          assert r["native_compiler_pass"] is True
+          assert r["real_hardware_pass"] is False
+          assert r["emulator_controller_replay_pass"] is False
+          print("DRAGON_REAL_LYNX_CC65_CARTRIDGE_PASS",r["cartridge_sha256"])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dragon-original-lynx-65c02-cartridge
+          path: |
+            _dragon_evidence/lynx-native/dragon-original-lynx.zip
+            _dragon_evidence/lynx-native/dragon-lynx-release.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Export machine-readable hardware readiness evidence
+        run: |
+          mkdir -p _dragon_evidence
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          from skeleton.ai.webcrawler.dragon_platform_readiness import readiness_json
+          path=Path("_dragon_evidence/hardware-readiness.json")
+          path.write_text(readiness_json(),encoding="utf-8")
+          result=json.loads(path.read_text())
+          assert result["coverage"]["catalog_count"]==169
+          from skeleton.ai.webcrawler.dragon_native_projects import EMITTERS
+          from skeleton.ai.webcrawler.dragon_native_targets import CATALOG
+          assert len(EMITTERS)>=87  # source capability grows without fixed stale quotas
+          assert result["coverage"]["native_source_count"]==len(EMITTERS)
+          assert result["coverage"]["missing_native_source_count"]==(
+              len(CATALOG)-len(EMITTERS))
+          assert len(result["targets"])==169
+          assert {
+              row["target"] for row in result["targets"]
+              if row["source_emitter"]
+          }==EMITTERS
+          assert all(not t["compiler_verified"] for t in result["targets"])
+          print("DRAGON_PLATFORM_COVERAGE_PASS",result["coverage"]["digest"])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dragon-all-era-hardware-readiness
+          path: _dragon_evidence/hardware-readiness.json
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dragon-original-6502-native-builds
+          path: |
+            _dragon_evidence/cc65-native/dragon-original-cc65-builds.zip
+            _dragon_evidence/cc65-native/dragon-cc65-build-bundle.json
+          if-no-files-found: error
+          retention-days: 14

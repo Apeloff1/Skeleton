@@ -55,7 +55,10 @@ class GameExperienceTests(unittest.TestCase):
         self.assertEqual(level.unique_tiles_visited, 1)
         self.assertFalse(report.completed_game)
         self.assertIn("wall_friction", {finding.signal for finding in report.findings})
-        self.assertIn("incomplete_objectives", {finding.signal for finding in report.findings})
+        # Repeatedly walking into the same wall proves navigation friction;
+        # it is insufficient evidence that the objectives themselves are
+        # defective. Do not infer a gameplay defect from player inactivity.
+        self.assertNotIn("incomplete_objectives", {finding.signal for finding in report.findings})
         self.assertTrue(all(len(finding.evidence_digest) == 64 for finding in report.findings))
 
     def test_short_incomplete_game_does_not_overclaim_defects(self):

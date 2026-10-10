@@ -55,15 +55,21 @@ MILESTONES=(
   CurriculumMilestone("gb_input","game_boy","arcade_score_attack",(),
                        "D-pad game logic and SM83 sprites",100,"handheld_8bit"),
   CurriculumMilestone("gb_platforms","game_boy","side_scrolling_platformer",
-                       ("game_boy",),"scrolling camera and jump physics",95,"handheld_8bit"),
+                       ("game_boy",),"scrolling camera and jump physics",104,"handheld_8bit"),
   CurriculumMilestone("nes_chase","nes","arcade_score_attack",
                        ("game_boy",),"6502 CPU and NES CHR graphics",94,"cartridge_8bit"),
+  CurriculumMilestone("nes_scroll","nes","side_scrolling_platformer",
+                       ("nes",),"6502 PPU nametable scrolling, A jump and ledge physics",90,"cartridge_8bit"),
   CurriculumMilestone("gbc_palette","game_boy_color","arcade_score_attack",
                        ("game_boy",),"CGB palette RAM and color-only ROM",93,"handheld_8bit"),
   CurriculumMilestone("c64_legacy","commodore_64","arcade_score_attack",
                        ("nes",),"VIC-II, CIA and SID platform input",85,"classic_computer"),
   CurriculumMilestone("sms_palette","master_system","arcade_score_attack",
                        ("nes",),"Z80 VRAM sprites and Sega VDP",83,"cartridge_8bit"),
+  CurriculumMilestone("lynx_handheld","lynx","arcade_score_attack",
+                       ("game_boy","nes"),
+                       "native 65C02 Lynx TGI colour graphics and Suzy joypad",81,
+                       "handheld_16bit"),
   CurriculumMilestone("gg_handheld","game_gear","arcade_score_attack",
                        ("game_boy_color",),"handheld VDP and 12-bit CRAM",82,"handheld_8bit"),
   CurriculumMilestone("gba_native","game_boy_advance","arcade_score_attack",
@@ -94,6 +100,20 @@ MILESTONES=(
                        ("nes","game_boy_color"),"Allegrex PSPSDK analog controller and LCD",57,"handheld_3d"),
   CurriculumMilestone("ps1_gpu","ps1","arcade_score_attack",
                        ("nes","game_boy_color"),"MIPS PS1 homebrew rendering",54,"console_32bit"),
+  CurriculumMilestone("vic20_video","commodore_vic20","arcade_score_attack",
+                       ("game_boy",),"Commodore VIC-I memory display and volume",60,"classic_computer"),
+  CurriculumMilestone("c128_sid","commodore_128","arcade_score_attack",
+                       ("nes",),"8502 VIC-II display and SID audio registers",55,"classic_computer"),
+  CurriculumMilestone("atari_8bit","atari_400_800","arcade_score_attack",
+                       ("nes",),"ANTIC/GTIA/POKEY controller graphics",54,"classic_computer"),
+  CurriculumMilestone("msx1_vdp","msx1","arcade_score_attack",
+                       ("nes",),"MSX BIOS/Z80 VDP and keyboard",53,"classic_computer"),
+  CurriculumMilestone("cpc_6845","amstrad_cpc","arcade_score_attack",
+                       ("nes",),"CPC Z80 firmware and ink palette",52,"classic_computer"),
+  CurriculumMilestone("dreamcast_maple","dreamcast","arcade_score_attack",
+                       ("nes","game_boy_color"),"SH-4 Maple controller and KOS framebuffer",53,"console_128bit"),
+  CurriculumMilestone("ps2_gs","ps2","arcade_score_attack",
+                       ("nes","game_boy_color"),"MIPS EE gsKit graphics and SIF controller RPC",52,"console_128bit"),
   CurriculumMilestone("xbox_gamepad","xbox_original","arcade_score_attack",
                        ("nes","game_boy_color"),"nxdk gamepad and GPU SDK source",53,"console_pc_hybrid"),
 )
@@ -121,9 +141,9 @@ class DragonNativeCurriculum:
         successes=Counter(x.target for x in proofs)
         recommendations=[];blocked=[]
         for step in MILESTONES:
-            # Once the source-bound Game Boy ROM receipt is present, move
-            # the companion into new mechanic acquisition instead of
-            # recommending another entry-level arcade reskin.
+            # The introductory Game Boy source skill is already structurally
+            # demonstrated. Do not farm repeat variants ahead of a newly
+            # unlocked platforming/6502 skill.
             if step.milestone_id=="gb_input" and "game_boy" in built:
                 continue
             unmet=tuple(x for x in step.requires if x not in built)

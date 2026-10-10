@@ -43,8 +43,11 @@ COMMANDS = {
         ("ca65","-o","build/dragon.o","src/main.s"),
         ("ld65","-C","nes.cfg","-o","build/dragon.nes","build/dragon.o"),
     ),
+    "lynx":(
+        ("cl65","-t","lynx","-O","-o","build/dragon.lnx","src/main.c"),
+    ),
 }
-OUTPUTS={"game_boy":"build/dragon.gb","game_boy_color":"build/dragon.gbc","nes":"build/dragon.nes"}
+OUTPUTS={"game_boy":"build/dragon.gb","game_boy_color":"build/dragon.gbc","nes":"build/dragon.nes","lynx":"build/dragon.lnx"}
 
 def _verify(target_id:str, blob:bytes)->bool:
     if target_id in ("game_boy","game_boy_color"):
@@ -62,6 +65,14 @@ def _verify(target_id:str, blob:bytes)->bool:
         for b in blob[0x134:0x14D]:
             checksum=(checksum-b-1)&0xff
         return blob[0x14D]==checksum
+    if target_id=="lynx":
+        # Standard cc65 .lnx header: 64 bytes, LYNX magic, LE page size
+        # and version. Content proof is structural only, not runtime play.
+        if not 1024<=len(blob)<=524288+64 or blob[:4]!=b"LYNX":
+            return False
+        page=int.from_bytes(blob[4:6],"little")
+        version=int.from_bytes(blob[8:10],"little")
+        return page in (512,1024,2048) and version in (1,2)
     if target_id=="nes":
         if len(blob)<16 or blob[:4]!=b"NES\x1a":
             return False
