@@ -377,13 +377,13 @@ class GameMechanicsMemory:
                     for x in insights
                 ],
                 "directives": directives,
-                "review_required": any(not x.user_confirmed for x in insights) or conflicting,
+                "review_required": not insights or any(not x.user_confirmed for x in insights) or conflicting,
             },
             sort_keys=True, separators=(",", ":"), ensure_ascii=True,
         ).encode()).hexdigest()
         return GameTasteProfile(
             owner, tuple(insights), tuple(directives),
-            any(not x.user_confirmed for x in insights) or conflicting, fingerprint,
+            not insights or any(not x.user_confirmed for x in insights) or conflicting, fingerprint,
         )
 
     def erase(self, owner: str, *, authorized: bool) -> int:
