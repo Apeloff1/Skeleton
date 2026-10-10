@@ -417,3 +417,12 @@ def test_history_aggregate_memory_cap(monkeypatch):
     with pytest.raises(ValueError, match="history memory"):
         store.sessions("alice", authorized=True)
 
+
+def test_bounded_history_can_read_multiple_small_sessions():
+    store = setup()
+    for name in ("First", "Second"):
+        value = store.build_session("alice", name, 20000, (observation(),),
+                                    capture_consent=True, analysis_consent=True)
+        store.record(value, authorized=True)
+    assert len(store.sessions("alice", authorized=True)) == 2
+
