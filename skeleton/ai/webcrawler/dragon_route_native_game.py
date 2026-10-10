@@ -204,6 +204,10 @@ EXAMPLES:dict[str,tuple[str,...]]={
    "walk_to_bazaar","harbor_path","harbor_to_reef",
    "reef_to_ocean","ocean_to_goal",
  ),
+ "underwater":(
+   "walk_to_bazaar","harbor_path","harbor_to_reef",
+   "reef_to_gate","gate_to_goal",
+ ),
  "outer_space":(
    "spaceport_access","shuttle_to_orbit","orbit_to_moon","moon_to_citadel",
  ),
