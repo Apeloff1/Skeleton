@@ -19,7 +19,7 @@
 #define PORT_A_KEY_1 0x0010
 #define PORT_A_KEY_2 0x0020
 #define GG_KEY_START 0x8000
-#define SMS_EMBED_SEGA_ROM_HEADER(product,revision)
+#define SMS_EMBED_SEGA_ROM_HEADER(product,revision) extern const unsigned char skeleton_host_signature_sentinel
 
 static jmp_buf host_boot_return;
 static unsigned char host_screen[24][32];
