@@ -761,6 +761,10 @@ def compile_native_sega_8bit(
         "original_demo_chord_frames":25,
         "original_demo_direction_encoding":"0=up,1=down,2=left,3=right",
         "original_demo_playback_steps":demo_steps_total,
+        "original_demo_solution_sha256":sha256(json.dumps(
+            [list(stage.safe_solution) for stage in world.levels],
+            separators=(",",":"),ensure_ascii=True,
+        ).encode("ascii")).hexdigest(),
         "original_demo_uses_identical_game_rules":True,
         "original_demo_autostart":False,
         "original_demo_external_content":False,
