@@ -13,6 +13,8 @@ from pathlib import Path
 import re
 from typing import Any
 
+from skeleton.ai.game_builder.native_release_intake import _read_bounded, NativeIntakeError
+
 _TARGETS = {"sega_master_system": "sms", "sega_game_gear": "gg"}
 _SHA = re.compile(r"[0-9a-f]{64}\Z")
 MAX_RECEIPT = 4 * 1024 * 1024
@@ -23,12 +25,10 @@ class Sega8PortParityError(ValueError):
 
 
 def _read(path: Path) -> dict[str, Any]:
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_RECEIPT:
-        raise Sega8PortParityError("receipt missing, linked, or beyond evidence budget")
     try:
-        data = json.loads(path.read_bytes())
-    except (UnicodeDecodeError, ValueError) as exc:
-        raise Sega8PortParityError("receipt has invalid JSON") from exc
+        data = json.loads(_read_bounded(path, max_bytes=MAX_RECEIPT))
+    except (NativeIntakeError, OSError, UnicodeDecodeError, ValueError) as exc:
+        raise Sega8PortParityError("receipt is linked, invalid, or beyond evidence budget") from exc
     if not isinstance(data, dict):
         raise Sega8PortParityError("receipt must be a canonical JSON object")
     return data
