@@ -350,3 +350,38 @@ def test_five_real_hardware_original_color_themes_are_distinct_and_digest_bound(
         assert result.content_digest not in seen
         seen.add(result.content_digest)
     assert len(seen)==5
+
+
+
+@pytest.mark.parametrize("target", ("sega_master_system", "sega_game_gear"))
+def test_original_native_pet_restart_pause_and_idle_are_gameplay_safe(target):
+    world=_world(seed=90304)
+    output=compile_native_sega_8bit(world,_rights(world),target,authorized=True)
+    meta=json.loads(output.manifest_json)
+    code=output.game_c
+    assert meta["world_digest"]==world.digest
+    assert meta["native_two_button_short_pet"] is True
+    assert meta["native_companion_pet_no_gameplay_authority"] is True
+    assert meta["native_console_restart_after_victory_or_defeat"] is True
+    assert meta["native_paused_psg_immediately_muted"] is True
+    assert meta["native_restored_theme_palette_on_restart"] is True
+    assert meta["native_ambient_companion_idle_gestures"]==4
+    assert "static void pet_companion(void)" in code
+    pet=code.split("static void pet_companion(void)",1)[1].split(
+        "static void grant_companion_bond(void)",1
+    )[0]
+    for forbidden in ("score+=", "board[", "gems_left=", "level_index=", "health="):
+        assert forbidden not in pet
+    assert "if (demo_chord_frames==0) pet_companion();" in code
+    assert "if (won || lost) { reset_original_run(); continue; }" in code
+    assert code.count("if (paused) { sound_frames=0; PSG_PORT=0x9F; }")==2
+    assert "if (phase>=58 && phase<65)" in code
+    assert "else if (phase>=92 && phase<104)" in code
+    assert "else if (phase>=120)" in code
+    assert "GG_setBGPaletteColor(3, BASE_COLOR_3);" in code
+    assert "SMS_setBGPaletteColor(3, BASE_COLOR_3);" in code
+    assert "original_demo_autostart" in meta
+    assert meta["original_demo_autostart"] is False
+    assert meta["original_demo_chord_frames"]==25
+    assert meta["emulator_playthrough_verified"] is False
+    assert meta["release_approved"] is False
