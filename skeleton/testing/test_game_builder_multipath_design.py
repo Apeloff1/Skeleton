@@ -403,3 +403,15 @@ def test_route_ranking_is_explainable_and_stable():
     with pytest.raises(MultipathError):
         rank_routes(p, routes, preference="guaranteed_delight")
 
+
+def test_challenge_selection_cannot_self_certify_fun():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    routes = route_portfolio(p, max_routes=4)
+    decision = challenge_route_selection(p, routes)
+    digests = {p.digest for p in routes}
+    assert decision["fastest_digest"] in digests
+    assert decision["explorer_digest"] in digests
+    assert decision["high_friction_digest"] in digests
+    assert decision["requires_playtesting"] is True
+    assert decision["player_enjoyment_proven"] is False
+
