@@ -911,6 +911,36 @@ class NativeGenomicPathRequest(BaseModel):
                          pattern=r"^(0|[1-9][0-9]*)$")
 
 
+class NativeGenomicPathComposeRequest(NativeGenomicWorldRequest):
+    """Compose sixteen actual in-world action choices without bigint JS math."""
+    word:list[StrictInt]=Field(default_factory=lambda:[0]*16,
+                               min_length=16,max_length=16)
+
+
+@router.post("/native/production/worlds/genome/compose-path")
+def native_genomic_world_compose_path(
+    body:NativeGenomicPathComposeRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from dataclasses import asdict
+    from skeleton.ai.webcrawler.dragon_genomic_paths import (
+        rank_path,materialize_path,verify_path,
+    )
+    try:
+        path_id=rank_path(body.index,tuple(body.word))
+        program=materialize_path(path_id)
+        checked=verify_path(program)
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original indexed game path contains invalid or non-playable actions") from None
+    return {
+        "ok":True,"exact_decimal_path_address":path_id,
+        "playable_route":asdict(program),
+        "verification":checked,
+        "claim":"sixteen real independently replayed user-selected original actions",
+    }
+
+
 class NativeGenomicPathSampleRequest(NativeGenomicWorldRequest):
     limit:StrictInt=Field(default=4,ge=1,le=6)
 
