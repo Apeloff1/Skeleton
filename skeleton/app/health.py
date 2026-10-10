@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 import time
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
 from skeleton.app.assembly import AssemblyManifest, ServiceSpec, load_manifest
+from skeleton.client import GatewayClient
+from skeleton.client.retry import RetryPolicy
 
 
 @dataclass(frozen=True)
@@ -29,30 +30,30 @@ class ProbeResult:
 
 
 def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
-    """Probe one HTTP endpoint without external client dependencies."""
+    """Probe one HTTP endpoint via the typed Skeleton client."""
 
-    request = Request(url, headers={"User-Agent": "skeleton-app-smoke/1"})
-    try:
-        with urlopen(request, timeout=timeout) as response:
-            status = int(getattr(response, "status", 200))
-            response.read(256)
-        ok = 200 <= status < 400
-        return ProbeResult(
-            service=name,
-            url=url,
-            ok=ok,
-            status=status,
-            detail="healthy" if ok else f"unexpected HTTP status {status}",
-        )
-    except HTTPError as exc:
+    parts = urlsplit(url)
+    if not parts.scheme or not parts.netloc:
         return ProbeResult(
             service=name,
             url=url,
             ok=False,
-            status=int(exc.code),
-            detail=f"HTTP error {exc.code}",
+            status=None,
+            detail="invalid URL: scheme and host are required",
         )
-    except (URLError, TimeoutError, OSError) as exc:
+    base = f"{parts.scheme}://{parts.netloc}"
+    path = parts.path or "/"
+    if parts.query:
+        path = f"{path}?{parts.query}"
+    client = GatewayClient(
+        base,
+        timeout_seconds=timeout,
+        headers={"User-Agent": "skeleton-app-smoke/1"},
+        retry=RetryPolicy(max_attempts=1),
+    )
+    try:
+        status, _body = client.request_raw("GET", path, idempotent=True)
+    except Exception as exc:  # transport / timeout / client construction
         return ProbeResult(
             service=name,
             url=url,
@@ -60,6 +61,17 @@ def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
             status=None,
             detail=f"{type(exc).__name__}: {exc}",
         )
+    finally:
+        client.close()
+
+    ok = 200 <= status < 400
+    return ProbeResult(
+        service=name,
+        url=url,
+        ok=ok,
+        status=status,
+        detail="healthy" if ok else f"unexpected HTTP status {status}",
+    )
 
 
 def probe_url(service: ServiceSpec, *, timeout: float = 3.0) -> ProbeResult:

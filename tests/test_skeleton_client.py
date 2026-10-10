@@ -181,3 +181,51 @@ def test_transport_error_maps():
             gw.capabilities()
     finally:
         gw.close()
+
+
+def test_gateway_request_raw_returns_status_on_http_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"detail": "missing"})
+
+    gw = GatewayClient(
+        "http://skel.test",
+        client=httpx.Client(
+            base_url="http://skel.test",
+            transport=_mock_transport(handler),
+            timeout=5.0,
+        ),
+        retry=RetryPolicy(max_attempts=1),
+    )
+    try:
+        status, body = gw.request_raw("GET", "/api/v1/health")
+        assert status == 404
+        assert body == {"detail": "missing"}
+    finally:
+        gw.close()
+
+
+def test_app_health_probe_uses_client(monkeypatch):
+    from skeleton.app.health import probe_http
+
+    captured: dict[str, object] = {}
+
+    class FakeClient:
+        def __init__(self, base, **kwargs):
+            captured["base"] = base
+            captured["headers"] = kwargs.get("headers")
+
+        def request_raw(self, method, path, *, idempotent=True):
+            captured["method"] = method
+            captured["path"] = path
+            return 200, {"status": "ok"}
+
+        def close(self):
+            captured["closed"] = True
+
+    monkeypatch.setattr("skeleton.app.health.GatewayClient", FakeClient)
+    result = probe_http("backend", "http://127.0.0.1:8000/api/v1/health", timeout=1.5)
+    assert result.ok is True
+    assert result.status == 200
+    assert captured["base"] == "http://127.0.0.1:8000"
+    assert captured["path"] == "/api/v1/health"
+    assert captured["closed"] is True
