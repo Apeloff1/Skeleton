@@ -41,10 +41,16 @@ class PortableGameDesign:
     candidates: int = 8
     project_notes: str = "Original native homebrew; platform-scaled design"
     procedural_levels: bool = False
+    campaign_pathing: str = "branching"
+    challenge_profile: str = "balanced"
 
     def validate(self) -> None:
         if type(self.procedural_levels) is not bool:
             raise ValueError("procedural game levels must be explicit boolean")
+        if self.campaign_pathing not in ("linear","branching"):
+            raise ValueError("unknown original campaign progression mode")
+        if self.challenge_profile not in ("gentle","balanced","challenging","spicy"):
+            raise ValueError("unsupported game challenge intensity")
         from .dragon_game_design import PALETTES, HEROES, THEMES
         if self.palette not in PALETTES or self.hero not in HEROES or self.quest_theme not in THEMES:
             raise ValueError("portable palette, hero or theme is not supported")
@@ -95,6 +101,7 @@ def _adapt_portable_design(request: "ProductionRequest", target_id: str):
         adjustments.append("palette_adapted_to_cartridge_safe_class")
     if not desktop:
         adjustments.append("hero_theme_and_difficulty_not_runtime_applied_by_cartridge_emitter")
+        adjustments.append("native_chapter_branching_not_applied_by_cartridge_emitter")
     return actual, {
         "schema": "skeleton.ai.dragon.portable_game_port.v1",
         "portable_profile": asdict(profile),
@@ -469,6 +476,10 @@ def _render(request: ProductionRequest, target_id: str) -> NativeProject:
         design=adapted_design,
         procedural_puzzles=bool(request.portable_design and request.portable_design.procedural_levels),
         authored_puzzles=request.authored_puzzles,
+        campaign_mode=(request.portable_design.campaign_pathing
+                       if request.portable_design is not None else "branching"),
+        challenge_profile=(request.portable_design.challenge_profile
+                           if request.portable_design is not None else "balanced"),
     )
 
 
