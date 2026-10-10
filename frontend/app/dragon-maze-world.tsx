@@ -113,6 +113,11 @@ function Editor(){
   const [player,setPlayer]=React.useState<Player|null>(null);
   const [moves,setMoves]=React.useState<string[]>([]);
   const [guided,setGuided]=React.useState<string[]|null>(null);
+  const [rescue,setRescue]=React.useState<{
+    reachable_now:boolean;next_move:string|null;
+    remaining_actions:number;reset_required:boolean;
+    proof:string;
+  }|null>(null);
   const [approved,setApproved]=React.useState(false);
   const [attested,setAttested]=React.useState(false);
   const [busy,setBusy]=React.useState(false);
@@ -130,7 +135,8 @@ function Editor(){
   const reset=()=>{
     epoch.current++;
     setBusy(false);setReview(null);setPlayer(null);setMoves([]);
-    setGuided(null);setApproved(false);setNotice('');setError('');
+    setGuided(null);setRescue(null);
+    setApproved(false);setNotice('');setError('');
   };
   const create=async()=>{
     if(!isEditor||busy||!validSeed)return;
@@ -149,6 +155,7 @@ function Editor(){
         throw new Error('Maze certificate is incomplete or mismatched.');
       if(ticket===epoch.current){
         setReview(result);setPlayer(result.player);setGuided(null);
+        setRescue(null);
       }
     }catch(caught){
       if(ticket===epoch.current)setError(caught instanceof Error
@@ -168,7 +175,7 @@ function Editor(){
       if(!result.ok||result.played_edges.join('|')!==next.join('|'))
         throw new Error('Maze move could not be verified against original world.');
       if(ticket===epoch.current){
-        setPlayer(result);setMoves(next);
+        setPlayer(result);setMoves(next);setRescue(null);
         if(result.completed)setNotice('Goal reached through actual original maze gameplay.');
       }
     }catch(caught){
@@ -188,16 +195,37 @@ function Editor(){
       if(!result.ok||result.played_edges.join('|')!==next.join('|'))
         throw new Error('Maze return state no longer verifies.');
       if(ticket===epoch.current){
-        setMoves(next);setPlayer(result);setNotice('');
+        setMoves(next);setPlayer(result);setNotice('');setRescue(null);
       }
     }catch(caught){
       if(ticket===epoch.current)setError(caught instanceof Error
         ?caught.message:'Cannot rewind original world journey.');
     }finally{if(ticket===epoch.current)setBusy(false);}
   };
+  const findSafeWay=async()=>{
+    if(!review||!player||busy)return;
+    const ticket=++epoch.current;
+    setBusy(true);setError('');setRescue(null);
+    try{
+      const proof=await post<{
+        ok:boolean;reachable_now:boolean;next_move:string|null;
+        remaining_actions:number;reset_required:boolean;
+        proof:string;
+      }>('/recovery',{...settings,moves});
+      if(!proof.ok||typeof proof.reachable_now!=='boolean'||
+         typeof proof.reset_required!=='boolean'||
+         (proof.reachable_now&&proof.next_move!==null&&
+          !player.options.some(x=>x.edge===proof.next_move&&x.available)))
+        throw new Error('Current-game maze rescue proof is inconsistent.');
+      if(ticket===epoch.current)setRescue(proof);
+    }catch(caught){
+      if(ticket===epoch.current)setError(caught instanceof Error
+        ?caught.message:'Original maze recovery failed.');
+    }finally{if(ticket===epoch.current)setBusy(false);}
+  };
   const startWitness=(path:string[])=>{
     if(!review||busy||!path.length)return;
-    setMoves([]);setPlayer(review.player);setGuided(path);
+    setMoves([]);setPlayer(review.player);setGuided(path);setRescue(null);
     setNotice('Following a constructively proven path. Each step still plays for real.');
     setError('');
   };
@@ -376,6 +404,26 @@ function Editor(){
                 </Text>}
               </TouchableOpacity>
             ))}
+            <TouchableOpacity accessibilityRole="button"
+              style={[s.action,busy&&s.disabled]} disabled={busy}
+              onPress={findSafeWay}>
+              <Text style={s.actionText}>
+                Ask Dragon for an actually playable escape
+              </Text>
+            </TouchableOpacity>
+            {rescue&&<View style={s.pass}>
+              <Text style={s.copy}>
+                {rescue.reachable_now
+                  ?rescue.remaining_actions+' proven safe moves remain'
+                  :'Action/time budget exhausted — use Restart or Guided route'}
+              </Text>
+              <Text style={s.hint}>{rescue.proof}</Text>
+              {rescue.next_move&&<TouchableOpacity style={s.chip}
+                onPress={()=>{if(rescue.next_move)play(rescue.next_move);}}
+                disabled={busy}>
+                <Text style={s.actionText}>Take next protected escape step</Text>
+              </TouchableOpacity>}
+            </View>}
             <View style={s.chips}>
               <TouchableOpacity style={s.chip} disabled={busy||!moves.length}
                 onPress={undo}>
