@@ -176,6 +176,36 @@ def native_production_capabilities(owner: str = Depends(_principal)) -> dict:
     }
 
 
+def _make_native_production_request(body: NativeProductionSourceRequest):
+    from skeleton.ai.webcrawler.dragon_native_production import (
+        PortableGameDesign, ProductionRequest,
+    )
+    return ProductionRequest(
+        title=body.title, style=body.style, targets=tuple(body.targets),
+        original_work_attested=body.original_work_attested,
+        rights_basis=body.rights_basis, rights_reference=body.rights_reference,
+        seed=body.seed, max_portfolio_bytes=3_000_000,
+        portable_design=(PortableGameDesign(**body.portable_design.model_dump())
+                         if body.portable_design is not None else None),
+    )
+
+
+@router.post("/native/production/preview")
+def native_production_preview(
+    body: NativeProductionSourceRequest,
+    owner: str = Depends(_native_source_editor),
+) -> dict:
+    """No build, rights approval, storage mutation, compiler or knowledge promotion."""
+    if not body.original_work_attested:
+        raise HTTPException(status_code=403, detail="Original rights declaration required")
+    from skeleton.ai.webcrawler.dragon_native_production import preview_native_portfolio
+    try:
+        return {"ok": True, **preview_native_portfolio(_make_native_production_request(body))}
+    except (ValueError, PermissionError):
+        raise HTTPException(status_code=422,
+                            detail="Unsupported target, genre or portable game controls") from None
+
+
 @router.post("/native/production/source-bundle")
 def native_production_source_bundle(
     body: NativeProductionSourceRequest,
@@ -185,18 +215,9 @@ def native_production_source_bundle(
     if not body.approved or not body.original_work_attested:
         raise HTTPException(status_code=403,
                             detail="Explicit publication and original rights attestation required")
-    from skeleton.ai.webcrawler.dragon_native_production import (
-        PortableGameDesign, ProductionRequest, build_source_bundle,
-    )
+    from skeleton.ai.webcrawler.dragon_native_production import build_source_bundle
     try:
-        request = ProductionRequest(
-            title=body.title, style=body.style, targets=tuple(body.targets),
-            original_work_attested=body.original_work_attested,
-            rights_basis=body.rights_basis, rights_reference=body.rights_reference,
-            seed=body.seed, max_portfolio_bytes=3_000_000,
-            portable_design=(PortableGameDesign(**body.portable_design.model_dump())
-                             if body.portable_design is not None else None),
-        )
+        request = _make_native_production_request(body)
         payload, index = build_source_bundle(request, authorized=True)
     except (ValueError, PermissionError):
         raise HTTPException(status_code=422,
