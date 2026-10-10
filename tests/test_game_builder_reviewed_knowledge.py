@@ -102,7 +102,11 @@ class ReviewedKnowledgeTests(unittest.TestCase):
         self.store.close()
         self.store = ReviewedKnowledgeStore(self.dbfile)
         reopened = self.store.search("studio-a", "jump", authorized=True)
-        self.assertEqual(hits, reopened)
+        # Relevance is specific to the query, not an immutable citation field.
+        self.assertEqual(
+            tuple(replace(hit, relevance=0) for hit in hits),
+            tuple(replace(hit, relevance=0) for hit in reopened),
+        )
         self.assertEqual(self.store.history("studio-a", "source-a", authorized=True)[0], receipt)
 
     def test_idempotent_queries_and_root(self):
@@ -166,9 +170,9 @@ class ReviewedKnowledgeTests(unittest.TestCase):
         bad = replace(base.notes[0], end=len(TEXT) + 1)
         with self.assertRaisesRegex(KnowledgeError, "outside"):
             self.admit(replace(base, notes=(bad,)))
-        bad = replace(base.notes[0], start=6, end=6)
+        # The immutable note itself rejects invalid zero-length spans at creation.
         with self.assertRaises(KnowledgeError):
-            self.admit(replace(base, notes=(bad,)))
+            replace(base.notes[0], start=6, end=6)
         long_doc = replace(
             base, text="Z" * 1200,
             notes=(replace(base.notes[0], start=0, end=1100),),

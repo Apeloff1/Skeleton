@@ -1,0 +1,76 @@
+name: Game Builder Native Apple II 6502
+
+on:
+  pull_request:
+    paths:
+      - 'skeleton/ai/game_builder/**'
+      - 'scripts/game_builder/native_apple2_ci.py'
+      - '.github/workflows/game-builder-native-apple2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: game-builder-apple2-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-apple2-program:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /skeleton/__init__.py
+            /skeleton/ai/__init__.py
+            /skeleton/ai/capability_map.py
+            /skeleton/ai/game_builder/
+            /scripts/game_builder/native_apple2_ci.py
+            /skeleton/testing/test_game_builder_apple2_native.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install real Apple II cc65 compiler and linker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cc65 make
+          cl65 --version
+      - name: Build original Apple II 6502 game and verify actual AppleSingle format
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          python scripts/game_builder/native_apple2_ci.py --emit apple2-original-source > apple2-source-provenance.json
+          make -C apple2-original-source
+          test -s apple2-original-source/build/skeleton-original.as
+          python scripts/game_builder/native_apple2_ci.py --verify apple2-original-source/build/skeleton-original.as > apple2-artifact-attestation.json
+          python - <<'PY'
+          import json
+          d=json.load(open("apple2-artifact-attestation.json",encoding="utf-8"))
+          assert d["actual_native_binary_compiled"] is True
+          assert d["applesingle_header_verified"] is True
+          assert d["apple_ii_emulator_playthrough_verified"] is False
+          print("GENUINE_APPLE_II_6502_PROGRAM_BUILT",d["sha256"])
+          PY
+      - name: Run original Apple II native game controls
+        env:
+          PYTHONPATH: .
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+        run: |
+          python -m pip install --disable-pip-version-check "pytest>=8.4,<9"
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_apple2_native.py
+      - name: Upload actual 6502 Apple II original and immutable evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: skeleton-original-apple-ii-applesingle-program
+          path: |
+            apple2-original-source/build/skeleton-original.as
+            apple2-original-source/manifest.json
+            apple2-source-provenance.json
+            apple2-artifact-attestation.json
+          if-no-files-found: error
+          retention-days: 7

@@ -218,12 +218,15 @@ class PlayableWorldTests(unittest.TestCase):
         state = initial_state(game, authorized=True)
         for direction in route:
             state = advance(game, state, direction, authorized=True)
-        if len(state.collected) != game.intent.collectibles_per_level:
-            self.assertEqual(state.level_index, 0)
+        if state.level_index == 0:
+            # A premature exit cannot advance an incomplete level.
+            self.assertLess(len(state.collected), game.intent.collectibles_per_level)
             self.assertEqual(state.status, "playing")
         else:
-            # A maze may place every collectible on the unique path to exit.
+            # Completion clears the per-level inventory before the next level.
+            # The old assertion incorrectly interpreted that reset as a missed gem.
             self.assertGreaterEqual(state.level_index, 1)
+            self.assertGreaterEqual(state.score, 100 + 10 * game.intent.collectibles_per_level)
 
     def test_corrupted_generated_level_proof_is_rejected(self):
         game = generate_playable_world(intent(), authorized=True)

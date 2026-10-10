@@ -204,7 +204,11 @@ def _findings(level: LevelExperience) -> tuple[PlayabilityFinding, ...]:
         flags.append(("route_overrun", "strong" if level.route_overrun_ppm > 3_000_000 else "attention"))
     if level.hazard_hits:
         flags.append(("hazard_damage", "strong" if level.hazard_hits > 1 else "attention"))
-    if level.moves >= max(12, level.shortest_safe_route) and not level.completed:
+    if (not level.completed and level.moves >= 12 and (
+        level.moves >= level.shortest_safe_route or level.wall_contacts >= 12
+    )):
+        # A player repeatedly trapped against a wall warrants an objective
+        # visibility review even when the optimal full maze route is longer.
         flags.append(("incomplete_objectives", "attention"))
     evidence = canonical_digest(level.to_payload())
     return tuple(

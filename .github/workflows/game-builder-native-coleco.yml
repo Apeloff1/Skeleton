@@ -1,0 +1,83 @@
+name: Game Builder Native ColecoVision Z80 ROM
+
+on:
+  pull_request:
+    paths:
+      - 'skeleton/ai/game_builder/**'
+      - 'scripts/game_builder/native_coleco_ci.py'
+      - '.github/workflows/game-builder-native-coleco.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-coleco-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  original-colecovision-os7-cartridge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /skeleton/__init__.py
+            /skeleton/ai/__init__.py
+            /skeleton/ai/capability_map.py
+            /skeleton/ai/game_builder/
+            /scripts/game_builder/native_coleco_ci.py
+            /skeleton/testing/test_game_builder_coleco_native.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install real cross-platform Zilog Z80 assembler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends z80asm make
+          z80asm -V
+      - name: Assemble genuine ColecoVision OS7 Z80 cartridge game
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          python scripts/game_builder/native_coleco_ci.py --emit coleco-original-game > coleco-authorship-evidence.json
+          make -C coleco-original-game
+          test -s coleco-original-game/build/original-coleco.bin
+          test -s coleco-original-game/build/original-coleco.col
+          python scripts/game_builder/native_coleco_ci.py \
+            --verify-rom coleco-original-game/build/original-coleco.col \
+            --source-bin coleco-original-game/build/original-coleco.bin > coleco-native-binary-evidence.json
+          python - <<'PY'
+          import json
+          e=json.load(open("coleco-native-binary-evidence.json",encoding="utf-8"))
+          assert e["bytes"]==32768
+          assert e["header_magic"]=="55aa"
+          assert e["coleco_soft_vectors_verified"] is True
+          assert e["binary_assembled"] is True
+          assert e["emulator_full_gameplay_verified"] is False
+          assert e["commercial_game_assets_included"] is False
+          print("GENUINE_COLECO_OS7_Z80_CARTRIDGE_COMPILED",e["native_cartridge_sha256"])
+          PY
+      - name: Reject malformed Coleco BIOS RST/NMI, VDP, PSG and copyright envelopes
+        env:
+          PYTHONPATH: .
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+        run: |
+          python -m pip install --disable-pip-version-check 'pytest>=8.4,<9'
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_coleco_native.py
+      - name: Upload authentic new ColecoVision machine-code game
+        uses: actions/upload-artifact@v4
+        with:
+          name: skeleton-original-colecovision-z80-homebrew
+          path: |
+            coleco-original-game/build/original-coleco.col
+            coleco-original-game/build/original-coleco.bin
+            coleco-original-game/manifest.json
+            coleco-authorship-evidence.json
+            coleco-native-binary-evidence.json
+          if-no-files-found: error
+          retention-days: 7

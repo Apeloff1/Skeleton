@@ -1,0 +1,76 @@
+name: Game Builder Native Atari 8-bit XEX
+
+on:
+  pull_request:
+    paths:
+      - 'skeleton/ai/game_builder/**'
+      - 'scripts/game_builder/native_atari8_ci.py'
+      - '.github/workflows/game-builder-native-atari8.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: game-builder-atari8-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-atari-8bit-game:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /skeleton/__init__.py
+            /skeleton/ai/__init__.py
+            /skeleton/ai/capability_map.py
+            /skeleton/ai/game_builder/
+            /scripts/game_builder/native_atari8_ci.py
+            /skeleton/testing/test_game_builder_atari8_native.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install authentic 6502 Atari 8-bit compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cc65 make
+          cl65 --version
+      - name: Compile original Atari 400/800 6502 program
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          python scripts/game_builder/native_atari8_ci.py --emit original-atari8-game > atari-source-receipt.json
+          make -C original-atari8-game
+          test -s original-atari8-game/build/skeleton-original.xex
+          python scripts/game_builder/native_atari8_ci.py --verify-xex original-atari8-game/build/skeleton-original.xex > atari-xex-verification.json
+          python - <<'PY'
+          import json
+          xex=json.load(open("atari-xex-verification.json", encoding="utf-8"))
+          assert xex["native_6502_compilation_verified"] is True
+          assert xex["autostart_runad_present"] is True
+          assert xex["atari_os_emulation_verified"] is False
+          print("ORIGINAL_ATARI_8BIT_XEX_COMPILED",xex["sha256"])
+          PY
+      - name: Run Atari hardware and original rights regressions
+        env:
+          PYTHONPATH: .
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+        run: |
+          python -m pip install --disable-pip-version-check "pytest>=8.4,<9"
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_atari8_native.py
+      - name: Upload genuine Atari 6502 program and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: skeleton-original-atari-8bit-xex
+          path: |
+            original-atari8-game/build/skeleton-original.xex
+            original-atari8-game/manifest.json
+            atari-xex-verification.json
+            atari-source-receipt.json
+          if-no-files-found: error
+          retention-days: 7

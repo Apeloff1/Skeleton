@@ -1,0 +1,107 @@
+name: Game Builder Native Game Boy Color ROM
+
+on:
+  pull_request:
+    paths:
+      - 'skeleton/ai/game_builder/**'
+      - 'scripts/game_builder/native_game_boy_color_ci.py'
+      - 'scripts/game_builder/emulate_game_boy_ci.py'
+      - '.github/workflows/game-builder-native-gameboy-color.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: game-builder-cgb-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-rgb555-color-cartridge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /skeleton/__init__.py
+            /skeleton/ai/__init__.py
+            /skeleton/ai/capability_map.py
+            /skeleton/ai/game_builder/
+            /scripts/game_builder/native_game_boy_ci.py
+            /scripts/game_builder/native_game_boy_color_ci.py
+            /scripts/game_builder/emulate_game_boy_ci.py
+            /skeleton/testing/test_game_builder_game_boy_color_native.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install genuine RGBDS 1.0 Color cartridge assembler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential bison flex libpng-dev pkg-config
+          git clone --depth 1 --branch v1.0.0 https://github.com/gbdev/rgbds.git /tmp/skeleton-rgbds
+          make -C /tmp/skeleton-rgbds -j 2
+          sudo make -C /tmp/skeleton-rgbds install
+          rgbasm --version
+      - name: Build original RGB555 CGB-only hardware cartridge
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          python scripts/game_builder/native_game_boy_color_ci.py --emit color-world-src > cgb-source-provenance.json
+          make -C color-world-src
+          test -s color-world-src/build/skeleton-original.gbc
+          test -s color-world-src/build/skeleton.sym
+          python scripts/game_builder/native_game_boy_color_ci.py --verify-rom color-world-src/build/skeleton-original.gbc > cgb-rom-verification.json
+          python - <<'PY'
+          import json
+          d=json.load(open("cgb-rom-verification.json",encoding="utf-8"))
+          assert d["native_color_only_flag_verified"] is True
+          assert d["native_color_gameplay_verified"] is False
+          print("NATIVE_CGB_RGB555_COLOR_ROM_COMPILED",d["sha256"])
+          PY
+      - name: Verify authored CGB sources and real hardware color mapping constraints
+        env:
+          PYTHONPATH: .
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+        run: |
+          python -m pip install --disable-pip-version-check "pytest>=8.4,<9"
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_game_boy_color_native.py
+      - name: Execute complete original game in true Game Boy Color CPU emulator
+        env:
+          PYTHONPATH: .
+          SDL_VIDEODRIVER: dummy
+        run: |
+          python -m pip install --disable-pip-version-check --only-binary=:all: pyboy==2.8.1
+          python scripts/game_builder/emulate_game_boy_ci.py --cgb \
+            --rom color-world-src/build/skeleton-original.gbc \
+            --symbols color-world-src/build/skeleton.sym \
+            --route color-world-src/color-hardware-reference.json \
+            --out cgb-emulator-attestation.json
+          python - <<'PY'
+          import json
+          d=json.load(open("cgb-emulator-attestation.json",encoding="utf-8"))
+          assert d["emulated_hardware_mode"]=="CGB"
+          assert d["emulated_levels"]==3
+          assert d["emulated_steps"]>100
+          assert d["emulator_gameplay_passed"] is True
+          assert d["final_ram"]["won"]==1
+          assert d["physical_hardware_verified"] is False
+          print("ACTUAL_CGB_ALL_ORIGINAL_MOVES_VERIFIED",d["emulated_steps"])
+          PY
+      - name: Upload real GBC game and evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: skeleton-original-rgb555-cgb-cartridge
+          path: |
+            color-world-src/build/skeleton-original.gbc
+            color-world-src/build/skeleton.sym
+            color-world-src/manifest.json
+            color-world-src/color-hardware-reference.json
+            cgb-rom-verification.json
+            cgb-source-provenance.json
+            cgb-emulator-attestation.json
+          if-no-files-found: error
+          retention-days: 7

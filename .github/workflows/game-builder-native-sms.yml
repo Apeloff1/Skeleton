@@ -1,0 +1,83 @@
+name: Game Builder Native Sega Master System ROM
+
+on:
+  pull_request:
+    paths:
+      - 'skeleton/ai/game_builder/**'
+      - 'scripts/game_builder/native_sms_ci.py'
+      - '.github/workflows/game-builder-native-sms.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-sms-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  original-sms-mode4-32kb-cartridge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /skeleton/__init__.py
+            /skeleton/ai/__init__.py
+            /skeleton/ai/capability_map.py
+            /skeleton/ai/game_builder/
+            /scripts/game_builder/native_sms_ci.py
+            /skeleton/testing/test_game_builder_sms_native.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install authentic native Sega Z80 assembler toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends z80asm make
+          z80asm -V
+      - name: Build original Z80 SMS game with real 4bpp tiles and mandatory boot checksum
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          python scripts/game_builder/native_sms_ci.py --emit original-sms-source > sms-source-provenance.json
+          make -C original-sms-source
+          test -s original-sms-source/build/skeleton-original.bin
+          test -s original-sms-source/build/skeleton-original.sms
+          python scripts/game_builder/native_sms_ci.py \
+            --verify-rom original-sms-source/build/skeleton-original.sms \
+            --binary original-sms-source/build/skeleton-original.bin > sms-cartridge-attestation.json
+          python - <<'PY'
+          import json
+          d=json.load(open("sms-cartridge-attestation.json",encoding="utf-8"))
+          assert d["rom_size"]==32768
+          assert d["boot_header_verified"] is True
+          assert d["vblank_interrupt_vector_verified"] is True
+          assert d["native_z80_binary_compiled"] is True
+          assert d["full_sms_emulator_playthrough_verified"] is False
+          print("ORIGINAL_SMS_Z80_MODE4_CARTRIDGE_COMPILED",d["sha256"])
+          PY
+      - name: Run original graphics, cartridge, joypad and copyright regressions
+        env:
+          PYTHONPATH: .
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+        run: |
+          python -m pip install --disable-pip-version-check "pytest>=8.4,<9"
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_sms_native.py
+      - name: Upload authentic playable cartridge and source evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: skeleton-original-sega-master-system-mode4-cartridge
+          path: |
+            original-sms-source/build/skeleton-original.sms
+            original-sms-source/build/skeleton-original.bin
+            original-sms-source/manifest.json
+            original-sms-source/README.txt
+            sms-source-provenance.json
+            sms-cartridge-attestation.json
+          if-no-files-found: error
+          retention-days: 7
