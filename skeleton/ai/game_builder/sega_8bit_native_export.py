@@ -23,6 +23,38 @@ _TARGETS = {
 }
 # Original tiles drawn in four-plane SMS VDP format, 8x8x4 = 32 bytes each.
 _TILE_IDS = {".": 0, "S": 0, "#": 1, "C": 2, "H": 3, "G": 4}
+
+
+def _authored_stage_accents(
+    palette: tuple[int, ...], levels: int, bits: int,
+) -> tuple[tuple[int, int], ...]:
+    """Deterministic theme-preserving stage accents for physical VDP CRAM.
+
+    Stage zero uses the original theme exactly; later stages rotate RGB
+    accents and selectively brighten channels within each console's limits.
+    Gameplay semantics never use this array.
+    """
+    if bits not in (2, 4) or not 1 <= levels <= 8 or len(palette) != 4:
+        raise Sega8BitNativeError("invalid stage palette hardware envelope")
+    mask = (1 << bits) - 1
+    def recolor(color: int, stage: int) -> int:
+        if type(color) is not int or not 0 <= color <= (1 << (bits * 3)) - 1:
+            raise Sega8BitNativeError("original color exceeds genuine console CRAM")
+        if stage == 0:
+            return color
+        channels = [(color >> (bits * n)) & mask for n in range(3)]
+        turn = stage % 3
+        channels = channels[turn:] + channels[:turn]
+        brighten = stage // 3
+        if brighten:
+            channels = [min(mask, channel + brighten) for channel in channels]
+        return sum(channel << (bits * n) for n, channel in enumerate(channels))
+    return tuple(
+        (recolor(palette[1], index), recolor(palette[2], index))
+        for index in range(levels)
+    )
+
+
 _BASE = r"""/* Original independently-authored Z80 homebrew: __TARGET__.
  * devkitSMS API is a build dependency, NOT redistributed in this package.
  * No Sega firmware, game ROM, copyrighted sound, or licensed SDK is embedded.
@@ -735,7 +767,21 @@ def compile_native_sega_8bit(
                    (0, 51, 60, 63)),
     }
     gg_colors, sms_colors = themes[world.intent.theme]
+    gg_stage_accents = _authored_stage_accents(gg_colors, len(world.levels), 4)
+    sms_stage_accents = _authored_stage_accents(sms_colors, len(world.levels), 2)
     substitutions = {
+        "__GG_STAGE_ACCENT_1__": ", ".join(
+            hex(accent[0]) for accent in gg_stage_accents
+        ),
+        "__GG_STAGE_ACCENT_2__": ", ".join(
+            hex(accent[1]) for accent in gg_stage_accents
+        ),
+        "__SMS_STAGE_ACCENT_1__": ", ".join(
+            str(accent[0]) for accent in sms_stage_accents
+        ),
+        "__SMS_STAGE_ACCENT_2__": ", ".join(
+            str(accent[1]) for accent in sms_stage_accents
+        ),
         "__GG_COLOR_0__": hex(gg_colors[0]),
         "__GG_COLOR_1__": hex(gg_colors[1]),
         "__GG_COLOR_2__": hex(gg_colors[2]),
@@ -783,6 +829,10 @@ def compile_native_sega_8bit(
         "original_color_theme":world.intent.theme,
         "game_gear_original_rgb12_palette":list(gg_colors),
         "master_system_original_rgb222_palette":list(sms_colors),
+        "game_gear_original_stage_rgb444_accents":[list(v) for v in gg_stage_accents],
+        "master_system_original_stage_rgb222_accents":[list(v) for v in sms_stage_accents],
+        "native_per_stage_hardware_bg_palette_accents":True,
+        "native_stage_palettes_change_core_gameplay":False,
         "native_psg_reactive_audio":True,
         "native_animated_companion":True,
         "default_audio_enabled":audio_enabled,
