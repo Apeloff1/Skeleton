@@ -727,3 +727,66 @@ def test_original_live_hint_cpu_entry_is_creator_role_protected():
                  "/api/dragon-academy/native/production/puzzle/current-hint")
     assert any(dep.call is route._native_source_editor
                for dep in current.dependant.dependencies)
+
+
+
+def test_original_campaign_api_builds_real_multistage_forks_and_solver_diversity():
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    from skeleton.ai.webcrawler.dragon_native_campaign_paths import verify_graph_report
+    from skeleton.ai.webcrawler.dragon_native_multipath import verify_route_report
+    from skeleton.ai.webcrawler.dragon_native_challenge_director import SCHEMA
+    args=route.NativeOriginalCampaignAnalysisRequest(
+        levels=[list(x) for x in BASE_LEVELS],
+        mode="branching",challenge_profile="spicy",route_budget=1500,
+    )
+    result=route.native_production_analyze_campaign(args,owner=identity())
+    assert result["ok"]
+    assert result["schema"]=="skeleton.ai.dragon.native_campaign_design_preview.v1"
+    assert len(result["stages"])==4
+    graph=verify_graph_report(result["chapter_paths"])
+    assert graph.ending_count==2 and graph.choice_nodes>=1
+    assert len(graph.complete_routes)>=2
+    assert result["challenge"]["schema"]==SCHEMA
+    assert result["challenge"]["profile"]=="spicy"
+    assert result["challenge"]["has_player_observations"] is False
+    for index,stage in enumerate(result["stages"]):
+        assert stage["stage"]==index+1
+        proof=verify_route_report(BASE_LEVELS[index],stage["routes"])
+        assert proof["routes"]>=1
+    assert "no human" in result["claim"]
+
+
+@pytest.mark.parametrize("bad",[
+    {"mode":"nonlinear_forever"},
+    {"challenge_profile":"sadistic"},
+    {"route_budget":False},
+    {"route_budget":1000000},
+])
+def test_original_campaign_preview_rejects_unbounded_game_or_coercible_choices(bad):
+    from pydantic import ValidationError
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    with pytest.raises(ValidationError):
+        route.NativeOriginalCampaignAnalysisRequest(
+            levels=[list(BASE_LEVELS[0])],**bad)
+
+
+def test_original_campaigned_multisolver_and_challenge_editor_routes_are_role_guarded():
+    for path in (
+        "/api/dragon-academy/native/production/puzzle/multiple-routes",
+        "/api/dragon-academy/native/production/puzzle/campaign/analyze",
+    ):
+        selected=next(x for x in route.router.routes if x.path==path)
+        assert any(item.call is route._native_source_editor
+                   for item in selected.dependant.dependencies)
+
+
+def test_original_campaign_does_not_invent_branch_choices_for_two_stages():
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    args=route.NativeOriginalCampaignAnalysisRequest(
+        levels=[list(BASE_LEVELS[0]),list(BASE_LEVELS[1])],
+        mode="branching",route_budget=1000,
+    )
+    report=route.native_production_analyze_campaign(args,owner=identity())
+    assert report["chapter_paths"]["ending_count"]==1
+    assert report["chapter_paths"]["choice_nodes"]==0
+    assert len(report["chapter_paths"]["complete_routes"])==1
