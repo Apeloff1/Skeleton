@@ -415,4 +415,16 @@ def objective_reachability(problem: RouteProblem) -> dict[str, object]:
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability"]
+def degree_histogram(problem: RouteProblem) -> dict[int, int]:
+    """Count safe physical cells by number of meaningful cardinal exits."""
+    if not isinstance(problem, RouteProblem):
+        raise MultipathError("typed problem required for branching report")
+    counts = {i: 0 for i in range(5)}
+    for cell in walkable_cells(problem):
+        degree = len(problem.neighbors(cell, allow_hazards=False))
+        counts[degree] += 1
+    return counts
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram"]
