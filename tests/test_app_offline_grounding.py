@@ -1,0 +1,494 @@
+"""Tamper/replay/backup/fork verification for atomic offline source-bound turns.
+
+Evidence custody proves *supplied context*, not model factual correctness.
+All tests use real SQLite transactions and immutable source-byte digests.
+"""
+from __future__ import annotations
+
+from hashlib import sha256
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
+import unittest
+
+from skeleton.ai.model_runtime.offline_chat import (
+    OfflineChatStore, _digest_request, _stable_bytes,
+)
+from skeleton.ai.model_runtime.runtime_contracts import (
+    GenerationConfig, RuntimeContractError,
+)
+from skeleton.app.offline_grounding import (
+    audit_answer_citations, grounded_request_digest,
+    prepare_evidence, validate_evidence,
+)
+from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary
+
+
+class GroundedOfflineReceiptTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.path = Path(self.temp.name) / "grounding.sqlite3"
+        self.store = OfflineChatStore(self.path)
+        self.addCleanup(self.store.close)
+        self.model = "a" * 64
+        self.token = "b" * 64
+        self.refs = OfflineKnowledgeLibrary(self.store, self.model, self.token)
+        self.question = "How does the depth buffer reject pixels?"
+        self.source = (
+            "The depth buffer stores a depth value for each pixel. "
+            "Fragments outside the visible depth range are rejected."
+        )
+        self.document = self.refs.add_text("GPU pipeline", self.source)
+        self.sid = self.store.create(self.model, self.token)
+        self.config = GenerationConfig(max_new_tokens=2)
+        self.digest = grounded_request_digest(
+            _digest_request(self.question, self.config)
+        )
+
+    def _snapshot(self):
+        hits = self.refs.search("depth buffer pixels", limit=2)
+        self.assertTrue(hits)
+        return prepare_evidence(
+            self.question, self.digest, hits, self.model, self.token
+        )
+
+    def _commit(self, evidence=None, *, req="grounded-one"):
+        saved = self.store.load(self.sid, self.model, self.token)
+        transcript = saved.transcript.append("user", self.question).append(
+            "assistant", "A local model output."
+        )
+        receipt = self.store.commit(
+            session=saved, request_id=req, request_digest=self.digest,
+            transcript=transcript, text="A local model output.",
+            output_digest=sha256(b"A local model output.").hexdigest(),
+            prompt_tokens=21, generated_tokens=2,
+            evidence_manifest=evidence,
+        )
+        return receipt
+
+    def test_atomic_commit_roundtrip_and_delete_source_snapshot_survives(self):
+        manifest = self._snapshot()
+        original = self._commit(manifest)
+        self.assertEqual(original.revision, 1)
+        self.assertEqual(self.store.turn_evidence(
+            self.sid, self.model, self.token
+        ), [manifest])
+        self.refs.delete(self.document["document_id"])
+        self.assertEqual(self.refs.search("depth"), [])
+        self.assertEqual(self.store.turn_evidence(
+            self.sid, self.model, self.token
+        ), [manifest])
+        self.store.close()
+        self.store = OfflineChatStore(self.path)
+        self.refs = OfflineKnowledgeLibrary(self.store, self.model, self.token)
+        self.assertEqual(self.store.load(
+            self.sid, self.model, self.token
+        ).revision, 1)
+        self.assertEqual(self.store.turn_evidence(
+            self.sid, self.model, self.token
+        ), [manifest])
+        self.assertEqual(self.store.replay(
+            self.sid, "grounded-one", self.digest
+        ).text, original.text)
+
+    def test_grounded_backup_v2_and_old_plain_v1_both_roundtrip(self):
+        manifest = self._snapshot()
+        self._commit(manifest)
+        archive = self.store.export_bundle(self.sid, self.model, self.token)
+        envelope = json.loads(archive)
+        self.assertEqual(
+            envelope["body"]["schema"], "skeleton.ai.offline-chat-bundle.v2"
+        )
+        self.assertEqual(envelope["body"]["evidence"], [manifest])
+        restored = self.store.import_bundle(
+            archive, self.model, self.token
+        )
+        self.assertNotEqual(self.sid, restored)
+        self.assertEqual(self.store.turn_evidence(
+            restored, self.model, self.token
+        ), [manifest])
+        self.assertEqual(self.store.load(
+            restored, self.model, self.token
+        ).revision, 1)
+
+        other = self.store.create(self.model, self.token)
+        original = self.sid
+        self.sid = other
+        try:
+            self._commit(None, req="legacy")
+        finally:
+            self.sid = original
+        plain = self.store.export_bundle(other, self.model, self.token)
+        self.assertEqual(
+            json.loads(plain)["body"]["schema"],
+            "skeleton.ai.offline-chat-bundle.v1"
+        )
+        imported = self.store.import_bundle(plain, self.model, self.token)
+        self.assertEqual(self.store.turn_evidence(
+            imported, self.model, self.token
+        ), [None])
+
+    def test_fork_exact_prefix_copies_grounding_and_delete_cascades(self):
+        manifest = self._snapshot()
+        self._commit(manifest)
+        branch = self.store.fork(self.sid, self.model, self.token)
+        self.assertEqual(self.store.turn_evidence(
+            branch, self.model, self.token
+        ), [manifest])
+        empty = self.store.fork(
+            self.sid, self.model, self.token, after_turn=0
+        )
+        self.assertEqual(self.store.turn_evidence(
+            empty, self.model, self.token
+        ), [])
+        self.store.delete(self.sid, self.model, self.token)
+        self.assertEqual(self.store.turn_evidence(
+            branch, self.model, self.token
+        ), [manifest])
+        self.assertEqual(self.store._db.execute(
+            "SELECT COUNT(*) FROM offline_turn_evidence "
+            "WHERE session_id=?", (self.sid,)
+        ).fetchone()[0], 0)
+
+    def test_poisoned_evidence_cannot_be_loaded_or_backed_up(self):
+        self._commit(self._snapshot())
+        with self.store._transaction():
+            self.store._db.execute(
+                "UPDATE offline_turn_evidence SET evidence_json=? "
+                "WHERE session_id=?", ('{"forged":true}', self.sid),
+            )
+        for task in (
+            lambda: self.store.load(self.sid, self.model, self.token),
+            lambda: self.store.export_bundle(self.sid, self.model, self.token),
+        ):
+            with self.assertRaises(RuntimeContractError):
+                task()
+
+    def test_manipulated_backup_rehash_does_not_launder_fake_citation(self):
+        self._commit(self._snapshot())
+        envelope = json.loads(
+            self.store.export_bundle(self.sid, self.model, self.token)
+        )
+        envelope["body"]["evidence"][0]["citations"][0]["passage"] = "fake passage"
+        envelope["sha256"] = sha256(
+            _stable_bytes(envelope["body"])
+        ).hexdigest()
+        with self.assertRaises(RuntimeContractError):
+            self.store.import_bundle(
+                _stable_bytes(envelope), self.model, self.token
+            )
+
+    def test_cancelled_generation_has_no_orphan_evidence(self):
+        manifest = self._snapshot()
+        saved = self.store.load(self.sid, self.model, self.token)
+        attempted = saved.transcript.append("user", self.question).append(
+            "assistant", "forged result"
+        )
+        invalid = dict(manifest)
+        invalid["context_sha256"] = "0" * 64
+        with self.assertRaises(RuntimeContractError):
+            self.store.commit(
+                session=saved, request_id="bad", request_digest=self.digest,
+                transcript=attempted, text="forged result",
+                output_digest=sha256(b"forged result").hexdigest(),
+                prompt_tokens=20, generated_tokens=1,
+                evidence_manifest=invalid,
+            )
+        self.assertEqual(self.store.load(
+            self.sid, self.model, self.token
+        ).revision, 0)
+        self.assertEqual(self.store._db.execute(
+            "SELECT COUNT(*) FROM offline_turn_evidence"
+        ).fetchone()[0], 0)
+
+    def test_missing_grounded_receipt_evidence_is_never_silently_downgraded(self):
+        self._commit(self._snapshot())
+        with self.store._transaction():
+            self.store._db.execute(
+                "DELETE FROM offline_turn_evidence WHERE session_id=?",
+                (self.sid,),
+            )
+        with self.assertRaisesRegex(RuntimeContractError, "evidence missing"):
+            self.store.load(self.sid, self.model, self.token)
+        with self.assertRaises(RuntimeContractError):
+            self.store.export_bundle(self.sid, self.model, self.token)
+        with self.assertRaises(RuntimeContractError):
+            self.store.turn_evidence(self.sid, self.model, self.token)
+
+    def test_plain_receipt_cannot_claim_unexpected_grounding(self):
+        plain = self.store.create(self.model, self.token)
+        saved = self.store.load(plain, self.model, self.token)
+        words = saved.transcript.append("user", "hello").append(
+            "assistant", "local result"
+        )
+        self.store.commit(
+            session=saved, request_id="plain-1", request_digest="a" * 64,
+            transcript=words, text="local result",
+            output_digest=sha256(b"local result").hexdigest(),
+            prompt_tokens=1, generated_tokens=1,
+        )
+        with self.store._transaction():
+            self.store._db.execute(
+                "UPDATE offline_turns SET grounded=1 "
+                "WHERE session_id=? AND request_id=?",
+                (plain, "plain-1"),
+            )
+        with self.assertRaisesRegex(RuntimeContractError, "evidence missing"):
+            self.store.load(plain, self.model, self.token)
+
+    def test_pre_grounding_database_schema_is_upgraded_without_losing_plain_turns(self):
+        import os
+        import sqlite3
+        legacy_path = Path(self.temp.name) / "legacy-schema.sqlite3"
+        connection = sqlite3.connect(legacy_path)
+        try:
+            connection.execute(
+                "CREATE TABLE offline_turns ("
+                "session_id TEXT NOT NULL,"
+                "request_id TEXT NOT NULL,"
+                "request_digest TEXT NOT NULL,"
+                "revision INTEGER NOT NULL CHECK (revision >= 1),"
+                "text TEXT NOT NULL, output_digest TEXT NOT NULL,"
+                "prompt_tokens INTEGER NOT NULL CHECK (prompt_tokens >= 0),"
+                "generated_tokens INTEGER NOT NULL CHECK (generated_tokens >= 0),"
+                "PRIMARY KEY (session_id, request_id),"
+                "UNIQUE (session_id, revision))"
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        if os.name != "nt":
+            legacy_path.chmod(0o600)
+        with OfflineChatStore(legacy_path) as upgraded:
+            fields = [
+                row[1] for row in upgraded._db.execute(
+                    "PRAGMA table_info(offline_turns)"
+                ).fetchall()
+            ]
+            self.assertIn("grounded", fields)
+            sid = upgraded.create(self.model, self.token)
+            snap = upgraded.load(sid, self.model, self.token)
+            conversation = snap.transcript.append("user", "hi").append(
+                "assistant", "response"
+            )
+            upgraded.commit(
+                session=snap, request_id="legacy-plain",
+                request_digest="a" * 64,
+                transcript=conversation, text="response",
+                output_digest=sha256(b"response").hexdigest(),
+                prompt_tokens=1, generated_tokens=1,
+            )
+            self.assertEqual(
+                upgraded.turn_evidence(sid, self.model, self.token), [None]
+            )
+        with OfflineChatStore(legacy_path) as reopened:
+            self.assertEqual(reopened.load(sid, self.model, self.token).revision, 1)
+
+    def test_migration_backfills_marker_for_existing_grounded_receipt(self):
+        import os
+        import sqlite3
+        manifest = self._snapshot()
+        self._commit(manifest)
+        legacy_path = Path(self.temp.name) / "pre-marker-grounded.sqlite3"
+        connection = sqlite3.connect(legacy_path)
+        try:
+            connection.execute(
+                "CREATE TABLE offline_sessions ("
+                "session_id TEXT PRIMARY KEY, model_digest TEXT NOT NULL,"
+                "tokenizer_digest TEXT NOT NULL, revision INTEGER NOT NULL,"
+                "transcript_json TEXT NOT NULL, updated_at INTEGER NOT NULL)"
+            )
+            connection.execute(
+                "CREATE TABLE offline_turns ("
+                "session_id TEXT NOT NULL REFERENCES offline_sessions(session_id),"
+                "request_id TEXT NOT NULL, request_digest TEXT NOT NULL,"
+                "revision INTEGER NOT NULL, text TEXT NOT NULL,"
+                "output_digest TEXT NOT NULL, prompt_tokens INTEGER NOT NULL,"
+                "generated_tokens INTEGER NOT NULL,"
+                "PRIMARY KEY (session_id, request_id),"
+                "UNIQUE (session_id, revision))"
+            )
+            connection.execute(
+                "CREATE TABLE offline_turn_evidence ("
+                "session_id TEXT NOT NULL, request_id TEXT NOT NULL,"
+                "evidence_json TEXT NOT NULL, evidence_digest TEXT NOT NULL,"
+                "PRIMARY KEY (session_id, request_id),"
+                "FOREIGN KEY (session_id, request_id) REFERENCES "
+                "offline_turns(session_id, request_id) ON DELETE CASCADE)"
+            )
+            session_row = self.store._db.execute(
+                "SELECT * FROM offline_sessions WHERE session_id=?",
+                (self.sid,),
+            ).fetchone()
+            turn_row = self.store._db.execute(
+                "SELECT session_id, request_id, request_digest, revision,"
+                "text, output_digest, prompt_tokens, generated_tokens "
+                "FROM offline_turns WHERE session_id=?", (self.sid,),
+            ).fetchone()
+            evidence_row = self.store._db.execute(
+                "SELECT * FROM offline_turn_evidence WHERE session_id=?",
+                (self.sid,),
+            ).fetchone()
+            connection.execute(
+                "INSERT INTO offline_sessions VALUES (?,?,?,?,?,?)", session_row
+            )
+            connection.execute(
+                "INSERT INTO offline_turns VALUES (?,?,?,?,?,?,?,?)", turn_row
+            )
+            connection.execute(
+                "INSERT INTO offline_turn_evidence VALUES (?,?,?,?)", evidence_row
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        if os.name != "nt":
+            legacy_path.chmod(0o600)
+        with OfflineChatStore(legacy_path) as migrated:
+            self.assertEqual(migrated.load(
+                self.sid, self.model, self.token
+            ).revision, 1)
+            grounded_flag = migrated._db.execute(
+                "SELECT grounded FROM offline_turns "
+                "WHERE session_id=? AND request_id=?",
+                (self.sid, "grounded-one"),
+            ).fetchone()[0]
+            self.assertEqual(grounded_flag, 1)
+            self.assertEqual(
+                migrated.turn_evidence(self.sid, self.model, self.token),
+                [manifest],
+            )
+        with OfflineChatStore(legacy_path) as reopened:
+            self.assertEqual(
+                reopened.turn_evidence(self.sid, self.model, self.token),
+                [manifest],
+            )
+
+    def test_prepared_snapshot_equals_exact_model_supplied_prefix(self):
+        original = (
+            "Rasterizer pixel edge coverage uses deterministic fixed-point "
+            "arithmetic. " * 7
+        )
+        indexed = self.refs.add_text("Long exact excerpt", original)
+        hits = self.refs.search("rasterizer pixel edge coverage", limit=1)
+        self.assertEqual(hits[0]["document_id"], indexed["document_id"])
+        manifest = prepare_evidence(
+            self.question, self.digest, hits, self.model, self.token
+        )
+        sent = manifest["citations"][0]
+        self.assertEqual(
+            original[sent["char_start"]:sent["char_end"]], sent["passage"]
+        )
+        self.assertLessEqual(len(sent["passage"]), 220)
+        self.assertIn(sent["passage"], manifest["context"])
+        self.assertNotIn(hits[0]["passage"], manifest["context"])
+        self.assertEqual(
+            json.loads(validate_evidence(
+                manifest, self.question, self.digest, self.model, self.token
+            )), manifest,
+        )
+
+    def test_tail_query_evidence_is_supplied_and_survives_durable_replay(self):
+        self.question = "Explain the NES vblank sprite DMA budget"
+        self.digest = grounded_request_digest(_digest_request(self.question, self.config))
+        source = "General introduction. " * 17 + "NES vblank sprite DMA budget uses 513 CPU cycles."
+        self.refs.add_text("Hardware notes", source)
+        hits = self.refs.search(self.question, limit=1)
+        self.assertGreater(hits[0]["passage"].find("NES"), 220)
+        manifest = prepare_evidence(self.question, self.digest, hits, self.model, self.token)
+        citation = manifest["citations"][0]
+        self.assertIn("513 CPU cycles", citation["passage"])
+        self.assertGreater(citation["char_start"], hits[0]["char_start"])
+        self.assertEqual(source[citation["char_start"]:citation["char_end"]], citation["passage"])
+        self._commit(manifest)
+        self.assertEqual(self.store.turn_evidence(self.sid, self.model, self.token), [manifest])
+        restored = self.store.import_bundle(self.store.export_bundle(self.sid, self.model, self.token), self.model, self.token)
+        self.assertEqual(self.store.turn_evidence(restored, self.model, self.token), [manifest])
+
+    def test_unicode_matching_preserves_original_source_coordinates(self):
+        for word, question in [("ＮＥＳ", "nes"), ("Straße", "strasse"), ("cafe\u0301", "café")]:
+            with self.subTest(word=word):
+                source = "Context. " * 45 + word + " timing measurement is reproducible."
+                document = self.refs.add_text("Unicode reference " + word, source)
+                hits = [hit for hit in self.refs.search(question, limit=3) if hit["document_id"] == document["document_id"]]
+                self.assertTrue(hits)
+                manifest = prepare_evidence(question, self.digest, hits[:1], self.model, self.token)
+                citation = manifest["citations"][0]
+                self.assertIn(word, citation["passage"])
+                self.assertEqual(source[citation["char_start"]:citation["char_end"]], citation["passage"])
+                self.assertEqual(sha256(citation["passage"].encode()).hexdigest(), citation["passage_sha256"])
+
+    def test_query_window_prefers_distinct_terms_and_is_deterministic(self):
+        source = "alpha " * 30 + "neutral filler " * 14 + "beta gamma form a distinct evidence pair."
+        self.refs.add_text("Coverage", source)
+        hits = self.refs.search("alpha beta gamma", limit=1)
+        first = prepare_evidence("alpha beta gamma", self.digest, hits, self.model, self.token)
+        second = prepare_evidence("alpha beta gamma", self.digest, hits, self.model, self.token)
+        self.assertEqual(first, second)
+        self.assertIn("beta gamma", first["citations"][0]["passage"])
+
+    def test_bad_original_hit_is_not_repaired_by_truncation(self):
+        hits = self.refs.search("depth", limit=1)
+        for changed in ({"char_end": hits[0]["char_end"] + 1}, {"document_sha256": None},
+                        {"document_id": "source] injected reference"}, {"passage": None}):
+            with self.subTest(changed=changed), self.assertRaises(RuntimeContractError):
+                prepare_evidence(self.question, self.digest, [dict(hits[0], **changed)], self.model, self.token)
+
+    def test_recognized_citation_identifier_is_not_claimed_as_factual_support(self):
+        manifest = self._snapshot()
+        valid = manifest["citations"][0]["citation"]
+        audit = audit_answer_citations(
+            "The output refers to [" + valid + "].", manifest
+        )
+        self.assertEqual(audit["status"], "recognized_identifiers")
+        self.assertEqual(audit["recognized"], [valid])
+        self.assertEqual(audit["unknown"], [])
+        self.assertEqual(
+            audit["interpretation"],
+            "source_identifier_check_only_not_factual_verification",
+        )
+        no_use = audit_answer_citations(
+            "A plausible model answer that cites nothing.", manifest
+        )
+        self.assertEqual(no_use["status"], "no_identifiers")
+
+    def test_hallucinated_citations_are_reported_not_silently_accepted(self):
+        manifest = self._snapshot()
+        valid = manifest["citations"][0]["citation"]
+        invented = "local:unknown-reference:99:abcdef0123456789"
+        audit = audit_answer_citations(
+            f"[{valid}] and [{invented}]", manifest
+        )
+        self.assertEqual(audit["status"], "unknown_identifiers")
+        self.assertEqual(audit["recognized"], [valid])
+        self.assertEqual(audit["unknown"], [invented])
+        mangled = audit_answer_citations("[" + valid + "extra]", manifest)
+        self.assertEqual(mangled["recognized"], [])
+
+    def test_mode_separation_prevents_same_id_plain_reuse(self):
+        self._commit(self._snapshot())
+        with self.assertRaisesRegex(RuntimeContractError, "request id reused"):
+            self.store.replay(
+                self.sid, "grounded-one",
+                _digest_request(self.question, self.config),
+            )
+
+    def test_strict_grounding_rejects_wrong_question_source_and_digest(self):
+        manifest = self._snapshot()
+        cases = [
+            {**manifest, "question_sha256": "0" * 64},
+            {**manifest, "model_digest": "0" * 64},
+            {**manifest, "context": "rewritten source text"},
+            {**manifest, "citations": []},
+        ]
+        for tampered in cases:
+            with self.subTest(tampered=tuple(tampered.items())[:1]):
+                with self.assertRaises(RuntimeContractError):
+                    validate_evidence(
+                        tampered, self.question, self.digest,
+                        self.model, self.token,
+                    )
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
+import secrets
 import subprocess
 import sys
 import threading
@@ -176,6 +177,12 @@ class WindowsLauncher:
 
         self.status = tk.StringVar(value="Checking system…")
         self._buttons: list[ttk.Button] = []
+        self._browser_lock = threading.RLock()
+        self._browser_server = None
+        self._browser_app = None
+        self._browser_worker = None
+        self._browser_token_file: Path | None = None
+        self._launcher_closed = False
 
         outer = ttk.Frame(self.window, padding=20)
         outer.pack(fill="both", expand=True)
@@ -205,6 +212,15 @@ class WindowsLauncher:
         self._add_button(buttons, "Open App", self.open_app)
         self._add_button(buttons, "Local AI (offline)", self.local_ai)
         self._add_button(buttons, "Stop", self.stop)
+
+        offline_buttons = ttk.Frame(outer)
+        offline_buttons.pack(fill="x", pady=(0, 12))
+        self._add_button(
+            offline_buttons, "Launch Offline Browser AI", self.browser_ai
+        )
+        self._add_button(
+            offline_buttons, "Stop Offline Browser", self.stop_browser_ai
+        )
 
         helper = ttk.Frame(outer)
         helper.pack(fill="x", pady=(0, 10))
@@ -275,7 +291,13 @@ class WindowsLauncher:
                 self._set_log(rendered)
                 self._busy(False, "Ready" if error is None else "Action failed")
 
-            self.window.after(0, finish)
+            if not self._launcher_closed:
+                try:
+                    self.window.after(0, finish)
+                except (RuntimeError, self.tk.TclError):
+                    # The window can be destroyed while model admission or
+                    # a long-running offline inference service is starting.
+                    pass
 
         threading.Thread(target=worker, name="skeleton-windows-launcher", daemon=True).start()
 
@@ -326,21 +348,184 @@ class WindowsLauncher:
         self._local_ai_window = open_offline_ai(self.window)
         self.status.set("Local AI window opened")
 
+    def _start_browser_service(self, selected: Path, *, gguf: bool) -> str:
+        """Start one authenticated loopback service owned by this launcher.
+
+        Admission happens without Docker or any remote-model fallback. The
+        file contains the only browser credential and is created mode 0600.
+        """
+        from skeleton.app.local_ai import (
+            load_gguf_deployment, load_native_checkpoint,
+            private_desktop_database,
+        )
+        from skeleton.app.offline_http import (
+            LocalOnlyHTTPServer, OfflineHTTPApplication, create_token_file,
+        )
+
+        with self._browser_lock:
+            if self._launcher_closed:
+                raise RuntimeError("offline browser launcher has closed")
+            if self._browser_server is not None:
+                url = "http://127.0.0.1:" + str(
+                    self._browser_server.server_port
+                ) + "/"
+                return "Offline browser already running at " + url
+
+        backend = (
+            load_gguf_deployment(selected) if gguf
+            else load_native_checkpoint(selected)
+        )
+        db = private_desktop_database(backend.model_digest)
+        token = secrets.token_urlsafe(48)
+        app = OfflineHTTPApplication(backend, db, token=token)
+        server = None
+        credential_file = (
+            db.parent / ("browser-" + secrets.token_hex(12) + ".secret")
+        )
+        try:
+            with self._browser_lock:
+                if self._launcher_closed:
+                    raise RuntimeError("offline browser launcher closed during model admission")
+            server = LocalOnlyHTTPServer(app, port=0)
+            # Do not write a credential until the socket is definitely bound.
+            create_token_file(credential_file, token=token)
+            thread = threading.Thread(
+                target=server.serve_forever,
+                kwargs={"poll_interval": 0.1},
+                name="skeleton-offline-browser-service",
+                daemon=True,
+            )
+            with self._browser_lock:
+                if self._launcher_closed:
+                    raise RuntimeError("offline browser launcher closed before service start")
+                thread.start()
+                self._browser_server = server
+                self._browser_app = app
+                self._browser_worker = thread
+                self._browser_token_file = credential_file
+            url = "http://127.0.0.1:" + str(server.server_port) + "/"
+            try:
+                webbrowser.open(url)
+            except (OSError, webbrowser.Error):
+                # A missing default browser must not destroy a correctly
+                # admitted local model service. The operator can open its
+                # recorded localhost URL manually.
+                pass
+            return (
+                "Offline AI browser: " + url + "\n"
+                "Paste the local bearer token from this owner-only file:\n"
+                + str(credential_file) + "\n"
+                "The server stops when Skeleton closes. No hosted provider."
+            )
+        except BaseException:
+            if server is not None:
+                server.server_close()
+            app.close()
+            credential_file.unlink(missing_ok=True)
+            raise
+
+    def browser_ai(self) -> None:
+        from tkinter import filedialog, messagebox
+
+        with self._browser_lock:
+            if self._browser_server is not None:
+                url = "http://127.0.0.1:" + str(
+                    self._browser_server.server_port
+                ) + "/"
+                webbrowser.open(url)
+                self.status.set("Opened existing offline browser.")
+                return
+        gguf = messagebox.askyesno(
+            "Choose local AI model",
+            "Use an installed GGUF/llama.cpp deployment manifest?\n\n"
+            "Yes: select GGUF manifest. No: select native checkpoint.",
+            parent=self.window,
+        )
+        chosen = filedialog.askopenfilename(
+            parent=self.window,
+            title=("Select local GGUF deployment manifest"
+                   if gguf else "Select local native model checkpoint"),
+            filetypes=[("JSON model manifest", "*.json"), ("All files", "*.*")],
+        )
+        if not chosen:
+            return
+        path = Path(chosen)
+        self._run_worker(
+            "Admitting local model and starting offline browser…",
+            lambda: self._start_browser_service(path, gguf=gguf),
+            lambda text: text,
+        )
+
+    def _stop_browser_service(self) -> str:
+        with self._browser_lock:
+            server, app, thread, token_path = (
+                self._browser_server, self._browser_app,
+                self._browser_worker, self._browser_token_file,
+            )
+            self._browser_server = None
+            self._browser_app = None
+            self._browser_worker = None
+            self._browser_token_file = None
+        if server is None:
+            return "Offline browser service is not running."
+        try:
+            server.shutdown()
+            server.server_close()
+            if thread is not None:
+                thread.join(timeout=10)
+        finally:
+            if app is not None:
+                app.close()
+            if token_path is not None:
+                token_path.unlink(missing_ok=True)
+        return "Offline browser stopped. Ephemeral bearer-token file deleted."
+
+    def stop_browser_ai(self) -> None:
+        self._run_worker(
+            "Stopping offline browser…",
+            self._stop_browser_service,
+            lambda outcome: outcome,
+        )
+
     def open_docker(self) -> None:
         webbrowser.open(DOCKER_DESKTOP_URL)
 
     def run(self) -> int:
-        self.window.mainloop()
-        return 0
+        try:
+            self.window.mainloop()
+            return 0
+        finally:
+            with self._browser_lock:
+                self._launcher_closed = True
+            self._stop_browser_service()
 
 
 def _headless(args: argparse.Namespace, root: Path) -> int:
+    if args.local_http_smoke:
+        from skeleton.app.offline_http import smoke_offline_http_inference
+        try:
+            return 0 if smoke_offline_http_inference() else 1
+        except Exception:
+            return 1
     if args.local_ai_smoke:
         from skeleton.app.local_ai import smoke_offline_native_inference
 
         try:
             return 0 if smoke_offline_native_inference() else 1
         except Exception:
+            return 1
+    if args.local_gguf_smoke is not None:
+        from skeleton.app.local_ai import smoke_offline_gguf_deployment
+
+        try:
+            ready = smoke_offline_gguf_deployment(args.local_gguf_smoke)
+            if not args.quiet:
+                print("GGUF offline inference + restart: " +
+                      ("PASS" if ready else "FAIL"))
+            return 0 if ready else 1
+        except Exception as exc:
+            if not args.quiet:
+                print("GGUF local acceptance failed: " + str(exc))
             return 1
     if args.check:
         report = check_host(root)
@@ -383,6 +568,20 @@ def parser() -> argparse.ArgumentParser:
     mode.add_argument("--open", action="store_true")
     mode.add_argument("--local-ai", action="store_true", help="open Docker-free native AI conversation")
     mode.add_argument("--local-ai-smoke", action="store_true", help="verify bundled native CPU inference without Docker")
+    mode.add_argument("--local-http-smoke", action="store_true",
+                      help="test installed loopback AI auth, generation, retries, and SQLite recovery")
+    mode.add_argument("--local-gguf-smoke", metavar="MANIFEST", type=Path,
+                      help="execute operator GGUF/llama.cpp model and verify offline durable resume")
+    mode.add_argument("--local-http", action="store_true",
+                      help="serve authenticated offline AI web UI on numeric loopback only")
+    result.add_argument("--local-native-checkpoint", type=Path,
+                        help="with --local-http: native model checkpoint")
+    result.add_argument("--local-gguf-deployment", type=Path,
+                        help="with --local-http: digest-pinned GGUF deployment manifest")
+    result.add_argument("--local-token-file", type=Path,
+                        help="with --local-http: new, private bearer-token file")
+    result.add_argument("--local-port", type=int, default=0,
+                        help="with --local-http: local TCP port (0 = ephemeral)")
     result.add_argument(
         "--development",
         action="store_true",
@@ -396,6 +595,26 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     root = installation_root()
+    if args.local_http:
+        if (bool(args.local_native_checkpoint) ==
+                bool(args.local_gguf_deployment) or args.local_token_file is None):
+            print("Offline HTTP requires one local model and --local-token-file.")
+            return 2
+        from skeleton.app.offline_http import main as serve_local_http
+        model_arg = (
+            ["--native-checkpoint", str(args.local_native_checkpoint)]
+            if args.local_native_checkpoint is not None else
+            ["--gguf-deployment", str(args.local_gguf_deployment)]
+        )
+        return serve_local_http(
+            model_arg + ["--token-file", str(args.local_token_file),
+                         "--port", str(args.local_port)]
+        )
+    if (args.local_native_checkpoint is not None
+            or args.local_gguf_deployment is not None
+            or args.local_token_file is not None or args.local_port != 0):
+        print("Offline HTTP model/token flags require --local-http.")
+        return 2
     if args.local_ai:
         if os.name != "nt":
             print("Skeleton Windows launcher requires Windows.")
