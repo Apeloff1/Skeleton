@@ -19,6 +19,7 @@ import json
 import os
 import re
 import shutil
+import tempfile
 
 from .dragon_game_mechanics import Mechanic
 from .dragon_native_projects import EMITTERS, NativeProject, digest, render_native_project
@@ -203,7 +204,8 @@ def _path(name: str) -> str:
             not SAFE_NAME.fullmatch(name) or "\\" in name):
         raise ValueError("untrusted generated filename")
     path = PurePosixPath(name)
-    if (path.is_absolute() or any(piece in (".", "..", "") for piece in path.parts) or
+    if (path.is_absolute() or name != str(path) or
+            any(piece in (".", "..", "") for piece in path.parts) or
             len(path.parts) > 8):
         raise ValueError("generated path traversal or excessive nesting")
     return str(path)
@@ -361,6 +363,7 @@ def verify_source_release(payload: bytes) -> dict:
             raise ValueError("invalid source inventory")
         expected = {"release-receipt.json"}
         counted = 0
+        recovered_sources: dict[str, str] = {}
         for name, checksum in source_files.items():
             _path(name)
             if not isinstance(checksum, str) or not HEX.fullmatch(checksum):
@@ -371,8 +374,21 @@ def verify_source_release(payload: bytes) -> dict:
             counted += len(body)
             if _hash(body) != checksum or b"\x00" in body:
                 raise ValueError("modified or invalid source file")
+            recovered_sources[name] = body.decode("utf-8")
         if counted != receipt.get("source_bytes") or len(source_files) != receipt.get("source_count"):
             raise ValueError("source quantity or byte count mismatch")
+        if digest(recovered_sources) != receipt.get("source_fingerprint"):
+            raise ValueError("source fingerprint cannot be reconstructed")
+        try:
+            native = json.loads(recovered_sources["dragon-native-manifest.json"])
+        except (KeyError, ValueError) as exc:
+            raise ValueError("native project manifest invalid") from exc
+        if (native.get("target") != receipt.get("target") or
+                native.get("style") != receipt.get("style") or
+                native.get("status") != "source_generated"):
+            raise ValueError("native manifest mismatches release")
+        if receipt.get("target") not in CATALOG or receipt.get("style") not in STYLES:
+            raise ValueError("unknown packaged target/style")
         binary_name = receipt.get("binary_member")
         if binary_name is not None:
             if (not isinstance(binary_name, str) or
@@ -391,30 +407,35 @@ def verify_source_release(payload: bytes) -> dict:
         elif (receipt.get("binary_sha256") is not None or
               receipt.get("evidence") != "source_generated"):
             raise ValueError("source-only release falsely claims compiled evidence")
-        if set(names) != expected or names != sorted(source_files, key=lambda x: "source/" + x) and False:
-            # Exact membership matters; zip ordering is not an authority condition.
+        if set(names) != expected:
             raise ValueError("unexpected member in release")
-        if receipt.get("target") not in CATALOG or receipt.get("style") not in STYLES:
-            raise ValueError("unknown packaged target/style")
         return receipt
 
 
 def _atomic_new(path: Path, payload: bytes) -> None:
-    """Create immutably; existing exact bytes are idempotent, never overwritten."""
+    """Stage and fsync then publish with a no-overwrite hard link.
+
+    A crash leaves at most an unreferenced temporary file, never a partial
+    release with its final canonical name. Replaying identical bytes is safe.
+    """
     if path.exists() or path.is_symlink():
         if not path.is_symlink() and path.is_file() and path.read_bytes() == payload:
             return
         raise FileExistsError("conflicting release artifact: " + path.name)
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    fd = os.open(path, flags, 0o644)
+    fd, staging_name = tempfile.mkstemp(prefix=".dragon-stage-", dir=path.parent)
+    staging = Path(staging_name)
     try:
         with os.fdopen(fd, "wb") as out:
             out.write(payload)
             out.flush()
             os.fsync(out.fileno())
-    except BaseException:
-        path.unlink(missing_ok=True)
-        raise
+        try:
+            os.link(staging, path, follow_symlinks=False)
+        except FileExistsError:
+            if path.is_symlink() or not path.is_file() or path.read_bytes() != payload:
+                raise FileExistsError("conflicting release artifact: " + path.name)
+    finally:
+        staging.unlink(missing_ok=True)
 
 
 def publish_production(
@@ -493,6 +514,8 @@ def publish_production(
 def verify_published_production(destination: Path, index_name: str) -> dict:
     """Offline release audit against immutable index; no network or provider AI."""
     _path(index_name)
+    if not re.fullmatch(r"dragon-production-[a-f0-9]{20}\.json", index_name):
+        raise ValueError("index filename is not a production receipt")
     root = Path(destination)
     if root.is_symlink() or not root.is_dir():
         raise ValueError("unsafe portfolio directory")
@@ -514,6 +537,8 @@ def verify_published_production(destination: Path, index_name: str) -> dict:
     targets: set[str] = set()
     for item in entries:
         name = _path(item["archive_name"])
+        if not re.fullmatch(r"dragon-[a-z0-9_]+-[a-f0-9]{20}\.zip", name):
+            raise ValueError("invalid portfolio archive filename")
         artifact = root / name
         if artifact.is_symlink() or not artifact.is_file():
             raise ValueError("missing or unsafe portfolio archive")
