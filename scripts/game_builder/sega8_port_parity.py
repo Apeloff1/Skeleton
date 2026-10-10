@@ -139,7 +139,6 @@ def verify_ports(root: Path) -> dict[str, object]:
         raise Sega8PortParityError("different consoles unexpectedly share identical binary")
     for field in (
         "original_controller_actions_verified", "original_levels_verified",
-        "authoritative_reference_sha256",
     ):
         if sms["host"].get(field) != gg["host"].get(field):
             raise Sega8PortParityError("different hardware ports accepted different gameplay")
@@ -149,7 +148,11 @@ def verify_ports(root: Path) -> dict[str, object]:
         "schema": "skeleton.game_builder.original_sega8_crossport_parity.v1",
         "world_digest": sms["manifest"]["world_digest"],
         "source_reference_digest": sms["manifest"]["reference_safe_replay_digest"],
-        "reference_sha256": sms["host"]["authoritative_reference_sha256"],
+        "host_reference_sha256_by_platform": {
+            target: _sha(records[target]["host"].get("authoritative_reference_sha256"),
+                         target+" host reference")
+            for target in sorted(_TARGETS)
+        },
         "original_controller_actions_verified_per_platform":
             sms["host"]["original_controller_actions_verified"],
         "native_platforms_checked": sorted(_TARGETS),
