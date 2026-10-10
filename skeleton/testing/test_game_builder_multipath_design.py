@@ -548,3 +548,13 @@ def test_adding_threat_keeps_safe_route_and_rejects_start_blocking():
     with pytest.raises(MultipathError):
         add_solvable_hazard(p, p.start, authorized=True)
 
+
+def test_removed_hazard_opens_shortest_risk_free_original_path():
+    p = RouteProblem.from_rows(HAZARD_LEVEL)
+    edited = remove_hazard(p, (3, 1), authorized=True)
+    assert edited.after.hazards == frozenset()
+    assert edited.safe_proof.steps == 6
+    assert verify_route_proof(edited.after, edited.safe_proof)
+    with pytest.raises(MultipathError):
+        remove_hazard(p, (2, 1), authorized=True)
+
