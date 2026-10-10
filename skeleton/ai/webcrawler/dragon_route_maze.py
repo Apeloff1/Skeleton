@@ -62,6 +62,7 @@ class MazeCertificate:
     real_dead_ends:tuple[str,...]
     return_edges:tuple[str,...]
     doubleback_witnesses:tuple[tuple[str,...],...]
+    impractical_witnesses:tuple[tuple[str,...],...]
     scenic_witnesses:tuple[tuple[str,...],...]
     secret_witnesses:tuple[tuple[str,...],...]
     optional_shapes:tuple[str,...]
@@ -182,14 +183,16 @@ def build_maze(request:MazeRequest=MazeRequest())->MazeCreation:
     side_reverse={}
     def add(prefix,a,b,mode,minutes,*,shapes=(),price=0,fatigue=0,
             danger=0,spectacle=0,requires=(),discover="",
-            weather_any=(),weather_none=()):
+            weather_any=(),weather_none=(),fuel=0,oxygen=0,mana=0,
+            departures=()):
         edge=Traverse(
             id=_name(prefix,a,b),origin=a,destination=b,
             mode=mode,minutes=minutes,price=price,fatigue=fatigue,
             danger=danger,spectacle=spectacle,
             shapes=tuple(shapes),requires=tuple(requires),
             secret_token=discover,weather_any=tuple(weather_any),
-            weather_none=tuple(weather_none),
+            weather_none=tuple(weather_none),fuel=fuel,oxygen=oxygen,mana=mana,
+            departures=tuple(departures),
         )
         if any(x.id==edge.id for x in edges):
             raise ValueError("original maze emitted a duplicate directed passage")
@@ -215,7 +218,8 @@ def build_maze(request:MazeRequest=MazeRequest())->MazeCreation:
         parent[(row,col)]=attach
         origin,destination=_place(*attach),_place(row,col)
         outward=add("branch",origin,destination,"trail",5+rng.randrange(6),
-                    shapes=("detour","scenic","dead_end","branch","free_roam"),
+                    shapes=("detour","scenic","dead_end","branch","free_roam",
+                            "impractical","long_way"),
                     spectacle=35+rng.randrange(51))
         returning=add("doubleback",destination,origin,"trail",4,
                       shapes=("doubleback","retrace","recovery","return_only"))
@@ -250,6 +254,27 @@ def build_maze(request:MazeRequest=MazeRequest())->MazeCreation:
         scenic_witnesses.append(tuple(
             main[:index]+[side_forward[room],side_reverse[room]]+main[index:]
         ))
+    # Deliberately inefficient yet *real* journeys repeat an explored
+    # chamber and return several times before winning. These certify long,
+    # frustrating or scenic circuit choices are possible without corrupting
+    # the safe, direct completion corridor.
+    impractical=[]
+    for room in side[:min(3,len(side))]:
+        at=indexed[parent[room]]
+        laps=3 if request.challenge in ("gentle","balanced") else 5
+        route=tuple(
+            main[:at]+
+            [side_forward[room],side_reverse[room]]*laps+
+            main[at:]
+        )
+        if len(route)<=MAX_HOPS:
+            if not replay(
+                World(tuple(places),tuple(edges),base_ids[0],base_ids[-1],
+                      (request.weather,),True,"generated_original",10080),
+                route,Traveller(),objective="deliberate_long_way",
+            ).success:
+                raise ValueError("original maze long-route witness not executable")
+            impractical.append(route)
     # Secret shortcut requires the clue physically obtained in a chamber,
     # then a doubleback before the route can be discovered.
     secret_witnesses=[]
@@ -341,6 +366,7 @@ def build_maze(request:MazeRequest=MazeRequest())->MazeCreation:
         "real_dead_ends":deadends,
         "return_edges":tuple(side_reverse[x] for x in side),
         "doubleback_witnesses":doublebacks[:12],
+        "impractical_witnesses":tuple(impractical),
         "scenic_witnesses":tuple(scenic_witnesses[:12]),
         "secret_witnesses":tuple(secret_witnesses),
         "optional_shapes":tuple(sorted({shape for edge in edges
@@ -382,7 +408,8 @@ def verify_maze(creation:MazeCreation)->dict:
     # graph with the same route labels but different gates or time costs.
     witnesses=(
         (cert.backbone,)+cert.location_recovery_routes+
-        cert.doubleback_witnesses+cert.scenic_witnesses+
+        cert.doubleback_witnesses+cert.impractical_witnesses+
+        cert.scenic_witnesses+
         cert.secret_witnesses
     )
     for trace in witnesses:
