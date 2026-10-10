@@ -90,11 +90,13 @@ def test_guest_c_replay_rejects_forged_trajectory_and_mutated_original_source(tm
     source=tmp_path/"source"
     route=tmp_path/"route.json"
     emit("sega_master_system",source,auth,reference_out=route)
-    data=json.loads(route.read_text(encoding="utf-8"))
+    clean_bytes=route.read_bytes()
+    data=json.loads(clean_bytes)
     data["steps"][0]["score"]+=10
     route.write_text(json.dumps(data),encoding="utf-8")
     with pytest.raises(Sega8HostReplayError,match="modified"):
         run_host_replay(source,route)
+    route.write_bytes(clean_bytes)
     src_file=source/"game.c"
     src_file.write_text(src_file.read_text(encoding="utf-8")+"\n",
                         encoding="utf-8")
