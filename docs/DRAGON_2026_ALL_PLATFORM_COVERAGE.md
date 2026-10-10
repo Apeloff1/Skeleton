@@ -1,4 +1,23 @@
-# Dragon Native Forge: Comprehensive hardware support audit (9 October 2026)
+# Dragon Native Forge: Comprehensive hardware support audit (10 October 2026)
+
+## Current verified scope — source archive snapshot 2026-10-10
+
+The authoritative catalog contains **169 unique hardware/OS identities**.
+There are **76 declared source-implemented targets**, including ABI-compatible
+variants, and **93 targets without emitted native source**. This is
+**45.0% source-emitter coverage**, not verified compatibility coverage.
+The latest dedicated coverage CI run passed 425 checks and failed two: a
+stale inventory assertion (now corrected) and an Atari 5200 cc65 2.19
+palette-header mismatch (source fallback added; requires CI rerun).
+The standalone original puzzle title independently passed native executable
+build/replay jobs on Linux, Windows and macOS on an earlier head. These
+desktop builds do not establish console-native executable coverage.
+
+The sections below record historical milestones and intermediate counts,
+which are retained for traceability but **do not supersede the snapshot
+above**. The machine-readable `dragon_platform_readiness.coverage_report()`
+is the live authoritative source. Real SDK compiler, emulator/controller
+and physical-device verification remain distinct from source generation.
 
 ## Scope and limitations
 
@@ -6,7 +25,7 @@ The game academy previously mapped **47** major platform targets and implemented
 **19 original native source backends**. This change adds 122 concrete historic,
 consumer, handheld, computer OS/ABI and modern mobile targets, bringing the
 curated inventory to **169 distinct target identities**. It additionally implements
-five independent legacy native backends plus 21 ABI-aware desktop variants, bringing source production to **55/169**.
+additional native game emitters and ABI-compatible source variants; the current verified inventory is **76/169**, not a claim of 76 compiled games.
 
 This is not every model or board ever manufactured, and 169 catalog entries
 do NOT mean 169 working console games. No compiler/emulator or device test is
@@ -474,16 +493,17 @@ while the global ledger still reads 72/169 source-capable targets.
 
 ## October 2026: original Atari 5200, ColecoVision, ZX81 and MSX2 source targets
 
-This increment adds one newly catalogued system (ColecoVision) and converts
-three already identified but source-incomplete systems to genuine original
-native source generation. **The latest scope is 170 catalog identities,
-76 source-capable targets, 94 without original native source (44.7% source
-coverage).** All previous historical figures in this file are superseded by
-this latest value, and none should be interpreted as a completed game count.
+This increment added original ColecoVision source to its preexisting
+hardware identity and converted Atari 5200, ZX81 and MSX2 into source-ready
+targets. The earlier 170-entry catalog inadvertently listed ColecoVision
+twice; the registry has since been deduplicated. The **current authoritative
+baseline is 169 unique identities, 76 source-implemented targets, and 93
+remaining original native source gaps (45.0%)**. None of these counts
+certifies console compilation or hardware execution.
 
 * **Atari 5200**: cc65 6502 target atari5200 and conio backed by ANTIC
   mode-6 display. Original rules include analog controller via cc65's linked
-  5200 joystick driver, shadow colour feedback, enemy pursuit, lives,
+  5200 joystick driver, version-aware GTIA palette feedback, enemy pursuit, lives,
   crystals and restart, with waitvsync input timing. Exports a source
   project targeting a raw .bin cartridge. Exact code generation/compiler
   build is a CI requirement; emulator and hardware analog-axis validation
@@ -522,3 +542,13 @@ regression checks the source status, expected SDK and complete registry.
 These numbers supersede inconsistent historical interim counts above.
 Compiled, emulator-tested and physical-hardware-complete counts are not
 inferred from native source coverage.
+
+### Atari 5200 exact compiler compatibility repair
+
+The dedicated Atari 5200 native test was executed against Ubuntu's cc65 2.19
+and exposed that its `atari5200.h` has `GTIA_WRITE` but no `OS` shadow
+register macro. The original source now selects newer `OS.color0/1/2`
+when available, and uses the real `GTIA_WRITE.colpf0/1/2` registers on
+cc65 2.19. The compilation gate remains required: changing source from
+one valid API to another is not proof of a successful ROM build until the
+updated CI job passes at the exact commit.
