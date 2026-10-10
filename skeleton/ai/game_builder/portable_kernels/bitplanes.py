@@ -63,3 +63,11 @@ def encode_snes_4bpp(tile: Sequence[Sequence[int]]) -> bytes:
     return bytes(sum(((row[x] >> plane) & 1) << (7-x) for x in range(8))
                  for pair in (0, 2) for row in rows for plane in (pair, pair+1))
 
+
+def decode_snes_4bpp(data: bytes) -> tuple[tuple[int, ...], ...]:
+    """Decode both SNES 16-byte interleaved plane banks into palette indices."""
+    raw = _raw(data, 32)
+    return tuple(tuple(sum(((raw[(plane//2)*16+y*2+(plane%2)] >> (7-x)) & 1) << plane
+                           for plane in range(4))
+                       for x in range(8)) for y in range(8))
+
