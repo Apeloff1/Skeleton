@@ -60,3 +60,12 @@ def pulse_pcm(hertz: int, sample_rate: int, count: int,
     return tuple(32767 if (i*hz*denominator)%duration < threshold else -32767
                  for i in range(samples))
 
+
+def triangle_pcm(hertz: int, sample_rate: int, count: int) -> tuple[int,...]:
+    """Aliasing-admitted deterministic signed triangle tone using integer phase."""
+    rate=_integer(sample_rate,"PCM sample rate",4000,96000)
+    hz=_integer(hertz,"triangle Hz",1,rate//2)
+    samples=_integer(count,"PCM sample count",1,32768)
+    return tuple(32767 - (65534*abs(2*((i*hz)%rate)-rate)+rate//2)//rate
+                 for i in range(samples))
+
