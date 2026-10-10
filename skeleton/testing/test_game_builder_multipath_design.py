@@ -114,3 +114,13 @@ def test_directed_route_edge_lineage_is_ordered_and_exact():
     assert edges[-1][1] == (7, 1)
     assert all(abs(a[0] - b[0]) + abs(a[1] - b[1]) == 1 for a, b in edges)
 
+
+def test_revisits_count_real_tiles_not_length_surrogates():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    direct = solve_route(p)
+    loop = ("down", "up") + direct.actions
+    replay = evaluate_route(p, loop)
+    assert route_revisits(direct) == 0
+    assert route_revisits(replay) == 2
+    assert replay.steps == direct.steps + 2
+
