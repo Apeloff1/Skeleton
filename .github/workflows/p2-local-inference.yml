@@ -4,7 +4,83 @@ on:
   pull_request:
     paths:
       - "skeleton/ai/runtime/inference/**"
+      - "skeleton/ai/training/offline_foundations.py"
+      - "skeleton/ai/training/datasets/offline_foundations_v1/**"
+      - "scripts/training/verify_offline_foundations.py"
+      - "scripts/training/generate_offline_foundations.py"
+      - "skeleton/testing/test_offline_foundations.py"
+      - "skeleton/ai/training/sparse_capability.py"
+      - "scripts/training/sparse_capability.py"
+      - "scripts/training/probe_sparse_capabilities.py"
+      - "skeleton/testing/test_sparse_capability.py"
+      - "skeleton/testing/test_procedural_capabilities.py"
+      - "skeleton/ai/training/capability_ledger.py"
+      - "skeleton/ai/training/resource_admission.py"
+      - "skeleton/testing/test_resource_admission.py"
+      - "skeleton/ai/runtime/deterministic_capabilities.py"
+      - "skeleton/ai/runtime/capability_graph.py"
+      - "skeleton/ai/runtime/gameplay_capabilities.py"
+      - "skeleton/testing/test_gameplay_capabilities.py"
+      - "skeleton/ai/runtime/game_platform_catalog.py"
+      - "skeleton/ai/runtime/game_rights.py"
+      - "skeleton/ai/runtime/homebrew_editor.py"
+      - "skeleton/ai/runtime/homebrew_porting.py"
+      - "skeleton/app/homebrew_port_ui.py"
+      - "scripts/game/port_homebrew.py"
+      - "skeleton/testing/test_homebrew_porting.py"
+      - "skeleton/app/homebrew_editor_ui.py"
+      - "scripts/game/homebrew_edit.py"
+      - "skeleton/testing/test_homebrew_editor.py"
+      - "skeleton/ai/runtime/game_project_capsule.py"
+      - "skeleton/ai/runtime/game_playability.py"
+      - "skeleton/ai/runtime/chip8_machine.py"
+      - "scripts/game/export_chip8.py"
+      - "skeleton/testing/test_chip8_homebrew.py"
+      - "skeleton/testing/test_chip8_classic.py"
+      - "skeleton/app/offline_chip8_preview.py"
+      - "skeleton/testing/test_offline_chip8_preview.py"
+      - "scripts/game/verify_target_completion.py"
+      - "skeleton/testing/test_target_completion.py"
+      - "scripts/game/accept_game_builds.py"
+      - "skeleton/testing/test_game_build_acceptance.py"
+      - "skeleton/testing/test_game_playability.py"
+      - "scripts/game/export_portable_c89.py"
+      - "skeleton/testing/test_game_c89_export.py"
+      - "scripts/game/game_project.py"
+      - "skeleton/testing/test_cross_era_game_rights.py"
+      - "skeleton/app/offline_game_preview.py"
+      - "skeleton/testing/test_offline_game_preview.py"
+      - "skeleton/testing/test_capability_graph.py"
+      - "skeleton/testing/test_deterministic_capabilities.py"
+      - "scripts/training/capability_ledger.py"
+      - "skeleton/testing/test_capability_ledger.py"
       - "skeleton/app/local_ai.py"
+      - "skeleton/app/cli.py"
+      - "skeleton/testing/test_app_offline_gguf.py"
+      - "skeleton/testing/test_offline_history_backup.py"
+      - "skeleton/app/offline_history.py"
+      - "scripts/offline_kit.py"
+      - "skeleton/testing/test_offline_kit.py"
+      - "skeleton/app/offline_cli.py"
+      - "skeleton/app/offline_workspace.py"
+      - "skeleton/app/offline_readiness.py"
+      - "skeleton/app/offline_qualification.py"
+      - "scripts/windows/create_offline_native_fixture.py"
+      - "skeleton/testing/test_offline_readiness.py"
+      - "skeleton/app/offline_library.py"
+      - "skeleton/testing/test_offline_library.py"
+      - "skeleton/app/offline_index_queue.py"
+      - "skeleton/app/offline_snapshot.py"
+      - "skeleton/testing/test_offline_index_queue.py"
+      - "skeleton/testing/test_offline_snapshot.py"
+      - "skeleton/app/offline_audit.py"
+      - "skeleton/testing/test_offline_audit.py"
+      - "skeleton/app/offline_sqlite_safety.py"
+      - "skeleton/testing/test_offline_sqlite_safety.py"
+      - "skeleton/testing/test_offline_firewall_policy.py"
+      - "scripts/windows/offline_network_policy.ps1"
+      - "skeleton/testing/test_offline_workspace.py"
+      - "skeleton/testing/test_offline_console.py"
       - "tests/flgb/test_desktop_offline_ai.py"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_native_neural_lm.py"
@@ -22,7 +98,83 @@ on:
       - feat/p2-functional-ai-closure-atomic
     paths:
       - "skeleton/ai/runtime/inference/**"
+      - "skeleton/ai/training/offline_foundations.py"
+      - "skeleton/ai/training/datasets/offline_foundations_v1/**"
+      - "scripts/training/verify_offline_foundations.py"
+      - "scripts/training/generate_offline_foundations.py"
+      - "skeleton/testing/test_offline_foundations.py"
+      - "skeleton/ai/training/sparse_capability.py"
+      - "scripts/training/sparse_capability.py"
+      - "scripts/training/probe_sparse_capabilities.py"
+      - "skeleton/testing/test_sparse_capability.py"
+      - "skeleton/testing/test_procedural_capabilities.py"
+      - "skeleton/ai/training/capability_ledger.py"
+      - "skeleton/ai/training/resource_admission.py"
+      - "skeleton/testing/test_resource_admission.py"
+      - "skeleton/ai/runtime/deterministic_capabilities.py"
+      - "skeleton/ai/runtime/capability_graph.py"
+      - "skeleton/ai/runtime/gameplay_capabilities.py"
+      - "skeleton/testing/test_gameplay_capabilities.py"
+      - "skeleton/ai/runtime/game_platform_catalog.py"
+      - "skeleton/ai/runtime/game_rights.py"
+      - "skeleton/ai/runtime/homebrew_editor.py"
+      - "skeleton/ai/runtime/homebrew_porting.py"
+      - "skeleton/app/homebrew_port_ui.py"
+      - "scripts/game/port_homebrew.py"
+      - "skeleton/testing/test_homebrew_porting.py"
+      - "skeleton/app/homebrew_editor_ui.py"
+      - "scripts/game/homebrew_edit.py"
+      - "skeleton/testing/test_homebrew_editor.py"
+      - "skeleton/ai/runtime/game_project_capsule.py"
+      - "skeleton/ai/runtime/game_playability.py"
+      - "skeleton/ai/runtime/chip8_machine.py"
+      - "scripts/game/export_chip8.py"
+      - "skeleton/testing/test_chip8_homebrew.py"
+      - "skeleton/testing/test_chip8_classic.py"
+      - "skeleton/app/offline_chip8_preview.py"
+      - "skeleton/testing/test_offline_chip8_preview.py"
+      - "scripts/game/verify_target_completion.py"
+      - "skeleton/testing/test_target_completion.py"
+      - "scripts/game/accept_game_builds.py"
+      - "skeleton/testing/test_game_build_acceptance.py"
+      - "skeleton/testing/test_game_playability.py"
+      - "scripts/game/export_portable_c89.py"
+      - "skeleton/testing/test_game_c89_export.py"
+      - "scripts/game/game_project.py"
+      - "skeleton/testing/test_cross_era_game_rights.py"
+      - "skeleton/app/offline_game_preview.py"
+      - "skeleton/testing/test_offline_game_preview.py"
+      - "skeleton/testing/test_capability_graph.py"
+      - "skeleton/testing/test_deterministic_capabilities.py"
+      - "scripts/training/capability_ledger.py"
+      - "skeleton/testing/test_capability_ledger.py"
       - "skeleton/app/local_ai.py"
+      - "skeleton/app/cli.py"
+      - "skeleton/testing/test_app_offline_gguf.py"
+      - "skeleton/testing/test_offline_history_backup.py"
+      - "skeleton/app/offline_history.py"
+      - "scripts/offline_kit.py"
+      - "skeleton/testing/test_offline_kit.py"
+      - "skeleton/app/offline_cli.py"
+      - "skeleton/app/offline_workspace.py"
+      - "skeleton/app/offline_readiness.py"
+      - "skeleton/app/offline_qualification.py"
+      - "scripts/windows/create_offline_native_fixture.py"
+      - "skeleton/testing/test_offline_readiness.py"
+      - "skeleton/app/offline_library.py"
+      - "skeleton/testing/test_offline_library.py"
+      - "skeleton/app/offline_index_queue.py"
+      - "skeleton/app/offline_snapshot.py"
+      - "skeleton/testing/test_offline_index_queue.py"
+      - "skeleton/testing/test_offline_snapshot.py"
+      - "skeleton/app/offline_audit.py"
+      - "skeleton/testing/test_offline_audit.py"
+      - "skeleton/app/offline_sqlite_safety.py"
+      - "skeleton/testing/test_offline_sqlite_safety.py"
+      - "skeleton/testing/test_offline_firewall_policy.py"
+      - "scripts/windows/offline_network_policy.ps1"
+      - "skeleton/testing/test_offline_workspace.py"
+      - "skeleton/testing/test_offline_console.py"
       - "tests/flgb/test_desktop_offline_ai.py"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_llama_cpp_local_inference.py"
@@ -58,6 +210,87 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.11.16"
+      - name: Parse-check offline Python sources before dependency installation
+        run: |
+          python -m compileall -q \
+            skeleton/app/offline_history.py \
+            skeleton/app/offline_workspace.py \
+            skeleton/app/offline_library.py \
+            skeleton/app/offline_index_queue.py \
+            skeleton/app/offline_snapshot.py \
+            skeleton/app/offline_audit.py \
+            skeleton/app/offline_sqlite_safety.py \
+            skeleton/app/offline_readiness.py \
+            skeleton/app/offline_qualification.py \
+            skeleton/ai/training/offline_foundations.py \
+            scripts/training/verify_offline_foundations.py \
+            scripts/training/generate_offline_foundations.py \
+            skeleton/testing/test_offline_foundations.py \
+            skeleton/ai/training/sparse_capability.py \
+            scripts/training/sparse_capability.py \
+            scripts/training/probe_sparse_capabilities.py \
+            skeleton/testing/test_sparse_capability.py \
+            skeleton/testing/test_procedural_capabilities.py \
+            skeleton/ai/training/capability_ledger.py \
+            skeleton/ai/training/resource_admission.py \
+            skeleton/ai/runtime/deterministic_capabilities.py \
+            skeleton/ai/runtime/capability_graph.py \
+            skeleton/ai/runtime/gameplay_capabilities.py \
+            skeleton/ai/runtime/game_platform_catalog.py \
+            skeleton/ai/runtime/game_rights.py \
+            skeleton/ai/runtime/homebrew_editor.py \
+            skeleton/ai/runtime/homebrew_porting.py \
+            skeleton/app/homebrew_port_ui.py \
+            scripts/game/port_homebrew.py \
+            skeleton/testing/test_homebrew_porting.py \
+            skeleton/app/homebrew_editor_ui.py \
+            scripts/game/homebrew_edit.py \
+            skeleton/testing/test_homebrew_editor.py \
+            skeleton/ai/runtime/game_project_capsule.py \
+            skeleton/ai/runtime/game_playability.py \
+            skeleton/ai/runtime/chip8_machine.py \
+            scripts/game/export_chip8.py \
+            scripts/game/verify_target_completion.py \
+            scripts/game/accept_game_builds.py \
+            skeleton/testing/test_game_build_acceptance.py \
+            skeleton/testing/test_target_completion.py \
+            skeleton/testing/test_chip8_homebrew.py \
+            skeleton/testing/test_chip8_classic.py \
+            skeleton/app/offline_chip8_preview.py \
+            skeleton/testing/test_offline_chip8_preview.py \
+            skeleton/testing/test_game_playability.py \
+            scripts/game/export_portable_c89.py \
+            skeleton/testing/test_game_c89_export.py \
+            scripts/game/game_project.py \
+            skeleton/testing/test_cross_era_game_rights.py \
+            skeleton/testing/test_gameplay_capabilities.py \
+            skeleton/app/offline_game_preview.py \
+            skeleton/testing/test_offline_game_preview.py \
+            skeleton/testing/test_capability_graph.py \
+            skeleton/testing/test_resource_admission.py \
+            skeleton/testing/test_deterministic_capabilities.py \
+            scripts/training/capability_ledger.py \
+            skeleton/testing/test_capability_ledger.py \
+            skeleton/app/offline_cli.py \
+            skeleton/app/local_ai.py \
+            skeleton/app/cli.py \
+            scripts/offline_kit.py \
+            skeleton/testing/test_offline_library.py \
+            skeleton/testing/test_offline_index_queue.py \
+            skeleton/testing/test_offline_snapshot.py \
+            skeleton/testing/test_offline_audit.py
+      - name: Independently regenerate and audit synthetic training data
+        run: |
+          python scripts/training/generate_offline_foundations.py
+          python scripts/training/verify_offline_foundations.py
+      - name: Check sparse capability breadth without adding training data
+        run: |
+          python scripts/training/sparse_capability.py --profile low-memory
+          python scripts/training/probe_sparse_capabilities.py --per-mode 1
+      - name: Require portable C89 compilation for actual original-game acceptance
+        run: |
+          command -v cc
+          cc --version
       - name: Install focused test dependency
         run: >-
           python -m pip install --disable-pip-version-check
@@ -67,6 +300,17 @@ jobs:
           "pydantic-settings==2.15.0"
           "fastapi>=0.141.1"
           "numpy==2.4.6"
+      - name: Require real original-homebrew Windows hybrid port win acceptance
+        run: |
+          PYTHONPATH=. python -c "from skeleton.testing.test_homebrew_porting import original; from skeleton.ai.runtime.homebrew_porting import make_homebrew_port,verify_port_gameplay; c=original(); p=make_homebrew_port(c,hybrids=['collectathon','keyquest','speedrun','exploration','combo'],quality='cinematic'); r=verify_port_gameplay(c,p); assert r['hybrid_gameplay_proven'] and r['remaining_collectibles']==0 and r['deterministic']"
+      - name: Execute full original-game build pipeline through three genuine runtimes
+        env:
+          OPENAI_API_KEY: ""
+          XAI_API_KEY: ""
+          ANTHROPIC_API_KEY: ""
+        run: |
+          PYTHONPATH=. python scripts/game/accept_game_builds.py
+          PYTHONPATH=. python scripts/game/verify_target_completion.py --target chip8-vip --prove-chip8
       - name: Run credential-free local inference acceptance
         env:
           OPENAI_API_KEY: ""
@@ -81,4 +325,35 @@ jobs:
           skeleton/testing/test_local_model_builder.py
           skeleton/testing/test_llama_cpp_local_inference.py
           skeleton/testing/test_local_model_deployment.py
+          skeleton/testing/test_app_offline_gguf.py
+          skeleton/testing/test_offline_history_backup.py
+          skeleton/testing/test_offline_kit.py
+          skeleton/testing/test_offline_console.py
+          skeleton/testing/test_offline_workspace.py
+          skeleton/testing/test_offline_readiness.py
+          skeleton/testing/test_offline_library.py
+          skeleton/testing/test_offline_index_queue.py
+          skeleton/testing/test_offline_snapshot.py
+          skeleton/testing/test_offline_audit.py
+          skeleton/testing/test_offline_sqlite_safety.py
+          skeleton/testing/test_offline_firewall_policy.py
+          skeleton/testing/test_offline_foundations.py
+          skeleton/testing/test_sparse_capability.py
+          skeleton/testing/test_procedural_capabilities.py
+          skeleton/testing/test_capability_ledger.py
+          skeleton/testing/test_resource_admission.py
+          skeleton/testing/test_deterministic_capabilities.py
+          skeleton/testing/test_capability_graph.py
+          skeleton/testing/test_gameplay_capabilities.py
+          skeleton/testing/test_cross_era_game_rights.py
+          skeleton/testing/test_homebrew_editor.py
+          skeleton/testing/test_homebrew_porting.py
+          skeleton/testing/test_game_playability.py
+          skeleton/testing/test_chip8_homebrew.py
+          skeleton/testing/test_chip8_classic.py
+          skeleton/testing/test_offline_chip8_preview.py
+          skeleton/testing/test_target_completion.py
+          skeleton/testing/test_game_build_acceptance.py
+          skeleton/testing/test_game_c89_export.py
+          skeleton/testing/test_offline_game_preview.py
           tests/flgb/test_desktop_offline_ai.py

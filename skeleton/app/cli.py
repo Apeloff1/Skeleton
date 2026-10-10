@@ -67,9 +67,55 @@ def _parser() -> argparse.ArgumentParser:
 
     local_ai = sub.add_parser("local-ai", help="run native AI locally, without Docker or provider credentials")
     local_ai.add_argument("--model", help="native content-addressed checkpoint for headless inference")
-    local_ai.add_argument("--prompt", help="headless text request (requires --model)")
+    local_ai.add_argument("--deployment", help="digest-pinned local GGUF/llama.cpp deployment manifest")
+    local_ai.add_argument("--prompt", help="headless text request (requires --model or --deployment)")
+    local_ai.add_argument("--backup-in", help="restore an exact-model local transcript before inference")
+    local_ai.add_argument("--backup-out", help="atomically save the completed local transcript after inference")
+    local_ai.add_argument("--workspace", help="local SQLite file for automatic durable conversation recovery")
+    local_ai.add_argument("--session-id", default="default", help="offline workspace conversation identity")
     local_ai.add_argument("--max-output-tokens", type=int, default=8)
     local_ai.add_argument("--json", action="store_true", dest="as_json", help="print a bound inference receipt")
+    local_ai.add_argument("--doctor", action="store_true", help="verify local artifacts without running inference")
+    local_ai.add_argument("--qualify-model", action="store_true", help="execute and verify two persisted on-device inference turns")
+    capability = local_ai.add_mutually_exclusive_group()
+    capability.add_argument("--capability-file", help="execute an admitted deterministic local JSON task")
+    capability.add_argument("--capability-graph-file", help="execute a bounded chain of deterministic local tasks")
+    capability.add_argument("--capability-list", action="store_true", help="list model-free deterministic operations")
+    capability.add_argument("--game-preview", action="store_true", help="open native offline playable game window")
+    capability.add_argument("--game-preview-check", action="store_true", help="verify deterministic native game replay without desktop")
+    capability.add_argument("--homebrew-editor", help="visual editor for a rights-checked original homebrew project")
+    capability.add_argument("--homebrew-port-check", action="store_true", help="verify original Windows port aesthetics/hybrid gameplay")
+    local_ai.add_argument("--homebrew-port-project", help="original project to verify Windows destination port")
+    local_ai.add_argument("--homebrew-port-blueprint", help="Windows port blueprint to verify")
+    local_ai.add_argument("--homebrew-editor-output", help="new project output for visual editor Save As")
+    capability.add_argument("--chip8-demo-output", help="write a genuine original CHIP-8 homebrew ROM")
+    capability.add_argument("--chip8-demo-check", action="store_true", help="verify a native original CHIP-8 game through actual machine instructions")
+    capability.add_argument("--chip8-export-capsule", help="legal-source authored capsule for CHIP-8 export")
+    local_ai.add_argument("--chip8-rom-output", help="new ROM output path for CHIP-8 capsule export")
+    local_ai.add_argument("--game-seed", type=int, help="optional explicit offline game preview seed")
+    local_ai.add_argument("--game-project", help="verified portable game project file for native preview")
+    local_ai.add_argument("--library", help="local SQLite document index")
+    local_ai.add_argument("--index-dir", help="index an explicitly selected local text folder")
+    local_ai.add_argument("--search", help="search local indexed documents without a model")
+    local_ai.add_argument("--use-library", action="store_true", help="include bounded local excerpts as untrusted context")
+    local_ai.add_argument("--context-limit", type=int, default=3, help="local document hit budget")
+    local_ai.add_argument("--queue-db", help="SQLite indexing work queue")
+    local_ai.add_argument("--enqueue-dir", help="queue explicit local document scan")
+    local_ai.add_argument("--queue-library", help="local SQLite FTS5 index for queued scan")
+    local_ai.add_argument("--run-queue", action="store_true", help="run bounded queued indexing work")
+    local_ai.add_argument("--queue-status", action="store_true", help="list locally queued indexing jobs")
+    local_ai.add_argument("--cancel-queue-job", help="cancel queued job by ID")
+    local_ai.add_argument("--retry-queue-job", help="retry terminal failed job by ID")
+    local_ai.add_argument("--drain-limit", type=int, default=5, help="maximum jobs processed per invocation")
+    local_ai.add_argument("--snapshot-to", help="create verified local state recovery bundle")
+    local_ai.add_argument("--restore-from", help="restore verified local recovery bundle")
+    local_ai.add_argument("--verify-snapshot", help="verify a local recovery bundle")
+    local_ai.add_argument("--snapshot-workspace", help="conversation SQLite state file")
+    local_ai.add_argument("--snapshot-library", help="document knowledge SQLite state file")
+    local_ai.add_argument("--snapshot-queue", help="indexing job SQLite state file")
+    local_ai.add_argument("--audit-workspace", help="read-only semantic check of chat SQLite")
+    local_ai.add_argument("--audit-library", help="read-only semantic check of document SQLite")
+    local_ai.add_argument("--audit-queue", help="read-only semantic check of job SQLite")
     sub.add_parser("down", help="stop the assembled application")
     sub.add_parser("ps", help="show assembled service state")
 
@@ -211,20 +257,137 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if command == "local-ai":
-        from skeleton.app.local_ai import OfflineAISession, load_native_checkpoint, run_offline_ai
+        if (
+            args.capability_file or args.capability_graph_file or args.capability_list or args.game_preview or args.game_preview_check or args.game_seed is not None or args.game_project or args.homebrew_editor or args.homebrew_editor_output or args.homebrew_port_check or args.homebrew_port_project or args.homebrew_port_blueprint or args.chip8_demo_output or args.chip8_demo_check or args.chip8_export_capsule or args.chip8_rom_output or args.qualify_model or args.index_dir or args.search or args.use_library or args.enqueue_dir
+            or args.run_queue or args.queue_status or args.cancel_queue_job
+            or args.retry_queue_job or args.snapshot_to
+            or args.restore_from or args.verify_snapshot
+            or args.audit_workspace or args.audit_library or args.audit_queue
+        ):
+            # A single command implementation ensures the GUI's CLI and the
+            # frozen console use identical offline document safety policies.
+            from skeleton.app.offline_cli import main as run_offline_console
+            local_args = []
+            for option, value in (
+                ("--model", args.model),
+                ("--deployment", args.deployment),
+                ("--prompt", args.prompt),
+                ("--backup-in", args.backup_in),
+                ("--backup-out", args.backup_out),
+                ("--workspace", args.workspace),
+                ("--session-id", args.session_id),
+                ("--library", args.library),
+                ("--index-dir", args.index_dir),
+                ("--search", args.search),
+                ("--queue-db", args.queue_db),
+                ("--enqueue-dir", args.enqueue_dir),
+                ("--queue-library", args.queue_library),
+                ("--cancel-queue-job", args.cancel_queue_job),
+                ("--retry-queue-job", args.retry_queue_job),
+                ("--snapshot-to", args.snapshot_to),
+                ("--restore-from", args.restore_from),
+                ("--verify-snapshot", args.verify_snapshot),
+                ("--snapshot-workspace", args.snapshot_workspace),
+                ("--snapshot-library", args.snapshot_library),
+                ("--snapshot-queue", args.snapshot_queue),
+                ("--audit-workspace", args.audit_workspace),
+                ("--audit-library", args.audit_library),
+                ("--audit-queue", args.audit_queue),
+                ("--capability-file", args.capability_file),
+                ("--capability-graph-file", args.capability_graph_file),
+                ("--game-seed", args.game_seed),
+                ("--game-project", args.game_project),
+                ("--homebrew-editor", args.homebrew_editor),
+                ("--homebrew-editor-output", args.homebrew_editor_output),
+                ("--homebrew-port-project", args.homebrew_port_project),
+                ("--homebrew-port-blueprint", args.homebrew_port_blueprint),
+                ("--chip8-demo-output", args.chip8_demo_output),
+                ("--chip8-export-capsule", args.chip8_export_capsule),
+                ("--chip8-rom-output", args.chip8_rom_output),
+            ):
+                if value is not None:
+                    local_args.extend((option, str(value)))
+            local_args.extend(("--max-output-tokens", str(args.max_output_tokens)))
+            local_args.extend(("--context-limit", str(args.context_limit)))
+            local_args.extend(("--drain-limit", str(args.drain_limit)))
+            if args.run_queue:
+                local_args.append("--run-queue")
+            if args.queue_status:
+                local_args.append("--queue-status")
+            if args.use_library:
+                local_args.append("--use-library")
+            if args.qualify_model:
+                local_args.append("--qualify-model")
+            if args.capability_list:
+                local_args.append("--capability-list")
+            if args.game_preview:
+                local_args.append("--game-preview")
+            if args.game_preview_check:
+                local_args.append("--game-preview-check")
+            if args.chip8_demo_check:
+                local_args.append("--chip8-demo-check")
+            if args.homebrew_port_check:
+                local_args.append("--homebrew-port-check")
+            if args.as_json:
+                local_args.append("--json")
+            return run_offline_console(local_args)
 
-        if bool(args.model) != bool(args.prompt):
-            print("local-ai headless inference requires both --model and --prompt")
+        from skeleton.app.local_ai import (
+            OfflineAISession, OfflineGGUFSession, load_native_checkpoint, run_offline_ai,
+        )
+        from skeleton.app.offline_workspace import DurableOfflineSession
+
+        if args.doctor:
+            if (bool(args.model) == bool(args.deployment)) or args.prompt or args.backup_in or args.backup_out or args.workspace:
+                print("local-ai --doctor requires exactly one local model and no generation parameters")
+                return 2
+            from skeleton.app.offline_readiness import inspect_local_readiness
+            try:
+                report = inspect_local_readiness(model=args.model, deployment=args.deployment)
+            except (ValueError, RuntimeError, OSError, TypeError) as exc:
+                print("local-ai doctor rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(report, sort_keys=True, ensure_ascii=False))
+            else:
+                print("Local artifact VERIFIED; inference and OS isolation not tested")
+            return 0
+
+        if (args.model and args.deployment) or (
+            bool(args.prompt) != bool(args.model or args.deployment)
+        ) or ((args.backup_in or args.backup_out) and not args.prompt):
+            print("local-ai requires both --prompt and exactly one of --model or --deployment")
             return 2
-        if args.model:
+        if args.model or args.deployment:
             import asyncio
 
+            if args.workspace and args.backup_in:
+                print("local-ai rejects --backup-in with a revisioned workspace")
+                return 2
+            durable = None
             try:
-                session = OfflineAISession(load_native_checkpoint(args.model))
-                answer = asyncio.run(session.ask(args.prompt, max_output_tokens=args.max_output_tokens))
+                session = (
+                    OfflineGGUFSession(args.deployment)
+                    if args.deployment
+                    else OfflineAISession(load_native_checkpoint(args.model))
+                )
+                if args.workspace:
+                    durable = DurableOfflineSession(
+                        session, args.workspace, session_id=args.session_id
+                    )
+                elif args.backup_in:
+                    session.restore_history_backup(args.backup_in)
+                answer = asyncio.run(
+                    (durable or session).ask(args.prompt, max_output_tokens=args.max_output_tokens)
+                )
+                if args.backup_out:
+                    session.save_history_backup(args.backup_out)
             except (ValueError, RuntimeError, OSError) as exc:
                 print("local-ai request rejected: " + type(exc).__name__ + ": " + str(exc))
                 return 1
+            finally:
+                if durable is not None:
+                    durable.close()
             if args.as_json:
                 print(json.dumps({
                     "schema_version": 1,

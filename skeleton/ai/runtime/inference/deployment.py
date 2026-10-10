@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import threading
 from typing import Any
 
@@ -29,10 +30,28 @@ from .local import (
 SCHEMA = "skeleton.local_model.deployment.v1"
 QUALIFICATION_SCHEMA = "skeleton.local_model.qualification.v1"
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
+_MAX_MANIFEST_BYTES = 128 * 1024
 
 
 class LocalModelDeploymentError(RuntimeError):
     """A local-model deployment manifest or artifact failed closed."""
+
+
+def _unambiguous_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise LocalModelDeploymentError(
+                "duplicate deployment manifest JSON key: " + key
+            )
+        result[key] = value
+    return result
+
+
+def _reject_nonfinite(value: str) -> None:
+    raise LocalModelDeploymentError(
+        "deployment manifest contains nonfinite JSON constant: " + value
+    )
 
 
 def _sha256_file(path: Path) -> str:
@@ -115,14 +134,38 @@ class LocalModelDeployment:
     @classmethod
     def load(cls, manifest_path: str | Path) -> "LocalModelDeployment":
         source = Path(manifest_path).expanduser()
+        if source.is_symlink():
+            raise LocalModelDeploymentError("deployment manifest symlink is forbidden")
         try:
             resolved_manifest = source.resolve(strict=True)
+            with resolved_manifest.open("rb") as reader:
+                info = os.fstat(reader.fileno())
+                if (
+                    not stat.S_ISREG(info.st_mode) or info.st_size < 1
+                    or info.st_size > _MAX_MANIFEST_BYTES
+                ):
+                    raise LocalModelDeploymentError(
+                        "deployment manifest must be a bounded regular file"
+                    )
+                raw = reader.read(_MAX_MANIFEST_BYTES + 1)
         except OSError as exc:
-            raise LocalModelDeploymentError(f"deployment manifest not found: {source}") from exc
+            raise LocalModelDeploymentError(
+                f"deployment manifest could not be read: {source}"
+            ) from exc
+        if len(raw) > _MAX_MANIFEST_BYTES or len(raw) != info.st_size:
+            raise LocalModelDeploymentError(
+                "deployment manifest changed or exceeded admitted size"
+            )
         try:
-            payload = json.loads(resolved_manifest.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            raise LocalModelDeploymentError("deployment manifest is not valid JSON") from exc
+            payload = json.loads(
+                raw.decode("utf-8", errors="strict"),
+                object_pairs_hook=_unambiguous_object,
+                parse_constant=_reject_nonfinite,
+            )
+        except (UnicodeError, json.JSONDecodeError) as exc:
+            raise LocalModelDeploymentError(
+                "deployment manifest is not valid UTF-8 JSON"
+            ) from exc
         if not isinstance(payload, dict):
             raise LocalModelDeploymentError("deployment manifest root must be an object")
         if payload.get("schema_version") != SCHEMA:

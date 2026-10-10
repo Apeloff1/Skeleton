@@ -374,3 +374,72 @@ def test_qualification_rejects_truncated_response(tmp_path: Path) -> None:
             prompt="qualification",
         )
 
+
+
+def test_deployment_rejects_ambiguous_duplicate_top_level_json_keys(
+    tmp_path: Path,
+) -> None:
+    manifest, _, _ = _deployment(tmp_path)
+    data = manifest.read_text("utf-8")
+    assert '"runtime_kind":' in data
+    data = data.replace(
+        '"runtime_kind":',
+        '"runtime_kind": "llama.cpp-cli", "runtime_kind":',
+        1,
+    )
+    manifest.write_text(data, encoding="utf-8")
+    with pytest.raises(LocalModelDeploymentError, match="duplicate.*runtime_kind"):
+        LocalModelDeployment.load(manifest)
+
+
+def test_deployment_rejects_ambiguous_duplicate_nested_config_keys(
+    tmp_path: Path,
+) -> None:
+    manifest, _, _ = _deployment(tmp_path)
+    data = manifest.read_text("utf-8")
+    assert '"temperature": 0.0' in data
+    manifest.write_text(
+        data.replace(
+            '"temperature": 0.0',
+            '"temperature": 0.0, "temperature": 0.0',
+            1,
+        ), encoding="utf-8",
+    )
+    with pytest.raises(LocalModelDeploymentError, match="duplicate.*temperature"):
+        LocalModelDeployment.load(manifest)
+
+
+def test_deployment_rejects_nonfinite_manifest_config_before_model_execution(
+    tmp_path: Path,
+) -> None:
+    manifest, _, _ = _deployment(tmp_path)
+    data = manifest.read_text("utf-8")
+    assert '"temperature": 0.0' in data
+    manifest.write_text(
+        data.replace('"temperature": 0.0', '"temperature": NaN', 1),
+        encoding="utf-8",
+    )
+    with pytest.raises(LocalModelDeploymentError, match="nonfinite"):
+        LocalModelDeployment.load(manifest)
+
+
+def test_deployment_manifest_bytes_are_bounded_before_json_parse(
+    tmp_path: Path,
+) -> None:
+    manifest, _, _ = _deployment(tmp_path)
+    manifest.write_bytes(manifest.read_bytes() + b" " * 150000)
+    with pytest.raises(LocalModelDeploymentError, match="bounded|size"):
+        LocalModelDeployment.load(manifest)
+
+
+def test_deployment_rejects_symlinked_manifest_at_admission(
+    tmp_path: Path,
+) -> None:
+    manifest, _, _ = _deployment(tmp_path)
+    linked = tmp_path / "linked-deployment.json"
+    try:
+        linked.symlink_to(manifest)
+    except OSError:
+        pytest.skip("filesystem does not permit symlink fixtures")
+    with pytest.raises(LocalModelDeploymentError, match="manifest symlink"):
+        LocalModelDeployment.load(linked)

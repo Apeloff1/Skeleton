@@ -9,6 +9,32 @@ on:
       - "scripts/windows/**"
       - "skeleton/app/**"
       - "skeleton/testing/test_windows_installer.py"
+      - "skeleton/ai/runtime/deterministic_capabilities.py"
+      - "skeleton/ai/runtime/capability_graph.py"
+      - "skeleton/ai/runtime/gameplay_capabilities.py"
+      - "skeleton/ai/runtime/game_playability.py"
+      - "skeleton/ai/runtime/game_platform_catalog.py"
+      - "skeleton/ai/runtime/game_rights.py"
+      - "skeleton/ai/runtime/homebrew_editor.py"
+      - "skeleton/ai/runtime/homebrew_porting.py"
+      - "skeleton/app/homebrew_port_ui.py"
+      - "scripts/game/port_homebrew.py"
+      - "skeleton/testing/test_homebrew_porting.py"
+      - "skeleton/app/homebrew_editor_ui.py"
+      - "scripts/game/homebrew_edit.py"
+      - "skeleton/testing/test_homebrew_editor.py"
+      - "skeleton/ai/runtime/game_project_capsule.py"
+      - "skeleton/ai/runtime/chip8_machine.py"
+      - "scripts/game/export_chip8.py"
+      - "skeleton/app/offline_chip8_preview.py"
+      - "skeleton/testing/test_offline_chip8_preview.py"
+      - "skeleton/testing/test_chip8_homebrew.py"
+      - "skeleton/testing/test_game_playability.py"
+      - "skeleton/testing/test_cross_era_game_rights.py"
+      - "skeleton/testing/test_gameplay_capabilities.py"
+      - "skeleton/testing/test_offline_game_preview.py"
+      - "skeleton/testing/test_deterministic_capabilities.py"
+      - "skeleton/testing/test_capability_graph.py"
       - "docker-compose.yml"
       - "docker-compose.hot.yml"
       - "pyproject.toml"
@@ -20,6 +46,32 @@ on:
       - "scripts/windows/**"
       - "skeleton/app/**"
       - "skeleton/testing/test_windows_installer.py"
+      - "skeleton/ai/runtime/deterministic_capabilities.py"
+      - "skeleton/ai/runtime/capability_graph.py"
+      - "skeleton/ai/runtime/gameplay_capabilities.py"
+      - "skeleton/ai/runtime/game_playability.py"
+      - "skeleton/ai/runtime/game_platform_catalog.py"
+      - "skeleton/ai/runtime/game_rights.py"
+      - "skeleton/ai/runtime/homebrew_editor.py"
+      - "skeleton/ai/runtime/homebrew_porting.py"
+      - "skeleton/app/homebrew_port_ui.py"
+      - "scripts/game/port_homebrew.py"
+      - "skeleton/testing/test_homebrew_porting.py"
+      - "skeleton/app/homebrew_editor_ui.py"
+      - "scripts/game/homebrew_edit.py"
+      - "skeleton/testing/test_homebrew_editor.py"
+      - "skeleton/ai/runtime/game_project_capsule.py"
+      - "skeleton/ai/runtime/chip8_machine.py"
+      - "scripts/game/export_chip8.py"
+      - "skeleton/app/offline_chip8_preview.py"
+      - "skeleton/testing/test_offline_chip8_preview.py"
+      - "skeleton/testing/test_chip8_homebrew.py"
+      - "skeleton/testing/test_game_playability.py"
+      - "skeleton/testing/test_cross_era_game_rights.py"
+      - "skeleton/testing/test_gameplay_capabilities.py"
+      - "skeleton/testing/test_offline_game_preview.py"
+      - "skeleton/testing/test_deterministic_capabilities.py"
+      - "skeleton/testing/test_capability_graph.py"
       - "docker-compose.yml"
       - "docker-compose.hot.yml"
       - "pyproject.toml"
@@ -84,6 +136,21 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check "pytest>=8,<9" "pydantic==2.13.5" "pydantic-settings==2.15.0"
           python -m pytest -q skeleton/testing/test_windows_installer.py
+
+      - name: Validate offline Windows network policy syntax
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            "scripts/windows/offline_network_policy.ps1",
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List | Out-String | Write-Host
+            throw "Offline Windows firewall policy script did not parse"
+          }
 
       - name: Build installer
         shell: pwsh
@@ -153,6 +220,526 @@ jobs:
           $nativeSmoke = Start-Process -FilePath $launcher -ArgumentList @("--local-ai-smoke") -Wait -PassThru
           if ($nativeSmoke.ExitCode -ne 0) {
             throw "installed Skeleton.exe native offline inference smoke exited $($nativeSmoke.ExitCode)"
+          }
+
+          # A genuinely console-capable binary is required for automated
+          # local inference. It must work without system Python or Docker.
+          $offline = Join-Path $installDir "SkeletonOffline.exe"
+          if (-not (Test-Path -LiteralPath $offline)) {
+            throw "installed SkeletonOffline.exe missing"
+          }
+          # The installer must include the actual one-click windowed game,
+          # not merely a command-line preview or source-only Tk module.
+          $gameExe = Join-Path $installDir "SkeletonGame.exe"
+          if (-not (Test-Path -LiteralPath $gameExe)) {
+            throw "installed SkeletonGame.exe native game is missing"
+          }
+          if ((Get-Item -LiteralPath $gameExe).Length -lt 100000) {
+            throw "installed native SkeletonGame.exe looks truncated"
+          }
+          # Desktop interaction itself is not verified on ephemeral CI
+          # hosts. --game-preview-check above executes the SAME engine
+          # through the installed headless console and must win twice.
+
+          & $offline --native-smoke
+          if ($LASTEXITCODE -ne 0) {
+            throw "standalone offline console native graph smoke failed"
+          }
+          & $offline --help
+          if ($LASTEXITCODE -ne 0) {
+            throw "standalone offline console help failed"
+          }
+
+          # The fixture is built by CI Python, but the qualification itself is
+          # executed by the installed, frozen EXE without using system Python.
+          # This verifies two real native inference calls and SQLite resume;
+          # it is NOT a trained model or production quality qualification.
+          $nativeFixture = Join-Path $env:RUNNER_TEMP "SkeletonOfflineSyntheticNative.json"
+          $env:PYTHONPATH = "."
+          & python scripts/windows/create_offline_native_fixture.py --output $nativeFixture
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $nativeFixture)) {
+            throw "cannot prepare local synthetic offline qualification fixture"
+          }
+          $qualificationRaw = & $offline --model $nativeFixture --qualify-model --max-output-tokens 2 --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed frozen console failed real two-turn local inference"
+          }
+          $qualification = $qualificationRaw | ConvertFrom-Json
+          if (
+            $qualification.turns_completed -ne 2 -or
+            -not $qualification.sqlite_context_restored_and_verified -or
+            -not $qualification.artifacts_verified_before_and_after -or
+            $qualification.network_isolation_verified -or
+            $qualification.trained_model_quality_verified
+          ) {
+            throw "offline functional qualification receipt missing required evidence/boundaries"
+          }
+          if ($qualification.receipts.Count -ne 2) {
+            throw "expected two bound local generation receipts"
+          }
+
+          # Exercise genuine model-free capabilities from the INSTALLED
+          # executable. This must not need a model, Python or external I/O.
+          $capabilityCatalogJson = & $offline --capability-list --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed offline deterministic capability catalog failed"
+          }
+          $capabilityCatalog = $capabilityCatalogJson | ConvertFrom-Json
+          if ($capabilityCatalog.operations.Count -ne 31 -or
+              $capabilityCatalog.training_examples_required -ne 0 -or
+              $capabilityCatalog.executor_authority_granted) {
+            throw "installed capability catalog contract mismatch"
+          }
+          $capabilityTask = Join-Path $env:RUNNER_TEMP "SkeletonOfflineCapability.json"
+          '{"operation":"grid.shortest_path","args":{"start":{"x":0,"y":0},"goal":{"x":3,"y":0},"width":4,"height":4,"blocked":[{"x":1,"y":0},{"x":2,"y":0}]}}' |
+            Set-Content -LiteralPath $capabilityTask -Encoding utf8
+          $capabilityReportJson = & $offline --capability-file $capabilityTask --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed frozen console failed model-free pathfinding"
+          }
+          $capabilityReport = $capabilityReportJson | ConvertFrom-Json
+          if ($capabilityReport.operation -ne "grid.shortest_path" -or
+              -not $capabilityReport.result.reachable -or
+              $capabilityReport.result.steps -ne 5 -or
+              $capabilityReport.result.path.Count -ne 6 -or
+              $capabilityReport.model_inference_used -or
+              $capabilityReport.network_access_used -or
+              $capabilityReport.authority_granted) {
+            throw "model-free installed runtime capability result was not valid"
+          }
+          '{"operation":"math.add","operation":"math.multiply","args":{"a":1,"b":2}}' |
+            Set-Content -LiteralPath $capabilityTask -Encoding utf8
+          $null = & $offline --capability-file $capabilityTask --json 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            throw "installed deterministic capability accepted ambiguous duplicate JSON"
+          }
+
+          # Multi-step model-free gameplay from an installed EXE: no Python,
+          # no network dependency, no model weights or extra training data.
+          $capabilityGraphTask = Join-Path $env:RUNNER_TEMP "SkeletonOfflineCapabilityGraph.json"
+          '{"schema_version":"skeleton.offline_capability_graph.v1","nodes":[{"id":"hp","operation":"game.damage","args":{"health":20,"damage":7}},{"id":"points","operation":"game.coins","args":{"coins":3,"points_per_coin":5}},{"id":"score","operation":"math.add","args":{"a":{"$ref":"hp"},"b":{"$ref":"points"}}}],"outputs":["score"]}' |
+            Set-Content -LiteralPath $capabilityGraphTask -Encoding utf8
+          $graphReportJson = & $offline --capability-graph-file $capabilityGraphTask --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed frozen console failed deterministic graph execution"
+          }
+          $graphReport = $graphReportJson | ConvertFrom-Json
+          if ($graphReport.outputs.score -ne 28 -or
+              $graphReport.node_count -ne 3 -or
+              $graphReport.training_examples_added -ne 0 -or
+              $graphReport.model_inference_used -or
+              $graphReport.network_access_used -or
+              $graphReport.executor_authority_granted) {
+            throw "installed frozen console returned an invalid multi-step capability result"
+          }
+          '{"schema_version":"skeleton.offline_capability_graph.v1","nodes":[{"id":"self","operation":"math.add","args":{"a":{"$ref":"self"},"b":1}}],"outputs":["self"]}' |
+            Set-Content -LiteralPath $capabilityGraphTask -Encoding utf8
+          $null = & $offline --capability-graph-file $capabilityGraphTask --json 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            throw "installed graph evaluator accepted a self-referencing task"
+          }
+
+          # Native deterministic game-building without downloaded weights:
+          # generate a solvable level, compile geometry, simulate player state.
+          $gameTask = Join-Path $env:RUNNER_TEMP "SkeletonOfflineProceduralLevel.json"
+          '{"operation":"game.level_generate","args":{"seed":1729,"width":12,"height":8,"wall_percent":45}}' |
+            Set-Content -LiteralPath $gameTask -Encoding utf8
+          $generatedRaw = & $offline --capability-file $gameTask --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed frozen console failed original level generation"
+          }
+          $generated = $generatedRaw | ConvertFrom-Json
+          if ($generated.operation -ne "game.level_generate" -or
+              -not $generated.result.goal_reachable -or
+              $generated.result.tiles.Count -ne 8 -or
+              $generated.result.training_examples_added -ne 0 -or
+              $generated.model_inference_used -or
+              $generated.authority_granted) {
+            throw "installed frozen console game-generation contract mismatch"
+          }
+          $repeatRaw = & $offline --capability-file $gameTask --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed frozen console failed replay of seeded game generation"
+          }
+          $repeat = $repeatRaw | ConvertFrom-Json
+          if ($generated.result_sha256 -ne $repeat.result_sha256) {
+            throw "installed generated-game digest was nondeterministic"
+          }
+
+          # First genuine vintage game-ROM target: legally original CHIP-8
+          # bytecode from installed SkeletonOffline.exe, verified by an
+          # independent CHIP-8 VM to reach WIN, then reproduced identically.
+          $chip8First = Join-Path $env:RUNNER_TEMP "SkeletonOriginalChip8A.ch8"
+          $chip8Second = Join-Path $env:RUNNER_TEMP "SkeletonOriginalChip8B.ch8"
+          $chip8ReceiptJson = & $offline --chip8-demo-output $chip8First
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $chip8First)) {
+            throw "installed offline console failed genuine CHIP-8 ROM export"
+          }
+          $chip8Receipt = $chip8ReceiptJson | ConvertFrom-Json
+          if ($chip8Receipt.target -ne "chip8-vip" -or
+              -not $chip8Receipt.acceptance.win_state_reached -or
+              -not $chip8Receipt.acceptance.actual_original_machine_rom_emitted -or
+              $chip8Receipt.rom_bytes -lt 64 -or
+              $chip8Receipt.rom_bytes -gt 3584 -or
+              $chip8Receipt.boot_rom_embedded -or
+              $chip8Receipt.licensed_sdk_embedded -or
+              $chip8Receipt.legal_publication_approved -or
+              $chip8Receipt.acceptance.real_hardware_tested -or
+              $chip8Receipt.training_examples_added -ne 0) {
+            throw "installed CHIP-8 homebrew is not a verified legal original ROM"
+          }
+          $chip8DiskHash = (Get-FileHash -LiteralPath $chip8First -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($chip8DiskHash -ne $chip8Receipt.rom_sha256) {
+            throw "installed CHIP-8 exporter ROM bytes failed digest acceptance"
+          }
+          $chip8RepeatJson = & $offline --chip8-demo-output $chip8Second
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed CHIP-8 reproducibility run failed"
+          }
+          $chip8Repeat = $chip8RepeatJson | ConvertFrom-Json
+          if ($chip8Repeat.rom_sha256 -ne $chip8Receipt.rom_sha256) {
+            throw "CHIP-8 ROM changed between independent frozen EXE runs"
+          }
+
+          # End-to-end ORIGINAL HOME-BREW production. Compose a new
+          # rights-attested 7x7 level, edit the actual geometry using the
+          # 11-tool engine, then compile the edited output via the
+          # installed Windows EXE into authentic CHIP-8 bytecode and WIN.
+          $sourceHomebrew = Join-Path $env:RUNNER_TEMP "SkeletonOriginalEditableHomebrew.json"
+          $homebrewRecipe = Join-Path $env:RUNNER_TEMP "SkeletonHomebrewRecipe.json"
+          $editedHomebrew = Join-Path $env:RUNNER_TEMP "SkeletonEditedHomebrew.json"
+          $editedHomebrewRom = Join-Path $env:RUNNER_TEMP "SkeletonEditedHomebrew.ch8"
+          & python scripts/game/game_project.py --demo-project $sourceHomebrew --seed 42 --width 7 --height 7 --targets chip8-vip,windows-11
+          if ($LASTEXITCODE -ne 0) {
+            throw "could not originate editable lawful 7x7 CHIP-8 game"
+          }
+          $optionJson = & python scripts/game/homebrew_edit.py --capsule $sourceHomebrew --tools
+          if ($LASTEXITCODE -ne 0) {
+            throw "homebrew editor options unavailable"
+          }
+          $options = $optionJson | ConvertFrom-Json
+          if (-not $options.homebrew_only -or $options.tool_count -lt 11 -or
+              $options.third_party_game_import_allowed -or
+              $options.max_edited_cells -lt 1024) {
+            throw "homebrew editor capabilities bypassed original-only policy"
+          }
+          $baseProject = Get-Content -LiteralPath $sourceHomebrew -Raw -Encoding utf8 | ConvertFrom-Json
+          $oldCell = $baseProject.tilemap[2].Substring(2, 1)
+          $newCell = if ($oldCell -eq "#") { "." } else { "#" }
+          $recipe = @{
+            schema_version = "skeleton.game.homebrew_editor_recipe.v1"
+            base_tile_sha256 = $baseProject.edited_tile_sha256
+            batches = @(
+              @{
+                commands = @(@{ op = "paint"; x = 2; y = 2; tile = $newCell })
+                require_grid_route = $true
+                require_controller_win = $false
+              }
+            )
+            analysis_targets = @("chip8-vip", "windows-11")
+            require_final_controller_win = $false
+          }
+          $recipe | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $homebrewRecipe -Encoding utf8
+          $editRaw = & python scripts/game/homebrew_edit.py --capsule $sourceHomebrew --recipe $homebrewRecipe --output $editedHomebrew
+          if ($LASTEXITCODE -ne 0) {
+            throw "homebrew editor failed to produce new original project"
+          }
+          $editReceipt = $editRaw | ConvertFrom-Json
+          if (-not $editReceipt.homebrew_only -or
+              $editReceipt.third_party_rom_exported -or
+              $editReceipt.modified_cells -ne 1 -or
+              $editReceipt.training_examples_added -ne 0 -or
+              $editReceipt.new_capsule_sha256 -eq $editReceipt.source_capsule_sha256) {
+            throw "homebrew editor did not preserve original-only project identity"
+          }
+          $editedRomRaw = & $offline --chip8-export-capsule $editedHomebrew --chip8-rom-output $editedHomebrewRom
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed SkeletonOffline.exe could not compile edited original game"
+          }
+          $editedRom = $editedRomRaw | ConvertFrom-Json
+          if (-not $editedRom.acceptance.win_state_reached -or
+              -not $editedRom.original_homebrew_only -or
+              $editedRom.licensed_sdk_embedded -or
+              $editedRom.training_examples_added -ne 0) {
+            throw "edited original CHIP-8 game was not actually executable homebrew"
+          }
+
+
+          # The separate native SkeletonGame.exe exposes a real CHIP-8
+          # framebuffer/keypad mode. Its headless simulation must independently
+          # execute the ROM all the way to victory in the installed console.
+          $chip8GameCheckRaw = & $offline --chip8-demo-check --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed CHIP-8 native game player failed real-controller WIN qualification"
+          }
+          $chip8GameCheck = $chip8GameCheckRaw | ConvertFrom-Json
+          if (-not $chip8GameCheck.original_player_won -or
+              -not $chip8GameCheck.win_state_reached -or
+              $chip8GameCheck.native_window_was_opened -or
+              $chip8GameCheck.real_vintage_hardware_verified -or
+              $chip8GameCheck.copyrighted_firmware_included -or
+              $chip8GameCheck.model_inference_used -or
+              $chip8GameCheck.training_examples_added -ne 0 -or
+              $chip8GameCheck.rom_sha256 -ne $chip8Receipt.rom_sha256) {
+            throw "installed native CHIP-8 player produced unverified or inconsistent win receipt"
+          }
+
+          $null = & $offline --chip8-demo-output $chip8First 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            throw "CHIP-8 exporter overwrote a previously created original ROM"
+          }
+
+
+          # Unlike a GUI window smoke in headless CI, this runs the exact
+          # native preview engine from the installed EXE and must actually
+          # play a complete seeded game to its goal twice, identically.
+          $headlessGameRaw = & $offline --game-preview-check --game-seed 1729 --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed frozen native gameplay replay acceptance failed"
+          }
+          $headlessGame = $headlessGameRaw | ConvertFrom-Json
+          if (-not $headlessGame.terminal_won -or
+              -not $headlessGame.replay_deterministic -or
+              -not $headlessGame.source_level_goal_reachable -or
+              $headlessGame.frames_verified -lt 16 -or
+              $headlessGame.frames_verified -gt 32 -or
+              $headlessGame.training_examples_added -ne 0 -or
+              $headlessGame.model_inference_used -or
+              $headlessGame.installed_tk_display_verified -or
+              $headlessGame.native_display_opened) {
+            throw "installed native preview did not satisfy deterministic playable-game contract"
+          }
+          $headlessGameRepeatRaw = & $offline --game-preview-check --game-seed 1729 --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed native preview second replay failed"
+          }
+          $headlessGameRepeat = $headlessGameRepeatRaw | ConvertFrom-Json
+          if ($headlessGameRepeat.replay_sha256 -ne $headlessGame.replay_sha256) {
+            throw "installed native preview replay changed across independent processes"
+          }
+          $null = & $offline --game-preview-check --game-seed -1 --json 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            throw "installed native preview replay accepted an invalid seed"
+          }
+
+          # Full legal-first project import, not merely the embedded demo.
+          # The generated capsule has an original-content SHA256/rights
+          # record and checked real-controller playability. The standalone
+          # EXE must load it, win, and reject a forged clearance flag.
+          $authoredGame = Join-Path $env:RUNNER_TEMP "SkeletonAuthorizedOriginalGame.json"
+          & python scripts/windows/create_offline_game_fixture.py --output $authoredGame
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $authoredGame)) {
+            throw "cannot build original authorized game fixture"
+          }
+          # ORIGINAL source -> destination-aware enhanced Windows version:
+          # actively combine platformer, collectibles, keyquest, speedrun,
+          # exploration and combo; preserve the exact source physics route.
+          $windowsPort = Join-Path $env:RUNNER_TEMP "SkeletonOriginalEnhancedWindowsPort.json"
+          $windowsPortRaw = & python scripts/game/port_homebrew.py --capsule $authoredGame --output $windowsPort --creative-mode hybrid_original --art-direction neon_noir --quality cinematic --hybrids "collectathon,keyquest,speedrun,exploration,combo" --seed 42 --scale 40 --decor-budget 36 --high-contrast
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $windowsPort)) {
+            throw "could not compose enhanced Windows-native original homebrew"
+          }
+          $portReceipt = $windowsPortRaw | ConvertFrom-Json
+          if (-not $portReceipt.source_is_original_homebrew -or
+              -not $portReceipt.actual_hybrid_gameplay.hybrid_gameplay_proven -or
+              $portReceipt.actual_hybrid_gameplay.remaining_collectibles -ne 0 -or
+              -not $portReceipt.actual_hybrid_gameplay.deterministic -or
+              -not $portReceipt.rights_review_still_needed -or
+              $portReceipt.training_examples_added -ne 0) {
+            throw "Windows homebrew enhancement did not prove actual hybrid gameplay"
+          }
+          $installedPortRaw = & $offline --homebrew-port-check --homebrew-port-project $authoredGame --homebrew-port-blueprint $windowsPort --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed offline executable could not verify Windows original game port"
+          }
+          $installedPort = $installedPortRaw | ConvertFrom-Json
+          if (-not $installedPort.hybrid_gameplay_proven -or
+              -not $installedPort.original_gameplay_proven -or
+              $installedPort.remaining_collectibles -ne 0 -or
+              $installedPort.legal_release_authorized -or
+              $installedPort.training_examples_added -ne 0 -or
+              $installedPort.trace_sha256 -ne $portReceipt.actual_hybrid_gameplay.trace_sha256) {
+            throw "installed enhanced Windows gameplay changed source physics or falsely authorized release"
+          }
+          $tamperedPort = Join-Path $env:RUNNER_TEMP "SkeletonForbiddenClonePort.json"
+          $portContent = Get-Content -LiteralPath $windowsPort -Raw -Encoding utf8
+          $modifiedPort = $portContent.Replace(
+            '"third_party_asset_import_allowed":false',
+            '"third_party_asset_import_allowed":true'
+          )
+          if ($modifiedPort -eq $portContent) {
+            throw "port fixture did not expose commercial game import policy"
+          }
+          Set-Content -LiteralPath $tamperedPort -Value $modifiedPort -Encoding utf8
+          $null = & $offline --homebrew-port-check --homebrew-port-project $authoredGame --homebrew-port-blueprint $tamperedPort --json 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            throw "installed Windows game port accepted forged commercial-clone permission"
+          }
+
+          $authoredReceiptRaw = & $offline --game-preview-check --game-project $authoredGame --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed original game capsule failed real-controller gameplay"
+          }
+          $authoredReceipt = $authoredReceiptRaw | ConvertFrom-Json
+          if (-not $authoredReceipt.terminal_won -or
+              $authoredReceipt.project_source -ne "verified_portable_capsule" -or
+              -not $authoredReceipt.replay_deterministic -or
+              $authoredReceipt.training_examples_added -ne 0 -or
+              $authoredReceipt.installed_tk_display_verified) {
+            throw "installed original game project falsely claimed gameplay/legal readiness"
+          }
+          $authoredRepeatRaw = & $offline --game-preview-check --game-project $authoredGame --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed authored game repeat failed"
+          }
+          $authoredRepeat = $authoredRepeatRaw | ConvertFrom-Json
+          if ($authoredRepeat.replay_sha256 -ne $authoredReceipt.replay_sha256) {
+            throw "original game player replay was not deterministic across processes"
+          }
+          $tamperedGame = Join-Path $env:RUNNER_TEMP "SkeletonUnauthorizedGame.json"
+          $originalBytes = Get-Content -LiteralPath $authoredGame -Raw -Encoding utf8
+          $changedBytes = $originalBytes.Replace(
+            '"legal_release_authorized":false',
+            '"legal_release_authorized":true'
+          )
+          if ($changedBytes -eq $originalBytes) {
+            throw "fixture did not expose legal-release flag for mutation"
+          }
+          Set-Content -LiteralPath $tamperedGame -Value $changedBytes -Encoding utf8
+          $null = & $offline --game-preview-check --game-project $tamperedGame --json 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            throw "installed native preview accepted a tampered legal-release flag"
+          }
+
+
+          # The typed graph can feed the generated tilemap into the compiler
+          # and simulator without shell execution or adding training rows.
+          $gameGraph = Join-Path $env:RUNNER_TEMP "SkeletonOfflineGameplayGraph.json"
+          '{"schema_version":"skeleton.offline_capability_graph.v1","nodes":[{"id":"level","operation":"game.level_generate","args":{"seed":42,"width":10,"height":8,"wall_percent":50}},{"id":"compiled","operation":"game.level_compile","args":{"tiles":{"$ref":"level","path":["tiles"]}}},{"id":"step","operation":"game.platformer_step","args":{"tiles":{"$ref":"compiled","path":["tiles"]},"avatar":{"x":1,"y":1,"vx":0,"vy":0},"control":{"left":false,"right":true,"jump":false}}}],"outputs":["compiled","step"]}' |
+            Set-Content -LiteralPath $gameGraph -Encoding utf8
+          $gameGraphRaw = & $offline --capability-graph-file $gameGraph --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed frozen console failed procedural gameplay graph"
+          }
+          $gameGraphReport = $gameGraphRaw | ConvertFrom-Json
+          # Safe headless installed-module admission. Never open a GUI window
+          # on the ephemeral CI runner; a real interactive desktop test is
+          # required for the final Windows acceptance checklist.
+          $null = & $offline --game-preview --json 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            throw "native game preview incorrectly accepted incompatible JSON mode"
+          }
+          $null = & $offline --game-preview --game-seed -1 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            throw "native game preview accepted an invalid seed"
+          }
+
+          if ($gameGraphReport.node_count -ne 3 -or
+              -not $gameGraphReport.outputs.compiled.goal_reachable -or
+              $gameGraphReport.outputs.step.avatar.x -lt 1 -or
+              $gameGraphReport.training_examples_added -ne 0 -or
+              $gameGraphReport.model_inference_used -or
+              $gameGraphReport.network_access_used) {
+            throw "installed procedural gameplay graph contract mismatch"
+          }
+
+
+
+
+
+          # Exercise the installed console's actual local knowledge, durable
+          # queue and portable database recovery without external Python.
+          $offlineNotes = Join-Path $env:RUNNER_TEMP "SkeletonOfflineNotes"
+          New-Item -ItemType Directory -Force -Path $offlineNotes | Out-Null
+          "Deterministic local physics frames and game replay." |
+            Set-Content -LiteralPath (Join-Path $offlineNotes "facts.md") -Encoding utf8
+          $offlineIndex = Join-Path $env:RUNNER_TEMP "SkeletonOfflineKnowledge.sqlite"
+          & $offline --library $offlineIndex --index-dir $offlineNotes --json | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            throw "frozen offline local-text index failed"
+          }
+          $searchResult = & $offline --library $offlineIndex --search "physics" --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "frozen offline FTS5 retrieval failed"
+          }
+          $parsedSearch = $searchResult | ConvertFrom-Json
+          if ($parsedSearch.results.Count -lt 1) {
+            throw "offline search returned no indexed local knowledge"
+          }
+
+          $offlineQueue = Join-Path $env:RUNNER_TEMP "SkeletonOfflineJobs.sqlite"
+          $queueJson = & $offline --queue-db $offlineQueue --queue-status --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "frozen offline indexing queue failed"
+          }
+          $queueStatus = $queueJson | ConvertFrom-Json
+          if ($null -eq $queueStatus.jobs) {
+            throw "offline indexing queue returned no jobs envelope"
+          }
+          $enqueueJson = & $offline --queue-db $offlineQueue --enqueue-dir $offlineNotes --queue-library $offlineIndex --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "frozen offline queue did not accept explicit local directory"
+          }
+          $queued = $enqueueJson | ConvertFrom-Json
+          if ($queued.enqueued.state -ne "queued") {
+            throw "frozen offline queue did not return a queued receipt"
+          }
+          $drainJson = & $offline --queue-db $offlineQueue --run-queue --queue-status --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "frozen offline queue did not complete admitted work"
+          }
+          $drained = $drainJson | ConvertFrom-Json
+          if ($drained.processed.Count -ne 1 -or $drained.processed[0].state -ne "completed") {
+            throw "frozen offline queue did not commit its index receipt"
+          }
+          $pendingJson = & $offline --queue-db $offlineQueue --enqueue-dir $offlineNotes --queue-library $offlineIndex --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "frozen offline queue cannot enqueue followup work"
+          }
+          $pending = $pendingJson | ConvertFrom-Json
+          if ($pending.enqueued.state -ne "queued") {
+            throw "followup indexing job is not pending for recovery test"
+          }
+
+          $auditJson = & $offline --audit-library $offlineIndex --audit-queue $offlineQueue --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "offline standalone semantic integrity audit failed"
+          }
+          $auditReport = $auditJson | ConvertFrom-Json
+          if (-not $auditReport.ok -or -not $auditReport.reports.library.ok -or
+              -not $auditReport.reports.queue.ok) {
+            throw "offline semantic audit returned an invalid status envelope"
+          }
+          $offlineSnapshot = Join-Path $env:RUNNER_TEMP "SkeletonOfflineRecovery"
+          & $offline --snapshot-to $offlineSnapshot --snapshot-library $offlineIndex --snapshot-queue $offlineQueue --json | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            throw "offline SQLite snapshot creation failed"
+          }
+          & $offline --verify-snapshot $offlineSnapshot --json | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            throw "offline SQLite snapshot verification failed"
+          }
+          $recoveredKnowledge = Join-Path $env:RUNNER_TEMP "SkeletonRecoveredKnowledge.sqlite"
+          $recoveredQueue = Join-Path $env:RUNNER_TEMP "SkeletonRecoveredJobs.sqlite"
+          & $offline --restore-from $offlineSnapshot --snapshot-library $recoveredKnowledge --snapshot-queue $recoveredQueue --json | Out-Null
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $recoveredKnowledge)) {
+            throw "offline SQLite snapshot restore failed"
+          }
+
+          $restoredQueueJson = & $offline --queue-db $recoveredQueue --queue-status --json
+          if ($LASTEXITCODE -ne 0) {
+            throw "recovered queue cannot be opened"
+          }
+          $restoredQueue = $restoredQueueJson | ConvertFrom-Json
+          $quarantined = @($restoredQueue.jobs | Where-Object {
+            $_.job_id -eq $pending.enqueued.job_id -and $_.state -eq "cancelled"
+          })
+          if ($quarantined.Count -ne 1) {
+            throw "restored queue did not quarantine stale-path pending work"
+          }
+          $recoveredAuditJson = & $offline --audit-library $recoveredKnowledge --audit-queue $recoveredQueue --json
+          if ($LASTEXITCODE -ne 0 -or -not ($recoveredAuditJson | ConvertFrom-Json).ok) {
+            throw "recovered local knowledge or job queue failed semantic audit"
           }
 
           $uninstaller = Join-Path $installDir "unins000.exe"

@@ -1,0 +1,101 @@
+{
+  "schema_version": "skeleton.synthetic_offline_curriculum.v1",
+  "dataset_id": "skeleton-offline-foundations",
+  "version": "1.0.0",
+  "seed": 1729,
+  "source_kind": "original_algorithmic_synthetic",
+  "source_description": "Original algorithmically generated game/simulation, document-grounding, text-processing and offline-authority examples. No scraped, private or external corpus has been ingested.",
+  "rights": {
+    "declaration": "Original AI-generated synthetic examples; no third-party source corpus included.",
+    "permitted_uses": [
+      "training",
+      "evaluation"
+    ],
+    "license_id": null,
+    "independent_legal_review_performed": false
+  },
+  "split_protocol": {
+    "method": "group-disjoint-scenarios",
+    "groups_per_family": 20,
+    "variants_per_group": 3,
+    "train_groups": "00-13",
+    "validation_groups": "14-16",
+    "test_groups": "17-19",
+    "template_overlap_across_splits": true
+  },
+  "families": [
+    "integer_arithmetic",
+    "grid_navigation",
+    "aabb_collision",
+    "discrete_motion",
+    "finite_state",
+    "inventory",
+    "source_grounding",
+    "json_extraction",
+    "game_mechanics",
+    "offline_authority",
+    "event_chronology",
+    "text_normalization"
+  ],
+  "files": {
+    "train": {
+      "file": "train.jsonl",
+      "sha256": "4c5a83ea65cbda2f4e28e2cd64963ef238e55e667d9f9573d0bc5e6bb63c025e",
+      "records": 504,
+      "byte_count": 162805,
+      "groups": 168
+    },
+    "validation": {
+      "file": "validation.jsonl",
+      "sha256": "97a6de4229d1d5c5d165f2d0e54b4127c7ae0bb5494ded9d1ee6c075a0527dc1",
+      "records": 108,
+      "byte_count": 35539,
+      "groups": 36
+    },
+    "test": {
+      "file": "test.jsonl",
+      "sha256": "25a2acb49f7679db94347c55434fa59b878806c24e54beade0a95a7d9f7b21a9",
+      "records": 108,
+      "byte_count": 34983,
+      "groups": 36
+    },
+    "train_corpus": {
+      "file": "train_corpus.txt",
+      "sha256": "171214a259afbda9340658ca65346e9da75343fedc7aa2a17bd42784818d6648",
+      "records": 504,
+      "byte_count": 86841
+    }
+  },
+  "record_fields": [
+    "family",
+    "group_id",
+    "id",
+    "instruction",
+    "oracle",
+    "response",
+    "split"
+  ],
+  "record_count": 720,
+  "family_record_count": {
+    "integer_arithmetic": 60,
+    "grid_navigation": 60,
+    "aabb_collision": 60,
+    "discrete_motion": 60,
+    "finite_state": 60,
+    "inventory": 60,
+    "source_grounding": 60,
+    "json_extraction": 60,
+    "game_mechanics": 60,
+    "offline_authority": 60,
+    "event_chronology": 60,
+    "text_normalization": 60
+  },
+  "limitations": [
+    "Answer labels are deterministic programmatic oracles, not independently human-adjudicated.",
+    "Cross-split templates repeat; this checks scenario identity but not out-of-distribution prompt generalization.",
+    "Held-out answers are shipped openly for scoring and are not protected as a secret benchmark.",
+    "Train-only exported corpus is appropriate for pipeline bring-up; it is not a general-purpose LLM-scale dataset.",
+    "Source-rights statement is a declaration of original synthetic authorship, not independent legal clearance.",
+    "No training, performance improvement, model deployment or production promotion is claimed by dataset creation."
+  ]
+}

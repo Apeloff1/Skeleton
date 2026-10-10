@@ -760,8 +760,31 @@ class LlamaCppModel:
                 + ":"
                 + response_digest
             )
+            # Local execution evidence binds the exact admitted artifacts,
+            # request and process output. This is an integrity checksum, not
+            # independent verification or authorization for side effects.
+            execution_receipt_digest = _digest({
+                "schema": "skeleton.local_execution_receipt.v1",
+                "runtime_sha256": self.runtime_digest,
+                "model_sha256": self.model_digest,
+                "request_digest": request.digest,
+                "stdout_sha256": hashlib.sha256(stdout_bytes).hexdigest(),
+                "finish_reason": finish_reason,
+                "input_tokens": _approx_tokens(rendered_prompt),
+                "output_tokens": _approx_tokens(text or ""),
+                "tool_calls": [
+                    {
+                        "call_id": call.call_id,
+                        "tool_id": call.tool_id,
+                        "arguments": dict(call.arguments),
+                    }
+                    for call in tool_calls
+                ],
+                "structured_output": structured,
+            })
             return LocalInferenceResult(
                 text=text,
+                execution_receipt_digest=execution_receipt_digest,
                 model_id=self.model_id,
                 model_digest=self.model_digest,
                 input_tokens=_approx_tokens(rendered_prompt),

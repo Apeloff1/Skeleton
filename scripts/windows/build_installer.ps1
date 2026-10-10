@@ -19,6 +19,8 @@ $LauncherWork = "$ShortDrive\launcher-work"
 $LauncherSpec = "$ShortDrive\launcher-spec"
 $ArchivePath = "$ShortDrive\source.zip"
 $EntryPoint = Join-Path $RepoRoot "packaging\windows\launcher_entry.py"
+$OfflineEntryPoint = Join-Path $RepoRoot "packaging\windows\offline_cli_entry.py"
+$GamePreviewEntryPoint = Join-Path $RepoRoot "packaging\windows\game_preview_entry.py"
 $InstallerScript = Join-Path $RepoRoot "packaging\windows\SkeletonSetup.iss"
 
 if (-not $Version) {
@@ -155,6 +157,118 @@ if (-not (Test-Path -LiteralPath $LauncherExe)) {
     throw "Expected launcher not found: $LauncherExe"
 }
 Copy-Item -LiteralPath $LauncherExe -Destination (Join-Path $PayloadDir "Skeleton.exe") -Force
+
+# Separate console executable: the windowed GUI launcher does not expose
+# stdin/stdout streams and cannot serve headless offline automation.
+# Build with the same pinned PyInstaller and package source as Skeleton.exe.
+Write-Host "==> Building provider-free SkeletonOffline.exe console"
+$OfflinePyInstallerArgs = @(
+    "-m", "PyInstaller",
+    "--noconfirm",
+    "--clean",
+    "--onefile",
+    "--console",
+    "--name", "SkeletonOffline",
+    "--distpath", $LauncherDist,
+    "--workpath", $LauncherWork,
+    "--specpath", $LauncherSpec,
+    "--paths", $RepoRoot,
+    "--collect-data", "skeleton.app",
+    "--hidden-import", "skeleton.app.offline_cli",
+    "--hidden-import", "skeleton.app.local_ai",
+    "--hidden-import", "skeleton.app.offline_history",
+    "--hidden-import", "skeleton.app.offline_workspace",
+    "--hidden-import", "skeleton.app.offline_readiness",
+    "--hidden-import", "skeleton.app.offline_qualification",
+    "--hidden-import", "skeleton.app.offline_library",
+    "--hidden-import", "skeleton.app.offline_index_queue",
+    "--hidden-import", "skeleton.app.offline_snapshot",
+    "--hidden-import", "skeleton.app.offline_audit",
+    "--hidden-import", "skeleton.app.offline_sqlite_safety",
+    "--hidden-import", "skeleton.ai.runtime.deterministic_capabilities",
+    "--hidden-import", "skeleton.ai.runtime.capability_graph",
+    "--hidden-import", "skeleton.ai.runtime.gameplay_capabilities",
+    "--hidden-import", "skeleton.ai.runtime.game_playability",
+    "--hidden-import", "skeleton.ai.runtime.game_project_capsule",
+    "--hidden-import", "skeleton.ai.runtime.game_platform_catalog",
+    "--hidden-import", "skeleton.ai.runtime.game_rights",
+    "--hidden-import", "skeleton.ai.runtime.chip8_machine",
+    "--hidden-import", "skeleton.app.offline_chip8_preview",
+    "--hidden-import", "skeleton.app.homebrew_editor_ui",
+    "--hidden-import", "skeleton.ai.runtime.homebrew_editor",
+    "--hidden-import", "skeleton.ai.runtime.homebrew_porting",
+    "--hidden-import", "skeleton.app.homebrew_port_ui",
+    "--hidden-import", "scripts.game.port_homebrew",
+    "--hidden-import", "scripts.game.homebrew_edit",
+    "--hidden-import", "scripts.game.export_chip8",
+    "--hidden-import", "scripts.game.game_project",
+    "--hidden-import", "skeleton.app.offline_game_preview",
+    "--hidden-import", "skeleton.ai.runtime.inference.local",
+    "--hidden-import", "skeleton.ai.runtime.inference.native_runtime",
+    "--hidden-import", "skeleton.ai.runtime.inference.llama_cpp",
+    "--hidden-import", "skeleton.ai.runtime.inference.deployment",
+    "--hidden-import", "skeleton.ai.runtime.inference.artifact",
+    "--hidden-import", "skeleton.ai.model_runtime.native_llm_runtime",
+    "--hidden-import", "skeleton.ai.model_runtime.runtime_checkpoint",
+    "--hidden-import", "skeleton.ai.model_runtime.tokenization",
+    "--hidden-import", "skeleton.cortex.transformer",
+    $OfflineEntryPoint
+)
+& python @OfflinePyInstallerArgs
+if ($LASTEXITCODE -ne 0) {
+    throw "PyInstaller offline console build failed"
+}
+
+$OfflineExe = Join-Path $LauncherDist "SkeletonOffline.exe"
+if (-not (Test-Path -LiteralPath $OfflineExe)) {
+    throw "Expected offline console executable not found: $OfflineExe"
+}
+Copy-Item -LiteralPath $OfflineExe -Destination (Join-Path $PayloadDir "SkeletonOffline.exe") -Force
+
+# A separate one-click Windows game window. The game app has no LLM,
+# browser, API key, downloaded art, or console dependency. Unlike the
+# SkeletonOffline.exe headless driver, this is a windowed entrypoint.
+Write-Host "==> Building model-free native SkeletonGame.exe"
+$GamePyInstallerArgs = @(
+    "-m", "PyInstaller",
+    "--noconfirm",
+    "--clean",
+    "--onefile",
+    "--windowed",
+    "--name", "SkeletonGame",
+    "--distpath", $LauncherDist,
+    "--workpath", $LauncherWork,
+    "--specpath", $LauncherSpec,
+    "--paths", $RepoRoot,
+    "--hidden-import", "skeleton.app.offline_game_preview",
+    "--hidden-import", "skeleton.ai.runtime.gameplay_capabilities",
+    "--hidden-import", "skeleton.ai.runtime.game_playability",
+    "--hidden-import", "skeleton.ai.runtime.game_project_capsule",
+    "--hidden-import", "skeleton.ai.runtime.game_platform_catalog",
+    "--hidden-import", "skeleton.ai.runtime.game_rights",
+    "--hidden-import", "skeleton.ai.runtime.chip8_machine",
+    "--hidden-import", "skeleton.app.offline_chip8_preview",
+    "--hidden-import", "skeleton.app.homebrew_editor_ui",
+    "--hidden-import", "skeleton.ai.runtime.homebrew_editor",
+    "--hidden-import", "skeleton.ai.runtime.homebrew_porting",
+    "--hidden-import", "skeleton.app.homebrew_port_ui",
+    "--hidden-import", "scripts.game.port_homebrew",
+    "--hidden-import", "scripts.game.homebrew_edit",
+    "--hidden-import", "scripts.game.export_chip8",
+    "--hidden-import", "scripts.game.game_project",
+    "--hidden-import", "tkinter",
+    $GamePreviewEntryPoint
+)
+& python @GamePyInstallerArgs
+if ($LASTEXITCODE -ne 0) {
+    throw "PyInstaller native game preview build failed"
+}
+$GameExe = Join-Path $LauncherDist "SkeletonGame.exe"
+if (-not (Test-Path -LiteralPath $GameExe)) {
+    throw "Expected native game preview not found: $GameExe"
+}
+Copy-Item -LiteralPath $GameExe -Destination (Join-Path $PayloadDir "SkeletonGame.exe") -Force
+
 
 $CompilerCandidates = @(
     (Join-Path $env:ProgramFiles "Inno Setup 7\ISCC.exe"),

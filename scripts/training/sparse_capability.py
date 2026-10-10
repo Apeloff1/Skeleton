@@ -1,0 +1,258 @@
+"""Sparse capability-first model preparation and held-out proficiency CLI.
+
+Default training material = 36 samples, one for each distinct task mode.
+The 720-row source bank is retained as audited reference/evaluation data.
+Never expand the source corpus, fetch URLs, or promote weights implicitly.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import sys
+from typing import Sequence
+
+from skeleton.ai.training.offline_foundations import (
+    SyntheticCurriculumError, validate_curriculum,
+)
+from skeleton.ai.training.capability_ledger import OfflineCapabilityLedger
+from skeleton.ai.training.resource_admission import (
+    MIB, observe_resources, select_sparse_profile,
+)
+from skeleton.ai.training.sparse_capability import (
+    DEFAULT_BUDGET, HARDWARE_BUDGETS, HARDWARE_CORPUS_BYTE_BUDGETS,
+    assess_heldout_capabilities, build_sparse_capability_plan,
+    register_sparse_capability_plan, sparse_plan_receipt,
+)
+
+
+DATASET = (
+    Path(__file__).resolve().parents[2]
+    / "skeleton/ai/training/datasets/offline_foundations_v1"
+)
+
+
+def _new_file(destination: Path, payload: bytes, *, dataset: Path) -> Path:
+    target = destination.expanduser().absolute()
+    if (
+        target.is_symlink() or target.exists() or not target.parent.is_dir()
+        or target.is_relative_to(dataset.resolve())
+    ):
+        raise SyntheticCurriculumError(
+            "sparse export requires a new regular file outside the dataset"
+        )
+    fd = os.open(
+        target,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+        0o600,
+    )
+    original = os.fstat(fd)
+    try:
+        with os.fdopen(fd, "wb") as writer:
+            writer.write(payload)
+            writer.flush()
+            os.fsync(writer.fileno())
+    except BaseException:
+        # Only remove this operation's inode; preserve a competing process's
+        # replacement, even if a write or fsync failed.
+        try:
+            observed = target.lstat()
+            if (observed.st_dev, observed.st_ino) == (
+                original.st_dev, original.st_ino
+            ):
+                target.unlink()
+        except OSError:
+            pass
+        raise
+    return target
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Prepare 36-72 supervised samples without expanding the synthetic data bank."
+    )
+    parser.add_argument("--dataset", type=Path, default=DATASET)
+    parser.add_argument("--profile", choices=(*HARDWARE_BUDGETS, "auto"),
+                        default="low-memory",
+                        help="fixed sparse profile or read-only hardware-aware auto policy")
+    parser.add_argument("--auto-ceiling", choices=tuple(HARDWARE_BUDGETS),
+                        default="workstation",
+                        help="maximum auto profile (does not bypass resource checks)")
+    parser.add_argument("--reserve-mib", type=int, default=512,
+                        help="memory reserve for auto mode (0-16384 MiB)")
+    parser.add_argument("--budget", type=int, default=None,
+                        help="36-72 samples; cannot exceed selected hardware profile")
+    focus = parser.add_mutually_exclusive_group()
+    focus.add_argument("--focus-validation", type=Path,
+                       help="validation predictions used only to prioritize additional train examples")
+    focus.add_argument("--focus-ledger", type=Path,
+                       help="reuse aggregate local validation metrics; no prediction text loaded")
+    parser.add_argument("--model-tag",
+                        help="model identifier for --focus-ledger, not an authorization")
+    operation = parser.add_mutually_exclusive_group()
+    operation.add_argument("--export", type=Path,
+                           help="write sparse train-only text, exclusive new file")
+    operation.add_argument("--export-jsonl", type=Path,
+                           help="write selected sparse train-only JSONL, exclusive new file")
+    operation.add_argument("--register-db", type=Path,
+                           help="register ONLY sparse training subset in existing governance")
+    operation.add_argument("--evaluate", type=Path,
+                           help="score predictions per capability; cannot be used to train")
+    parser.add_argument("--split", choices=("validation", "test"), default=None)
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    if args.split is not None and args.evaluate is None:
+        print("--split requires --evaluate", file=sys.stderr)
+        return 2
+    if (
+        (args.focus_validation is not None or args.focus_ledger is not None)
+        and args.evaluate is not None
+    ):
+        print("validation focus is for sparse selection, not held-out scoring", file=sys.stderr)
+        return 2
+    if (args.focus_ledger is not None) != (args.model_tag is not None):
+        print("--focus-ledger requires --model-tag and vice versa", file=sys.stderr)
+        return 2
+    if (
+        args.profile != "auto"
+        and (args.auto_ceiling != "workstation" or args.reserve_mib != 512)
+    ):
+        print("auto memory controls require --profile auto", file=sys.stderr)
+        return 2
+    if type(args.reserve_mib) is not int or not 0 <= args.reserve_mib <= 16384:
+        print("reserve-mib must be between 0 and 16384", file=sys.stderr)
+        return 2
+    resources = None
+    profile = args.profile
+    if profile == "auto":
+        resources = select_sparse_profile(
+            observe_resources(),
+            ceiling_profile=args.auto_ceiling,
+            reserve_bytes=args.reserve_mib * MIB,
+        )
+        profile = resources["selected_profile"]
+    budget = HARDWARE_BUDGETS[profile] if args.budget is None else args.budget
+    if (
+        type(budget) is not int or budget < DEFAULT_BUDGET
+        or budget > HARDWARE_BUDGETS[profile]
+    ):
+        print("sparse data budget violates selected hardware profile", file=sys.stderr)
+        return 2
+    try:
+        focus_modes = ()
+        if args.focus_validation is not None:
+            evidence = assess_heldout_capabilities(
+                args.dataset, args.focus_validation, split="validation",
+            )
+            focus_modes = tuple(sorted(
+                evidence["modes_with_observed_errors"],
+                key=lambda mode: (
+                    evidence["per_mode"][mode]["correct"], mode
+                ),
+            ))
+        ledger_feedback = None
+        if args.focus_ledger is not None:
+            source = validate_curriculum(args.dataset)
+            ledger_file = args.focus_ledger.expanduser().absolute()
+            if (
+                ledger_file.is_symlink() or not ledger_file.is_file()
+                or ledger_file.is_relative_to(args.dataset.resolve())
+            ):
+                raise SyntheticCurriculumError(
+                    "capability focus must use an existing ledger outside source dataset"
+                )
+            with OfflineCapabilityLedger(ledger_file) as ledger:
+                matches = ledger.latest(
+                    args.model_tag,
+                    source_manifest_sha256=source["manifest_sha256"],
+                    limit=1,
+                )
+            if not matches:
+                raise SyntheticCurriculumError(
+                    "no admitted aggregate validation evidence for this model/dataset"
+                )
+            ledger_feedback = matches[0]
+            focus_modes = tuple(sorted(
+                (
+                    key for key, count in ledger_feedback["per_mode"].items()
+                    if count["correct"] < count["total"]
+                ),
+                key=lambda key: (
+                    ledger_feedback["per_mode"][key]["correct"],
+                    key,
+                ),
+            ))
+        plan = build_sparse_capability_plan(
+            args.dataset, budget=budget, focus_modes=focus_modes,
+        )
+        report = sparse_plan_receipt(plan)
+        limit_bytes = HARDWARE_CORPUS_BYTE_BUDGETS[profile]
+        if plan["active_training_bytes"] > limit_bytes:
+            raise SyntheticCurriculumError(
+                "sparse training text exceeds selected hardware profile byte budget"
+            )
+        report["hardware_profile_training_byte_cap"] = limit_bytes
+        if args.focus_validation is not None:
+            report["adaptive_selection_source"] = "validation-only"
+            report["adaptive_selection_did_not_copy_heldout_labels"] = True
+        elif ledger_feedback is not None:
+            report["adaptive_selection_source"] = "aggregate-validation-ledger"
+            report["adaptive_selection_feedback_sha256"] = ledger_feedback["prediction_sha256"]
+            report["adaptive_selection_did_not_copy_heldout_labels"] = True
+            report["raw_predictions_loaded"] = False
+        report["hardware_profile"] = profile
+        report["hardware_profile_requested"] = args.profile
+        report["resource_admission"] = resources
+        report["hardware_benchmark_run"] = False
+        if args.export is not None:
+            result = _new_file(
+                args.export, plan["training_text"], dataset=args.dataset,
+            )
+            report["exported_sparse_training_text"] = str(result)
+        elif args.export_jsonl is not None:
+            result = _new_file(
+                args.export_jsonl, plan["active_jsonl"], dataset=args.dataset,
+            )
+            report["exported_sparse_training_jsonl"] = str(result)
+        elif args.register_db is not None:
+            from skeleton.ai.runtime.training.data import DatasetRegistry
+            target = args.register_db.expanduser().absolute()
+            if (
+                target.is_symlink() or not target.parent.is_dir()
+                or (target.exists() and not target.is_file())
+                or target.is_relative_to(args.dataset.resolve())
+            ):
+                raise SyntheticCurriculumError(
+                    "sparse registry requires a local SQLite path outside source data"
+                )
+            registry = DatasetRegistry(target)
+            try:
+                digest = register_sparse_capability_plan(args.dataset, plan, registry)
+            finally:
+                registry.close()
+            report["registered_sparse_dataset_digest"] = digest
+            report["governed_training_ready"] = True
+        elif args.evaluate is not None:
+            report = {
+                **report,
+                "heldout_proficiency": assess_heldout_capabilities(
+                    args.dataset, args.evaluate, split=args.split or "validation",
+                ),
+            }
+        print(json.dumps(report, sort_keys=True, ensure_ascii=False))
+        return 0
+    except (OSError, ValueError, RuntimeError, KeyError, TypeError) as exc:
+        print(
+            "sparse capability admission rejected: "
+            + type(exc).__name__ + ": " + str(exc),
+            file=sys.stderr,
+        )
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

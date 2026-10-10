@@ -192,3 +192,167 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97" in source
     assert "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" in source
     assert "dist/windows/Skeleton-Setup-*-windows-x64.exe" in source
+
+
+def test_frozen_offline_console_is_packaged_and_smoke_tested():
+    build = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    installer = Path("packaging/windows/SkeletonSetup.iss").read_text(encoding="utf-8")
+    pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
+
+    assert "packaging\\windows\\offline_cli_entry.py" in build
+    assert '"--console"' in build
+    assert '"SkeletonOffline"' in build
+    assert "SkeletonOffline.exe" in build
+    assert "SkeletonOffline.exe" in workflow
+    assert "& $offline --native-smoke" in workflow
+    assert "SkeletonOffline.exe" in installer
+    assert 'skeleton-offline = "skeleton.app.offline_cli:main"' in pyproject
+
+
+def test_installed_frozen_console_qualifies_two_local_inference_turns() -> None:
+    workflow = Path(".github/workflows/windows-installer.yml").read_text("utf-8")
+    build = Path("scripts/windows/build_installer.ps1").read_text("utf-8")
+    fixture = Path("scripts/windows/create_offline_native_fixture.py").read_text("utf-8")
+    source = Path("skeleton/app/offline_qualification.py").read_text("utf-8")
+
+    assert "scripts/windows/create_offline_native_fixture.py" in workflow
+    assert "& $offline --model $nativeFixture --qualify-model" in workflow
+    assert "sqlite_context_restored_and_verified" in workflow
+    assert "artifacts_verified_before_and_after" in workflow
+    assert "network_isolation_verified" in workflow
+    assert "trained_model_quality_verified" in workflow
+    assert '"skeleton.app.offline_qualification"' in build
+    assert "write_local_model_artifact" in fixture
+    assert "TinyTransformer" in fixture
+    assert "DurableOfflineSession" in source
+    assert "TemporaryDirectory" in source
+    assert '"trained_model_quality_verified": False' in source
+
+
+def test_installed_offline_capability_engine_is_bundled_and_actually_exercised():
+    workflow = Path(".github/workflows/windows-installer.yml").read_text("utf-8")
+    build = Path("scripts/windows/build_installer.ps1").read_text("utf-8")
+    cli = Path("skeleton/app/offline_cli.py").read_text("utf-8")
+
+    assert '"skeleton.ai.runtime.deterministic_capabilities"' in build
+    assert "& $offline --capability-list --json" in workflow
+    assert "$capabilityCatalog.operations.Count -ne 31" in workflow
+    assert "& $offline --capability-file $capabilityTask --json" in workflow
+    assert '$capabilityReport.result.steps -ne 5' in workflow
+    assert "$capabilityReport.model_inference_used" in workflow
+    assert "$capabilityReport.network_access_used" in workflow
+    assert "duplicate JSON" in workflow
+    assert '"skeleton/ai/runtime/deterministic_capabilities.py"' in workflow
+    assert '"skeleton/ai/runtime/capability_graph.py"' in workflow
+    assert "& $offline --capability-graph-file $capabilityGraphTask --json" in workflow
+    assert "$graphReport.outputs.score -ne 28" in workflow
+    assert "self-referencing task" in workflow
+    assert "args.capability_file" in cli
+    assert "execute_capability_json" in cli
+    assert "stat.S_ISREG" in cli
+
+
+def test_installer_contains_dedicated_one_click_offline_game_executable():
+    """Real native .exe, not a browser page or a console-only simulation."""
+    build = Path("scripts/windows/build_installer.ps1").read_text("utf-8")
+    inno = Path("packaging/windows/SkeletonSetup.iss").read_text("utf-8")
+    entry = Path("packaging/windows/game_preview_entry.py").read_text("utf-8")
+    workflow = Path(".github/workflows/windows-installer.yml").read_text("utf-8")
+
+    assert "$GamePreviewEntryPoint" in build
+    assert 'game_preview_entry.py' in build
+    assert '"--name", "SkeletonGame"' in build
+    assert '"--windowed"' in build
+    assert '"skeleton.app.offline_game_preview"' in build
+    assert '"skeleton.ai.runtime.gameplay_capabilities"' in build
+    assert 'Join-Path $LauncherDist "SkeletonGame.exe"' in build
+    assert 'Join-Path $PayloadDir "SkeletonGame.exe"' in build
+    assert 'Filename: "{app}\\SkeletonGame.exe"' in inno
+    assert "Skeleton Game Preview" in inno
+    assert "from skeleton.app.offline_game_preview import (" in entry
+    assert "load_game_project, run_game_preview" in entry
+    assert "return run_game_preview()" in entry
+    assert "run_game_preview(project_tiles=load_game_project(args.project))" in entry
+    assert "installed SkeletonGame.exe native game is missing" in workflow
+    assert "installed native SkeletonGame.exe looks truncated" in workflow
+    assert "& $offline --game-preview-check --game-seed 1729 --json" in workflow
+    assert "$headlessGame.terminal_won" in workflow
+    assert "$headlessGame.replay_deterministic" in workflow
+    assert "$headlessGameRepeat.replay_sha256" in workflow
+    assert "$headlessGame.installed_tk_display_verified" in workflow
+    assert "scripts/windows/create_offline_game_fixture.py" in workflow
+    assert "--game-preview-check --game-project $authoredGame --json" in workflow
+    assert "tampered legal-release flag" in workflow
+    assert "SkeletonGame.exe" in build
+    assert "run_game_preview(project_tiles=load_game_project(args.project))" in entry
+
+
+def test_frozen_game_app_builds_an_original_executable_chip8_rom_without_sdk():
+    """Windows acceptance must run the VM, not just list CHIP-8 platforms."""
+    build = Path("scripts/windows/build_installer.ps1").read_text("utf-8")
+    workflow = Path(".github/workflows/windows-installer.yml").read_text("utf-8")
+    offline = Path("skeleton/app/offline_cli.py").read_text("utf-8")
+    unified = Path("skeleton/app/cli.py").read_text("utf-8")
+
+    assert '"skeleton.ai.runtime.chip8_machine"' in build
+    assert '"scripts.game.export_chip8"' in build
+    assert '"scripts.game.game_project"' in build
+    assert "--chip8-demo-output" in offline
+    assert "--chip8-export-capsule" in offline
+    assert "--chip8-demo-output" in unified
+    assert "& $offline --chip8-demo-output $chip8First" in workflow
+    assert "& $offline --chip8-demo-output $chip8Second" in workflow
+    assert "$chip8Receipt.acceptance.win_state_reached" in workflow
+    assert "$chip8Receipt.boot_rom_embedded" in workflow
+    assert "$chip8Receipt.licensed_sdk_embedded" in workflow
+    assert "Get-FileHash -LiteralPath $chip8First -Algorithm SHA256" in workflow
+    assert "installed CHIP-8 homebrew is not a verified legal original ROM" in workflow
+
+
+def test_windows_game_can_play_original_chip8_rom_in_its_own_native_window():
+    entry = Path("packaging/windows/game_preview_entry.py").read_text("utf-8")
+    build = Path("scripts/windows/build_installer.ps1").read_text("utf-8")
+    workflow = Path(".github/workflows/windows-installer.yml").read_text("utf-8")
+    app = Path("skeleton/app/offline_chip8_preview.py").read_text("utf-8")
+
+    assert 'mode.add_argument("--chip8-demo"' in entry
+    assert "return run_native_chip8_preview()" in entry
+    assert '"skeleton.app.offline_chip8_preview"' in build
+    assert "from scripts.game.export_chip8 import (" in app
+    assert "Chip8Machine" in app
+    assert 'root.title("Skeleton - Original CHIP-8 Game")' in app
+    assert "canvas.create_rectangle(" in app
+    assert "_KEY_CODES" in app
+    assert "& $offline --chip8-demo-check --json" in workflow
+    assert "$chip8GameCheck.original_player_won" in workflow
+    assert "$chip8GameCheck.rom_sha256 -ne $chip8Receipt.rom_sha256" in workflow
+    assert "$chip8GameCheck.copyrighted_firmware_included" in workflow
+    assert "$chip8GameCheck.real_vintage_hardware_verified" in workflow
+    assert "$chip8GameCheck.native_window_was_opened" in workflow
+
+
+def test_native_windows_game_port_replays_original_plus_hybrids_legally():
+    """Installed acceptance must not merely rename an existing ROM/title."""
+    from pathlib import Path
+    entry = Path("packaging/windows/game_preview_entry.py").read_text("utf-8")
+    build = Path("scripts/windows/build_installer.ps1").read_text("utf-8")
+    workflow = Path(".github/workflows/windows-installer.yml").read_text("utf-8")
+    offline = Path("skeleton/app/offline_cli.py").read_text("utf-8")
+    ui = Path("skeleton/app/homebrew_editor_ui.py").read_text("utf-8")
+
+    assert 'parser.add_argument("--port-blueprint"' in entry
+    assert "open_native_homebrew_port(args.project, args.port_blueprint)" in entry
+    assert '"skeleton.ai.runtime.homebrew_porting"' in build
+    assert '"skeleton.app.homebrew_port_ui"' in build
+    assert '"scripts.game.port_homebrew"' in build
+    assert "--homebrew-port-check" in offline
+    assert "Windows Port Studio" in ui
+    assert "reduced_motion" in ui and "colorblind" in ui
+    assert "make_homebrew_port" in ui
+    assert "scripts/game/port_homebrew.py" in workflow
+    assert "collectathon,keyquest,speedrun,exploration,combo" in workflow
+    assert "$installedPort.hybrid_gameplay_proven" in workflow
+    assert "$installedPort.original_gameplay_proven" in workflow
+    assert "$installedPort.trace_sha256 -ne $portReceipt.actual_hybrid_gameplay.trace_sha256" in workflow
+    assert "forged commercial-clone permission" in workflow
