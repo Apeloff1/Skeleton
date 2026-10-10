@@ -36,6 +36,7 @@ from .apple2_native_export import Apple2NativeError, Apple2SourceProject, compil
 from .spectrum_native_export import SpectrumNativeError, SpectrumSourceProject, compile_native_spectrum, export_native_spectrum
 from .msx1_native_export import MSX1NativeError, MSX1SourceProject, compile_native_msx1, export_native_msx1
 from .coleco_native_export import ColecoNativeError, ColecoSourceProject, compile_native_coleco, export_native_coleco
+from .vectrex_native_export import VectrexNativeError, VectrexSourceProject, compile_native_vectrex, export_native_vectrex
 from .sega_8bit_native_export import Sega8BitNativeError, Sega8BitSourceProject, compile_native_sega_8bit, export_native_sega_8bit
 from .sms_native_export import SMSNativeError, SMSSourceProject, compile_native_sms, export_native_sms
 from .port_planner import HomebrewSource
@@ -55,7 +56,7 @@ class EvolutionNativeStage:
     source_kind: str | None
     source_digest: str | None
     status: str
-    project: NativeDesktopSourceProject | GameBoySourceProject | NativeNESSourceProject | NativeC64SourceProject | NativeDOSSourceProject | Atari8BitSourceProject | GameBoyColorSourceProject | Apple2SourceProject | SpectrumSourceProject | MSX1SourceProject | Sega8BitSourceProject | SMSSourceProject | ColecoSourceProject | None
+    project: NativeDesktopSourceProject | GameBoySourceProject | NativeNESSourceProject | NativeC64SourceProject | NativeDOSSourceProject | Atari8BitSourceProject | GameBoyColorSourceProject | Apple2SourceProject | SpectrumSourceProject | MSX1SourceProject | Sega8BitSourceProject | SMSSourceProject | ColecoSourceProject | VectrexSourceProject | None
 
     def __post_init__(self):
         if self.status not in _STATUSES:
@@ -141,7 +142,7 @@ def compile_evolution_native_sources(
         if stage.native_binary_built or stage.target_adapter_state != "concept_prototype_not_native":
             raise GameEvolutionError("upstream practice has forged hardware build assertion")
         target = stage.intended_platform_id
-        project: NativeDesktopSourceProject | GameBoySourceProject | NativeNESSourceProject | NativeC64SourceProject | NativeDOSSourceProject | Atari8BitSourceProject | GameBoyColorSourceProject | Apple2SourceProject | SpectrumSourceProject | MSX1SourceProject | Sega8BitSourceProject | SMSSourceProject | ColecoSourceProject | None = None
+        project: NativeDesktopSourceProject | GameBoySourceProject | NativeNESSourceProject | NativeC64SourceProject | NativeDOSSourceProject | Atari8BitSourceProject | GameBoyColorSourceProject | Apple2SourceProject | SpectrumSourceProject | MSX1SourceProject | Sega8BitSourceProject | SMSSourceProject | ColecoSourceProject | VectrexSourceProject | None = None
         status = "design_only"
         if target in _DESKTOP:
             try:
@@ -196,6 +197,13 @@ def compile_evolution_native_sources(
             except Sega8BitNativeError as exc:
                 if "screen tile budget" not in str(exc):
                     raise GameEvolutionError("Sega 8-bit compiler refused original stage") from exc
+                status = "budget_incompatible"
+        elif target == "vectrex":
+            try:
+                project = compile_native_vectrex(stage.game_world, source, authorized=True)
+            except VectrexNativeError as exc:
+                if "budget exceeded" not in str(exc):
+                    raise GameEvolutionError("Vectrex original Motorola 6809 vector compiler refused stage") from exc
                 status = "budget_incompatible"
         elif target == "colecovision":
             try:
@@ -288,6 +296,8 @@ def export_evolution_native_sources(
             export_native_sms(stage.project, folder, authorized=True)
         elif isinstance(stage.project, Sega8BitSourceProject):
             export_native_sega_8bit(stage.project, folder, authorized=True)
+        elif isinstance(stage.project, VectrexSourceProject):
+            export_native_vectrex(stage.project, folder, authorized=True)
         elif isinstance(stage.project, ColecoSourceProject):
             export_native_coleco(stage.project, folder, authorized=True)
         elif isinstance(stage.project, MSX1SourceProject):
