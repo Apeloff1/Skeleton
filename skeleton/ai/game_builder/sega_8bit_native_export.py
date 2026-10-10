@@ -187,6 +187,19 @@ static void queue_hud(unsigned char tile) {
 static void draw_hero(void) {
     SMS_setTileatXY(LEFT+hero_x, TOP+hero_y, HERO);
 }
+/* Render a second independently authored sprite. This is a cosmetic familiar,
+ * not a gameplay actor: it never enters board[] or changes physics/replay.
+ * Sprite animation uses the VDP sprite attribute table once each VBlank. */
+static void render_following_sprite(void) {
+    unsigned int x=(unsigned int)(LEFT+hero_x)*8U+6U;
+    unsigned int y=(unsigned int)(TOP+hero_y)*8U;
+    SMS_initSprites();
+    if (y>=13U && x<=247U) {
+        y-=((companion_clock & 16) ? 10U : 12U);
+        SMS_addSprite((unsigned char)x,(unsigned char)y,companion_mood);
+    }
+    SMS_copySpritestoSAT();
+}
 static void animate_companion(void) {
     unsigned char pose;
     ++companion_clock;
@@ -282,16 +295,25 @@ void main(void) {
     unsigned int keys;
     SMS_displayOff();
     SMS_loadTiles(original_tiles, 0, sizeof(original_tiles));
+    SMS_useFirstHalfTilesforSprites(1);
 #ifdef TARGET_GG
     GG_setBGPaletteColor(0, 0x000);
     GG_setBGPaletteColor(1, 0xD94);
     GG_setBGPaletteColor(2, 0x8DC);
     GG_setBGPaletteColor(3, 0xFFF);
+    GG_setSpritePaletteColor(0, 0x000);
+    GG_setSpritePaletteColor(1, 0xD94);
+    GG_setSpritePaletteColor(2, 0x8DC);
+    GG_setSpritePaletteColor(3, 0xFFF);
 #else
     SMS_setBGPaletteColor(0, RGB(0,0,0));
     SMS_setBGPaletteColor(1, RGB(1,2,3));
     SMS_setBGPaletteColor(2, RGB(0,3,2));
     SMS_setBGPaletteColor(3, RGB(3,3,3));
+    SMS_setSpritePaletteColor(0, RGB(0,0,0));
+    SMS_setSpritePaletteColor(1, RGB(1,2,3));
+    SMS_setSpritePaletteColor(2, RGB(0,3,2));
+    SMS_setSpritePaletteColor(3, RGB(3,3,3));
 #endif
     level_index=0;
     health=INITIAL_HEALTH;
@@ -309,6 +331,7 @@ void main(void) {
         flush_pending();
         psg_tick();
         animate_companion();
+        render_following_sprite();
         if (won || lost || pending_count) continue;
         if (move_cooldown) { --move_cooldown; continue; }
         keys=SMS_getKeysStatus();
@@ -523,6 +546,8 @@ def compile_native_sega_8bit(
         "companion_progression_changes_core_gameplay":False,
         "animation_vram_writes_per_frame":3,
         "hardware_sprite_claim":False,
+        "native_sprite_familiar_source_present":True,
+        "native_sprite_collision_authority":False,
         "historical_sdk_downloaded":False,
         "third_party_game_or_firmware_redistributed":False,
         "binary_compiled":False,
