@@ -95,6 +95,35 @@ def test_registry_rejects_unsafe_or_broken_catalog(mutation):
         parse_registry(json.dumps(data))
 
 
+def test_editor_reports_only_actual_original_sprite_transforms():
+    options = {option["id"]: option for option in editor_platform_options()}
+    expected = {
+        "nintendo_game_boy": "gb_2bpp",
+        "nintendo_game_boy_color": "gb_2bpp",
+        "nintendo_famicom": "nes_2bpp",
+        "nintendo_snes": "snes_4bpp",
+        "sega_master_system": "sms_4bpp",
+        "sega_game_gear": "sms_4bpp",
+        "sega_mega_drive": "genesis_4bpp",
+    }
+    for platform_id, codec in expected.items():
+        option=options[platform_id]
+        assert option["portable_tile_codec"] == codec
+        assert option["portable_asset_conversion_status"]=="offline_source_data_only"
+        assert option["portable_asset_release_verified"] is False
+        assert option["native_binary_built"] is False
+        assert option["verified_native_exporter"] is False
+    # Atari, C64 and MSX use different pixel encoding layouts, so they must
+    # not inherit an unsupported tile conversion from a neighboring system.
+    for platform_id in ("commodore_64","msx1","atari_400_800"):
+        assert options[platform_id]["portable_tile_codec"] is None
+        assert options[platform_id]["portable_asset_conversion_status"]==(
+            "platform_specific_codec_not_implemented"
+        )
+    assert options["nintendo_snes"]["portable_palette_codec"]=="rgb555"
+    assert options["nintendo_game_boy_color"]["portable_tone_timer"]=="gameboy_pulse"
+
+
 def test_direct_port_is_deterministic_and_respects_period_style():
     request = PortRequest((original(),), "nec_pc_fx")
     a = compile_port(request)
