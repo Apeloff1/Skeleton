@@ -8,6 +8,7 @@ on:
       - 'scripts/game_builder/nes_reproducibility_ci.py'
       - 'scripts/game_builder/nes_6502_boot.py'
       - 'scripts/game_builder/nes_6502_controller.py'
+      - 'skeleton/testing/test_game_builder_nes_6502_controller.py'
       - 'skeleton/testing/test_game_builder_nes_6502_boot.py'
       - 'skeleton/testing/test_game_builder_nes_reproducibility.py'
       - '.github/workflows/game-builder-native-nes.yml'
@@ -38,6 +39,7 @@ jobs:
             /scripts/game_builder/nes_reproducibility_ci.py
             /scripts/game_builder/nes_6502_boot.py
             /scripts/game_builder/nes_6502_controller.py
+            /skeleton/testing/test_game_builder_nes_6502_controller.py
             /skeleton/testing/test_game_builder_nes_6502_boot.py
             /scripts/game_builder/sega_reproducibility_ci.py
             /skeleton/testing/test_game_builder_nes_reproducibility.py
@@ -55,7 +57,7 @@ jobs:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
         run: |
           python -m pip install --disable-pip-version-check "pytest>=8.4,<9" "py65==1.2.0"
-          python -m pytest -q --noconftest skeleton/testing/test_game_builder_nes_reproducibility.py skeleton/testing/test_game_builder_nes_6502_boot.py
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_nes_reproducibility.py skeleton/testing/test_game_builder_nes_6502_boot.py skeleton/testing/test_game_builder_nes_6502_controller.py
       - name: Compile source-authored worlds to real NES iNES ROM
         env:
           PYTHONPATH: .
