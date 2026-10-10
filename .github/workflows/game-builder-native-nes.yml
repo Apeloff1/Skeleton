@@ -97,9 +97,11 @@ jobs:
           assert proof["physical_hardware_verified"] is False
           assert proof["publication_authorized"] is False
           PY
+          BG_SHA="$(python -c 'import json; print(json.load(open("nes-world-src/manifest.json",encoding="utf-8"))["original_stage_zero_bg_sha256"])')"
           python scripts/game_builder/nes_6502_boot.py \
             --rom nes-world-src/build/skeleton-original.nes \
             --expected-sha256 "$FIRST_ROM_SHA" \
+            --expected-bg-sha256 "$BG_SHA" \
             --receipt-out nes-6502-observed-boot.json
           python - <<'PY'
           import json
@@ -109,6 +111,7 @@ jobs:
           assert boot["actual_6502_cpu_executed"] is True
           assert boot["original_ppu_palette_writes_observed"] >= 32
           assert boot["original_ppu_nametable_writes_observed"] >= 960
+          assert boot["original_nametable_sha256"] == json.load(open("nes-world-src/manifest.json",encoding="utf-8"))["original_stage_zero_bg_sha256"]
           assert boot["actual_sprite_dma_transfers_observed"] >= 1
           assert boot["cycle_accurate_ppu_apu_verified"] is False
           assert boot["full_gameplay_playthrough_verified"] is False
@@ -126,6 +129,7 @@ jobs:
           move=json.load(open("nes-6502-original-first-move.json",encoding="utf-8"))
           assert move["original_6502_input_executed"] is True
           assert move["original_safe_first_move_matched"] is True
+          assert move["actual_ppu_stage_zero_bg_sha256"] == move["original_stage_zero_bg_sha256"]
           assert move["native_input_port_reads"] >= 8
           assert move["native_sprite_dma_transfers"] >= 2
           assert move["full_controller_route_replayed"] is False
