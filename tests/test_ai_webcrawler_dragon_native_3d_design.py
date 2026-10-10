@@ -86,6 +86,52 @@ def test_native_generator_refuses_forged_design_dataclass():
     assert verify_design(design) is design
 
 
+def test_design_loader_rejects_path_replacement_between_check_and_open(tmp_path):
+    from unittest.mock import patch
+    design = starter_design()
+    original = tmp_path / "current.json"
+    replacement = tmp_path / "replacement.json"
+    original.write_text(json.dumps(design), encoding="utf-8")
+    changed = dict(design, seed=design["seed"]+1)
+    replacement.write_text(json.dumps(changed), encoding="utf-8")
+    real_open = os.open
+    swapped = []
+
+    def swap_then_open(path, flags, *args, **kwargs):
+        if str(path) == str(original) and not swapped:
+            swapped.append(True)
+            os.replace(replacement, original)
+        return real_open(path, flags, *args, **kwargs)
+
+    with patch("skeleton.ai.webcrawler.dragon_game_design.os.open",
+               side_effect=swap_then_open):
+        with pytest.raises(ValueError, match="changed during admission"):
+            load_design(original)
+    assert swapped
+
+
+def test_design_loader_rejects_invalid_utf8_and_size_budget(tmp_path):
+    path = tmp_path / "malformed.json"
+    path.write_bytes(b"\xff\xfe")
+    with pytest.raises(ValueError, match="strict UTF-8"):
+        load_design(path)
+    path.write_bytes(b" " * 16385)
+    with pytest.raises(ValueError, match="small regular JSON file"):
+        load_design(path)
+
+
+def test_design_loader_rejects_symlink_even_to_valid_document(tmp_path):
+    target = tmp_path / "real.json"
+    target.write_text(json.dumps(starter_design()), encoding="utf-8")
+    link = tmp_path / "alias.json"
+    try:
+        link.symlink_to(target)
+    except OSError:
+        pytest.skip("symlinks unavailable on test filesystem")
+    with pytest.raises(ValueError, match="small regular JSON file"):
+        load_design(link)
+
+
 def test_unknown_schema_fields_and_duplicate_keys_rejected(tmp_path):
     data=starter_design()
     data["command"]="curl attacker"
