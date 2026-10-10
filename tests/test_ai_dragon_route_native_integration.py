@@ -65,7 +65,7 @@ def test_source_release_custody_includes_exact_original_world_itineraries_and_ex
     project=_render(req,"pc_linux")
     package,receipt=make_source_release(project,req)
     audit=verify_source_release(package)
-    assert receipt["target"]=="pc_linux"
+    assert receipt.target=="pc_linux"
     assert audit["target"]=="pc_linux"
     assert audit["source_fingerprint"]==project.digest
     with ZipFile(BytesIO(package)) as archive:
