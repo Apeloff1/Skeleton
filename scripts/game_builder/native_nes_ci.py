@@ -6,6 +6,8 @@ from hashlib import sha256
 import json
 from pathlib import Path
 
+from skeleton.ai.game_builder.native_release_intake import _read_bounded
+
 from skeleton.ai.game_builder.nes_native_export import (
     compile_native_nes, export_native_nes,
 )
@@ -38,8 +40,9 @@ def generate(destination: Path) -> dict[str, object]:
 
 
 def inspect_rom(path: Path) -> dict[str, object]:
-    with path.open("rb") as f:
-        blob = f.read()
+    # Read the actual ROM once through no-follow, bounded, regular-file
+    # descriptors. A preliminary is_file()/read_bytes() enables path swapping.
+    blob = _read_bounded(path, max_bytes=16+32768+8192)
     if len(blob) != 16 + 32768 + 8192:
         raise ValueError("NROM-256 ROM has wrong PRG/CHR length")
     if blob[:16] != bytes((0x4E, 0x45, 0x53, 0x1A, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)):
@@ -47,6 +50,16 @@ def inspect_rom(path: Path) -> dict[str, object]:
     reset_vector = int.from_bytes(blob[16 + 0x7FFC:16 + 0x7FFE], "little")
     if reset_vector < 0x8000:
         raise ValueError("invalid NES reset vector")
+    # An iNES signature is not evidence of executable 6502 game code.
+    # Reset and interrupt vectors must reference actual file-backed PRG.
+    prg = blob[16:16+32768]
+    nmi = int.from_bytes(prg[0x7FFA:0x7FFC], "little")
+    irq = int.from_bytes(prg[0x7FFE:0x8000], "little")
+    for vector in (reset_vector,nmi,irq):
+        if not 0x8000 <= vector <= 0xFFFF:
+            raise ValueError("NES reset/NMI/IRQ vector outside mapped executable PRG")
+        if prg[vector-0x8000] in (0x00,0xFF):
+            raise ValueError("NES vector enters empty or unsupported startup bytes")
     if not any(blob[16 + 32768:]):
         raise ValueError("CHR contains no original tiles")
     return {
@@ -57,6 +70,10 @@ def inspect_rom(path: Path) -> dict[str, object]:
         "ines_header_verified": True,
         "mapper_0_prg_chr_verified": True,
         "reset_vector": reset_vector,
+        "nmi_vector": nmi,
+        "irq_vector": irq,
+        "real_machine_code_structurally_inspected": True,
+        "compiler_execution_independently_attested": False,
         "emulator_playthrough_verified": False,
         "hardware_verified": False,
         "release_approved": False,
