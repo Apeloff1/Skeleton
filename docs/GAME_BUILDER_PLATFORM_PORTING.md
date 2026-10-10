@@ -517,3 +517,54 @@ The editor-facing real source reachability inventory and transactional
 all-platform original-homebrew portfolio now include **12 separate native
 machine targets**. Candidate historical hardware remains represented,
 without inventing code generators for systems that are not implemented.
+
+## Original Sega Master System console ROM — authored 4bpp tiles and real VDP
+
+The separately implemented `sms_native_export.py` produces **actual Z80
+machine code** for a genuine export Sega Master System 32KB ROM. It is
+not a Game Gear binary, a JavaScript emulation wrapper, an MSX BIOS
+program or a relabeled source collection. Unlike the MSX it directly
+controls the console hardware: Mode-4 VDP **$BF control/$BE data** ports,
+32x24 background name-table at VRAM $3800, original 8x8 planar
+**4bpp** glyph/tile patterns (floor, walls, star crystals, hazards,
+exits, player, score digits and HUD labels), 32 authored RGB222
+palette entries, video interrupts at Z80 vector $0038, original
+SN76489 tone playback at port $7F, and native player-one controller
+reads from port $DC.
+
+The machine has only 8KB of internal RAM, so all mutable original
+game state and map copies are bounded at $C000/$C100. The emulator
+cannot simply load ZX Spectrum or MSX machine code and expect it to
+work: this is a wholly independent low-level console engine.
+
+The game's scored stage progression, safe-to-goal tile rules,
+collectibles and hazards derive from the same independently solved
+world as all the other supported machine-native builds.
+
+The companion `sms_rom.py` takes the **actually assembled Z80 source**
+and produces a 32,768-byte `.sms` cartridge with the correct
+`TMR SEGA` header at offset $7FF0, export-region and 32KB-size
+byte $4C, and the BIOS-required 16-bit checksum over exactly the
+preceding $7FF0 bytes. It rejects invalid reset vectors, malformed
+VBlank/pause-button handlers, missing VDP/PSG/joypad opcodes, altered
+source bytes, duplicate overlays, and noncanonical ROM padding.
+
+The dedicated `Game Builder Native Sega Master System ROM` workflow
+assembles the actual Z80 game, validates the cartridge against its
+original source and checks the hardware and game rights envelope.
+Its verified binary is uploaded as a build artifact. No commercial
+Sega game content, cartridge memory dump, assets or system BIOS is
+bundled. Real emulator gameplay and hardware tests are separately
+required before declaring the binary fully accepted or suitable for
+distribution.
+
+The portable editor also exposes a distinct **Game Gear source**
+backend using SDCC and devkitSMS's Game Gear-specific video/input
+envelope. Game Gear is **not** counted as having a verified compiled
+binary merely because a Master System cartridge compiles, and
+additional hardware distinctions remain separately enforced.
+
+The overall editor currently exposes **14 machine-specific native
+source targets** (including Game Gear's source-only stage), against
+524 archived historical hardware candidates. Counts refer to source
+authoring, not to independently completed hardware qualification.
