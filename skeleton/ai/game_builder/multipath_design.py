@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
-from hashlib import sha256
 from heapq import heappop, heappush
 from typing import Mapping, Sequence
 
@@ -1089,12 +1088,14 @@ def make_level_edit(
             or not 1 <= len(operation) <= 64
             or not all(c.islower() or c == "_" for c in operation)):
         raise MultipathError("invalid bounded map edit request")
+    for p in changes:
+        if (not isinstance(p, tuple) or len(p) != 2
+                or any(type(v) is not int for v in p)):
+            raise MultipathError("tile edit coordinates must be integer pairs")
     rows = [list(row) for row in problem.rows]
     recorded: list[tuple[Position, str, str]] = []
     for p, new in sorted(changes.items(), key=lambda item: (item[0][1], item[0][0])):
-        if (not isinstance(p, tuple) or len(p) != 2
-                or any(type(v) is not int for v in p)
-                or not 0 < p[0] < problem.width-1
+        if (not 0 < p[0] < problem.width-1
                 or not 0 < p[1] < problem.height-1
                 or type(new) is not str or len(new) != 1 or new not in "#.SGCH"):
             raise MultipathError("invalid in-bounds tile mutation")
@@ -1358,4 +1359,28 @@ def evolve_challenge_level(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget", "pareto_hazard_routes", "enumerate_shortest_routes", "route_progress_trace", "make_level_edit", "carve_alternative_corridor", "seal_safe_corridor", "relocate_collectible", "relocate_exit", "add_solvable_hazard", "remove_hazard", "relocate_hazard", "relocate_start", "carve_for_diversity", "evaluate_level_challenge", "evolve_challenge_level"]
+def verify_map_edit_receipt(
+    original: RouteProblem, receipt: MapEditReceipt,
+) -> bool:
+    """Check the exact changed tiles and resulting solvability, not just hashes."""
+    if (not isinstance(original, RouteProblem)
+            or not isinstance(receipt, MapEditReceipt)
+            or receipt.before_digest != original.digest
+            or not isinstance(receipt.after, RouteProblem)
+            or original.width != receipt.after.width
+            or original.height != receipt.after.height):
+        raise MultipathError("map edit receipt has mismatched source authority")
+    actual = tuple(
+        ((x, y), original.rows[y][x], receipt.after.rows[y][x])
+        for y in range(original.height)
+        for x in range(original.width)
+        if original.rows[y][x] != receipt.after.rows[y][x]
+    )
+    if actual != receipt.changes:
+        raise MultipathError("map edit receipt omits or misstates changed tiles")
+    verify_route_proof(receipt.after, receipt.safe_proof)
+    return True
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget", "pareto_hazard_routes", "enumerate_shortest_routes", "route_progress_trace", "make_level_edit", "carve_alternative_corridor", "seal_safe_corridor", "relocate_collectible", "relocate_exit", "add_solvable_hazard", "remove_hazard", "relocate_hazard", "relocate_start", "carve_for_diversity", "evaluate_level_challenge", "evolve_challenge_level", "MapEditReceipt", "LevelEvolution", "verify_map_edit_receipt"]
