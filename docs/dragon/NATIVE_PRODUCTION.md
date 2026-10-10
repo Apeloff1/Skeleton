@@ -248,6 +248,15 @@ manifest records original sprite digests and actual target source
 application, and the release verifier reconstructs the original tiles
 and compares them with the emitted assembly.
 
+On the Game Boy and Game Boy Color arcade creators, actual controller
+movement now selects the authored walk frame in SM83 assembly; stationary
+idle/blink states select their corresponding cartridge graphics.
+The NES arcade creator has equivalent 6502 movement-driven sprite index
+selection and a frame-timed blink path, with dedicated zero-page state
+initialized in the reset routine. These are real ROM-side animation branches,
+not presentation-only UI animations or metadata claiming animation.
+Structural ROM/build gates still need to compile and validate the result.
+
 Only Game Boy, Game Boy Color and NES are claimed as integrated native
 art targets here. Other target emitters retain their existing, separately
 documented graphic capabilities; do not extrapolate new coverage to them.
