@@ -10,6 +10,7 @@ from skeleton.ai.game_builder.sms_native_export import (
 )
 from skeleton.ai.game_builder.sms_rom import verify_sms
 from skeleton.ai.game_builder.playable_world import GameBuildIntent,generate_playable_world
+from skeleton.ai.game_builder.game_boy_memory_replay import export_game_boy_memory_replay
 from skeleton.ai.game_builder.port_planner import HomebrewSource
 
 
@@ -27,6 +28,7 @@ def emit(output:Path)->dict[str,object]:
     )
     project=compile_native_sms(world,rights,authorized=True)
     root=export_native_sms(project,output,authorized=True)
+    export_game_boy_memory_replay(world,root/"guest-cpu-reference.json")
     manifest=json.loads((root/"manifest.json").read_text(encoding="utf-8"))
     if manifest["world_digest"]!=world.digest or manifest["native_cartridge_compiled"]:
         raise ValueError("SMS original game identity or build certification incorrect")
