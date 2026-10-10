@@ -553,6 +553,13 @@ execution for both consoles.
 Both **Master System** and **Game Gear** cartridges now embed each generated
 world's own independently verified safe solution as a compact native
 direction table, with no commercial video-game data or proprietary assets.
+Four directions (up/down/left/right) are packed into two-bit codes, **four
+moves per ROM byte**, with the first move in the lowest two bits. This
+uses approximately one quarter of the cartridge ROM space required by an
+uncompressed one-byte-per-move route, especially useful on fixed 32 KiB
+Master System and Game Gear cartridges. The individual level lengths and
+the cross-console canonical route hash preserve stage boundaries and
+make any altered, missing or reordered move fail acceptance.
 
 Hold both face buttons **1 + 2 together for 25 video frames** to start
 an optional original-game exhibition. The cartridge resets the score,
