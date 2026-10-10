@@ -185,6 +185,8 @@ class GameMechanicsMemory:
                 obs.confidence, obs.preference.value, obs.user_confirmed,
             ])
         payload = json.dumps(rows, separators=(",", ":"), ensure_ascii=True)
+        if len(payload.encode("utf-8")) > MAX_STORED_SESSION_BYTES:
+            raise ValueError("session observation byte budget exceeded")
         expected = sha256(json.dumps(
             [owner, session.game_label, session.duration_ms, rows],
             separators=(",", ":"), ensure_ascii=True,
