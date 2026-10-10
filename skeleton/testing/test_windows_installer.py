@@ -97,6 +97,8 @@ def test_inno_setup_contract_is_per_user_and_uninstallable():
     assert 'Parameters: "--stop --quiet"' in source
     assert 'Type: files; Name: "{app}\\.env"' in source
     assert "{userdesktop}\\Skeleton" in source
+    assert 'Name: "{group}\\Skeleton Local AI (offline)"' in source
+    assert 'Parameters: "--local-ai"' in source
     assert "{commondesktop}" not in source
 
 
@@ -184,6 +186,8 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert "sparse-checkout-cone-mode: false" in source
     assert "scripts/windows/build_installer.ps1" in source
     assert "Smoke install generated Setup.exe" in source
+    assert '@("--local-ai-training-smoke")' in source
+    assert '@("--local-ai-smoke")' in source
     assert '"/VERYSILENT"' in source
     assert 'Start-Process -FilePath $launcher -ArgumentList @("--help") -Wait -PassThru' in source
     assert "$launch.ExitCode" in source

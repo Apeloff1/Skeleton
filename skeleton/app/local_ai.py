@@ -16,6 +16,7 @@ from typing import Any
 from skeleton.ai.runtime.inference.artifact import load_local_model_artifact
 from skeleton.ai.runtime.inference.local import LocalInferenceRequest, LocalInferenceResult, LocalInferenceEngine
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
+from skeleton.app.local_ai_transcript import load_transcript, save_transcript
 
 
 MAX_USER_CHARS = 4096
@@ -33,6 +34,31 @@ def load_native_checkpoint(source: str | Path) -> NativeRuntimeLocalModel:
         raise OfflineAIError("checkpoint must contain a native transformer, not a reference/demo model")
     loaded.model.assert_identity()
     return loaded.model
+
+
+def inspect_local_model(backend: NativeRuntimeLocalModel) -> dict[str, object]:
+    """Report actual offline model limits and identity without executing a prompt.
+
+    This is technical capability inspection, NOT a trained-quality or general
+    intelligence certificate.
+    """
+    if not isinstance(backend, NativeRuntimeLocalModel):
+        raise OfflineAIError("native transformer model required")
+    backend.assert_identity()
+    runtime = backend.runtime
+    return {
+        "schema_version": 1,
+        "model_id": backend.model_id,
+        "model_digest": backend.model_digest,
+        "tokenizer_digest": backend.tokenizer_digest,
+        "runtime_digest": backend.runtime_digest,
+        "max_context_tokens": runtime.limits.max_context,
+        "max_output_tokens": runtime.limits.max_new_tokens,
+        "model_bytes": runtime.model_bytes,
+        "provider_credentials_required": False,
+        "network_required": False,
+        "model_quality_certified": False,
+    }
 
 
 @dataclass(frozen=True)
@@ -66,6 +92,24 @@ class OfflineAISession:
     @property
     def model_digest(self) -> str:
         return self.backend.model_digest
+
+    def export_transcript(self, path: str | Path) -> str:
+        """User-requested offline snapshot; not the durable assistant authority."""
+        self.backend.assert_identity()
+        return save_transcript(
+            path, model_digest=self.backend.model_digest,
+            tokenizer_digest=self.backend.tokenizer_digest, history=self.history,
+        )
+
+    def import_transcript(self, path: str | Path) -> int:
+        """Restore only fully verified turns bound to this exact native model."""
+        self.backend.assert_identity()
+        restored = load_transcript(
+            path, model_digest=self.backend.model_digest,
+            tokenizer_digest=self.backend.tokenizer_digest,
+        )
+        self.history = restored  # commit only after all checks pass
+        return len(restored) // 2
 
     def _request(self, prompt: str, max_output_tokens: int) -> tuple[LocalInferenceRequest, tuple[tuple[str, str], ...]]:
         if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_USER_CHARS:
@@ -155,8 +199,14 @@ class OfflineAIWindow:
         toolbar.pack(fill="x")
         self.load_button = ttk.Button(toolbar, text="Load checkpoint…", command=self.choose_model)
         self.load_button.pack(side="left")
+        self.train_button = ttk.Button(toolbar, text="Train small local model…", command=self.train_model)
+        self.train_button.pack(side="left", padx=4)
         self.clear_button = ttk.Button(toolbar, text="New conversation", command=self.clear)
         self.clear_button.pack(side="left", padx=8)
+        self.open_history_button = ttk.Button(toolbar, text="Open chat…", command=self.open_history)
+        self.open_history_button.pack(side="left", padx=4)
+        self.save_history_button = ttk.Button(toolbar, text="Save chat…", command=self.save_history)
+        self.save_history_button.pack(side="left", padx=4)
         self.cancel_button = ttk.Button(toolbar, text="Cancel generation", command=self.cancel)
         self.cancel_button.pack(side="left")
         self.status = tk.StringVar(value="Choose a local native model checkpoint to begin.")
@@ -173,9 +223,12 @@ class OfflineAIWindow:
 
     def _refresh(self) -> None:
         self.load_button.configure(state="disabled" if self.active else "normal")
+        self.train_button.configure(state="disabled" if self.active else "normal")
         self.send_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.clear_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.cancel_button.configure(state="normal" if self.active else "disabled")
+        self.open_history_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
+        self.save_history_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
 
     def _append(self, speaker: str, text: str) -> None:
         self.transcript.configure(state="normal")
@@ -206,6 +259,54 @@ class OfflineAIWindow:
 
         threading.Thread(target=work, name="skeleton-local-model-load", daemon=True).start()
 
+    def train_model(self) -> None:
+        """Bootstrap one genuine, tiny CPU checkpoint from user-chosen text.
+
+        This is an educational/experimental local transformer, not
+        production-trained LLM weights. Never train on startup without consent.
+        """
+        if self.active:
+            return
+        from tkinter import messagebox
+
+        if not messagebox.askyesno(
+            "Experimental CPU model training",
+            "Train a small transformer only on the local text you choose? "
+            "The output is experimental and not comparable to a trained "
+            "foundation language model. No data is uploaded.",
+            parent=self.window,
+        ):
+            return
+        source = self.filedialog.askopenfilename(
+            parent=self.window, title="Choose UTF-8 local training text",
+            filetypes=[("UTF-8 text", "*.txt"), ("All files", "*.*")],
+        )
+        if not source:
+            return
+        destination = self.filedialog.asksaveasfilename(
+            parent=self.window, title="Save new experimental native checkpoint",
+            defaultextension=".json", filetypes=[("Native checkpoint", "*.json")],
+        )
+        if not destination:
+            return
+        self.active = True
+        self.status.set("Training a bounded native CPU transformer locally…")
+        self._refresh()
+
+        def work() -> None:
+            try:
+                from skeleton.app.local_ai_training import train_local_text
+
+                receipt = train_local_text(source, destination)
+                session = OfflineAISession(load_native_checkpoint(destination))
+                self.events.put(("trained", (session, receipt)))
+            except Exception as exc:
+                self.events.put(("error", str(exc)))
+
+        threading.Thread(
+            target=work, daemon=True, name="skeleton-native-cpu-training",
+        ).start()
+
     def clear(self) -> None:
         if self.active or self.session is None:
             return
@@ -214,6 +315,45 @@ class OfflineAIWindow:
         self.transcript.delete("1.0", "end")
         self.transcript.configure(state="disabled")
         self.status.set("Conversation reset in memory.")
+
+    def open_history(self) -> None:
+        """Import is explicit and never modifies the session on bad input."""
+        if self.active or self.session is None:
+            return
+        selected = self.filedialog.askopenfilename(
+            parent=self.window, title="Open an offline Skeleton chat",
+            filetypes=[("Skeleton chat", "*.json"), ("All files", "*.*")],
+        )
+        if not selected:
+            return
+        try:
+            turns = self.session.import_transcript(selected)
+        except (ValueError, OSError) as exc:
+            self.status.set("Chat not opened: " + str(exc))
+            return
+        self.transcript.configure(state="normal")
+        self.transcript.delete("1.0", "end")
+        self.transcript.configure(state="disabled")
+        for role, text in self.session.history:
+            self._append("You" if role == "user" else "Skeleton · Local", text)
+        self.status.set(f"Restored {turns} complete offline turns for this model.")
+
+    def save_history(self) -> None:
+        """The chosen file is readable local plaintext; no background upload."""
+        if self.active or self.session is None:
+            return
+        selected = self.filedialog.asksaveasfilename(
+            parent=self.window, title="Save offline chat as plaintext JSON",
+            defaultextension=".json", filetypes=[("Skeleton chat", "*.json")],
+        )
+        if not selected:
+            return
+        try:
+            digest = self.session.export_transcript(selected)
+        except (ValueError, OSError) as exc:
+            self.status.set("Chat not saved: " + str(exc))
+            return
+        self.status.set("Saved local chat · SHA-256 " + digest[:16] + "… · file is plaintext.")
 
     def send(self) -> None:
         if self.active or self.session is None:
@@ -264,10 +404,26 @@ class OfflineAIWindow:
             while True:
                 kind, value = self.events.get_nowait()
                 self.active = False
-                if kind == "loaded":
+                if kind == "trained":
+                    self.session, receipt = value  # type: ignore[misc]
+                    self.clear()
+                    self.status.set(
+                        "Experimental CPU checkpoint ready · "
+                        + str(receipt.training_steps) + " SGD steps · "
+                        + f"corpus perplexity {receipt.initial_perplexity:.2f} → "
+                        + f"{receipt.final_perplexity:.2f} · not quality certified"
+                    )
+                elif kind == "loaded":
                     self.session = value  # type: ignore[assignment]
                     self.clear()
-                    self.status.set("Native model loaded: " + self.session.model_digest[:16] + "…")
+                    info = inspect_local_model(self.session.backend)
+                    self.status.set(
+                        "Native model loaded · context "
+                        + str(info["max_context_tokens"])
+                        + " tokens · weights "
+                        + str(info["model_bytes"])
+                        + " bytes · " + self.session.model_digest[:12] + "…"
+                    )
                 elif kind == "answer":
                     answer = value
                     self._append("Skeleton · Local", answer.text)  # type: ignore[attr-defined]
@@ -324,9 +480,20 @@ def smoke_offline_native_inference() -> bool:
     ))
     session = OfflineAISession(NativeRuntimeLocalModel(runtime))
     answer = asyncio.run(session.ask("hello", max_output_tokens=2))
+    # The Windows bundled binary must also round-trip a verified, private
+    # conversation snapshot without importing optional hosted services.
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="skeleton-native-smoke-") as folder:
+        transcript = Path(folder) / "chat.json"
+        session.export_transcript(transcript)
+        restored = OfflineAISession(NativeRuntimeLocalModel(runtime))
+        turns = restored.import_transcript(transcript)
+        snapshot_ok = turns == 1 and restored.history == session.history
     return (
         bool(answer.text)
         and answer.model_digest == runtime.model_digest
         and len(answer.execution_receipt_digest) == 64
         and len(session.history) == 2
+        and snapshot_ok
     )

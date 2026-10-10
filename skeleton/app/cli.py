@@ -67,9 +67,17 @@ def _parser() -> argparse.ArgumentParser:
 
     local_ai = sub.add_parser("local-ai", help="run native AI locally, without Docker or provider credentials")
     local_ai.add_argument("--model", help="native content-addressed checkpoint for headless inference")
+    local_ai.add_argument("--inspect-model", action="store_true", help="validate model weights and report offline runtime limits")
+    local_ai.add_argument("--train-corpus", help="train a bounded CPU native checkpoint from a local UTF-8 text file")
+    local_ai.add_argument("--output-model", help="new native checkpoint filename for --train-corpus")
+    local_ai.add_argument("--epochs", type=int, default=1, help="bounded native CPU training passes (1-4)")
+
     local_ai.add_argument("--prompt", help="headless text request (requires --model)")
     local_ai.add_argument("--max-output-tokens", type=int, default=8)
     local_ai.add_argument("--json", action="store_true", dest="as_json", help="print a bound inference receipt")
+    local_ai.add_argument("--load-chat", help="restore verified turns from explicit model-bound local transcript")
+    local_ai.add_argument("--save-chat", help="atomically export model-bound local transcript after inference")
+
     sub.add_parser("down", help="stop the assembled application")
     sub.add_parser("ps", help="show assembled service state")
 
@@ -211,17 +219,67 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if command == "local-ai":
-        from skeleton.app.local_ai import OfflineAISession, load_native_checkpoint, run_offline_ai
+        from skeleton.app.local_ai import OfflineAISession, inspect_local_model, load_native_checkpoint, run_offline_ai
 
+        if args.train_corpus:
+            if (
+                not args.output_model or args.model or args.prompt
+                or args.inspect_model or args.load_chat or args.save_chat
+            ):
+                print("local-ai training requires --train-corpus and --output-model without chat/inference options")
+                return 2
+            from skeleton.app.local_ai_training import train_local_text
+
+            try:
+                receipt = train_local_text(args.train_corpus, args.output_model, epochs=args.epochs)
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local-ai training rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(receipt.as_dict(), ensure_ascii=False, sort_keys=True))
+            else:
+                print("Trained bounded CPU checkpoint: " + str(args.output_model))
+                print("model digest: " + receipt.model_digest)
+                print("training steps: " + str(receipt.training_steps))
+                print("quality: not independently certified; not foundation-model weights")
+            return 0
+        if args.output_model:
+            print("--output-model requires --train-corpus")
+            return 2
+        if args.inspect_model:
+            if not args.model or args.prompt or args.load_chat or args.save_chat:
+                print("local-ai --inspect-model requires only --model")
+                return 2
+            try:
+                report = inspect_local_model(load_native_checkpoint(args.model))
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local-ai model rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(report, ensure_ascii=False, sort_keys=True))
+            else:
+                print("model: " + str(report["model_id"]))
+                print("digest: " + str(report["model_digest"]))
+                print("context: " + str(report["max_context_tokens"]) + " tokens")
+                print("output limit: " + str(report["max_output_tokens"]) + " tokens")
+                print("native model bytes: " + str(report["model_bytes"]))
+                print("model quality: not independently certified")
+            return 0
         if bool(args.model) != bool(args.prompt):
             print("local-ai headless inference requires both --model and --prompt")
+            return 2
+        if (args.load_chat or args.save_chat) and not args.model:
+            print("local-ai chat import/export requires --model and --prompt")
             return 2
         if args.model:
             import asyncio
 
             try:
                 session = OfflineAISession(load_native_checkpoint(args.model))
+                if args.load_chat:
+                    session.import_transcript(args.load_chat)
                 answer = asyncio.run(session.ask(args.prompt, max_output_tokens=args.max_output_tokens))
+                chat_digest = session.export_transcript(args.save_chat) if args.save_chat else None
             except (ValueError, RuntimeError, OSError) as exc:
                 print("local-ai request rejected: " + type(exc).__name__ + ": " + str(exc))
                 return 1
@@ -233,6 +291,8 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                     "execution_receipt_digest": answer.execution_receipt_digest,
                     "input_tokens": answer.input_tokens,
                     "output_tokens": answer.output_tokens,
+                    "conversation_turns": len(session.history) // 2,
+                    "chat_sha256": chat_digest,
                 }, ensure_ascii=False, sort_keys=True))
             else:
                 print(answer.text)

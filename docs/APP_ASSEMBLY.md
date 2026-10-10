@@ -44,6 +44,10 @@ does not download them.
 # On a machine with Python + Tk, without Docker/Mongo/hosted-provider tokens:
 python -m skeleton app local-ai
 
+# Validate/checkpoint identity and capacity without executing a model prompt:
+python -m skeleton app local-ai --model ./native-runtime.json \
+  --inspect-model --json
+
 # Headless model inference with a bound JSON receipt, for scripts/automation:
 python -m skeleton app local-ai --model ./native-runtime.json \\
   --prompt "hello" --max-output-tokens 8 --json
@@ -51,6 +55,31 @@ python -m skeleton app local-ai --model ./native-runtime.json \\
 # From the Windows installer (no system Python required):
 Skeleton.exe --local-ai
 ```
+
+### Train a small native checkpoint on your own text
+
+The desktop window's **Train small local model…** action can train a genuine,
+small, causal transformer from an explicitly chosen UTF-8 text file using the
+existing CPU training kernels, then reload and verify its native checkpoint.
+No Docker, hosted API key, network, model download or external Python package
+is required inside the bundled Windows executable. This is an **experimental
+small model**, not a pretrained/production LLM; brief, low-quality outputs are
+expected, and no general model-quality certification is made. It does not
+perform unattended collection, training, promotion or overwrite weights.
+
+```bash
+python -m skeleton app local-ai --train-corpus ./notes.txt \
+  --output-model ./my-native.json --epochs 1 --json
+python -m skeleton app local-ai --model ./my-native.json --inspect-model --json
+python -m skeleton app local-ai --model ./my-native.json \
+  --prompt "user: hello" --max-output-tokens 8 --json
+```
+
+Training is bounded to a 32-KiB input file, at most 512 normalized tokens,
+256 vocabulary entries, and 1–4 CPU epochs with a fixed small architecture.
+The output is checkpointed using the existing model artifact writer, loaded
+again and verified against the trained native model digest. A path that
+already exists is refused rather than overwriting previous weights.
 
 Use **Load checkpoint…** to open a `write_local_model_artifact`-compatible
 native transformer JSON artifact. File size, duplicate keys, SHA-based model
@@ -60,8 +89,26 @@ window carries conversational context within the model's finite token budget,
 drops only oldest *full* turns when required, offers generation cancellation,
 and only commits a turn to its session history after the local inference
 receipt is complete. No tools, providers or network transport are granted by
-this window. The local transcript is ephemeral and discarded on close; the
-canonical governed assistant/workspace remains the durable product authority.
+this window. The local transcript stays in memory by default. **Open chat…** and **Save chat…**
+support explicit, private, model/tokenizer-bound JSON snapshots: the file
+contains readable plaintext conversation, has a SHA-256 corruption check
+(not a cryptographic signature), rejects symlinks/oversized or malformed
+inputs, and is atomically replaced on save. The user chooses when and where to
+save it; no cloud upload, background autosave, extra runtime service or
+provider credentials are involved. A transcript can only be imported when
+the exact checkpoint and tokenizer identities match. It is a portable
+non-authoritative projection, **not** the governed assistant's persistent
+transactional conversation state.
+
+```bash
+python -m skeleton app local-ai --model ./native-runtime.json \
+  --prompt "Hello" --max-output-tokens 8 --save-chat ./chat.json --json
+python -m skeleton app local-ai --model ./native-runtime.json \
+  --prompt "Continue" --max-output-tokens 8 \
+  --load-chat ./chat.json --save-chat ./chat.json --json
+```
+
+The canonical governed assistant/workspace remains the durable product authority.
 
 **Scope:** this is an independently usable local desktop execution surface,
 not a claim that the complete product shell, all 421 masterplan volumes, advanced
@@ -74,7 +121,7 @@ Windows runner before this mode can be described as shipped.
 Targeted source validation:
 
 ```bash
-python -m unittest tests.flgb.test_desktop_offline_ai -v
+python -m unittest tests.flgb.test_desktop_offline_ai tests.flgb.test_offline_chat_transcript tests.flgb.test_offline_native_training -v
 python -m unittest tests.flgb.test_flgb_02_native_local_provider -v
 python scripts/check_ai_app_construction.py
 python scripts/check_architecture_map.py

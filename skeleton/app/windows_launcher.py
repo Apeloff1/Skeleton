@@ -174,7 +174,7 @@ class WindowsLauncher:
         self.window.geometry("820x610")
         self.window.minsize(720, 520)
 
-        self.status = tk.StringVar(value="Checking system…")
+        self.status = tk.StringVar(value="Local AI runs offline; System Check is for Docker-backed services.")
         self._buttons: list[ttk.Button] = []
 
         outer = ttk.Frame(self.window, padding=20)
@@ -210,7 +210,7 @@ class WindowsLauncher:
         helper.pack(fill="x", pady=(0, 10))
         ttk.Label(
             helper,
-            text="Docker Desktop with Docker Compose is required to run the assembled services.",
+            text="Local AI runs without Docker. Compose is only for the full service profile.",
             font=("Segoe UI", 9),
         ).pack(side="left")
         ttk.Button(helper, text="Get Docker Desktop", command=self.open_docker).pack(side="right")
@@ -233,7 +233,7 @@ class WindowsLauncher:
         )
         footer.pack(anchor="w", pady=(10, 0))
 
-        self.window.after(200, self.system_check)
+        # Service-profile Docker checks are opt-in; local native AI needs no Docker.
 
     def _add_button(self, parent, text: str, command) -> None:
         button = self.ttk.Button(parent, text=text, command=command)
@@ -335,6 +335,13 @@ class WindowsLauncher:
 
 
 def _headless(args: argparse.Namespace, root: Path) -> int:
+    if args.local_ai_training_smoke:
+        from skeleton.app.local_ai_training import smoke_offline_native_training
+
+        try:
+            return 0 if smoke_offline_native_training() else 1
+        except Exception:
+            return 1
     if args.local_ai_smoke:
         from skeleton.app.local_ai import smoke_offline_native_inference
 
@@ -383,6 +390,7 @@ def parser() -> argparse.ArgumentParser:
     mode.add_argument("--open", action="store_true")
     mode.add_argument("--local-ai", action="store_true", help="open Docker-free native AI conversation")
     mode.add_argument("--local-ai-smoke", action="store_true", help="verify bundled native CPU inference without Docker")
+    mode.add_argument("--local-ai-training-smoke", action="store_true", help="verify bundled CPU training, checkpoint, and inference")
     result.add_argument(
         "--development",
         action="store_true",

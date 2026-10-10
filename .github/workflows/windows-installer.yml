@@ -155,6 +155,13 @@ jobs:
             throw "installed Skeleton.exe native offline inference smoke exited $($nativeSmoke.ExitCode)"
           }
 
+          # The frozen binary also needs to train actual native weights,
+          # persist them, reload identity and execute a real inference turn.
+          $trainSmoke = Start-Process -FilePath $launcher -ArgumentList @("--local-ai-training-smoke") -Wait -PassThru
+          if ($trainSmoke.ExitCode -ne 0) {
+            throw "installed Skeleton.exe local CPU training smoke exited $($trainSmoke.ExitCode)"
+          }
+
           $uninstaller = Join-Path $installDir "unins000.exe"
           if (-not (Test-Path -LiteralPath $uninstaller)) {
             throw "uninstaller missing"
