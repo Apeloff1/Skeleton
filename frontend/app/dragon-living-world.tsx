@@ -132,6 +132,8 @@ function LivingWorldEditor(){
   const [sessionToken,setSessionToken]=React.useState<string|null>(null);
   const [previousTokens,setPreviousTokens]=React.useState<string[]>([]);
   const [sessionMode,setSessionMode]=React.useState(false);
+  const [lastDurableDigest,setLastDurableDigest]=React.useState<string|null>(null);
+  const [durableSlot,setDurableSlot]=React.useState(0);
   const [portfolio,setPortfolio]=React.useState<Portfolio|null>(null);
   const [guided,setGuided]=React.useState<Alternative|null>(null);
   const [temporal,setTemporal]=React.useState<TemporalPlan|null>(null);
@@ -155,7 +157,8 @@ function LivingWorldEditor(){
     runId.current++;
     setBusy(false);setGame(null);setPreview(null);setTerrain([]);
     setHistory([]);setSessionToken(null);setPreviousTokens([]);
-    setSessionMode(false);setPortfolio(null);setGuided(null);
+    setSessionMode(false);setLastDurableDigest(null);
+    setPortfolio(null);setGuided(null);
     setTemporal(null);setFailure('');setNotice('');
   };
   const changeStyle=(next:string)=>{
@@ -189,6 +192,7 @@ function LivingWorldEditor(){
         setGuided(null);setTemporal(null);
         setSessionToken(signed?.new_checkpoint||null);
         setPreviousTokens([]);setSessionMode(!!signed?.new_checkpoint);
+        setLastDurableDigest(null);
         if(!signed)setNotice(
           'Long-session signing is unavailable; bounded world replay remains playable.');
       }
@@ -457,6 +461,64 @@ function LivingWorldEditor(){
         caught instanceof Error?caught.message:'Saved world cannot be restored.');
     }finally{if(ticket===runId.current)setBusy(false);}
   };
+  const saveDurably=async()=>{
+    if(!preview||!game||!sessionToken||busy)return;
+    const ticket=++runId.current;
+    setBusy(true);setFailure('');
+    try{
+      const expected=lastDurableDigest;
+      const receipt=await apiPost<{
+        ok:boolean;status:string;history_digest:string;
+        version:number;slot:number;
+      }>('/store',{
+        ...config,slot:durableSlot,token:sessionToken,
+        replace_existing:expected!==null,
+        expected_digest:expected,
+      });
+      if(!receipt.ok||receipt.history_digest!==game.player.history_digest)
+        throw new Error('Durable original world save receipt differs from player history.');
+      if(ticket===runId.current){
+        setLastDurableDigest(receipt.history_digest);
+        setNotice('World permanently stored in your creator database, version '+
+          receipt.version+'.');
+      }
+    }catch(caught){
+      if(ticket===runId.current)setFailure(
+        caught instanceof Error?caught.message:
+        'Cannot store world; slot may be occupied by newer decisions.');
+    }finally{if(ticket===runId.current)setBusy(false);}
+  };
+  const restoreDurably=async()=>{
+    if(!preview||busy)return;
+    const ticket=++runId.current;
+    setBusy(true);setFailure('');
+    try{
+      const restored=await apiPost<{
+        ok:boolean;new_checkpoint:string;history_digest:string;
+        version:number;state:{actions_played:number};
+      }>('/restore',{...config,slot:durableSlot});
+      if(!restored.ok||!restored.new_checkpoint)
+        throw new Error('Durable world store has no verified saved state.');
+      const inspected=await apiPost<SignedInspect>('/checkpoint/inspect',{
+        ...config,token:restored.new_checkpoint,
+      });
+      if(!inspected.ok||!inspected.checkpoint_bound_to_authenticated_owner||
+         inspected.current.player.history_digest!==restored.history_digest)
+        throw new Error('Restored original choices failed independent owner validation.');
+      if(ticket===runId.current){
+        setGame(inspected.current);setTerrain(inspected.surroundings);
+        setSessionToken(restored.new_checkpoint);
+        setSessionMode(true);setPreviousTokens([]);
+        setHistory([]);setGuided(null);setTemporal(null);
+        setLastDurableDigest(restored.history_digest);
+        setNotice('Saved original world restored from durable server database. '
+          +restored.state.actions_played+' real actions preserved.');
+      }
+    }catch(caught){
+      if(ticket===runId.current)setFailure(
+        caught instanceof Error?caught.message:'Durable world save is unavailable.');
+    }finally{if(ticket===runId.current)setBusy(false);}
+  };
   const styleNames=catalog?Object.keys(catalog.styles):fallbackStyles;
   return <SafeAreaView style={s.root}>
     <ScrollView contentContainerStyle={s.page}>
@@ -625,6 +687,40 @@ function LivingWorldEditor(){
               :' 192-action bounded replay until server signing is configured'}.
             Save/restore always checks the original server replay or owner-bound signature.
           </Text>
+          {sessionMode&&<View style={s.panel}>
+            <Text style={s.heading}>Durable world and story saves</Text>
+            <Text style={s.copy}>
+              Save your real player history, settlements and experienced endings
+              to the operator-configured account-bound database. A saved world
+              can be restored even after its renewable session expires.
+            </Text>
+            <View style={s.chips}>{[0,1,2,3,4,5,6,7,8,9].map(slot=>(
+              <TouchableOpacity key={slot} style={[
+                s.chip,durableSlot===slot&&s.selected]}
+                disabled={busy} onPress={()=>{
+                  setDurableSlot(slot);setLastDurableDigest(null);
+                }}>
+                <Text style={s.text}>Slot {slot+1}</Text>
+              </TouchableOpacity>
+            ))}</View>
+            <View style={s.chips}>
+              <TouchableOpacity style={s.chip} disabled={busy}
+                onPress={saveDurably}>
+                <Text style={s.actionText}>
+                  {lastDurableDigest?'Update verified saved world':'Save to empty slot'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.chip} disabled={busy}
+                onPress={restoreDurably}>
+                <Text style={s.actionText}>Restore durable original world</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={s.hint}>
+              Occupied slots are never overwritten without the exact previous
+              saved-state digest. Restoring from the server verifies your account
+              and resumes the original world with a fresh signed checkpoint.
+            </Text>
+          </View>}
           {Platform.OS!=='web'&&<View style={s.chips}>
             <TouchableOpacity style={s.chip} onPress={save} disabled={busy}>
               <Text style={s.actionText}>Save original history</Text>
