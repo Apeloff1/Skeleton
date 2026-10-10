@@ -295,3 +295,10 @@ def test_session_record_refuses_unbounded_serialized_payload(monkeypatch):
         store.record(session(store), authorized=True)
     assert store.sessions("alice", authorized=True) == ()
 
+
+def test_session_byte_budget_accepts_regular_observations():
+    store = setup()
+    value = session(store)
+    store.record(value, authorized=True)
+    assert store.sessions("alice", authorized=True)[0].session_id == value.session_id
+
