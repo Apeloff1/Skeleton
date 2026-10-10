@@ -578,6 +578,10 @@ def test_original_game_board_editor_validates_user_drawn_source_before_compilati
     assert result["ok"] and result["total_stages"]==2
     assert len(result["digest"])==64
     assert all(row["shortest_moves"]>0 for row in result["stages"])
+    assert all(set(row["shortest_solution"])<=set("wasd") and
+               len(row["shortest_solution"])==row["shortest_moves"]
+               for row in result["stages"])
+    assert all(row["shortest_moves"]<=400 for row in result["stages"])
     assert result["digest"]==validate_authored_levels(
         tuple(tuple(x) for x in boards)).digest
 
@@ -646,3 +650,21 @@ def test_original_puzzle_cpu_budgets_are_editor_only(endpoint):
     assert denied.value.status_code==403
     editor={"email":"maker@example.test","tenant_id":"tenant-a","role":"editor"}
     assert len(route._native_source_editor(editor))==64
+
+
+
+def test_editor_shortest_solution_sequence_completes_original_game_in_independent_physics():
+    """Creator walkthrough comes from exact BFS and is a real playable route."""
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    from skeleton.ai.webcrawler.dragon_native_puzzle_trace import simulate_grid
+    from skeleton.ai.webcrawler.dragon_native_puzzle_authoring import preview_authored_levels
+    boards=(BASE_LEVELS[0],BASE_LEVELS[3])
+    approved=preview_authored_levels(boards)
+    assert approved["total_stages"]==len(boards)
+    for index,record in enumerate(approved["stages"]):
+        moves=record["shortest_solution"]
+        assert moves and len(moves)==record["shortest_moves"]
+        simulated=simulate_grid(boards[index],moves,level=index+1)
+        assert simulated.solved
+        assert simulated.moves==record["shortest_moves"]
+        assert simulated.pushes>=1
