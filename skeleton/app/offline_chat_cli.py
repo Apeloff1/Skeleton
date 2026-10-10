@@ -8,7 +8,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 from pathlib import Path
+import stat
 import sys
 
 from skeleton.ai.model_runtime.offline_chat import (
@@ -31,14 +33,48 @@ from skeleton.app.local_ai import (
 
 
 def _read_reference_file(path: Path) -> str:
-    """Admit only bounded operator-selected local UTF-8 text, never a URL."""
-    if path.is_symlink() or not path.is_file():
-        raise RuntimeContractError("reference path must be a local regular non-symlink file")
-    if not 1 <= path.stat().st_size <= MAX_DOCUMENT_BYTES:
-        raise RuntimeContractError("reference file exceeds the 64 KiB limit")
-    with path.open("rb") as source:
-        payload = source.read(MAX_DOCUMENT_BYTES + 1)
-    if not 1 <= len(payload) <= MAX_DOCUMENT_BYTES:
+    """Read one bounded local UTF-8 file through a stable regular-file handle.
+
+    Inspect the path both before and after opening, bind the opened file to
+    that identity, and reject any replacement or in-place change during read.
+    O_NOFOLLOW also prevents symlink traversal on supporting operating systems.
+    """
+    try:
+        before = path.lstat()
+        if not stat.S_ISREG(before.st_mode):
+            raise RuntimeContractError(
+                "reference path must be a local regular non-symlink file"
+            )
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_BINARY", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+        )
+        fd = os.open(path, flags)
+        with os.fdopen(fd, "rb") as source:
+            opened = os.fstat(source.fileno())
+            if (not stat.S_ISREG(opened.st_mode)
+                    or (opened.st_dev, opened.st_ino) !=
+                    (before.st_dev, before.st_ino)):
+                raise RuntimeContractError("reference changed during file admission")
+            if not 1 <= opened.st_size <= MAX_DOCUMENT_BYTES:
+                raise RuntimeContractError("reference file exceeds the 64 KiB limit")
+            payload = source.read(MAX_DOCUMENT_BYTES + 1)
+            after = os.fstat(source.fileno())
+            current = path.lstat()
+            if (not stat.S_ISREG(current.st_mode)
+                    or (current.st_dev, current.st_ino) !=
+                    (opened.st_dev, opened.st_ino)
+                    or (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns) !=
+                    (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns)):
+                raise RuntimeContractError("reference changed during file admission")
+    except (OSError, ValueError) as exc:
+        if isinstance(exc, RuntimeContractError):
+            raise
+        raise RuntimeContractError("reference path is not a readable regular file") from exc
+    if not 1 <= len(payload) <= MAX_DOCUMENT_BYTES or len(payload) != opened.st_size:
         raise RuntimeContractError("reference changed or exceeded size budget")
     try:
         text = payload.decode("utf-8", errors="strict")
@@ -47,7 +83,6 @@ def _read_reference_file(path: Path) -> str:
     if "\x00" in text:
         raise RuntimeContractError("binary reference content is prohibited")
     return text
-
 
 def _result(answer, session_id: str, *, as_json: bool,
             evidence: dict | None = None) -> None:
