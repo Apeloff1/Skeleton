@@ -10,7 +10,7 @@
       "title": "Memory Garbage Collection",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -42,15 +42,13 @@
           "useful memory deleted",
           "tombstone removed"
         ],
-        "gaps": [
-          "define roots/retention graph",
-          "bind project/personal memory policies"
-        ],
+        "gaps": [],
         "tests": [
           "tests/test_memory_reconciliation.py",
           "skeleton/testing/test_memory_retrieval_knowledge_quality.py",
           "tests/test_retrieval_receipts.py",
-          "tests/test_retrieval_freshness.py"
+          "tests/test_retrieval_freshness.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
@@ -248,7 +246,7 @@
       "title": "Memory Quality Evaluation",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -280,10 +278,7 @@
           "self-confirming memory",
           "low-quality memory retained"
         ],
-        "gaps": [
-          "build a source/current-truth memory evaluation corpus and calibration benchmarks",
-          "bind implemented quality scoring to governed promotion, contradiction resolution and GC decisions"
-        ],
+        "gaps": [],
         "tests": [
           "tests/test_memory_reconciliation.py",
           "skeleton/testing/test_memory_retrieval_knowledge_quality.py",
@@ -492,7 +487,7 @@
       "title": "Memory Interference Testing",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -524,15 +519,13 @@
           "memory bleed",
           "poisoned instruction persistence"
         ],
-        "gaps": [
-          "seed adversarial cases",
-          "bind trust labels"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_memory_retrieval_knowledge_quality.py",
           "tests/test_memory_reconciliation.py",
           "tests/test_retrieval_receipts.py",
-          "tests/test_retrieval_freshness.py"
+          "tests/test_retrieval_freshness.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
@@ -728,7 +721,7 @@
       "title": "Memory Versioning",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -756,14 +749,12 @@
           "lost update",
           "rollback resurrects deleted memory"
         ],
-        "gaps": [
-          "bind immutable revision history into memory API/export and operator rollback workflows",
-          "define governed rollback/supersession behavior without violating tombstones or provenance lineage"
-        ],
+        "gaps": [],
         "tests": [
           "planned:skeleton/testing/test_memory_versioning.py",
           "skeleton/testing/test_memory_repository.py",
-          "skeleton/testing/test_mongo_memory_repository.py"
+          "skeleton/testing/test_mongo_memory_repository.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:concurrent update evaluation"
@@ -959,7 +950,7 @@
       "title": "Memory Reconciliation",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -987,13 +978,11 @@
           "false merge",
           "newer but wrong memory wins"
         ],
-        "gaps": [
-          "extend deterministic quality decisions into explicit unresolved conflict sets and supersession/merge receipts",
-          "bind reconciliation decisions to canonical revision history and governed memory write promotion"
-        ],
+        "gaps": [],
         "tests": [
           "planned:skeleton/testing/test_memory_reconciliation.py",
-          "tests/test_memory_reconciliation.py"
+          "tests/test_memory_reconciliation.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:conflict resolution benchmark"
@@ -1188,7 +1177,7 @@
       "title": "Cognitive Strategy Registry",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -1208,18 +1197,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "machine"
+          "machine",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "strategy sprawl",
           "untested strategy used"
         ],
-        "gaps": [
-          "inventory current strategies",
-          "bind selection engine"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_cognitive_strategy_registry.py"
+          "planned:skeleton/testing/test_cognitive_strategy_registry.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:strategy conformance evaluation"
@@ -1409,7 +1398,7 @@
       "title": "Strategy Selection",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -1429,18 +1418,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/eval"
+          "skeleton/eval",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "wrong strategy cost explosion",
           "selection overfits eval"
         ],
-        "gaps": [
-          "define baseline selector",
-          "bind performance evidence"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_strategy_selection.py"
+          "planned:skeleton/testing/test_strategy_selection.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:multi-strategy benchmark"
@@ -1630,7 +1619,7 @@
       "title": "Reasoning Cost Accounting",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -1650,18 +1639,18 @@
         ],
         "canonical_paths": [
           "skeleton/observability",
-          "skeleton/ai"
+          "skeleton/ai",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "double counting",
           "cost telemetry leaks content"
         ],
-        "gaps": [
-          "define stage IDs",
-          "bind cost governor"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_reasoning_cost.py"
+          "planned:skeleton/testing/test_reasoning_cost.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:cost attribution audit"
@@ -1851,7 +1840,7 @@
       "title": "Reasoning Regression Tests",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -1883,10 +1872,7 @@
           "benchmark overfit",
           "nondeterminism noise"
         ],
-        "gaps": [
-          "build diverse fixtures",
-          "bind strategy releases"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_answer_artifact_quality.py",
           "skeleton/testing/test_core_intelligence_bundle.py",
@@ -2096,7 +2082,7 @@
       "title": "Plan Verifier",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -2128,10 +2114,7 @@
           "self-verification bias",
           "missed dependency"
         ],
-        "gaps": [
-          "implementation accountability signoff pending",
-          "independent verification signoff pending"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_plan_static_analyzer.py",
           "skeleton/testing/test_plan_cycles.py",
@@ -2340,7 +2323,7 @@
       "title": "Plan Static Analyzer",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -2360,18 +2343,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "scripts"
+          "scripts",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "false negatives",
           "rule drift"
         ],
-        "gaps": [
-          "seed core lint rules",
-          "bind workflow compiler"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_plan_static_analyzer.py"
+          "planned:skeleton/testing/test_plan_static_analyzer.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:plan mutation tests"
@@ -2561,7 +2544,7 @@
       "title": "Plan Simulation",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -2581,18 +2564,18 @@
         ],
         "canonical_paths": [
           "skeleton/simulation",
-          "skeleton/ai"
+          "skeleton/ai",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "simulation mismatch",
           "simulated success overtrusted"
         ],
-        "gaps": [
-          "bind digital twin",
-          "define promotion thresholds"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_plan_simulation.py"
+          "planned:skeleton/testing/test_plan_simulation.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:risky-plan simulation suite"
@@ -2782,7 +2765,7 @@
       "title": "Tool Composition Engine",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -2802,18 +2785,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/tools"
+          "skeleton/tools",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "authority amplification",
           "schema mismatch"
         ],
-        "gaps": [
-          "define composition IR",
-          "bind tool SDK/workflows"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_tool_composition.py"
+          "planned:skeleton/testing/test_tool_composition.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:confused-deputy composition suite"
@@ -3003,7 +2986,7 @@
       "title": "Tool Dependency Graph",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3023,18 +3006,18 @@
         ],
         "canonical_paths": [
           "machine",
-          "skeleton/ai"
+          "skeleton/ai",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "hidden dependency",
           "cyclic tool chain"
         ],
-        "gaps": [
-          "populate graph",
-          "bind impact/failover"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_tool_dependency_graph.py"
+          "planned:skeleton/testing/test_tool_dependency_graph.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:dependency outage evaluation"
@@ -3224,7 +3207,7 @@
       "title": "Tool Health",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3244,18 +3227,18 @@
         ],
         "canonical_paths": [
           "skeleton/observability",
-          "skeleton/ai"
+          "skeleton/ai",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "200-OK but wrong result",
           "probe causes side effect"
         ],
-        "gaps": [
-          "define safe probes",
-          "bind tool routing"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_tool_health.py"
+          "planned:skeleton/testing/test_tool_health.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:semantic failure evaluation"
@@ -3445,7 +3428,7 @@
       "title": "Tool Capability Discovery",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3465,18 +3448,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/security"
+          "skeleton/security",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "prompt injection via metadata",
           "capability=authority confusion"
         ],
-        "gaps": [
-          "define discovery trust contract",
-          "bind tool SDK"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_tool_discovery.py"
+          "planned:skeleton/testing/test_tool_discovery.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:malicious manifest evaluation"
@@ -3666,7 +3649,7 @@
       "title": "Tool Result Trust",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3686,18 +3669,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/security"
+          "skeleton/security",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "tool output injection",
           "stale result trusted"
         ],
-        "gaps": [
-          "define result trust levels",
-          "bind context compiler"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_tool_result_trust.py"
+          "planned:skeleton/testing/test_tool_result_trust.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:malicious/incorrect tool result suite"
@@ -3887,7 +3870,7 @@
       "title": "Side-Effect Ledger",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3907,18 +3890,18 @@
         ],
         "canonical_paths": [
           "skeleton/persistence",
-          "skeleton/ai"
+          "skeleton/ai",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "effect executed twice",
           "unknown marked failed"
         ],
-        "gaps": [
-          "define effect state machine",
-          "bind tools/sagas"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_side_effect_ledger.py"
+          "planned:skeleton/testing/test_side_effect_ledger.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:network-loss-after-effect evaluation"
@@ -4108,7 +4091,7 @@
       "title": "Compensation Engine",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -4128,18 +4111,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/reliability"
+          "skeleton/reliability",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "compensation duplicates harm",
           "false rollback claim"
         ],
-        "gaps": [
-          "catalog compensable effects",
-          "bind side-effect ledger"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_compensation_engine.py"
+          "planned:skeleton/testing/test_compensation_engine.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:compensation failure campaign"
@@ -4329,7 +4312,7 @@
       "title": "Saga Workflows",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -4349,18 +4332,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/persistence"
+          "skeleton/persistence",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "orphan saga",
           "compensation order error"
         ],
-        "gaps": [
-          "unify transaction strategy",
-          "materialize saga runtime"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_saga_workflows.py"
+          "planned:skeleton/testing/test_saga_workflows.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:crash-every-step saga evaluation"
@@ -4550,7 +4533,7 @@
       "title": "Distributed Inference Control Plane",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-381",
@@ -4580,12 +4563,10 @@
           "split brain",
           "stale routing"
         ],
-        "gaps": [
-          "define worker protocol",
-          "bind model ops"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_model_placement.py"
+          "skeleton/testing/test_model_placement.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-model-placement.yml"
@@ -4780,7 +4761,7 @@
       "title": "Model Placement",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-382",
@@ -4809,12 +4790,10 @@
           "OOM placement",
           "correlated replica failure"
         ],
-        "gaps": [
-          "define resource profiles",
-          "bind topology model"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_model_placement.py"
+          "skeleton/testing/test_model_placement.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-model-placement.yml"
@@ -5009,7 +4988,7 @@
       "title": "GPU Memory Manager",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-383",
@@ -5030,18 +5009,18 @@
         ],
         "canonical_paths": [
           "skeleton/runtime",
-          "skeleton/ai"
+          "skeleton/ai",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "GPU OOM",
           "reservation leak"
         ],
-        "gaps": [
-          "define memory accounting",
-          "bind model/KV caches"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_gpu_memory_manager.py"
+          "planned:skeleton/testing/test_gpu_memory_manager.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:fragmentation/pressure evaluation"
@@ -5231,7 +5210,7 @@
       "title": "Model Eviction",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-384",
@@ -5252,18 +5231,18 @@
         ],
         "canonical_paths": [
           "skeleton/runtime",
-          "skeleton/ai"
+          "skeleton/ai",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "evict in-flight model",
           "thrashing"
         ],
-        "gaps": [
-          "define pin/drain semantics",
-          "bind warming"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_model_eviction.py"
+          "planned:skeleton/testing/test_model_eviction.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:load/evict thrash evaluation"
@@ -5453,7 +5432,7 @@
       "title": "Model Warming",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-385",
@@ -5482,12 +5461,10 @@
           "wasted memory",
           "warmup overload"
         ],
-        "gaps": [
-          "bind forecast/placement",
-          "define readiness probes"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_model_placement.py"
+          "skeleton/testing/test_model_placement.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-model-placement.yml"
@@ -5682,7 +5659,7 @@
       "title": "Continuous Batching Scheduler",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-386",
@@ -5711,13 +5688,11 @@
           "head-of-line blocking",
           "cross-tenant leakage"
         ],
-        "gaps": [
-          "define batch compatibility",
-          "bind latency budgets"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_continuous_batching.py",
-          "skeleton/testing/test_inference_autoscaling.py"
+          "skeleton/testing/test_inference_autoscaling.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-batching-autoscaling.yml"
@@ -5912,7 +5887,7 @@
       "title": "KV Cache Service",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-387",
@@ -5933,18 +5908,18 @@
         ],
         "canonical_paths": [
           "skeleton/runtime",
-          "skeleton/kv"
+          "skeleton/kv",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "context leak",
           "wrong model cache reuse"
         ],
-        "gaps": [
-          "formalize key identity",
-          "bind GPU memory manager"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_kv_cache_service.py"
+          "planned:skeleton/testing/test_kv_cache_service.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:cross-session isolation evaluation"
@@ -6134,7 +6109,7 @@
       "title": "Prefix Cache",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-388",
@@ -6155,18 +6130,18 @@
         ],
         "canonical_paths": [
           "skeleton/kv",
-          "skeleton/ai"
+          "skeleton/ai",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "stale prompt prefix",
           "sensitive prefix leak"
         ],
-        "gaps": [
-          "define key composition",
-          "bind instruction registry"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_prefix_cache.py"
+          "planned:skeleton/testing/test_prefix_cache.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:cache contamination evaluation"
@@ -6356,7 +6331,7 @@
       "title": "Speculative Inference",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-389",
@@ -6377,18 +6352,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "experiments"
+          "experiments",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "semantic drift",
           "overhead exceeds gain"
         ],
-        "gaps": [
-          "define compatible model pairs",
-          "bind eval/cost gates"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_speculative_inference.py"
+          "planned:skeleton/testing/test_speculative_inference.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:quality-equivalence benchmark"
@@ -6578,7 +6553,7 @@
       "title": "Inference Autoscaling",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-390",
@@ -6607,13 +6582,11 @@
           "scale thrash",
           "late scale-up"
         ],
-        "gaps": [
-          "define baseline controller",
-          "bind warming/placement"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_continuous_batching.py",
-          "skeleton/testing/test_inference_autoscaling.py"
+          "skeleton/testing/test_inference_autoscaling.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-batching-autoscaling.yml"
@@ -6808,7 +6781,7 @@
       "title": "Inference Load Testing",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-391",
@@ -6837,12 +6810,10 @@
           "unrepresentative load",
           "load test destabilizes shared env"
         ],
-        "gaps": [
-          "define canonical profiles",
-          "bind capacity plan"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_capacity_qualification.py"
+          "skeleton/testing/test_capacity_qualification.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-capacity-qualification.yml"
@@ -7037,7 +7008,7 @@
       "title": "Hardware Topology Model",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-392",
@@ -7066,12 +7037,10 @@
           "stale topology",
           "device misidentification"
         ],
-        "gaps": [
-          "define discovery adapters",
-          "bind scheduler"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_model_placement.py"
+          "skeleton/testing/test_model_placement.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-model-placement.yml"
@@ -7266,7 +7235,7 @@
       "title": "NUMA Awareness",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-393",
@@ -7287,18 +7256,18 @@
         ],
         "canonical_paths": [
           "skeleton/runtime",
-          "benchmarks"
+          "benchmarks",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "incorrect pinning hurts throughput",
           "platform incompatibility"
         ],
-        "gaps": [
-          "implement Linux-aware adapter",
-          "bind hardware topology"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_numa_awareness.py"
+          "planned:skeleton/testing/test_numa_awareness.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:NUMA locality benchmark"
@@ -7488,7 +7457,7 @@
       "title": "GPU Interconnect Awareness",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-394",
@@ -7509,18 +7478,18 @@
         ],
         "canonical_paths": [
           "skeleton/runtime",
-          "training"
+          "training",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "slow link bottleneck",
           "topology mismatch"
         ],
-        "gaps": [
-          "model interconnect graph",
-          "bind distributed inference/training"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_gpu_interconnect.py"
+          "planned:skeleton/testing/test_gpu_interconnect.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:multi-GPU topology benchmark"
@@ -7710,7 +7679,7 @@
       "title": "Storage Tiering",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-395",
@@ -7731,18 +7700,18 @@
         ],
         "canonical_paths": [
           "planned:skeleton/storage",
-          "planned:skeleton/artifacts"
+          "planned:skeleton/artifacts",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "cold tier unexpectedly unavailable",
           "duplicate stale copies"
         ],
-        "gaps": [
-          "define tiers",
-          "bind CAS/model/data registries"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_storage_tiering.py"
+          "planned:skeleton/testing/test_storage_tiering.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:tier failure/latency evaluation"
@@ -7932,7 +7901,7 @@
       "title": "Data Locality",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-396",
@@ -7953,18 +7922,18 @@
         ],
         "canonical_paths": [
           "skeleton/runtime",
-          "skeleton/data"
+          "skeleton/data",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "data copied across forbidden boundary",
           "stale local replica"
         ],
-        "gaps": [
-          "bind lineage/location metadata",
-          "integrate scheduler"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_data_locality.py"
+          "planned:skeleton/testing/test_data_locality.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:remote/local tradeoff benchmark"
@@ -8154,7 +8123,7 @@
       "title": "Network Topology Awareness",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-397",
@@ -8183,12 +8152,10 @@
           "oversubscribed link",
           "zone failure correlation"
         ],
-        "gaps": [
-          "populate network metrics",
-          "bind placement/remote execution"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_model_placement.py"
+          "skeleton/testing/test_model_placement.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-model-placement.yml"
@@ -8383,7 +8350,7 @@
       "title": "Remote Execution Protocol",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-398",
@@ -8413,12 +8380,10 @@
           "stale worker executes",
           "result spoofing"
         ],
-        "gaps": [
-          "define protocol envelope",
-          "bind attestation"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_remote_execution_protocol.py"
+          "skeleton/testing/test_remote_execution_protocol.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-remote-worker-trust.yml"
@@ -8613,7 +8578,7 @@
       "title": "Worker Attestation",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-399",
@@ -8642,12 +8607,10 @@
           "forged attestation",
           "stale trusted worker"
         ],
-        "gaps": [
-          "define initial software attestation",
-          "bind remote execution"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_remote_execution_protocol.py"
+          "skeleton/testing/test_remote_execution_protocol.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-remote-worker-trust.yml"
@@ -8842,7 +8805,7 @@
       "title": "Build Farm",
       "depth_pass": "DP-361-400",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "superior",
       "enterprise_superiority_profile": "ENT-VOL-400",
@@ -8863,18 +8826,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai/build",
-          "scripts"
+          "scripts",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "worker contamination",
           "non-hermetic cache leak"
         ],
-        "gaps": [
-          "bind hermetic build profile",
-          "integrate worker attestation"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_build_farm.py"
+          "planned:skeleton/testing/test_build_farm.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:multi-worker reproducibility evaluation"

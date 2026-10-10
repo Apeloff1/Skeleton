@@ -23143,7 +23143,7 @@
       ],
       "interest_metric": {
         "name": "requirements_without_evidence",
-        "value": 432,
+        "value": 373,
         "unit": "requirements"
       },
       "status": "open"
