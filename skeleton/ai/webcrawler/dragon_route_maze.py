@@ -57,6 +57,7 @@ class MazeCertificate:
     main_journey_digest:str
     all_climates_backbone_verified:tuple[str,...]
     location_recovery_verified:tuple[str,...]
+    location_recovery_routes:tuple[tuple[str,...],...]
     location_recovery_count:int
     real_dead_ends:tuple[str,...]
     return_edges:tuple[str,...]
@@ -284,6 +285,7 @@ def build_maze(request:MazeRequest=MazeRequest())->MazeCreation:
     validate_world(world)
     completed=replay(world,tuple(main),traveller,objective="constructive_backbone")
     recovery=[]
+    recovery_routes=[]
     for cell in all_cells:
         if cell in indexed:
             i=indexed[cell]
@@ -295,6 +297,7 @@ def build_maze(request:MazeRequest=MazeRequest())->MazeCreation:
         if not result.success:
             raise ValueError("constructed maze has an unfinishable room")
         recovery.append(_place(*cell))
+        recovery_routes.append(trace)
     for witness in (*scenic_witnesses,*secret_witnesses):
         if not replay(world,witness,traveller).success:
             raise ValueError("constructed optional route fails actual game mechanics")
@@ -320,6 +323,7 @@ def build_maze(request:MazeRequest=MazeRequest())->MazeCreation:
         "main_journey_digest":completed.digest,
         "all_climates_backbone_verified":tuple(weather_verified),
         "location_recovery_verified":tuple(recovery),
+        "location_recovery_routes":tuple(recovery_routes),
         "location_recovery_count":len(recovery),
         "real_dead_ends":deadends,
         "return_edges":tuple(side_reverse[x] for x in side),
@@ -364,8 +368,9 @@ def verify_maze(creation:MazeCreation)->dict:
     # No trust is placed in claimed certificates, including a source-only
     # graph with the same route labels but different gates or time costs.
     witnesses=(
-        (cert.backbone,)+cert.doubleback_witnesses+
-        cert.scenic_witnesses+cert.secret_witnesses
+        (cert.backbone,)+cert.location_recovery_routes+
+        cert.doubleback_witnesses+cert.scenic_witnesses+
+        cert.secret_witnesses
     )
     for trace in witnesses:
         journey=replay(world,trace,traveller)
