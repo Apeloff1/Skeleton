@@ -23,7 +23,7 @@ from .playable_export import PlayableHTML, render_playable_world
 PACK_ROOT = Path(__file__).with_name("practice_games")
 PACK_SCHEMA = "skeleton.dragon.original_practice_game.v1"
 MAX_PRACTICE_GAME_BYTES = 16 * 1024
-_GAME_ID = re.compile(r"dragon-practice-[0-9]{3}\\Z")
+_GAME_ID = re.compile(r"dragon-practice-[0-9]{3}\Z")
 
 
 class PracticeGameError(ValueError):
@@ -118,7 +118,7 @@ def load_practice_game(game_id: str, *, authorized: bool) -> OriginalPracticeGam
             raw.decode("utf-8", "strict"), object_pairs_hook=_pairs_unique,
             parse_constant=_reject_float_constant,
         )
-        if type(body) is not dict or canonical_json(body).encode("ascii") + b"\\n" != raw:
+        if type(body) is not dict or canonical_json(body).encode("ascii") + b"\n" != raw:
             raise PracticeGameError("practice game source not canonical")
     except (UnicodeError, TypeError, ValueError, RecursionError) as exc:
         raise PracticeGameError("practice game JSON integrity invalid") from exc
