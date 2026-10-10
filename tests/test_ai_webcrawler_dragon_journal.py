@@ -36,3 +36,37 @@ def test_sessions_are_isolated():
     journal.append("bob","policy_rejected","https://example.org/b",at=1)
     assert [x["url"] for x in journal.page("alice")["events"]]==["https://example.org/a"]
     assert journal.verify("alice") and journal.verify("bob")
+
+
+@pytest.mark.parametrize("url", [
+    "https://", "http://", "https://user:secret@example.org/file",
+    "https://example.org/#fragment", "https://example.org/\ncommand",
+    "https://[invalid-host", "file:///local/secrets",
+])
+def test_journal_rejects_untrusted_event_origin(url):
+    journal = DragonEventJournal(sqlite3.connect(":memory:"))
+    with pytest.raises(ValueError, match="event URL"):
+        journal.append("session", "fetch_started", url, at=1)
+
+
+@pytest.mark.parametrize("bad_session", [
+    "", "name with spaces", "../session", "session\ncontrol", "s" * 129,
+])
+def test_journal_requires_bounded_scoped_session_identifiers(bad_session):
+    journal = DragonEventJournal(sqlite3.connect(":memory:"))
+    with pytest.raises(ValueError, match="session"):
+        journal.append(bad_session, "fetch_started", "https://example.org", at=1)
+
+
+def test_journal_rejects_nonobject_and_exhaustive_json_payloads():
+    journal = DragonEventJournal(sqlite3.connect(":memory:"))
+    for payload in ([], "text", [1, 2], {"huge": list(range(5000))},
+                    {"invalid": object()}, {"nonfinite": float("inf")}):
+        with pytest.raises(ValueError):
+            journal.append("session", "fetch_started", "https://example.org",
+                           at=1, payload=payload)
+    cycle = {}
+    cycle["self"] = cycle
+    with pytest.raises(ValueError, match="node/depth budget"):
+        journal.append("session", "fetch_started", "https://example.org",
+                       at=1, payload=cycle)
