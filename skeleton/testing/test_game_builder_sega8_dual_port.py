@@ -77,6 +77,7 @@ def test_actual_original_game_dual_console_source_custody(theme,tmp_path):
         manifest=json.loads((path/"manifest.json").read_text())
         assert source==targets[target]["source_sha256"]
         assert manifest["world_digest"]==proof["world_digest"]
+        assert manifest["source_platform"]==target
         assert manifest["original_demo_solution_sha256"]==proof["original_solution_sha256"]
         assert manifest["source_rights_evidence_sha256"]==proof["author_declaration_sha256"]
         assert manifest["original_color_theme"]==theme
