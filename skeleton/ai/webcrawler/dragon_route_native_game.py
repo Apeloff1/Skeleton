@@ -252,7 +252,8 @@ def _bit(values,mapping):
 def _u(value:int)->str:
     return f"UINT64_C({value})"
 
-def emit_route_game(world:World,traveller:Traveller,*,authorized:bool)->dict[str,str]:
+def emit_route_game(world:World,traveller:Traveller,*,authorized:bool,
+                    maze_creation=None)->dict[str,str]:
     if authorized is not True:
         raise PermissionError("original world C99 source export requires explicit approval")
     validate_world(world);validate_traveller(traveller)
@@ -292,7 +293,34 @@ def emit_route_game(world:World,traveller:Traveller,*,authorized:bool)->dict[str
         )
     proofs=[]
     probes=[]
-    for name,route in EXAMPLES.items():
+    certified_maze=None
+    if maze_creation is not None:
+        from .dragon_route_maze import MazeCreation,verify_maze
+        if not isinstance(maze_creation,MazeCreation) or (
+                maze_creation.world!=world or maze_creation.traveller!=traveller):
+            raise ValueError("maze C99 compilation input diverges from its certificate")
+        certified_maze=verify_maze(maze_creation)
+        proof=maze_creation.certificate
+        named_routes={"maze_spine":proof.backbone}
+        named_routes.update({
+            f"room_{index}":trace
+            for index,trace in enumerate(proof.location_recovery_routes)
+        })
+        named_routes.update({
+            f"doubleback_{index}":trace
+            for index,trace in enumerate(proof.doubleback_witnesses[:8])
+        })
+        named_routes.update({
+            f"scenic_{index}":trace
+            for index,trace in enumerate(proof.scenic_witnesses[:8])
+        })
+        named_routes.update({
+            f"secret_{index}":trace
+            for index,trace in enumerate(proof.secret_witnesses)
+        })
+    else:
+        named_routes=EXAMPLES
+    for name,route in named_routes.items():
         try:
             verified=replay(world,route,traveller,objective="native_witness")
         except ValueError:
@@ -362,12 +390,13 @@ def emit_route_game(world:World,traveller:Traveller,*,authorized:bool)->dict[str
         "static const DragonProof dragon_probes[DRAGON_PROBE_COUNT]={\n"+
         "\n".join(proof_data)+"\n};\n#endif\n"
     )
-    from .dragon_route_world_assurance import demand_viable_world
+    from .dragon_route_world_assurance import demand_viable_world,audit_world
     from .dragon_route_legal_provenance import (
         SourceRights,assess_route_originality,
         assert_original_game_candidate,review_json,
     )
-    quality=demand_viable_world(world,traveller)
+    quality=(asdict(audit_world(world,traveller)) if certified_maze is not None
+             else demand_viable_world(world,traveller))
     rights=assess_route_originality(
         world,rights=SourceRights(
             owner_reference="Dragon generated original world route source",
@@ -395,6 +424,13 @@ def emit_route_game(world:World,traveller:Traveller,*,authorized:bool)->dict[str
         "token_registry":token_list,
         "abstract_graph_audit":analysis,
         "full_route_world_assurance":quality,
+        "constructive_maze_verification":certified_maze,
+        "constructive_maze_certificate":(
+            asdict(maze_creation.certificate) if maze_creation is not None else None
+        ),
+        "constructive_maze_design":(
+            asdict(maze_creation.request) if maze_creation is not None else None
+        ),
         "originality_screen":review_json(rights),
         "probes":probes,
         "original_work_attested":world.original_work_attested,
