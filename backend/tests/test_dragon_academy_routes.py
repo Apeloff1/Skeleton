@@ -528,3 +528,41 @@ def test_original_pixel_preview_is_strictly_typed_and_has_no_unsafe_inputs(field
     from pydantic import ValidationError
     with pytest.raises(ValidationError):
         route.NativeProductionPixelArtPreview(**fields)
+
+
+
+def test_original_puzzle_creator_can_explicitly_request_solver_proven_new_stages():
+    from zipfile import ZipFile
+    from io import BytesIO
+    import json
+    from skeleton.ai.webcrawler.dragon_native_production import verify_source_bundle
+    spec = route.NativeProductionSourceRequest(
+        title="Original Clockwork Crate Labyrinth",
+        style="fixed_screen_puzzle", targets=["pc_linux"],
+        seed=1977, original_work_attested=True, approved=True,
+        portable_design=route.NativeProductionDesignBody(
+            palette="vga_dusk", hero="explorer",
+            quest_theme="clockwork", stages=2,
+            candidates=4, difficulty=7, procedural_levels=True,
+        ),
+    )
+    preview = route.native_production_preview(spec, owner=identity())
+    assert preview["can_export_sources"]
+    released = route.native_production_source_bundle(spec, owner=identity())
+    assert verify_source_bundle(released.body)["target_count"] == 1
+    with ZipFile(BytesIO(released.body)) as archive:
+        inner = next(name for name in archive.namelist() if name.startswith("releases/"))
+        with ZipFile(BytesIO(archive.read(inner))) as project:
+            proof = json.loads(project.read("source/dragon-puzzle-proof.json"))
+            assert proof["stages"] == 2 and proof["procedural"] is True
+
+
+@pytest.mark.parametrize("bad", [
+    {"procedural_levels": "true"},
+    {"procedural_levels": 1},
+    {"procedural_levels": []},
+])
+def test_original_creator_procedural_option_rejects_coerced_input(bad):
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        route.NativeProductionDesignBody(**bad)
