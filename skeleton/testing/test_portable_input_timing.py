@@ -63,3 +63,11 @@ def test_eight_way_controller_ports_cardinals_and_diagonals():
     with pytest.raises(InputTimingError):
         axis_to_eightway(True,0)
 
+
+def test_button_debounce_waits_for_stable_contiguous_frames():
+    samples=(0,1,0,1,1,1,0,0)
+    assert debounce_buttons(samples,stable_frames=2)==(0,0,0,0,1,1,1,0)
+    assert debounce_buttons((1,0),stable_frames=1)==(1,0)
+    with pytest.raises(InputTimingError):
+        debounce_buttons((1,),stable_frames=0)
+
