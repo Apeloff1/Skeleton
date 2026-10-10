@@ -108,27 +108,62 @@ jobs:
             tests/test_ai_webcrawler_dragon_native_c64.py \
             tests/test_ai_webcrawler_dragon_native_gbc.py \
             tests/test_ai_webcrawler_dragon_native_platformer.py
-      - name: Compile original art-directed handheld and NES ROMs
+      - name: Compile authored hero art and movement animations in actual GB CGB NES ROMs
         run: |
           set -euo pipefail
+          cat > /tmp/dragon-authored-game.json <<'JSON'
+          {
+            "schema":"skeleton.ai.dragon.portable_game_design.v1",
+            "palette":"dmg_green",
+            "hero":"robot",
+            "quest_theme":"space",
+            "difficulty":7,
+            "stages":5,
+            "candidates":8,
+            "project_notes":"Original art-directed homebrew with input-driven sprite motion"
+          }
+          JSON
           python -m skeleton.ai.webcrawler.dragon_native_production build \
             --title "Original Sprite and World Campaign" \
             --style arcade_score_attack \
             --targets game_boy,game_boy_color,nes \
+            --portable-design /tmp/dragon-authored-game.json \
             --attest-original-rights --compile-roms --require-compiled \
             --out /tmp/dragon-original-art-roms \
             > /tmp/dragon-original-art-build.json
+          python -m skeleton.ai.webcrawler.dragon_native_production build \
+            --title "Original Scrolling Pixel Quest" \
+            --style side_scrolling_platformer \
+            --targets game_boy --portable-design /tmp/dragon-authored-game.json \
+            --attest-original-rights --compile-roms --require-compiled \
+            --out /tmp/dragon-original-art-platformer \
+            > /tmp/dragon-original-art-platformer.json
           python - <<'PY'
           import json
           from pathlib import Path
-          from skeleton.ai.webcrawler.dragon_native_production import verify_published_production
-          result = json.loads(Path("/tmp/dragon-original-art-build.json").read_text())
-          assert result["status"] == "published"
-          audit = verify_published_production(
-              Path("/tmp/dragon-original-art-roms"), result["index"])
-          assert audit["archives_verified"] == 3
-          assert all(item["binary_sha256"] for item in result["artifacts"])
-          print("ORIGINAL_NATIVE_ART_ROM_BUILDS_PASS", audit["request_id"])
+          from zipfile import ZipFile
+          from io import BytesIO
+          from skeleton.ai.webcrawler.dragon_native_production import (
+              verify_published_production, verify_source_release,
+          )
+          runs = (
+              ("/tmp/dragon-original-art-build.json", "/tmp/dragon-original-art-roms", 3),
+              ("/tmp/dragon-original-art-platformer.json", "/tmp/dragon-original-art-platformer", 1),
+          )
+          for receipt_path, root_path, count in runs:
+              result = json.loads(Path(receipt_path).read_text())
+              assert result["status"] == "published"
+              audit = verify_published_production(Path(root_path), result["index"])
+              assert audit["archives_verified"] == count
+              for item in result["artifacts"]:
+                  assert item["binary_sha256"] and item["original_art_sha256"]
+                  archive = (Path(root_path) / item["archive_name"]).read_bytes()
+                  proof = verify_source_release(archive)
+                  assert proof["port_plan"]["portable_profile"]["hero"] == "robot"
+                  assert proof["original_art_sha256"] == item["original_art_sha256"]
+                  with ZipFile(BytesIO(archive)) as native:
+                      assert "source/dragon-native-art.json" in native.namelist()
+              print("ORIGINAL_GAME_ROM_AND_ART_APPLIED", audit["request_id"])
           PY
       - name: Prove multi-game evolution produces distinct verified native cartridges
         run: |
