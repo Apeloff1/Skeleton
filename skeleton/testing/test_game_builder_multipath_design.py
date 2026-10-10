@@ -577,3 +577,14 @@ def test_spawn_relocation_requires_new_full_reachable_solution():
     with pytest.raises(MultipathError):
         relocate_start(p, p.collectibles[0], authorized=True)
 
+
+def test_route_evolver_carves_only_evidence_backed_new_corridor():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    edited = carve_for_diversity(p, authorized=True, max_candidates=8)
+    assert cycle_rank(edited.after) > cycle_rank(p)
+    alternatives = route_portfolio(edited.after, max_routes=3)
+    assert len(alternatives) >= 2
+    assert portfolio_diversity_ppm(alternatives) > 0
+    with pytest.raises(PermissionError):
+        carve_for_diversity(p, authorized=False)
+
