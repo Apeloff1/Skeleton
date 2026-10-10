@@ -502,6 +502,8 @@ def canonical_idle_work_items(state: Mapping[str, Any]) -> tuple[tuple[WorkItem,
     """
 
     supervisor = state.get("_shift_supervisor")
+    if canonical_queue_drained(supervisor, "idle"):
+        return (), ""
     if not isinstance(supervisor, Mapping) or supervisor.get("status") != "loaded":
         raise ValueError("canonical shift-supervisor state was not loaded")
     if supervisor.get("team") != "idle":
