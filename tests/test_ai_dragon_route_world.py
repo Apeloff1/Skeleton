@@ -303,3 +303,46 @@ def test_original_multimodal_free_roaming_reports_live_resource_visibility():
     blocked=next(x for x in drained["options"] if x["edge"]=="reef_to_gate")
     assert not blocked["available"]
     assert blocked["access"]=="oxygen_required"
+
+
+
+def test_original_long_interstellar_journey_crosses_25_game_years_without_integer_overflow():
+    world,hero=make_frontier(seed=1977)
+    itinerary=(
+        "spaceport_access","shuttle_to_orbit","generation_ship_voyage",
+        "deep_space_crossing","stellar_return",
+    )
+    journey=replay(world,itinerary,hero,objective="impractical")
+    assert journey.success
+    assert journey.elapsed_minutes>25*365*24*60
+    assert journey.elapsed_minutes<world.max_minutes
+    assert journey.money_spent==235
+    assert journey.fuel_used==25
+    assert journey.mana_used==20
+    assert "generation_ship" in journey.modes
+    assert "deep_space_cruise" in journey.modes
+    assert "stellar_gate" in journey.modes
+    assert "impractical" in journey.shapes
+    assert "world_transition" in journey.shapes
+    assert journey.length==5
+    assert journey.places[0]=="crossroads"
+    assert journey.places[-1]=="citadel"
+    exhausted=replace(hero,cash=234)
+    with pytest.raises(ValueError):
+        replay(world,itinerary,exhausted)
+    tiny_horizon=replace(world,max_minutes=365*24*60)
+    with pytest.raises(ValueError):
+        replay(tiny_horizon,itinerary,hero)
+
+
+def test_original_world_clock_preserves_minutes_after_multiple_game_years():
+    world,hero=make_frontier(seed=1977)
+    before=experience(world,hero,path=(
+        "spaceport_access","shuttle_to_orbit","generation_ship_voyage",
+    ))
+    assert before["world_position"]=="distant_star"
+    assert before["elapsed_minutes"]>=20*365*24*60
+    assert before["remaining_cash"]==30
+    assert before["remaining_fuel"]==35
+    assert any(x["edge"]=="deep_space_crossing" and x["available"]
+               for x in before["options"])
