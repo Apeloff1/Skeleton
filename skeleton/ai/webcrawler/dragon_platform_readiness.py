@@ -95,6 +95,11 @@ SOURCE_RENDERERS.update({
     "atari_7800":"Atari 7800 6502C MARIA DMA 160A sprites",
 })
 SOURCE_RENDERERS["intellivision"]="CP1610 / STIC 8 MOB sprites / AY-3-8914 PSG"
+SOURCE_RENDERERS.update({
+    "atari_st":"Motorola 68000 Atari TOS GEMDOS/BIOS native text",
+    "amiga_500":"Motorola 68000 Kickstart 1.3 Intuition/graphics RastPort",
+    "sharp_x68000":"Motorola 68000 Human68k DOS native console and X-file",
+})
 assert set(SOURCE_RENDERERS)==EMITTERS
 
 @dataclass(frozen=True)

@@ -76,7 +76,7 @@ apple_iigs|Apple|16-bit computer|1986|65816|Super Hi-Res|Ensoniq|keyboard|ORCA /
 trs80_model_i|Tandy|8-bit computer|1977|Z80|text video|mono|keyboard|z88dk trs80|cmd|toolchain_adapter
 ti_99_4a|Texas Instruments|16-bit computer|1981|TMS9900|TMS9918|SN76489|joystick|TI99 homebrew GCC|bin|toolchain_adapter
 oric_atmos|Oric|8-bit computer|1984|6502|ULA|AY-3-8912|keyboard|cc65 atmos|bin|native_source
-sharp_x68000|Sharp|16-bit Japanese PC|1987|68000|custom sprite GPU|YM2151|keyboard|Human68k GCC|x|toolchain_adapter
+sharp_x68000|Sharp|16-bit Japanese PC|1987|68000|custom sprite GPU|YM2151|keyboard|human68k-gcc / elf2x68k|x|native_source
 nec_pc_8801|NEC|8-bit Japanese PC|1981|Z80|NEC video|YM2203|keyboard|PC-88 cross compiler|d88|toolchain_adapter
 nec_pc_9801|NEC|16-bit Japanese PC|1982|8086|GDC|YM2608|keyboard|OpenWatcom PC-98|exe|toolchain_adapter
 fm_towns|Fujitsu|CD-ROM era PC|1989|386|FM Towns graphics|YM2612|keyboard|FM Towns homebrew|exe|toolchain_adapter

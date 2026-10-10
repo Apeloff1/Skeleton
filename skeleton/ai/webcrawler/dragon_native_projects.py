@@ -17,7 +17,7 @@ EMITTERS=EMITTERS|frozenset(COMPATIBILITY)|frozenset(("commodore_pet","commodore
 EMITTERS=EMITTERS|frozenset(("atari_5200","colecovision","zx81","msx2","thumby"))
 EMITTERS=EMITTERS|frozenset(("lynx","saturn","ps_vita","nintendo_switch","wii_u"))
 EMITTERS=EMITTERS|frozenset(("vectrex","atari_7800"))
-EMITTERS=EMITTERS|frozenset(("intellivision",))
+EMITTERS=EMITTERS|frozenset(("intellivision","atari_st","amiga_500","sharp_x68000"))
 
 @dataclass(frozen=True)
 class NativeProject:
@@ -596,6 +596,9 @@ def render_native_project(*,title:str,target_id:str,style:str,
     elif target_id in ("commodore_pet","commodore_plus4","bbc_micro","oric_atmos"):
         from .dragon_native_cc65_classics import classic_cc65_source
         files=classic_cc65_source(target_id,seed)
+    elif target_id in ("atari_st","amiga_500","sharp_x68000"):
+        from .dragon_native_m68k_computers import motorola_native_source
+        files=motorola_native_source(target_id,seed)
     elif target_id=="commodore_64":
         from .dragon_native_c64 import commodore64_source
         files=commodore64_source(seed)

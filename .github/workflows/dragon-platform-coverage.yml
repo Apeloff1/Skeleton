@@ -11,6 +11,7 @@ on:
       - 'skeleton/ai/webcrawler/dragon_native_nintendo_ppc_3ds.py'
       - 'skeleton/ai/webcrawler/dragon_native_vector_maria.py'
       - 'skeleton/ai/webcrawler/dragon_native_intellivision.py'
+      - 'skeleton/ai/webcrawler/dragon_native_m68k_computers.py'
       - 'skeleton/ai/webcrawler/dragon_native_switch_wiiu.py'
       - 'skeleton/ai/webcrawler/dragon_native_dreamcast_ps2.py'
       - 'skeleton/ai/webcrawler/dragon_native_8bit_computers.py'
@@ -36,6 +37,7 @@ on:
       - 'tests/test_ai_webcrawler_dragon_native_nintendo_ppc_3ds.py'
       - 'tests/test_ai_webcrawler_dragon_native_vector_maria.py'
       - 'tests/test_ai_webcrawler_dragon_native_intellivision.py'
+      - 'tests/test_ai_webcrawler_dragon_native_m68k_computers.py'
       - 'tests/test_ai_webcrawler_dragon_native_switch_wiiu.py'
       - 'tests/test_ai_webcrawler_dragon_native_dreamcast_ps2.py'
       - 'tests/test_ai_webcrawler_dragon_native_8bit_computers.py'
@@ -85,6 +87,7 @@ jobs:
             tests/test_ai_webcrawler_dragon_native_nintendo_ppc_3ds.py \
             tests/test_ai_webcrawler_dragon_native_vector_maria.py \
             tests/test_ai_webcrawler_dragon_native_intellivision.py \
+            tests/test_ai_webcrawler_dragon_native_m68k_computers.py \
             tests/test_ai_webcrawler_dragon_native_switch_wiiu.py \
             tests/test_ai_webcrawler_dragon_native_dreamcast_ps2.py \
             tests/test_ai_webcrawler_dragon_native_8bit_computers.py \

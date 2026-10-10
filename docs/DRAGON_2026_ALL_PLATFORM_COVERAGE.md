@@ -843,3 +843,38 @@ Official toolchain references:
 - IntyBASIC original guide: https://nanochess.org/intybasic.html
 - IntyBASIC source/manual: https://github.com/nanochess/IntyBASIC
 - jzIntv and AS1600: https://spatula-city.org/~im14u2c/intv/
+
+## Genuine classic Motorola 68000 platform source (Atari ST, Amiga 500, X68000)
+
+Three more distinct native game producers are implemented, not simply
+catalogued. Each platform executes original Dragon input/pickups,
+increasing challenge, enemy pursuit, HP, invulnerability and restart,
+using its system's actual operating-system interfaces and toolchain:
+
+- **Atari ST, 1985:** GEMDOS/TOS console and BIOS routines via `osbind.h`
+  (`Cconws`, `Crawcin`, `Bconout`), compiling an Atari TOS executable
+  with `m68k-atari-mint-gcc -m68000`. No fake floppy disk `.st` file.
+- **Amiga 500, Kickstart 1.3:** actual Intuition window with
+  `IDCMP_VANILLAKEY` and `IDCMP_CLOSEWINDOW` message dispatch,
+  `graphics.library` RastPort rectangles/text, deterministic collisions,
+  safe library/window cleanup, and vbcc `+kick13` producing native
+  Amiga Hunk executable. Not falsely a prebuilt ADF image.
+- **Sharp X68000, Human68k:** genuine Human68k DOS traps declared by
+  `<sys/dos.h>` for interactive input/display; m68k Human68k GCC links
+  an ELF intermediate converted by `elf2x68k` into a native relocatable
+  `.x` game, not a TOS or Amiga executable with the suffix renamed.
+
+Build-recipe validation explicitly avoids GNU Make's built-in host `CC=cc`
+fall-through for cross-compilers. Optional cross-compiler tests build
+actual executables only when the appropriate SDK, toolchain and runner
+are installed. Source generation does not establish a compiler success,
+cycle timing, sound playback or physical machine compatibility.
+
+These implementations increase all-era native source coverage by **three
+additional historical computer targets**. The exact emitted/remaining
+counts are produced dynamically from the canonical EMITTERS registry;
+no separate counters may be used to award compiler or hardware assurance.
+
+Toolchain references: https://github.com/erique/human68k-gcc ;
+https://github.com/freemint/libcmini ;
+https://wiki.amigaos.net/wiki/Graphics_Library_and_Text .
