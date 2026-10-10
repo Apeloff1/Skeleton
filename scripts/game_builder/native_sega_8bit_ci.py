@@ -23,6 +23,7 @@ from skeleton.ai.game_builder.sega_8bit_rom import validate_rom_file
 
 _TARGETS = {"sega_master_system": "sms", "sega_game_gear": "gg"}
 _SHA = re.compile(r"^[0-9a-f]{64}$")
+_GIT_REVISION = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 
 
 def emit(target: str, output: Path, authorship_file: Path) -> dict[str, object]:
@@ -86,8 +87,8 @@ def verify(
     """Verify *actual* bytes, not just strings in a source generation report."""
     if target not in _TARGETS:
         raise ValueError("unknown emulator/console hardware target")
-    if not isinstance(toolchain_revision, str) or not _SHA.fullmatch(toolchain_revision):
-        raise ValueError("exact toolchain revision is required")
+    if not isinstance(toolchain_revision, str) or not _GIT_REVISION.fullmatch(toolchain_revision):
+        raise ValueError("exact 40-hex SHA-1 or 64-hex SHA-256 Git revision is required")
     if directory.is_symlink() or not directory.is_dir():
         raise ValueError("expected ordinary generated source directory")
     expected = {"game.c", "Makefile", "manifest.json"}
@@ -133,6 +134,8 @@ def verify(
         "rom_sha256": measured["sha256"],
         "rom_size": measured["bytes"],
         "toolchain_revision": toolchain_revision,
+        "toolchain_revision_hash_algorithm": "git-sha1" if len(toolchain_revision) == 40 else "git-sha256",
+        "toolchain_source_authenticated": False,  # Exact Git ID is not a signed supply-chain attestation.
         "native_rom_compiled": False,  # The byte verifier did not itself witness SDCC.\n        "real_rom_structure_verified": True,
         "rom_header_checksum_verified": measured["native_rom_checksum_verified"],
         "emulator_playthrough_verified": False,
