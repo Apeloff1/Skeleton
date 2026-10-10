@@ -471,3 +471,17 @@ def test_confidence_reflects_sessions_not_raw_event_volume():
         store.record(value, authorized=True)
     assert store.distill("alice", authorized=True).insights[0].confidence == 0.8
 
+
+def test_conflicting_confirmed_tastes_cannot_self_approve():
+    store = setup()
+    for title, pref in (("Good", PreferenceSignal.ENJOYED),
+                        ("Bad", PreferenceSignal.DISLIKED)):
+        value = store.build_session("alice", title, 20000,
+            (observation(preference=pref, confirmed=True),),
+            capture_consent=True, analysis_consent=True)
+        store.record(value, authorized=True)
+    profile = store.distill("alice", authorized=True)
+    assert profile.insights[0].user_confirmed
+    assert profile.review_required
+    assert profile.design_directives == ()
+
