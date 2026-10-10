@@ -55,3 +55,11 @@ def test_pulse_pcm_duty_phase_and_sampling_bounds():
     with pytest.raises(AudioKernelError):
         pulse_pcm(100,8000,8,duty_num=2,duty_den=2)
 
+
+def test_triangle_pcm_has_symmetric_ramp_and_clamped_amplitude():
+    a=triangle_pcm(1000,8000,16)
+    assert a[0]==-32767 and a[4]==32767 and a[8]==-32767
+    assert min(a)>=-32767 and max(a)<=32767
+    with pytest.raises(AudioKernelError):
+        triangle_pcm(4001,8000,8)
+
