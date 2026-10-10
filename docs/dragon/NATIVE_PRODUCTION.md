@@ -616,6 +616,32 @@ approving original game source export. This is not an assertion that a
 particular player will enjoy those worlds. Human-rated frustration and
 enjoyment remain unverified until consenting playtests supply evidence.
 
+### Constructive maze guarantee and world-scale multi-route atlas
+
+Dragon's original routing lane now has a constructively solved maze mode,
+including real doublebacks, deliberate multi-lap impractical journeys,
+scenic branch loops, clue-gated secret shortcuts and climate-dependent
+public, environmental and fantasy routes. All maze rooms and all six
+supported climates receive replayed source-level completion witnesses.
+The native C99 selftest must pass through the declared room checkpoint
+before counting a finished room route.
+
+The additional desktop source style **maze_route_adventure** generates a
+6x6 original playable maze and independent completion receipts. The
+authenticated standalone Maze Forge can vary world size, seed, weather,
+difficulty, scenic and detour density and secret-route count.
+
+A separate World Atlas composes 2-12 independently completed regions,
+up to 576 rooms, with actual earned portal choices, shortcut itineraries
+and long scenic whole-world routes. Its regional portal gameplay is
+currently a Python product runtime; no combined giant native C99
+executable is claimed.
+
+**Operational reference:** [Constructive Maze and World Atlas]
+(CONSTRUCTIVE_MAZE_AND_ROUTE_ATLAS.md). Generate and test original source,
+not commercial maze assets, and retain the distinction between a valid
+completable maze and arbitrary depleted-state softlock freedom.
+
 ### Release verification and index integrity
 
 A release index is **not trusted merely because its archive hashes match**.
