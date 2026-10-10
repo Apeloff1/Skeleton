@@ -77,6 +77,15 @@ __POINTERS__
 };
 static const unsigned char authored_spawn_x[] = { __START_X__ };
 static const unsigned char authored_spawn_y[] = { __START_Y__ };
+/* Original per-stage accents adapt to genuine RGB222 and RGB444 CRAM.
+ * Background and text contrast keep their authored base colors. */
+#ifdef TARGET_GG
+static const unsigned int original_stage_accent_1[LEVEL_COUNT] = { __GG_STAGE_ACCENT_1__ };
+static const unsigned int original_stage_accent_2[LEVEL_COUNT] = { __GG_STAGE_ACCENT_2__ };
+#else
+static const unsigned char original_stage_accent_1[LEVEL_COUNT] = { __SMS_STAGE_ACCENT_1__ };
+static const unsigned char original_stage_accent_2[LEVEL_COUNT] = { __SMS_STAGE_ACCENT_2__ };
+#endif
 
 /* Generated from this original game world's independently verified safe paths.
  * These are abstract directions, not copied gameplay traces or third-party art.
@@ -276,6 +285,15 @@ static void load_level(void) {
     unsigned int i;
     unsigned char x, y;
     SMS_displayOff();
+    /* Stage color updates are explicit hardware CRAM writes, not board
+     * mutations; movement, collision and reward state remain unchanged. */
+#ifdef TARGET_GG
+    GG_setBGPaletteColor(1, original_stage_accent_1[level_index]);
+    GG_setBGPaletteColor(2, original_stage_accent_2[level_index]);
+#else
+    SMS_setBGPaletteColor(1, original_stage_accent_1[level_index]);
+    SMS_setBGPaletteColor(2, original_stage_accent_2[level_index]);
+#endif
     pending_count=0; /* old-stage writes cannot leak into the new level */
     companion_mood=BUDDY_CHEER;
     mood_hold=60;
