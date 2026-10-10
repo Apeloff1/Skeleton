@@ -1284,4 +1284,78 @@ def evaluate_level_challenge(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget", "pareto_hazard_routes", "enumerate_shortest_routes", "route_progress_trace", "make_level_edit", "carve_alternative_corridor", "seal_safe_corridor", "relocate_collectible", "relocate_exit", "add_solvable_hazard", "remove_hazard", "relocate_hazard", "relocate_start", "carve_for_diversity", "evaluate_level_challenge"]
+@dataclass(frozen=True, slots=True)
+class LevelEvolution:
+    original_digest: str
+    result: RouteProblem
+    edits: tuple[MapEditReceipt, ...]
+    dossier: dict[str, object]
+    status: str = "design_validated_player_qualification_pending"
+
+    @property
+    def digest(self) -> str:
+        return canonical_digest({
+            "schema": "skeleton.game_builder.level_evolution.v1",
+            "original": self.original_digest, "result": self.result.digest,
+            "edits": [edit.digest for edit in self.edits], "dossier": self.dossier,
+            "status": self.status,
+        })
+
+
+def evolve_challenge_level(
+    problem: RouteProblem, *, min_loops: int,
+    add_hazards: int = 0, max_changes: int = 4,
+    authorized: bool,
+) -> LevelEvolution:
+    """Bounded game-editor pass: add real alternatives and controlled challenge.
+
+    Never auto-certifies enjoyment, rights, difficulty fairness, or game release.
+    """
+    if authorized is not True:
+        raise PermissionError("level evolution requires designer authorization")
+    if (not isinstance(problem, RouteProblem)
+            or type(min_loops) is not int or not 0 <= min_loops <= 200
+            or type(add_hazards) is not int or not 0 <= add_hazards <= 4
+            or type(max_changes) is not int or not 1 <= max_changes <= 8):
+        raise MultipathError("invalid bounded level evolution goal")
+    result = problem
+    edits: list[MapEditReceipt] = []
+    while cycle_rank(result) < min_loops:
+        if len(edits) >= max_changes:
+            raise MultipathError("level topology target exceeded edit budget")
+        step = carve_for_diversity(result, authorized=True, max_candidates=48)
+        edits.append(step)
+        result = step.after
+    for _ in range(add_hazards):
+        if len(edits) >= max_changes:
+            raise MultipathError("threat budget exceeds edit limit")
+        protected = set(solve_route(result).positions)
+        candidates = [
+            p for p in walkable_cells(result)
+            if result.tile(p) == "." and p not in protected
+        ]
+        candidates.sort(key=lambda p: (
+            min(abs(p[0]-route[0]) + abs(p[1]-route[1]) for route in protected),
+            p[1], p[0],
+        ))
+        for p in candidates[:64]:
+            try:
+                candidate = add_solvable_hazard(result, p, authorized=True)
+                break
+            except MultipathError:
+                continue
+        else:
+            raise MultipathError("no safe authored threat position remains")
+        edits.append(candidate)
+        result = candidate.after
+    dossier = evaluate_level_challenge(result)
+    if dossier["independent_topological_loops"] < min_loops:
+        raise MultipathError("evolved result missed structural goal")
+    for before, after in zip((problem, *(edit.after for edit in edits[:-1])), edits):
+        if before.digest != after.before_digest:
+            raise MultipathError("evolution custody chain mismatch")
+    return LevelEvolution(problem.digest, result, tuple(edits), dossier)
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget", "pareto_hazard_routes", "enumerate_shortest_routes", "route_progress_trace", "make_level_edit", "carve_alternative_corridor", "seal_safe_corridor", "relocate_collectible", "relocate_exit", "add_solvable_hazard", "remove_hazard", "relocate_hazard", "relocate_start", "carve_for_diversity", "evaluate_level_challenge", "evolve_challenge_level"]
