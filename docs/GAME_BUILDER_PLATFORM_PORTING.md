@@ -432,3 +432,49 @@ does not falsely certify compiled ROMs, executable installation, emulator
 runs, original hardware, independent copyright clearance, or release
 approval. Those remain separately measured acceptance gates, and copied
 third-party game assets continue to be refused.
+
+## Authentic Sinclair ZX Spectrum 48K game and tape export
+
+`spectrum_native_export.py` is a new independent Z80 backend for
+original ZX Spectrum 48K games. It does not claim the 128K, +2, +3
+or other clones are independently certified hardware just because they
+share a Z80 CPU. The source uses the actual Spectrum ROM character
+output entry `RST $10`, ROM screen-clear routine, and the physical
+**ULA keyboard-row matrix ports** ($FBFE, $FDFE; W/A/S/D movement and
+Q exit). Native gameplay includes real Z80 grid bounds checks,
+original per-stage room maps, gems, scoring, hazards, health,
+terminal victory, 50Hz frame timing via `HALT`, and ULA
+border/beeper feedback through port $FE.
+
+The Z80 assembler builds a load-address-$8000 code binary.
+`spectrum_tap.py` packages the resulting bytes as a **real Spectrum
+CODE tape image**, with the genuine 19-byte CODE header block,
+flag parity, native-load address, code block, checksum and strict
+byte-for-byte verification against the compiled binary. Both the
+assembler and packer run entirely offline. The export includes its
+own packer source, Makefile, README, machine-specific assembly and
+original rights-bound manifest; it distributes **no Sinclair ROM**.
+
+The `.tap` is deliberately a CODE-only image, not a fictional
+autostart cartridge. On a legally provisioned 48K Spectrum-compatible
+machine or emulator, follow these BASIC commands and load the tape:
+
+```basic
+CLEAR 32767
+LOAD "" CODE
+RANDOMIZE USR 32768
+```
+
+`Game Builder Native ZX Spectrum 48K Tape` assembles a real Z80
+binary via `z80asm`, creates genuine .tap records, validates original
+binary parity and supported hardware budget, and uploads the playable
+game for independent loading and evaluation. A successful compilation
+or tape header does **not** automatically prove emulator gameplay,
+real-machine testing, ownership of third-party assets, or release
+approval. Those remain separate evidence gates.
+
+With this backend the source exporter spans **11 independently
+implemented native target destinations** across historical computers,
+console cartridges and modern desktop systems. The historical
+catalogue retains design-only entries until their own hardware-specific
+code generators and independently verified format controls exist.
