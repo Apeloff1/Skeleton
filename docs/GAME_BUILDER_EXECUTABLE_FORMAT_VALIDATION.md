@@ -162,3 +162,68 @@ external copyright/license review remain distinct unfinished milestones.
 A synthetic ROM in the adversarial unit tests is a **format-validation
 fixture only**. The real platform workflow invokes ca65/ld65 against the
 original exported assembly, independently of that fixture.
+
+
+## NES native 6502 CPU, original PPU, controller and map acceptance
+
+The NES lane now has a separate, bounded **real instruction-level execution**
+gate in addition to source reproducibility and iNES ROM format validation.
+It uses the open-source, BSD-3-Clause Py65 **NMOS 6502** core with a controlled
+NROM memory map and observable subset of the Famicom CPU/PPU bus:
+
+- actual 2 KiB mirrored CPU RAM and bankless $8000-$FFFF 32 KiB PRG;
+- time-advanced synthetic NTSC PPU $2002 VBlank latch with read-to-clear;
+- $2006/$2007 background/palette addressing and increment modes;
+- authentic $4014 256-byte OAM sprite-DMA source page;
+- $4016 eight-button controller latch and serial shift-register reads.
+
+The bootstrap asserts that the actual compiled game reaches its initialized
+sprite DMA after writing **all 32 PPU palette bytes** and **all 960 original
+background tile bytes**, within a hard CPU-instruction budget. It does not
+accept a magic-header-only synthetic ROM stub or pretend that a ROM exists
+if file integrity checks fail. On the first successful native CI witness,
+the original real cartridge executed **33,001 6502 instructions**, produced
+**1,024 name-table writes** (960 tiles plus 64 attributes), **32 palette
+writes** and one sprite DMA.
+
+The next stage reuses the actual authored, content-addressed source folder to
+derive the first independently solvable D-pad action and initial world spawn.
+It advances the compiled NES CPU through the actual 4016 controller input
+handler and observes the sprite location copied by the next $4014 DMA.
+The first genuine ROM witness moved right from original world cell (1,1) to
+(2,1), changing native sprite X **8 → 16** and making eight controller-port
+reads over **41,581 total instructions**. The recorder marks the first
+action verified but never claims the *entire* reference route completed.
+
+An additional world-hash safeguard now independently encodes the original
+first level's full **32 × 30 = 960 tile** name table into the source manifest.
+Both the real boot and the 6502 controller runner compare the **actual
+PPU-observed** name-table SHA-256 against this PlayableWorld-derived digest,
+not merely the count of writes. The game generation reports the actual
+first controller action, starting coordinate, expected neighboring target,
+and exact 960-byte background hash in its separately compared source file.
+
+Adversarial test suites include:
+- `test_game_builder_nes_6502_boot.py` — CPU/PPU RAM mirrors, 2002 read-to-clear,
+  2006/2007 palette and name-table access, OAM DMA, serial controller bits,
+  instruction budget refusal and forged ROM rejection;
+- `test_game_builder_nes_6502_controller.py` — original route metadata,
+  source/ROM substitution, invalid direction, unsafe source symlinks and
+  premature/unbounded replay claims;
+- `test_game_builder_nes_native.py` — independently reconstructs the entire
+  original first-stage tile-map digest from PlayableWorld rows;
+- `test_game_builder_nes_reproducibility.py` — original independent
+  source/ROM equality and mapper/interrupt/rights defenses.
+
+**Scope boundaries:** Py65 is a real 6502 instruction interpreter, but
+this project-owned minimal PPU/controller observer is **not** an independently
+validated cycle-exact NES/Famicom PPU/APU or a reliable rendering/audio
+emulator. A single world-derived controller action is not a complete
+native playthrough. Physical console behavior, developer-toolchain origin,
+copyright title and official publisher authorization remain unverified.
+No third-party game ROMs, copyrighted commercial sprites or console firmware
+are required for these original homebrew checks.
+
+The successful native CPU/one-step observations came from prior runs; any
+newer source/digest or first-stage pixel acceptance control must independently
+pass its own exact-head CI before the stronger guarantee is credited.
