@@ -105,3 +105,12 @@ def test_edge_penalty_influences_route_and_cannot_reference_walls():
     with pytest.raises(MultipathError, match="invalid edge penalty"):
         solve_route(problem, algorithm="dijkstra",
                     edge_penalties={((1, 1), (2, 1)): -1})
+
+def test_directed_route_edge_lineage_is_ordered_and_exact():
+    route = solve_route(RouteProblem.from_rows(OPEN_LEVEL))
+    edges = route_edges(route)
+    assert len(edges) == route.steps
+    assert edges[0][0] == (1, 1)
+    assert edges[-1][1] == (7, 1)
+    assert all(abs(a[0] - b[0]) + abs(a[1] - b[1]) == 1 for a, b in edges)
+
