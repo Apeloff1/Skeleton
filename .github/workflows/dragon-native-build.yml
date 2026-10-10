@@ -112,6 +112,7 @@ jobs:
             tests/test_ai_dragon_route_maze.py \
             tests/test_ai_dragon_route_maze_native.py \
             tests/test_ai_dragon_route_maze_integration.py \
+            tests/test_ai_dragon_route_atlas.py \
             tests/test_ai_dragon_route_world_assurance.py \
             tests/test_ai_dragon_native_puzzle_graphics.py \
             tests/test_ai_webcrawler_dragon_native_projects.py \
@@ -507,7 +508,8 @@ jobs:
             skeleton/ai/webcrawler/dragon_route_world_factory.py \
             skeleton/ai/webcrawler/dragon_route_world_variants.py \
             skeleton/ai/webcrawler/dragon_route_native_game.py \
-            skeleton/ai/webcrawler/dragon_route_maze.py
+            skeleton/ai/webcrawler/dragon_route_maze.py \
+            skeleton/ai/webcrawler/dragon_route_atlas.py
       - name: Install strictly local Python testing dependencies
         run: python -m pip install --disable-pip-version-check pytest
       - name: Compile and replay true weather/secret/free-roam C99 games
@@ -519,7 +521,8 @@ jobs:
             tests/test_ai_dragon_route_native_integration.py \
             tests/test_ai_dragon_route_maze.py \
             tests/test_ai_dragon_route_maze_native.py \
-            tests/test_ai_dragon_route_maze_integration.py
+            tests/test_ai_dragon_route_maze_integration.py \
+            tests/test_ai_dragon_route_atlas.py
       - name: Require every-room, all-climate and secret C99 maze gameplay
         run: |
           set -euo pipefail
