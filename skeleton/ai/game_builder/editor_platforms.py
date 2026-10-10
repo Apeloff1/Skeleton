@@ -20,6 +20,7 @@ _NATIVE_SOURCE_ADAPTERS = {
     "dos_vga": "nasm_8086_pc_textmode_com_source",
     "atari_400_800": "cc65_6502_antic_gtia_pokey_xex_source",
     "apple_ii": "cc65_6502_apple2_applesingle_source",
+    "sinclair_zx_spectrum": "z80asm_spectrum_ula_keyboard_rom_tap_source",
 }
 _NATIVE_SOURCE_TARGETS = frozenset(_NATIVE_SOURCE_ADAPTERS)
 
