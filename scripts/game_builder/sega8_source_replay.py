@@ -289,11 +289,8 @@ def main() -> None:
     args = parser.parse_args()
     result = run_host_replay(args.source_dir, args.reference)
     if args.receipt_out is not None:
-        if args.receipt_out.exists() or args.receipt_out.is_symlink():
-            raise FileExistsError(str(args.receipt_out))
-        with args.receipt_out.open("x", encoding="utf-8") as stream:
-            json.dump(result, stream, indent=2, sort_keys=True)
-            stream.write("\n")
+        from scripts.game_builder.sega_reproducibility_ci import emit_receipt
+        emit_receipt(args.receipt_out, result)
     print(json.dumps(result, sort_keys=True))
 
 
