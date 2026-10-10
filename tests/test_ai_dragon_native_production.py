@@ -496,3 +496,65 @@ def test_creator_publisher_rejects_symlink_parent_before_writing(tmp_path):
     with pytest.raises(ValueError, match="symlink"):
         publish_production(request(), path, authorized=True)
     assert not (base / "release").exists()
+
+
+
+@pytest.mark.parametrize("field,altered", [
+    ("production_evidence", "hardware_certified"),
+    ("cross_target_fidelity", "equivalent_original_gameplay_across_platforms"),
+    ("declared_gameplay_modes", ["invented_gameplay"]),
+    ("legal_claim", "fully legally licensed and cleared"),
+])
+def test_release_audit_independently_reconstructs_top_level_claims(
+    tmp_path, field, altered,
+):
+    out = tmp_path / "issued"
+    result = publish_production(
+        request(targets=("game_boy", "pc_linux")), out, authorized=True)
+    index = out / result["index"]
+    manifest = json.loads(index.read_text())
+    manifest[field] = altered
+    index.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="claims|claim|mode|legal|parity|level"):
+        verify_published_production(out, result["index"])
+
+
+@pytest.mark.parametrize("field,altered", [
+    ("production_evidence", "console_certified"),
+    ("cross_target_fidelity", "equivalent_port"),
+    ("declared_gameplay_modes", ["fictitious"]),
+    ("legal_claim", "licensed without review"),
+])
+def test_nested_browser_source_bundle_does_not_trust_index_claims(field, altered):
+    from skeleton.ai.webcrawler.dragon_native_production import (
+        build_source_bundle, verify_source_bundle,
+    )
+    spec = request(targets=("game_boy", "pc_linux"),
+                   max_portfolio_bytes=3_000_000)
+    payload, _ = build_source_bundle(spec, authorized=True)
+    with ZipFile(BytesIO(payload)) as archive:
+        index = json.loads(archive.read("production-index.json"))
+    index[field] = altered
+    forged = rezip({"production-index.json": json.dumps(index).encode()}, payload)
+    with pytest.raises(ValueError, match="claims|claim|mode|legal|parity|level"):
+        verify_source_bundle(forged)
+
+
+def test_index_member_cannot_misstate_archive_evidence_or_gameplay(tmp_path):
+    destination = tmp_path / "issued"
+    result = publish_production(request(), destination, authorized=True)
+    index = destination / result["index"]
+    record = json.loads(index.read_text())
+    record["entries"][0]["gameplay_mode"] = "different_game"
+    index.write_text(json.dumps(record), encoding="utf-8")
+    with pytest.raises(ValueError, match="gameplay_mode|disagree"):
+        verify_published_production(destination, result["index"])
+
+
+def test_index_path_and_request_prefix_bound(tmp_path):
+    result = publish_production(request(), tmp_path, authorized=True)
+    original = tmp_path / result["index"]
+    substitute = tmp_path / ("dragon-production-" + "f" * 20 + ".json")
+    substitute.write_bytes(original.read_bytes())
+    with pytest.raises(ValueError, match="index name"):
+        verify_published_production(tmp_path, substitute.name)
