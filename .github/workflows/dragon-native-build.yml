@@ -91,6 +91,7 @@ jobs:
             tests/test_ai_dragon_native_puzzle_hints.py \
             tests/test_ai_dragon_native_puzzle_trace.py \
             tests/test_ai_dragon_native_puzzle_variants.py \
+            tests/test_ai_dragon_native_puzzle_authoring.py \
             tests/test_ai_webcrawler_dragon_native_projects.py \
             tests/test_ai_webcrawler_dragon_native_compile.py \
             tests/test_ai_webcrawler_dragon_native_cycles.py \
@@ -196,6 +197,44 @@ jobs:
           assert audit["source_projects_verified"] == 6
           assert audit["editions_verified"] == 3
           print("DRAGON_NATIVE_GAME_EVOLUTION_VERIFIED",audit["index_sha256"])
+          PY
+      - name: Compile and verify player-authored original puzzle campaigns
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from skeleton.ai.webcrawler.dragon_native_puzzle_authoring import (
+              authored_document, starter_authored_levels,
+          )
+          from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+          from skeleton.ai.webcrawler.dragon_native_production import (
+              ProductionRequest, PortableGameDesign,
+          )
+          from skeleton.ai.webcrawler.dragon_native_desktop import (
+              build_native_puzzle_executable, verify_native_puzzle_executable,
+          )
+          from zipfile import ZipFile
+          from io import BytesIO
+          import json
+
+          layouts = (BASE_LEVELS[0], BASE_LEVELS[3])
+          spec = ProductionRequest(
+              title="Original Authored Level Creator",
+              style="fixed_screen_puzzle", targets=("pc_linux",),
+              seed=1923, original_work_attested=True,
+              authored_puzzles=layouts,
+              portable_design=PortableGameDesign(stages=2, difficulty=6),
+          )
+          package, report = build_native_puzzle_executable(spec, authorized=True)
+          assert report["independent_replays_verified"] == 8
+          audit = verify_native_puzzle_executable(package)
+          assert audit["source_level_proofs"] == 2
+          with ZipFile(BytesIO(package)) as released:
+              with ZipFile(BytesIO(released.read("source/native-source-release.zip"))) as sources:
+                  game = json.loads(sources.read("source/dragon-puzzle-proof.json"))
+                  assert game["authoring_mode"] == "authored"
+                  assert game["authored_level_rows"] == [list(x) for x in layouts]
+          print("NATIVE_USER_AUTHORED_GAME_REPLAYED", audit["executable_sha256"])
           PY
       - name: Build original Game Boy ROM
         run: |
