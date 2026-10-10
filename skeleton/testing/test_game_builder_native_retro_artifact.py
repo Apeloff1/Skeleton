@@ -91,7 +91,7 @@ def test_every_historical_system_refuses_modified_rom_even_with_valid_old_header
 
 @pytest.mark.parametrize("offset,value",[
     (0x14D,0), (0x148,0xFF), (0x147,0xFF), (0x143,0xC0),
-    (0x100,0), (0x148,0x01),
+    (0x148,0x01),
 ])
 def test_original_dmg_header_hardware_integrity_and_banked_rom_sizes(
     tmp_path,offset,value,
@@ -126,7 +126,7 @@ def test_cgb_cartridge_requires_color_header_and_bounded_original_rom(
 
 @pytest.mark.parametrize("offset,value",[
     (0,0), (4,3),(5,3),(6,0x04),(6,0x10),(7,0x08),
-    (8,0x40),(16,0),(16+32768-4,0),
+    (8,0x40),(16,0),(16+32768-4,0xFF),
 ])
 def test_nes_mapper_trainer_reserved_region_and_reset_vector_mutations_rejected(
     tmp_path,offset,value,
@@ -187,4 +187,17 @@ def test_unsupported_historic_platform_is_never_silently_treated_as_a_game_boy(t
         inspect_original_retro_artifact(
             p,target_platform_id="nintendo_game_boy_advance",
             expected_sha256=sha256(b).hexdigest(),
+        )
+
+
+
+def test_game_boy_rom_with_blank_reset_entry_is_not_runnable_machine_code(tmp_path):
+    rom=bytearray(dmg())
+    rom[0x100:0x104]=bytes(4)
+    path=tmp_path/"uninitialized.gb"
+    path.write_bytes(rom)
+    with pytest.raises(RetroArtifactError,match="entry"):
+        inspect_original_retro_artifact(
+            path,target_platform_id="nintendo_game_boy",
+            expected_sha256=sha256(rom).hexdigest(),
         )
