@@ -130,6 +130,63 @@ def native_targets(owner: str = Depends(_principal)) -> dict:
             "supported_matrix":practice_matrix()}
 
 
+class NativeProductionPixelArtPreview(BaseModel):
+    """Strictly original 8x8 source sprite preview, no external images or ROMs."""
+    model_config = ConfigDict(extra="forbid")
+    hero: str = Field(default="hatchling", max_length=32)
+    quest_theme: str = Field(default="ancient_ruins", max_length=32)
+    palette: str = Field(default="dmg_green", max_length=30)
+    seed: StrictInt = Field(default=1, ge=0, le=0xffffffff)
+    target: str = Field(default="game_boy", max_length=32)
+
+
+@router.post("/native/production/art-preview")
+def native_production_art_preview(
+    body: NativeProductionPixelArtPreview,
+    owner: str = Depends(_principal),
+) -> dict:
+    """Pixel-perfect intended original 2bpp source tiles, NOT device rendering."""
+    from skeleton.ai.webcrawler.dragon_native_artforge import (
+        TARGETS, make_art,
+    )
+    if body.target not in TARGETS:
+        raise HTTPException(status_code=422,
+                            detail="Original sprite tile preview adapter unavailable")
+    # Cartridge video asset palette classes are intentionally bounded: other
+    # UI themes map into a compatible handheld 2bpp tone class.
+    actual_palette = (body.palette if body.palette in
+                      ("dmg_green", "handheld", "vga_dusk") else "handheld")
+    try:
+        art, tiles = make_art(
+            hero=body.hero, theme=body.quest_theme,
+            palette=actual_palette, seed=body.seed, target=body.target,
+        )
+    except ValueError:
+        raise HTTPException(status_code=422,
+                            detail="Unsupported original sprite design") from None
+    return {
+        "ok": True,
+        "schema": art.schema,
+        "target": body.target,
+        "requested_palette": body.palette,
+        "applied_palette": actual_palette,
+        "hero": body.hero,
+        "quest_theme": body.quest_theme,
+        "frames": {
+            "hero": tiles["dragon"],
+            "hero_blink": tiles["dragon_blink"],
+            "collectible": tiles["star"],
+            "enemy": tiles["enemy"],
+        },
+        "gb_tiles_sha256": art.gb_source_digest,
+        "nes_tiles_sha256": art.nes_source_digest,
+        "claim_boundary": (
+            "actual original 2bpp sprite source values only; "
+            "screen colors and hardware rendering not certified"
+        ),
+    }
+
+
 class NativeProductionDesignBody(BaseModel):
     """Optional original game controls; never interpreted as executable source."""
     model_config = ConfigDict(extra="forbid")
