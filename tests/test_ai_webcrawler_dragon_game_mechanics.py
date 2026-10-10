@@ -152,3 +152,10 @@ def test_policy_session_capacity_bool_not_admitted():
     with pytest.raises(ValueError, match="session capacity"):
         GameMechanicsMemory(sqlite3.connect(":memory:"), policy=CapturePolicy(max_sessions_per_owner=False))
 
+
+def test_policy_confidence_rejects_boolean_and_nonfinite():
+    from skeleton.ai.webcrawler.dragon_game_mechanics import CapturePolicy
+    for bad in (True, float("nan"), float("inf"), -1):
+        with pytest.raises(ValueError, match="confidence"):
+            GameMechanicsMemory(sqlite3.connect(":memory:"), policy=CapturePolicy(min_confidence=bad))
+
