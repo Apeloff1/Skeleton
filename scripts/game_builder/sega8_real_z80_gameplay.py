@@ -18,7 +18,7 @@ from pathlib import Path
 import re
 from typing import Any
 
-from skeleton.ai.game_builder.native_release_intake import _read_bounded
+from skeleton.ai.game_builder.native_release_intake import _read_bounded, _json
 from skeleton.ai.game_builder.sega_8bit_rom import validate_rom
 from scripts.game_builder.emulate_sega8_sdcc_boot import (
     Sega8Machine, SDCCSegaBootError, DEFAULT_FRAME_INSTRUCTIONS,
@@ -31,12 +31,43 @@ MAX_BOOT_FRAMES = 120
 MAX_INPUT_FRAMES = 16
 MAX_SETTLE_FRAMES = 9
 MAX_INSTRUCTION_FRAMES = DEFAULT_FRAME_INSTRUCTIONS
+MAX_TOTAL_GAMEPLAY_FRAMES = 9000
+MAX_TOTAL_GAMEPLAY_INSTRUCTIONS = MAX_TOTAL_GAMEPLAY_FRAMES * MAX_INSTRUCTION_FRAMES
 _STATE_KEYS = (
     "level", "x", "y", "health", "score",
     "gems_remaining", "bond_rank",
 )
 _ACTION_BITS = {"up": 0, "down": 1, "left": 2, "right": 3}
 _HASH = re.compile(r"[0-9a-f]{64}\Z")
+
+
+def advance_semantic_trace(
+    previous: bytes, index: int, button: str | None,
+    hardware_state: dict[str, int],
+) -> bytes:
+    """Hash actual guest screen snapshots and original action in sequence.
+
+    Excludes hardware clock timings so the same authored game should match
+    across SMS and Game Gear, while divergent game state will not.
+    """
+    if not isinstance(previous, bytes) or len(previous) != 32:
+        raise Sega8NativeGameplayError("invalid previous native semantic digest")
+    if type(index) is not int or index < 0 or index > MAX_ACTIONS:
+        raise Sega8NativeGameplayError("semantic gameplay index out of bounds")
+    if (button is None) != (index == 0) or (
+        button is not None and button not in _ACTION_BITS
+    ):
+        raise Sega8NativeGameplayError("unreviewed game controller action")
+    if not isinstance(hardware_state, dict) or set(hardware_state) != set(_STATE_KEYS):
+        raise Sega8NativeGameplayError("untrusted hardware state fields")
+    if any(type(hardware_state[k]) is not int or not 0 <= hardware_state[k] <= 65535
+           for k in _STATE_KEYS):
+        raise Sega8NativeGameplayError("invalid actual Z80 screen state")
+    payload = json.dumps(
+        {"index": index, "button": button, "screen": hardware_state},
+        sort_keys=True, separators=(",", ":"), allow_nan=False,
+    ).encode("utf-8")
+    return sha256(previous + payload).digest()
 
 
 class Sega8NativeGameplayError(ValueError):
@@ -47,7 +78,7 @@ def _read_project(source_dir: Path, target: str) -> dict[str, Any]:
     try:
         parts = tuple(_read_bounded(source_dir / leaf, max_bytes=1024*1024)
                       for leaf in ("game.c", "Makefile", "manifest.json"))
-        meta = json.loads(parts[2])
+        meta = _json(parts[2], "original native Z80 game manifest")
     except (OSError, ValueError, UnicodeDecodeError) as exc:
         raise Sega8NativeGameplayError("native source project failed bounded intake") from exc
     if not isinstance(meta, dict):
@@ -158,8 +189,10 @@ class ActualZ80GameSession:
     def step_frame(self, button: str | None) -> None:
         if button is not None and button not in _ACTION_BITS:
             raise Sega8NativeGameplayError("unrecognized game controller action")
-        if self.frames > MAX_BOOT_FRAMES + MAX_ACTIONS*(MAX_INPUT_FRAMES+MAX_SETTLE_FRAMES):
+        if self.frames >= MAX_TOTAL_GAMEPLAY_FRAMES:
             raise Sega8NativeGameplayError("native Z80 controller frame cap exceeded")
+        if self.instructions + MAX_INSTRUCTION_FRAMES > MAX_TOTAL_GAMEPLAY_INSTRUCTIONS:
+            raise Sega8NativeGameplayError("native game exceeded total CPU instruction budget")
         self.machine.controller = (
             0xFF if button is None else (0xFF ^ (1 << _ACTION_BITS[button]))
         )
@@ -231,6 +264,12 @@ def verify_original_z80_gameplay(
     first = session.run_to_playable_boot(meta["width"], meta["height"])
     _assert_state(first, reference["initial"], 0)
     snapshots_checked = 1
+    # Only observed native CPU/VDP state enters this content-addressed chain.
+    seed = sha256(
+        b"skeleton.sega8.native_gameplay.semantic_trace.v1\\0"
+        + reference["world_digest"].encode("ascii")
+    ).digest()
+    trace = advance_semantic_trace(seed, 0, None, first)
     max_frames_per_move = 0
     for index, expected in enumerate(reference["steps"], 1):
         achieved = False
@@ -263,6 +302,7 @@ def verify_original_z80_gameplay(
             session.machine,width=meta["width"],height=meta["height"],
         )
         _assert_state(stable,expected,index)
+        trace = advance_semantic_trace(trace,index,expected["button"],stable)
         snapshots_checked += 1
 
     last = reference["steps"][-1]
@@ -294,6 +334,10 @@ def verify_original_z80_gameplay(
         "original_levels_replayed": meta["levels"],
         "controller_actions_replayed": len(reference["steps"]),
         "hardware_screen_states_verified": snapshots_checked,
+        "semantic_controller_screen_trace_sha256": trace.hex(),
+        "semantic_trace_steps_hashed": snapshots_checked,
+        "total_instruction_budget_enforced": True,
+        "total_frame_budget_enforced": True,
         "real_z80_instruction_count": session.instructions,
         "real_z80_tstates": session.tstates,
         "controller_frame_count": session.frames,
