@@ -147,6 +147,35 @@ class DragonEventJournal:
         return {"events": events, "nextCursor": str(rows[-1][0]) if rows else None,
                 "hasMore": has_more}
 
+    def verified_page(self, session_id: str, *, after: int = 0,
+                      limit: int = 100) -> dict[str, Any]:
+        """Return a bounded page and its chain receipts only if history verifies.
+
+        The digest chain proves internal continuity, not operator identity or
+        authenticity of the URLs. Hosting APIs must still authenticate sessions.
+        """
+        if (not isinstance(session_id, str) or not _SESSION_ID.fullmatch(session_id)
+                or type(after) is not int or after < 0
+                or type(limit) is not int or not 1 <= limit <= 1000):
+            raise ValueError("invalid verified journal page parameters")
+        if not self.verify(session_id):
+            raise ValueError("journal evidence chain failed verification")
+        result = self.page(session_id, after=after, limit=limit)
+        proof = self.db.execute(
+            "SELECT sequence,previous_digest,digest FROM dragon_companion_events "
+            "WHERE session_id=? AND sequence>? ORDER BY sequence LIMIT ?",
+            (session_id, after, limit)).fetchall()
+        if [row[0] for row in proof] != [event["sequence"] for event in result["events"]]:
+            raise ValueError("journal page changed after chain verification")
+        return {
+            **result,
+            "chain_verified": True,
+            "chain_receipts": [
+                {"sequence": seq, "previous_digest": parent, "digest": digest}
+                for seq, parent, digest in proof
+            ],
+        }
+
     def verify(self, session_id: str) -> bool:
         previous = "0" * 64
         # Stream rows from SQLite: journal verification must not materialize
