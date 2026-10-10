@@ -46,6 +46,9 @@ class MacGameEvidence:
     shortest_grid_proofs:int
     native_runtime_stages:int
     native_hint_stages:int
+    native_branch_transitions:int
+    native_branch_endings:int
+    branch_output_sha256:str
     independent_replays:int
     native_star_grades:int
     executable_output_sha256:str
@@ -130,6 +133,25 @@ def build_native_macos_game(spec:ProductionRequest,*,authorized:bool,
         _selftest_stages(completed.stdout,proof["stages"])
         hints=_invoke([str(executable),"--hint-selftest"],root=root,timeout=timeout_seconds)
         _hint_stages(hints.stdout,proof["stages"])
+        from .dragon_native_campaign_paths import verify_graph_report
+        graph=verify_graph_report(proof["campaign_graph"])
+        branch=_invoke([str(executable),"--branch-selftest"],root=root,
+                       timeout=timeout_seconds)
+        expected_branches=[]
+        for chapter in graph.chapters:
+            for option,next_stage in enumerate(chapter.exits,1):
+                expected_branches.append(
+                    f"DRAGON_BRANCH_PASS from={chapter.stage+1} "
+                    f"choice={option} to={next_stage+1}")
+            if not chapter.exits:
+                expected_branches.append(
+                    f"DRAGON_ENDING_PASS stage={chapter.stage+1}")
+        transitions=sum(len(x.exits) for x in graph.chapters)
+        expected_branches.append(
+            f"DRAGON_BRANCH_CAMPAIGN_PASS stages={proof['stages']} "
+            f"transitions={transitions} endings={graph.ending_count}")
+        if branch.stdout.splitlines()!=expected_branches:
+            raise ValueError("native macOS chapter routes differ from original branch graph")
         grades=_invoke([str(executable),"--challenge-selftest"],root=root,
                        timeout=timeout_seconds)
         if (grades.stdout.count("PUZZLE_CHALLENGE_PASS level=")!=proof["stages"] or
@@ -172,6 +194,9 @@ def build_native_macos_game(spec:ProductionRequest,*,authorized:bool,
         shortest_grid_proofs=proof["stages"],
         native_runtime_stages=proof["stages"],
         native_hint_stages=proof["stages"],
+        native_branch_transitions=transitions,
+        native_branch_endings=graph.ending_count,
+        branch_output_sha256=_hash(branch.stdout.encode("utf-8")),
         independent_replays=len(traces),native_star_grades=proof["stages"],
         executable_output_sha256=_hash(_canonical(traces)),
         actual_macos_host_executed=True,
@@ -208,7 +233,10 @@ def verify_native_macos_game(package:bytes)->dict:
         binary=archive.read("binary/dragon_game")
         report=json.loads(archive.read("macos-build-evidence.json"))
     native,inventory=_puzzle_proof(source)
-    stages=json.loads(inventory["dragon-puzzle-proof.json"])["stages"]
+    puzzle=json.loads(inventory["dragon-puzzle-proof.json"])
+    stages=puzzle["stages"]
+    from .dragon_native_campaign_paths import verify_graph_report
+    graph=verify_graph_report(puzzle["campaign_graph"])
     identity=macho64_format(binary)
     if (not isinstance(report,dict) or report.get("schema")!=SCHEMA or
             report.get("target")!="pc_macos" or native["target"]!="pc_macos" or
@@ -224,6 +252,11 @@ def verify_native_macos_game(package:bytes)->dict:
             report.get("shortest_grid_proofs")!=stages or
             report.get("native_runtime_stages")!=stages or
             report.get("native_hint_stages")!=stages or
+            report.get("native_branch_transitions")!=sum(
+                len(x.exits) for x in graph.chapters) or
+            report.get("native_branch_endings")!=graph.ending_count or
+            not re.fullmatch(r"[a-f0-9]{64}",
+                             str(report.get("branch_output_sha256",""))) or
             report.get("independent_replays")!=stages*3 or
             report.get("native_star_grades")!=stages or
             not re.fullmatch(r"[a-f0-9]{64}",
