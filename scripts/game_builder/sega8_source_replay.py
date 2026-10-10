@@ -18,7 +18,7 @@ import subprocess
 import tempfile
 from typing import Any
 
-from skeleton.ai.game_builder.native_release_intake import _read_bounded
+from skeleton.ai.game_builder.native_release_intake import _read_bounded, _json, NativeIntakeError
 from skeleton.ai.game_builder.playable_simulation import advance, initial_state
 from skeleton.ai.game_builder.playable_world import PlayableWorld
 
@@ -109,11 +109,17 @@ def export_host_reference(
 
 def _parse_reference(raw: bytes) -> dict[str, Any]:
     try:
-        obj = json.loads(raw)
-    except (ValueError, UnicodeDecodeError) as exc:
+        obj = _json(raw, "original host reference")
+    except (NativeIntakeError, ValueError, UnicodeDecodeError) as exc:
         raise Sega8HostReplayError("invalid independent route JSON") from exc
-    if not isinstance(obj, dict):
-        raise Sega8HostReplayError("game route must be a JSON object")
+    expected_keys = {
+        "schema", "world_digest", "source_content_digest", "initial", "steps",
+        "native_cartridge_compiled", "host_c_executed",
+        "z80_cpu_emulator_executed", "physical_hardware_verified",
+        "release_approved", "route_sha256",
+    }
+    if set(obj) != expected_keys:
+        raise Sega8HostReplayError("unexpected field or missing original route evidence")
     digest = obj.get("route_sha256")
     payload = {k: v for k, v in obj.items() if k != "route_sha256"}
     if not isinstance(digest, str) or not _HASH.fullmatch(digest):
@@ -140,12 +146,14 @@ def _parse_reference(raw: bytes) -> dict[str, Any]:
         raise Sega8HostReplayError("host reference has invalid action count")
     if not isinstance(initial, dict):
         raise Sega8HostReplayError("host reference initial state missing")
-    for item in [initial, *steps]:
-        if not isinstance(item, dict) or any(
+    for index, item in enumerate([initial, *steps]):
+        expected = set(_FIELDS) if index == 0 else set(_FIELDS) | {"button"}
+        if (not isinstance(item, dict) or set(item) != expected or any(
             type(item.get(key)) is not int
             or not 0 <= item[key] <= 65535
             for key in _FIELDS
-        ):
+        ) or item["won"] not in (0, 1) or item["lost"] not in (0, 1)
+            or (item["won"] == 1 and item["lost"] == 1)):
             raise Sega8HostReplayError("invalid state expectation in original route")
     for step in steps:
         if step.get("button") not in _MOVE_CODES:
@@ -169,7 +177,7 @@ def run_host_replay(
         _read_bounded(reference_path, max_bytes=_MAX_DATA_BYTES)
     )
     try:
-        manifest = json.loads(manifest_raw)
+        manifest = _json(manifest_raw, "original host gameplay manifest")
     except (ValueError, UnicodeDecodeError) as exc:
         raise Sega8HostReplayError("native manifest JSON invalid") from exc
     if (
