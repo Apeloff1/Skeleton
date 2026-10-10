@@ -22,6 +22,7 @@ _NATIVE_SOURCE_ADAPTERS = {
     "apple_ii": "cc65_6502_apple2_applesingle_source",
     "sinclair_zx_spectrum": "z80asm_spectrum_ula_keyboard_rom_tap_source",
     "msx1": "z80asm_msx1_bios_vdp_16kb_rom_source",
+    "sega_master_system": "z80asm_sms_mode4_4bpp_32kb_cartridge_source",
 }
 _NATIVE_SOURCE_TARGETS = frozenset(_NATIVE_SOURCE_ADAPTERS)
 
