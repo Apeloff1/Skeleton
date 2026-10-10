@@ -34,7 +34,7 @@ PR_AUTOMATION_TESTS = (
 CONCURRENCY_GROUP = "group: merge-readiness-${{ github.event.pull_request.number || github.sha }}"
 CANCEL_POLICY = "cancel-in-progress: ${{ github.event_name == 'pull_request' }}"
 READINESS_GUARD = (
-    "if: ${{ always() && (github.event_name != 'pull_request' || "
+    "if: ${{ !cancelled() && (github.event_name != 'pull_request' || "
     "(!github.event.pull_request.draft && github.event.action != 'converted_to_draft' "
     "&& github.event.action != 'closed')) }}"
 )
