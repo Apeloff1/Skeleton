@@ -7,9 +7,11 @@ from __future__ import annotations
 
 from hashlib import sha256
 import json
+import os
 
 import pytest
 
+from scripts.game_builder.sega_reproducibility_ci import emit_receipt
 from scripts.game_builder.sega8_source_replay import (
     _parse_reference, Sega8HostReplayError,
 )
@@ -137,3 +139,48 @@ def test_original_route_sha256_rejects_modified_or_missing_hash():
     valid.pop("route_sha256")
     with pytest.raises(Sega8HostReplayError):
         _parse_reference(encoded(valid))
+
+
+
+def test_large_original_game_route_writes_privately_and_exclusively(tmp_path):
+    payload=reference()
+    payload["safe_original_game_description"]="original "*6000
+    destination=tmp_path/"reference.json"
+    emit_receipt(destination,payload,max_bytes=4*1024*1024)
+    assert json.loads(destination.read_text(encoding="utf-8"))==payload
+    assert destination.stat().st_mode & 0o777==0o600
+    with pytest.raises(FileExistsError):
+        emit_receipt(destination,{"source":"new game"},max_bytes=4*1024*1024)
+    assert json.loads(destination.read_text(encoding="utf-8"))==payload
+
+
+@pytest.mark.parametrize("limit",[False,0,-1,4*1024*1024+1,1.2,"4M"])
+def test_original_game_route_never_accepts_unbounded_output_limits(tmp_path,limit):
+    path=tmp_path/"declined.json"
+    with pytest.raises(ValueError,match="limit"):
+        emit_receipt(path,reference(),max_bytes=limit)
+    assert not path.exists()
+
+
+def test_original_game_route_refuses_oversized_source_without_leaving_partial_receipt(tmp_path):
+    path=tmp_path/"aborted.json"
+    with pytest.raises(ValueError,match="exceeded"):
+        emit_receipt(path,reference(),max_bytes=20)
+    assert not path.exists()
+
+
+def test_original_game_route_rejects_parent_symlink_and_protects_existing_receipt(tmp_path):
+    folder=tmp_path/"ordinary"
+    folder.mkdir()
+    linked=tmp_path/"fake"
+    linked.symlink_to(folder,target_is_directory=True)
+    with pytest.raises(ValueError):
+        emit_receipt(linked/"bad.json",reference(),max_bytes=4*1024*1024)
+    assert list(folder.iterdir())==[]
+    existing=folder/"real.json"
+    existing.write_text('{"trusted":true}',encoding="utf-8")
+    fake=tmp_path/"linked-receipt.json"
+    fake.symlink_to(existing)
+    with pytest.raises(OSError):
+        emit_receipt(fake,reference(),max_bytes=4*1024*1024)
+    assert json.loads(existing.read_text(encoding="utf-8"))=={"trusted":True}
