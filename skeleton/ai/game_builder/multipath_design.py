@@ -318,4 +318,35 @@ def route_diversity_ppm(left: RouteProof, right: RouteProof) -> int:
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm"]
+def route_portfolio(
+    problem: RouteProblem, *, max_routes: int = 5,
+    penalty_per_use: int = 10, max_expansions: int = _MAX_STATES,
+) -> tuple[RouteProof, ...]:
+    """Search for distinct playable routes rather than fabricate path variety.
+
+    Each later route pays progressively larger penalties for previously used
+    directed transitions. A single-path map returns only proven actual routes.
+    """
+    if (type(max_routes) is not int or not 1 <= max_routes <= 8
+            or type(penalty_per_use) is not int
+            or not 1 <= penalty_per_use <= 100_000):
+        raise MultipathError("invalid alternative solver portfolio limits")
+    found: list[RouteProof] = []
+    seen: set[tuple[str, ...]] = set()
+    penalties: dict[Edge, int] = {}
+    for _ in range(max_routes * 3):
+        proof = solve_route(problem, algorithm="dijkstra",
+                            edge_penalties=penalties,
+                            max_expansions=max_expansions)
+        if proof.actions not in seen:
+            seen.add(proof.actions)
+            found.append(proof)
+            if len(found) >= max_routes:
+                break
+        for edge in route_edges(proof):
+            penalties[edge] = min(1_000_000, penalties.get(edge, 0) + penalty_per_use)
+    return tuple(found)
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio"]
