@@ -245,6 +245,11 @@ class DragonWisdomPyramid:
             self.library.require_fresh_brief(brief, authorized=True)
             if any(h.source_id in self._open_orders(events) for h in citations):
                 raise ValueError("cannot review a source awaiting recrawl")
+            if any(e["kind"] == "wiki_review" and e["mechanic"] == mechanic
+                   and e["brief_digest"] == brief.to_payload()["brief_digest"]
+                   and e["review_evidence"] == review_evidence_digest
+                   for e in events):
+                raise ValueError("Wiki evidence receipt already consumed")
         return self._append(owner, "wiki_review", {
             "mechanic": mechanic, "disposition": disposition,
             "reviewer": independent_reviewer_id,
@@ -279,6 +284,12 @@ class DragonWisdomPyramid:
                 raise ValueError("review was revoked")
             if any(e["kind"] == "promoted" and e["review_digest"] == review_digest for e in events):
                 raise ValueError("review was already promoted")
+            if approval_evidence_digest is not None and any(
+                e["kind"] == "promoted"
+                and e.get("approval_evidence_digest") == approval_evidence_digest
+                for e in events
+            ):
+                raise ValueError("approval grant already consumed")
             if any(e["kind"] == "wiki_review" and e["mechanic"] == review["mechanic"]
                    and e["sequence"] > review["sequence"] and e["disposition"] != "accepted"
                    for e in events):
