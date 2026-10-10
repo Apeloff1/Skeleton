@@ -205,3 +205,27 @@ def test_cartridge_art_auditor_does_not_accept_inert_hero_animation(target,anima
     _,port=_adapt_portable_design(game,target)
     with pytest.raises(ValueError,match="animation source"):
         verify_original_art(files,port,"arcade_score_attack")
+
+
+
+def test_scrolling_game_boy_original_hero_has_real_ground_walk_and_airborne_frames():
+    approved=make_request("game_boy","side_scrolling_platformer")
+    project=_render(approved,"game_boy")
+    source=project.files["src/main.asm"]
+    assert "PreviousWorldX: ds 1" in source
+    assert "ld a,[Grounded]" in source
+    assert ".heroWalking:" in source and "ld a,5" in source
+    assert ".heroInAir:" in source and "ld a,6" in source
+    assert ".heroTile:" in source
+    assert "PlatformTilesEnd:" in source
+    # The console's background floor/brick and OBJ tiles are now 7*16 real
+    # hardware bytes: actor idle, blink, walking and airborne silhouettes.
+    from skeleton.ai.webcrawler.dragon_native_artforge import source_asm,original_tiles
+    name,_,content=source_asm(
+        original_tiles(hero="robot",theme="clockwork",palette="dmg_green",seed=19),
+        "side_scrolling_platformer","game_boy",
+    )
+    assert name=="src/main.asm"
+    assert content in source
+    assert content.count("    db ")==14
+    assert verify_source_release(make_source_release(project,approved)[0])["target"]=="game_boy"
