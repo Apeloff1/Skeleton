@@ -70,3 +70,45 @@ def test_journal_rejects_nonobject_and_exhaustive_json_payloads():
     with pytest.raises(ValueError, match="node/depth budget"):
         journal.append("session", "fetch_started", "https://example.org",
                        at=1, payload=cycle)
+
+
+def test_verified_journal_page_provides_persistent_chain_receipts(tmp_path):
+    path = tmp_path / "journal.sqlite"
+    conn = sqlite3.connect(path)
+    journal = DragonEventJournal(conn)
+    a = journal.append("adventure", "fetch_started", "https://example.org", at=1)
+    b = journal.append("adventure", "fetch_received", "https://example.org", at=2)
+    page = journal.verified_page("adventure", limit=1)
+    assert page["chain_verified"] is True
+    assert page["hasMore"] is True
+    assert page["chain_receipts"] == [{
+        "sequence": 1, "previous_digest": "0" * 64, "digest": a.digest,
+    }]
+    page2 = journal.verified_page("adventure", after=1)
+    assert page2["chain_receipts"] == [{
+        "sequence": 2, "previous_digest": a.digest, "digest": b.digest,
+    }]
+    assert page2["events"][0]["kind"] == "fetch_received"
+    conn.close()
+    reopened = DragonEventJournal(sqlite3.connect(path))
+    assert reopened.verified_page("adventure")["chain_verified"]
+
+
+def test_corrupted_persisted_journal_fails_closed_without_exposing_verified_page():
+    conn = sqlite3.connect(":memory:")
+    journal = DragonEventJournal(conn)
+    journal.append("s", "fetch_started", "https://example.org", at=1)
+    conn.execute("UPDATE dragon_companion_events SET payload='not json'")
+    assert journal.verify("s") is False
+    with pytest.raises(ValueError, match="evidence chain"):
+        journal.verified_page("s")
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"after": True}, {"limit": False}, {"after": -1},
+    {"limit": 0}, {"limit": 1001},
+])
+def test_verified_journal_paging_rejects_invalid_limits_and_cursors(kwargs):
+    journal = DragonEventJournal(sqlite3.connect(":memory:"))
+    with pytest.raises(ValueError, match="page parameters"):
+        journal.verified_page("s", **kwargs)
