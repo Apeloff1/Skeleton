@@ -168,7 +168,7 @@ def _reference(route:object,manifest:object)->dict[str,Any]:
     moves=route.get("steps")
     if not isinstance(moves,list) or not 1<=len(moves)<=MAX_GAME_ACTIONS:
         raise ColecoCPUError("source gameplay moves empty or outside bounded CPU budget")
-    if route.get("levels") not in range(1,9) or moves[-1].get("won")!=1:
+    if route.get("levels") not in range(1,9):
         raise ColecoCPUError("source-game winning path or level budget invalid")
     for item in moves:
         if not isinstance(item,dict) or item.get("button") not in MOVES:
@@ -176,6 +176,8 @@ def _reference(route:object,manifest:object)->dict[str,Any]:
         for k in ("level","x","y","gems_remaining","health","score","won","lost"):
             if type(item.get(k)) is not int or item[k]<0 or item[k]>65535:
                 raise ColecoCPUError("untrusted Z80 physical-RAM state expectation")
+    if moves[-1]["won"] != 1:
+        raise ColecoCPUError("original guest CPU reference has no winning final action")
     return route
 
 
@@ -254,7 +256,7 @@ def play(rom_path:Path,route_path:Path,manifest_path:Path)->dict[str,object]:
         "real_z80_nmi_acknowledgements":machine.vblank_acks,
         "sn76489_write_count":machine.psg_writes,
         "coleco_bios_stub_calls":machine.bios_calls,
-        "actual_colo_z80_cpu_gameplay_verified":True,
+        "actual_coleco_z80_cpu_gameplay_verified":True,
         "proprietary_coleco_bios_redistributed":False,
         "complete_colecovision_emulator_verified":False,
         "physical_hardware_verified":False,
@@ -276,7 +278,7 @@ def main()->None:
         json.dump(receipt,handle,sort_keys=True,indent=2)
         handle.write("\n")
     print(json.dumps({
-        "actual_colo_z80_cpu_gameplay_verified":receipt["actual_colo_z80_cpu_gameplay_verified"],
+        "actual_coleco_z80_cpu_gameplay_verified":receipt["actual_coleco_z80_cpu_gameplay_verified"],
         "controller_actions_verified":receipt["controller_actions_verified"],
         "original_levels_completed":receipt["original_levels_completed"],
     },sort_keys=True))
