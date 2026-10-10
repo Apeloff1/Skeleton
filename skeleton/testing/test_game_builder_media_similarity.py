@@ -93,6 +93,23 @@ def test_wav_exact_and_modified_audio_generate_bounded_fingerprints():
     assert near.legal_infringement_determined is False
 
 
+def test_antiphase_stereo_is_not_misclassified_as_silence():
+    # The left/right channels are equal amplitude but opposite phase.
+    # Averaging signed samples would erase the envelope and a review signal.
+    frames = 256
+    out = BytesIO()
+    with wave.open(out, "wb") as stream:
+        stream.setnchannels(2)
+        stream.setsampwidth(2)
+        stream.setframerate(8000)
+        stream.writeframes(b"".join(
+            struct.pack("<hh", 20000, -20000) for _ in range(frames)
+        ))
+    antiphase = fingerprint_wav("phase-opposed", out.getvalue())
+    assert max(antiphase.feature) == pytest.approx(1.0)
+    assert len(antiphase.feature) == 128
+
+
 def test_image_and_audio_findings_are_separate_and_cannot_auto_clear():
     image = fingerprint_image("original-illustration", synthetic_png())
     image_match = compare_media(image, fingerprint_image("third-party", synthetic_png()))
