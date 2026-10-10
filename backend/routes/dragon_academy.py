@@ -262,6 +262,140 @@ def _make_native_production_request(body: NativeProductionSourceRequest):
     )
 
 
+class NativeRouteWorldRequest(BaseModel):
+    """Only deterministic original homebrew world scenarios are admitted."""
+    model_config=ConfigDict(extra="forbid")
+    seed: StrictInt=Field(default=1,ge=0,le=0xffffffff)
+    weather: str=Field(default="clear",
+        pattern=r"^(clear|rain|windy|storm|snow|high_tide)$")
+    hour: StrictInt=Field(default=8,ge=0,le=23)
+
+
+class NativeRoutePreviewRequest(NativeRouteWorldRequest):
+    max_routes: StrictInt=Field(default=7,ge=1,le=12)
+    search_budget: StrictInt=Field(default=1700,ge=100,le=3000)
+    include_long: StrictBool=Field(default=True)
+
+
+class NativeRoutePlayRequest(NativeRouteWorldRequest):
+    moves: list[str]=Field(default_factory=list,max_length=80)
+
+
+class NativeRouteSourceRequest(NativeRouteWorldRequest):
+    original_work_attested: StrictBool=Field(default=False)
+    approved: StrictBool=Field(default=False)
+
+
+@router.get("/native/production/routes/taxonomy")
+def native_world_route_taxonomy(
+    owner: str=Depends(_principal),
+) -> dict:
+    from skeleton.ai.webcrawler.dragon_route_taxonomy import capabilities
+    return {"ok":True,**capabilities()}
+
+
+@router.post("/native/production/routes/preview")
+def native_world_route_preview(
+    body: NativeRoutePreviewRequest,
+    owner: str=Depends(_native_source_editor),
+) -> dict:
+    from skeleton.ai.webcrawler.dragon_route_world_factory import (
+        make_frontier,scenario_digest,structural_report,
+    )
+    from skeleton.ai.webcrawler.dragon_route_world import (
+        portfolio,route_dictionary,experience,
+    )
+    try:
+        world,traveller=make_frontier(
+            seed=body.seed,weather=body.weather,hour=body.hour)
+        routes=portfolio(world,traveller,max_routes=body.max_routes,
+                         expansion_cap=body.search_budget,
+                         include_circuitous=body.include_long)
+        summary=structural_report(world)
+        current=experience(world,traveller)
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original game route world could not be evaluated within bounded limits") from None
+    return {
+        "ok":True,
+        "schema":"skeleton.ai.dragon.route_world_preview.v1",
+        "world_digest":scenario_digest(world),
+        "world":summary,
+        "routes":route_dictionary(routes),
+        "player":current,
+        "source_only":True,
+        "claim":"generic original graph travel mechanics, not native vehicle-specific simulation",
+    }
+
+
+@router.post("/native/production/routes/play")
+def native_world_route_play(
+    body: NativeRoutePlayRequest,
+    owner: str=Depends(_native_source_editor),
+) -> dict:
+    from skeleton.ai.webcrawler.dragon_route_world_factory import make_frontier
+    from skeleton.ai.webcrawler.dragon_route_world import experience
+    try:
+        world,traveller=make_frontier(
+            seed=body.seed,weather=body.weather,hour=body.hour)
+        state=experience(world,traveller,path=tuple(body.moves))
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original game route is unavailable, undiscovered or exceeds resources") from None
+    return {"ok":True,**state}
+
+
+@router.post("/native/production/routes/source-bundle")
+def native_world_route_source_bundle(
+    body: NativeRouteSourceRequest,
+    owner: str=Depends(_native_source_editor),
+):
+    """In-memory source ZIP of actual playable original C99 routing game."""
+    if not body.original_work_attested or not body.approved:
+        raise HTTPException(status_code=403,
+                            detail="Explicit original-game rights and export approval required")
+    from io import BytesIO
+    from zipfile import ZipFile,ZipInfo,ZIP_DEFLATED
+    from skeleton.ai.webcrawler.dragon_route_world_factory import make_frontier
+    from skeleton.ai.webcrawler.dragon_route_native_game import emit_route_game
+    try:
+        world,traveller=make_frontier(
+            seed=body.seed,weather=body.weather,hour=body.hour)
+        files=emit_route_game(world,traveller,authorized=True)
+        if (len(files)>12 or
+                any(not isinstance(x,str) or not isinstance(y,str)
+                    for x,y in files.items())):
+            raise ValueError("original routing game source format invalid")
+        total=sum(len(value.encode("utf-8")) for value in files.values())
+        if total>1_500_000:
+            raise ValueError("original game source exceeds bounded creator export")
+        buffer=BytesIO()
+        with ZipFile(buffer,"w",ZIP_DEFLATED,compresslevel=9) as archive:
+            for name in sorted(files):
+                if name not in (
+                    "src/main.c","include/dragon_route_world.h",
+                    "dragon-original-route-proof.json","Makefile","README.md",
+                ):
+                    raise ValueError("unexpected source code path")
+                item=ZipInfo(name,date_time=(1980,1,1,0,0,0))
+                item.compress_type=ZIP_DEFLATED
+                item.external_attr=0o100644<<16
+                archive.writestr(item,files[name].encode("utf-8"))
+        payload=buffer.getvalue()
+        if len(payload)>1_500_000:
+            raise ValueError("original routing game ZIP exceeds source limit")
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original multimodal routing source could not be exported") from None
+    return Response(content=payload,media_type="application/zip",headers={
+        "Content-Disposition":'attachment; filename="dragon-original-world-routes.zip"',
+        "X-Content-Type-Options":"nosniff",
+        "Cache-Control":"private, no-store",
+        "X-Content-SHA256":sha256(payload).hexdigest(),
+        "X-Dragon-Claim":"original-source-only-native-C99-not-compiled",
+    })
+
+
 class NativePuzzleGridValidationRequest(BaseModel):
     """Small bounded original authored-grid validation; never compiles source."""
     model_config = ConfigDict(extra="forbid")
