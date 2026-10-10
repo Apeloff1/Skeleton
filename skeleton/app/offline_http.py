@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 import secrets
 import sqlite3
+import stat
 import sys
 import threading
 from typing import Any
@@ -707,6 +708,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     app = None
     token_created = False
+    token_identity: tuple[int, int, int, int] | None = None
     try:
         backend = (load_native_checkpoint(args.native_checkpoint)
                    if args.native_checkpoint is not None
@@ -719,6 +721,10 @@ def main(argv: list[str] | None = None) -> int:
         with LocalOnlyHTTPServer(app, port=args.port) as server:
             create_token_file(args.token_file, token=token)
             token_created = True
+            created = args.token_file.lstat()
+            token_identity = (
+                created.st_dev, created.st_ino, created.st_size, created.st_mtime_ns,
+            )
             url = f"http://127.0.0.1:{server.server_port}/"
             # Windows PyInstaller --windowed sets sys.stdout/sys.stderr to
             # None. The HTTP service must work without a console. Open the
@@ -746,11 +752,21 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         if app is not None:
             app.close()
-        if token_created:
-            # Tokens are short-lived process credentials, not persistent
-            # account keys. Remove only the file this run actually created;
-            # pre-existing paths are never removed or replaced.
-            args.token_file.unlink(missing_ok=True)
+        if token_created and token_identity is not None:
+            # Never unlink a file that replaced the ephemeral credential while
+            # the service was running. This protects a new operator-owned file
+            # or symlink substituted at the original path. The containing
+            # directory must still be protected from untrusted writers.
+            try:
+                current = args.token_file.lstat()
+            except FileNotFoundError:
+                pass
+            else:
+                observed = (
+                    current.st_dev, current.st_ino, current.st_size, current.st_mtime_ns,
+                )
+                if stat.S_ISREG(current.st_mode) and observed == token_identity:
+                    args.token_file.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
