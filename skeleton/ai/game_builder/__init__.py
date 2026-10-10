@@ -255,6 +255,7 @@ _KNOWLEDGE_EXPORTS = {
     "SegaBuildEvidenceError": ".sega_reproducibility",
     "SegaReproducibilityReceipt": ".sega_reproducibility",
     "verify_rebuilt_sega_cartridge": ".sega_reproducibility",
+    "verify_separate_authoring_runs": ".sega_reproducibility",
     "RetroArtifactError": ".native_retro_artifact",
     "RetroArtifactReceipt": ".native_retro_artifact",
     "inspect_original_retro_artifact": ".native_retro_artifact",
