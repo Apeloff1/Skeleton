@@ -22,7 +22,7 @@ def _game(target,style="arcade_score_attack"):
 
 def test_all_11_revisions_have_same_cartridge_abi_and_external_checks():
     assert len(REVISIONS)==len(COMPATIBILITY)==11
-    assert len(EMITTERS)==76
+    assert len(EMITTERS)==77
     assert len({r.target for r in REVISIONS})==11
     for r in REVISIONS:
         assert CATALOG[r.target].output==CATALOG[r.parent].output==r.output

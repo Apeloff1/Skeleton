@@ -3,8 +3,8 @@
 ## Current verified scope — source archive snapshot 2026-10-10
 
 The authoritative catalog contains **169 unique hardware/OS identities**.
-There are **76 declared source-implemented targets**, including ABI-compatible
-variants, and **93 targets without emitted native source**. This is
+There are **77 declared source-implemented targets**, including ABI-compatible
+variants, and **92 targets without emitted native source**. This is
 **45.0% source-emitter coverage**, not verified compatibility coverage.
 The latest dedicated coverage CI run passed 425 checks and failed two: a
 stale inventory assertion (now corrected) and an Atari 5200 cc65 2.19
@@ -25,7 +25,7 @@ The game academy previously mapped **47** major platform targets and implemented
 **19 original native source backends**. This change adds 122 concrete historic,
 consumer, handheld, computer OS/ABI and modern mobile targets, bringing the
 curated inventory to **169 distinct target identities**. It additionally implements
-additional native game emitters and ABI-compatible source variants; the current verified inventory is **76/169**, not a claim of 76 compiled games.
+additional native game emitters and ABI-compatible source variants; the current verified inventory is **77/169**, not a claim of 77 compiled games.
 
 This is not every model or board ever manufactured, and 169 catalog entries
 do NOT mean 169 working console games. No compiler/emulator or device test is
@@ -497,7 +497,7 @@ This increment added original ColecoVision source to its preexisting
 hardware identity and converted Atari 5200, ZX81 and MSX2 into source-ready
 targets. The earlier 170-entry catalog inadvertently listed ColecoVision
 twice; the registry has since been deduplicated. The **current authoritative
-baseline is 169 unique identities, 76 source-implemented targets, and 93
+baseline is 169 unique identities, 77 source-implemented targets, and 93
 remaining original native source gaps (45.0%)**. None of these counts
 certifies console compilation or hardware execution.
 
@@ -535,8 +535,8 @@ A GitHub CI run revealed a duplicate ColecoVision identity: the original
 contained the same system as source-ready. The canonical registry now keeps
 **one** ColecoVision entry with its z88dk source backend and removes the
 duplicate supplemental row. The authoritative count is **169 unique
-hardware identities, 76 source emitters, 93 without native source**
-(76/169 = 45.0% source-emitter coverage). An import-time diagnostic
+hardware identities, 77 source emitters, 92 without native source**
+(77/169 = 45.0% source-emitter coverage). An import-time diagnostic
 identifies any future duplicate names precisely, and the targeted
 regression checks the source status, expected SDK and complete registry.
 These numbers supersede inconsistent historical interim counts above.
@@ -552,3 +552,31 @@ when available, and uses the real `GTIA_WRITE.colpf0/1/2` registers on
 cc65 2.19. The compilation gate remains required: changing source from
 one valid API to another is not proof of a successful ROM build until the
 updated CI job passes at the exact commit.
+
+## Thumby RP2040 — original real MicroPython microconsole game
+
+Original Dragon Micro Quest now has an independent source producer for the
+TinyCircuits Thumby **72 × 40 monochrome OLED** handheld. It uses the actual
+built-in `thumby` device API rather than a desktop emulator: hardware
+D-pad movement, A-to-start/A-shield, B-dash, `display.blit` 8×8 original
+sprite bitmaps, `display.update` 30 FPS cap, and piezo feedback on pickups,
+damage, shielding, and victory. Its sixteen-gem finite campaign has hostile
+movement, damage invulnerability, resource cooldown and restart.
+
+The emitted device entry follows the documented Thumby launcher path:
+`Games/DragonMicroQuest/DragonMicroQuest.py`. The accompanying Makefile
+has a host-only MicroPython syntax check and a non-mutating deployment
+instruction. It deliberately never flashes a user's USB device, installs
+firmware or grants permissions without owner action.
+
+The gameplay implementation is deterministic and testable independent of
+hardware import. CI exercises hundreds of input/game-state steps, forced
+pickup, victory, death, restart and a fake 72×40 device renderer that
+checks sprite width/height and audio calls. Real Thumby frame throughput,
+flash size, button response and audio quality still require physical
+hardware tests; running its Python source on CPython is not a device pass.
+
+This increases the identified inventory's **source-implemented count to
+77/169 (45.6%)** and reduces unsupported native source identities to
+**92**. This does **not** mean 77 verified binaries; the Thumby target is
+a MicroPython script executed by the existing on-device interpreter.

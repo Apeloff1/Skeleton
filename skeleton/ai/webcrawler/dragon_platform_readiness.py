@@ -61,6 +61,7 @@ SOURCE_RENDERERS.update({
 SOURCE_RENDERERS.update({
     "playdate":"STM32F7 native Playdate C API 400x240 1bpp",
     "arduboy":"ATmega32u4 Arduboy2 OLED 128x64 1bpp",
+    "thumby":"RP2040 Thumby MicroPython 72x40 1bpp display/buttons/piezo",
 })
 from .dragon_compatible_revisions import REVISIONS
 SOURCE_RENDERERS.update({

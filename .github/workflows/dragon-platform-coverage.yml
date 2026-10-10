@@ -15,6 +15,7 @@ on:
       - 'skeleton/ai/webcrawler/dragon_native_playdate.py'
       - 'skeleton/ai/webcrawler/dragon_compatible_revisions.py'
       - 'skeleton/ai/webcrawler/dragon_native_arduboy.py'
+      - 'skeleton/ai/webcrawler/dragon_native_thumby.py'
       - 'skeleton/ai/webcrawler/dragon_vic20_tiny.py'
       - 'skeleton/ai/webcrawler/dragon_desktop_abi.py'
       - 'skeleton/ai/webcrawler/dragon_native_targets.py'
@@ -28,6 +29,7 @@ on:
       - 'tests/test_ai_webcrawler_dragon_native_8bit_computers.py'
       - 'tests/test_ai_webcrawler_dragon_atari_z80_new.py'
       - 'tests/test_ai_webcrawler_dragon_micro_handhelds.py'
+      - 'tests/test_ai_webcrawler_dragon_native_thumby.py'
       - 'tests/test_ai_webcrawler_dragon_compatible_revisions.py'
       - 'tests/test_ai_webcrawler_dragon_desktop_abi.py'
       - 'tests/test_ai_webcrawler_dragon_platform_matrix.py'
@@ -70,6 +72,7 @@ jobs:
             tests/test_ai_webcrawler_dragon_native_8bit_computers.py \
             tests/test_ai_webcrawler_dragon_atari_z80_new.py \
             tests/test_ai_webcrawler_dragon_micro_handhelds.py \
+            tests/test_ai_webcrawler_dragon_native_thumby.py \
             tests/test_ai_webcrawler_dragon_compatible_revisions.py \
             tests/test_ai_webcrawler_dragon_desktop_abi.py \
             tests/test_ai_webcrawler_dragon_platform_matrix.py
@@ -101,7 +104,7 @@ jobs:
           path.write_text(readiness_json(),encoding="utf-8")
           result=json.loads(path.read_text())
           assert result["coverage"]["catalog_count"]==169
-          assert result["coverage"]["native_source_count"]==76
+          assert result["coverage"]["native_source_count"]==77
           assert len(result["targets"])==169
           assert all(not t["compiler_verified"] for t in result["targets"])
           print("DRAGON_PLATFORM_COVERAGE_PASS",result["coverage"]["digest"])

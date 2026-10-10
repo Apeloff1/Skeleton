@@ -42,7 +42,7 @@ def test_comprehensive_hardware_inventory_has_no_duplicates_or_lost_eras():
     assert len(TARGETS)==len(CATALOG)==169
     assert len({t.id for t in TARGETS})==169
     assert len({t.id for t in SUPPLEMENTAL_TARGETS})==122
-    assert len(EMITTERS)==76
+    assert len(EMITTERS)==77
     assert all(t.year>=1972 and t.year<=2026 for t in TARGETS)
     for ident in ("vectrex","atari_5200","atari_7800","zx_spectrum_next",
         "commodore_vic20","bbc_micro","msx1","amstrad_cpc",
@@ -80,15 +80,15 @@ def test_every_identified_system_has_actionable_truthful_readiness(target):
 def test_curated_platform_report_never_claims_all_consumer_devices_implemented():
     report=coverage_report()
     assert report["catalog_count"]==169
-    assert report["native_source_count"]==76
-    assert report["missing_native_source_count"]==93
-    assert report["source_coverage_fraction"]==round(76/169,6)
+    assert report["native_source_count"]==77
+    assert report["missing_native_source_count"]==92
+    assert report["source_coverage_fraction"]==round(77/169,6)
     assert report["compiler_verified_count"]==0
     assert report["emulator_verified_count"]==0
     assert report["physical_hardware_verified_count"]==0
     assert len(report["hardware_ids"])==169
-    assert len(report["source_ids"])==76
-    assert len(report["next_unimplemented"])==93
+    assert len(report["source_ids"])==77
+    assert len(report["next_unimplemented"])==92
     assert "not literally every SKU" in report["coverage_scope"]
     digest=report.pop("digest")
     assert sha256(json.dumps(report,sort_keys=True,separators=(",",":"),

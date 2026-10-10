@@ -14,7 +14,7 @@ EMITTERS=EMITTERS|DESKTOP_NATIVE|frozenset(("gamecube","wii","nintendo_3ds","dre
 EMITTERS=EMITTERS|frozenset(("playdate","arduboy"))
 from .dragon_compatible_revisions import COMPATIBILITY
 EMITTERS=EMITTERS|frozenset(COMPATIBILITY)|frozenset(("commodore_pet","commodore_plus4","bbc_micro","oric_atmos"))
-EMITTERS=EMITTERS|frozenset(("atari_5200","colecovision","zx81","msx2"))
+EMITTERS=EMITTERS|frozenset(("atari_5200","colecovision","zx81","msx2","thumby"))
 
 @dataclass(frozen=True)
 class NativeProject:
@@ -573,6 +573,9 @@ def render_native_project(*,title:str,target_id:str,style:str,
     elif target_id=="arduboy":
         from .dragon_native_arduboy import arduboy_source
         files=arduboy_source(seed)
+    elif target_id=="thumby":
+        from .dragon_native_thumby import thumby_source
+        files=thumby_source(seed)
     elif target_id in ("commodore_pet","commodore_plus4","bbc_micro","oric_atmos"):
         from .dragon_native_cc65_classics import classic_cc65_source
         files=classic_cc65_source(target_id,seed)

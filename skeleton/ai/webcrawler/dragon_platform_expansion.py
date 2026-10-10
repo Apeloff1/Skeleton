@@ -55,7 +55,7 @@ gp2x|GamePark Holdings|Linux handheld|2005|dual ARM9|framebuffer|SDL audio|butto
 dingoo_a320|Dingoo|MIPS handheld|2009|Ingenic MIPS|TFT LCD|PCM|D-pad|Dingux toolchain|elf|toolchain_adapter
 playdate|Panic|modern handheld|2022|STM32F7|1-bit LCD|audio|crank/buttons|Playdate SDK|pdx|native_source
 arduboy|Arduboy|micro handheld|2016|ATmega32u4|128x64 OLED|piezo|buttons|Arduino avr-gcc|hex|native_source
-thumby|TinyCircuits|micro handheld|2021|RP2040|monochrome OLED|piezo|buttons|MicroPython SDK|py|toolchain_adapter
+thumby|TinyCircuits|micro handheld|2021|RP2040|monochrome OLED|piezo|buttons|MicroPython SDK|py|native_source
 analogue_pocket|Analogue|FPGA handheld|2021|FPGA|FPGA display|FPGA audio|buttons|openFPGA core|rbf|toolchain_adapter
 evercade|Blaze|emulation handheld|2020|ARM|LCD|PCM|buttons|authorized SDK / emulator|elf|toolchain_adapter
 zx81|Sinclair|8-bit home computer|1981|Z80|monochrome ULA|beeper|keyboard|z88dk +zx81|p|native_source
