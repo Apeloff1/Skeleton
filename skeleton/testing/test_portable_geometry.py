@@ -28,3 +28,10 @@ def test_line_of_sight_blocks_wall_and_bounds_endpoints():
     assert not line_of_sight(grid,(0,2),(3,0))
     with pytest.raises(GeometryError):
         line_of_sight(grid,(0,0),(10,10))
+
+def test_flood_fill_excludes_isolated_rooms_and_orders_coordinates():
+    grid=("#####","#S#G#","#.#.#","#####")
+    assert flood_fill(grid,(1,1))==((1,1),(1,2))
+    assert flood_fill(grid,(3,1))==((3,1),(3,2))
+    with pytest.raises(GeometryError):
+        flood_fill(grid,(2,1))
