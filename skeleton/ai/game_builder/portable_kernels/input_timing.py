@@ -44,3 +44,14 @@ def edge_released(previous: int, current: int, mask: int=65535) -> int:
     include=_buttons(mask)
     return (prior & ~present & include) & 65535
 
+
+def deadzone_axis(value: int, *, threshold: int=4096) -> int:
+    """Integer radial-independent controller-axis deadzone and rescale."""
+    sample=_int(value,"signed controller axis",-32768,32767)
+    dead=_int(threshold,"axis deadzone",0,32766)
+    magnitude=abs(sample)
+    if magnitude<=dead:
+        return 0
+    normalized=min(32767,(magnitude-dead)*32767//(32767-dead))
+    return normalized if sample>0 else -normalized
+
