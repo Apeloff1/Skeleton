@@ -399,4 +399,20 @@ def connected_regions(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions"]
+def objective_reachability(problem: RouteProblem) -> dict[str, object]:
+    """Explain why collectible-exit search is impossible before state BFS."""
+    if not isinstance(problem, RouteProblem):
+        raise MultipathError("typed problem required for reachability")
+    reachable = flood_fill(problem, problem.start)
+    missing = tuple(p for p in problem.collectibles if p not in reachable)
+    return {
+        "problem_digest": problem.digest,
+        "all_collectibles_reachable": not missing,
+        "exit_reachable": problem.goal in reachable,
+        "missing_collectibles": missing,
+        "reachable_tiles": len(reachable),
+    }
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability"]
