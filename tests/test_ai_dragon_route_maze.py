@@ -96,6 +96,20 @@ def test_scenic_routes_are_real_longer_spur_loops_not_relabelled_fastest_route()
         assert "doubleback" in outcome.shapes
 
 
+def test_intentionally_impractical_long_routes_are_real_repeatable_gameplay():
+    item=build_maze(MazeRequest(seed=531,challenge="spicy",width=6,height=6))
+    safe=replay(item.world,item.certificate.backbone,item.traveller)
+    assert item.certificate.impractical_witnesses
+    for path in item.certificate.impractical_witnesses:
+        played=replay(item.world,path,item.traveller)
+        assert played.success
+        assert played.length>safe.length+6
+        assert played.elapsed_minutes>safe.elapsed_minutes
+        assert played.loops>=4
+        assert "impractical" in played.shapes
+        assert "doubleback" in played.shapes
+
+
 def test_maze_ordinary_backtracking_is_always_costless_and_recoverable():
     item=build_maze(MazeRequest(seed=7,width=8,height=6))
     routes={edge.id:edge for edge in item.world.connections}
