@@ -147,6 +147,28 @@ static int simulate_native_inputs(const char*number,const char*sequence){
         (unsigned)state_hash((int)stage));
  return 0;
 }
+/* Dynamic shortest move from the exact C99 game's altered runtime state. */
+static int live_hint_at(const char*number,const char*sequence){
+ char *end=NULL;
+ unsigned long stage=strtoul(number,&end,10);
+ if(!number[0]||!end||*end||stage<1||stage>(unsigned long)LEVEL_COUNT)return 30;
+ size_t size=strlen(sequence);
+ if(size>400||!load_level((int)stage-1))return 31;
+ for(size_t i=0;i<size;i++){
+  char action=sequence[i];
+  if(action=='r'){
+   if(!load_level((int)stage-1))return 32;
+  }else if(action=='u')rollback();
+  else if(action=='w'||action=='a'||action=='s'||action=='d')perform(action);
+  else return 33;
+ }
+ char hint=shortest_hint();
+ if(!hint&&!level_done())return 34;
+ printf("DRAGON_NATIVE_LIVE_HINT level=%lu next=%c solved=%d digest=%08x\n",
+        stage,hint?hint:'-',level_done()?1:0,
+        (unsigned)state_hash((int)stage));
+ return 0;
+}
 '''
 
 
@@ -158,7 +180,9 @@ def enable_native_trace(source:str)->str:
     result=source.replace(OLD_MAIN,C_TRACE+"\n"+OLD_MAIN,1)
     result=result.replace(MAIN_HEAD,
         ' if(argc==4&&!strcmp(argv[1],"--simulate"))'
-        'return simulate_native_inputs(argv[2],argv[3]);\n'+MAIN_HEAD,1)
+        'return simulate_native_inputs(argv[2],argv[3]);\n'
+        ' if(argc==4&&!strcmp(argv[1],"--hint-at"))'
+        'return live_hint_at(argv[2],argv[3]);\n'+MAIN_HEAD,1)
     return result
 
 
