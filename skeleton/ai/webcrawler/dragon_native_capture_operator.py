@@ -54,10 +54,12 @@ def _bitmap(raw:bytes)->None:
     dib_size=struct.unpack_from("<I",raw,14)[0]
     width,height=struct.unpack_from("<ii",raw,18)
     bit_depth=struct.unpack_from("<H",raw,28)[0]
+    stride=((640*bit_depth+31)//32)*4
     if (file_size!=len(raw) or dib_size<40 or
             width!=640 or abs(height)!=480 or
             bit_depth not in (24,32) or
-            pixel_offset<54 or pixel_offset>=len(raw)):
+            pixel_offset<54 or pixel_offset>=len(raw) or
+            pixel_offset+stride*480>len(raw)):
         raise ValueError("fake original gameplay bitmap dimensions or headers")
 
 
