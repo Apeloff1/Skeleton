@@ -517,3 +517,10 @@ def test_distillation_work_budget_is_finite(monkeypatch):
     monkeypatch.setattr(module, "MAX_DISTILL_OBSERVATIONS", 1)
     with pytest.raises(ValueError, match="resource budget"):
         store.distill("alice", authorized=True)
+
+def test_unobserved_game_taste_has_no_approval_authority():
+    store = setup()
+    result = store.distill("alice", authorized=True)
+    assert result.insights == ()
+    assert result.review_required is True
+    assert result.design_directives == ()
