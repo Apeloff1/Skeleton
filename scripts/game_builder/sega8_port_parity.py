@@ -146,6 +146,12 @@ def verify_ports(root: Path) -> dict[str, object]:
             or host.get("all_level_completion_verified") is not True
             or host.get("original_score_and_screen_state_verified") is not True
             or host.get("original_companion_rank_progression_verified") is not True
+            or host.get("original_native_solution_attract_mode_host_verified") is not True
+            or type(host.get("original_demo_controller_actions_verified")) is not int
+            or host.get("original_demo_controller_actions_verified")
+               != host.get("original_controller_actions_verified")
+            or not isinstance(host.get("original_demo_screen_trace_sha256"), str)
+            or not _SHA.fullmatch(host["original_demo_screen_trace_sha256"])
         ):
             raise Sega8PortParityError("not all original C-gameplay steps accepted")
         if (
@@ -163,6 +169,9 @@ def verify_ports(root: Path) -> dict[str, object]:
             or native_route.get("original_source_game_verified_on_instruction_level_cpu") is not True
             or native_route.get("original_companion_rank_and_reward_verified") is not True
             or native_route.get("actual_victory_palette_verified") is not True
+            or native_route.get("native_attract_demo_chord_started_from_victory") is not True
+            or native_route.get("native_attract_demo_performed_first_original_move") is not True
+            or native_route.get("native_attract_demo_user_cancel_restored_game") is not True
         ):
             raise Sega8PortParityError("compiled native Z80 ROM never completed authored winning replay")
         # Each source has different typed false-claim envelopes. Missing,
@@ -279,6 +288,11 @@ def verify_ports(root: Path) -> dict[str, object]:
     if (sms["native_route"]["semantic_controller_screen_trace_sha256"]
             != gg["native_route"]["semantic_controller_screen_trace_sha256"]):
         raise Sega8PortParityError("same original game has different guest-observed Z80 semantic trace")
+    if (
+        sms["host"]["original_demo_screen_trace_sha256"]
+        != gg["host"]["original_demo_screen_trace_sha256"]
+    ):
+        raise Sega8PortParityError("original attract demonstrations disagree across hardware")
     if sms["manifest"].get("target_rom_suffix") == gg["manifest"].get("target_rom_suffix"):
         raise Sega8PortParityError("different native ports share incorrect ROM extension")
     result = {
@@ -296,6 +310,10 @@ def verify_ports(root: Path) -> dict[str, object]:
         "gameplay_parity_verified": True,
         "independent_native_rom_formats_verified": True,
         "real_z80_startup_checked_per_platform": True,
+        "original_on_cartridge_demo_equivalent_across_platforms": True,
+        "native_attract_demo_entry_and_cancel_verified_on_both_platforms": True,
+        "original_demo_controller_actions_verified_per_platform":
+            sms["host"]["original_demo_controller_actions_verified"],
         "native_cartridge_rebuild_byte_equality_checked_per_platform": True,
         "native_rebuild_provenance_sha256_by_platform": {
             target: records[target]["reproducibility"]["comparison_sha256"]
