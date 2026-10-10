@@ -455,6 +455,118 @@ def verify_source_release(payload: bytes) -> dict:
         return receipt
 
 
+def build_source_bundle(
+    request: ProductionRequest, *, authorized: bool,
+) -> tuple[bytes, dict]:
+    """Create a bounded portable source ZIP for an authenticated creator.
+
+    Pure in-memory assembly: no subprocess, filesystem write, model, web
+    request or privileged compiler. Intended for the guarded Dragon Academy
+    editor endpoint. At most 3 platforms and 3 MiB total decoded output.
+    """
+    if authorized is not True:
+        raise PermissionError("explicit creator download authorization required")
+    request.validate()
+    if request.compile_roms or request.require_compiled:
+        raise PermissionError("browser/API production is source-only; use local operator CLI for ROMs")
+    if len(request.targets) > 3 or request.max_portfolio_bytes > 3_000_000:
+        raise ValueError("creator download exceeds three-platform source-only budget")
+    decisions = plan_production(request)
+    if any(d.state != "source_ready" for d in decisions):
+        raise ValueError("one or more native targets are not implemented for this gameplay")
+    releases: list[tuple[bytes, ArtifactReceipt]] = []
+    total = 0
+    for decision in decisions:
+        project = _render(request, decision.target)
+        payload, receipt = make_source_release(project, request)
+        verify_source_release(payload)
+        total += len(payload)
+        if total > request.max_portfolio_bytes:
+            raise ValueError("creator download budget exceeded")
+        releases.append((payload, receipt))
+    modes = tuple(sorted({r.gameplay_mode for _, r in releases}))
+    index = ProductionIndex(
+        schema=INDEX_SCHEMA, request_id=request.request_id, style=request.style,
+        target_count=len(releases),
+        entries=tuple(r for _, r in releases),
+        production_evidence="source_only",
+        declared_gameplay_modes=modes,
+        cross_target_fidelity=(
+            "different_implemented_modes_not_an_equivalent_port" if len(modes) > 1
+            else "matching_declared_modes_not_verified_equivalent"
+        ),
+        legal_claim="attested original/authorized material; external legal verification not asserted",
+    )
+    index_data = _canonical(asdict(index))
+    total += len(index_data)
+    if total > request.max_portfolio_bytes:
+        raise ValueError("creator index exceeds resource budget")
+    bundle = BytesIO()
+    with ZipFile(bundle, "w", compression=ZIP_DEFLATED, compresslevel=9) as archive:
+        for content, receipt in releases:
+            archive.writestr(_zipinfo("releases/" + receipt.archive_name), content)
+        archive.writestr(_zipinfo("production-index.json"), index_data)
+    result = bundle.getvalue()
+    if len(result) > request.max_portfolio_bytes:
+        raise ValueError("creator compressed bundle exceeds resource budget")
+    audit = verify_source_bundle(result)
+    if audit["request_id"] != request.request_id:
+        raise ValueError("in-memory source bundle verification disagrees")
+    return result, asdict(index)
+
+
+def verify_source_bundle(bundle: bytes) -> dict:
+    """Offline nested bundle verifier with bounded members and replayed digests."""
+    if not isinstance(bundle, bytes) or not 50 <= len(bundle) <= 3_000_000:
+        raise ValueError("source bundle size invalid")
+    with ZipFile(BytesIO(bundle)) as source:
+        names = source.namelist()
+        if len(names) != len(set(names)) or not 2 <= len(names) <= 4:
+            raise ValueError("invalid bundle inventory")
+        if "production-index.json" not in names:
+            raise ValueError("missing canonical production index")
+        infos = source.infolist()
+        if any(i.flag_bits & 1 or i.file_size > 3_000_000 for i in infos):
+            raise ValueError("unsafe source bundle member")
+        if sum(i.file_size for i in infos) > 3_000_000:
+            raise ValueError("expanded source bundle budget exceeded")
+        index = json.loads(source.read("production-index.json"))
+        rows = index.get("entries")
+        if (index.get("schema") != INDEX_SCHEMA or
+                not HEX.fullmatch(str(index.get("request_id", ""))) or
+                not isinstance(rows, list) or not 1 <= len(rows) <= 3 or
+                index.get("target_count") != len(rows) or
+                index.get("production_evidence") != "source_only"):
+            raise ValueError("invalid source index identity")
+        expected = {"production-index.json"}
+        seen: set[str] = set()
+        for row in rows:
+            name = row.get("archive_name")
+            if not isinstance(name, str) or not re.fullmatch(
+                r"dragon-[a-z0-9_]+-[a-f0-9]{20}\.zip", name
+            ):
+                raise ValueError("invalid nested release filename")
+            nested = "releases/" + name
+            expected.add(nested)
+            payload = source.read(nested)
+            if len(payload) != row.get("archive_bytes") or _hash(payload) != row.get("archive_sha256"):
+                raise ValueError("tampered nested release")
+            receipt = verify_source_release(payload)
+            target = receipt["target"]
+            if (target in seen or row.get("target") != target or
+                    receipt["request_id"] != index["request_id"] or
+                    receipt["source_fingerprint"] != row.get("source_fingerprint") or
+                    receipt["gameplay_mode"] != row.get("gameplay_mode") or
+                    row.get("binary_sha256") is not None):
+                raise ValueError("nested release evidence mismatch")
+            seen.add(target)
+        if expected != set(names):
+            raise ValueError("unrecognized nested bundle contents")
+        return {"schema": INDEX_SCHEMA, "status": "verified_source_bundle",
+                "request_id": index["request_id"], "target_count": len(rows),
+                "scope": "source only; no binaries, gameplay or distribution clearance"}
+
+
 def _atomic_new(path: Path, payload: bytes) -> None:
     """Stage and fsync then publish with a no-overwrite hard link.
 
