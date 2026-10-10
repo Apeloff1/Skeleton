@@ -343,3 +343,11 @@ def test_linear_map_has_structurally_unavoidable_chokepoints():
     route = solve_route(p)
     assert route_chokepoint_ppm(p, route) == 5 * 1_000_000 // 7
 
+
+def test_route_overrun_measures_detours_but_not_search_penalty_costs():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    best = solve_route(p)
+    detour = evaluate_route(p, ("down", "right", "up") + ("right",) * 5)
+    assert route_overrun_ppm(p, best) == 0
+    assert route_overrun_ppm(p, detour) == (8 - 6) * 1_000_000 // 6
+
