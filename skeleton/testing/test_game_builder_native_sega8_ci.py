@@ -150,7 +150,8 @@ def test_real_build_directory_is_accepted_without_adding_false_source_integrity(
         "sega_master_system",source,rom,toolchain_revision=REVISION,
         expected_source_sha256=evidence["source_content_digest"],
     )
-    assert receipt["source_digest_independently_pinned"] is True
+    assert receipt["source_digest_matches_expected"] is True
+    assert receipt["source_digest_independently_attested"] is False
     assert receipt["source_sha256"]==evidence["source_content_digest"]
     assert receipt["native_rom_compiled"] is False
 
@@ -163,7 +164,7 @@ def test_source_digest_without_independent_pin_is_not_reported_as_authenticated(
     rom=tmp_path/"native.sms"
     rom.write_bytes(_rom("sega_master_system"))
     receipt=verify("sega_master_system",source,rom,toolchain_revision=REVISION)
-    assert receipt["source_digest_independently_pinned"] is False
+    assert receipt["source_digest_matches_expected"] is False
 
 
 def test_sega_source_mutation_invalidates_external_prebuild_hash(tmp_path):
