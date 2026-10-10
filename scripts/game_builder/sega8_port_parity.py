@@ -185,6 +185,23 @@ def _check_eight_worlds(
            != guest.get("native_attract_demo_semantic_trace_sha256")
     ):
         raise Sega8PortParityError("full eight-stage Z80 gameplay and attract demo not proven")
+    for reference_key, guest_key in (
+        ("original_reference_final_score", "native_z80_vdp_final_score"),
+        ("original_reference_final_companion_rank", "native_z80_vdp_final_companion_rank"),
+        ("original_reference_final_stage_index", "native_z80_vdp_final_stage_index"),
+        ("original_reference_final_gems_remaining", "native_z80_vdp_final_gems_remaining"),
+    ):
+        if (type(host.get(reference_key)) is not int
+                or type(guest.get(guest_key)) is not int
+                or host[reference_key] != guest[guest_key]):
+            raise Sega8PortParityError("extended original gameplay final VDP evidence differs from reference")
+    if (host["original_reference_final_score"] != 1280
+            or host["original_reference_final_companion_rank"] != 7
+            or host["original_reference_final_stage_index"] != 7
+            or host["original_reference_final_gems_remaining"] != 0
+            or type(guest.get("native_z80_vdp_final_health")) is not int
+            or guest["native_z80_vdp_final_health"] <= 0):
+        raise Sega8PortParityError("eight-world cartridge failed complete 48-objective bond progression")
     for receipt, fields in (
         (host, ("native_z80_rom_executed", "physical_hardware_verified",
                 "full_console_emulator_playthrough_verified", "release_approved",
@@ -337,6 +354,19 @@ def verify_ports(root: Path) -> dict[str, object]:
             or host["original_controller_actions_verified"] <= 0
         ):
             raise Sega8PortParityError("gameplay acceptance proof has invalid action counts")
+        for reference_key, guest_key in (
+            ("original_reference_final_score", "native_z80_vdp_final_score"),
+            ("original_reference_final_companion_rank", "native_z80_vdp_final_companion_rank"),
+            ("original_reference_final_stage_index", "native_z80_vdp_final_stage_index"),
+            ("original_reference_final_gems_remaining", "native_z80_vdp_final_gems_remaining"),
+        ):
+            if (type(host.get(reference_key)) is not int
+                    or type(native_route.get(guest_key)) is not int
+                    or host[reference_key] != native_route[guest_key]):
+                raise Sega8PortParityError("original Z80 final score/stage differs from verified host replay")
+        if (host["original_reference_final_stage_index"] != meta.get("levels", 0)-1
+                or host["original_reference_final_gems_remaining"] != 0):
+            raise Sega8PortParityError("native final game state did not complete objective")
         if (
             type(native_route.get("controller_actions_replayed")) is not int
             or type(native_route.get("original_levels_replayed")) is not int
@@ -490,6 +520,10 @@ def verify_ports(root: Path) -> dict[str, object]:
             extended_sms["source"]["world_digest"],
         "extended_eight_worlds_winning_replay_digest":
             extended_sms["source"]["winning_replay_digest"],
+        "extended_eight_worlds_final_score_from_guest_z80":
+            extended_sms["guest"]["native_z80_vdp_final_score"],
+        "extended_eight_worlds_final_companion_rank_from_guest_z80":
+            extended_sms["guest"]["native_z80_vdp_final_companion_rank"],
         "extended_eight_worlds_native_z80_semantic_trace_sha256":
             extended_sms["guest"]["semantic_controller_screen_trace_sha256"],
         "extended_eight_worlds_native_controller_actions_verified_per_platform":
