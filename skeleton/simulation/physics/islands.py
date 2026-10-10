@@ -282,6 +282,10 @@ def solve_islands(
     warm_started_rows = 0
 
     for island in graph.islands:
+        # Sleeping islands are frozen: solving them would only let resting
+        # position correction wake them (and pay for it every step).
+        if not any(bodies[body_id].awake for body_id in island.dynamic_bodies):
+            continue
         if island.manifolds:
             contact_stats = contact_solver.solve(
                 bodies,

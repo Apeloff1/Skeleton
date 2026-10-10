@@ -91,6 +91,7 @@ from .errors import (
     PhysicsReplayDivergenceError,
     PhysicsReplayError,
     PhysicsSnapshotError,
+    PhysicsStabilityError,
     PhysicsValidationError,
     SolverError,
     UnsupportedCollisionError,
@@ -143,6 +144,11 @@ from .snapshots import (
     verify_snapshot,
 )
 from .solver import SequentialImpulseSolver, SolverStats
+from .stability import (
+    EnergyDriftMonitor,
+    EnergyGuardMode,
+    StabilityReport,
+)
 from .world import PhysicsSettings, PhysicsStepReceipt, PhysicsWorld
 from .commands import (
     PhysicsCommand,
@@ -264,6 +270,10 @@ __all__ = [
     "PhysicsRollbackSession",
     "PhysicsSnapshot",
     "PhysicsSnapshotError",
+    "PhysicsStabilityError",
+    "EnergyDriftMonitor",
+    "EnergyGuardMode",
+    "StabilityReport",
     "PhysicsError",
     "PhysicsMaterial",
     "PhysicsSettings",
