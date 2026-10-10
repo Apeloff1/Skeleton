@@ -346,7 +346,8 @@ def make_source_release(
         "binary_bytes": len(binary) if binary is not None else 0,
         "evidence": evidence,
         "rights_basis": request.rights_basis,
-        "rights_reference": request.rights_reference,
+        # Never expose human-provided license notes/identifiers in release ZIPs.
+        "rights_reference_sha256": _hash(request.rights_reference.encode("utf-8")) if request.rights_reference else None,
         "rights_attestation": "operator_attested_unverified",
         "legal_claim": "attestation is not a legal clearance or license grant",
         "verification_limit": "ROM header and size do not prove emulator, hardware, or gameplay function",
