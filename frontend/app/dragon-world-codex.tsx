@@ -46,6 +46,12 @@ type OptionalGate={id:string;source_axis:string;source_domain:string;
 type OptionalAccessPreview={
   ok:boolean;optional_paths:OptionalGate[];world_must_have_an_ending:boolean;
 };
+type Artwork={ok:boolean;source:{
+  target_id:string;native_layout:string;named_tiles:string[];
+  palette:string[];tile_pixels:number[][][];
+  compatible_format_encoder:boolean;emitted_into_final_rom:boolean;
+  hardware_verified:boolean;digest:string;
+};independent_format_verification:{verified:boolean;tiles:number}};
 type StoryView={ok:boolean;actual_decisions:string[];
   original_story_world:{
     original_world_bible:{setting:string;core_conflict:string;
@@ -90,6 +96,7 @@ function Editor(){
   const [target,setTarget]=React.useState('game_boy');
   const [story,setStory]=React.useState<StoryView|null>(null);
   const [storyDecisions,setStoryDecisions]=React.useState<string[]>([]);
+  const [art,setArt]=React.useState<Artwork|null>(null);
   const [access,setAccess]=React.useState<OptionalAccessPreview|null>(null);
   const [accessProof,setAccessProof]=React.useState<OptionalAccessProof|null>(null);
   const [pack,setPack]=React.useState<{
@@ -112,7 +119,7 @@ function Editor(){
   const reset=()=>{
     generation.current++;setOpened(null);setWorld(null);
     setHistory([]);setGuide([]);setPlatforms(null);setPack(null);
-    setAccess(null);setAccessProof(null);setStory(null);
+    setAccess(null);setAccessProof(null);setStory(null);setArt(null);
     setStoryDecisions([]);
     setError('');setNotice('');
   };
@@ -322,6 +329,23 @@ function Editor(){
       if(ticket===generation.current)setPlatforms(result);
     }catch(e){if(ticket===generation.current)setError(
       e instanceof Error?e.message:'Cannot evaluate platform options.');}
+    finally{if(ticket===generation.current)setBusy(false);}
+  };
+  const createOriginalArt=async()=>{
+    if(!opened||busy)return;
+    const ticket=++generation.current;setBusy(true);setError('');
+    try{
+      const asset=await api<Artwork>('/tiles',{index:address,target});
+      if(!asset.ok||!asset.independent_format_verification.verified||
+         asset.source.named_tiles.length!==12||
+         asset.source.emitted_into_final_rom||asset.source.hardware_verified)
+        throw Error('Original world tile data failed native layout inspection.');
+      if(ticket===generation.current){
+        setArt(asset);
+        setNotice('Real original platform tile bytes generated; no ROM/hardware claim.');
+      }
+    }catch(e){if(ticket===generation.current)setError(
+      e instanceof Error?e.message:'Original platform pixels cannot be generated.');}
     finally{if(ticket===generation.current)setBusy(false);}
   };
   const compile=async()=>{
@@ -639,7 +663,7 @@ function Editor(){
               <TouchableOpacity key={item.target}
                 style={[s.chip,target===item.target&&s.selected]}
                 disabled={busy}
-                onPress={()=>{setTarget(item.target);setPack(null);}}>
+                onPress={()=>{setTarget(item.target);setPack(null);setArt(null);}}>
                 <Text style={s.small}>{friendly(item.target)}</Text>
               </TouchableOpacity>
             ))}
@@ -650,6 +674,36 @@ function Editor(){
               {' '}{platforms.platforms.find(x=>x.target===target)?.capability.active_axes}
               {' '}axes in source projection
             </Text>}
+          <TouchableOpacity style={s.chip} disabled={busy}
+            onPress={createOriginalArt}>
+            <Text style={s.actionText}>Generate real original world tiles</Text>
+          </TouchableOpacity>
+          {art&&<View style={s.axis}>
+            <Text style={s.copy}>
+              {art.source.named_tiles.length} original 8×8 tiles
+              {' · '}{art.source.native_layout}
+            </Text>
+            <View style={s.chips}>
+              {art.source.tile_pixels.map((pixels,tile)=>(
+                <View key={art.source.named_tiles[tile]} style={s.artTile}>
+                  <Text style={s.small}>{friendly(art.source.named_tiles[tile])}</Text>
+                  {pixels.map((line,row)=>(
+                    <View key={row} style={s.artRow}>
+                      {line.map((color,col)=>(
+                        <View key={col} style={{
+                          width:9,height:9,
+                          backgroundColor:art.source.palette[color]||'#445',
+                        }}/>
+                      ))}
+                    </View>
+                  ))}
+                </View>
+              ))}
+            </View>
+            <Text style={s.hint}>
+              Native tile format source checked. Physical console ROM: not yet.
+            </Text>
+          </View>}
           <TouchableOpacity style={s.action} disabled={busy}
             onPress={compile}>
             <Text style={s.actionText}>
@@ -707,4 +761,6 @@ const s=StyleSheet.create({
  action:{padding:12,borderRadius:9,backgroundColor:'#357a57',alignItems:'center'},
  actionText:{fontSize:13,color:'#f3fff5',fontWeight:'700'},
  disabled:{opacity:0.4},
+ artTile:{padding:7,borderRadius:7,backgroundColor:'#243e4b',gap:3},
+ artRow:{flexDirection:'row'},
 });
