@@ -58,6 +58,9 @@ def test_original_macos_game_is_compiled_executed_and_exactly_replayed(tmp_path)
     assert evidence["actual_macos_host_executed"] is True
     assert evidence["macos_hardware_certified"] is False
     assert evidence["native_hint_stages"]==2
+    assert evidence["native_branch_endings"]==1
+    assert evidence["native_branch_transitions"]==1
+    assert len(evidence["branch_output_sha256"])==64
     assert evidence["native_star_grades"]==2
     assert evidence["independent_replays"]==6
     audit=verify_native_macos_game(packaged)
