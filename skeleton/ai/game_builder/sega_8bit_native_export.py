@@ -78,6 +78,16 @@ __POINTERS__
 static const unsigned char authored_spawn_x[] = { __START_X__ };
 static const unsigned char authored_spawn_y[] = { __START_Y__ };
 
+/* Generated from this original game world's independently verified safe paths.
+ * These are abstract directions, not copied gameplay traces or third-party art.
+ * They are played by advance() through the same rules as the human player. */
+__DEMO_ROUTES__
+static const unsigned char *const original_demo_routes[] = {
+__DEMO_POINTERS__
+};
+static const unsigned int original_demo_lengths[] = { __DEMO_LENGTHS__ };
+#define DEMO_CHORD_FRAMES 25
+
 static unsigned char board[MAP_SIZE];
 static unsigned char level_index, hero_x, hero_y, health, gems_left;
 static unsigned char won, lost, move_cooldown;
@@ -87,6 +97,8 @@ static unsigned char companion_clock, companion_mood, companion_drawn, mood_hold
 static unsigned char hero_pose;
 static unsigned char bond_collected, bond_rank;
 static unsigned char paused, reduced_motion, sound_enabled;
+static unsigned char demo_active, demo_chord_frames;
+static unsigned int demo_step;
 static unsigned char sound_frames, sound_phase;
 static const unsigned char bond_goal[7] = { 3, 7, 12, 18, 25, 33, 42 };
 __sfr __at (0x7F) PSG_PORT;
@@ -260,6 +272,24 @@ static void load_level(void) {
     draw_hud();
     SMS_displayOn();
 }
+/* Starting an original demonstration discards the current run explicitly.
+ * The native world is reset, so no altered game state or hidden rewards leak. */
+static void reset_original_run(void) {
+    pending_count=0;
+    level_index=0;
+    score=0;
+    health=INITIAL_HEALTH;
+    won=lost=paused=move_cooldown=0;
+    bond_collected=bond_rank=0;
+    companion_clock=0;
+    companion_mood=BUDDY_IDLE;
+    mood_hold=0;
+    hero_pose=HERO;
+    sound_frames=0;
+    PSG_PORT=0x9F;
+    demo_step=0;
+    load_level();
+}
 static void end_game(unsigned char victory) {
     if (victory) won=1; else lost=1;
     companion_mood=victory ? BUDDY_CHEER : BUDDY_SAD;
@@ -345,6 +375,8 @@ void main(void) {
     bond_rank=bond_collected=0;
     companion_mood=BUDDY_IDLE;
     sound_frames=0;
+    demo_active=demo_chord_frames=0;
+    demo_step=0;
     reduced_motion=__DEFAULT_REDUCED_MOTION__;
     sound_enabled=__DEFAULT_AUDIO_ENABLED__;
     paused=0;
@@ -353,6 +385,30 @@ void main(void) {
     for (;;) {
         SMS_waitForVBlank();
         pressed=SMS_getKeysPressed();
+        keys=SMS_getKeysStatus();
+        /* Chord starts a real native solution exhibition on either console.
+         * Ordinary face-button toggles never trigger while chord is held.
+         * Any new human input cancels playback and resets to an owned game. */
+        if (demo_active && pressed) {
+            demo_active=0;
+            reset_original_run();
+            continue;
+        }
+        if ((keys & (PORT_A_KEY_1 | PORT_A_KEY_2)) ==
+                    (PORT_A_KEY_1 | PORT_A_KEY_2)) {
+            if (!demo_active && demo_chord_frames<DEMO_CHORD_FRAMES) {
+                ++demo_chord_frames;
+                if (demo_chord_frames==DEMO_CHORD_FRAMES) {
+                    reset_original_run();
+                    demo_active=1;
+                }
+            }
+            flush_pending();
+            render_following_sprite();
+            continue;
+        }
+        demo_chord_frames=0;
+        if (!demo_active) {
 #ifdef TARGET_GG
         if (pressed & GG_KEY_START) {
             paused=!paused;
@@ -371,6 +427,7 @@ void main(void) {
             sound_enabled=!sound_enabled;
             if (!sound_enabled) { sound_frames=0; PSG_PORT=0x9F; }
         }
+        }
         flush_pending();
         if (!paused) {
             psg_tick();
@@ -379,7 +436,26 @@ void main(void) {
         render_following_sprite();
         if (paused || won || lost || pending_count) continue;
         if (move_cooldown) { --move_cooldown; continue; }
-        keys=SMS_getKeysStatus();
+        if (demo_active) {
+            unsigned char action;
+            unsigned char old_level=level_index;
+            if (demo_step>=original_demo_lengths[level_index]) {
+                /* Playback has diverged; never invent an input or advance. */
+                demo_active=0;
+                return;
+            }
+            action=original_demo_routes[level_index][demo_step];
+            if (action==0) advance(0,-1);
+            else if (action==1) advance(0,1);
+            else if (action==2) advance(-1,0);
+            else if (action==3) advance(1,0);
+            else { demo_active=0; return; }
+            if (won || lost) demo_active=0;
+            else if (level_index!=old_level) demo_step=0;
+            else ++demo_step;
+            move_cooldown=7;
+            continue;
+        }
         if (keys & PORT_A_KEY_UP) {
             advance(0,-1);
         } else if (keys & PORT_A_KEY_DOWN) {
