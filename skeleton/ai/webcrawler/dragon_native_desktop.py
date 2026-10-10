@@ -58,6 +58,8 @@ class PuzzleBuildEvidence:
     compiler_flags: tuple[str, ...]
     compiler_std: str
     runtime_selftest: str
+    native_hint_selftest: str
+    hint_output_sha256: str
     runtime_output_sha256: str
     runtime_stages_verified: int
     abstract_levels_verified: int
@@ -177,6 +179,13 @@ def _selftest_stages(stdout: str, total: int) -> None:
         raise ValueError("compiled puzzle game did not replay every expected stage")
 
 
+def _hint_stages(stdout: str, total: int) -> None:
+    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    expected = [f"PUZZLE_HINT_PASS level={i}" for i in range(1, total + 1)]
+    if lines != expected + [f"DRAGON_NATIVE_PUZZLE_HINTS PASS stages={total}"]:
+        raise ValueError("native current-position hint selftest did not finish all stages")
+
+
 def build_native_puzzle_executable(
     request: ProductionRequest, *, authorized: bool, timeout_seconds: int = 40,
 ) -> tuple[bytes, dict]:
@@ -222,6 +231,9 @@ def build_native_puzzle_executable(
         passed = _invoke([str(executable), "--selftest"], root=root,
                          timeout=timeout_seconds)
         _selftest_stages(passed.stdout, proof["stages"])
+        hint = _invoke([str(executable), "--hint-selftest"], root=root,
+                       timeout=timeout_seconds)
+        _hint_stages(hint.stdout, proof["stages"])
         # Exercise a separate real executable route beyond the selftest.
         listing = _invoke([str(executable), "--list"], root=root,
                           timeout=timeout_seconds)
@@ -239,6 +251,8 @@ def build_native_puzzle_executable(
         compiler_flags=COMPILER_FLAGS,
         compiler_std="c99",
         runtime_selftest="native_executable_all_stages_passed",
+        native_hint_selftest="current_position_bfs_all_stages_passed",
+        hint_output_sha256=_hash(hint.stdout.encode("utf-8")),
         runtime_output_sha256=_hash(passed.stdout.encode("utf-8")),
         runtime_stages_verified=proof["stages"],
         abstract_levels_verified=proof["stages"],
@@ -304,6 +318,8 @@ def verify_native_puzzle_executable(package: bytes) -> dict:
             evidence.get("runtime_stages_verified") != proof["stages"] or
             evidence.get("abstract_levels_verified") != proof["stages"] or
             evidence.get("runtime_selftest") != "native_executable_all_stages_passed" or
+            evidence.get("native_hint_selftest") != "current_position_bfs_all_stages_passed" or
+            not re.fullmatch(r"[a-f0-9]{64}", str(evidence.get("hint_output_sha256", ""))) or
             not re.fullmatch(r"[a-f0-9]{64}", str(evidence.get("runtime_output_sha256", ""))) or
             evidence.get("legal_claim") !=
                 "original-work operator attestation; no independent legal clearance"):
