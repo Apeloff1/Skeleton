@@ -499,3 +499,12 @@ def test_authorized_map_edit_has_replayable_custody_and_atomic_failure():
     with pytest.raises(PermissionError):
         make_level_edit(p, {(2, 3): "."}, operation="open_passage", authorized=False)
 
+
+def test_carved_corridor_creates_real_cycle_and_not_illusory_backtracking():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    carved = carve_alternative_corridor(p, (2, 3), authorized=True)
+    assert cycle_rank(carved.after) > cycle_rank(p)
+    assert verify_route_proof(carved.after, carved.safe_proof)
+    with pytest.raises(MultipathError):
+        carve_alternative_corridor(p, p.start, authorized=True)
+
