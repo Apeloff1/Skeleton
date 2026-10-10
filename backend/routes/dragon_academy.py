@@ -1068,6 +1068,66 @@ def native_world_codex_desktop_source(
             detail="Original source world cannot emit native C99 game safely") from None
 
 
+class NativeCodexAccessRequest(NativeCodexWorldRequest):
+    domain:str=Field(default="geology",pattern=r"^[a-z_]{2,32}$")
+    actions:list[str]=Field(default_factory=list,max_length=96)
+
+
+class NativeCodexAccessUnlockRequest(NativeCodexWorldRequest):
+    gate_id:str=Field(default="access_elevation_tectonics",
+        pattern=r"^access_[a-z_]{2,56}$")
+    horizon:StrictInt=Field(default=96,ge=8,le=96)
+
+
+@router.post("/native/production/worlds/codex/access-matrix")
+def native_world_codex_access_matrix(
+    body:NativeCodexAccessRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from dataclasses import asdict
+    from skeleton.ai.webcrawler.dragon_world_codex import unrank
+    from skeleton.ai.webcrawler.dragon_codex_access_matrix import (
+        replay_access,available_gates,
+    )
+    try:
+        source=unrank(body.index)
+        current=replay_access(source,tuple(body.actions))
+        statuses=available_gates(source,current,domain=body.domain)
+        return {
+            "ok":True,"schema":"skeleton.ai.dragon.access_matrix_preview.v1",
+            "actually_played_actions":list(body.actions),
+            "source_digest":source.codex_digest,
+            "player_world_turn":current.world.player.base.turn,
+            "player_position":[current.world.player.base.realm,
+                               current.world.player.base.x,
+                               current.world.player.base.y],
+            "historical_era":current.world.era,
+            "access_digest":current.access_digest,
+            "optional_paths":[asdict(x) for x in statuses],
+            "world_must_have_an_ending":False,
+            "claim":"actual optional routes, not unconditional game solvability",
+        }
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original seasonal/era route history or domain cannot replay") from None
+
+
+@router.post("/native/production/worlds/codex/access-proof")
+def native_world_codex_access_proof(
+    body:NativeCodexAccessUnlockRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_world_codex import unrank
+    from skeleton.ai.webcrawler.dragon_codex_access_matrix import attempt_unlock
+    try:
+        source=unrank(body.index)
+        result=attempt_unlock(source,body.gate_id,horizon=body.horizon)
+        return {"ok":True,**result}
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original optional game-world gate is not implemented") from None
+
+
 class NativeGenomicWorldRequest(BaseModel):
     """Arbitrary-precision design address is a DECIMAL STRING, never a float."""
     model_config=ConfigDict(extra="forbid")
