@@ -88,6 +88,8 @@ class DragonRecrawlDispatcher:
         if type(io_tokens) is not int or not 1 <= io_tokens <= 10000:
             raise ValueError("bounded declared I/O demand required")
         with self.lock:
+            if len(self.active) + len(self.stopped_tickets) >= 64:
+                raise ValueError("bounded unacknowledged recrawl worker budget exceeded")
             pending = self._pending(owner, now)
             for order in pending:
                 digest = _hash(order["order_digest"])
@@ -124,9 +126,9 @@ class DragonRecrawlDispatcher:
         An expiring resource ticket does not bypass application egress policy.
         On false result the caller stops its worker and then calls stopped().
         """
-        self._scope(ticket.owner, now, authorized, trusted_worker, consent)
         if not isinstance(ticket, RecrawlWorkerTicket) or not isinstance(sample, HardwareSample):
             raise TypeError("typed worker ticket and hardware required")
+        self._scope(ticket.owner, now, authorized, trusted_worker, consent)
         with self.lock:
             if self.active.get(ticket.order_digest) != ticket:
                 return False
