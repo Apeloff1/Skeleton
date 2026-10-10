@@ -15,6 +15,7 @@ import {
  type DragonPracticeAttempt,type DragonPracticeProgress,type DragonPracticeSubscription,
  normalizeDragonAttempts,validateDragonProgress,
 } from './dragonProgression';
+import {normalizeDragonWisdomReview,type DragonWisdomReview} from './dragonWisdomReview';
 import type {CompanionAcademyInput,CompanionTelemetry} from './DragonCompanionPanel';
 import {type NativeAttempt,type NativeTarget,type NativeCurriculum,normalizeNativeAttempts,normalizeNativeTargets,normalizeNativeCurriculum} from './dragonNativeTargets';
 import {EMPTY_COMPANION_JOURNAL,reduceDragonJournal,type CompanionJournal,type WireDragonEvent} from './dragonJournal';
@@ -22,7 +23,7 @@ import {EMPTY_COMPANION_JOURNAL,reduceDragonJournal,type CompanionJournal,type W
 type Snapshot={
  ok:boolean;progress:DragonPracticeProgress;attempts:DragonPracticeAttempt[];
  subscription:DragonPracticeSubscription;native_attempts?:NativeAttempt[];
- curriculum?:NativeCurriculum;
+ curriculum?:NativeCurriculum;wisdom_review?:unknown;
 };
 type HtmlArtifact={ok:boolean;html:string;sha256:string;sandbox_required:boolean;attempt_id:string};
 type CrawlFeed={ok:boolean;session_id:string|null;active:boolean;events:WireDragonEvent[];next_cursor:string|null;has_more:boolean};
@@ -44,6 +45,8 @@ export function useDragonAcademy(){
  const [nativeAttempts,setNativeAttempts]=useState<NativeAttempt[]>([]);
  const [nativeTargets,setNativeTargets]=useState<NativeTarget[]>([]);
  const [nativeStyles,setNativeStyles]=useState<string[]>([]);
+ const [wisdomReview,setWisdomReview]=useState<DragonWisdomReview|null>(null);
+ const [wisdomExpires,setWisdomExpires]=useState(0);
  const [curriculum,setCurriculum]=useState<NativeCurriculum|null>(null);
  const [subscription,setSubscription]=useState<DragonPracticeSubscription|null>(null);
  const [busy,setBusy]=useState(false);
@@ -60,7 +63,7 @@ export function useDragonAcademy(){
    const me=await checkMe();
    if(!alive.current)return;
    if(!me.authenticated||!getAuthToken()){
-    setAuthenticated(false);setProgress(null);setAttempts([]);setNativeAttempts([]);setNativeTargets([]);setCurriculum(null);setSubscription(null);
+    setAuthenticated(false);setProgress(null);setWisdomReview(null);setAttempts([]);setNativeAttempts([]);setNativeTargets([]);setCurriculum(null);setSubscription(null);
     setTelemetry(undefined);sessionRef.current=null;journal.current=EMPTY_COMPANION_JOURNAL;
     setError('Sign in through Studio to connect Dragon Academy.');
     return;
@@ -76,6 +79,14 @@ export function useDragonAcademy(){
    const valid=validateDragonProgress(snapshot.progress);
    if(!valid||!subscriptionValid(snapshot.subscription))throw new Error(
     'Dragon Academy returned an invalid verified progression snapshot.');
+   const wisdom=snapshot.wisdom_review as {review?:unknown;issued_at?:unknown;expires_at?:unknown}|null;
+   const currentTime=Date.now()/1000;
+   const validWisdom=wisdom&&typeof wisdom.issued_at==='number'&&Number.isSafeInteger(wisdom.issued_at)
+    &&typeof wisdom.expires_at==='number'&&Number.isSafeInteger(wisdom.expires_at)
+    &&wisdom.issued_at<=currentTime&&currentTime<wisdom.expires_at
+    &&wisdom.expires_at-wisdom.issued_at<=86400;
+   setWisdomReview(validWisdom?normalizeDragonWisdomReview(wisdom.review):null);
+   setWisdomExpires(validWisdom?wisdom.expires_at as number:0);
    setProgress(valid);setAttempts(normalizeDragonAttempts(snapshot.attempts));
    setNativeAttempts(normalizeNativeAttempts(snapshot.native_attempts));
    // Catalog is read-only. If unavailable, remain safely without platform choices.
@@ -92,11 +103,16 @@ export function useDragonAcademy(){
     setCurriculum(normalizeNativeCurriculum(course.data));
    setSubscription(snapshot.subscription);setAuthenticated(true);setError('');
   }catch(e){
-   if(alive.current){setAuthenticated(false);setProgress(null);
+   if(alive.current){setAuthenticated(false);setProgress(null);setWisdomReview(null);
     setAttempts([]);setNativeAttempts([]);setNativeTargets([]);setCurriculum(null);setSubscription(null);
     setError(e instanceof Error?e.message:'Could not connect to Dragon Academy.');}
   }
  },[]);
+ useEffect(()=>{
+  if(!wisdomReview)return;
+  const expiry=setTimeout(()=>setWisdomReview(null),Math.max(0,wisdomExpires*1000-Date.now()));
+  return()=>clearTimeout(expiry);
+ },[wisdomReview,wisdomExpires]);
  const pollCrawler=useCallback(async()=>{
   if(feedBusy.current||!getAuthToken()||!['active','unknown'].includes(AppState.currentState))return;
   feedBusy.current=true;
@@ -246,7 +262,7 @@ export function useDragonAcademy(){
  },[attempts,authenticated]);
  const closeDemo=useCallback(()=>setDemo(null),[]);
  const view:CompanionAcademyInput={
-  progress,attempts,subscription,practiceBusy:busy,
+  progress,attempts,subscription,practiceBusy:busy,wisdomReview,
   nativeAttempts,nativeTargets,nativeStyles,nativeCurriculum:curriculum,
   onGenerateCurriculum:authenticated?generateCurriculum:undefined,
   onGenerateNative:authenticated?generateNative:undefined,

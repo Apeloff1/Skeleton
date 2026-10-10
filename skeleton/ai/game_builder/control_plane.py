@@ -276,3 +276,21 @@ class ForgeControlPlane:
             "schema": self.SCHEMA,
         }
         return {**core, "bundle_digest": canonical_digest(core)}
+
+    def dragon_review(self, *, rights, candidate, workload_digest, now,
+                      incorporation_decisions, target_id, jurisdictions,
+                      legal_reviews, comparators=(), research=None, library=None,
+                      terminal=False, legal_source_baseline=(), legal_source_current=()):
+        """Project panel/rights evidence into Dragon's advisory four squares.
+
+        Runs alongside refinement; does not replace panel arbitration or the
+        terminal release tribunal. All supplied reviews originate at trusted
+        application boundaries, not from untrusted crawler pages.
+        """
+        from .dragon_wisdom import review_candidate
+        return review_candidate(self.forge, self.evaluation_panel, rights,
+            candidate=candidate, workload_digest=workload_digest, now=now,
+            incorporation_decisions=incorporation_decisions, target_id=target_id,
+            jurisdictions=jurisdictions, legal_reviews=legal_reviews,
+            comparators=comparators, research=research, library=library, terminal=terminal,
+            legal_source_baseline=legal_source_baseline, legal_source_current=legal_source_current)

@@ -1,0 +1,5600 @@
+{
+  "schema": "skeleton.dragon.repository_game_audit.v1",
+  "base_revision": "79fe3870e331563f5da85471976f53aaf10c240d",
+  "tracked_files": 58619,
+  "selected_files": 13943,
+  "counts": {
+    "authority_or_docs": 276,
+    "runtime": 7871,
+    "test": 730,
+    "historical_snapshot": 5066
+  },
+  "python_parse_errors": [],
+  "scope_note": "Full tracked text scan and Python syntax/import inventory; not semantic review or execution of every file. Historical snapshots are not runtime capability proof.",
+  "canonical_surface_inventory": [
+    {
+      "path": "backend/routes/dragon_academy.py",
+      "scope": "runtime",
+      "sha256": "c24fe9ef5ce8573cc88d2d0f3fa5e1be52f20648009d3c841f371a5b60e8074e",
+      "lines": 281,
+      "symbols": [
+        "CurriculumGenerateRequest",
+        "NativeGenerateRequest",
+        "RunPracticeRequest",
+        "SubscribeRequest",
+        "_principal",
+        "_database_path",
+        "_lab",
+        "_snapshot",
+        "academy_status",
+        "crawler_feed",
+        "native_targets",
+        "_build_signing_key",
+        "native_build_evidence",
+        "_curriculum",
+        "native_curriculum",
+        "native_curriculum_generate",
+        "generate_native",
+        "native_archive",
+        "run_practice",
+        "subscribe_practice",
+        "stop_practice",
+        "revoke_practice",
+        "practice_artifact"
+      ],
+      "imports": [
+        "__future__",
+        "contextlib",
+        "dataclasses",
+        "fastapi",
+        "hashlib",
+        "os",
+        "pathlib",
+        "pydantic",
+        "routes.gameforge_auth",
+        "skeleton.ai.webcrawler.dragon_build_evidence",
+        "skeleton.ai.webcrawler.dragon_native_curriculum",
+        "skeleton.ai.webcrawler.dragon_native_practice",
+        "skeleton.ai.webcrawler.dragon_native_targets",
+        "skeleton.ai.webcrawler.dragon_practice_cycles",
+        "skeleton.ai.webcrawler.dragon_practice_lab",
+        "skeleton.ai.webcrawler.dragon_session_projection",
+        "sqlite3",
+        "time",
+        "typing"
+      ]
+    },
+    {
+      "path": "backend/routes/jeeves_game_builder.py",
+      "scope": "runtime",
+      "sha256": "13780cdb19f34e8b184ada5fafa1812a121fcb4b29db20188b4449255469db82",
+      "lines": 701,
+      "symbols": [
+        "JeevesGameRequest",
+        "BuildAdvanceRequest",
+        "get_aaa_genres",
+        "get_build_phases",
+        "create_aaa_game",
+        "advance_build",
+        "get_project_status",
+        "compile_aaa_game",
+        "_get_current_phase",
+        "_get_recent_agents"
+      ],
+      "imports": [
+        "datetime",
+        "fastapi",
+        "pydantic",
+        "routes.game_factory",
+        "routes.game_shared",
+        "typing",
+        "uuid"
+      ]
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/DragonAtmosphere.tsx",
+      "scope": "runtime",
+      "sha256": "adeea02d88a602edf5764d403c85096629113cd276796b8e907ed111e1897d65",
+      "lines": 42
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/DragonCompanion.tsx",
+      "scope": "runtime",
+      "sha256": "e10d2da6c18be5a47037de8a7bf5197af9bb6bc85c50bb9be0da0c3889b8351c",
+      "lines": 55
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/DragonCompanionPanel.tsx",
+      "scope": "runtime",
+      "sha256": "919adc1c541cc590a1998f460ce898e087b412a7f6fb7a01dc99cc853aa86e7b",
+      "lines": 111
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/DragonDemoPlayer.tsx",
+      "scope": "runtime",
+      "sha256": "50c02c3b4f6171e3e3ca0b0806f710f93219c3148d1f89dfe9a76a1daa34eb90",
+      "lines": 57
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/DragonNativeWorkshop.tsx",
+      "scope": "runtime",
+      "sha256": "ddf2d9c51edbdc37f8752455510c488dfd60d8c7c483601c733c26286fe60a81",
+      "lines": 145
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/DragonQuestBoard.tsx",
+      "scope": "runtime",
+      "sha256": "b2616c45d7fe6c9e680aa6d18ddb2f5e3abb07d8ff390e1127d8582b2fb9cd40",
+      "lines": 221
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/DragonVideoConsent.tsx",
+      "scope": "runtime",
+      "sha256": "c95916f0d8ae66b8688245e93055b6c73e59d166779ba6e4c2a3e5e942a62bef",
+      "lines": 40
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/DragonVideoEvidence.tsx",
+      "scope": "runtime",
+      "sha256": "ea856ab88ffe05bf9b9615c28a391849f210d8e98cca2dcb1f69907e10673b44",
+      "lines": 46
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/DragonWatchAlong.tsx",
+      "scope": "runtime",
+      "sha256": "92696422cbbaa8e702c669af7cd56e48639543036dc6e4283d9c172cb3fb3f25",
+      "lines": 52
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/DragonWatchDock.tsx",
+      "scope": "runtime",
+      "sha256": "aff88f854a577c0c9acb98901bdf13486d1ddf5cf0f90e216ba4127ba6bd5b9c",
+      "lines": 37
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/dragonChoreography.ts",
+      "scope": "runtime",
+      "sha256": "37c73c6a4f790d34dec560c49e4d0de7319deb1e2953ec35689205479221bff3",
+      "lines": 125
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/dragonCompanion.ts",
+      "scope": "runtime",
+      "sha256": "19e5fa20195ea2125e1e6280b7d72989b1761d83d2e84fa87fc2df2a93249c4d",
+      "lines": 27
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/dragonGesturePoses.ts",
+      "scope": "runtime",
+      "sha256": "43cb0daf2fe5dfefccf8f11caa8e1d48ff691a9a4e26a80429f616f3637e2c45",
+      "lines": 42
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/dragonJournal.ts",
+      "scope": "runtime",
+      "sha256": "04fd99dc7dbe4fb99af96d1c9c5a4c9a822fd768a9ad22b775d9cdfbfd7158ec",
+      "lines": 22
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/dragonNativeTargets.ts",
+      "scope": "runtime",
+      "sha256": "128d56fc29e3e85547b4a51257030dba8e9fac289c6c1d483457485cf182b9cd",
+      "lines": 87
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/dragonPlayerBridge.ts",
+      "scope": "runtime",
+      "sha256": "4e3d78e4d959d0c8768e69f2e045d8d47b85139329f16f0614a13f9fbce16c76",
+      "lines": 19
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/dragonPreferences.ts",
+      "scope": "runtime",
+      "sha256": "ea8ab6e833bc14600379d6b667be0bc49cd5347126ae7cf01293c08c4e13aedd",
+      "lines": 11
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/dragonProgression.ts",
+      "scope": "runtime",
+      "sha256": "f3210b0d44a9f27cb8f5829a85b4069144d27589a3075bc366a2fcd3455016a5",
+      "lines": 84
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/dragonReplay.ts",
+      "scope": "runtime",
+      "sha256": "915f574e26a5cffddd4cd1b22894e027f3fbf704baed81b3449fdfc9a2ea37b2",
+      "lines": 18
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/dragonVideoPrivacy.ts",
+      "scope": "runtime",
+      "sha256": "2780e6d5e96444243b3cc5f3a3cd202f5f451c95a4af33dcf109fa33d1a66d58",
+      "lines": 30
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/dragonWatch.ts",
+      "scope": "runtime",
+      "sha256": "1d450bf706ccf9b6d320873c2fe6275fd34109e16cda86938b164f439038a831",
+      "lines": 20
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/dragonWatchCues.ts",
+      "scope": "runtime",
+      "sha256": "74d1e94526140d21662204f0a05556b78e45a1f746790c5b494c80bbf57c8506",
+      "lines": 64
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/dragonWatchReactions.ts",
+      "scope": "runtime",
+      "sha256": "681620391377b481abc9ba5c889b40278a8bc98f844ffa6f3380698e733e1902",
+      "lines": 17
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/dragonWatchTimeline.ts",
+      "scope": "runtime",
+      "sha256": "8dbda6fc7366a7142e1a773a092860694e1f5b4e6cdfcf89714ff64253be83d7",
+      "lines": 23
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/useDragonAcademy.ts",
+      "scope": "runtime",
+      "sha256": "abe2acc791e4a98c453fdf67dc06d9b2ebc39d05bb5c497f5be9e3c820f38535",
+      "lines": 261
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/useDragonLife.ts",
+      "scope": "runtime",
+      "sha256": "6cbf5df647936961c9ede1208d4d408e40d096a6fd079f63f9e8d13afaac9aa1",
+      "lines": 136
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/useDragonMotion.ts",
+      "scope": "runtime",
+      "sha256": "8a4aaa5847461a981ced5c51f5e306f96eb28806d0c762cc1a2e8f8ae8d0c2e8",
+      "lines": 13
+    },
+    {
+      "path": "skeleton/ai/game_builder/PLAYABLE_GAME.md",
+      "scope": "runtime",
+      "sha256": "f7bd92bfe45466e28f50f02645140def5c0d922d3e01576647e9274d0782519b",
+      "lines": 211
+    },
+    {
+      "path": "skeleton/ai/game_builder/REVIEWED_KNOWLEDGE.md",
+      "scope": "runtime",
+      "sha256": "e7e67c191e9bb6bd2b665fc4f163db52bcb266b673e35df2b3ec07ee31e743b4",
+      "lines": 222
+    },
+    {
+      "path": "skeleton/ai/game_builder/__init__.py",
+      "scope": "runtime",
+      "sha256": "8a32a594b1f6e727b313882946ee49f8d2c566f98992ba8d7d7e56cc8170978f",
+      "lines": 301,
+      "symbols": [
+        "__getattr__"
+      ],
+      "imports": [
+        "atomizer",
+        "canon",
+        "contracts",
+        "control_plane",
+        "deep_assurance",
+        "dual_rival_forge",
+        "evaluation",
+        "evaluator_provenance",
+        "experience_eval",
+        "importlib",
+        "producer_provenance",
+        "quality_debt",
+        "release",
+        "resilience",
+        "resource_governor",
+        "rights"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/atomizer.py",
+      "scope": "runtime",
+      "sha256": "0f5c4519b10d48279792a68e475d5d388d7e56233bec61e1f4d081c9c95c8408",
+      "lines": 209,
+      "symbols": [
+        "AtomGraphError",
+        "AtomSourceBinding",
+        "ArtifactAtom",
+        "AtomGraph"
+      ],
+      "imports": [
+        "__future__",
+        "contracts",
+        "dataclasses",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/canon.py",
+      "scope": "runtime",
+      "sha256": "9a387d4a11bd54b9323f58eb47488ccfc860adc18b0602dd907430092c33fad3",
+      "lines": 356,
+      "symbols": [
+        "CanonError",
+        "BranchRecord",
+        "CanonAssertion",
+        "CharacterKnowledge",
+        "CanonLedger"
+      ],
+      "imports": [
+        "__future__",
+        "contracts",
+        "dataclasses",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/contracts.py",
+      "scope": "runtime",
+      "sha256": "fe03e27a9b3a284601bbd53c49aa21e0d78fe30a39f56462ae04e173e129721c",
+      "lines": 904,
+      "symbols": [
+        "Rival",
+        "Stage",
+        "EffortMode",
+        "canonical_json",
+        "canonical_digest",
+        "_normalized_identity_text",
+        "_sha256_identity",
+        "ProducerProvenance",
+        "ArtifactIdentity",
+        "normalize_quality",
+        "Candidate",
+        "Challenge",
+        "EvaluatorProvenance",
+        "GateResult",
+        "_promotion_decision_payload",
+        "PromotionReceipt",
+        "hard_gates_pass",
+        "pareto_safe_scores",
+        "pareto_safe",
+        "promotion_receipt"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "enum",
+        "hashlib",
+        "json",
+        "math",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/control_plane.py",
+      "scope": "runtime",
+      "sha256": "e6ebad9038f147d4245c8f2f7a071c3e7ec475ce879e7c65a8a879c205a64587",
+      "lines": 278,
+      "symbols": [
+        "ControlPlaneError",
+        "ControlledStatus",
+        "_deterministic_evaluator_provenance",
+        "ForgeControlPlane"
+      ],
+      "imports": [
+        "__future__",
+        "contracts",
+        "dataclasses",
+        "dual_rival_forge",
+        "evaluation",
+        "quality_debt",
+        "resource_governor",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/deep_assurance.py",
+      "scope": "runtime",
+      "sha256": "7a8504589727710ff37735ffcf6552f6b3dd715bd150716707625d474cc4607f",
+      "lines": 981,
+      "symbols": [
+        "DeepAssuranceError",
+        "_text",
+        "_digest",
+        "_stable",
+        "ComplexitySnapshot",
+        "ComplexityDecision",
+        "ComplexityGovernor",
+        "RequirementProof",
+        "RequirementClosureLedger",
+        "ConstraintResult",
+        "ConstraintProofSet",
+        "IntentInvariant",
+        "IntentPreservationGate",
+        "TransformReceipt",
+        "HermeticTransformRegistry",
+        "KnowledgeSource",
+        "KnowledgeIngestionFirewall",
+        "GranularityCoverage",
+        "MentalModelProbe",
+        "PlayerMentalModelGate",
+        "InteractionMatrix",
+        "RareEventObservation",
+        "TailRiskLab",
+        "TelemetryAggregate",
+        "TelemetryFeedbackGate",
+        "ResurrectionPoint",
+        "ResurrectionVerification",
+        "ProjectResurrectionRegistry",
+        "EvidenceMerkleLedger",
+        "ClosureCertificate"
+      ],
+      "imports": [
+        "__future__",
+        "contracts",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "math",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/dual_rival_forge.py",
+      "scope": "runtime",
+      "sha256": "120c0f3c25a8cb2f85263ab1dba9c782502423873a4a296b530729be997e20eb",
+      "lines": 530,
+      "symbols": [
+        "ForgeStateError",
+        "_candidate_from_payload",
+        "_challenge_from_payload",
+        "ForgeStatus",
+        "DualRivalForge"
+      ],
+      "imports": [
+        "__future__",
+        "contracts",
+        "dataclasses",
+        "release",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/evaluation.py",
+      "scope": "runtime",
+      "sha256": "0b7a9f19f133dafddcc2a4d9f90822047e9358c6b6f6ce480ce04f39bca0ec50",
+      "lines": 360,
+      "symbols": [
+        "EvaluationError",
+        "JudgeVerdict",
+        "PanelDecision",
+        "EvaluationPanel",
+        "blind_candidate_token"
+      ],
+      "imports": [
+        "__future__",
+        "contracts",
+        "dataclasses",
+        "statistics",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/evaluator_provenance.py",
+      "scope": "runtime",
+      "sha256": "0efa34d89ff0fe03074a2619391896ac00ed91462a6d9608b887f2df2b1a8e59",
+      "lines": 145,
+      "symbols": [
+        "EvaluatorProvenanceBindingError",
+        "evaluator_provenance_from_canonical_execution",
+        "gate_result_from_canonical_execution",
+        "judge_verdict_from_canonical_execution"
+      ],
+      "imports": [
+        "__future__",
+        "collections.abc",
+        "contracts",
+        "evaluation",
+        "skeleton.ai.learning.model_identity",
+        "skeleton.ai.runtime.contracts.ai_execution"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/experience_eval.py",
+      "scope": "runtime",
+      "sha256": "1e25b0f1445fbcdbe70dbbc9eca2ce33288867151158e03c72e2073c9e23418b",
+      "lines": 486,
+      "symbols": [
+        "ExperienceEvaluationError",
+        "_text",
+        "_digest",
+        "_score",
+        "normalize_experience_metrics",
+        "ExperienceObservation",
+        "ExperienceDefect",
+        "ExperienceReport",
+        "build_experience_report",
+        "ExperiencePromotionDecision",
+        "evaluate_experience_promotion"
+      ],
+      "imports": [
+        "__future__",
+        "contracts",
+        "dataclasses",
+        "statistics",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/frontier_assurance.py",
+      "scope": "runtime",
+      "sha256": "6c7ac202842c0f7c6820c9a824dbfe93db53132786f1076840cdca271bd39ee9",
+      "lines": 844,
+      "symbols": [
+        "FrontierAssuranceError",
+        "_stable",
+        "_unit",
+        "ObligationSeverity",
+        "CausalObligation",
+        "CausalProofLedger",
+        "HorizonProbe",
+        "HorizonConsistencySentinel",
+        "EffortSignal",
+        "EffortDecision",
+        "EffortPortfolioScheduler",
+        "GenealogyNode",
+        "ArtifactGenealogy",
+        "EvaluatorIndependenceGraph",
+        "RegretObservation",
+        "RegretLedger",
+        "EvidenceInvalidationReceipt",
+        "EvidenceInvalidationGraph",
+        "ConvergenceMonitor",
+        "WisdomRecord",
+        "ProjectWisdomLedger"
+      ],
+      "imports": [
+        "__future__",
+        "contracts",
+        "dataclasses",
+        "enum",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/knowledge_cli.py",
+      "scope": "runtime",
+      "sha256": "b6d62aed904e6e00c3f0d72ca9c70fa0a5a427288372a26b33b5f0483ecc97b7",
+      "lines": 175,
+      "symbols": [
+        "_json_pairs",
+        "_read_import",
+        "build_parser",
+        "main"
+      ],
+      "imports": [
+        "__future__",
+        "argparse",
+        "contracts",
+        "json",
+        "pathlib",
+        "reviewed_knowledge",
+        "sys",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/knowledge_rights_bridge.py",
+      "scope": "runtime",
+      "sha256": "cac5411f1c40c15114c2df1c6ac15c3898b776b02f5818ed263cca5163faa222",
+      "lines": 268,
+      "symbols": [
+        "ResearchHandoffError",
+        "ClearedResearchSource",
+        "ClearedResearchPacket",
+        "clear_research_for_design",
+        "require_cleared_research_current"
+      ],
+      "imports": [
+        "__future__",
+        "contracts",
+        "dataclasses",
+        "reviewed_knowledge",
+        "rights",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/playability_analysis.py",
+      "scope": "runtime",
+      "sha256": "96dcb122143e5ed12c5964917408eac6594184ea745b37582edddb1ab8364f93",
+      "lines": 341,
+      "symbols": [
+        "PlayabilityAnalysisError",
+        "LevelExperience",
+        "PlayabilityFinding",
+        "PlayabilityReport",
+        "_LevelCounters",
+        "_findings",
+        "analyze_replay",
+        "CohortExperience",
+        "aggregate_playability"
+      ],
+      "imports": [
+        "__future__",
+        "contracts",
+        "dataclasses",
+        "playable_simulation",
+        "playable_world",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/playable_cli.py",
+      "scope": "runtime",
+      "sha256": "f4f23f9bf005607d27cd83406b176b03cc7c28358596c8bb22acc73d9e67182f",
+      "lines": 172,
+      "symbols": [
+        "_object_pairs",
+        "_read_json",
+        "_intent",
+        "_actions",
+        "parser",
+        "main"
+      ],
+      "imports": [
+        "__future__",
+        "argparse",
+        "contracts",
+        "hashlib",
+        "json",
+        "pathlib",
+        "playability_analysis",
+        "playable_compiler",
+        "playable_simulation",
+        "playable_world",
+        "sys",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/playable_compiler.py",
+      "scope": "runtime",
+      "sha256": "54851fb10ef09b3e105d0a5ff0f117858c4f20b33688562e47dc46add722d244",
+      "lines": 159,
+      "symbols": [
+        "PlayableCompilationError",
+        "CompiledPlayableProject",
+        "compile_original_game",
+        "compile_game_from_reviewed_research",
+        "export_compiled_project"
+      ],
+      "imports": [
+        "__future__",
+        "contracts",
+        "dataclasses",
+        "knowledge_rights_bridge",
+        "pathlib",
+        "playable_export",
+        "playable_simulation",
+        "playable_world",
+        "reviewed_knowledge",
+        "rights"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/playable_export.py",
+      "scope": "runtime",
+      "sha256": "482dafd67cd4373289018bc5b5c701182baae3ae68685baa2f1f4aef7585b592",
+      "lines": 473,
+      "symbols": [
+        "PlayableExportError",
+        "_safe_script_json",
+        "_sha256_csp",
+        "PlayableHTML",
+        "render_playable_world",
+        "write_playable_html"
+      ],
+      "imports": [
+        "__future__",
+        "base64",
+        "contracts",
+        "dataclasses",
+        "hashlib",
+        "html",
+        "json",
+        "knowledge_rights_bridge",
+        "os",
+        "pathlib",
+        "playable_simulation",
+        "playable_world",
+        "tempfile"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/playable_simulation.py",
+      "scope": "runtime",
+      "sha256": "26bd1b49bcb845d7e8102f35b9114ef543a0dd54c78885bb29edc0cb30e189b9",
+      "lines": 288,
+      "symbols": [
+        "GameplayError",
+        "PlayState",
+        "ActionReceipt",
+        "GameReplay",
+        "_assert_state",
+        "initial_state",
+        "advance",
+        "play_actions",
+        "verify_replay",
+        "demonstrate_solvable"
+      ],
+      "imports": [
+        "__future__",
+        "contracts",
+        "dataclasses",
+        "playable_world",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/playable_world.py",
+      "scope": "runtime",
+      "sha256": "2bc5ef462145b9e065347334f8da1c82d1a0b028e67ed45987872e2aaeac68ac",
+      "lines": 396,
+      "symbols": [
+        "PlayableWorldError",
+        "_int",
+        "_word",
+        "_id",
+        "GameBuildIntent",
+        "TileLevel",
+        "PlayableWorld",
+        "_neighbors",
+        "_walk_distances",
+        "_simple_path",
+        "solve_safe_path",
+        "_maze",
+        "_build_level",
+        "generate_playable_world"
+      ],
+      "imports": [
+        "__future__",
+        "collections",
+        "contracts",
+        "dataclasses",
+        "hashlib",
+        "random",
+        "re",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/producer_provenance.py",
+      "scope": "runtime",
+      "sha256": "d0c02db115d488a8716461fc768bac7a2786ad0be378280f4ab24ffe90047834",
+      "lines": 126,
+      "symbols": [
+        "ProducerProvenanceBindingError",
+        "producer_provenance_from_canonical_execution",
+        "candidate_from_canonical_execution"
+      ],
+      "imports": [
+        "__future__",
+        "collections.abc",
+        "contracts",
+        "skeleton.ai.learning.model_identity",
+        "skeleton.ai.runtime.contracts.ai_execution"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/quality_debt.py",
+      "scope": "runtime",
+      "sha256": "c8020fe93f11feebab576e14be0395f2d4b6d60d5c7d57057c2698ce161f9827",
+      "lines": 247,
+      "symbols": [
+        "QualityDebtError",
+        "DebtSeverity",
+        "DebtItem",
+        "QualityDebtLedger"
+      ],
+      "imports": [
+        "__future__",
+        "contracts",
+        "dataclasses",
+        "enum",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/release.py",
+      "scope": "runtime",
+      "sha256": "c09b3f05d6182af3a115849a70e1f8f0bff1000ecd61ab49dfc54557d37a0194",
+      "lines": 698,
+      "symbols": [
+        "ReleaseArbitrationError",
+        "FamilyQualification",
+        "CriticalGateQualification",
+        "ForgeReleaseBinding",
+        "GoldMasterBundle",
+        "TribunalVote",
+        "GoldMasterVerdict",
+        "GoldMasterTribunal"
+      ],
+      "imports": [
+        "__future__",
+        "contracts",
+        "dataclasses",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/resilience.py",
+      "scope": "runtime",
+      "sha256": "0b2622d236fcb417c93e55ad4f511d98578d778f25d80a1326940e0b307495bb",
+      "lines": 648,
+      "symbols": [
+        "ResilienceError",
+        "_stable_id",
+        "_stable_digest",
+        "_feature_vector",
+        "NoveltyRecord",
+        "NoveltyReservoir",
+        "Objection",
+        "DissentLedger",
+        "ImpactCalibrationReceipt",
+        "ImpactGraph",
+        "Invariant",
+        "InvariantRevisionReceipt",
+        "InvariantRegistry"
+      ],
+      "imports": [
+        "__future__",
+        "contracts",
+        "dataclasses",
+        "math",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/resource_governor.py",
+      "scope": "runtime",
+      "sha256": "fd299f8f14e19fd9eb4a554a0d11f25ce36cd9126d8ce03c7a34418b6ee2bea9",
+      "lines": 233,
+      "symbols": [
+        "ResourceLimitError",
+        "ResourceEnvelope",
+        "ResourceDelta",
+        "ResourceSnapshot",
+        "ResourceGovernor"
+      ],
+      "imports": [
+        "__future__",
+        "contracts",
+        "dataclasses",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/reviewed_knowledge.py",
+      "scope": "runtime",
+      "sha256": "feee62121069882e96777cfd120dde927b7454e0c930959e99fa26415c1f7ded",
+      "lines": 727,
+      "symbols": [
+        "KnowledgeError",
+        "_id",
+        "_text",
+        "_digest",
+        "_integer",
+        "_utc",
+        "_source_url",
+        "_words",
+        "_strict_json",
+        "KnowledgePolicy",
+        "ReviewedNote",
+        "ReviewedDocument",
+        "RevisionReceipt",
+        "KnowledgeHit",
+        "KnowledgeBrief",
+        "ReviewedKnowledgeStore"
+      ],
+      "imports": [
+        "__future__",
+        "collections",
+        "contracts",
+        "dataclasses",
+        "datetime",
+        "hashlib",
+        "json",
+        "pathlib",
+        "re",
+        "sqlite3",
+        "typing",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/game_builder/rights.py",
+      "scope": "runtime",
+      "sha256": "65e8563a0cafc3ceb295eb9234e8cdc4685970c7a075c289bc9bd16195751d10",
+      "lines": 438,
+      "symbols": [
+        "RightsError",
+        "RightsState",
+        "UseKind",
+        "SimilarityRisk",
+        "SourceRecord",
+        "SimilarityFinding",
+        "IncorporationDecision",
+        "RightsLedger"
+      ],
+      "imports": [
+        "__future__",
+        "contracts",
+        "dataclasses",
+        "enum",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/__init__.py",
+      "scope": "runtime",
+      "sha256": "1258adef4ba7eecfccc7f66c9454fcc1bb2e03f920a33ce2ebeb6284d46f4fb9",
+      "lines": 254,
+      "symbols": [
+        "__getattr__"
+      ],
+      "imports": [
+        "acquisition_queries",
+        "action_learning",
+        "active_research",
+        "bitemporal",
+        "bound_http",
+        "calibration",
+        "citation_lineage",
+        "claiming",
+        "content_credentials",
+        "contradiction_history",
+        "core",
+        "counterfactual",
+        "decade_signals",
+        "dependence_trust",
+        "dns_binding",
+        "dragon_events",
+        "dragon_graph",
+        "dragon_observer",
+        "dragon_visual_state",
+        "durable_frontier",
+        "evidence_revision",
+        "game_scale_catalog",
+        "governance",
+        "historical_bias",
+        "importlib",
+        "information_gain",
+        "ingestion",
+        "ingestion_registry",
+        "knowledge_bridge",
+        "lag_signals",
+        "leases",
+        "mime",
+        "outbox",
+        "recrawl",
+        "regime_assurance",
+        "regime_trajectory",
+        "regimes",
+        "research",
+        "research_controller",
+        "research_learning",
+        "research_state",
+        "retrieval_bridge",
+        "sequential_evidence",
+        "session",
+        "shapley",
+        "source_dependence",
+        "source_quality",
+        "stopping",
+        "storage",
+        "temporal",
+        "temporal_retrieval",
+        "temporal_scope",
+        "temporal_semantics",
+        "traps",
+        "uncertainty",
+        "value_of_information",
+        "year_signals"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/acquisition_queries.py",
+      "scope": "runtime",
+      "sha256": "4e3bc63360bddc41d486bb86384671ccb0a2206cfa8cd71ae9798a69ed7292a3",
+      "lines": 16,
+      "symbols": [
+        "AcquisitionQuery",
+        "synthesize_acquisition_queries"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/action_learning.py",
+      "scope": "runtime",
+      "sha256": "607d0e7bcd174f315f23cda2bd3becb27aad858711c037e5012dcc0e5ed45629",
+      "lines": 13,
+      "symbols": [
+        "ActionEconomics",
+        "update_action_economics"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/active_research.py",
+      "scope": "runtime",
+      "sha256": "822d59d6e24e78bb48c8667bd05ac76840a2af7090469b23bba1362fc073d738",
+      "lines": 19,
+      "symbols": [
+        "AcquisitionTarget",
+        "plan_acquisition"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/archivex.py",
+      "scope": "runtime",
+      "sha256": "4f1ee751eeb8eaa93601e4369f1f3469a0572612b94a1862240a8fab5bf68377",
+      "lines": 196,
+      "symbols": [
+        "ArchiveXPolicy",
+        "ArchiveXSnapshot",
+        "ArchiveX"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_video_history",
+        "hashlib",
+        "json",
+        "math",
+        "sqlite3",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/archivex_dependencies.py",
+      "scope": "runtime",
+      "sha256": "25c4841a1d1056e4cbdf70bbb93f1883b94563e4c6dde2beb13ad92682e1ef70",
+      "lines": 142,
+      "symbols": [
+        "DependencyPolicy",
+        "InvalidationReceipt",
+        "ArchiveXDependencyIndex"
+      ],
+      "imports": [
+        "__future__",
+        "archivex_knowledge",
+        "archivex_lineage",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/archivex_integrated_writer.py",
+      "scope": "runtime",
+      "sha256": "4a8dccec18c7b5bfcc31b5beef489cea3512da2f115cfc85fe8e5fbc6658b032",
+      "lines": 212,
+      "symbols": [
+        "IntegratedWritePolicy",
+        "IntegratedWriteReceipt",
+        "ArchiveXIntegratedWriter"
+      ],
+      "imports": [
+        "__future__",
+        "archivex_dependencies",
+        "archivex_knowledge",
+        "archivex_lineage",
+        "archivex_promotion",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "math",
+        "sqlite3",
+        "threading"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/archivex_journals.py",
+      "scope": "runtime",
+      "sha256": "65a8c2c7beba468c953d65452574f831d4678c04b6fef5e66e726e28605631f0",
+      "lines": 161,
+      "symbols": [
+        "JournalIngestionPolicy",
+        "JournalSection",
+        "JournalIngestionReceipt",
+        "_text",
+        "_license_from_xml",
+        "_parse_article",
+        "ingest_open_access_journal"
+      ],
+      "imports": [
+        "__future__",
+        "archivex",
+        "dataclasses",
+        "hashlib",
+        "re",
+        "typing",
+        "urllib.parse",
+        "xml.etree.ElementTree"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/archivex_knowledge.py",
+      "scope": "runtime",
+      "sha256": "4b6d9fbe3cb2296df4dfa76e908eedec66573d5a2f3e481691fe1d8438cdba5a",
+      "lines": 276,
+      "symbols": [
+        "MemoryWritePolicy",
+        "ArchivedKnowledge",
+        "ArchiveXKnowledgeStore"
+      ],
+      "imports": [
+        "__future__",
+        "archivex_promotion",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "math",
+        "sqlite3",
+        "threading"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/archivex_lineage.py",
+      "scope": "runtime",
+      "sha256": "e40c9f6f2b5a76ed172c037a7b1f6592745bdaf9481c0b6e52525355e88ab2fc",
+      "lines": 135,
+      "symbols": [
+        "EvidenceAnchor",
+        "AnchorValidation",
+        "ArchiveXEvidenceLineage"
+      ],
+      "imports": [
+        "__future__",
+        "archivex",
+        "dataclasses",
+        "dragon_truth_verifier",
+        "hashlib",
+        "json",
+        "math",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/archivex_preflight.py",
+      "scope": "runtime",
+      "sha256": "380e31d981b8c972a443f731e9eeab1b90725172faf79ed1eb8ebf7aec1a8db1",
+      "lines": 174,
+      "symbols": [
+        "DiagnosticSeverity",
+        "DiagnosticPolicy",
+        "DiagnosticIssue",
+        "DiagnosticReport",
+        "ArchiveXPreflight"
+      ],
+      "imports": [
+        "__future__",
+        "archivex_knowledge",
+        "dataclasses",
+        "enum",
+        "hashlib",
+        "json",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/archivex_promotion.py",
+      "scope": "runtime",
+      "sha256": "87527199e0a2a484c5a67f547f11f4f306ac4032bf838477b1faeb4f6321792a",
+      "lines": 162,
+      "symbols": [
+        "PromotionPolicy",
+        "PromotionReceipt",
+        "ArchiveXPromotionGate"
+      ],
+      "imports": [
+        "__future__",
+        "archivex_truth_gate",
+        "dataclasses",
+        "dragon_truth_verifier",
+        "hashlib",
+        "json",
+        "math",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/archivex_revalidation.py",
+      "scope": "runtime",
+      "sha256": "667293e6611e2a7b0c974e42e245aa9277b0bd212e87ad7ee83f71426387975d",
+      "lines": 141,
+      "symbols": [
+        "RevalidationPolicy",
+        "RevalidationEvent",
+        "RevalidationReport",
+        "ArchiveXRevalidator"
+      ],
+      "imports": [
+        "__future__",
+        "archivex",
+        "archivex_knowledge",
+        "archivex_lineage",
+        "archivex_signals",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/archivex_signal_index.py",
+      "scope": "runtime",
+      "sha256": "eb78f6f4821d062b830fc3a84038bdf1df22e7b1fb9bbfe093ae54fbb7c5e050",
+      "lines": 249,
+      "symbols": [
+        "SignalKind",
+        "SignalIndexPolicy",
+        "ResearchSignal",
+        "ScoredResearchSignal",
+        "ArchiveXSignalIndex"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "enum",
+        "hashlib",
+        "json",
+        "math",
+        "re",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/archivex_signal_propagation.py",
+      "scope": "runtime",
+      "sha256": "2ec417c2ae422d112fb286ea032e46a27a375c288481de484c32a280aaaf4264",
+      "lines": 109,
+      "symbols": [
+        "PropagationPolicy",
+        "PropagationReceipt",
+        "ArchiveXSignalPropagator"
+      ],
+      "imports": [
+        "__future__",
+        "archivex",
+        "archivex_dependencies",
+        "archivex_signal_index",
+        "archivex_signals",
+        "dataclasses",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/archivex_signals.py",
+      "scope": "runtime",
+      "sha256": "f703ceecfafb8b57bb83f981463c7f46ccbfcc6d0647e1557df6a6ad048b4535",
+      "lines": 135,
+      "symbols": [
+        "ArchiveSignalKind",
+        "ArchiveSignal",
+        "ArchiveDriftPolicy",
+        "_text",
+        "compare_snapshots",
+        "source_drift_timeline"
+      ],
+      "imports": [
+        "__future__",
+        "archivex",
+        "dataclasses",
+        "difflib",
+        "enum"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/archivex_truth_gate.py",
+      "scope": "runtime",
+      "sha256": "1d2048ccda1de4b29b76a3669a95a0687985d605b43a476a47c39a2495914c91",
+      "lines": 88,
+      "symbols": [
+        "AnchoredVerification",
+        "verify_anchored_claim"
+      ],
+      "imports": [
+        "__future__",
+        "archivex_lineage",
+        "dataclasses",
+        "dragon_provenance_registry",
+        "dragon_truth_verifier"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/bitemporal.py",
+      "scope": "runtime",
+      "sha256": "cf3f0536736b3e0207ce5d7345c967f74050c26c16b18b96048a2466bcf19d61",
+      "lines": 9,
+      "symbols": [
+        "BitemporalFact"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/bound_http.py",
+      "scope": "runtime",
+      "sha256": "d59ec01506717362e6746a833ef4419066f691ce627e592dcd6dbea153e29ce0",
+      "lines": 63,
+      "symbols": [
+        "BoundConnectionError",
+        "_PinnedHTTPConnection",
+        "_PinnedHTTPSConnection",
+        "SocketBoundFetcher"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "dataclasses",
+        "dns_binding",
+        "http.client",
+        "socket",
+        "ssl",
+        "time",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/calibration.py",
+      "scope": "runtime",
+      "sha256": "dcd650fa2cc6e5a296c472e8c6df7997a1afe3e8c4e46d76c3a6d38ca40c236e",
+      "lines": 19,
+      "symbols": [
+        "CalibrationReport",
+        "calibration_report"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/citation_lineage.py",
+      "scope": "runtime",
+      "sha256": "db264d1426137a0240be3fd8513e3843ac8ee8707133772334b050d1950503c1",
+      "lines": 24,
+      "symbols": [
+        "CitationEdge",
+        "extract_citation_edges",
+        "citation_dependence"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "re",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/claiming.py",
+      "scope": "runtime",
+      "sha256": "ebeda67687d4dcf06a300fa87912da748c21a9fda8093b3fcd171e9b789c2a18",
+      "lines": 20,
+      "symbols": [
+        "ClaimedWork",
+        "FrontierClaimer"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "leases"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/content_credentials.py",
+      "scope": "runtime",
+      "sha256": "06e64bb8dd414b3d0e159bfbfa6327073f65470f647d594e032a131b1c881f9e",
+      "lines": 19,
+      "symbols": [
+        "CredentialObservation",
+        "credential_trust_delta"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/context_bridge.py",
+      "scope": "runtime",
+      "sha256": "c2d80e412aaaee34a4c47193a6159e34a66dccc26540be975ab1a362f8a48466",
+      "lines": 112,
+      "symbols": [
+        "CrawlContextBundle",
+        "compile_crawl_context"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "dataclasses",
+        "evidence_retrieval_bridge",
+        "hashlib",
+        "skeleton.ai.context.flgb_context_runtime",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/contradiction_history.py",
+      "scope": "runtime",
+      "sha256": "3f5936d1bf0e7d127a609a58e5c5a642b050c96cff6221433173b07c1035c4e7",
+      "lines": 21,
+      "symbols": [
+        "ContradictionPersistence",
+        "contradiction_persistence",
+        "persistent_contestation"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/core.py",
+      "scope": "runtime",
+      "sha256": "c490a5a821d627656f8ca418e2684396d811623cbc98568cb3416a4c5c8b1bca",
+      "lines": 570,
+      "symbols": [
+        "canonicalize_url",
+        "destination_allowed",
+        "CrawlPolicy",
+        "CrawlBudget",
+        "FrontierItem",
+        "FetchResponse",
+        "Fetcher",
+        "CrawlDocument",
+        "_Extractor",
+        "_source_score",
+        "extract_document",
+        "InMemoryCrawlStore",
+        "RobotsCache",
+        "CrawlEngine"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "email.utils",
+        "hashlib",
+        "heapq",
+        "html",
+        "html.parser",
+        "ipaddress",
+        "json",
+        "posixpath",
+        "re",
+        "redirects",
+        "time",
+        "typing",
+        "urllib.parse",
+        "urllib.robotparser"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/counterfactual.py",
+      "scope": "runtime",
+      "sha256": "a8c29376eae4fe487058fc1fd8f0e1d733e50b1d1a96823ed1d8f8c9c0d26759",
+      "lines": 16,
+      "symbols": [
+        "EvidenceInfluence",
+        "leave_one_out_influence"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/decade_signals.py",
+      "scope": "runtime",
+      "sha256": "197ed127dde11ca6f605b7712a1e745d53d90928de3f02469ddacf96404852d8",
+      "lines": 41,
+      "symbols": [
+        "DecadeSignalDelta",
+        "DecadeSignalSeries"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dependence_trust.py",
+      "scope": "runtime",
+      "sha256": "5eb32522b12cef1df2b027e04edb2c1dfc0d9a4bde5bb4db97512d5df75f8e5c",
+      "lines": 25,
+      "symbols": [
+        "ClusterTrust",
+        "dependence_adjusted_trust"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dns_binding.py",
+      "scope": "runtime",
+      "sha256": "49d46256729eb80acb4a792dd57c2815e8189d2dc8ab590c247cf2ff1e71630d",
+      "lines": 22,
+      "symbols": [
+        "ResolvedTarget",
+        "resolve_target",
+        "peer_is_planned"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "dataclasses",
+        "ipaddress",
+        "socket",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_adaptive_rereads.py",
+      "scope": "runtime",
+      "sha256": "a8443ea48ef54e65cc41dd1a878e70e7171a52cd7b73639ddba45b4ad0de2e61",
+      "lines": 70,
+      "symbols": [
+        "RereadDecision",
+        "plan_adaptive_rereads"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_knowledge_ledger",
+        "dragon_probabilistic_distillation",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_adversarial_review_worker.py",
+      "scope": "runtime",
+      "sha256": "07950b05e6bc6d8f8bc375ca775d98e724431af952a9e2d10124fbbbc9dbf5e1",
+      "lines": 74,
+      "symbols": [
+        "AdversarialFinding",
+        "AdversarialReviewOutput",
+        "_hex64",
+        "execute_adversarial_review"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains",
+        "dragon_analysis_execution",
+        "dragon_knowledge_manifest",
+        "dragon_knowledge_normalization_worker",
+        "hashlib",
+        "json",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_analysis_chains.py",
+      "scope": "runtime",
+      "sha256": "ff693dfef0d7ca4df778f3ec5378cff48561ae6e9d3d0475cc7cd992718f6d27",
+      "lines": 148,
+      "symbols": [
+        "AnalysisLayer",
+        "LayerSpec",
+        "LayerReceipt",
+        "ChainVerdict",
+        "_digest",
+        "validate_chain"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "enum",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_analysis_execution.py",
+      "scope": "runtime",
+      "sha256": "3893d5cbba708b6d71f62eff00a4dd2161a097060fb9938caa9789e8918a80c9",
+      "lines": 90,
+      "symbols": [
+        "WorkerCapability",
+        "LayerDispatch",
+        "ExecutionPlan",
+        "plan_analysis_execution"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_analysis_quality_gates.py",
+      "scope": "runtime",
+      "sha256": "64d4375ef2bfe609587dbe6e4309e1d8604bb0c6c4c50f0d7e922a9ab396902e",
+      "lines": 120,
+      "symbols": [
+        "Measure",
+        "Measurement",
+        "GatePolicy",
+        "AnalysisGateReport",
+        "gate_analysis"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains",
+        "enum",
+        "hashlib",
+        "json",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_analysis_queue.py",
+      "scope": "runtime",
+      "sha256": "310d976b969aad180e3b961b558e364ce49b9462c14695930ef7cb2a4ec1d17d",
+      "lines": 187,
+      "symbols": [
+        "JobStatus",
+        "AnalysisJob",
+        "DragonAnalysisQueue"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_consent_ledger",
+        "enum",
+        "hashlib",
+        "json",
+        "math",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_analysis_runtime.py",
+      "scope": "runtime",
+      "sha256": "14229754bfccabde46e57357373057f1f0d4904ba10c4cf308b58246ec100a74",
+      "lines": 111,
+      "symbols": [
+        "RunCheckpoint",
+        "DragonAnalysisRuntime"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains",
+        "dragon_analysis_execution",
+        "hashlib",
+        "json",
+        "math",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_attestation_replay.py",
+      "scope": "test",
+      "sha256": "2aec0bc0afc93b39bb8cfeb265b9f1bf6ce49ffa25168b1030c1a15de4bf0d7d",
+      "lines": 62,
+      "symbols": [
+        "AttestationReplay",
+        "verify_receipt_attestation"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains",
+        "dragon_analysis_runtime",
+        "dragon_receipt_attestation",
+        "dragon_worker_leases",
+        "hashlib",
+        "json",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_belief_stress.py",
+      "scope": "runtime",
+      "sha256": "5da91f9961852fc25fb8b69a2b9df802b0ef71bbf379771f278e4377da43167d",
+      "lines": 120,
+      "symbols": [
+        "GroupInfluence",
+        "BeliefStressReport",
+        "stress_test_belief"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_probabilistic_distillation",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_browser_visual_import.py",
+      "scope": "runtime",
+      "sha256": "95c4affb37dd8eaa1d39ad618c763b9b420bc73cc328f8390208726bf94ce9a3",
+      "lines": 107,
+      "symbols": [
+        "BrowserVisualEnvelope",
+        "AcceptedBrowserVisual",
+        "canonical_browser_visual_fingerprint",
+        "_hex64",
+        "_preflight_envelope",
+        "accept_browser_visual"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_canonical_wire",
+        "dragon_consent_bound_queue",
+        "dragon_frame_custody",
+        "dragon_visual_features",
+        "hashlib",
+        "json",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_build_evidence.py",
+      "scope": "runtime",
+      "sha256": "d0f4db172a1945bd3dc930ca1bd03cada63f2967941ec5a0c943ef5ca241d65d",
+      "lines": 151,
+      "symbols": [
+        "BuildReceipt",
+        "DragonBuildEvidence"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_native_compile",
+        "dragon_native_practice",
+        "dragon_practice_lab",
+        "hashlib",
+        "hmac",
+        "json",
+        "pathlib",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_campaign_quests.py",
+      "scope": "runtime",
+      "sha256": "01f0157c2b0c98818a1166fc3116964659aa9825cbe9646caba2bd7d71121066",
+      "lines": 125,
+      "symbols": [
+        "QuestPlacement",
+        "_area",
+        "place_quests",
+        "quest_record"
+      ],
+      "imports": [
+        "__future__",
+        "collections",
+        "dataclasses",
+        "dragon_game_blueprints",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_canonical_wire.py",
+      "scope": "runtime",
+      "sha256": "89b6121161d0dc0d18872fbad6451d2fabc2659cb543ce9df2811b69a4f3d575",
+      "lines": 33,
+      "symbols": [
+        "decimal_wire",
+        "visual_wire_body",
+        "visual_wire_bytes",
+        "visual_wire_fingerprint"
+      ],
+      "imports": [
+        "__future__",
+        "decimal",
+        "hashlib",
+        "json",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_causal_falsification_worker.py",
+      "scope": "runtime",
+      "sha256": "a24bfddb6d838662423593ba9bca9c2dfb4c44c5b5da0a6256dd9c9e70c41bc1",
+      "lines": 71,
+      "symbols": [
+        "FalsificationOutcome",
+        "CausalFalsificationOutput",
+        "execute_causal_falsification"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains",
+        "dragon_analysis_execution",
+        "dragon_hypothesis_worker",
+        "dragon_mechanic_causal_analysis",
+        "dragon_trial_ledger",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_chip_music.py",
+      "scope": "runtime",
+      "sha256": "a6de083deeaf7969def73afa472b8e6d88656e272d80a01cc85443f179fb85d4",
+      "lines": 90,
+      "symbols": [
+        "ChipScore",
+        "compose",
+        "emit_score_header",
+        "score_manifest"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_game_blueprints",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_chunked_temporal.py",
+      "scope": "runtime",
+      "sha256": "719b88ef7fabcae9151d3c7c9e4782f02620006da48f662ce2e4f7b98fc67070",
+      "lines": 37,
+      "symbols": [
+        "ChunkedTemporalTrace",
+        "segment_with_consent_checkpoints"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_consent_bound_queue",
+        "dragon_temporal_segmentation",
+        "hashlib"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_companion_runtime.py",
+      "scope": "runtime",
+      "sha256": "a1aaede45eefb98fa46df96dd674f75e6bd45c4992d09da6f483d7552e25657c",
+      "lines": 236,
+      "symbols": [
+        "DragonMood",
+        "DragonPhase",
+        "DragonEvent",
+        "DragonCompanionPolicy",
+        "DragonCompanionState",
+        "new_companion",
+        "transition",
+        "animation_frame"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "enum",
+        "hashlib",
+        "json",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_consent_bound_queue.py",
+      "scope": "runtime",
+      "sha256": "cb48d9d9a044ba324e87d7b04a908ab3b3264b28bf560fbac56f8e883551a60f",
+      "lines": 96,
+      "symbols": [
+        "JobConsentBinding",
+        "ConsentBoundAnalysisQueue"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_queue",
+        "dragon_consent_ledger",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_consent_ledger.py",
+      "scope": "runtime",
+      "sha256": "e5d9936289ab7e89b38a7af9819c6f011695c4606a63b5698f4943e72ba3daef",
+      "lines": 85,
+      "symbols": [
+        "ConsentReceipt",
+        "DragonConsentLedger"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "math",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_crawl_custody.py",
+      "scope": "runtime",
+      "sha256": "09259c60d5a44112a5593072e46266cf8c3b1fbdef145a7007e2d8c9848965e6",
+      "lines": 350,
+      "symbols": [
+        "_canonical_hash",
+        "CapturedSource",
+        "LocatedReading",
+        "CrawlCustodyBundle",
+        "CustodyPolicy",
+        "_validate_policy",
+        "_document",
+        "bind_crawl_evidence",
+        "CapturedCrawlReview",
+        "assure_captured_crawl"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "dataclasses",
+        "dragon_probabilistic_distillation",
+        "dragon_provenance_assurance",
+        "dragon_provenance_registry",
+        "dragon_source_independence",
+        "hashlib",
+        "json",
+        "math",
+        "typing",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_crawl_revision.py",
+      "scope": "runtime",
+      "sha256": "f8e58a2cbd25c40ccf74bf1e134941c6ac99a8703759db752ef8594f577f368f",
+      "lines": 297,
+      "symbols": [
+        "SourceChange",
+        "ReadingDisposition",
+        "SourceRevisionDelta",
+        "ReadingRevalidation",
+        "RevisionRevalidation",
+        "_hash",
+        "_quote_location",
+        "compare_crawl_revisions",
+        "revision_report_fingerprint"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_crawl_custody",
+        "dragon_probabilistic_distillation",
+        "enum",
+        "hashlib",
+        "json",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_cross_source_worker.py",
+      "scope": "runtime",
+      "sha256": "bc35d73c23a0a69510b7a194bd8e3b1975a54c3c0402eb198c8e16ee2f189a7d",
+      "lines": 78,
+      "symbols": [
+        "CorroboratedClaim",
+        "CorroborationOutput",
+        "execute_cross_source_corroboration"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains",
+        "dragon_analysis_execution",
+        "dragon_causal_falsification_worker",
+        "dragon_source_independence",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_custodied_temporal_worker.py",
+      "scope": "runtime",
+      "sha256": "d28e4e2b7323c40b9ec564803cfc7d67354aabdcb670a3e5805a23911939b9b5",
+      "lines": 53,
+      "symbols": [
+        "CustodiedTemporalOutput",
+        "execute_consent_bound_temporal"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains",
+        "dragon_analysis_execution",
+        "dragon_consent_bound_queue",
+        "dragon_temporal_segmentation",
+        "dragon_temporal_worker",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_empirical_calibration.py",
+      "scope": "runtime",
+      "sha256": "c4228f1f3161c2e67e3ff5f4f63650260d59104fefb0130fff24ad115c2fd232",
+      "lines": 149,
+      "symbols": [
+        "CalibrationBin",
+        "CalibratedScore",
+        "CalibrationArtifact",
+        "_validate_periods",
+        "fit_histogram_calibrator",
+        "apply_calibrator"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_probability_calibration",
+        "hashlib",
+        "json",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_events.py",
+      "scope": "runtime",
+      "sha256": "41778927ac154bbe07f312b74e4fc530931bc29c92325cded18ba6e3d3743830",
+      "lines": 18,
+      "symbols": [
+        "DragonCrawlEvent",
+        "DragonEventStream"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_fenced_queue.py",
+      "scope": "runtime",
+      "sha256": "5cf34b7b57ed3e564b46a950e9beb4ce2d83bd301918221bc8c8abe81ddd659e",
+      "lines": 100,
+      "symbols": [
+        "FencedClaim",
+        "FencedDragonQueue"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_proposal_store",
+        "math",
+        "secrets",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_frame_custody.py",
+      "scope": "runtime",
+      "sha256": "1c3a790b25e5d686c64d659d897c1aaa93417b5ca64dc1bca1505377a009140c",
+      "lines": 51,
+      "symbols": [
+        "CapturedFrame",
+        "FrameBatch",
+        "bind_extracted_frames"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_consent_bound_queue",
+        "hashlib",
+        "json",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_frame_features.py",
+      "scope": "runtime",
+      "sha256": "2f5f0c0143fcccf878ed806c8a95b37e055b8f46d4b509e203b678317c6cc1d3",
+      "lines": 44,
+      "symbols": [
+        "FeatureBatch",
+        "extract_custodied_features"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_consent_bound_queue",
+        "dragon_frame_custody",
+        "dragon_temporal_segmentation",
+        "hashlib",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_game_blueprints.py",
+      "scope": "runtime",
+      "sha256": "fafb0af143294c5b028cde8e5c82478428a8fa4bb1dbe5a52b17208a6aaf00f3",
+      "lines": 295,
+      "symbols": [
+        "Stage",
+        "Campaign",
+        "PRNG",
+        "_ascii_hash",
+        "_fill",
+        "_reachable",
+        "_carve_dungeon",
+        "_carve_platforms",
+        "_carve_race",
+        "_decorate",
+        "design_campaign",
+        "campaign_dict"
+      ],
+      "imports": [
+        "__future__",
+        "collections",
+        "dataclasses",
+        "dragon_campaign_quests",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_game_builder_bridge.py",
+      "scope": "runtime",
+      "sha256": "13cc7e486300f350bf7860a5f1718f4bef441bc4c75c24817ca63ac7d42fd582",
+      "lines": 133,
+      "symbols": [
+        "VisualEvent",
+        "ReviewedObservation",
+        "GameBuilderHandoff",
+        "_hash",
+        "_event",
+        "review_recording",
+        "prepare_game_builder_handoff"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_game_forge",
+        "dragon_game_mechanics",
+        "hashlib",
+        "json",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_game_design.py",
+      "scope": "runtime",
+      "sha256": "24be362d9691ff23c7e86eabba22622e22cf6aafbddd2c5ba472db22716c9eae",
+      "lines": 105,
+      "symbols": [
+        "GameDesign",
+        "parse_design",
+        "load_design",
+        "starter_design",
+        "design_manifest"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_native_targets",
+        "hashlib",
+        "json",
+        "pathlib",
+        "re"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_game_fitness.py",
+      "scope": "runtime",
+      "sha256": "c50acec1d9df54485ef52cf0c0b3b5bea38bad9f680310a3363819b169714cac",
+      "lines": 209,
+      "symbols": [
+        "StageAnalysis",
+        "CampaignAnalysis",
+        "SelectionEvidence",
+        "_pos",
+        "_neighbors",
+        "_floor",
+        "_distance_field",
+        "_weighted_path",
+        "analyze_stage",
+        "evaluate_campaign",
+        "choose_campaign",
+        "selection_report"
+      ],
+      "imports": [
+        "__future__",
+        "collections",
+        "dataclasses",
+        "dragon_game_blueprints",
+        "hashlib",
+        "heapq",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_game_forge.py",
+      "scope": "runtime",
+      "sha256": "d998b134196fd4ada1951fc1fce8311aae3926caf5de16613503446ac09a4fa1",
+      "lines": 229,
+      "symbols": [
+        "ForgePolicy",
+        "GameDesignConstraint",
+        "GameMechanicDesign",
+        "GamePrototypeSpec",
+        "ForgeEvaluation",
+        "ForgeCompetition",
+        "_digest",
+        "_constraint",
+        "DragonGameForge"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_game_mechanics",
+        "hashlib",
+        "json",
+        "math",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_game_mechanics.py",
+      "scope": "runtime",
+      "sha256": "6a471ebbe11d40e5b1f0e6c5f2f142f0f520b4068b848df866c5de458f293269",
+      "lines": 286,
+      "symbols": [
+        "Mechanic",
+        "PreferenceSignal",
+        "CapturePolicy",
+        "GameObservation",
+        "GameSession",
+        "MechanicInsight",
+        "GameTasteProfile",
+        "GameMechanicsMemory"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "enum",
+        "hashlib",
+        "json",
+        "math",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_gb_platformer.py",
+      "scope": "runtime",
+      "sha256": "0ae541557bf93a332f14e64d41851da126467ffd7f986e9ab11fe2ed1335b380",
+      "lines": 423,
+      "symbols": [
+        "_rom_tile_bytes",
+        "gb_platformer_source"
+      ],
+      "imports": [
+        "__future__",
+        "dragon_retro_assets"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_gb_sound.py",
+      "scope": "runtime",
+      "sha256": "c50f28787a6f7a8e07bf674872ba421684035f2f0c3bc07082729814ac05f6fb",
+      "lines": 61,
+      "symbols": [
+        "enrich_native_gb_sound"
+      ],
+      "imports": [
+        "__future__"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_graph.py",
+      "scope": "runtime",
+      "sha256": "d8ab8243247f28f92f4c0c86547aaa2559289388dab7e754384a32c02952b369",
+      "lines": 21,
+      "symbols": [
+        "CrawlGraphNode",
+        "CrawlGraphEdge",
+        "CrawlGraphProjection"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_hardware_budget.py",
+      "scope": "runtime",
+      "sha256": "9d73e48eadd2346e891e389149cccd436d09ca75dac0780eca25db3f9be10b73",
+      "lines": 145,
+      "symbols": [
+        "HardwareBudget",
+        "HardwareAudit",
+        "budget_for",
+        "analyze_project_budget"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_hw_graphics",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_human_review.py",
+      "scope": "runtime",
+      "sha256": "5d822ef60cbb759b724f51ee4ae32e5ec78836db15d2c32ee48c868a30f8ffc1",
+      "lines": 139,
+      "symbols": [
+        "ReviewerPrincipal",
+        "reviewer_principal_fingerprint",
+        "HumanReviewDecision",
+        "DragonHumanReviewLedger"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_adversarial_review_worker",
+        "dragon_analysis_chains",
+        "dragon_knowledge_manifest",
+        "dragon_knowledge_normalization_worker",
+        "hashlib",
+        "json",
+        "math",
+        "sqlite3",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_hw_graphics.py",
+      "scope": "runtime",
+      "sha256": "50a8714e80919340e259fca0e9cbf96cd93a9506868aad671c8340d3b2921e49",
+      "lines": 131,
+      "symbols": [
+        "TileArtifact",
+        "_pixels",
+        "encode_tile",
+        "decode_tile",
+        "encode_assets",
+        "atlas_data",
+        "atlas_header",
+        "source_manifest"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_retro_assets",
+        "hashlib",
+        "re"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_hypothesis_registry.py",
+      "scope": "runtime",
+      "sha256": "c5842072f1fdf6533df060cff609999b5caa3300bf73ca5dec90b4571e5cbe11",
+      "lines": 157,
+      "symbols": [
+        "HypothesisState",
+        "MechanicHypothesis",
+        "HypothesisResult",
+        "DragonHypothesisRegistry"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_causal_falsification_worker",
+        "enum",
+        "hashlib",
+        "json",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_hypothesis_worker.py",
+      "scope": "runtime",
+      "sha256": "f3ae0563ad6468e24cff8db203b11fee1f51a39ab352ae05ab5d3237998fc0d1",
+      "lines": 66,
+      "symbols": [
+        "HypothesisCandidate",
+        "HypothesisWorkerOutput",
+        "execute_hypothesis_generation"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains",
+        "dragon_analysis_execution",
+        "dragon_hypothesis_registry",
+        "dragon_state_inference_worker",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_idle_planner.py",
+      "scope": "runtime",
+      "sha256": "f3b4e1ea09ed5d024108ea75cf83efa776fd4f7e6c8d88435db991ca1ef72b7c",
+      "lines": 51,
+      "symbols": [
+        "IdleVideoPolicy",
+        "IdleVideoPlanner"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_video_discovery",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_idle_research.py",
+      "scope": "runtime",
+      "sha256": "f49b92b33798f1506fef2a01a30941c20862217d8925cc3c9304a28769304a54",
+      "lines": 65,
+      "symbols": [
+        "ResearchConsent",
+        "ResearchReport",
+        "prepare_idle_video_research"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_idle_planner",
+        "dragon_interest_signals",
+        "dragon_signal_discovery",
+        "dragon_video_catalog",
+        "dragon_video_discovery",
+        "dragon_video_history"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_idle_service.py",
+      "scope": "runtime",
+      "sha256": "3bab0f3206c46db2bff30f379722fb46105d6f7e4a1cbc8b19c1b7e3de4536cc",
+      "lines": 40,
+      "symbols": [
+        "IdleVideoRequest",
+        "IdleVideoResult",
+        "plan_idle_video_research",
+        "approve_video_for_digest"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_idle_planner",
+        "dragon_video_discovery",
+        "dragon_video_history"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_interest_signals.py",
+      "scope": "runtime",
+      "sha256": "88fc77d0077c7281ee658cd4d0d9ea4863ef98240584009d51aa4b3db0b6411d",
+      "lines": 186,
+      "symbols": [
+        "SignalKind",
+        "InterestSignal",
+        "SignalPolicy",
+        "TopicInterest",
+        "InterestProfile",
+        "normalize_tag",
+        "validate_signal",
+        "build_interest_profile",
+        "signal_search_terms"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "enum",
+        "hashlib",
+        "math",
+        "re",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_journal.py",
+      "scope": "runtime",
+      "sha256": "4ffbc5bb10b8dc65da146a694604be4d44bede590b8b4412ace698aeaa7e1fa7",
+      "lines": 104,
+      "symbols": [
+        "_canonical",
+        "StoredDragonEvent",
+        "DragonEventJournal"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "math",
+        "sqlite3",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_knowledge_graph.py",
+      "scope": "runtime",
+      "sha256": "d5ff095351bfcb7a76c9cc2895c8ab4eea0b32c913817efd46f4f97cc9870dc3",
+      "lines": 213,
+      "symbols": [
+        "Relation",
+        "KnowledgeConcept",
+        "KnowledgeRelation",
+        "KnowledgeAudit",
+        "_validate_concept",
+        "DragonKnowledgeGraph"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "enum",
+        "hashlib",
+        "json",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_knowledge_ledger.py",
+      "scope": "runtime",
+      "sha256": "f0627ca6fa6f18b47456d07fea7e43b4cc7f8f0c9588c29274ba3d3d76eccaef",
+      "lines": 170,
+      "symbols": [
+        "RereadTask",
+        "schedule_rereads",
+        "DragonKnowledgeLedger"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_probabilistic_distillation",
+        "hashlib",
+        "json",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_knowledge_manifest.py",
+      "scope": "runtime",
+      "sha256": "070b38645b250285f729915746ab91c697532ea1e9bac97217cade8396d2d018",
+      "lines": 22,
+      "symbols": [
+        "canonical_knowledge_id",
+        "canonical_knowledge_manifest"
+      ],
+      "imports": [
+        "dragon_knowledge_normalization_worker",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_knowledge_normalization_worker.py",
+      "scope": "runtime",
+      "sha256": "5b2cef16f3106bb6b4727690dff690716b9833bd7bba18d79f6d6b00d58c698b",
+      "lines": 77,
+      "symbols": [
+        "NormalizedKnowledge",
+        "KnowledgeNormalizationOutput",
+        "normalization_records_fingerprint",
+        "execute_knowledge_normalization"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains",
+        "dragon_analysis_execution",
+        "dragon_uncertainty_calibration_worker",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_knowledge_promotion.py",
+      "scope": "runtime",
+      "sha256": "1bde7517ecb45addf27f3c0a0de840785a3a4117dd3e3af46519aee170469acc",
+      "lines": 100,
+      "symbols": [
+        "PromotionPolicy",
+        "PromotionDecision",
+        "assess_promotion"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains",
+        "dragon_analysis_quality_gates",
+        "dragon_belief_stress",
+        "dragon_empirical_calibration",
+        "dragon_probabilistic_distillation"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_knowledge_retrieval.py",
+      "scope": "runtime",
+      "sha256": "b34c35f8ed7e3832172170c5a62db37aabfa5e77a4a7039639e117b6019348fc",
+      "lines": 83,
+      "symbols": [
+        "RetrievalHit",
+        "RetrievalSnapshot",
+        "retrieve_knowledge"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_knowledge_graph",
+        "hashlib",
+        "json",
+        "re",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_labyrinth.py",
+      "scope": "runtime",
+      "sha256": "052875967d4296e3d2d956da0cbecba844760c385ea001b2a5d7b4eccc114db0",
+      "lines": 280,
+      "symbols": [
+        "WorkKind",
+        "WorkStatus",
+        "WorkSpec",
+        "WorkRecord",
+        "LabyrinthPlan",
+        "_digest",
+        "plan_labyrinth",
+        "DragonLabyrinth"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "enum",
+        "hashlib",
+        "json",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_leased_runtime.py",
+      "scope": "runtime",
+      "sha256": "4cd9445774809bc204cd3cc1b4b6d16b969a51b9dbad6bfddfe8f55eca0dc8e2",
+      "lines": 39,
+      "symbols": [
+        "LeasedCommit",
+        "commit_leased_receipt"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains",
+        "dragon_analysis_runtime",
+        "dragon_receipt_attestation",
+        "dragon_runtime_events",
+        "dragon_worker_leases"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_mechanic_causal_analysis.py",
+      "scope": "runtime",
+      "sha256": "97dc1d7d6f6138c69775199a69e2d52564d8d9b9812816cae6bd4a213252e2e5",
+      "lines": 151,
+      "symbols": [
+        "MechanicTrial",
+        "TrialProtocol",
+        "MechanicEffect",
+        "_wilson",
+        "analyze_mechanic_trials"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_memory_promotion_worker.py",
+      "scope": "runtime",
+      "sha256": "f36043b16b6f50f34e3dba49dd2d02507c406bfdcc94b094b8e9f3e1f2281eac",
+      "lines": 94,
+      "symbols": [
+        "PromotedKnowledge",
+        "MemoryPromotionOutput",
+        "execute_memory_promotion",
+        "execute_memory_promotion_from_ledger"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains",
+        "dragon_analysis_execution",
+        "dragon_human_review",
+        "dragon_knowledge_manifest",
+        "dragon_knowledge_normalization_worker",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_mission_catalog.py",
+      "scope": "runtime",
+      "sha256": "7e704bf5ea09feb309be7831f4390d2fd6f270faec54b496d1247b5715834aad",
+      "lines": 65,
+      "symbols": [
+        "MissionCapability",
+        "resolve_mission_capability",
+        "describe_mission_capabilities"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "importlib"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_mission_quality.py",
+      "scope": "runtime",
+      "sha256": "1b805393182ede51e2a090ffc334f47a445b6d73f144aa81306a90732846a886",
+      "lines": 372,
+      "symbols": [
+        "RightsGrant",
+        "TextRisk",
+        "TextSpan",
+        "RankedPassage",
+        "DuplicateGroup",
+        "InformationQuality",
+        "_words",
+        "_digest",
+        "_verify_text",
+        "require_training_grant",
+        "scan_untrusted_instructions",
+        "mask_personal_data",
+        "segment_passages",
+        "rank_query_passages",
+        "exact_revision_groups",
+        "near_duplicate_groups",
+        "measure_information_quality",
+        "locate_uncertainty_cues",
+        "extract_citation_candidates"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "dataclasses",
+        "hashlib",
+        "math",
+        "re",
+        "typing",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_mission_scheduler.py",
+      "scope": "runtime",
+      "sha256": "b07c24bf7cec26ec3c5194138ee68193aba59ff386cb6772d46a345b7a664b0a",
+      "lines": 344,
+      "symbols": [
+        "AcquisitionCandidate",
+        "PrioritizedAcquisition",
+        "HostDispatch",
+        "RecrawlSource",
+        "RecrawlDue",
+        "MissionStopDecision",
+        "_bound",
+        "_hash",
+        "_public_host",
+        "rank_acquisition_candidates",
+        "allocate_host_dispatches",
+        "plan_adaptive_recrawls",
+        "decide_mission_stop"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "dataclasses",
+        "dragon_provenance_assurance",
+        "hashlib",
+        "json",
+        "math",
+        "typing",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_mission_token_feed.py",
+      "scope": "runtime",
+      "sha256": "eb1a461d8a84e6473288f535a7be72812fc4e3ec48b5f036e4ee2b7feeeda2e8",
+      "lines": 316,
+      "symbols": [
+        "CuratedFragment",
+        "EncodedFragment",
+        "TokenWindow",
+        "DatasetAssignment",
+        "YearTaggedWindow",
+        "TrainingManifest",
+        "_digest",
+        "curate_training_fragment",
+        "encode_verified_tokens",
+        "pack_token_windows",
+        "assign_dependency_splits",
+        "balance_decade_windows",
+        "compile_training_manifest"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "dataclasses",
+        "dragon_mission_quality",
+        "dragon_source_independence",
+        "hashlib",
+        "itertools",
+        "json",
+        "math",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_motion_features.py",
+      "scope": "runtime",
+      "sha256": "fd1222c4a76f795c85970057fe2169a76af95ec7943bed66662abe40a3b3ad32",
+      "lines": 29,
+      "symbols": [
+        "MotionFeatureBatch",
+        "derive_motion_features"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_temporal_segmentation",
+        "dragon_visual_features",
+        "hashlib"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_3d_era.py",
+      "scope": "runtime",
+      "sha256": "69012e37f826ab15989db79745cb44e4069364ea75a26b13e28116e07105afe7",
+      "lines": 367,
+      "symbols": [
+        "_seed",
+        "n64_source",
+        "ds_source",
+        "psp_source"
+      ],
+      "imports": [
+        "__future__"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_arcade_runtime.py",
+      "scope": "runtime",
+      "sha256": "0acdae5c3d017122bcb652c3e4e6679cbef5d4a20c0384a5f7e3ec5b32487f8c",
+      "lines": 698,
+      "symbols": [
+        "render_sdl_campaign"
+      ],
+      "imports": [
+        "__future__",
+        "dragon_chip_music",
+        "dragon_game_blueprints",
+        "dragon_native_replay_system",
+        "dragon_native_save_system",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_c64.py",
+      "scope": "runtime",
+      "sha256": "ba17158bb61ac1b20037ac1c1b708840d298899566bb414857a48c5a0e9b1af1",
+      "lines": 84,
+      "symbols": [
+        "commodore64_source"
+      ],
+      "imports": [
+        "__future__"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_cli.py",
+      "scope": "runtime",
+      "sha256": "174ec6cc0f5392d8d217d4374dc9696cbaad593bdc0325e74a44db3120e391b8",
+      "lines": 86,
+      "symbols": [
+        "emit_demo",
+        "main"
+      ],
+      "imports": [
+        "__future__",
+        "argparse",
+        "dragon_game_design",
+        "dragon_game_mechanics",
+        "dragon_native_compile",
+        "dragon_native_projects",
+        "dragon_native_targets",
+        "hashlib",
+        "pathlib"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_compile.py",
+      "scope": "runtime",
+      "sha256": "8e9bf7ab4246debe951cf94adf27242aca0ee870d5b5c5eb1782f392f57987cc",
+      "lines": 124,
+      "symbols": [
+        "NativeBuildResult",
+        "_verify",
+        "compile_local"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_native_projects",
+        "hashlib",
+        "os",
+        "pathlib",
+        "shutil",
+        "subprocess",
+        "time"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_curriculum.py",
+      "scope": "runtime",
+      "sha256": "ad70f7ba0da39bc604d4619b27f4f26c1281e435e448d5a95b1257b081e50675",
+      "lines": 166,
+      "symbols": [
+        "CurriculumMilestone",
+        "CurriculumRecommendation",
+        "CurriculumSnapshot",
+        "DragonNativeCurriculum",
+        "curriculum_report"
+      ],
+      "imports": [
+        "__future__",
+        "collections",
+        "dataclasses",
+        "dragon_build_evidence",
+        "dragon_native_practice",
+        "dragon_native_projects",
+        "dragon_native_targets",
+        "dragon_practice_lab"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_gbc.py",
+      "scope": "runtime",
+      "sha256": "70b0fd555c21c3a031e7f78ec12ed24f5494b49b8a171e59661d5c579baeba71",
+      "lines": 56,
+      "symbols": [
+        "color_game_boy"
+      ],
+      "imports": [
+        "__future__"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_practice.py",
+      "scope": "runtime",
+      "sha256": "c4324dc6cf01d550e84c904b7324f640f624925a90466b8dc93b695d19300ff3",
+      "lines": 163,
+      "symbols": [
+        "NativeAttempt",
+        "DragonNativePracticeLab"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_game_mechanics",
+        "dragon_native_projects",
+        "dragon_native_targets",
+        "dragon_practice_lab",
+        "hashlib",
+        "io",
+        "json",
+        "sqlite3",
+        "zipfile"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_projects.py",
+      "scope": "runtime",
+      "sha256": "17746c2e299e21f170389fb285b3de36cdd42b2f8bbded452b47274530af5a94",
+      "lines": 728,
+      "symbols": [
+        "NativeProject",
+        "digest",
+        "_gameboy",
+        "_nes",
+        "_dos",
+        "_desktop",
+        "render_native_project"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_game_blueprints",
+        "dragon_game_design",
+        "dragon_game_fitness",
+        "dragon_game_mechanics",
+        "dragon_gb_platformer",
+        "dragon_gb_sound",
+        "dragon_hardware_budget",
+        "dragon_hw_graphics",
+        "dragon_native_3d_era",
+        "dragon_native_arcade_runtime",
+        "dragon_native_c64",
+        "dragon_native_gbc",
+        "dragon_native_puzzle",
+        "dragon_native_raycaster",
+        "dragon_native_rhythm",
+        "dragon_native_sdk_emitters",
+        "dragon_native_sms",
+        "dragon_native_snes",
+        "dragon_native_targets",
+        "dragon_native_turn_rpg",
+        "dragon_playtest_planner",
+        "dragon_retro_assets",
+        "hashlib",
+        "json",
+        "pathlib",
+        "re"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_puzzle.py",
+      "scope": "runtime",
+      "sha256": "fc0c30f531fa05b6eeca6177d089045eb600291825680f7c60e1fa26560974f6",
+      "lines": 349,
+      "symbols": [
+        "LevelProof",
+        "_parse",
+        "solve_grid",
+        "transformed_level",
+        "emit_native_puzzle"
+      ],
+      "imports": [
+        "__future__",
+        "collections",
+        "dataclasses",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_raycaster.py",
+      "scope": "runtime",
+      "sha256": "f03aba5143bee5ea4d82895e68b136c01c96d57b8c2392a7b3bf60a274f1d33c",
+      "lines": 316,
+      "symbols": [
+        "render_raycaster"
+      ],
+      "imports": [
+        "__future__",
+        "dragon_game_blueprints"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_release.py",
+      "scope": "runtime",
+      "sha256": "cb400f0539a74b6ca2303128139c6a4c276feb48183af7461ad701353b74c100",
+      "lines": 175,
+      "symbols": [
+        "NativeRelease",
+        "host_target",
+        "format_for_bytes",
+        "_run",
+        "_zip_entry",
+        "build_native_release",
+        "main"
+      ],
+      "imports": [
+        "__future__",
+        "argparse",
+        "dataclasses",
+        "dragon_native_cli",
+        "dragon_native_projects",
+        "hashlib",
+        "json",
+        "os",
+        "pathlib",
+        "platform",
+        "shutil",
+        "subprocess",
+        "sys",
+        "time",
+        "zipfile"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_replay_system.py",
+      "scope": "runtime",
+      "sha256": "737af27ec78bc9b43684ad63899dcc22d2e2dbfeecb81376fecffa5514b4714f",
+      "lines": 133,
+      "symbols": [
+        "emit_replay_system"
+      ],
+      "imports": [
+        "__future__"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_rhythm.py",
+      "scope": "runtime",
+      "sha256": "be37d5019075d11cf7679b4f84f06520291d1fba41223838347868162c41df5b",
+      "lines": 258,
+      "symbols": [
+        "render_rhythm"
+      ],
+      "imports": [
+        "__future__",
+        "dragon_chip_music"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_save_system.py",
+      "scope": "runtime",
+      "sha256": "c60ff7d35dc18b2f7f1e791a23ee6124655c7039f462e79a5ab948522fb4bb8e",
+      "lines": 119,
+      "symbols": [
+        "emit_save_system"
+      ],
+      "imports": [
+        "__future__"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_sdk_emitters.py",
+      "scope": "runtime",
+      "sha256": "760255f0b6610f1996935831d6cf7158f5113392c437651e33489c240bcfef12",
+      "lines": 213,
+      "symbols": [
+        "genesis_source",
+        "gba_source",
+        "ps1_source",
+        "xbox_original_source"
+      ],
+      "imports": [
+        "__future__",
+        "dragon_native_projects"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_sms.py",
+      "scope": "runtime",
+      "sha256": "2bda5e755e9f2447d6a6450c7dbff3e0ad15ce6779bc5c8e024ca7e1d3b7a1d0",
+      "lines": 136,
+      "symbols": [
+        "_sms_tile",
+        "sms_source"
+      ],
+      "imports": [
+        "__future__",
+        "dragon_retro_assets"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_snes.py",
+      "scope": "runtime",
+      "sha256": "c07af8fcfc155030364dde097daf68251cde437e2f87f1d0adb6c76626482457",
+      "lines": 131,
+      "symbols": [
+        "snes_source"
+      ],
+      "imports": [
+        "__future__"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_targets.py",
+      "scope": "runtime",
+      "sha256": "e293b7ea86605ddf2e1317597a2c14235adc2d06001799e4b641129d5b584659",
+      "lines": 188,
+      "symbols": [
+        "ConsoleTarget",
+        "_t",
+        "target_catalog",
+        "demand_target",
+        "practice_matrix"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_game_blueprints",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_turn_rpg.py",
+      "scope": "runtime",
+      "sha256": "b6379cd45ae0c9df61c9e62aa2b38b3af2531d553e1a013762dbfaf28045e725",
+      "lines": 341,
+      "symbols": [
+        "render_rpg"
+      ],
+      "imports": [
+        "__future__",
+        "dragon_game_blueprints"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_object_tracking_worker.py",
+      "scope": "runtime",
+      "sha256": "dfc3b52037986213d95fac88ad2300430eb37a49c1511294891e7e69845aaf81",
+      "lines": 92,
+      "symbols": [
+        "Detection",
+        "ObjectTrack",
+        "ObjectTrackingOutput",
+        "_center",
+        "execute_object_tracking"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains",
+        "dragon_analysis_execution",
+        "hashlib",
+        "json",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_observer.py",
+      "scope": "runtime",
+      "sha256": "f0c126c130c7dcfd204ba04c1cbd711bacd313fc82a153d97d2a7c546162595f",
+      "lines": 15,
+      "symbols": [
+        "DragonCrawlObserver"
+      ],
+      "imports": [
+        "__future__"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_playable_prototype.py",
+      "scope": "runtime",
+      "sha256": "b82da6c5910e1c6a1551df8026834cd89a06cf0a415892891efbe3e4dc822e90",
+      "lines": 181,
+      "symbols": [
+        "PlayablePrototype",
+        "render_playable_prototype"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_game_forge",
+        "dragon_game_mechanics",
+        "hashlib",
+        "html",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_playtest_planner.py",
+      "scope": "test",
+      "sha256": "7a1d6cdc2af7194ab6de5a6f91e855f62a068c1d74ba15c2eefbdeeab9dd2599",
+      "lines": 185,
+      "symbols": [
+        "AgentAction",
+        "StagePlan",
+        "CampaignPlan",
+        "_tiles",
+        "_weighted_route",
+        "plan_stage",
+        "plan_campaign",
+        "agent_report"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_game_blueprints",
+        "hashlib",
+        "heapq",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_practice_cycles.py",
+      "scope": "runtime",
+      "sha256": "9c749fcb52a2d7c7e56987884b8685dee0bb2707bd7f3d5cd761037a5cc04105",
+      "lines": 180,
+      "symbols": [
+        "PracticeSubscription",
+        "DragonPracticeCycles"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_build_evidence",
+        "dragon_native_curriculum",
+        "dragon_native_practice",
+        "dragon_native_projects",
+        "dragon_native_targets",
+        "dragon_practice_lab",
+        "os",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_practice_lab.py",
+      "scope": "runtime",
+      "sha256": "c201d4aaafcb89f34c4170dd4d7e0c24858e273b50df80858ab96313f2200074",
+      "lines": 394,
+      "symbols": [
+        "_hash",
+        "_fingerprint",
+        "_owner",
+        "_time",
+        "PracticePolicy",
+        "ApprovedLesson",
+        "PracticeAttempt",
+        "PracticeProgress",
+        "_policy",
+        "_validate_lesson",
+        "_choose_mechanics",
+        "_build_spec",
+        "DragonPracticeLab"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_game_forge",
+        "dragon_game_mechanics",
+        "dragon_knowledge_promotion",
+        "dragon_playable_prototype",
+        "hashlib",
+        "json",
+        "math",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_probabilistic_distillation.py",
+      "scope": "runtime",
+      "sha256": "93f38ff9d2774dd62419e7e51637d75d79da85fa99e2b4d5476206090a809f62",
+      "lines": 182,
+      "symbols": [
+        "EvidencePass",
+        "Belief",
+        "EvidencePolicy",
+        "_check_probability",
+        "_digest",
+        "ProbabilisticKnowledgeDistiller"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "math",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_probability_calibration.py",
+      "scope": "runtime",
+      "sha256": "9d8a3164d007bff0e4b492f3e0134e9c7ecd1e451db9a4c4733bddf1d4ba53b7",
+      "lines": 107,
+      "symbols": [
+        "CalibrationExample",
+        "CalibrationReport",
+        "calibration_report"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_proposal_store.py",
+      "scope": "runtime",
+      "sha256": "a433fb6606e54df2352a6304462e84702e42d75b5b543a18d647a8ce29dbb378",
+      "lines": 183,
+      "symbols": [
+        "ProposalRecord",
+        "DragonProposalStore"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_video_discovery",
+        "json",
+        "math",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_provenance_assurance.py",
+      "scope": "runtime",
+      "sha256": "e3a65dd8ed987051ff113430a8f7e1735aae3e4d2e251014222b9d3a79e07711",
+      "lines": 466,
+      "symbols": [
+        "_fingerprint",
+        "SourceCluster",
+        "ClusterHoldout",
+        "ResearchNextAction",
+        "ProvenanceAssurance",
+        "AssurancePolicy",
+        "_verify_policy",
+        "_manifest",
+        "_assured_groups",
+        "_actions",
+        "assure_crawler_evidence"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "dataclasses",
+        "dragon_adaptive_rereads",
+        "dragon_probabilistic_distillation",
+        "dragon_provenance_registry",
+        "dragon_source_independence",
+        "hashlib",
+        "json",
+        "math",
+        "typing",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_provenance_binding.py",
+      "scope": "runtime",
+      "sha256": "1770c69e1c45498c87f7bcf72ec1c59d4a25870ffabf91c28ca6baa625d3ace1",
+      "lines": 38,
+      "symbols": [
+        "bind_provenance_independence"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_probabilistic_distillation",
+        "dragon_source_independence"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_provenance_promotion.py",
+      "scope": "runtime",
+      "sha256": "70457312e1bb3844a5a8a6c369a4dba10cd525ffd615f1ddbfe84a1e1289cf0c",
+      "lines": 97,
+      "symbols": [
+        "CustodyPromotionReview",
+        "assess_custodied_promotion"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains",
+        "dragon_analysis_quality_gates",
+        "dragon_empirical_calibration",
+        "dragon_knowledge_promotion",
+        "dragon_probabilistic_distillation",
+        "dragon_provenance_assurance",
+        "dragon_provenance_registry",
+        "dragon_source_independence",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_provenance_registry.py",
+      "scope": "runtime",
+      "sha256": "3768e82edba42cea1ab67aaf15c1794f559cef7849f1b45e59b94eb3f3db8bf3",
+      "lines": 149,
+      "symbols": [
+        "SourceAttestation",
+        "ProvenancePolicy",
+        "ProvenanceReview",
+        "_hostname",
+        "ProvenanceRegistry"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_truth_verifier",
+        "dragon_video_history",
+        "hashlib",
+        "json",
+        "re",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_receipt_attestation.py",
+      "scope": "test",
+      "sha256": "320b19ad17e52c71511f516528248576df8aab72d54f8a9c2f371b7d98de8cbf",
+      "lines": 61,
+      "symbols": [
+        "ReceiptAttestation",
+        "DragonReceiptAttestations"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_worker_leases",
+        "hashlib",
+        "json",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_research_audit.py",
+      "scope": "runtime",
+      "sha256": "c374412ba8f50f5b28c9b8a841533f7853e46f7dda0370600b655c4d30eca1bf",
+      "lines": 113,
+      "symbols": [
+        "ResearchAuditEvent",
+        "DragonResearchAudit"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "math",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_research_discovery.py",
+      "scope": "runtime",
+      "sha256": "b40cf9b740eabfbc7eb7152323e442979aaaf79f51c2cab54b51d3c84ab959f0",
+      "lines": 249,
+      "symbols": [
+        "ResearchSource",
+        "ResearchHit",
+        "DiscoveryQuery",
+        "DiscoveryReceipt",
+        "_plain",
+        "_year",
+        "_hit",
+        "_records",
+        "_url",
+        "discover_research"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "enum",
+        "hashlib",
+        "json",
+        "re",
+        "typing",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_research_missions.py",
+      "scope": "runtime",
+      "sha256": "9846b4b36df8d05a53d3d8b28027571f0c21d4c5f8ffc5715d310a748869d83e",
+      "lines": 84,
+      "symbols": [
+        "ResearchInterest",
+        "MissionPolicy",
+        "ResearchMission",
+        "plan_research"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_research_discovery",
+        "hashlib",
+        "json",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_retro_assets.py",
+      "scope": "runtime",
+      "sha256": "a9b9e2b75c24d4b763906658e24ba17cecf93da787cc5b7c412ef09d18988406",
+      "lines": 142,
+      "symbols": [
+        "RetroTile",
+        "_validate",
+        "compile_tile",
+        "decode_tile",
+        "asset_tiles",
+        "gb_assembly",
+        "nes_assembly",
+        "enrich_gb_asm",
+        "enrich_nes_asm"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "re"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_revision_journal.py",
+      "scope": "runtime",
+      "sha256": "eece529a9521332bb671660eb1a39455f2dcff4551c0c8b306d04cff16b236a1",
+      "lines": 346,
+      "symbols": [
+        "_digest",
+        "_valid_digest",
+        "_identifier",
+        "RevisionEntry",
+        "RevisionJournal"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_crawl_revision",
+        "hashlib",
+        "json",
+        "math",
+        "sqlite3",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_runtime_events.py",
+      "scope": "runtime",
+      "sha256": "0ae64456bf55f2b942838542e8bc40b46043005116311302b3ab83c4fe07836c",
+      "lines": 61,
+      "symbols": [
+        "RuntimeEvent",
+        "DragonRuntimeEventLedger"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "math",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_session_projection.py",
+      "scope": "runtime",
+      "sha256": "aa754e56edb86560b85455eb6bb6c48e7ea91e25fcf5b828301088b6740be9c3",
+      "lines": 95,
+      "symbols": [
+        "DragonCrawlFeed",
+        "DragonSessionProjection"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_journal",
+        "math",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_signal_discovery.py",
+      "scope": "runtime",
+      "sha256": "d9f36156905f09f4bb4965caecf3da2112d7f8d2d52218119da0548bb7fc94c1",
+      "lines": 61,
+      "symbols": [
+        "SignalDiscoveryPolicy",
+        "rank_signal_aware_videos"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_interest_signals",
+        "dragon_video_discovery",
+        "dragon_video_history",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_signal_ledger.py",
+      "scope": "runtime",
+      "sha256": "4f954fcc22e1a033621e09a6f2699bdbc36fb14d68eba56754421e3197a66300",
+      "lines": 131,
+      "symbols": [
+        "SignalLedgerPolicy",
+        "DragonSignalLedger"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_interest_signals",
+        "json",
+        "math",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_source_independence.py",
+      "scope": "runtime",
+      "sha256": "dfaf73a42fd66f950a2b12ab35e82bae44e6d149eb2977b40bcb719041b04883",
+      "lines": 98,
+      "symbols": [
+        "SourceProvenance",
+        "DependencyCluster",
+        "_uri_identity",
+        "derive_dependency_clusters"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_state_inference_worker.py",
+      "scope": "runtime",
+      "sha256": "daf167370c10b5b7021f8bd36fb93a6b8a884173effbace725c3394220679c6b",
+      "lines": 62,
+      "symbols": [
+        "TrackState",
+        "StateInferenceOutput",
+        "execute_state_inference"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains",
+        "dragon_analysis_execution",
+        "dragon_object_tracking_worker",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_streaming_temporal.py",
+      "scope": "runtime",
+      "sha256": "79d9b9c41feb8709e95646dfc75f95089f3a23119879964ee57ec69b915b6b84",
+      "lines": 198,
+      "symbols": [
+        "StreamingTemporalTrace",
+        "_validate_config",
+        "_TemporalSegmentationState",
+        "segment_streaming_with_consent"
+      ],
+      "imports": [
+        "__future__",
+        "collections",
+        "dataclasses",
+        "dragon_consent_bound_queue",
+        "dragon_temporal_segmentation",
+        "hashlib",
+        "json",
+        "math",
+        "statistics",
+        "time",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_studio_graph.py",
+      "scope": "runtime",
+      "sha256": "a8ee1c1fc70d435c278bc75359eb8f27a8898e997a4b5d2336733beb81ac8f4c",
+      "lines": 81,
+      "symbols": [
+        "StudioScale",
+        "create_studio_plan"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_labyrinth"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_temporal_segmentation.py",
+      "scope": "runtime",
+      "sha256": "0c8d704c185bdf159fe961e74e316591c06b48a175578db853e94d096bbcf6c5",
+      "lines": 142,
+      "symbols": [
+        "FeatureFrame",
+        "TemporalEvent",
+        "SegmentationConfig",
+        "segment_feature_trace"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "math",
+        "statistics"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_temporal_worker.py",
+      "scope": "runtime",
+      "sha256": "9c9dcbeb8a627ed3eb5d6fafd703c68656be77d7f57b049d4f690cd23c030b05",
+      "lines": 93,
+      "symbols": [
+        "TemporalWorkerOutput",
+        "_fingerprint",
+        "execute_temporal_dispatch"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains",
+        "dragon_analysis_execution",
+        "dragon_temporal_segmentation",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_trial_ledger.py",
+      "scope": "runtime",
+      "sha256": "fc4fb6aa7bb0c2c2dac2e9886ad422b0566e68e7cc9ca9d81c7634787a928382",
+      "lines": 184,
+      "symbols": [
+        "TrialAssignment",
+        "TrialObservation",
+        "expected_randomized_intervention",
+        "cryptographic_allocation_evidence",
+        "DragonTrialLedger"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_mechanic_causal_analysis",
+        "hashlib",
+        "json",
+        "math",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_truth_review.py",
+      "scope": "runtime",
+      "sha256": "0725bcf53c5c278b76ad4b28d5d866d3190fcd650de7e3abae29290edae0558c",
+      "lines": 97,
+      "symbols": [
+        "VerificationBatchPolicy",
+        "ClaimReview",
+        "VerificationBatch",
+        "verify_claim_batch"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_truth_verifier",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_truth_verifier.py",
+      "scope": "runtime",
+      "sha256": "98e4667923cc5adb4ffb411048fff860ea1182f1b77695fb4cb663c982b7ab5f",
+      "lines": 247,
+      "symbols": [
+        "EvidenceStance",
+        "VerificationStatus",
+        "Claim",
+        "Evidence",
+        "VerificationPolicy",
+        "EvidenceAssessment",
+        "VerificationResult",
+        "_validate_claim",
+        "_validate_policy",
+        "_validate_evidence",
+        "verify_claim"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_video_history",
+        "enum",
+        "hashlib",
+        "json",
+        "math",
+        "re",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_uncertainty_calibration_worker.py",
+      "scope": "runtime",
+      "sha256": "2e3fb7c415c860bafab8015d872ccc175aa7342d07c093e173d10150144c19bc",
+      "lines": 67,
+      "symbols": [
+        "CalibratedClaim",
+        "UncertaintyCalibrationOutput",
+        "execute_uncertainty_calibration"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains",
+        "dragon_analysis_execution",
+        "dragon_cross_source_worker",
+        "dragon_empirical_calibration",
+        "hashlib",
+        "json",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_uncertainty_worker.py",
+      "scope": "runtime",
+      "sha256": "0d519abd78cb2017a3a49d097dc53e8ecc7844cb41f01e02a01b477be65011ed",
+      "lines": 66,
+      "symbols": [
+        "CalibratedClaim",
+        "UncertaintyCalibrationOutput",
+        "execute_uncertainty_calibration"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains",
+        "dragon_analysis_execution",
+        "dragon_cross_source_worker",
+        "dragon_empirical_calibration",
+        "hashlib",
+        "json",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_video_catalog.py",
+      "scope": "runtime",
+      "sha256": "bc081feb7c886dab0d157e4e06cdf452b1f03be3c937d90d4b2dc64cccdb4424",
+      "lines": 83,
+      "symbols": [
+        "CatalogPolicy",
+        "CatalogReceipt",
+        "ingest_video_catalog"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_video_discovery",
+        "dragon_video_history",
+        "hashlib",
+        "math",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_video_discovery.py",
+      "scope": "runtime",
+      "sha256": "0926e6ae6a03dbf7b793f3d28399e878aee082399e98ad42c262f1c5940b8619",
+      "lines": 49,
+      "symbols": [
+        "VideoCandidate",
+        "VideoProposal",
+        "rank_similar_videos"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_video_history",
+        "hashlib",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_video_history.py",
+      "scope": "runtime",
+      "sha256": "63078faf95318addd8f935f5b4687dfe3a5a847a83ea2ec90299e769ee49c1cc",
+      "lines": 87,
+      "symbols": [
+        "VideoVisit",
+        "canonical_video_url",
+        "DragonVideoHistory"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "ipaddress",
+        "json",
+        "math",
+        "sqlite3",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_visual_features.py",
+      "scope": "runtime",
+      "sha256": "7ae27c25a3ce1a6032cc13a839d101453a3d52f5b917b6e3cc394fdfc564971e",
+      "lines": 46,
+      "symbols": [
+        "VisualObservation",
+        "VisualFeatureBatch",
+        "bind_visual_observations"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_consent_bound_queue",
+        "dragon_frame_custody",
+        "dragon_temporal_segmentation",
+        "hashlib",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_visual_runtime_ingest.py",
+      "scope": "runtime",
+      "sha256": "14c9a5483c2e8cfe9169a8b058e7e1ef6ca4303a12efffe4a27328aa3f9c1c8b",
+      "lines": 74,
+      "symbols": [
+        "VisualRuntimeIngest",
+        "_digest",
+        "_commit_stage",
+        "ingest_browser_visual"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_analysis_chains",
+        "dragon_analysis_runtime",
+        "dragon_browser_visual_import",
+        "dragon_consent_bound_queue",
+        "dragon_motion_features",
+        "dragon_runtime_events",
+        "dragon_streaming_temporal",
+        "hashlib",
+        "json",
+        "math",
+        "time",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_visual_state.py",
+      "scope": "runtime",
+      "sha256": "4ee9c21e5e1664edf58b28e4f80d25eb3bdfd29eae086dcd96aed30c23a83dc1",
+      "lines": 24,
+      "symbols": [
+        "DragonVisualState",
+        "visual_state"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_worker_leases.py",
+      "scope": "runtime",
+      "sha256": "5e1a53144df20264f339aa05232acb29566e198a0cb3416723096aea7635acb1",
+      "lines": 104,
+      "symbols": [
+        "WorkerLease",
+        "DragonWorkerLeases"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "math",
+        "secrets",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/durable_frontier.py",
+      "scope": "runtime",
+      "sha256": "843b6a67adedf183224278c83f5774ef534fe974d1e794d13dd8af02154a954e",
+      "lines": 47,
+      "symbols": [
+        "DurableClaim",
+        "DurableFrontier"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "sqlite3",
+        "uuid"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/evidence_retrieval_bridge.py",
+      "scope": "runtime",
+      "sha256": "e1c4bd8840461d85b768f038078847500c9f154ae4732dce2b7b974f21b4718a",
+      "lines": 155,
+      "symbols": [
+        "CrawlRetrievalBridgeError",
+        "_digest_json",
+        "_ppm",
+        "CrawlRetrievalRecord",
+        "_verified_provenance",
+        "bridge_crawl_document"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "dataclasses",
+        "governance",
+        "hashlib",
+        "ingestion",
+        "json",
+        "skeleton.ai.context.flgb_context_runtime",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/evidence_revision.py",
+      "scope": "runtime",
+      "sha256": "7a25c5c422a3d9f86343aa2b55d365147031a5e28fee5ebc838348a8de4c0030",
+      "lines": 14,
+      "symbols": [
+        "RevisionReceipt",
+        "_digest",
+        "revision_receipt"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_builder_cli.py",
+      "scope": "runtime",
+      "sha256": "f0364b4d92ed47e11b0df65844e3cb25f058eff566b78e5a308645f04ac80196",
+      "lines": 231,
+      "symbols": [
+        "import_research_captures",
+        "run"
+      ],
+      "imports": [
+        "__future__",
+        "argparse",
+        "core",
+        "game_builder_knowledge_runtime",
+        "game_knowledge_design",
+        "game_playable_builder",
+        "game_scale_campaign",
+        "game_scale_campaign_hub",
+        "game_scale_feedback",
+        "game_scale_integration",
+        "game_scale_mass_production",
+        "game_scale_world",
+        "hashlib",
+        "json",
+        "pathlib",
+        "sqlite3",
+        "time",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_builder_knowledge_runtime.py",
+      "scope": "runtime",
+      "sha256": "6995036595ac1d54fcd39da322c91efcd3ae503285b4ab6fb4307b9f6c4d0a04",
+      "lines": 185,
+      "symbols": [
+        "GameKnowledgeBuild",
+        "KnowledgeDrivenGameBuilder"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "dataclasses",
+        "dragon_game_builder_bridge",
+        "game_godot_export",
+        "game_knowledge_acquisition",
+        "game_knowledge_design",
+        "game_knowledge_index",
+        "game_playable_builder",
+        "hashlib",
+        "io",
+        "sqlite3",
+        "typing",
+        "zipfile"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_godot_export.py",
+      "scope": "runtime",
+      "sha256": "53c86b5d949b40ea033405290d095e0858c6d0c251ecaea1590165b5ffe45b11",
+      "lines": 349,
+      "symbols": [
+        "GodotProject",
+        "compile_godot_project",
+        "export_godot_game_archive"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "game_knowledge_design",
+        "game_playable_builder",
+        "hashlib",
+        "io",
+        "json",
+        "zipfile"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_knowledge_acquisition.py",
+      "scope": "runtime",
+      "sha256": "d808fe2c1429da5e6778dacce5c90ec9bb4a8a9c0f418268589a34506a92b523",
+      "lines": 418,
+      "symbols": [
+        "GameSource",
+        "KnowledgePassage",
+        "GameParameter",
+        "EngineSymbol",
+        "_validated_document",
+        "plan_game_research",
+        "discover_game_research",
+        "prioritize_game_sources",
+        "queue_game_sources",
+        "acquire_game_documents",
+        "extract_game_sections",
+        "extract_game_mechanics",
+        "extract_engine_symbols",
+        "extract_game_parameters",
+        "extract_design_guidance",
+        "official_game_documentation",
+        "enqueue_official_game_docs"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "dataclasses",
+        "dragon_mission_quality",
+        "dragon_research_discovery",
+        "hashlib",
+        "math",
+        "re",
+        "typing",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_knowledge_design.py",
+      "scope": "runtime",
+      "sha256": "04380d201bfe6b51e74c27b9e98f864240f5970bb6d559eb6be5a84330db39fc",
+      "lines": 317,
+      "symbols": [
+        "GameBlueprint",
+        "LevelMetrics",
+        "propose_game_blueprint",
+        "select_game_mechanics",
+        "resolve_mechanic_dependencies",
+        "budget_game_mechanics",
+        "design_player_physics",
+        "design_level_geometry",
+        "estimate_jump_reach",
+        "find_level_route",
+        "populate_game_level",
+        "analyze_level_playability"
+      ],
+      "imports": [
+        "__future__",
+        "collections",
+        "dataclasses",
+        "game_knowledge_index",
+        "hashlib",
+        "json",
+        "math",
+        "random"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_knowledge_index.py",
+      "scope": "runtime",
+      "sha256": "8b7c0de077b00f3b4c5e116eac532c5d0e2cb4746a2bb56e1c7ad5c94cfe9907",
+      "lines": 416,
+      "symbols": [
+        "_terms",
+        "GameKnowledgeHit",
+        "ContradictionCandidate",
+        "KnowledgeGap",
+        "GameKnowledgeIndex"
+      ],
+      "imports": [
+        "__future__",
+        "collections",
+        "core",
+        "dataclasses",
+        "game_knowledge_acquisition",
+        "game_knowledge_relations",
+        "hashlib",
+        "json",
+        "re",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_knowledge_relations.py",
+      "scope": "runtime",
+      "sha256": "ccc90ae7ba2faaa15334d4377111bcf536921b6f22609b54ed73e1b146c5017f",
+      "lines": 69,
+      "symbols": [
+        "MechanicRelation",
+        "extract_mechanic_dependencies"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "game_knowledge_acquisition",
+        "re"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_playable_builder.py",
+      "scope": "runtime",
+      "sha256": "4300c046011506e468f86f901aad9c098265e392c8d53180a59a5de504e311d8",
+      "lines": 483,
+      "symbols": [
+        "CompiledGame",
+        "_valid",
+        "compile_scene_entities",
+        "compile_tile_collision",
+        "compile_input_controls_js",
+        "compile_physics_system_js",
+        "compile_enemy_behaviors_js",
+        "compile_gameplay_system_js",
+        "compile_camera_system_js",
+        "compile_rendering_system_js",
+        "build_playable_web_game",
+        "export_playable_game_archive"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "game_knowledge_design",
+        "hashlib",
+        "html",
+        "io",
+        "json",
+        "re",
+        "zipfile"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_assets.py",
+      "scope": "runtime",
+      "sha256": "a4a4026deddd10a1b7443e41558ff84fce26f8283b53367df75954078cdfc440",
+      "lines": 229,
+      "symbols": [
+        "Sprite",
+        "generate_game_palette",
+        "procedural_heightmap",
+        "classify_terrain_biomes",
+        "procedural_sprite",
+        "sprite_to_svg",
+        "animate_sprite",
+        "pack_sprite_atlas",
+        "synthesize_game_effect",
+        "compose_game_melody",
+        "render_game_melody"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "html",
+        "io",
+        "math",
+        "random",
+        "struct",
+        "wave"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_balancing.py",
+      "scope": "runtime",
+      "sha256": "4bd4b938f970455ab799531fe00cad25f44982455781e2791caed30d1cf4865a",
+      "lines": 156,
+      "symbols": [
+        "PlayBalance",
+        "estimate_level_clear_time",
+        "analyze_collectible_reachability",
+        "compute_route_risk",
+        "evaluate_reward_distribution",
+        "analyze_jump_gap_requirements",
+        "evaluate_game_balance",
+        "tune_player_speed",
+        "tune_jump_physics",
+        "simulate_input_latency",
+        "optimize_level_variants"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "game_knowledge_design",
+        "game_scale_npc_ai",
+        "math",
+        "random"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_campaign.py",
+      "scope": "runtime",
+      "sha256": "200c2fccf2e73f1dcdfecac3419b2c5c13548b932f212f3b115f0288e88b2ef8",
+      "lines": 246,
+      "symbols": [
+        "Chapter",
+        "Campaign",
+        "HeroProgress",
+        "compose_game_campaign",
+        "validate_campaign_graph",
+        "available_campaign_chapters",
+        "plan_campaign_path",
+        "award_campaign_experience",
+        "upgrade_hero_skill",
+        "complete_campaign_chapter",
+        "generate_game_campaign",
+        "encode_campaign_save",
+        "decode_campaign_save",
+        "export_campaign_archive"
+      ],
+      "imports": [
+        "__future__",
+        "collections",
+        "dataclasses",
+        "game_knowledge_design",
+        "game_knowledge_index",
+        "game_playable_builder",
+        "hashlib",
+        "html",
+        "io",
+        "json",
+        "zipfile"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_campaign_hub.py",
+      "scope": "runtime",
+      "sha256": "3e4b8a1073ee6916d77bc470dd12da8cc4c9106de0f6ebd37ad4d20d810d10c4",
+      "lines": 304,
+      "symbols": [
+        "_safe_json",
+        "_level_with_completion",
+        "render_campaign_hub",
+        "export_interactive_campaign"
+      ],
+      "imports": [
+        "__future__",
+        "game_playable_builder",
+        "game_scale_campaign",
+        "hashlib",
+        "html",
+        "io",
+        "json",
+        "zipfile"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_catalog.py",
+      "scope": "runtime",
+      "sha256": "20d83cf7d9de734a773c9d0cbf06fc7bf9c63d53befe2d9958d9e50b779f7b3e",
+      "lines": 88,
+      "symbols": [
+        "Milestone",
+        "game_milestone_by_number",
+        "grouped_game_milestones"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "importlib"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_combat.py",
+      "scope": "runtime",
+      "sha256": "e1e188be43976d0beabd2dd11875acc8d61c70f1f7ae8ccdb6c48a1318781367",
+      "lines": 187,
+      "symbols": [
+        "Weapon",
+        "Fighter",
+        "Projectile",
+        "Status",
+        "CombatHit",
+        "configure_weapon",
+        "create_weapon_loadout",
+        "combat_overlap",
+        "melee_targets",
+        "fire_projectile",
+        "advance_projectiles",
+        "apply_combat_damage",
+        "apply_knockback",
+        "advance_combat_status",
+        "generate_combat_wave"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "math",
+        "random"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_economy.py",
+      "scope": "runtime",
+      "sha256": "668c9ef1b1e8b1a39bc555f70078b4fdbc3b9bf4fa2260ffbdd992e8c602bae6",
+      "lines": 149,
+      "symbols": [
+        "Item",
+        "Inventory",
+        "Recipe",
+        "TradingPost",
+        "_stock",
+        "_pack",
+        "define_game_item",
+        "inventory_add",
+        "inventory_remove",
+        "trade_inventory_item",
+        "craft_item",
+        "equip_character",
+        "use_consumable",
+        "merchant_purchase",
+        "roll_loot_table",
+        "simulate_game_economy"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "random"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_editor.py",
+      "scope": "runtime",
+      "sha256": "e720511fe2d17b23621528d19159df694d51852cb291f31a228ef1a95b630404",
+      "lines": 162,
+      "symbols": [
+        "EditorHistory",
+        "_grid",
+        "_finish",
+        "_inside",
+        "open_editor_history",
+        "record_editor_edit",
+        "paint_scene_tile",
+        "paint_scene_brush",
+        "flood_scene_region",
+        "draw_scene_rectangle",
+        "relocate_player_spawn",
+        "relocate_level_exit",
+        "copy_scene_region",
+        "paste_scene_region",
+        "undo_scene_edit",
+        "redo_scene_edit"
+      ],
+      "imports": [
+        "__future__",
+        "collections",
+        "dataclasses",
+        "game_knowledge_design",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_feedback.py",
+      "scope": "runtime",
+      "sha256": "d056f8e3a9550f1b787520b4a0e8707a3261d84637092a7293f723fdac9dd8d1",
+      "lines": 233,
+      "symbols": [
+        "GameplayEvent",
+        "SessionFeedback",
+        "PlayerTuning",
+        "_finite",
+        "decode_play_sessions",
+        "analyze_player_feedback",
+        "tune_game_from_feedback",
+        "instrument_playable_telemetry"
+      ],
+      "imports": [
+        "__future__",
+        "collections",
+        "dataclasses",
+        "game_knowledge_design",
+        "hashlib",
+        "json",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_integration.py",
+      "scope": "runtime",
+      "sha256": "b3a39f1257aa0b08b54d686423567c68652f8887497cb45d530bdd1f0830c202",
+      "lines": 156,
+      "symbols": [
+        "EnhancedGame",
+        "_assets",
+        "_enhance_html",
+        "build_enhanced_game"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "game_knowledge_design",
+        "game_playable_builder",
+        "game_scale_assets",
+        "game_scale_balancing",
+        "game_scale_campaign",
+        "game_scale_feedback",
+        "game_scale_live_systems",
+        "game_scale_playable_systems",
+        "game_scale_studio",
+        "hashlib",
+        "io",
+        "json",
+        "zipfile"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_live_systems.py",
+      "scope": "runtime",
+      "sha256": "3749bd925f04cd979c432a5a1484b46658ca82c0ab9718134f79cf4ab86be880",
+      "lines": 95,
+      "symbols": [
+        "integrate_live_progression"
+      ],
+      "imports": [
+        "__future__"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_mass_production.py",
+      "scope": "runtime",
+      "sha256": "38b0507624a752a78733cc2440307231f17e7f4100e547349d2618a138940825",
+      "lines": 142,
+      "symbols": [
+        "ProducedGame",
+        "GamePortfolio",
+        "produce_game_portfolio"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "game_knowledge_design",
+        "game_knowledge_index",
+        "game_playable_builder",
+        "game_scale_balancing",
+        "hashlib",
+        "html",
+        "io",
+        "json",
+        "sqlite3",
+        "zipfile"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_npc_ai.py",
+      "scope": "runtime",
+      "sha256": "95a2857a8965a218361650c83f44827653c0c7b829f9e99140cf4cf75320b47f",
+      "lines": 187,
+      "symbols": [
+        "AgentIntent",
+        "_ok",
+        "_neighbors",
+        "navigation_reachable",
+        "npc_astar",
+        "npc_dijkstra",
+        "npc_line_of_sight",
+        "npc_find_cover",
+        "npc_patrol_route",
+        "npc_chase",
+        "npc_flee",
+        "npc_separation",
+        "npc_choose_action"
+      ],
+      "imports": [
+        "__future__",
+        "collections",
+        "dataclasses",
+        "heapq",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_playable_systems.py",
+      "scope": "runtime",
+      "sha256": "3834ea44548ba156691ed72f5a4b75d83407c0399890eddc5888f5e676433d22",
+      "lines": 198,
+      "symbols": [
+        "integrate_advanced_gameplay"
+      ],
+      "imports": [
+        "__future__"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_research.py",
+      "scope": "runtime",
+      "sha256": "d68208e57fab2179ce94c2638dfde27fbce45e3d2af51f8ded6407667c4ae959",
+      "lines": 191,
+      "symbols": [
+        "CitedInstruction",
+        "ConceptDefinition",
+        "EngineComparison",
+        "LearningStep",
+        "find_game_code_examples",
+        "identify_game_engine_families",
+        "extract_game_glossary",
+        "extract_game_constraints",
+        "summarize_game_topics",
+        "compare_engine_implementations",
+        "retrieve_mechanic_examples",
+        "plan_game_knowledge_gaps",
+        "compile_game_reference_pack",
+        "build_mechanic_learning_curriculum"
+      ],
+      "imports": [
+        "__future__",
+        "collections",
+        "core",
+        "dataclasses",
+        "game_knowledge_acquisition",
+        "game_knowledge_design",
+        "game_knowledge_index",
+        "hashlib",
+        "re"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_story.py",
+      "scope": "runtime",
+      "sha256": "eae3df7368d3140f56f493c0700d2ecb1c2eba4643a3b8fa4ef8bceec0318cc2",
+      "lines": 198,
+      "symbols": [
+        "Objective",
+        "Quest",
+        "QuestProgress",
+        "DialogueChoice",
+        "DialogueNode",
+        "StoryState",
+        "define_quest",
+        "schedule_quest_dependencies",
+        "activate_available_quests",
+        "apply_quest_event",
+        "complete_quest",
+        "available_dialogue_choices",
+        "advance_dialogue",
+        "generate_dialogue_arc",
+        "update_faction_reputation",
+        "story_save_slot",
+        "restore_story_slot"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "random"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_studio.py",
+      "scope": "runtime",
+      "sha256": "fe78d57fe58b58d24ec9dd623b11b19aa7f7fb83e3ee3422c8ba2fa0b80b3d08",
+      "lines": 249,
+      "symbols": [
+        "generate_level_studio"
+      ],
+      "imports": [
+        "__future__",
+        "game_knowledge_design",
+        "game_playable_builder",
+        "html",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_world.py",
+      "scope": "runtime",
+      "sha256": "f632c4b670f7b018cc0b558884edcd9dcf299be1f8385e57e413beb8857efa77",
+      "lines": 281,
+      "symbols": [
+        "Room",
+        "WorldRegion",
+        "_digest",
+        "_replace_grid",
+        "generate_room_graph",
+        "create_shortcuts",
+        "pack_world_rooms",
+        "carve_world_rooms",
+        "connect_world_corridors",
+        "choose_distant_exit",
+        "distribute_world_hazards",
+        "distribute_world_secrets",
+        "select_world_checkpoints",
+        "generate_world_region",
+        "world_region_to_blueprint"
+      ],
+      "imports": [
+        "__future__",
+        "collections",
+        "dataclasses",
+        "game_knowledge_design",
+        "game_scale_npc_ai",
+        "hashlib",
+        "json",
+        "math",
+        "random"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/generation_bridge.py",
+      "scope": "runtime",
+      "sha256": "d44d08911c2257bcf7002a34fb52fb01d60878b1dca032bdbfdd1f36451d21bd",
+      "lines": 97,
+      "symbols": [
+        "EvidenceGenerationError",
+        "EvidenceGenerationReceipt",
+        "EvidenceGenerationResult",
+        "generate_from_crawl_context"
+      ],
+      "imports": [
+        "__future__",
+        "context_bridge",
+        "dataclasses",
+        "hashlib",
+        "hmac",
+        "skeleton.ai.model_runtime.native_llm_runtime",
+        "skeleton.ai.model_runtime.runtime_contracts"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/governance.py",
+      "scope": "runtime",
+      "sha256": "fe1ea2d9e85d3e0ea634aa6b94c5fa19dd3e13a825bb0c532aa7df79c4cb3c60",
+      "lines": 47,
+      "symbols": [
+        "PromotionDecision",
+        "PromotionGate",
+        "HostHealth",
+        "HostBudgetController"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "research",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/historical_bias.py",
+      "scope": "runtime",
+      "sha256": "c0a62a23106a575bddcf747e29e0921654671af8fba6f458cf6e240bf23d7513",
+      "lines": 25,
+      "symbols": [
+        "HistoricalBias",
+        "HistoricalBiasAnalyzer"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/http.py",
+      "scope": "runtime",
+      "sha256": "d560344965b0a5f6da611e91c295a386f254017574c661499e9276cdd15a2d87",
+      "lines": 58,
+      "symbols": [
+        "UnsafeDestination",
+        "_validate_destination",
+        "_NoRedirect",
+        "SafeHttpFetcher"
+      ],
+      "imports": [
+        "__future__",
+        "bound_http",
+        "core",
+        "dataclasses",
+        "socket",
+        "time",
+        "urllib.error",
+        "urllib.parse",
+        "urllib.request"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/information_gain.py",
+      "scope": "runtime",
+      "sha256": "6e0ec3c0d51b94197b0961edcbdc1788525efafe8405da0e8b5ef6df53e6b4ef",
+      "lines": 21,
+      "symbols": [
+        "InformationGain",
+        "binary_entropy",
+        "expected_binary_information_gain"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/ingestion.py",
+      "scope": "runtime",
+      "sha256": "38521efe1317b998e34b3c03ca52bf00aca6b1ff2f45444e01711f7983ea05c4",
+      "lines": 29,
+      "symbols": [
+        "RetrievalSink",
+        "IngestionReceipt",
+        "GovernedIngestor"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "dataclasses",
+        "governance",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/ingestion_registry.py",
+      "scope": "runtime",
+      "sha256": "824717e93730a0f9165ce8be6d8788f3c9a074aff36dad945e51974af590b6d1",
+      "lines": 38,
+      "symbols": [
+        "IngestionLease",
+        "DurableIngestionRegistry"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "json",
+        "sqlite3",
+        "uuid"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/knowledge_bridge.py",
+      "scope": "runtime",
+      "sha256": "1739373a5daf14ac502f5f443dfde6caaa6f1cd19f21247493a017fd8ff3eb46",
+      "lines": 40,
+      "symbols": [
+        "KnowledgeBridgeReceipt",
+        "CanonicalKnowledgeBridge"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "dataclasses",
+        "governance",
+        "hashlib",
+        "skeleton.ai.runtime.knowledge.store"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/lag_signals.py",
+      "scope": "runtime",
+      "sha256": "d74f480753662f42d05f635c9e44d6e78c6ae15547878b8a6f3cadc3b638db5a",
+      "lines": 22,
+      "symbols": [
+        "LagSignal",
+        "_pearson",
+        "lag_scan"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/leases.py",
+      "scope": "runtime",
+      "sha256": "168ece8f304e51ae8271b4394f6f1e7815ee778691312c013c36bd4e6c3b634c",
+      "lines": 31,
+      "symbols": [
+        "Lease",
+        "SqliteLeaseStore"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "sqlite3",
+        "time",
+        "uuid"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/migrations.py",
+      "scope": "runtime",
+      "sha256": "ca8676394baa0e38ab5e36bb938455e25bf1855101afb4268e8f42b804de9788",
+      "lines": 46,
+      "symbols": [
+        "migrate"
+      ],
+      "imports": [
+        "__future__"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/mime.py",
+      "scope": "runtime",
+      "sha256": "81665fb54bc8ffe9eb28491a7a08d98a21710b14cec1748053976a0f1c764082",
+      "lines": 27,
+      "symbols": [
+        "ExtractedPayload",
+        "MimeExtractor"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "json",
+        "re"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/outbox.py",
+      "scope": "runtime",
+      "sha256": "2f903464f1492894488f7001bce11583553ee6fd2eaa47f9ac39f50be042e924",
+      "lines": 29,
+      "symbols": [
+        "OutboxOperation",
+        "IngestionOutbox"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/providers.py",
+      "scope": "runtime",
+      "sha256": "f6e74449c577b0dbcb3daf006f88b1284489681c894dd53925fa110ad20d67ac",
+      "lines": 63,
+      "symbols": [
+        "SourceCandidate",
+        "ProviderFailure",
+        "SourceProvider",
+        "FederatedDiscovery"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "dataclasses",
+        "math",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/recrawl.py",
+      "scope": "runtime",
+      "sha256": "9a1e6e7e6f0bbfb8eb73f4eaa0779760cb0317662ed730236288e1ba86131a55",
+      "lines": 37,
+      "symbols": [
+        "RecrawlItem",
+        "RecrawlScheduler"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "heapq",
+        "math",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/redirects.py",
+      "scope": "runtime",
+      "sha256": "b2a2ab3dff86d623c0fc081a684f7365c3992c4c74c6e566e6e4a66959051a7a",
+      "lines": 61,
+      "symbols": [
+        "RedirectPolicyError",
+        "RedirectFetchError",
+        "fetch_with_policy",
+        "fetch_robots_with_policy"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/regime_assurance.py",
+      "scope": "runtime",
+      "sha256": "0494630cc6d86f22236cd4c0b37e767b64e6af5afd92d07471f91e64805b24b5",
+      "lines": 14,
+      "symbols": [
+        "ChangePointDecision",
+        "gate_change_points"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/regime_trajectory.py",
+      "scope": "runtime",
+      "sha256": "a04add71f1aa6202e623b8ae7433b8f22c1cda22a131ffad6c8d804ea5633196",
+      "lines": 24,
+      "symbols": [
+        "RegimeTransition",
+        "classify_regime_transitions"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/regimes.py",
+      "scope": "runtime",
+      "sha256": "a9b84b78543b281f8d5de3bbe54c7dc71ffc11255038ad42e012ae19ff75a7f3",
+      "lines": 40,
+      "symbols": [
+        "Regime",
+        "ChangePoint",
+        "_features",
+        "RegimeDetector"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/research.py",
+      "scope": "runtime",
+      "sha256": "bed602c63c1c06a8507ab56c2a7117740509d3008f6cc4c62f38108a1059d89d",
+      "lines": 236,
+      "symbols": [
+        "tokens",
+        "lexical_relevance",
+        "ResearchQuery",
+        "EvidenceObservation",
+        "Contradiction",
+        "EvidenceSet",
+        "frontier_priority"
+      ],
+      "imports": [
+        "__future__",
+        "citation_lineage",
+        "contradiction_history",
+        "core",
+        "counterfactual",
+        "dataclasses",
+        "decade_signals",
+        "hashlib",
+        "historical_bias",
+        "math",
+        "re",
+        "regime_trajectory",
+        "regimes",
+        "source_dependence",
+        "typing",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/research_controller.py",
+      "scope": "runtime",
+      "sha256": "f5cda9035658fd8f090c49a209b737dd72733cebc0875372df81523f929acb2c",
+      "lines": 19,
+      "symbols": [
+        "ControllerCandidate",
+        "ControllerChoice",
+        "choose_next_action"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "information_gain"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/research_learning.py",
+      "scope": "runtime",
+      "sha256": "030bfdb99f66daf5adc7070a312680b1e0d630a435435a4917423baaf43c7f01",
+      "lines": 20,
+      "symbols": [
+        "ResearchLearningStore"
+      ],
+      "imports": [
+        "__future__",
+        "action_learning",
+        "dataclasses",
+        "hashlib",
+        "json"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/research_state.py",
+      "scope": "runtime",
+      "sha256": "80a731ebe8a6ea427f3b41c51d22e9878efa4140368d986b5332911df4d7e85a",
+      "lines": 25,
+      "symbols": [
+        "ResearchStateStore"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "evidence_revision",
+        "json",
+        "source_quality",
+        "temporal_retrieval"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/retrieval_bridge.py",
+      "scope": "runtime",
+      "sha256": "0a35c4efb10d8e0bedcf19fcf484da8e66582e17a5da1d358690df4e71a909d0",
+      "lines": 55,
+      "symbols": [
+        "RetrievalBridgeReceipt",
+        "CanonicalRetrievalBridge"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "dataclasses",
+        "governance",
+        "ingestion_registry",
+        "outbox",
+        "research",
+        "temporal_retrieval",
+        "time"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/sequential_evidence.py",
+      "scope": "runtime",
+      "sha256": "0f177ec771a60017f1a3d7e25b87d64b83260597a3bcb32b9927429d1f52823c",
+      "lines": 14,
+      "symbols": [
+        "SequentialDecision",
+        "sequential_bernoulli"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/session.py",
+      "scope": "runtime",
+      "sha256": "450a9a7851983d4d9838c25de575b3e2b3c51de3c815cf60940dcd8d5c4a7955",
+      "lines": 35,
+      "symbols": [
+        "SessionLimits",
+        "ResearchSession"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "dataclasses",
+        "hashlib",
+        "research",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/shapley.py",
+      "scope": "runtime",
+      "sha256": "fe2909634fe7d12229274175e355ef115bab79c7fa97dbe1b64296e3e46c1c37",
+      "lines": 22,
+      "symbols": [
+        "SourceAttribution",
+        "approximate_shapley"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "random"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/source_dependence.py",
+      "scope": "runtime",
+      "sha256": "de541df420e410bb94e2bbd030f9f2efbed7c82a83ac91dcef1fccf1dc82b030",
+      "lines": 40,
+      "symbols": [
+        "DependenceEdge",
+        "source_dependence",
+        "merge_citation_dependence",
+        "independent_host_count"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "re",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/source_quality.py",
+      "scope": "runtime",
+      "sha256": "391a6674256bb8de8b74a82cc816afeb2e8985fadb1c2aa262a532ba912e08a3",
+      "lines": 15,
+      "symbols": [
+        "SourcePosterior",
+        "update_source_quality",
+        "conservative_quality"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/stopping.py",
+      "scope": "runtime",
+      "sha256": "c039d74952b1189f22c58881c1224e0c8521ba61fddc3c0d8794fdf001952d7f",
+      "lines": 13,
+      "symbols": [
+        "ResearchStopDecision",
+        "decide_research_stop"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/storage.py",
+      "scope": "runtime",
+      "sha256": "10b57d8d7d07209d6d00832aa0d175194a40cd7139c6a79957448d601cbf020d",
+      "lines": 57,
+      "symbols": [
+        "SqliteCrawlStore"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "dataclasses",
+        "json",
+        "migrations",
+        "os",
+        "pathlib",
+        "sqlite3",
+        "tempfile",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/temporal.py",
+      "scope": "runtime",
+      "sha256": "ef18e57bd73a569ea54994cc5222e9ce943d2ca914d10708ce38139747f03b01",
+      "lines": 68,
+      "symbols": [
+        "TemporalVersion",
+        "ChangeEvent",
+        "TemporalCorpus"
+      ],
+      "imports": [
+        "__future__",
+        "core",
+        "dataclasses",
+        "difflib",
+        "hashlib",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/temporal_retrieval.py",
+      "scope": "runtime",
+      "sha256": "5e3ca7ed55b4c489b24e1ed399e84a1c1ca5f1970f7dea3da6143867fd2a114e",
+      "lines": 22,
+      "symbols": [
+        "TemporalFragment",
+        "TemporalRetrievalCatalog"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/temporal_scope.py",
+      "scope": "runtime",
+      "sha256": "d19b072f25fdd567315b9732830b499ab1ffdb7da60063047aa89eb56afa009f",
+      "lines": 13,
+      "symbols": [
+        "TemporalScope",
+        "filter_temporal"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/temporal_semantics.py",
+      "scope": "runtime",
+      "sha256": "e5a60d1ea21a1f0a4e43c5360594f892f5aa3426456c162f0245c4a258f3d875",
+      "lines": 23,
+      "symbols": [
+        "TemporalSemantics",
+        "_epoch",
+        "infer_temporal_semantics"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "re"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/traps.py",
+      "scope": "runtime",
+      "sha256": "2380bb9817b5cba11705bd26ac22b9e421ffc62abd3b37c791f24235740543d9",
+      "lines": 22,
+      "symbols": [
+        "TrapDecision",
+        "TrapGuard"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "re",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/uncertainty.py",
+      "scope": "runtime",
+      "sha256": "cfc93ee987472c436b92a952f2a607c37fb0f4bf3305fd82f23f455f1ddd4966",
+      "lines": 19,
+      "symbols": [
+        "Interval",
+        "deterministic_bootstrap",
+        "polarity_uncertainty"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "random"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/value_of_information.py",
+      "scope": "runtime",
+      "sha256": "5894aedd34ae4cc890a224988092b764af14b5585a0bfbf13c1600005d87ca44",
+      "lines": 19,
+      "symbols": [
+        "ResearchAction",
+        "ActionValue",
+        "rank_actions"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "math"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/video_adapter.py",
+      "scope": "runtime",
+      "sha256": "a48d9f7f752db3bae46de61ceecd8d44750c714f64cf1ad2aeea75f4d5d0995c",
+      "lines": 44,
+      "symbols": [
+        "VideoSourceGrant",
+        "VideoAdapterFrame",
+        "VideoObservationAdapter",
+        "ingest_authorized_video"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "typing",
+        "video_digest",
+        "video_stream"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/video_claims.py",
+      "scope": "runtime",
+      "sha256": "790f95e3c9cafe673c853d71807c1c2b65662588573d31e42f02221f4db09780",
+      "lines": 29,
+      "symbols": [
+        "VideoClaim",
+        "propose_video_claims"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "video_digest"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/video_digest.py",
+      "scope": "runtime",
+      "sha256": "3d982b51ac808ed276e220364b7be337c766a33f528073307371a4d7fe8f7804",
+      "lines": 70,
+      "symbols": [
+        "VideoObservation",
+        "VideoKnowledgeChunk",
+        "validate_observation",
+        "digest_video_observations"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "math",
+        "typing"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/video_memory_bridge.py",
+      "scope": "runtime",
+      "sha256": "7848c00992ad79c1c3164d3c7819b30476e3553b04f349a6b7bf70f8ec5f0fb3",
+      "lines": 33,
+      "symbols": [
+        "VideoIndexReceipt",
+        "commit_video_knowledge"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dragon_journal",
+        "typing",
+        "video_digest"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/video_stream.py",
+      "scope": "runtime",
+      "sha256": "d2c583b693b0d72e0be8a10cf0fecb35c90415ed1a5d85c4552eb0a42ffab7b6",
+      "lines": 40,
+      "symbols": [
+        "VideoStreamSession"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "video_digest"
+      ]
+    },
+    {
+      "path": "skeleton/ai/webcrawler/year_signals.py",
+      "scope": "runtime",
+      "sha256": "039c116e00d2318ea7e66512725c762dd773ca00c78f548cca8a384f4208272b",
+      "lines": 25,
+      "symbols": [
+        "YearSignalDelta",
+        "YearSignalSeries"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "typing"
+      ]
+    }
+  ],
+  "full_inventory_sha256": "a9b4ab658155196d2183d14a5aa722cfe1af5014c8373f4b2c99ad2eee1a45dd"
+}

@@ -28,6 +28,9 @@ class DragonRuntimeEventLedger:
   if evidence_fingerprint and (len(evidence_fingerprint)!=64 or any(c not in "0123456789abcdef" for c in evidence_fingerprint)):
    raise ValueError("invalid event evidence fingerprint")
   if len(error_code)>128: raise ValueError("error code too long")
+  if isinstance(occurred_at,bool) or not isinstance(occurred_at,(int,float)) or occurred_at<0:
+   raise ValueError("invalid runtime event time")
+  occurred_at=float(occurred_at)
   row=self.db.execute("""SELECT sequence,event_hash,occurred_at FROM dragon_runtime_events
    WHERE owner=? AND run_id=? ORDER BY sequence DESC LIMIT 1""",(owner,run_id)).fetchone()
   seq=1 if row is None else row[0]+1;prev="0"*64 if row is None else row[1]
@@ -56,6 +59,9 @@ class DragonRuntimeEventLedger:
   for e in events:
    body=[e.owner,e.run_id,e.sequence,e.event_type,e.layer,e.outcome,e.evidence_fingerprint,e.error_code,e.occurred_at,prev]
    h=sha256(json.dumps(body,separators=(",",":"),allow_nan=False).encode()).hexdigest()
+   if e.event_hash!=h and float(e.occurred_at).is_integer():
+    body[8]=int(e.occurred_at)
+    h=sha256(json.dumps(body,separators=(",",":"),allow_nan=False).encode()).hexdigest()
    if e.previous_hash!=prev or e.event_hash!=h:return False
    prev=e.event_hash
   return True

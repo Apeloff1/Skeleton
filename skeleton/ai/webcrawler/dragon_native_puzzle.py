@@ -116,7 +116,7 @@ def transformed_level(stage:int,seed:int,difficulty:int=4)->tuple[str,...]:
     _parse(rows)
     return rows
 
-C_SOURCE=r'''/* Dragon Native Sokoban: pure C99, ANSI terminal, no SDL/no WebView.
+C_SOURCE=r'''/* Dragon Native Sokoban: pure C99, ANSI terminal, dependency-free native runtime.
   Gameplay: push crates onto original goals; undo and reset; bounded levels.
   Each level is solved in advance with a canonical shortest walk trace. */
 #include <stdio.h>

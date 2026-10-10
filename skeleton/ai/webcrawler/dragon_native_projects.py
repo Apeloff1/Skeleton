@@ -140,14 +140,14 @@ Sprites:
     ld a,[PlayerX]
     ld [OAM+1],a
     xor a
-    ld [OAM+2],a
-    ld [OAM+3],a
+    ld [OAM+2], a
+    ld [OAM+3], a
     ld a,GOAL_Y
     ld [OAM+4],a
     ld a,GOAL_X
     ld [OAM+5],a
-    ld a,1
-    ld [OAM+6],a
+    ld a, 1
+    ld [OAM+6], a
     xor a
     ld [OAM+7],a
     ld a,[PlayerX]
@@ -156,8 +156,8 @@ Sprites:
     ld a,[PlayerY]
     cp GOAL_Y
     jr nz,.notWin
-    ld a,$1B
-    ldh [rOBP0],a
+    ld a, $1B
+    ldh [rOBP0], a
 .notWin:
     ret
 Tiles:

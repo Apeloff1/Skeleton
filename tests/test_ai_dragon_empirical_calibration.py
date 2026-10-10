@@ -65,7 +65,7 @@ def test_eligible_calibrator_maps_score_to_empirical_rate():
         bins=4, minimum_bin_samples=20,
     )
     assert artifact.eligible
-    assert 0 <= apply_calibrator(.8, artifact) <= 1
+    assert 0 <= apply_calibrator(.8, artifact).calibrated_probability <= 1
 
 
 def test_authorization_required():

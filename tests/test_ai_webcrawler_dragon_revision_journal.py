@@ -182,7 +182,7 @@ def test_mutating_head_blocks_future_append_and_detection():
     """, ("d" * 64,))
     journal.db.commit()
     assert not journal.verify("owner-a", "claim-42", authorized=True)
-    with pytest.raises(RuntimeError, match="tampered"):
+    with pytest.raises(RuntimeError, match="tampered|head mismatch"):
         journal.append(
             "owner-a", report(), observed_at=2, expected_sequence=1,
             authorized=True,

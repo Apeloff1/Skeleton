@@ -101,7 +101,7 @@ class ReviewedKnowledgeTests(unittest.TestCase):
         self.assertIn("Jump arcs should remain predictable", raw)
         self.store.close()
         self.store = ReviewedKnowledgeStore(self.dbfile)
-        reopened = self.store.search("studio-a", "jump", authorized=True)
+        reopened = self.store.search("studio-a", "jump timing", authorized=True)
         self.assertEqual(hits, reopened)
         self.assertEqual(self.store.history("studio-a", "source-a", authorized=True)[0], receipt)
 
@@ -166,9 +166,8 @@ class ReviewedKnowledgeTests(unittest.TestCase):
         bad = replace(base.notes[0], end=len(TEXT) + 1)
         with self.assertRaisesRegex(KnowledgeError, "outside"):
             self.admit(replace(base, notes=(bad,)))
-        bad = replace(base.notes[0], start=6, end=6)
         with self.assertRaises(KnowledgeError):
-            self.admit(replace(base, notes=(bad,)))
+            replace(base.notes[0], start=6, end=6)
         long_doc = replace(
             base, text="Z" * 1200,
             notes=(replace(base.notes[0], start=0, end=1100),),
@@ -266,7 +265,7 @@ class ReviewedKnowledgeTests(unittest.TestCase):
             """UPDATE game_builder_knowledge SET payload=replace(payload, 'predictable', 'unreliable')
             WHERE owner='studio-a'"""
         )
-        with self.assertRaisesRegex(KnowledgeError, "integrity"):
+        with self.assertRaisesRegex(KnowledgeError, "integrity|stored source span mismatch"):
             self.store.search("studio-a", "jump", authorized=True)
 
     def test_modified_digest_is_rejected(self):

@@ -203,7 +203,7 @@ def compare_crawl_revisions(
         elif delta.delivery_changed:
             disposition = ReadingDisposition.DELIVERY_CHANGED
             count, candidate = 0, None
-        elif delta.quality_changed:
+        elif delta.quality_changed and not delta.content_changed:
             disposition = ReadingDisposition.QUALITY_CHANGED
             count, candidate = 0, None
         elif delta.change is SourceChange.UNCHANGED:

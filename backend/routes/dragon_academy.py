@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path as URLPath, Query, R
 from pydantic import BaseModel, Field
 
 from routes.gameforge_auth import get_current_user
+from skeleton.ai.game_builder.dragon_review_store import DragonReviewStore
 from skeleton.ai.webcrawler.dragon_practice_lab import DragonPracticeLab
 from skeleton.ai.webcrawler.dragon_practice_cycles import DragonPracticeCycles
 from skeleton.ai.webcrawler.dragon_session_projection import DragonSessionProjection
@@ -102,7 +103,19 @@ def _snapshot(lab: DragonPracticeLab, cycles: DragonPracticeCycles,
         "attempts": [asdict(a) for a in lab.attempts(owner,authorized=True,limit=50)],
         "native_attempts": [asdict(a) for a in DragonNativePracticeLab(lab.db,lab).list(owner,authorized=True)],
         "subscription": asdict(cycles.status(owner,authorized=True)),
+        "wisdom_review": _wisdom_snapshot(lab.db, owner),
     }
+
+def _wisdom_snapshot(db: sqlite3.Connection, owner: str) -> dict | None:
+    raw = os.environ.get("SKL_DRAGON_REVIEW_SIGNING_KEY_HEX", "")
+    if not raw:
+        return None
+    try:
+        key = bytes.fromhex(raw)
+        store = DragonReviewStore(db, signing_key=key)
+        return store.latest(owner, now=int(time.time()), authorized=True)
+    except (ValueError, KeyError, TypeError):
+        raise HTTPException(status_code=409, detail="Dragon advisory snapshot unavailable") from None
 
 @router.get("/status")
 def academy_status(owner: str = Depends(_principal)) -> dict:

@@ -389,6 +389,13 @@ class RightsLedger:
         if not decisions:
             blockers.append("no incorporation/provenance decisions supplied")
         for decision in decisions:
+            if not isinstance(decision, IncorporationDecision):
+                raise RightsError("release decisions must be typed ledger receipts")
+            if decision not in self._decisions:
+                blockers.append(f"decision {decision.decision_digest} was not issued by this ledger")
+            record = self._sources.get(decision.source_id)
+            if record is None or record.rights_binding_digest != decision.source_record_digest:
+                blockers.append(f"source {decision.source_id} rights binding is missing or stale")
             if decision.artifact_digest != artifact_digest:
                 blockers.append(f"decision {decision.decision_digest} targets another artifact")
             if not decision.allowed:

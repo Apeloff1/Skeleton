@@ -268,3 +268,41 @@ def test_adaptive_practice_subscriptions_preserve_opt_in_and_finite_ticks(
     assert len(created)==1
     assert created[0].target_id=="game_boy"
     assert route.academy_status(owner=owner)["native_attempts"]
+
+
+def test_authenticated_companion_reads_only_signed_current_owner_review(tmp_path, monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from skeleton.ai.game_builder.dragon_review_store import DragonReviewStore
+    from skeleton.ai.game_builder.dragon_wisdom import SquareReview, SQUARES
+    monkeypatch.setenv("SKL_DRAGON_PRACTICE_DB_PATH", str(tmp_path/"reviews.sqlite"))
+    monkeypatch.setenv("SKL_DRAGON_REVIEW_SIGNING_KEY_HEX", (b"s"*32).hex())
+    monkeypatch.setattr(route.time, "time", lambda: 21)
+    squares=tuple({"id": key,"label":label,"score":70,"industry_score":None,
+        "industry_delta":None,"status":"improve","comparison_state":"unknown",
+        "axes":list(axes)} for key,label,axes in SQUARES)
+    review=SquareReview("a"*64,"b"*64,"c"*64,"d"*64,"e"*64,None,100,100,
+        squares,(),(),(),"f"*64,True)
+    with sqlite3.connect(tmp_path/"reviews.sqlite") as db:
+        DragonReviewStore(db,signing_key=b"s"*32).publish(identity(),review,
+            now=20,expires_at=40,trusted_worker=True)
+    app=FastAPI();app.include_router(route.router)
+    app.dependency_overrides[route.get_current_user]=lambda: {
+        "email":"alice@example.test","tenant_id":"tenant-a","role":"viewer"}
+    with TestClient(app) as client:
+        response=client.get("/api/dragon-academy/status")
+        assert response.status_code==200
+        assert response.json()["wisdom_review"]["review"]==review.to_payload()
+        assert client.post("/api/dragon-academy/status",json={"wisdom_review":{}}).status_code==405
+        app.dependency_overrides[route.get_current_user]=lambda: {
+            "email":"bob@example.test","tenant_id":"tenant-a","role":"viewer"}
+        assert client.get("/api/dragon-academy/status").json()["wisdom_review"] is None
+        app.dependency_overrides[route.get_current_user]=lambda: {
+            "email":"alice@example.test","tenant_id":"tenant-a","role":"viewer"}
+        monkeypatch.setattr(route.time,"time",lambda:40)
+        assert client.get("/api/dragon-academy/status").json()["wisdom_review"] is None
+        monkeypatch.setattr(route.time,"time",lambda:21)
+        monkeypatch.setenv("SKL_DRAGON_REVIEW_SIGNING_KEY_HEX", (b"x"*32).hex())
+        assert client.get("/api/dragon-academy/status").status_code==409
+        app.dependency_overrides[route.get_current_user]=lambda: None
+        assert client.get("/api/dragon-academy/status").status_code==401

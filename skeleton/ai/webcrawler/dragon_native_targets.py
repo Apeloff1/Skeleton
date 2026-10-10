@@ -49,7 +49,7 @@ TARGETS: tuple[ConsoleTarget,...] = (
     _t("apple_ii","Apple","8-bit home computer",1977,"6502","hi-res NTSC","beeper",
        "keyboard / paddle","cc65","dsk",colors=6,width=280,height=192),
     _t("nes","Nintendo","8-bit",1983,"Ricoh 2A03","PPU tiles","APU",
-       "NES controller","cc65 / ca65","nes",colors=54,width=256,height=240),
+       "NES controller","cc65 / ca65","nes","native_source",colors=54,width=256,height=240),
     _t("master_system","Sega","8-bit",1985,"Z80","VDP tiles","SN76489",
        "2-button pad","SDCC / devkitSMS","sms","native_source",colors=64,width=256,height=192),
     _t("game_boy","Nintendo","handheld 8-bit",1989,"SM83","2bpp tiles / OAM","DMG APU",

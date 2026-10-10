@@ -7,6 +7,8 @@ import { extractConversationInterests, proposeResearchMission } from './conversa
 import { Ionicons } from '@expo/vector-icons';
 import DragonCompanion from './DragonCompanion';
 import DragonQuestBoard from './DragonQuestBoard';
+import DragonWisdomSquares from './DragonWisdomSquares';
+import type { DragonWisdomReview } from './dragonWisdomReview';
 import type{NativeAttempt,NativeTarget,NativeCurriculum}from './dragonNativeTargets';
 import {type DragonPracticeProgress,type DragonPracticeAttempt,type DragonPracticeSubscription,validateDragonProgress} from './dragonProgression';
 import { companionForConversation, companionFromCrawler, type DragonEventKind } from './dragonCompanion';
@@ -20,6 +22,7 @@ export interface CompanionTelemetry {
 }
 
 export interface CompanionAcademyInput {
+  wisdomReview?: DragonWisdomReview | null;
   progress?:DragonPracticeProgress|null;
   attempts?:readonly DragonPracticeAttempt[];
   nativeAttempts?:readonly NativeAttempt[];
@@ -91,6 +94,7 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry, a
       onOpenDemo={academy?.onOpenDemo} onStopPractice={academy?.onStopPractice}
       onRevokePractice={academy?.onRevokePractice}
       busy={academy?.practiceBusy} />}
+    {academy?.wisdomReview && <DragonWisdomSquares review={academy.wisdomReview} />}
     <Text style={s.note}>Petting and animation are just for fun. System reduced-motion settings take priority. These reactions never start research or change memory.</Text>
     <Text style={s.note}>Conversation creates interest signals. Only policy-compliant, provenance-preserved acquisitions may become distilled memory.</Text>
   </View>;

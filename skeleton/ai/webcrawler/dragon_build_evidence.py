@@ -103,8 +103,10 @@ class DragonBuildEvidence:
         if project.get("digest")!=source_digest:
             raise ValueError("native build source custody mismatch")
         expected_toolchain="RGBDS" if target_id in ("game_boy","game_boy_color") else "cc65"
-        if target_id not in ROM_EXTENSIONS or toolchain!=expected_toolchain:
+        if target_id not in ROM_EXTENSIONS:
             raise ValueError("native target is not supported for ROM verification")
+        if toolchain!=expected_toolchain:
+            raise ValueError("trusted native compiler does not match target")
         if not _verify(target_id,rom):
             raise ValueError("ROM header, size or checksum invalid")
         # Explicitly preserve the issuer's source digest, not caller-provided

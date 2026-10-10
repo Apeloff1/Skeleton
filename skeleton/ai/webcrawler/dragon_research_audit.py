@@ -63,8 +63,9 @@ class DragonResearchAudit:
             raise ValueError("unsupported audit action")
         if not isinstance(subject_id, str) or not subject_id or len(subject_id) > 128:
             raise ValueError("invalid audit subject")
-        if not isfinite(now) or now < 0:
+        if isinstance(now, bool) or not isinstance(now, (int, float)) or not isfinite(now) or now < 0:
             raise ValueError("invalid audit time")
+        now = float(now)
         with self.db:
             row = self.db.execute("""
                 SELECT sequence, event_hash FROM dragon_research_audit
@@ -99,7 +100,9 @@ class DragonResearchAudit:
                 return False
             if digest != self._digest(owner, sequence, action, subject_id,
                                       timestamp, stored_previous):
-                return False
+                if not float(timestamp).is_integer() or digest != self._digest(
+                        owner, sequence, action, subject_id, int(timestamp), stored_previous):
+                    return False
             previous = digest
         return True
 

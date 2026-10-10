@@ -89,9 +89,11 @@ class DragonSignalLedger:
             """, checked)
             return self.connection.total_changes - before
 
-    def recent(self, owner: str, *, limit: int = 500) -> tuple[InterestSignal, ...]:
+    def recent(self, owner: str, *, limit: int | None = None) -> tuple[InterestSignal, ...]:
         owner = self._owner(owner)
-        if not 1 <= limit <= self.policy.max_per_owner:
+        if limit is None:
+            limit = min(500, self.policy.max_per_owner)
+        if type(limit) is not int or not 1 <= limit <= self.policy.max_per_owner:
             raise ValueError("invalid query limit")
         rows = self.connection.execute("""
             SELECT signal_id, kind, tags_json, observed_at, strength, source_id

@@ -58,7 +58,7 @@ def test_independent_design_evidence_enables_causal_eligibility():
  seed="1"*64
  l=DragonTrialLedger(sqlite3.connect(":memory:"))
  a=tuple(TrialAssignment(f"t{i}",expected_randomized_intervention(f"t{i}",seed),
-  "ctx",f"s{i%2}") for i in range(20))
+  "ctx",f"s{i%2}") for i in range(40))
  assert {x.intervention for x in a}=={False,True}
  p=l.preregister("u",hypothesis_id="h",mechanic="jump",assignments=a,
   outcome_definition="binary displacement threshold",registered_at=10,authorized=True)

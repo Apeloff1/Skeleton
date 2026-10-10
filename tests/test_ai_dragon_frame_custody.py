@@ -30,7 +30,7 @@ def test_revocation_blocks_frame_binding():
 
 def test_non_monotonic_capture_fails_closed():
     _,cq,_,j=setup()
-    with pytest.raises(ValueError,match="monotonic"):
+    with pytest.raises(ValueError,match="timestamps must increase strictly"):
         bind_extracted_frames(cq,"u",j.job_id,
           ((16,"c"*64,"frame://1"),(0,"d"*64,"frame://0")),
           now=3,retention_until=90,authorized=True)
