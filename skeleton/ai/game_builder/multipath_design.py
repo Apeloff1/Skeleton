@@ -1057,4 +1057,58 @@ def route_progress_trace(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget", "pareto_hazard_routes", "enumerate_shortest_routes", "route_progress_trace"]
+@dataclass(frozen=True, slots=True)
+class MapEditReceipt:
+    operation: str
+    before_digest: str
+    after: RouteProblem
+    changes: tuple[tuple[Position, str, str], ...]
+    safe_proof: RouteProof
+
+    @property
+    def digest(self) -> str:
+        return canonical_digest({
+            "schema": "skeleton.game_builder.map_edit.v1",
+            "operation": self.operation, "before": self.before_digest,
+            "after": self.after.digest,
+            "changes": [[list(p), old, new] for p, old, new in self.changes],
+            "proof": self.safe_proof.digest,
+        })
+
+
+def make_level_edit(
+    problem: RouteProblem, changes: Mapping[Position, str], *,
+    operation: str, authorized: bool,
+) -> MapEditReceipt:
+    """Apply bounded tile mutations atomically, proving all objectives survive."""
+    if authorized is not True:
+        raise PermissionError("game map mutation requires designer authorization")
+    if (not isinstance(problem, RouteProblem)
+            or not isinstance(changes, Mapping) or not 1 <= len(changes) <= 12
+            or not isinstance(operation, str)
+            or not 1 <= len(operation) <= 64
+            or not all(c.islower() or c == "_" for c in operation)):
+        raise MultipathError("invalid bounded map edit request")
+    rows = [list(row) for row in problem.rows]
+    recorded: list[tuple[Position, str, str]] = []
+    for p, new in sorted(changes.items(), key=lambda item: (item[0][1], item[0][0])):
+        if (not isinstance(p, tuple) or len(p) != 2
+                or any(type(v) is not int for v in p)
+                or not 0 < p[0] < problem.width-1
+                or not 0 < p[1] < problem.height-1
+                or type(new) is not str or len(new) != 1 or new not in "#.SGCH"):
+            raise MultipathError("invalid in-bounds tile mutation")
+        old = problem.tile(p)
+        if old == new:
+            raise MultipathError("no-op map mutations are not admissible")
+        rows[p[1]][p[0]] = new
+        recorded.append((p, old, new))
+    revised = RouteProblem.from_rows(tuple("".join(row) for row in rows))
+    if len(revised.collectibles) != len(problem.collectibles):
+        raise MultipathError("map edit cannot silently change objective count")
+    proof = solve_route(revised)
+    return MapEditReceipt(operation, problem.digest, revised, tuple(recorded), proof)
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget", "pareto_hazard_routes", "enumerate_shortest_routes", "route_progress_trace", "make_level_edit"]
