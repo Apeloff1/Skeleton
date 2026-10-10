@@ -381,6 +381,50 @@ class TestNativeLLMRuntime(unittest.TestCase):
             )
 
 
+    def test_batch_encodes_only_once_and_executes_the_admitted_sequences(self):
+        from unittest.mock import patch
+
+        runtime = self.runtime()
+        config = GenerationConfig(max_new_tokens=2, seed=19, temperature=0.0)
+        requests = (
+            BatchGenerationRequest("one", "hello", config),
+            BatchGenerationRequest("two", "world again", config),
+        )
+        original_encode = runtime.encode
+        # The batch path must not call the prompt-level generation entrypoint:
+        # it would tokenize a second time after the admission budget check.
+        with (
+            patch.object(runtime, "encode", wraps=original_encode) as encode,
+            patch.object(runtime, "generate",
+                         side_effect=AssertionError("batch re-encoded prompt")),
+        ):
+            receipts = runtime.generate_batch(requests)
+        self.assertEqual(encode.call_count, 2)
+        self.assertEqual([r.request_id for r in receipts], ["one", "two"])
+        self.assertEqual([r.result.prompt_sequence for r in receipts],
+                         [original_encode("hello"), original_encode("world again")])
+
+
+    def test_terminal_success_not_emitted_until_checkpoint_validated(self):
+        from unittest.mock import patch
+
+        runtime = self.runtime()
+        observed = []
+        with patch.object(
+            runtime, "checkpoint",
+            side_effect=RuntimeContractError("checkpoint rejected before commit"),
+        ):
+            with self.assertRaisesRegex(RuntimeContractError,
+                                        "checkpoint rejected before commit"):
+                for event in runtime.stream(
+                    "hello world",
+                    GenerationConfig(max_new_tokens=1, temperature=0.0),
+                ):
+                    observed.append(event.kind)
+        self.assertIn("token", observed)
+        self.assertNotIn("completed", observed)
+
+
     def test_streaming_text_feed_executes_without_retokenization_boundary(self):
         runtime = self.runtime()
         feed = StreamingTextFeed()
