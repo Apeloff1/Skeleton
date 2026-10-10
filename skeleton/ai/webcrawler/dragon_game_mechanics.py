@@ -243,9 +243,13 @@ class GameMechanicsMemory:
             if (not isinstance(raw, str)
                     or len(raw.encode("utf-8")) > MAX_STORED_SESSION_BYTES):
                 raise ValueError("stored game observations exceed byte budget")
+            try:
+                recorded = json.loads(raw)
+            except (TypeError, ValueError, RecursionError) as exc:
+                raise ValueError("stored game observation JSON corrupt") from exc
             observations = tuple(
                 GameObservation(t, Mechanic(m), d, c, PreferenceSignal(p), u)
-                for t, m, d, c, p, u in json.loads(raw)
+                for t, m, d, c, p, u in recorded
             )
             sessions.append(GameSession(
                 session_id, owner, label, duration, observations, True, True,
