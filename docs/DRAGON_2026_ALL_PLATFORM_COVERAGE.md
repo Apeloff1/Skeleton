@@ -1,23 +1,35 @@
 # Dragon Native Forge: Comprehensive hardware support audit (10 October 2026)
 
-## Current verified scope — source archive snapshot 2026-10-10
+## Current reviewed status — 10 October 2026
 
-The authoritative catalog contains **169 unique hardware/OS identities**.
-There are **77 declared source-implemented targets**, including ABI-compatible
-variants, and **92 targets without emitted native source**. This is
-**45.0% source-emitter coverage**, not verified compatibility coverage.
-The latest dedicated coverage CI run passed 425 checks and failed two: a
-stale inventory assertion (now corrected) and an Atari 5200 cc65 2.19
-palette-header mismatch (source fallback added; requires CI rerun).
-The standalone original puzzle title independently passed native executable
-build/replay jobs on Linux, Windows and macOS on an earlier head. These
-desktop builds do not establish console-native executable coverage.
+The curated hardware/OS inventory contains **169 unique target IDs**. The
+authoritative native source registry has **80 source-producing targets**;
+**89 still lack a native source producer**. The source coverage ratio is
+**80/169 = 47.3%**. These are source identities, not 80 distinct engines or
+80 working console games. Some records use ABI-specific and hardware-revision
+overlays on an existing original native game.
 
-The sections below record historical milestones and intermediate counts,
-which are retained for traceability but **do not supersede the snapshot
-above**. The machine-readable `dragon_platform_readiness.coverage_report()`
-is the live authoritative source. Real SDK compiler, emulator/controller
-and physical-device verification remain distinct from source generation.
+**Verified positive CI evidence:** the current feature-branch predecessor
+passed native C99 executable build plus gameplay replay on Ubuntu, Windows
+and macOS; it also passed the game-builder suite and SDL headless validation.
+A separate source catalog test passed 453 cases with 17 SDK-specific skips,
+but failed two stale source-count assertions. The GB/NES source-project suite
+passed 254 cases with four skips and failed one old C/assembly-only assumption
+for the actual Thumby MicroPython game. Those three source/test mismatches
+were corrected on the next commit. **They have not yet been certified green
+on the new exact head.** Automated GitHub security-agent checks additionally
+reported an external Copilot **HTTP 402 monthly quota** error, not a
+malware/code vulnerability finding.
+
+Compilation proofs cover only the binaries and configurations actually
+built by those workflows. No global emulator/gamepad/physical hardware pass,
+copyright clearance or licensed-SDK entitlement is inferred from them.
+
+The dated sections below preserve earlier engineering milestones, but their
+historic 24/45/48/55/57/68/72/77 counts do not supersede this 80-target
+snapshot. The machine-readable
+`dragon_platform_readiness.coverage_report()` is authoritative and
+produces an auditable source inventory and gap list.
 
 ## Scope and limitations
 
@@ -25,7 +37,7 @@ The game academy previously mapped **47** major platform targets and implemented
 **19 original native source backends**. This change adds 122 concrete historic,
 consumer, handheld, computer OS/ABI and modern mobile targets, bringing the
 curated inventory to **169 distinct target identities**. It additionally implements
-additional native game emitters and ABI-compatible source variants; the current verified inventory is **77/169**, not a claim of 77 compiled games.
+additional native game emitters and ABI-compatible source variants; the current declared source inventory is **80/169**, not a claim of 80 compiled games.
 
 This is not every model or board ever manufactured, and 169 catalog entries
 do NOT mean 169 working console games. No compiler/emulator or device test is
@@ -48,7 +60,7 @@ listed system.
 | Gate | Meaning | What this change demonstrates |
 | --- | --- | --- |
 | Hardware identified | CPU/graphics/sound/inputs/SDK/ABI recorded | 169 targets |
-| Original native source | Per-hardware implementation and build recipe exist | 50 targets |
+| Original native source | Per-hardware implementation and build recipe exist | 80 targets (compiler status independent) |
 | Compiler passed | Exact source built by target-specific toolchain | Not inferred |
 | Emulator passed | Repeated native input, video, audio and state trace | Not inferred |
 | Physical device passed | Hardware-verified timing and controls | Not inferred |
@@ -124,7 +136,7 @@ PS/Xbox/Nintendo releases remain blocked without legitimate developer SDK
 authorization. No proprietary system firmware, ROMs, game assets, DRM keys
 or unlicensed SDKs are included.
 
-CI: dragon-platform-coverage.yml validates all 169 target records, 24
+CI: dragon-platform-coverage.yml validates all 169 target records and the 80 source backends; earlier revisions began with 24
 source generators, disallowed target/style pairs, and performs a genuine
 Apple II cc65 build. Other cross compilers are tested if they are installed.
 CI only proves outcomes of checks that actually pass on the exact head.

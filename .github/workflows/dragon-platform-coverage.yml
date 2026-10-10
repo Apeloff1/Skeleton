@@ -87,7 +87,8 @@ jobs:
             tests/test_ai_webcrawler_dragon_lynx_evidence.py \
             tests/test_ai_webcrawler_dragon_compatible_revisions.py \
             tests/test_ai_webcrawler_dragon_desktop_abi.py \
-            tests/test_ai_webcrawler_dragon_platform_matrix.py
+            tests/test_ai_webcrawler_dragon_platform_matrix.py \
+            tests/test_ai_webcrawler_dragon_native_projects.py
       - name: Compile source-bound original PET, Plus/4, Atmos and BBC objects or binaries
         run: |
           python -m skeleton.ai.webcrawler.dragon_cc65_release \
@@ -143,8 +144,17 @@ jobs:
           path.write_text(readiness_json(),encoding="utf-8")
           result=json.loads(path.read_text())
           assert result["coverage"]["catalog_count"]==169
-          assert result["coverage"]["native_source_count"]==80
+          from skeleton.ai.webcrawler.dragon_native_projects import EMITTERS
+          from skeleton.ai.webcrawler.dragon_native_targets import CATALOG
+          assert len(EMITTERS)==80  # reviewed exact-head source milestone
+          assert result["coverage"]["native_source_count"]==len(EMITTERS)
+          assert result["coverage"]["missing_native_source_count"]==(
+              len(CATALOG)-len(EMITTERS))
           assert len(result["targets"])==169
+          assert {
+              row["target"] for row in result["targets"]
+              if row["source_emitter"]
+          }==EMITTERS
           assert all(not t["compiler_verified"] for t in result["targets"])
           print("DRAGON_PLATFORM_COVERAGE_PASS",result["coverage"]["digest"])
           PY
