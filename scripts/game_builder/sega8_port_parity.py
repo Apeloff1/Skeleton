@@ -93,13 +93,31 @@ def verify_ports(root: Path) -> dict[str, object]:
             or boot.get("zero_score_hud_verified") is not True
         ):
             raise Sega8PortParityError("actual compiled cartridge startup was not observed")
-        for receipt in (meta, compile_evidence, host, boot):
-            if any(receipt.get(key) is True for key in (
-                "release_approved", "distribution_licensed",
-                "physical_hardware_verified", "full_console_emulator_playthrough_verified",
-                "independent_cycle_exact_emulator_verified",
-            )):
-                raise Sega8PortParityError("port evidence attempted to elevate legal/hardware status")
+        # Each source has different typed false-claim envelopes. Missing,
+        # non-boolean, or truthful-looking string fields are not acceptable:
+        # a forged release gate must fail closed, not merely reject JSON true.
+        unapproved = (
+            (meta, ("binary_compiled", "emulator_playthrough_verified",
+                    "physical_hardware_verified", "release_approved",
+                    "distribution_licensed",
+                    "third_party_game_or_firmware_redistributed")),
+            (compile_evidence, ("native_rom_compiled", "emulator_playthrough_verified",
+                                "physical_hardware_verified", "release_approved",
+                                "distribution_licensed", "rights_independently_verified")),
+            (host, ("native_z80_rom_executed", "full_console_emulator_playthrough_verified",
+                    "physical_hardware_verified", "release_approved",
+                    "rights_independently_verified")),
+            (boot, ("entire_game_playthrough_verified",
+                    "independent_cycle_exact_emulator_verified",
+                    "physical_hardware_verified", "distribution_licensed",
+                    "release_approved")),
+        )
+        for receipt, fields in unapproved:
+            for key in fields:
+                if receipt.get(key) is not False:
+                    raise Sega8PortParityError(
+                        f"native port evidence has an unreviewed or missing {key} claim"
+                    )
         source = _sha(compile_evidence.get("source_sha256"), "source")
         rom = _sha(compile_evidence.get("rom_sha256"), "ROM")
         if (
