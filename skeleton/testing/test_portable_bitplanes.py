@@ -51,3 +51,9 @@ def test_decode_snes_4bpp_recovers_all_palette_indices():
     with pytest.raises(PortableCodecError):
         decode_snes_4bpp(b"\x00"*16)
 
+
+def test_encode_sms_4bpp_row_planes_are_contiguous():
+    row = (1, 2, 4, 8, 15, 0, 0, 0)
+    assert encode_sms_4bpp((row,)*8) == bytes([0x88,0x48,0x28,0x18]*8)
+    assert encode_sms_4bpp((row,)*8) != encode_snes_4bpp((row,)*8)
+
