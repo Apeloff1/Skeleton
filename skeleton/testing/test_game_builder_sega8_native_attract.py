@@ -47,15 +47,25 @@ def test_on_cartridge_demo_bytes_are_exact_authoritative_solved_game(target,leve
     )
     assert len(route_matches)==levels
     total=0
+    total_bytes=0
     for stage,(ordinal,directions) in enumerate(route_matches):
         expected=tuple(_MOVES[move] for move in world.levels[stage].safe_solution)
-        actual=tuple(int(x.strip()) for x in directions.split(",") if x.strip())
+        packed=tuple(int(x.strip()) for x in directions.split(",") if x.strip())
+        actual=tuple(
+            (packed[index >> 2] >> ((index & 3)*2)) & 3
+            for index in range(len(expected))
+        )
         assert ordinal==str(stage)
-        assert len(actual)==len(expected)
+        assert len(packed)==(len(expected)+3)//4
+        assert all(0<=value<=255 for value in packed)
         assert actual==expected
         assert all(0<=move<=3 for move in actual)
         total+=len(actual)
+        total_bytes+=len(packed)
     assert manifest["original_native_solution_attract_mode"] is True
+    assert manifest["original_demo_compressed_rom_bytes"]==total_bytes
+    assert total_bytes<total
+    assert manifest["original_demo_direction_encoding"].startswith("2bit_lsb_first")
     assert manifest["original_demo_playback_steps"]==total
     assert manifest["original_demo_solution_sha256"] == sha256(json.dumps(
         [list(level.safe_solution) for level in world.levels],
