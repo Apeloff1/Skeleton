@@ -225,7 +225,7 @@ class GameMechanicsMemory:
         owner = self._owner(owner)
         if not authorized:
             raise PermissionError("game history requires authorization")
-        if not 1 <= limit <= 1000:
+        if type(limit) is not int or not 1 <= limit <= 1000:
             raise ValueError("invalid history limit")
         rows = self.db.execute("""
             SELECT session_id, game_label, duration_ms, observations_json
