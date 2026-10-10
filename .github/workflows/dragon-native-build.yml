@@ -107,6 +107,8 @@ jobs:
             tests/test_ai_dragon_route_world.py \
             tests/test_ai_dragon_route_native_game.py \
             tests/test_ai_dragon_route_native_integration.py \
+            tests/test_ai_dragon_route_world_assurance.py \
+            tests/test_ai_dragon_route_world_assurance.py \
             tests/test_ai_dragon_native_puzzle_graphics.py \
             tests/test_ai_webcrawler_dragon_native_projects.py \
             tests/test_ai_webcrawler_dragon_native_compile.py \
