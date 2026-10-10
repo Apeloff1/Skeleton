@@ -312,4 +312,10 @@ def route_overlap_ppm(left: RouteProof, right: RouteProof) -> int:
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm"]
+def route_diversity_ppm(left: RouteProof, right: RouteProof) -> int:
+    """Cross-route novelty; 0 means the same corridors were traversed."""
+    return 1_000_000 - route_overlap_ppm(left, right)
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm"]
