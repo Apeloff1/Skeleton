@@ -68,6 +68,10 @@ type Portfolio={
 };
 type Play={ok:boolean;played_moves:string[];
   current:GameState;surroundings:Tile[]};
+type SignedAdvance={ok:boolean;new_checkpoint:string;cumulative_actions:number;
+  current:GameState;surroundings:Tile[];current_history_digest:string};
+type SignedInspect={ok:boolean;current:GameState;surroundings:Tile[];
+  checkpoint_bound_to_authenticated_owner:boolean};
 
 const fallbackStyles=[
   'creative_sandbox','survival_sandbox','open_world_story',
@@ -85,6 +89,7 @@ async function apiPost<T>(route:string,data:object):Promise<T>{
   if(!response.ok)throw new Error(
     response.status===403?'Only authenticated editors may author living worlds.':
     response.status===422?'This world, ending, door or resource choice is not currently legal.':
+    response.status===503?'Long-session signing is not configured on this server.':
     'Original living-world runtime is unavailable.');
   return response.json() as Promise<T>;
 }
@@ -114,6 +119,9 @@ function LivingWorldEditor(){
   const [game,setGame]=React.useState<GameState|null>(null);
   const [terrain,setTerrain]=React.useState<Tile[]>([]);
   const [history,setHistory]=React.useState<string[]>([]);
+  const [sessionToken,setSessionToken]=React.useState<string|null>(null);
+  const [previousTokens,setPreviousTokens]=React.useState<string[]>([]);
+  const [sessionMode,setSessionMode]=React.useState(false);
   const [portfolio,setPortfolio]=React.useState<Portfolio|null>(null);
   const [guided,setGuided]=React.useState<Alternative|null>(null);
   const [busy,setBusy]=React.useState(false);
@@ -134,7 +142,8 @@ function LivingWorldEditor(){
   const reset=()=>{
     runId.current++;
     setBusy(false);setGame(null);setPreview(null);setTerrain([]);
-    setHistory([]);setPortfolio(null);setGuided(null);
+    setHistory([]);setSessionToken(null);setPreviousTokens([]);
+    setSessionMode(false);setPortfolio(null);setGuided(null);
     setFailure('');setNotice('');
   };
   const changeStyle=(next:string)=>{
@@ -153,10 +162,22 @@ function LivingWorldEditor(){
          snapshot.player?.world_id!==id||
          !Array.isArray(snapshot.tiles)||snapshot.tiles.length!==25)
         throw new Error('Living-world preview has inconsistent original source.');
+      let signed:SignedAdvance|null=null;
+      try{
+        signed=await apiPost<SignedAdvance>('/checkpoint/advance',{
+          ...config,moves:[],
+        });
+      }catch{
+        // Bounded replay continues to work when the operator has not
+        // installed a signing key. Never accept an unsigned fake token.
+      }
       if(ticket===runId.current){
         setPreview(snapshot);setGame(snapshot.player);
         setTerrain(snapshot.tiles);setHistory([]);setPortfolio(null);
-        setGuided(null);
+        setGuided(null);setSessionToken(signed?.new_checkpoint||null);
+        setPreviousTokens([]);setSessionMode(!!signed?.new_checkpoint);
+        if(!signed)setNotice(
+          'Long-session signing is unavailable; bounded world replay remains playable.');
       }
     }catch(caught){
       if(ticket===runId.current)setFailure(
