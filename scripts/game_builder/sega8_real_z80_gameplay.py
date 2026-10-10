@@ -272,6 +272,7 @@ def verify_original_z80_gameplay(
     trace = advance_semantic_trace(seed, 0, None, first)
     max_frames_per_move = 0
     for index, expected in enumerate(reference["steps"], 1):
+        observed_controller_reads_before = session.machine.active_joypad_reads
         achieved = False
         last_observed: dict[str, int] | None = None
         for frames in range(1, MAX_INPUT_FRAMES + 1):
@@ -287,6 +288,10 @@ def verify_original_z80_gameplay(
                 achieved = True
                 max_frames_per_move = max(max_frames_per_move, frames)
                 break
+        if achieved and session.machine.active_joypad_reads <= observed_controller_reads_before:
+            raise Sega8NativeGameplayError(
+                f"original input {index} was not received from guest Z80 controller port"
+            )
         if not achieved:
             raise Sega8NativeGameplayError(
                 f"native Z80 controller route differs at action {index}: "
@@ -322,6 +327,8 @@ def verify_original_z80_gameplay(
         )
     if not machine.vcounter_b0_seen or not machine.vcounter_c8_seen:
         raise Sega8NativeGameplayError("guest initialization did not traverse real VDP scanlines")
+    if machine.active_joypad_reads < len(reference["steps"]):
+        raise Sega8NativeGameplayError("native game bypassed real input port reads")
     if machine.vdp_writes < 1500 or machine.psg_writes < 4:
         raise Sega8NativeGameplayError("native Z80 did not perform expected video/audio hardware I/O")
     return {
@@ -342,6 +349,9 @@ def verify_original_z80_gameplay(
         "real_z80_tstates": session.tstates,
         "controller_frame_count": session.frames,
         "max_controller_frames_per_move": max_frames_per_move,
+        "real_z80_active_joypad_port_reads": machine.active_joypad_reads,
+        "real_z80_directions_seen_as_active_low_buttons":
+            machine.active_joypad_bits_observed,
         "original_companion_rank_and_reward_verified": True,
         "actual_victory_palette_verified": True,
         "original_source_game_verified_on_instruction_level_cpu": True,
