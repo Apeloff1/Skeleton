@@ -30,19 +30,18 @@ false unless a later independent gate records actual evidence.
 ## Authoring
 
 ```sh
-python -m skeleton.ai.game_builder.native_game_cli \
-  --target sega_master_system --basis bandai_wonderswan \
-  --project-id entirely-new-game --title 'My Original Star Maze' \
-  --seed 1979 --width 17 --height 15 --levels 3 \
-  --collectibles 3 --hazards 4 --health 4 \
-  --rights-evidence ./my-authorship-proof.txt \
-  --identity 'my original tiles and shapes' \
-  --identity 'my own game concept and rules' \
-  --output ./original-sms --authorize-original-homebrew
+printf '%s\n' 'My independently authored graphics, rules and level design.' > my-authorship-proof.txt
+python -m scripts.game_builder.native_sega_8bit_ci \\
+  --target sega_master_system \\
+  --emit ./original-sms --author-evidence ./my-authorship-proof.txt
 ```
 
-Substitute `sega_game_gear` for the handheld project. `native_portfolio_cli`
-can also emit both with a shared, independently authored world digest.
+Use `sega_game_gear` to generate the handheld SDCC backend. The
+`native_game_cli` and native portfolio additionally expose an independently
+authored **direct Z80 assembly** Master System exporter. Both methods generate
+original machine-specific games; they are distinct implementations, not a
+renamed cartridge. The SDCC generator is invoked explicitly above to avoid
+silently replacing the independent Z80 assembly backend.
 
 ## Building with separately obtained tools
 
