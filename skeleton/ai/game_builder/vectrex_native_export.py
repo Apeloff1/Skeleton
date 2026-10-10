@@ -83,6 +83,7 @@ RenderTile      EQU     $CB0F
 GameStart:
         LDS     #$CBF0
         CLRA
+        CLRB
         STA     Level
         STA     Won
         STA     Lost
@@ -96,6 +97,7 @@ GameStart:
         JSR     LoadLevel
 
 GameLoop:
+        JSR     DP_to_D0         ; DP must be $D0 before all Vectrex BIOS calls.
         JSR     Wait_Recal       ; Beam recalibration every frame, REQUIRED.
         JSR     DP_to_D0         ; Vectrex BIOS routines require DP=$D0.
         LDA     #$5F
@@ -162,15 +164,15 @@ DelayMove:
 TryAdvance:
         LDA     TryX
         CMPA    #WIDTH
-        BHS     RefuseMove
+        LBHS    RefuseMove
         LDA     TryY
         CMPA    #HEIGHT
-        BHS     RefuseMove
+        LBHS    RefuseMove
         JSR     LocateCell
         LDA     ,X
         STA     LastTile
         CMPA    #T_WALL
-        BEQ     RefuseMove
+        LBEQ    RefuseMove
         LDA     TryX
         STA     HeroX
         LDA     TryY
