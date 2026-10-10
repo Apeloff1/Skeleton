@@ -253,7 +253,14 @@ static void animate_companion(void) {
         --mood_hold;
         pose=companion_mood;
     } else {
-        pose=((companion_clock & 63)==0) ? BUDDY_BLINK : BUDDY_IDLE;
+        /* Native idle choreography uses authored sprites only: brief
+         * visible blinking, curious looks, a smile and a small celebration.
+         * No new objective, collision or replay-sensitive RNG state. */
+        unsigned char phase=companion_clock & 127;
+        if (phase>=58 && phase<65) pose=BUDDY_BLINK;
+        else if (phase>=92 && phase<104) pose=BUDDY_HAPPY;
+        else if (phase>=120) pose=BUDDY_CHEER;
+        else pose=BUDDY_IDLE;
         companion_mood=pose;
     }
     if (pose!=companion_drawn && pending_count==0) {
@@ -303,6 +310,13 @@ static void reset_original_run(void) {
     sound_frames=0;
     PSG_PORT=0x9F;
     demo_step=0;
+    /* Defeat/victory recolors CRAM entry 3. Restore the actual authored
+     * theme when a player starts again, on BOTH color architectures. */
+#ifdef TARGET_GG
+    GG_setBGPaletteColor(3, BASE_COLOR_3);
+#else
+    SMS_setBGPaletteColor(3, BASE_COLOR_3);
+#endif
     load_level();
 }
 static void end_game(unsigned char victory) {
@@ -753,6 +767,8 @@ def compile_native_sega_8bit(
         "native_companion_pet_no_gameplay_authority":True,
         "native_console_restart_after_victory_or_defeat":True,
         "native_paused_psg_immediately_muted":True,
+        "native_restored_theme_palette_on_restart":True,
+        "native_ambient_companion_idle_gestures":4,
         "original_companion_pose_count":5,
         "original_hero_pose_count":2,
         "companion_bond_ranks":8,
