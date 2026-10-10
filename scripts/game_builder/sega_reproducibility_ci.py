@@ -19,8 +19,10 @@ from skeleton.ai.game_builder.sega_reproducibility import (
 )
 
 
-def emit_receipt(destination: str | Path, receipt: dict[str, object]) -> None:
+def emit_receipt(destination: str | Path, receipt: dict[str, object], *, max_bytes: int = 16384) -> None:
     """Create-only, no-follow, atomic-name exclusive output: never overwrite."""
+    if type(max_bytes) is not int or not 1 <= max_bytes <= 4 * 1024 * 1024:
+        raise ValueError("native game evidence output size limit invalid")
     destination = Path(destination)
     if destination.name in {"", ".", ".."}:
         raise ValueError("invalid native provenance output basename")
@@ -39,8 +41,8 @@ def emit_receipt(destination: str | Path, receipt: dict[str, object]) -> None:
         data = json.dumps(
             receipt, sort_keys=True, indent=2, ensure_ascii=False, allow_nan=False,
         ).encode("utf-8") + b"\n"
-        if len(data) > 16384:
-            raise ValueError("Sega reproducibility receipt exceeded expected size")
+        if len(data) > max_bytes:
+            raise ValueError("Sega evidence output exceeded explicitly permitted size")
         with os.fdopen(fd, "wb") as out:
             fd = -1
             out.write(data)
