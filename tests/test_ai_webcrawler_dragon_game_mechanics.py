@@ -459,3 +459,15 @@ def test_one_long_session_cannot_outvote_an_independent_session():
     store.record(second, authorized=True)
     assert store.distill("alice", authorized=True).insights[0].preference_score == 0
 
+
+def test_confidence_reflects_sessions_not_raw_event_volume():
+    store = setup()
+    frequent = tuple(observation(confidence=1.0, timestamp=100+n)
+                     for n in range(8))
+    uncertain = (observation(confidence=0.6),)
+    for title, items in (("Long", frequent), ("Short", uncertain)):
+        value = store.build_session("alice", title, 20000, items,
+                                    capture_consent=True, analysis_consent=True)
+        store.record(value, authorized=True)
+    assert store.distill("alice", authorized=True).insights[0].confidence == 0.8
+
