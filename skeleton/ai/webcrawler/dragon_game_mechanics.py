@@ -107,7 +107,8 @@ class GameMechanicsMemory:
             raise ValueError("invalid note budget")
         if type(policy.max_sessions_per_owner) is not int or not 1 <= policy.max_sessions_per_owner <= 100000:
             raise ValueError("invalid session capacity")
-        if not isfinite(policy.min_confidence) or not 0 <= policy.min_confidence <= 1:
+        if (type(policy.min_confidence) not in (int, float) or not 0 <= policy.min_confidence <= 1
+                or not isfinite(policy.min_confidence)):
             raise ValueError("invalid confidence threshold")
         self.db = db
         self.policy = policy
