@@ -190,6 +190,12 @@ def run_host_replay(
         or reference["source_content_digest"] != source_digest
     ):
         raise Sega8HostReplayError("generated game diverges from independent reference")
+    if (manifest.get("original_native_solution_attract_mode") is not True
+            or manifest.get("original_demo_playback_steps") != len(reference["steps"])
+            or manifest.get("original_demo_uses_identical_game_rules") is not True
+            or manifest.get("original_demo_autostart") is not False
+            or manifest.get("original_demo_external_content") is not False):
+        raise Sega8HostReplayError("native demonstration differs from original winning game")
     if any(manifest.get(field) is not False for field in (
         "binary_compiled", "emulator_playthrough_verified",
         "physical_hardware_verified", "release_approved",
@@ -242,11 +248,45 @@ def run_host_replay(
                 "real original C gameplay failed: "
                 + execution.stderr[:1000]
             )
+        # Run the actual emitted C demonstration arrays using the same native
+        # advance()/score/rank implementation, but without providing input
+        # actions from the reference JSON. Compare every independently
+        # generated step after both executions; this catches a broken byte
+        # encoder, a missing stage, and a copied/misaligned route.
+        demonstration = workspace / "host-attract-demo"
+        demo_command = list(command)
+        demo_command.insert(1, "-DSKELETON_NATIVE_DEMO_REPLAY")
+        demo_command[demo_command.index("-o") + 1] = str(demonstration)
+        demo_build = subprocess.run(
+            demo_command, cwd=workspace, capture_output=True,
+            text=True, timeout=60, check=False,
+        )
+        if demo_build.returncode:
+            raise Sega8HostReplayError(
+                "real on-cartridge demonstration C failed host compile: "
+                + demo_build.stderr[:2500]
+            )
+        demo_execution = subprocess.run(
+            [str(demonstration)], cwd=workspace, capture_output=True,
+            text=True, timeout=60, check=False,
+        )
+        if demo_execution.returncode:
+            raise Sega8HostReplayError(
+                "on-cartridge original demonstration did not finish: "
+                + demo_execution.stderr[:1000]
+            )
     states = execution.stdout.splitlines()
+    demo_states = demo_execution.stdout.splitlines()
     expectations = [reference["initial"], *reference["steps"]]
     if len(states) != len(expectations):
         raise Sega8HostReplayError("host gameplay returned incorrect frame count")
+    if len(demo_states) != len(expectations):
+        raise Sega8HostReplayError("on-cartridge original demonstration omitted game steps")
     for index, (line, expected) in enumerate(zip(states, expectations)):
+        if demo_states[index] != line:
+            raise Sega8HostReplayError(
+                f"native on-cartridge demonstration diverges from hand-played source at {index}"
+            )
         parts = line.split()
         if len(parts) != len(_FIELDS) + 1 or parts[0] != "S":
             raise Sega8HostReplayError("actual game state output malformed")
@@ -273,6 +313,11 @@ def run_host_replay(
         "original_companion_rank_progression_verified": True,
         "original_score_and_screen_state_verified": True,
         "native_game_c_compiled_and_executed_on_host": True,
+        "original_native_solution_attract_mode_host_verified": True,
+        "original_demo_controller_actions_verified": len(demo_states)-1,
+        "original_demo_screen_trace_sha256": sha256(
+            ("\n".join(demo_states) + "\n").encode("utf-8")
+        ).hexdigest(),
         "native_z80_rom_executed": False,
         "full_console_emulator_playthrough_verified": False,
         "physical_hardware_verified": False,
