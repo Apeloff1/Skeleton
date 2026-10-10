@@ -60,6 +60,51 @@ pixels. Independent asset rights, license restrictions, marks, protected
 characters, trade dress, and distribution permissions remain separate,
 fail-closed game-builder release gates.
 
+## Operator command (offline, source-only)
+
+Create a regular UTF-8 file named `authored_tiles.json`:
+
+```json
+{
+  "schema": "skeleton.game_builder.original_indexed_tiles.v1",
+  "project_id": "my-original-homebrew",
+  "tiles": [
+    [[0,0,1,1,1,1,0,0],
+     [0,1,2,2,2,2,1,0],
+     [1,2,3,3,3,3,2,1],
+     [1,2,3,0,0,3,2,1],
+     [1,2,3,0,0,3,2,1],
+     [1,2,3,3,3,3,2,1],
+     [0,1,2,2,2,2,1,0],
+     [0,0,1,1,1,1,0,0]]
+  ]
+}
+```
+
+Then compile the original pixels into an **RGBDS source declaration**:
+
+```bash
+python -m skeleton.ai.game_builder.portable_tile_cli \
+  --input authored_tiles.json \
+  --target nintendo_game_boy \
+  --syntax rgbds \
+  --output original_tiles.asm \
+  --acknowledge-original
+```
+
+The command emits a machine-readable SHA-256 receipt to standard output.
+Alternative native source declarations are `--syntax ca65` for Famicom/NES
+CHR tiles and `--syntax c99` for any supported target family. The command
+never downloads firmware, compiles a ROM, runs an emulator, or clears third-
+party rights.
+
+The input source must be one regular, non-symlink file no larger than 256 KB
+and contain exact schema keys, a bounded original project ID and 1–256 valid
+8×8 tiles. Duplicate JSON keys, non-finite values and replacement races are
+rejected. Output uses exclusive creation and never overwrites an existing
+file. A user-origin acknowledgement is mandatory but **does not qualify the
+project for distribution**.
+
 ## Color and presentation
 
 `encode/decode_rgb555`, `encode/decode_rgb565` and
