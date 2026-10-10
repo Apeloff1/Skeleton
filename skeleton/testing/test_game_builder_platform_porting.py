@@ -150,10 +150,10 @@ def test_unknown_or_infringing_sources_are_refused():
 
 @pytest.mark.parametrize("bad", [
     {"project_id": "x" * 129},
-    {"project_id": "local\\nnewline"},
+    {"project_id": "local\nnewline"},
     {"creative_identity": tuple("idea-" + str(n) for n in range(17))},
     {"creative_identity": ("x" * 241,)},
-    {"creative_identity": ("bad\\x00name",)},
+    {"creative_identity": ("bad\x00name",)},
     {"target_type": None},
 ])
 def test_homebrew_plan_admission_limits_identity_resource_costs(bad):
