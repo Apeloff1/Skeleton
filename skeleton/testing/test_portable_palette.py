@@ -71,3 +71,13 @@ def test_palettization_preserves_rectangular_geometry():
     with pytest.raises(PaletteError):
         index_image((((0,0,0),), ((0,0,0),(1,1,1))),((0,0,0),))
 
+
+def test_ordered_dither_handles_endpoints_and_repeats():
+    grid=((0,128,128,255),)*4
+    got=ordered_luma_dither(grid,levels=2)
+    assert all(row[0]==0 and row[-1]==1 for row in got)
+    assert got==ordered_luma_dither(grid,levels=2)
+    assert len(set(row[1] for row in got))>1
+    with pytest.raises(PaletteError):
+        ordered_luma_dither(((256,),))
+
