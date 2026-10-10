@@ -181,7 +181,7 @@ def _puzzle_proof(source_archive: bytes) -> tuple[dict, dict[str, str]]:
         candidate=json.loads(raw_design)
         from .dragon_game_design import FIELDS
         design=parse_design({key:candidate[key] for key in FIELDS})
-        if candidate.get("digest")!=design.digest or
+        if (candidate.get("digest")!=design.digest or
                 design.genre!="fixed_screen_puzzle" or
                 design.target!=receipt["target"] or
                 design.seed!=expected_seed):
