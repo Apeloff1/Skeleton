@@ -14,14 +14,15 @@ from skeleton.ai.game_builder.game_boy_memory_replay import export_game_boy_memo
 from skeleton.ai.game_builder.port_planner import HomebrewSource
 
 
-def emit(output:Path)->dict[str,object]:
+def emit(output:Path,*,campaign:bool=False)->dict[str,object]:
     world=generate_playable_world(GameBuildIntent(
         project_id="new-original-colecovision-game",
         title="Original Coleco Star Quest",
         subtitle="New legally authored ColecoVision Z80 maze adventure",
-        seed=198207,width=17,height=15,levels=3,
-        collectibles_per_level=3,hazards_per_level=4,
-        starting_health=4,theme="arcade",
+        seed=198210 if campaign else 198207,
+        width=17,height=15,levels=8 if campaign else 3,
+        collectibles_per_level=6 if campaign else 3,
+        hazards_per_level=4,starting_health=4,theme="arcade",
     ),authorized=True)
     rights=HomebrewSource(
         project_id=world.intent.project_id,platform_id="colecovision",
@@ -37,6 +38,8 @@ def emit(output:Path)->dict[str,object]:
         raise ValueError("Coleco machine-source provenance or certification inconsistent")
     return {"game_world_digest":world.digest,"machine_source_sha256":project.content_digest,
             "target":"colecovision","original_levels":len(world.levels),
+            "total_original_crystals":sum(len(stage.collectibles) for stage in world.levels),
+            "author_campaign_profile":"eight_level_48_crystal" if campaign else "three_level_intro",
             "actual_native_binary_compiled":False,"original_homebrew":True}
 
 
@@ -52,9 +55,10 @@ def main()->None:
     exclusive.add_argument("--emit",type=Path)
     exclusive.add_argument("--verify-rom",type=Path)
     parser.add_argument("--source-bin",type=Path)
+    parser.add_argument("--campaign",action="store_true",help="Author full eight-stage 48-gem original ColecoVision game")
     args=parser.parse_args()
     if args.emit is not None:
-        report=emit(args.emit)
+        report=emit(args.emit,campaign=args.campaign)
     else:
         if args.source_bin is None:
             parser.error("--source-bin is required for --verify-rom")
