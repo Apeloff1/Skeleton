@@ -219,6 +219,7 @@ class ArtifactReceipt:
     evidence: str
     compiler_state: str
     port_profile_digest: str | None = None
+    original_art_sha256: str | None = None
 
 
 @dataclass(frozen=True)
@@ -458,6 +459,10 @@ def make_source_release(
                 raise ValueError("native project design does not match portable plan")
         elif project.target_id in ("pc_linux", "pc_windows", "pc_macos", "steam_deck"):
             raise ValueError("desktop native generator discarded the approved game design")
+    from .dragon_native_artforge import FILENAME as ART_NAME, verify_original_art
+    verify_original_art(project.files, port_plan, project.style)
+    art_digest = (_hash(project.files[ART_NAME].encode("utf-8"))
+                  if ART_NAME in project.files else None)
     if binary is not None:
         if not request.compile_roms or project.target_id not in COMPILABLE or compiler_state != "compiled_native":
             raise ValueError("binary may be admitted only from verified compiler")
@@ -481,6 +486,7 @@ def make_source_release(
         "source_bytes": source_total,
         "port_plan": port_plan,
         "port_profile_digest": port_plan["portable_profile_digest"] if port_plan else None,
+        "original_art_sha256": art_digest,
         "gameplay_mode": json.loads(project.files["dragon-native-manifest.json"])["runtime_gameplay_mode"],
         "campaign_stages": json.loads(project.files["dragon-native-manifest.json"])["campaign_stages"],
         "hardware_budget_state": "source_budget_checked_only",
@@ -517,6 +523,7 @@ def make_source_release(
         hardware_budget_state=receipt["hardware_budget_state"],
         evidence=evidence, compiler_state=compiler_state,
         port_profile_digest=receipt["port_profile_digest"],
+        original_art_sha256=art_digest,
     )
 
 
@@ -612,6 +619,13 @@ def verify_source_release(payload: bytes) -> dict:
                 raise ValueError("portable profile receipt mismatch")
         elif receipt.get("port_profile_digest") is not None:
             raise ValueError("portable profile claimed without translated evidence")
+        from .dragon_native_artforge import FILENAME as ART_NAME, verify_original_art
+        verify_original_art(recovered_sources, port_plan, receipt["style"])
+        claimed_art = receipt.get("original_art_sha256")
+        actual_art = (_hash(recovered_sources[ART_NAME].encode("utf-8"))
+                      if ART_NAME in recovered_sources else None)
+        if claimed_art != actual_art:
+            raise ValueError("original native art digest differs from verified runtime source")
         if receipt.get("target") not in CATALOG or receipt.get("style") not in STYLES:
             raise ValueError("unknown packaged target/style")
         binary_name = receipt.get("binary_member")
@@ -727,6 +741,7 @@ def _assert_index_consistency(index: dict, verified: list[tuple[dict, dict, int]
             "target", "source_fingerprint", "source_count", "source_bytes",
             "binary_sha256", "gameplay_mode", "campaign_stages",
             "hardware_budget_state", "evidence", "compiler_state", "port_profile_digest",
+            "original_art_sha256",
         ):
             if entry.get(field) != receipt.get(field):
                 raise ValueError("portfolio entry and verified release disagree on " + field)
@@ -975,7 +990,8 @@ def verify_published_production(destination: Path, index_name: str) -> dict:
                 receipt["campaign_stages"] != item["campaign_stages"] or
                 receipt["hardware_budget_state"] != item["hardware_budget_state"] or
                 receipt["binary_sha256"] != item["binary_sha256"] or
-                receipt["port_profile_digest"] != item.get("port_profile_digest")):
+                receipt["port_profile_digest"] != item.get("port_profile_digest") or
+                receipt.get("original_art_sha256") != item.get("original_art_sha256")):
             raise ValueError("portfolio index and archive receipts disagree")
         targets.add(target)
         hashes.append(item["archive_sha256"])
@@ -1038,6 +1054,8 @@ def compare_verified_portfolios(
                 reasons.append("campaign_stage_count_changed")
             if a.get("port_profile_digest") != b.get("port_profile_digest"):
                 reasons.append("portable_game_design_changed")
+            if a.get("original_art_sha256") != b.get("original_art_sha256"):
+                reasons.append("original_native_pixel_art_changed")
             if a["compiler_state"] != b["compiler_state"]:
                 reasons.append("build_toolchain_evidence_changed")
             if a["evidence"] != b["evidence"]:
