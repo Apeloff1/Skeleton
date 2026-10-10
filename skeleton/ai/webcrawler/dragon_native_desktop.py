@@ -41,6 +41,7 @@ COMPILER_FLAGS = (
 )
 REQUIRED_SOURCE_FILES = frozenset({
     "src/main.c", "include/dragon_puzzle.h", "dragon-puzzle-proof.json",
+    "src/graphics.c", "include/dragon_puzzle_pixels.h",
 })
 
 
