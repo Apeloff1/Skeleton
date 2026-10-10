@@ -152,7 +152,10 @@ class DragonResourceSession:
 
     def dispatch(self, tasks: tuple[SessionTask, ...], sample: HardwareSample,
                  *, now: float) -> DispatchDecision:
-        if len(tasks) > 64 or len({t.task_id for t in tasks}) != len(tasks):
+        if (not isinstance(tasks, tuple) or len(tasks) > 64
+                or any(not isinstance(t, SessionTask) for t in tasks)):
+            raise ValueError("typed bounded tuple of SessionTask required")
+        if len({t.task_id for t in tasks}) != len(tasks):
             raise ValueError("task budget or duplicate task")
         requests = tuple(t.request() for t in tasks)
         with self._lock:
