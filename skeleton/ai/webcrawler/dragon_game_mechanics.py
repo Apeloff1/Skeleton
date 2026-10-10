@@ -141,7 +141,7 @@ class GameMechanicsMemory:
                 or session.capture_consent is not True or session.analysis_consent is not True):
             raise PermissionError("game observation storage requires explicit consent")
         owner = self._owner(session.owner)
-        if session.raw_video_retained:
+        if session.raw_video_retained is not False:
             raise ValueError("raw recording retention requires a separate storage policy")
         if not isinstance(session.game_label, str) or not 1 <= len(session.game_label) <= 200:
             raise ValueError("invalid game label")
