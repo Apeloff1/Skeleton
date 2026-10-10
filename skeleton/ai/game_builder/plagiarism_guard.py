@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from hashlib import sha256
+from math import isfinite
 import json
 import re
 import unicodedata
@@ -147,6 +148,35 @@ class ExpressiveOverlap:
     exact_normalized_match: bool
     triage_signal: str
     legal_infringement_determined: bool = False
+
+    def __post_init__(self) -> None:
+        if (not isinstance(self.sample_id, str) or not _ID.fullmatch(self.sample_id)
+                or not isinstance(self.reference_id, str) or not _ID.fullmatch(self.reference_id)
+                or self.modality not in _TEXT_CLASSES):
+            raise OriginalityError("invalid bounded expressive-overlap identities")
+        for field in ("reference_sha256", "sample_sha256"):
+            value = getattr(self, field)
+            if not isinstance(value, str) or not _SHA.fullmatch(value):
+                raise OriginalityError("expression overlap requires authentic digest format")
+        if (type(self.shared_word_shingles) is not int or self.shared_word_shingles < 0
+                or type(self.longest_consecutive_tokens) is not int
+                or not 0 <= self.longest_consecutive_tokens <= _MAX_TOKENS):
+            raise OriginalityError("expressive overlap counts must be bounded")
+        if (type(self.candidate_shingle_share) not in (float, int)
+                or not isfinite(self.candidate_shingle_share)
+                or not 0 <= self.candidate_shingle_share <= 1):
+            raise OriginalityError("invalid expressive overlap share")
+        if type(self.exact_normalized_match) is not bool:
+            raise OriginalityError("exact expression match flag must be boolean")
+        if self.triage_signal not in {
+            "IDENTICAL_NORMALIZED_EXPRESSION",
+            "SHORT_IDENTICAL_NARRATIVE_FOR_REVIEW",
+            "LONG_IDENTICAL_EXPRESSION_RUN",
+            "SUBSTANTIAL_SHARED_PHRASE_STRUCTURE_FOR_REVIEW",
+        }:
+            raise OriginalityError("unsupported expressive similarity signal")
+        if self.legal_infringement_determined is not False:
+            raise OriginalityError("automated expressive similarity cannot decide infringement")
 
 
 @dataclass(frozen=True, slots=True)
