@@ -106,12 +106,14 @@ def store(db:sqlite3.Connection,world:LivingWorld,state:LivingState,
         ):
             raise FileExistsError("stale save version would overwrite another player decision")
         version=old[3]+1
-        db.execute(
+        changed=db.execute(
             "UPDATE dragon_original_living_world_save_v1 SET "
             "document=?,mac=?,version=?,updated_at=? "
             "WHERE owner=? AND slot=? AND version=?",
             (blob,_mac(blob),version,stamp,owner,slot,old[3]),
         )
+        if changed.rowcount!=1:
+            raise FileExistsError("another writer advanced this game save slot")
     else:
         if expected_digest is not None or replace_existing:
             raise ValueError("cannot replace a durable original save before it exists")
