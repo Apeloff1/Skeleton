@@ -45,7 +45,7 @@ def test_canonical_bytes_use_utf8() -> None:
 
 @pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
 def test_non_finite_numbers_fail_before_digest(value: float) -> None:
-    with pytest.raises(CanonicalContractError, match="strict canonical JSON"):
+    with pytest.raises(CanonicalContractError, match="non-finite numbers are not canonical JSON"):
         _ = _envelope({"value": value}).digest
 
 
