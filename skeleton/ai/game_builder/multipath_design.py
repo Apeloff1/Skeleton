@@ -564,4 +564,18 @@ def hazard_proximity(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity"]
+def route_exposure_score(
+    problem: RouteProblem, proof: RouteProof, *, radius: int = 2,
+) -> int:
+    """Count risk-adjacent frames without treating proximity as direct damage."""
+    if not isinstance(proof, RouteProof) or proof.problem_digest != problem.digest:
+        raise MultipathError("hazard exposure must bind the source world")
+    replayed = evaluate_route(problem, proof.actions, allow_hazards=proof.hazard_visits > 0)
+    if replayed.positions != proof.positions:
+        raise MultipathError("route geometry does not replay")
+    exposures = hazard_proximity(problem, radius=radius)
+    return sum(exposures.get(p, len(problem.hazards)) for p in proof.positions)
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score"]
