@@ -22,6 +22,7 @@ from skeleton.ai.game_builder.editor_platforms import (
 )
 from skeleton.ai.game_builder.port_planner import (
     HomebrewSource, PortMode, PortPlanningError, PortRequest, compile_port, compile_port_route,
+    compile_progressive_port_route,
 )
 
 PROOF_1 = "a" * 64
@@ -145,6 +146,66 @@ def test_unknown_or_infringing_sources_are_refused():
         lookup_platform("../firmware")
     with pytest.raises(PortPlanningError):
         HomebrewSource("some", "bandai_wonderswan", "project_owned", PROOF_1, ())
+
+
+@pytest.mark.parametrize("bad", [
+    {"project_id": "x" * 129},
+    {"project_id": "local\\nnewline"},
+    {"creative_identity": tuple("idea-" + str(n) for n in range(17))},
+    {"creative_identity": ("x" * 241,)},
+    {"creative_identity": ("bad\\x00name",)},
+    {"target_type": None},
+])
+def test_homebrew_plan_admission_limits_identity_resource_costs(bad):
+    if "target_type" in bad:
+        with pytest.raises(PortPlanningError):
+            PortRequest((original(),), {"not": "a platform"})
+        return
+    with pytest.raises(PortPlanningError):
+        replace(original(), **bad)
+
+
+def test_progressive_route_is_true_hop_chain_without_forged_intermediate_rights():
+    source = original(platform="bandai_wonderswan")
+    targets = ("windows_modern", "nintendo_game_boy", "linux_desktop")
+    first = compile_progressive_port_route(source, targets)
+    second = compile_progressive_port_route(source, targets)
+    assert first == second
+    assert tuple(h.from_platform_id for h in first.hops) == (
+        "bandai_wonderswan", "windows_modern", "nintendo_game_boy",
+    )
+    assert tuple(h.to_platform_id for h in first.hops) == targets
+    assert {"visual_upgrade", "simulation_upgrade"} <= {
+        x.phase for x in first.hops[0].actions
+    }
+    assert {"visual_demotion", "gameplay_demotion"} <= {
+        x.phase for x in first.hops[1].actions
+    }
+    assert first.hops[1].prior_hop_digest == first.hops[0].digest
+    assert first.hops[2].prior_hop_digest == first.hops[1].digest
+    assert all(h.original_rights_evidence_sha256 == source.evidence_sha256
+               for h in first.hops)
+    assert all("independent_intermediate_rights_and_originality_review"
+               in h.pending_release_gates for h in first.hops)
+    assert not first.releasable
+    assert all(not h.releasable and not h.native_build_verified for h in first.hops)
+    assert first.digest != compile_progressive_port_route(
+        source, targets[:2], mode=PortMode.ENHANCED
+    ).digest
+
+
+@pytest.mark.parametrize("destinations,mode", [
+    ((), PortMode.ENHANCED),
+    (("windows_modern", "windows_modern"), PortMode.ENHANCED),
+    (("bandai_wonderswan",), PortMode.ENHANCED),
+    (("unlisted_proprietary_platform",), PortMode.ENHANCED),
+    (("windows_modern",), PortMode.CROSS_HYBRID),
+])
+def test_progressive_port_route_rejects_unauthorized_or_cyclic_hops(
+    destinations, mode,
+):
+    with pytest.raises(PortPlanningError):
+        compile_progressive_port_route(original(), destinations, mode=mode)
 
 
 def test_port_ideas_to_many_destinations_without_conflating_them_with_builds():
