@@ -163,7 +163,7 @@ def instrument_playable_telemetry(game_html:str,blueprint:GameBlueprint
         "function physicsStep(dt){",
         "function restart(){",
         "function loseLife(){",
-        "if(!p.alive||p.invincible>0)return;",
+        "if(!p.alive||p.invincible>0) return;",
         "function updateGameState(){",
         "requestAnimationFrame(frame);",
     ]
@@ -211,8 +211,8 @@ document.addEventListener("keydown",event=>{
         'function restart(){_gameTelemetryPush(gameTelemetry.events.length?"retry":"spawn");',1
     )
     game_html=game_html.replace(
-        "if(!p.alive||p.invincible>0)return;",
-        'if(!p.alive||p.invincible>0)return;_gameTelemetryPush("damage");',1
+        "if(!p.alive||p.invincible>0) return;",
+        'if(!p.alive||p.invincible>0) return;_gameTelemetryPush("damage");',1
     )
     game_html=game_html.replace(
         'if(state.lives<=0){p.alive=false;return}',
