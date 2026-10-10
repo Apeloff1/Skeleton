@@ -84,6 +84,7 @@ def test_wiiu_native_gamepad_both_screens_and_wut_rpx():
     for token in (
         "#include <vpad/input.h>","#include <coreinit/screen.h>",
         "WHBProcInit()","WHBProcIsRunning()","WHBProcShutdown()",
+        " WHBProcInit();",
         "OSScreenGetBufferSizeEx(SCREEN_DRC)",
         "OSScreenGetBufferSizeEx(SCREEN_TV)","OSScreenSetBufferEx",
         "OSScreenPutFontEx(SCREEN_DRC","OSScreenPutFontEx(SCREEN_TV",
@@ -96,6 +97,7 @@ def test_wiiu_native_gamepad_both_screens_and_wut_rpx():
     assert "wut_create_rpx(dragon_original)" in cmake
     assert "src/dragon_game.c" in cmake
     assert "NOT COMMAND wut_create_rpx" in cmake
+    assert "if(!WHBProcInit())" not in c
     assert "Makefile" not in p.files
     assert "wuhb" not in cmake
     assert "RPX" in p.files["README.port.md"]

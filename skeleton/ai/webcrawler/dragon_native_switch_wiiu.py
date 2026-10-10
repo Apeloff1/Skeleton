@@ -252,7 +252,7 @@ static void render(VPADStatus*pad,const DragonGame*g){
  (void)pad;
 }
 int main(void){
- if(!WHBProcInit())return 1;
+ WHBProcInit();
  OSScreenInit();
  size_t tvSize=OSScreenGetBufferSizeEx(SCREEN_TV);
  size_t drcSize=OSScreenGetBufferSizeEx(SCREEN_DRC);
