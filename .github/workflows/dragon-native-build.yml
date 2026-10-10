@@ -321,6 +321,27 @@ jobs:
           assert executable[:4] == b"\x7fELF"
           print("DRAGON_NATIVE_LINUX_PUZZLE_EXECUTED", receipt["executable_sha256"])
           PY
+      - name: Compile and replay original Steam Deck-target Linux game
+        run: |
+          set -euo pipefail
+          python -m skeleton.ai.webcrawler.dragon_native_desktop build \
+            --title "Original Dragon Deck Expedition" --target steam_deck \
+            --seed 2026 --stages 3 --difficulty 8 \
+            --attest-original-rights --authorize-local-build \
+            --out /tmp/original-dragon-deck > /tmp/dragon-deck-result.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from skeleton.ai.webcrawler.dragon_native_desktop import verify_native_puzzle_executable
+          result=json.loads(Path("/tmp/dragon-deck-result.json").read_text())
+          assert result["status"]=="native_linux_executable_built_and_selftested"
+          assert result["evidence"]["native_target"]=="steam_deck"
+          assert result["evidence"]["independent_replays_verified"]==12
+          audit=verify_native_puzzle_executable(
+              (Path("/tmp/original-dragon-deck")/result["filename"]).read_bytes())
+          assert audit["source_level_proofs"]==3
+          print("ORIGINAL_STEAM_DECK_LINUX_HOST_GAME_PASS",audit["executable_sha256"])
+          PY
       - name: Publish original Linux executable and runtime replay evidence
         uses: actions/upload-artifact@v4
         with:
