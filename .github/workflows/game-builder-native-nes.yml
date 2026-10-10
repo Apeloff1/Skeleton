@@ -6,6 +6,8 @@ on:
       - 'skeleton/ai/game_builder/**'
       - 'scripts/game_builder/native_nes_ci.py'
       - 'scripts/game_builder/nes_reproducibility_ci.py'
+      - 'scripts/game_builder/nes_6502_boot.py'
+      - 'skeleton/testing/test_game_builder_nes_6502_boot.py'
       - 'skeleton/testing/test_game_builder_nes_reproducibility.py'
       - '.github/workflows/game-builder-native-nes.yml'
   workflow_dispatch:
@@ -33,6 +35,8 @@ jobs:
             /skeleton/ai/game_builder/
             /scripts/game_builder/native_nes_ci.py
             /scripts/game_builder/nes_reproducibility_ci.py
+            /scripts/game_builder/nes_6502_boot.py
+            /skeleton/testing/test_game_builder_nes_6502_boot.py
             /scripts/game_builder/sega_reproducibility_ci.py
             /skeleton/testing/test_game_builder_nes_reproducibility.py
       - uses: actions/setup-python@v5
@@ -48,8 +52,8 @@ jobs:
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
         run: |
-          python -m pip install --disable-pip-version-check "pytest>=8.4,<9"
-          python -m pytest -q --noconftest skeleton/testing/test_game_builder_nes_reproducibility.py
+          python -m pip install --disable-pip-version-check "pytest>=8.4,<9" "py65==1.2.0"
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_nes_reproducibility.py skeleton/testing/test_game_builder_nes_6502_boot.py
       - name: Compile source-authored worlds to real NES iNES ROM
         env:
           PYTHONPATH: .
@@ -88,6 +92,23 @@ jobs:
           assert proof["emulator_gameplay_verified"] is False
           assert proof["physical_hardware_verified"] is False
           assert proof["publication_authorized"] is False
+          PY
+          python scripts/game_builder/nes_6502_boot.py \
+            --rom nes-world-src/build/skeleton-original.nes \
+            --expected-sha256 "$FIRST_ROM_SHA" \
+            --receipt-out nes-6502-observed-boot.json
+          python - <<'PY'
+          import json
+          rom=json.load(open("nes-compiled-rom-verification.json",encoding="utf-8"))
+          boot=json.load(open("nes-6502-observed-boot.json",encoding="utf-8"))
+          assert boot["rom_sha256"]==rom["sha256"]
+          assert boot["actual_6502_cpu_executed"] is True
+          assert boot["original_ppu_palette_writes_observed"] >= 32
+          assert boot["original_ppu_nametable_writes_observed"] >= 960
+          assert boot["actual_sprite_dma_transfers_observed"] >= 1
+          assert boot["cycle_accurate_ppu_apu_verified"] is False
+          assert boot["full_gameplay_playthrough_verified"] is False
+          assert boot["publication_authorized"] is False
           print("Compiled genuine native NES cartridge", result["sha256"])
           PY
       - name: Save ROM with provenance and reproducible build source
@@ -101,5 +122,6 @@ jobs:
             nes-source-evidence.json
             nes-second-source-evidence.json
             nes-independent-rebuild-proof.json
+            nes-6502-observed-boot.json
           if-no-files-found: error
           retention-days: 7
