@@ -60,6 +60,8 @@ class PuzzleBuildEvidence:
     runtime_selftest: str
     native_hint_selftest: str
     hint_output_sha256: str
+    independent_replays_verified: int
+    replay_transcripts_sha256: str
     runtime_output_sha256: str
     runtime_stages_verified: int
     abstract_levels_verified: int
@@ -234,6 +236,31 @@ def build_native_puzzle_executable(
         hint = _invoke([str(executable), "--hint-selftest"], root=root,
                        timeout=timeout_seconds)
         _hint_stages(hint.stdout, proof["stages"])
+        from .dragon_native_puzzle import transformed_level, solve_grid
+        from .dragon_native_puzzle_trace import simulate_grid, parse_native_state_line
+        transcripts = []
+        for level in range(1, proof["stages"] + 1):
+            puzzle = transformed_level(level - 1, proof["seed"], proof["difficulty"])
+            solution, _ = solve_grid(puzzle)
+            for commands in (
+                solution, "r" + solution, solution[:4] + "r" + solution,
+                "su" + solution,
+            ):
+                expected = simulate_grid(puzzle, commands, level=level)
+                observed = _invoke(
+                    [str(executable), "--simulate", str(level), commands],
+                    root=root, timeout=timeout_seconds,
+                )
+                parsed = parse_native_state_line(observed.stdout)
+                if (parsed["digest"] != expected.digest or
+                        parsed["level"] != expected.level or
+                        parsed["player"] != expected.player or
+                        parsed["crates"] != expected.crates or
+                        parsed["moves"] != expected.moves or
+                        parsed["pushes"] != expected.pushes or
+                        parsed["solved"] != expected.solved):
+                    raise ValueError("compiled game diverges from independent native physics")
+                transcripts.append(observed.stdout.strip())
         # Exercise a separate real executable route beyond the selftest.
         listing = _invoke([str(executable), "--list"], root=root,
                           timeout=timeout_seconds)
@@ -253,6 +280,8 @@ def build_native_puzzle_executable(
         runtime_selftest="native_executable_all_stages_passed",
         native_hint_selftest="current_position_bfs_all_stages_passed",
         hint_output_sha256=_hash(hint.stdout.encode("utf-8")),
+        independent_replays_verified=len(transcripts),
+        replay_transcripts_sha256=_hash(_canonical(transcripts)),
         runtime_output_sha256=_hash(passed.stdout.encode("utf-8")),
         runtime_stages_verified=proof["stages"],
         abstract_levels_verified=proof["stages"],
@@ -317,6 +346,9 @@ def verify_native_puzzle_executable(package: bytes) -> dict:
             evidence.get("compiler_std") != "c99" or
             evidence.get("runtime_stages_verified") != proof["stages"] or
             evidence.get("abstract_levels_verified") != proof["stages"] or
+            evidence.get("independent_replays_verified") != proof["stages"] * 4 or
+            not re.fullmatch(r"[a-f0-9]{64}",
+                             str(evidence.get("replay_transcripts_sha256", ""))) or
             evidence.get("runtime_selftest") != "native_executable_all_stages_passed" or
             evidence.get("native_hint_selftest") != "current_position_bfs_all_stages_passed" or
             not re.fullmatch(r"[a-f0-9]{64}", str(evidence.get("hint_output_sha256", ""))) or
