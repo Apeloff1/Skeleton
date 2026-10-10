@@ -330,6 +330,38 @@ def replay_prefix(
     )
 
 
+
+def resume_replay(
+    world: PlayableWorld, replay: GameReplay, actions: Sequence[str], *,
+    authorized: bool,
+) -> GameReplay:
+    """Continue an authenticated, verified replay without recomputing its
+    committed receipt hash chain. No continuation may rewrite prior actions.
+    """
+    if authorized is not True:
+        raise PermissionError("replay continuation requires authorization")
+    verify_replay(world, replay, authorized=True)
+    if (not isinstance(actions, (tuple, list))
+            or len(replay.action_receipts) + len(actions) > MAX_REPLAY_ACTIONS):
+        raise GameplayError("replay continuation exceeds action budget")
+    if replay.final_state.status != "playing" and actions:
+        raise GameplayError("terminal gameplay cannot resume")
+    receipts = list(replay.action_receipts)
+    state = replay.final_state
+    for action in actions:
+        before_digest = state.digest
+        state = advance(world, state, action, authorized=True)
+        receipts.append(ActionReceipt(
+            len(receipts), action, before_digest, state.digest,
+            receipts[-1].digest if receipts else None,
+        ))
+    output = GameReplay(
+        world.digest, tuple(receipts), state, replay.initial_state_digest,
+    )
+    verify_replay(world, output, authorized=True)
+    return output
+
+
 def demonstrate_solvable(world: PlayableWorld, *, authorized: bool) -> GameReplay:
     """Execute each level's hazard-free proof with the real transition engine."""
     if authorized is not True:
