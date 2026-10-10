@@ -177,3 +177,10 @@ def test_strict_explicit_capture_and_analysis_consent():
     with pytest.raises(PermissionError, match="consent"):
         store.record(base, authorized=1)
 
+
+def test_raw_video_retention_flag_requires_explicit_false():
+    from dataclasses import replace
+    store = setup()
+    with pytest.raises(ValueError, match="raw"):
+        store.record(replace(session(store), raw_video_retained=0), authorized=True)
+
