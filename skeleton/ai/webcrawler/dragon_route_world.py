@@ -24,7 +24,8 @@ MAX_NODES=48
 MAX_EDGES=192
 MAX_HOPS=80
 MAX_EXPANSIONS=60000
-MAX_MINUTES=10080
+MAX_MINUTES=26_280_000  # 50 years of actual in-game travel time
+MAX_EDGE_MINUTES=10_512_000  # 20 years per abstract leg; still int32-safe
 VALID_ID=re.compile(r"[a-z][a-z0-9_]{0,39}\Z")
 OBJECTIVES=("fastest","cheapest","safest","least_exhausting","scenic",
             "exploratory","challenging","impractical","balanced")
@@ -210,7 +211,7 @@ def validate_world(world:World)->None:
                 any(x not in ROUTE_SHAPES for x in edge.shapes)):
             raise ValueError("route classification outside original game vocabulary")
         _ids(edge.shapes,limit=16)
-        for field,high in (("minutes",1440),("price",10000),
+        for field,high in (("minutes",MAX_EDGE_MINUTES),("price",10000),
                            ("fatigue",100),("danger",100),
                            ("spectacle",100),("fuel",100),
                            ("oxygen",100),("mana",100)):
@@ -255,7 +256,7 @@ def validate_traveller(traveller:Traveller):
     _number(traveller.cash,0,100000,"starting currency")
     _number(traveller.max_energy,1,1000,"maximum stamina")
     _number(traveller.energy,0,traveller.max_energy,"starting stamina")
-    _number(traveller.start_minute,0,MAX_MINUTES,"starting clock")
+    _number(traveller.start_minute,0,10080,"starting clock")
     _number(traveller.fuel,0,1000,"starting fuel")
     _number(traveller.oxygen,0,1000,"starting oxygen")
     _number(traveller.mana,0,1000,"starting magic resource")
