@@ -211,6 +211,10 @@ EXAMPLES:dict[str,tuple[str,...]]={
  "outer_space":(
    "spaceport_access","shuttle_to_orbit","orbit_to_moon","moon_to_citadel",
  ),
+ "interstellar":(
+   "spaceport_access","shuttle_to_orbit","generation_ship_voyage",
+   "deep_space_crossing","stellar_return",
+ ),
  "magic":(
    "forest_entry","forest_to_ruins","magic_circle_entry","magic_gateway",
  ),
