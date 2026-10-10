@@ -208,3 +208,15 @@ def test_observation_collection_requires_typed_bounded_tuple():
         with pytest.raises(ValueError, match="observation collection"):
             store.record(replace(base, observations=bad), authorized=True)
 
+
+def test_recorded_observations_require_real_monotone_timestamps():
+    from dataclasses import replace
+    store = setup()
+    base = session(store)
+    for items, reason in (
+        ((observation(timestamp=1000), observation(timestamp=999)), "recording order"),
+        ((observation(timestamp=True),), "outside recording"),
+    ):
+        with pytest.raises(ValueError, match=reason):
+            store.record(replace(base, observations=items), authorized=True)
+
