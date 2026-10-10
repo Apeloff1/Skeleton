@@ -6,7 +6,7 @@ independently certified native exporters. This is an API model, not a GUI.
 from __future__ import annotations
 
 from .platform_registry import PlatformProfile, PlatformRegistry, PlatformRegistryError, default_registry
-from .port_planner import PortMode
+from .port_planner import PortMode, HomebrewSource, compile_progressive_port_route
 
 # Source producers are real and platform-specific. None self-certifies a build or release.
 _NATIVE_SOURCE_ADAPTERS = {
@@ -124,6 +124,57 @@ def editor_portability_context(
         "rights_policy": "original_or_cleared_homebrew_only",
         "modes": [mode.value for mode in PortMode],
         "targets": targets,
+    }
+
+
+
+def editor_progressive_route_preview(
+    source: HomebrewSource, destinations: tuple[str, ...], *,
+    mode: PortMode = PortMode.ENHANCED,
+    registry: PlatformRegistry | None = None,
+) -> dict[str, object]:
+    """Deliver a fully serializable, custody-bound cross-era editor preview.
+
+    It never fabricates intermediate binaries, hardware test outcomes,
+    independent IP review or licensed distribution rights.
+    """
+    plan = compile_progressive_port_route(
+        source, destinations, mode=mode, registry=registry,
+    )
+    return {
+        "schema": "skeleton.game_builder.progressive_route_preview.v1",
+        "original_project_id": plan.original_project_id,
+        "original_platform_id": plan.original_platform_id,
+        "original_rights_basis": plan.original_rights_basis,
+        "original_evidence_sha256": plan.original_evidence_sha256,
+        "creative_identity": list(plan.creative_identity),
+        "design_route_digest": plan.digest,
+        "planning_status": plan.planning_status,
+        "native_binary_built": False,
+        "rights_independently_verified": False,
+        "distribution_authorized": False,
+        "hops": [
+            {
+                "ordinal": hop.step,
+                "from": hop.from_platform_id,
+                "to": hop.to_platform_id,
+                "mode": hop.mode,
+                "design_digest": hop.digest,
+                "previous_design_digest": hop.prior_hop_digest,
+                "original_rights_evidence_sha256": hop.original_rights_evidence_sha256,
+                "target_constraints": list(hop.target_constraints),
+                "actions": [
+                    {"phase": action.phase,
+                     "disposition": action.disposition, "work": action.work}
+                    for action in hop.actions
+                ],
+                "pending_release_gates": list(hop.pending_release_gates),
+                "native_binary_built": False,
+                "rights_independently_verified": False,
+                "distribution_authorized": False,
+            }
+            for hop in plan.hops
+        ],
     }
 
 
