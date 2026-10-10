@@ -383,6 +383,56 @@ research crawler. Real gameplay verification covers the original Sokoban
 rules, not every game mechanic available in the broader multi-genre
 factory.
 
+### Native Windows x64 binary and Steam Deck Linux-target source
+
+The original C99 puzzle engine now has **two additional genuine output paths**:
+
+- \`dragon_native_windows.py\`: opt-in, fixed-command MinGW-w64
+  cross-compilation creates an actual Windows x86_64 PE32+ \`.exe\`.
+  The offline verifier checks the native PE signature, machine type,
+  optional header, entry point, bounded section table, SHA digests,
+  identical original source and all solver-proven source-level stages.
+  A Windows EXE built on Linux is **not executed** on Windows, and
+  \`windows_runtime_verified\` and \`host_execution_verified\` are both
+  permanently false in this receipt.
+- \`dragon_native_desktop.py build --target steam_deck\` uses the real
+  native Linux C99 game pipeline and performs actual ELF execution with
+  stage replay and independent physics on the authorized Linux host.
+  The target is Steam Deck-compatible source intent; the Linux host
+  run is **not SteamOS hardware or input-device certification**.
+
+\`\`\`sh
+# On an authorized Linux build host with MinGW-w64 installed:
+python -m skeleton.ai.webcrawler.dragon_native_windows build \
+  --title "Original Dragon Windows Puzzle" --stages 4 \
+  --seed 1977 --attest-original-rights --authorize-cross-compile \
+  --out ./original-windows-build
+
+# Actual Linux ELF, target-specific source and native gameplay replay:
+python -m skeleton.ai.webcrawler.dragon_native_desktop build \
+  --target steam_deck --title "Original Dragon Steam Quest" \
+  --stages 4 --seed 1977 --attest-original-rights \
+  --authorize-local-build --out ./original-steam-deck-build
+\`\`\`
+
+The GitHub native workflow has a separate job that installs
+\`gcc-mingw-w64-x86-64\`, compiles original Win64 source,
+inspects the actual PE bytes and packages the release. These
+are independent target-admission and structural verification claims:
+Windows runtime playtesting remains a distinct incomplete task.
+
+### Saving and importing original game editor projects
+
+The mobile/web grid editor now supports user-controlled export of its
+exactly solver-validated board pack as bounded versioned JSON with
+canonical campaign digest. On web it downloads a content-addressed
+\`.json\` file; on native mobile it saves and offers OS sharing.
+Import goes through the OS document picker, enforces the 8 KiB limit
+and strict 12×10 grid shape and **immediately drops earlier validation**.
+Imported maps must be revalidated by the authenticated backend before
+source generation can resume. Raw arbitrary files and script execution
+are not accepted.
+
 ### Release verification and index integrity
 
 A release index is **not trusted merely because its archive hashes match**.
