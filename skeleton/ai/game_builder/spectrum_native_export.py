@@ -52,6 +52,8 @@ Start:
     call LoadLevel
 MainLoop:
     halt                   ; Interrupt-synchronized original Spectrum frame.
+    xor a
+    out (254), a           ; End one-frame PIO beeper pulse; avoid stuck sound.
     ld a, (won)
     or a
     jp nz, Finish
