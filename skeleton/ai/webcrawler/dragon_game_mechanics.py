@@ -147,7 +147,7 @@ class GameMechanicsMemory:
                 or not session.game_label.isprintable()
                 or len(session.game_label.encode("utf-8")) > 600):
             raise ValueError("invalid game label")
-        if not isinstance(session.duration_ms, int) or not 0 < session.duration_ms <= self.policy.max_session_seconds * 1000:
+        if type(session.duration_ms) is not int or not 0 < session.duration_ms <= self.policy.max_session_seconds * 1000:
             raise ValueError("invalid session duration")
         if not 1 <= len(session.observations) <= self.policy.max_observations:
             raise ValueError("invalid observation count")
