@@ -631,4 +631,16 @@ def objective_dispersion(problem: RouteProblem) -> dict[str, int]:
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion"]
+def route_chokepoint_ppm(problem: RouteProblem, proof: RouteProof) -> int:
+    """Share of unique route positions that are articulation vertices."""
+    if proof.problem_digest != problem.digest:
+        raise MultipathError("chokepoint analysis needs matching world")
+    replay = evaluate_route(problem, proof.actions, allow_hazards=proof.hazard_visits > 0)
+    if replay.positions != proof.positions:
+        raise MultipathError("route positions cannot be verified")
+    visited = set(proof.positions)
+    return len(visited & set(articulation_cells(problem))) * 1_000_000 // max(1, len(visited))
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm"]
