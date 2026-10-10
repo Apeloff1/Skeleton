@@ -197,6 +197,97 @@ emulator has proved the game playable. The verifier binds both manifests'
 content digests before comparing them, preventing a read-after-verification
 manifest replacement from masquerading as a trustworthy diff.
 
+### Real standalone native Linux game — compiled and exercised
+
+Unlike the source-only cross-platform creator route, the new operator-only
+\`dragon_native_desktop.py\` owner compiles an actual C99 Linux puzzle game
+using the repository's existing original solver-backed Sokoban generator.
+
+\`\`\`sh
+python -m skeleton.ai.webcrawler.dragon_native_desktop build \
+  --title "Original Dragon Puzzle Campaign" --seed 1977 \
+  --difficulty 8 --stages 6 --attest-original-rights \
+  --authorize-local-build --out ./my-original-linux-game
+\`\`\`
+
+The builder writes the approved native C sources into a temporary build tree,
+invokes the allowlisted host \`cc\` compiler with fixed warning/C99 arguments,
+validates the output is a genuine bounded ELF executable, **executes its
+real \`--selftest\`** and requires one correct stage-completion trace per
+generated level, then **executes \`--list\`** to verify level inventory.
+It archives the source release ZIP, executable and runtime evidence together
+under a content-addressed name.
+
+The independent \`verify\` command replays every original Sokoban level via
+the exact bounded Python BFS solver and checks source fingerprints, ELF
+structure, binary hash, compile settings and runtime receipt integrity
+**without executing code from a downloaded or modified archive**.
+A runtime result is a report from the trusted local builder, not a
+cryptographic proof of origin or safety. Restrict builders with appropriate
+OS-level sandboxing; no arbitrary user-uploaded source is accepted and this
+capability is never exposed to a web request or research crawler.
+
+This is a **genuine compiled terminal game**, not a promise of a 3D
+PlayStation, Nintendo, Xbox or modern PC graphical game.
+
+### Original pixel-art forge connected to cartridge runtimes
+
+\`dragon_native_artforge.py\` translates original protagonist and world
+themes into eight 8×8 four-index sprite tiles. Distinct silhouettes are
+authored for hatchling, knight, explorer, pilot, astronaut and robot,
+and original collectible visuals are authored for space, ruins,
+crystals, forest, clockwork, ice and volcano themes. Gameplay palettes
+apply bounded color-index remappings.
+
+The compiler emits true interleaved 2bpp Game Boy and planar 2bpp NES tiles.
+The Dragon native source generator embeds these bytes directly in the
+canonical \`Tiles\` / \`PlatformTiles\` / NES \`CHARS\` source sections,
+preserving sprite addresses and ROM build layouts. This affects native
+cartridge picture data, not just a manifest or a web preview. The art
+manifest records original sprite digests and actual target source
+application, and the release verifier reconstructs the original tiles
+and compares them with the emitted assembly.
+
+Only Game Boy, Game Boy Color and NES are claimed as integrated native
+art targets here. Other target emitters retain their existing, separately
+documented graphic capabilities; do not extrapolate new coverage to them.
+Game Boy color indices do not mean a DMG has additional RGB colors.
+
+### Original game series with verified stepping-stone outputs
+
+\`dragon_native_evolution.py\` supports a bounded offline evolution series
+of **2–12 source editions**, each with up to 3 native game targets (36
+individual projects total). It deterministically evolves hero, palette,
+world theme, difficulty, stage count, search budget and seed from one
+operator-approved original design.
+
+An episode is a real generated/archived/verified native source portfolio;
+not just a task-plan entry. Each edition gets an individually verified
+immutable archive and source-index. Consecutive releases are compared for
+actual source/binary/receipt changes; the series index is published last.
+A stopped or failed series never gets a completed-series receipt, but
+previous immutable editions are safely resumable.
+
+\`\`\`sh
+python -m skeleton.ai.webcrawler.dragon_native_evolution preview \
+  --title "Original Crystal Odyssey" --targets game_boy,nes \
+  --portable-design ./original-design.json --attest-original-rights \
+  --editions 6
+python -m skeleton.ai.webcrawler.dragon_native_evolution build \
+  --title "Original Crystal Odyssey" --targets game_boy,nes \
+  --portable-design ./original-design.json --attest-original-rights \
+  --authorize-series --editions 6 --out ./original-odyssey
+\`\`\`
+
+The design JSON is strictly validated, has canonical versioned keys and
+rejects symlink input, excess bytes, duplicate keys and unknown controls.
+Series verification replays the exact deterministic design variants,
+inspects every target's verified source release and checks inter-edition
+manifest linkage. An unchanged source graph, emulator crash or inferior
+game mechanic is **not** automatically a training gain; any machine
+learning/memory promotion belongs to the separate evidence and approval
+planes.
+
 ### Release verification and index integrity
 
 A release index is **not trusted merely because its archive hashes match**.
