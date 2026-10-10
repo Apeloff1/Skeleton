@@ -87,16 +87,44 @@ def retrieve_weight_pack(pack: AlmanacWeightPack, library: ReviewedKnowledgeStor
     raw = decoder.decompress(pack.payload, 32_000_001)
     if len(raw) > 32_000_000 or not decoder.eof or decoder.unused_data or len(raw) != pack.raw_bytes:
         raise ValueError("pack size or compression stream invalid")
-    body = json.loads(raw)
-    if body["owner"] != owner or body["knowledge_root"] != pack.knowledge_root:
-        raise ValueError("pack provenance mismatch")
+    try:
+        body = json.loads(raw)
+        # Requiring the exact canonical encoding rejects duplicate keys, non-finite
+        # numeric tokens and alternate parses even if the pack hash is recomputed.
+        if not isinstance(body, dict) or canonical_json(body).encode("utf-8") != raw:
+            raise ValueError("weight pack is not canonical JSON")
+    except (ValueError, TypeError, UnicodeError, RecursionError) as exc:
+        raise ValueError("weight pack JSON integrity invalid") from exc
+    if (body.get("schema") != "skeleton.dragon.almanac_sparse_weights.v1"
+            or body.get("owner") != owner
+            or body.get("knowledge_root") != pack.knowledge_root
+            or body.get("weight_semantics") != "bounded_integer_lexical_frequency_not_neural_parameters"
+            or body.get("training_authorized") is not False
+            or body.get("release_authorized") is not False):
+        raise ValueError("pack schema or provenance mismatch")
+    documents = body.get("documents")
+    postings = body.get("postings")
+    if (type(pack.documents) is not int or not 0 <= pack.documents <= 10_000
+            or not isinstance(documents, list) or len(documents) != pack.documents
+            or not isinstance(postings, dict)):
+        raise ValueError("weight pack document index invalid")
+    query_terms = sorted(set(WORD.findall(query.casefold())))
     scores = Counter()
-    for term in sorted(set(WORD.findall(query.casefold()))):
-        for number, weight in body["postings"].get(term, ()):
-            scores[number] += weight
+    for term in query_terms:
+        entries = postings.get(term, [])
+        if not isinstance(entries, list) or len(entries) > len(documents):
+            raise ValueError("weight pack postings malformed")
+        last_number = -1
+        for entry in entries:
+            if (not isinstance(entry, list) or len(entry) != 2
+                    or type(entry[0]) is not int or type(entry[1]) is not int
+                    or not last_number < entry[0] < len(documents)
+                    or not 1 <= entry[1] <= 255):
+                raise ValueError("weight pack postings invalid or out of order")
+            last_number = entry[0]
+            scores[entry[0]] += entry[1]
     selected = sorted(scores, key=lambda n: (-scores[n], n))[:limit]
-    hits = [{**body["documents"][n], "routing_weight": scores[n]} for n in selected]
-    conflicts = sorted({h["mechanic"] for h in hits} & set(body["conflicting_mechanics"]))
+    hits = [{**documents[n], "routing_weight": scores[n]} for n in selected]
     # A mutable local pack is not an authentication boundary. Verify selected
     # statements against the canonical notes; a recomputed hash grants nothing.
     canonical_rows = library._rows(owner)
@@ -104,6 +132,31 @@ def retrieve_weight_pack(pack: AlmanacWeightPack, library: ReviewedKnowledgeStor
     notes = {(r["source_id"], r["revision_digest"], e["note"]["note_id"]): e["note"]
              for r in canonical_rows if r["status"] == "active" and "design_reference" in r["allowed_scopes"]
              for e in r["notes"]}
+    # A rehashed pack must not bias retrieval with invented weights or suppress
+    # matching reviewed notes. Reconstruct only the requested term postings from
+    # canonical evidence, not the unrelated vocabulary's full index.
+    expected = {term: [] for term in query_terms}
+    for number, entry in enumerate(documents):
+        if not isinstance(entry, dict):
+            raise ValueError("weight pack document malformed")
+        key = (entry.get("source_id"), entry.get("revision"), entry.get("note_id"))
+        note = notes.get(key)
+        if (note is None
+                or any(entry.get(k) != note[k] for k in (
+                    "statement", "mechanic", "stance",
+                    "dependence_group", "confidence_ppm",
+                ))
+                or entry.get("source_url") != source_urls.get(key[0])
+                or entry.get("span") != [note["start"], note["end"]]):
+            raise ValueError("weight pack document not canonical reviewed evidence")
+        weights = Counter(WORD.findall(note["statement"].casefold()))
+        for term in WORD.findall(note["mechanic"].casefold()):
+            weights[term] += 6
+        for term in query_terms:
+            if weights.get(term, 0):
+                expected[term].append([number, min(255, weights[term])])
+    if any(postings.get(term, []) != expected[term] for term in query_terms):
+        raise ValueError("weight pack postings differ from canonical reviewed notes")
     for hit in hits:
         note = notes.get((hit["source_id"], hit["revision"], hit["note_id"]))
         if note is None or any(hit[k] != note[k] for k in ("statement", "mechanic", "stance", "dependence_group", "confidence_ppm")):
