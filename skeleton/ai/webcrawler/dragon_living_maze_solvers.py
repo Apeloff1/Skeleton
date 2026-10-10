@@ -42,6 +42,8 @@ class DynamicMazeProof:
     waiting_turns:int
     movement_turns:int
     expanded:int
+    search_budget:int
+    search_horizon:int
     truncated:bool
     first_phase:int
     end_phase:int
@@ -146,7 +148,8 @@ def solve(world:LivingWorld,goal:tuple[int,int,int], *,
         steps=path,actual_turns=len(path),
         waiting_turns=sum(x in ("wait","rest") for x in path),
         movement_turns=sum(x in {name for name,_,_ in DIRS} for x in path),
-        expanded=expanded,truncated=truncated,
+        expanded=expanded,search_budget=budget,
+        search_horizon=horizon,truncated=truncated,
         first_phase=start.turn%8,end_phase=end.turn%8,
         replay_digest=end.history_digest,
         ending_is_required=world.lifecycle=="mandatory_completion",
@@ -231,11 +234,10 @@ def verify_proof(world:LivingWorld,proof:DynamicMazeProof, *,
         raise ValueError("changing maze route detached from original source")
     original=solve(
         world,proof.goal_position,starting_state=starting_state,
-        method=proof.solver,budget=max(100,min(MAX_EXPANSIONS,proof.expanded+100)),
-        horizon=max(1,min(MAX_HORIZON,proof.actual_turns+3)),
+        method=proof.solver,budget=proof.search_budget,
+        horizon=proof.search_horizon,
     )
-    if original.reachable_in_bound!=proof.reachable_in_bound or (
-            proof.reachable_in_bound and original.steps!=proof.steps):
+    if asdict(original)!=asdict(proof):
         raise ValueError("changing-world route differs on independent source replay")
     if proof.reachable_in_bound:
         start=initial_state(world) if starting_state is None else starting_state
