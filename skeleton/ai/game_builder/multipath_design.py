@@ -516,4 +516,28 @@ def cycle_rank(problem: RouteProblem) -> int:
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank"]
+def tile_distances(
+    problem: RouteProblem, origin: Position, *, allow_hazards: bool = False,
+) -> dict[Position, int]:
+    """Shortest cardinal distances for game pacing and objective placement."""
+    if not isinstance(problem, RouteProblem):
+        raise MultipathError("typed RouteProblem required")
+    if (not isinstance(origin, tuple) or len(origin) != 2
+            or any(type(k) is not int for k in origin)
+            or problem.tile(origin) == "#"
+            or (origin in problem.hazards and not allow_hazards)):
+        raise MultipathError("invalid distance origin")
+    out = {origin: 0}
+    pending = deque([origin])
+    while pending:
+        at = pending.popleft()
+        for _, nxt in problem.neighbors(at, allow_hazards=allow_hazards):
+            if nxt in out:
+                continue
+            out[nxt] = out[at] + 1
+            pending.append(nxt)
+    return out
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances"]
