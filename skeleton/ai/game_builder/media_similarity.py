@@ -103,12 +103,15 @@ def fingerprint_wav(media_id: str, data: bytes) -> MediaFingerprint:
         samples = ((value - 128) / 128.0 for value in raw)
     channel_sums = 0.0
     for index, sample in enumerate(samples):
-        channel_sums += sample
+        # Absolute per-channel energy avoids cancellation when stereo left
+        # and right carry opposite phase. Signed averaging could make loud
+        # anti-phase audio look silent and bypass a human-review trigger.
+        channel_sums += abs(sample)
         if index % channels != channels - 1:
             continue
         frame = index // channels
         block = min(_WINDOWS - 1, frame * _WINDOWS // nframes)
-        energy[block] += abs(channel_sums / channels)
+        energy[block] += channel_sums / channels
         count[block] += 1
         channel_sums = 0.0
     env = [energy[i] / max(1, count[i]) for i in range(_WINDOWS)]
