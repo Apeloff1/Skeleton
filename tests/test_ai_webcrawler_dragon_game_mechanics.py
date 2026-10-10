@@ -508,3 +508,12 @@ def test_taste_fingerprint_binds_quoted_examples_not_just_score():
     assert one.insights[0].confidence == two.insights[0].confidence
     assert one.fingerprint != two.fingerprint
 
+
+def test_distillation_work_budget_is_finite(monkeypatch):
+    import skeleton.ai.webcrawler.dragon_game_mechanics as module
+    store = setup()
+    events = (observation(timestamp=100), observation(timestamp=200))
+    store.record(session(store, observations=events), authorized=True)
+    monkeypatch.setattr(module, "MAX_DISTILL_OBSERVATIONS", 1)
+    with pytest.raises(ValueError, match="resource budget"):
+        store.distill("alice", authorized=True)
