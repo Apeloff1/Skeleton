@@ -668,3 +668,62 @@ def test_editor_shortest_solution_sequence_completes_original_game_in_independen
         assert simulated.solved
         assert simulated.moves==record["shortest_moves"]
         assert simulated.pushes>=1
+
+
+
+def test_live_editor_hint_solves_actual_modified_game_state_not_only_first_move():
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    from skeleton.ai.webcrawler.dragon_native_puzzle_trace import simulate_grid
+    world=BASE_LEVELS[0]
+    played=simulate_grid(world,"d")
+    question=route.NativePuzzleCurrentHintRequest(
+        rows=list(world),player=played.player,crates=list(played.crates))
+    result=route.native_production_current_puzzle_hint(question,owner=identity())
+    assert result["ok"]
+    assert result["schema"]=="skeleton.ai.dragon.original_puzzle_current_hint.v1"
+    assert result["remaining_moves"]==len(result["shortest_route"])
+    assert result["next_move"]==result["shortest_route"][0]
+    assert set(result["shortest_route"])<=set("wasd")
+    completed=simulate_grid(world,"d"+result["shortest_route"])
+    assert completed.solved
+    assert result["solved"] is False
+    terminal=route.NativePuzzleCurrentHintRequest(
+        rows=list(world),player=completed.player,crates=list(completed.crates))
+    done=route.native_production_current_puzzle_hint(terminal,owner=identity())
+    assert done["solved"] is True
+    assert done["remaining_moves"]==0
+    assert done["next_move"] is None
+
+
+@pytest.mark.parametrize("bad", [
+    {"player":-1,"crates":[52]},
+    {"player":120,"crates":[52]},
+    {"player":True,"crates":[52]},
+    {"player":43,"crates":[]},
+    {"player":43,"crates":[52,53,54,55]},
+    {"player":43,"crates":["52"]},
+])
+def test_live_editor_hint_rejects_malformed_current_player_and_crate_inputs(bad):
+    from pydantic import ValidationError
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    with pytest.raises(ValidationError):
+        route.NativePuzzleCurrentHintRequest(rows=list(BASE_LEVELS[0]),**bad)
+
+
+def test_live_hint_denies_overlapping_or_unreachable_original_grid_state():
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    from fastapi import HTTPException
+    board=list(BASE_LEVELS[0])
+    for player,crates in [(0,[65]),(52,[52]),(52,[0])]:
+        request=route.NativePuzzleCurrentHintRequest(
+            rows=board,player=player,crates=crates)
+        with pytest.raises(HTTPException) as denied:
+            route.native_production_current_puzzle_hint(request,owner=identity())
+        assert denied.value.status_code==422
+
+
+def test_original_live_hint_cpu_entry_is_creator_role_protected():
+    current=next(x for x in route.router.routes if x.path==
+                 "/api/dragon-academy/native/production/puzzle/current-hint")
+    assert any(dep.call is route._native_source_editor
+               for dep in current.dependant.dependencies)
