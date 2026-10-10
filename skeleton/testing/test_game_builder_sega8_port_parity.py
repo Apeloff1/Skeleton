@@ -124,6 +124,10 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
             "native_restart_restores_original_theme_verified": True,
             "actual_victory_palette_verified": True,
             "native_attract_demo_chord_started_from_victory": True,
+            "native_attract_demo_full_solution_verified_on_guest_z80": True,
+            "native_attract_demo_controller_free_actions_verified": 256,
+            "native_attract_demo_semantic_trace_sha256": "f"*64,
+            "native_attract_demo_screen_frames": 2350,
             "native_attract_demo_performed_first_original_move": True,
             "native_attract_demo_user_cancel_restored_game": True,
             "original_levels_replayed": 3,
@@ -198,6 +202,8 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     assert receipt["real_z80_startup_checked_per_platform"] is True
     assert receipt["original_on_cartridge_demo_equivalent_across_platforms"] is True
     assert receipt["native_attract_demo_entry_and_cancel_verified_on_both_platforms"] is True
+    assert receipt["native_autonomous_full_game_replayed_on_both_platforms"] is True
+    assert receipt["native_autonomous_guest_semantic_trace_sha256"] == "f"*64
     assert receipt["original_demo_controller_actions_verified_per_platform"] == 256
     assert receipt["original_demo_solution_sha256"] == "9"*64
     assert receipt["native_cartridge_rebuild_byte_equality_checked_per_platform"] is True
@@ -234,6 +240,10 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     ("host", "original_demo_controller_actions_verified", 0),
     ("host", "original_demo_screen_trace_sha256", "0"*64),
     ("native_route", "native_attract_demo_chord_started_from_victory", False),
+    ("native_route", "native_attract_demo_full_solution_verified_on_guest_z80", False),
+    ("native_route", "native_attract_demo_controller_free_actions_verified", 200),
+    ("native_route", "native_attract_demo_semantic_trace_sha256", "0"*64),
+    ("native_route", "native_attract_demo_screen_frames", 1),
     ("native_route", "native_attract_demo_performed_first_original_move", False),
     ("native_route", "native_attract_demo_user_cancel_restored_game", False),
     ("host", "full_console_emulator_playthrough_verified", True),
