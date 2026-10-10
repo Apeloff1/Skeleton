@@ -83,6 +83,9 @@ jobs:
           e=json.load(open('coleco-eight-stage-guest-cpu-attestation.json',encoding='utf-8'))
           assert e['native_binary_matches_source_exactly'] is True
           assert e['actual_coleco_z80_cpu_gameplay_verified'] is True
+          assert e['actual_original_8x8_video_art_verified'] is True
+          assert len(e['guest_vram_original_art_sha256'])==64
+          assert len(e['guest_vram_original_palette_sha256'])==64
           assert e['original_levels_completed']==8
           assert e['controller_actions_verified']>400
           assert e['final_1kb_mirrored_guest_ram']['won']==1
