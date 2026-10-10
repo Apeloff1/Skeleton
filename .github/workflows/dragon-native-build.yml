@@ -4,6 +4,16 @@ on:
   pull_request:
     paths:
       - 'skeleton/ai/webcrawler/dragon_native_*.py'
+      - 'skeleton/ai/webcrawler/dragon_living_world*.py'
+      - 'skeleton/ai/webcrawler/dragon_route_*.py'
+      - 'tests/test_ai_dragon_living_world*.py'
+      - 'tests/test_ai_dragon_route_*.py'
+      - 'backend/tests/test_dragon_living_world*.py'
+      - 'backend/tests/test_dragon_route_*.py'
+      - 'frontend/app/dragon-living-world.tsx'
+      - 'frontend/app/dragon-maze-world.tsx'
+      - 'frontend/app/dragon-route-atlas.tsx'
+      - 'frontend/src/product/productCatalog.ts'
       - 'skeleton/ai/webcrawler/dragon_game_blueprints.py'
       - 'skeleton/ai/webcrawler/dragon_game_design.py'
       - 'skeleton/ai/webcrawler/dragon_playtest_planner.py'
@@ -486,6 +496,88 @@ jobs:
         with:
           name: dragon-original-gameplay-sdl-frames
           path: /tmp/original-game-media/dragon-original-game-frames-*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  living-world-lifecycle-and-endings:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Ensure living world state machines have no Python syntax errors
+        run: |
+          set -euo pipefail
+          python -m compileall -q \
+            skeleton/ai/webcrawler/dragon_living_world.py \
+            skeleton/ai/webcrawler/dragon_living_world_routes.py \
+            skeleton/ai/webcrawler/dragon_living_world_checkpoint.py
+      - name: Install only deterministic living-world test harness
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Prove original non-win sandboxes, mutable maze, ending choices and signed world continuation
+        run: |
+          set -euo pipefail
+          python -m pytest -q \
+            tests/test_ai_dragon_living_world.py \
+            tests/test_ai_dragon_living_world_routes.py \
+            tests/test_ai_dragon_living_world_checkpoint.py
+      - name: Replay real postgame, no-win and shifting labyrinth alternative source proofs
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/dragon-living-world-evidence
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          from skeleton.ai.webcrawler.dragon_living_world import (
+              create_world,initial_state,replay,describe,catalog,
+          )
+          from skeleton.ai.webcrawler.dragon_living_world_routes import portfolio
+          folder=Path("/tmp/dragon-living-world-evidence")
+          worlds=(
+              ("endless",create_world(world_id=1977,variant=4,
+                                    style="creative_sandbox")),
+              ("postgame",create_world(world_id=2026,variant=2,
+                                     style="open_world_story")),
+              ("mutable_maze",create_world(world_id=101,variant=7,
+                                         style="mutable_labyrinth")),
+              ("multi_realm",create_world(world_id=81,variant=9,
+                                        style="multiple_world_platform")),
+          )
+          for title,world in worlds:
+              paths=portfolio(world,limit=10)
+              assert len(paths["samples"])==10
+              fresh=describe(world,initial_state(world))
+              assert fresh["playable"]
+              assert paths["world_fingerprint"]==world.world_fingerprint
+              report={"schema":"skeleton.ai.dragon.living_ci_evidence.v1",
+                      "world":title,"style":world.style,
+                      "has_required_goal":world.includes_goal,
+                      "source_fingerprint":world.world_fingerprint,
+                      "start":fresh,"alternatives":paths}
+              if title=="postgame":
+                  finished=replay(world,("help_settlers",
+                     "help_settlers","ending_civic_union","forage"))
+                  assert finished.endings_seen==("civic_union",)
+                  assert describe(world,finished)["postgame_active"]
+                  report["verified_play_after_ending"]=describe(world,finished)
+              if title=="mutable_maze":
+                  before=describe(world,initial_state(world))
+                  after=describe(world,replay(world,("north","wait")))
+                  assert before["environment"]["maze_phase"]!=after["environment"]["maze_phase"]
+                  report["shifting_maze_after_move"]=after
+              (folder/(title+".json")).write_text(
+                  json.dumps(report,sort_keys=True,indent=2)+"\n",encoding="utf-8")
+          assert catalog()["addressable_world_variant_slots"]==16_000_000
+          PY
+      - name: Publish deterministic gameplay/state-machine evidence without claiming built games
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-original-living-world-gameplay-evidence
+          path: /tmp/dragon-living-world-evidence/*.json
           if-no-files-found: error
           retention-days: 7
 
