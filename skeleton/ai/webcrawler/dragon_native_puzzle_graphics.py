@@ -163,11 +163,14 @@ int main(int argc,char**argv){
 '''
 
 
-def pixel_header()->str:
+def pixel_header(*,hero:str="hatchling",theme:str="ancient_ruins",
+                 palette:str="dmg_green",seed:int=1)->str:
+    from .dragon_native_artforge import original_tiles
+    sprites=original_tiles(hero=hero,theme=theme,palette=palette,seed=seed)
     rows=["#ifndef DRAGON_ORIGINAL_PIXELS_H",
           "#define DRAGON_ORIGINAL_PIXELS_H","#include <stdint.h>"]
     for name in PIXELS:
-        data=[int(p) for line in BITMAPS[name] for p in line]
+        data=[int(p) for line in sprites[name] for p in line]
         if len(data)!=64 or any(pixel not in (0,1,2,3) for pixel in data):
             raise ValueError("original native pixel source malformed")
         rows.append("static const uint8_t dragon_pixel_"+name+"[64]={")
@@ -178,7 +181,10 @@ def pixel_header()->str:
     return "\n".join(rows)+"\n"
 
 
-def enable_puzzle_graphics(files:dict[str,str])->dict[str,str]:
+def enable_puzzle_graphics(
+    files:dict[str,str],*,hero:str="hatchling",
+    theme:str="ancient_ruins",palette:str="dmg_green",seed:int=1,
+)->dict[str,str]:
     if not isinstance(files,dict) or "src/main.c" not in files or "Makefile" not in files:
         raise ValueError("original native C99 puzzle source incomplete")
     if "static int perform(char key)" not in files["src/main.c"]:
@@ -186,7 +192,9 @@ def enable_puzzle_graphics(files:dict[str,str])->dict[str,str]:
     result=dict(files)
     from .dragon_native_puzzle_capture import enable_sdl_original_game_capture
     result["src/graphics.c"]=enable_sdl_original_game_capture(C_GRAPHICS)
-    result["include/dragon_puzzle_pixels.h"]=pixel_header()
+    result["include/dragon_puzzle_pixels.h"]=pixel_header(
+        hero=hero,theme=theme,palette=palette,seed=seed,
+    )
     result["README.graphics.md"]=(
         "# Original SDL2 Dragon Puzzle\n\n"
         "Native pixel-art 640x480 window with D-pad controller, WASD/arrow "
