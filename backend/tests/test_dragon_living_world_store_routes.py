@@ -133,7 +133,7 @@ def test_world_saves_require_editor_or_admin_role(endpoint):
 
 @pytest.mark.parametrize("invalid",[
     {"slot":10},{"slot":-1},{"slot":True},
-    {"token":"not-a-real-signature"},{"token":7},
+    {"token":"invalid signature with spaces"},{"token":7},
     {"replace_existing":"true"},{"replace_existing":1},
     {"expected_digest":"untrusted"},
 ])
