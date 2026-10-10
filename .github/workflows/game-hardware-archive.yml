@@ -51,7 +51,10 @@ permissions:
 
 concurrency:
   group: game-hardware-archive-${{ github.ref }}
-  cancel-in-progress: true
+  # Finish the currently running focused suite during collaborative updates.
+  # GitHub coalesces pending executions for this ref; cancelling active jobs
+  # on every other contributor's push never produces a stable validation.
+  cancel-in-progress: false
 
 jobs:
   archive-and-evolution-tests:
