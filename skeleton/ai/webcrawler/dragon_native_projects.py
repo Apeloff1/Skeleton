@@ -489,12 +489,17 @@ endif()
 def render_native_project(*,title:str,target_id:str,style:str,
                           candidate_id:str,mechanics:tuple[Mechanic,...],
                           authorized:bool,design=None,
-                          procedural_puzzles:bool=False)->NativeProject:
+                          procedural_puzzles:bool=False,
+                          authored_puzzles:tuple[tuple[str,...],...]|None=None)->NativeProject:
     if not authorized:raise PermissionError("native game build requires authorization")
     if type(procedural_puzzles) is not bool:
         raise ValueError("procedural puzzle control must be strict boolean")
     if procedural_puzzles and style!="fixed_screen_puzzle":
         raise ValueError("procedural puzzles require original fixed-screen gameplay")
+    if authored_puzzles is not None and style!="fixed_screen_puzzle":
+        raise ValueError("authored native levels require fixed-screen puzzle gameplay")
+    if authored_puzzles is not None and procedural_puzzles:
+        raise ValueError("user-authored and generated procedural levels cannot be combined")
     target=demand_target(target_id)
     if target_id not in EMITTERS:
         if target.status=="licensed_sdk":
@@ -564,7 +569,8 @@ def render_native_project(*,title:str,target_id:str,style:str,
             files=emit_native_puzzle(
                 seed=seed,stages=design.stages if design is not None else 4,
                 difficulty=design.difficulty if design is not None else 4,
-                procedural=procedural_puzzles)
+                procedural=procedural_puzzles,
+                authored_levels=authored_puzzles)
             if design is not None:
                 from .dragon_game_design import design_manifest
                 files["dragon-game-design.json"]=json.dumps(
