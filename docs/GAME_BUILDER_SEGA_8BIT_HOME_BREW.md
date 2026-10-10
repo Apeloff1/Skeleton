@@ -580,9 +580,15 @@ The original authored paths are generated into *different* native ROM
 source files for each destination console. The CI host compiler executes
 the real emitted C tables separately and must reproduce every state of
 the source-game replay. An additional instruction-level Z80 gate presses
-the real face-button combination against the compiled cartridge, checks
-that the opening original move is performed without input, then cancels
-and verifies the original starting game is restored.
+the real face-button combination against the compiled cartridge and
+**replays the entire original winning solution without directional input**.
+Every autonomous stage, score, reward, collectible, companion rank and
+screen coordinate must equal the authoritative independent reference.
+The game must enter its genuine hardware victory palette again, and
+the hash of all guest-observed automatic game states must match the
+earlier manual-input Z80 winning route. A second demonstration is
+then started, allowed to make its first original move, cancelled with
+a real hardware button press, and checked for a pristine game reset.
 
 Cross-console acceptance rejects a missing/modified demonstration
 fingerprint, unequal gameplay traces, absence of real Z80 demonstration
