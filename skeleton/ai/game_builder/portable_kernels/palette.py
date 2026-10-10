@@ -28,3 +28,10 @@ def encode_rgb555(pixel: object) -> int:
     q = lambda c: (c*31 + 127)//255
     return q(r) | (q(g)<<5) | (q(b)<<10)
 
+
+def decode_rgb555(word: object) -> tuple[int,int,int]:
+    """Expand five-bit component words back to bounded 8-bit working RGB."""
+    n = _packed(word,0x7fff)
+    q = lambda x: (x*255+15)//31
+    return q(n&31),q((n>>5)&31),q((n>>10)&31)
+
