@@ -62,7 +62,7 @@ def test_true_vblank_bios_trampoline_and_minimal_legal_os7_stubs():
 
 def test_real_tms9918_control_latch_vdp_name_table_and_video_nmi():
     h=_host()
-    with pytest.raises(ColecoCPUError,match="selected"):
+    with pytest.raises(ColecoCPUError,match="before joystick strobe"):
         h.read_port(0xFC)
     with pytest.raises(ColecoCPUError,match="frame|VBlank|TMS9918"):
         h.assert_screen()
@@ -117,9 +117,15 @@ def test_guest_original_replay_refuses_forged_hardware_authority_and_tampering()
     with pytest.raises(ColecoCPUError,match="falsely"):
         _reference(bad,manifest)
     bad={**route,"steps":[]}
+    bad["route_sha256"]=sha256(json.dumps(
+        {k:v for k,v in bad.items() if k!="route_sha256"},
+        sort_keys=True,separators=(",",":")).encode()).hexdigest()
     with pytest.raises(ColecoCPUError,match="bounded"):
         _reference(bad,manifest)
     bad={**route,"steps":[123]}
+    bad["route_sha256"]=sha256(json.dumps(
+        {k:v for k,v in bad.items() if k!="route_sha256"},
+        sort_keys=True,separators=(",",":")).encode()).hexdigest()
     with pytest.raises(ColecoCPUError):
         _reference(bad,manifest)
     bad=_route()
