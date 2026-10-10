@@ -169,3 +169,18 @@ def test_native_cpu_observations_never_relabel_gameplay_as_hardware_or_rights():
     device=new_bus()
     assert not hasattr(device,"physical_hardware_verified")
     assert not hasattr(device,"copyright_status_certified")
+
+
+
+@pytest.mark.parametrize("digest",["X"*64,"0x"+"0"*64,"a"*63,True,None,123,[]])
+def test_native_6502_boot_refuses_untrusted_expected_original_tilemap_digest(
+    tmp_path,digest,
+):
+    rom=synthetic_original_nrom()
+    path=tmp_path/"boot.nes"
+    path.write_bytes(rom)
+    with pytest.raises(NES6502BootError,match="stage|SHA-256"):
+        verify_original_nes_6502_boot(
+            path,expected_sha256=sha256(rom).hexdigest(),
+            expected_stage_zero_bg_sha256=digest,
+        )
