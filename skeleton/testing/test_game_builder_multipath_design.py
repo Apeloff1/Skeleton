@@ -370,3 +370,13 @@ def test_portfolio_diversity_requires_real_distinct_routes():
     with pytest.raises(MultipathError):
         portfolio_diversity_ppm((routes[0], solve_route(RouteProblem.from_rows(HAZARD_LEVEL))))
 
+
+def test_route_exclusive_edges_identify_actual_alternative_geometry():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    first, second = route_portfolio(p, max_routes=2)
+    assert route_exclusive_edges(first, (first,)) == ()
+    exclusive = route_exclusive_edges(first, (second,))
+    assert len(exclusive) > 0
+    assert all(edge not in route_exclusive_edges(second, (first,))
+               for edge in exclusive)
+
