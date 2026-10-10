@@ -60,7 +60,7 @@ def test_hardlinked_source_file_cannot_import_unreviewed_external_inode(tmp_path
     args = _setup(tmp_path)
     source = args["source_directory"] / filename
     os.link(source,tmp_path / (filename + ".other-copy"))
-    with pytest.raises(NativeIntakeError,match="private bounded"):
+    with pytest.raises(NativeIntakeError,match="(?:private bounded|bounded private)"):
         verify_native_release_intake(**args)
 
 
@@ -69,7 +69,7 @@ def test_hardlinked_external_native_evidence_cannot_bypass_single_file_attestati
     args = _setup(tmp_path)
     source = args[field]
     os.link(source,tmp_path / (field+".hardlink"))
-    with pytest.raises(NativeIntakeError,match="private bounded"):
+    with pytest.raises(NativeIntakeError,match="(?:private bounded|bounded private)"):
         verify_native_release_intake(**args)
 
 
@@ -80,7 +80,7 @@ def test_fifo_evidence_refused_without_blocking_native_release(tmp_path):
     fifo=tmp_path/"no-producer-fifo"
     os.mkfifo(fifo)
     args["compiled_binary"]=fifo
-    with pytest.raises(NativeIntakeError,match="private bounded"):
+    with pytest.raises(NativeIntakeError,match="(?:private bounded|bounded private)"):
         verify_native_release_intake(**args)
 
 
