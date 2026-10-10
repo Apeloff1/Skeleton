@@ -19,6 +19,7 @@ import json
 import sqlite3
 
 MAX_STORED_SESSION_BYTES = 4 * 1024 * 1024
+MAX_HISTORY_BYTES = 8 * 1024 * 1024
 
 
 class Mechanic(str, Enum):
