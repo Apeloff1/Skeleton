@@ -21,3 +21,10 @@ def test_decode_gb_2bpp_roundtrip_and_length_rejection():
         with pytest.raises(PortableCodecError):
             decode_gb_2bpp(blob)
 
+
+def test_encode_nes_2bpp_matches_chr_plane_order():
+    row = (1, 2, 3, 0, 0, 0, 0, 0)
+    assert encode_nes_2bpp((row,) * 8) == bytes([0xA0]*8 + [0x60]*8)
+    with pytest.raises(PortableCodecError):
+        encode_nes_2bpp(((0,)*8,)*7)
+
