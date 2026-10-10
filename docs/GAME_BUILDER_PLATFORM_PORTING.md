@@ -647,3 +647,35 @@ the particular audited guest device paths. It is **not** equivalent
 to accurate timing/pixels for the real TMS9918A, a fully booted
 proprietary Coleco OS7 BIOS, an independently tested ColecoVision
 emulator, an actual original console, or legal distribution clearance.
+
+## ColecoVision visual engine — original 8x8 dragon companion
+
+The original ColecoVision console homebrew now has genuine authored
+pixel art instead of merely drawing anonymous ASCII cells. Six distinct
+**8×8 bitplane tile patterns** are individually designed for floor,
+solid brick, glowing crystal, dangerous hazard, exit portal, and the
+tiny baby-dragon player. They are original newly authored assets rather
+than extracted art from a commercial cartridge.
+
+The native Z80 source uploads each tile pattern into the real
+**TMS9918A Graphics I pattern-generator VRAM**, at tile indices
+$80/$88/$90/$98/$A0/$A8. These lie in independent groups of eight
+patterns, so each cell class can have its own foreground/background
+color without affecting neighboring characters. Six custom
+**TMS9918A color-table entries** are written into hardware VRAM at
+$2010–$2015. The player's dragon avatar now draws actual tile $A8,
+rather than a host-rendered sprite overlay.
+
+Both the full eight-level game and the three-level real-Z80 game
+playthrough verify the *observed guest VRAM bytes*: SHA-256 of the
+48 authentic bitmap bytes and six color entries must match the
+distinct, author-generated source manifest digests. A valid ROM
+header with missing art uploads, incorrect palettes or substituted
+sprites fails the emulator qualification.
+
+Because this is an actual 1982 video chip, the graphics use
+honest 8×8 two-color patterns with Graphics I color groups.
+A future Windows/game-console enhanced port may recreate these
+original motifs with smooth animation and richer pixel effects,
+but the original ColecoVision ROM stays within native memory,
+graphics and rights constraints.
