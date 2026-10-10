@@ -184,7 +184,8 @@ def enable_puzzle_graphics(files:dict[str,str])->dict[str,str]:
     if "static int perform(char key)" not in files["src/main.c"]:
         raise ValueError("graphical C99 source cannot find original engine state")
     result=dict(files)
-    result["src/graphics.c"]=C_GRAPHICS
+    from .dragon_native_puzzle_capture import enable_sdl_original_game_capture
+    result["src/graphics.c"]=enable_sdl_original_game_capture(C_GRAPHICS)
     result["include/dragon_puzzle_pixels.h"]=pixel_header()
     result["README.graphics.md"]=(
         "# Original SDL2 Dragon Puzzle\n\n"
