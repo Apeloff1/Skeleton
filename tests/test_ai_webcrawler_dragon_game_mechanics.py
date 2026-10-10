@@ -331,3 +331,13 @@ def test_corrupt_stored_observation_json_fails_closed():
     with pytest.raises(ValueError, match="JSON corrupt"):
         store.sessions("alice", authorized=True)
 
+
+def test_stored_observation_shape_refuses_partial_records():
+    store = setup()
+    store.record(session(store), authorized=True)
+    for body in ("{}", "[[1,2]]", "[]"):
+        store.db.execute("UPDATE dragon_game_sessions SET observations_json=? WHERE owner=?",
+                         (body, "alice"))
+        with pytest.raises(ValueError, match="invalid shape"):
+            store.sessions("alice", authorized=True)
+
