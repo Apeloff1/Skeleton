@@ -370,7 +370,7 @@ class GameMechanicsMemory:
         ).encode()).hexdigest()
         return GameTasteProfile(
             owner, tuple(insights), tuple(directives),
-            any(not x.user_confirmed for x in insights), fingerprint,
+            any(not x.user_confirmed for x in insights) or conflicting, fingerprint,
         )
 
     def erase(self, owner: str, *, authorized: bool) -> int:
