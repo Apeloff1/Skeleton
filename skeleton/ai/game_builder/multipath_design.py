@@ -1178,4 +1178,16 @@ def add_solvable_hazard(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget", "pareto_hazard_routes", "enumerate_shortest_routes", "route_progress_trace", "make_level_edit", "carve_alternative_corridor", "seal_safe_corridor", "relocate_collectible", "relocate_exit", "add_solvable_hazard"]
+def remove_hazard(
+    problem: RouteProblem, hazard: Position, *, authorized: bool,
+) -> MapEditReceipt:
+    """Delete exactly one authored hazard and recompute the solution proof."""
+    if not isinstance(problem, RouteProblem) or problem.tile(hazard) != "H":
+        raise MultipathError("hazard removal needs an existing hazard marker")
+    return make_level_edit(
+        problem, {hazard: "."}, operation="remove_hazard", authorized=authorized,
+    )
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget", "pareto_hazard_routes", "enumerate_shortest_routes", "route_progress_trace", "make_level_edit", "carve_alternative_corridor", "seal_safe_corridor", "relocate_collectible", "relocate_exit", "add_solvable_hazard", "remove_hazard"]
