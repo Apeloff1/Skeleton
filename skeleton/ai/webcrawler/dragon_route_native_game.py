@@ -30,6 +30,7 @@ C_GAME=r'''/* Original world routes, not commercial transit/spaceflight simulati
 #include "dragon_route_world.h"
 typedef struct {
  int at,clock,elapsed,energy,cash,hops,waited,movement,spent,danger,fatigue,sights;
+ int fuel,oxygen,mana,spent_fuel,spent_oxygen,spent_mana;
  uint64_t acquired,visited;
 } JourneyState;
 static JourneyState player;
@@ -39,6 +40,9 @@ static void reset_world(void){
  player.clock=DRAGON_START_CLOCK;
  player.energy=DRAGON_START_ENERGY;
  player.cash=DRAGON_START_CASH;
+ player.fuel=DRAGON_START_FUEL;
+ player.oxygen=DRAGON_START_OXYGEN;
+ player.mana=DRAGON_START_MANA;
  player.acquired=DRAGON_START_TOKENS|dragon_places[player.at].gifts;
  player.visited=UINT64_C(1)<<player.at;
  player.energy+=dragon_places[player.at].refill;
@@ -70,9 +74,17 @@ static int step_world(int number){
  int waiting=departure_wait(edge);
  if(player.elapsed+waiting+edge->minutes>DRAGON_MAX_MINUTES ||
     player.cash<edge->price||player.energy<edge->fatigue||
+    player.fuel<edge->fuel||player.oxygen<edge->oxygen||
+    player.mana<edge->mana||
     player.hops>=DRAGON_MAX_HOPS)return 0;
  player.cash-=edge->price;
  player.energy-=edge->fatigue;
+ player.fuel-=edge->fuel;
+ player.oxygen-=edge->oxygen;
+ player.mana-=edge->mana;
+ player.spent_fuel+=edge->fuel;
+ player.spent_oxygen+=edge->oxygen;
+ player.spent_mana+=edge->mana;
  player.acquired=(player.acquired&~edge->consumes)|edge->grants;
  player.clock+=waiting+edge->minutes;
  player.elapsed+=waiting+edge->minutes;
@@ -106,18 +118,23 @@ static int run_probes(void){
   }
   if(player.at!=DRAGON_GOAL||player.hops!=check->steps ||
      player.elapsed!=check->minutes||player.spent!=check->spent ||
-     player.danger!=check->danger)return 51;
-  printf("DRAGON_ORIGINAL_ROUTE_PASS name=%s hops=%d minutes=%d fare=%d risk=%d\n",
-   check->name,player.hops,player.elapsed,player.spent,player.danger);
+     player.danger!=check->danger||
+     player.spent_fuel!=check->fuel||
+     player.spent_oxygen!=check->oxygen||
+     player.spent_mana!=check->mana)return 51;
+  printf("DRAGON_ORIGINAL_ROUTE_PASS name=%s hops=%d minutes=%d fare=%d risk=%d fuel=%d oxygen=%d mana=%d\n",
+   check->name,player.hops,player.elapsed,player.spent,player.danger,
+   player.spent_fuel,player.spent_oxygen,player.spent_mana);
  }
  printf("DRAGON_ORIGINAL_WORLD_PASS probes=%d places=%d routes=%d\n",
         DRAGON_PROBE_COUNT,DRAGON_PLACE_COUNT,DRAGON_EDGE_COUNT);
  return 0;
 }
 static void show_world(void){
- printf("\nORIGINAL ROUTE WORLD | %s | clock=%02d:%02d | %d/%d stamina | fare %d\n",
+ printf("\nORIGINAL ROUTE WORLD | %s | clock=%02d:%02d | stamina %d/%d | cash %d | fuel %d | O2 %d | mana %d\n",
   dragon_places[player.at].id,(player.clock/60)%24,player.clock%60,
-  player.energy,DRAGON_MAX_ENERGY,player.cash);
+  player.energy,DRAGON_MAX_ENERGY,player.cash,
+  player.fuel,player.oxygen,player.mana);
  if(player.at==DRAGON_GOAL){
   printf("GOAL REACHED: original game world completed in %d minutes!\n",
          player.elapsed);
@@ -254,6 +271,7 @@ def emit_route_game(world:World,traveller:Traveller,*,authorized:bool)->dict[str
             f'  {{"{edge.id}","{edge.mode}",{names[edge.origin]},'
             f'{names[edge.destination]},{edge.minutes},{edge.price},'
             f'{edge.fatigue},{edge.danger},{edge.spectacle},'
+        f'{edge.fuel},{edge.oxygen},{edge.mana},'
             f'{_u(_bit(edge.requires,tokens))},'
             f'{_u(_bit(edge.requires_one,tokens))},'
             f'{_u(_bit(edge.grants,tokens))},'
@@ -279,6 +297,9 @@ def emit_route_game(world:World,traveller:Traveller,*,authorized:bool)->dict[str
             "elapsed":verified.elapsed_minutes,
             "spent":verified.money_spent,
             "danger":verified.risk,
+            "fuel":verified.fuel_used,
+            "oxygen":verified.oxygen_used,
+            "mana":verified.mana_used,
             "digest":verified.digest,
         })
         proofs.append((name,indices,verified))
@@ -294,7 +315,8 @@ def emit_route_game(world:World,traveller:Traveller,*,authorized:bool)->dict[str
     for index,(name,indices,result) in enumerate(proofs):
         proof_data.append(
             f'  {{"{name}",{len(indices)},dragon_probe_route_{index},'
-            f'{result.elapsed_minutes},{result.money_spent},{result.risk}}},'
+            f'{result.elapsed_minutes},{result.money_spent},{result.risk},'
+            f'{result.fuel_used},{result.oxygen_used},{result.mana_used}}},'
         )
     header=(
         "#ifndef DRAGON_ORIGINAL_WORLD_ROUTE_H\n#define DRAGON_ORIGINAL_WORLD_ROUTE_H\n"
@@ -310,17 +332,20 @@ def emit_route_game(world:World,traveller:Traveller,*,authorized:bool)->dict[str
         f"#define DRAGON_START_CASH {traveller.cash}\n"
         f"#define DRAGON_START_ENERGY {traveller.energy}\n"
         f"#define DRAGON_START_CLOCK {traveller.start_minute}\n"
+        f"#define DRAGON_START_FUEL {traveller.fuel}\n"
+        f"#define DRAGON_START_OXYGEN {traveller.oxygen}\n"
+        f"#define DRAGON_START_MANA {traveller.mana}\n"
         f"#define DRAGON_START_TOKENS {_u(_bit(traveller.tokens,tokens))}\n"
         f"#define DRAGON_WEATHER {_u(active)}\n"
         "typedef struct { const char*id; uint64_t gifts;"
         " int refill,money,scenery; } DragonPlace;\n"
         "typedef struct { const char*id; const char*mode;"
-        " int from,to,minutes,price,fatigue,danger,spectacle;"
+        " int from,to,minutes,price,fatigue,danger,spectacle,fuel,oxygen,mana;"
         " uint64_t requires,requires_one,grants,consumes,secret,resistance,"
         "weather_any,weather_none;"
         " int departure_count; int departures[24]; } DragonConnection;\n"
         "typedef struct { const char*name; int steps; const int*edges;"
-        " int minutes,spent,danger; } DragonProof;\n"
+        " int minutes,spent,danger,fuel,oxygen,mana; } DragonProof;\n"
         "static const DragonPlace dragon_places[DRAGON_PLACE_COUNT]={\n"+
         "\n".join(places)+"\n};\n"
         "static const DragonConnection dragon_connections[DRAGON_EDGE_COUNT]={\n"+
@@ -340,6 +365,8 @@ def emit_route_game(world:World,traveller:Traveller,*,authorized:bool)->dict[str
         "world_digest":scenario_digest(world),
         "traveller":{
             "cash":traveller.cash,"energy":traveller.energy,
+            "fuel":traveller.fuel,"oxygen":traveller.oxygen,
+            "mana":traveller.mana,
             "max_energy":traveller.max_energy,
             "start_minute":traveller.start_minute,
             "tokens":sorted(traveller.tokens),
