@@ -18,7 +18,7 @@ import time
 from typing import Iterator
 
 from fastapi import APIRouter, Depends, HTTPException, Path as URLPath, Query, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 
 from routes.gameforge_auth import get_current_user
 from skeleton.ai.webcrawler.dragon_practice_lab import DragonPracticeLab
@@ -132,14 +132,15 @@ def native_targets(owner: str = Depends(_principal)) -> dict:
 
 class NativeProductionSourceRequest(BaseModel):
     """Strict browser-only original source export, never privileged ROM compilation."""
+    model_config = ConfigDict(extra="forbid")
     title: str = Field(..., min_length=2, max_length=80)
     style: str = Field(..., min_length=2, max_length=64)
     targets: list[str] = Field(..., min_length=1, max_length=3)
-    seed: int = Field(default=1, ge=0, le=0xffffffff)
-    original_work_attested: bool = Field(default=False)
+    seed: StrictInt = Field(default=1, ge=0, le=0xffffffff)
+    original_work_attested: StrictBool = Field(default=False)
     rights_basis: str = Field(default="original_homebrew", max_length=40)
     rights_reference: str = Field(default="", max_length=240)
-    approved: bool = Field(default=False)
+    approved: StrictBool = Field(default=False)
 
 
 def _native_source_editor(user: dict | None = Depends(get_current_user)) -> str:
