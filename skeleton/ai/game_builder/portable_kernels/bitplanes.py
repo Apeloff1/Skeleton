@@ -56,3 +56,10 @@ def decode_nes_2bpp(data: bytes) -> tuple[tuple[int, ...], ...]:
                        (((raw[8+y] >> (7-x)) & 1) << 1)
                        for x in range(8)) for y in range(8))
 
+
+def encode_snes_4bpp(tile: Sequence[Sequence[int]]) -> bytes:
+    """Encode SNES 4bpp: planes 0-1 row-interleaved, then planes 2-3."""
+    rows = _pixels(tile, 15)
+    return bytes(sum(((row[x] >> plane) & 1) << (7-x) for x in range(8))
+                 for pair in (0, 2) for row in rows for plane in (pair, pair+1))
+
