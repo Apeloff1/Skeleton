@@ -31,6 +31,7 @@ from .apple2_native_export import compile_native_apple2, export_native_apple2
 from .spectrum_native_export import compile_native_spectrum, export_native_spectrum
 from .sega_8bit_native_export import compile_native_sega_8bit, export_native_sega_8bit
 from .msx1_native_export import compile_native_msx1, export_native_msx1
+from .sms_native_export import compile_native_sms, export_native_sms
 from .platform_registry import default_registry
 from .playable_simulation import demonstrate_solvable
 from .playable_world import GameBuildIntent, generate_playable_world
@@ -51,6 +52,7 @@ _NATIVE = {
     "sega_master_system": "sms_sdcc_z80",
     "sega_game_gear": "gg_sdcc_z80",
     "msx1": "msx1_z80asm",
+    "sega_master_system": "sms_z80asm",
 }
 
 _MAX_EVIDENCE_FILE = 8 * 1024 * 1024
@@ -143,6 +145,11 @@ def build_game(
         project = compile_native_msx1(world, source, authorized=True)
         folder = export_native_msx1(project, output, authorized=True)
         artifact_type = "native_msx1_z80_16kb_bios_rom_source"
+        digest = project.content_digest
+    elif kind == "sms_z80asm":
+        project = compile_native_sms(world, source, authorized=True)
+        folder = export_native_sms(project, output, authorized=True)
+        artifact_type = "native_sms_z80_mode4_32kb_cartridge_source"
         digest = project.content_digest
     else:
         project = compile_native_desktop(world, source, target, authorized=True)
