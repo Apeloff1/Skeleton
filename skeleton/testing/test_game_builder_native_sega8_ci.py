@@ -356,6 +356,9 @@ def test_custom_independent_original_game_emits_native_source_with_exact_author_
     )).hexdigest()
     assert manifest["project_id"]==parameters["project_id"]
     assert manifest["original_color_theme"]==theme
+    assert manifest["source_platform"]==target
+    assert receipt["native_source_authoring_platform"]==target
+    assert receipt["third_party_console_origin_claimed"] is False
     assert manifest["levels"]==1
     assert manifest["width"]==13 and manifest["height"]==11
     assert manifest["binary_compiled"] is False
