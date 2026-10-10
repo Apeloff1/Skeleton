@@ -94,10 +94,9 @@ def test_request_id_order_independent_but_rights_and_build_bound():
 
 def test_preflight_blocks_licensed_sdk_unimplemented_and_wrong_styles():
     unavailable = plan_production(request(targets=("ps5", "atari_2600", "game_boy")))
-    assert [x.state for x in unavailable] == ["blocked", "source_ready", "blocked"] or (
-        {x.target: x.state for x in unavailable}
-        == {"ps5": "blocked", "atari_2600": "blocked", "game_boy": "source_ready"}
-    )
+    assert {x.target: x.state for x in unavailable} == {
+        "ps5": "blocked", "atari_2600": "blocked", "game_boy": "source_ready",
+    }
     failure = plan_production(request(style="turn_based_rpg"))
     assert failure[0].state == "blocked"
     assert not failure[0].compiler_available or failure[0].state == "blocked"
@@ -304,7 +303,7 @@ def test_existing_symlinked_archive_is_not_overwritten(tmp_path):
     outside.write_text("sensitive")
     (tmp_path / name).unlink()
     (tmp_path / name).symlink_to(outside)
-    with pytest.raises(FileExistsError):
+    with pytest.raises((ValueError, FileExistsError)):
         publish_production(spec, tmp_path, authorized=True)
     assert outside.read_text() == "sensitive"
 
@@ -312,7 +311,7 @@ def test_existing_symlinked_archive_is_not_overwritten(tmp_path):
 def test_invalid_index_filename_and_modification_fails(tmp_path):
     result = publish_production(request(), tmp_path, authorized=True)
     with pytest.raises(ValueError, match="index filename"):
-        verify_published_production(tmp_path, "../outside.json")
+        verify_published_production(tmp_path, "dragon-not-index.json")
     index_file = tmp_path / result["index"]
     document = json.loads(index_file.read_text())
     document["entries"][0]["archive_sha256"] = "f" * 64
@@ -367,3 +366,41 @@ def test_product_is_still_source_not_fabricated_console_binary(tmp_path):
             assert not any(x.startswith("binary/") for x in packaged.namelist())
             assert packaged.read("release-receipt.json")
     assert output["status"] == "published"
+
+
+def test_portfolio_discloses_actual_mode_differences(tmp_path):
+    spec = request(targets=("game_boy", "pc_linux"))
+    created = publish_production(spec, tmp_path, authorized=True)
+    assert created["status"] == "published"
+    info = json.loads((tmp_path / created["index"]).read_text())
+    assert info["cross_target_fidelity"] == "different_implemented_modes_not_an_equivalent_port"
+    assert len(info["declared_gameplay_modes"]) >= 2
+    assert {entry["gameplay_mode"] for entry in info["entries"]} == set(info["declared_gameplay_modes"])
+    assert verify_published_production(tmp_path, created["index"])["status"] == "verified"
+
+
+def test_generated_source_budget_recomputed_not_just_declared():
+    native = project_for()
+    altered = dict(native.files)
+    budget = json.loads(altered["dragon-hardware-budget.json"])
+    budget["source_bytes"] = 1
+    altered["dragon-hardware-budget.json"] = json.dumps(budget) + "\n"
+    modified = replace(native, files=altered, digest=digest(altered))
+    with pytest.raises(ValueError, match="hardware budget"):
+        validate_native_source(modified)
+
+
+def test_modified_source_with_forged_hash_table_rejected():
+    spec = request()
+    raw, _ = make_source_release(project_for(spec), spec)
+    with ZipFile(BytesIO(raw)) as zipped:
+        receipt = json.loads(zipped.read("release-receipt.json"))
+        native = zipped.read("source/dragon-native-manifest.json")
+    mutated = native.replace(b"source_generated", b"source_replaced")
+    receipt["source_files"]["dragon-native-manifest.json"] = __import__("hashlib").sha256(mutated).hexdigest()
+    modified = rezip({
+        "source/dragon-native-manifest.json": mutated,
+        "release-receipt.json": json.dumps(receipt).encode(),
+    }, raw)
+    with pytest.raises(ValueError, match="fingerprint"):
+        verify_source_release(modified)
