@@ -41,6 +41,26 @@ def test_multi_platform_portfolio_refuses_symlink_rights_evidence_atomically(tmp
     assert not args["output"].exists()
 
 
+def test_portfolio_detects_rights_document_mutation_before_atomic_publication(
+    tmp_path, monkeypatch,
+):
+    import skeleton.ai.game_builder.native_portfolio_cli as plane
+
+    args = _arguments(tmp_path)
+    original_build = plane.build_game
+
+    def build_then_tamper(*, rights_evidence, **options):
+        built = original_build(rights_evidence=rights_evidence, **options)
+        Path(rights_evidence).write_bytes(b"Source rights changed after project generation")
+        return built
+
+    monkeypatch.setattr(plane, "build_game", build_then_tamper)
+    with pytest.raises(NativePortfolioError, match="rights evidence changed"):
+        compile_native_portfolio(**(args | {"targets": ("windows_modern",)}))
+    assert not args["output"].exists()
+    assert not any(tmp_path.glob(".skeleton-native-port-*"))
+
+
 def test_full_portfolio_really_exports_all_supported_native_machine_sources(tmp_path):
     args=_arguments(tmp_path)
     report=compile_native_portfolio(**args)
