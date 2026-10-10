@@ -13,7 +13,10 @@ from heapq import heappop, heappush
 from typing import Mapping, Sequence
 
 from .contracts import canonical_digest
-from .playable_world import DIRECTIONS, MAX_COLLECTIBLES, MAX_DIMENSION
+from .playable_world import (
+    DIRECTIONS, MAX_COLLECTIBLES, MAX_DIMENSION,
+    TileLevel, PlayableWorld, solve_safe_path,
+)
 
 Position = tuple[int, int]
 State = tuple[int, int, int]
@@ -1383,4 +1386,40 @@ def verify_map_edit_receipt(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget", "pareto_hazard_routes", "enumerate_shortest_routes", "route_progress_trace", "make_level_edit", "carve_alternative_corridor", "seal_safe_corridor", "relocate_collectible", "relocate_exit", "add_solvable_hazard", "remove_hazard", "relocate_hazard", "relocate_start", "carve_for_diversity", "evaluate_level_challenge", "evolve_challenge_level", "MapEditReceipt", "LevelEvolution", "verify_map_edit_receipt"]
+def apply_edit_to_tile_level(
+    level: TileLevel, receipt: MapEditReceipt, *, authorized: bool,
+) -> TileLevel:
+    """Materialize a path-editor mutation into the canonical playable level."""
+    if authorized is not True:
+        raise PermissionError("canonical playable level mutation requires authorization")
+    if not isinstance(level, TileLevel):
+        raise MultipathError("canonical source TileLevel required")
+    original = RouteProblem.from_rows(level.rows)
+    verify_map_edit_receipt(original, receipt)
+    edited = receipt.after
+    return TileLevel(
+        level.index, edited.rows, edited.start, edited.goal,
+        edited.collectibles, tuple(sorted(edited.hazards)),
+        solve_safe_path(edited.rows),
+    )
+
+
+def apply_edit_to_playable_world(
+    world: PlayableWorld, level_index: int,
+    receipt: MapEditReceipt, *, authorized: bool,
+) -> PlayableWorld:
+    """Rebuild the owned world with one updated level, retaining every other."""
+    if authorized is not True:
+        raise PermissionError("game-world edit requires authorization")
+    if (not isinstance(world, PlayableWorld) or type(level_index) is not int
+            or not 0 <= level_index < len(world.levels)):
+        raise MultipathError("invalid canonical world level index")
+    levels = list(world.levels)
+    levels[level_index] = apply_edit_to_tile_level(
+        levels[level_index], receipt, authorized=True,
+    )
+    return PlayableWorld(world.intent, tuple(levels), world.algorithm)
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget", "pareto_hazard_routes", "enumerate_shortest_routes", "route_progress_trace", "make_level_edit", "carve_alternative_corridor", "seal_safe_corridor", "relocate_collectible", "relocate_exit", "add_solvable_hazard", "remove_hazard", "relocate_hazard", "relocate_start", "carve_for_diversity", "evaluate_level_challenge", "evolve_challenge_level", "MapEditReceipt", "LevelEvolution", "verify_map_edit_receipt", "apply_edit_to_tile_level", "apply_edit_to_playable_world"]
