@@ -352,6 +352,9 @@ def _legal(world:LivingWorld,state:LivingState)->dict[str,dict]:
     if "construction" in rules or "crafting" in rules:
         add("build","requires_two_wood",state.wood>=2 and state.energy>=2)
         add("craft","requires_wood_ore",state.wood>=1 and state.ore>=1)
+    if rules.intersection({"survival","crafting","construction","economy",
+                           "science","terraform","exploration","combat"}):
+        add("mine","energy_required",state.energy>=2)
     if "farming" in rules:
         add("farm","requires_wood",state.wood>=1)
     if "terraform" in rules:
@@ -386,11 +389,16 @@ def _legal(world:LivingWorld,state:LivingState)->dict[str,dict]:
             )
     if "transport" in rules:
         add("take_ferry","coastal_gate_or_raft_required",
-            state.wood>=1 or "coast" in terrain(world,state.realm,state.x,state.y)["biome"],
+            abs(state.x+4)<=MAX_ABS_COORD and
+            abs(state.y+2)<=MAX_ABS_COORD and
+            (state.wood>=1 or
+             "coast" in terrain(world,state.realm,state.x,state.y)["biome"]),
             to=[state.realm,state.x+4,state.y+2],
             movement_model="abstract_water_travel_no_vessel_physics")
         add("ride_shuttle","research_or_allies_required",
-            state.research>=2 or state.allies>=2,
+            abs(state.x+8)<=MAX_ABS_COORD and
+            abs(state.y+1)<=MAX_ABS_COORD and
+            (state.research>=2 or state.allies>=2),
             to=[state.realm,state.x+8,state.y+1],
             movement_model="abstract_transport_not_spaceflight_physics")
     if world.includes_goal:
@@ -483,7 +491,7 @@ def take_action(world:LivingWorld,state:LivingState,action:str)->LivingState:
     rules=set(world.rules)
     next=replace(state,turn=state.turn+1,actions_played=state.actions_played+1)
     if action in {n for n,_,_ in DIRS}:
-        _,dx,dy=next((entry for entry in DIRS if entry[0]==action))
+        _,dx,dy=next(direction for direction in DIRS if direction[0]==action)
         # The chosen gate is checked on OLD phase, after which the maze
         # immediately twists into the new phase for the next choice.
         next=replace(next,x=state.x+dx,y=state.y+dy,
@@ -512,6 +520,10 @@ def take_action(world:LivingWorld,state:LivingState,action:str)->LivingState:
     elif action=="craft":
         next=replace(next,wood=state.wood-1,ore=state.ore-1,
                      crystal=_cap(state.crystal+1),research=_cap(state.research+1))
+    elif action=="mine":
+        next=replace(next,ore=_cap(state.ore+2),
+                     crystal=_cap(state.crystal+(1 if state.turn%3==0 else 0)),
+                     energy=max(0,state.energy-2))
     elif action=="farm":
         next=replace(next,wood=state.wood-1,food=_cap(state.food+7),
                      world_changes=_add_unique(
