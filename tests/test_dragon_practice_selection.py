@@ -112,9 +112,10 @@ def test_practice_attempt_rejects_foreign_world_and_manipulated_ledger():
     right = load_practice_game("dragon-practice-002", authorized=True)
     with pytest.raises(ValueError):
         verified_practice_run(left.game_id, right.proof, authorized=True)
-    forged = replace(
-        left.proof, action_receipts=left.proof.action_receipts[:-1],
-    )
+    altered = list(left.proof.action_receipts)
+    changed_control = "up" if altered[1].action != "up" else "left"
+    altered[1] = replace(altered[1], action=changed_control)
+    forged = replace(left.proof, action_receipts=tuple(altered))
     with pytest.raises(ValueError):
         verified_practice_run(left.game_id, forged, authorized=True)
     with pytest.raises(PracticeSelectionError):
