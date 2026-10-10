@@ -608,3 +608,42 @@ distribution approval.
 This increases separately implemented native machine-*source*
 destinations to **15** of 524 archive candidates. The source count
 must not be confused with qualified playable hardware binaries.
+
+## ColecoVision guest-Z80 replay: real gameplay without distributing a BIOS
+
+A second, independent `Game Builder ColecoVision Native Z80 CPU Replay`
+workflow now drives every original safe-action joystick direction through
+**actual compiled native Coleco cartridge Z80 instructions**, rather
+than concluding that a valid header means a playable game.
+
+`emulate_coleco_ci.py` uses the externally validated `z80-python`
+instruction core and implements a strict, explicitly bounded ColecoVision
+device adapter: physical **1KiB mirrored RAM** ($6000–$7FFF),
+BIOS-selected boot address, BIOS-to-cartridge NMI trampoline at $0066,
+TMS9918A VRAM name-table writes, register-1 video interrupt
+enable/disable, active-low first controller and SN76489 sound port.
+The simulator supplies exactly **two stub BIOS routines**, MODE_1 and
+LOAD_ASCII, each modeled as RET. No proprietary OS7 BIOS is uploaded,
+downloaded, or reverse-engineered into the project; a stub is never
+described as full firmware emulation.
+
+The original `PlayableWorld` emits a separately hashed winning
+action/state reference; the CPU runner compares every actual
+guest-RAM state (level, player, gems, health, game-over, score)
+and the tile drawn in VRAM after every action. Any diverging
+instruction, modified author-source digest, unregistered BIOS
+access, unauthorized memory write, malformed VDP control latch,
+or missing physical joystick poll fails closed. CI retains
+the built 32KiB .col ROM and independent CPU execution receipt.
+
+The code also explicitly disables **VDP NMI during two-byte video
+name-table address writes**, then acknowledges and rearms VBlank at
+the end of each redraw, avoiding a hardware race that merely
+using Z80 `DI` could not prevent. This requires real Coleco NMI
+semantics, not SMS maskable INT semantics.
+
+Passing this CPU replay is evidence for native Z80 execution and
+the particular audited guest device paths. It is **not** equivalent
+to accurate timing/pixels for the real TMS9918A, a fully booted
+proprietary Coleco OS7 BIOS, an independently tested ColecoVision
+emulator, an actual original console, or legal distribution clearance.
