@@ -15,6 +15,7 @@ import * as Sharing from 'expo-sharing';
 import StudioLoginGate, { useStudioAuth } from '../src/auth/StudioLoginGate';
 import { authHeaders, getAuthToken } from '../src/auth/gameforgeAuth';
 import { API_BASE } from '../utils/apiBase';
+import DragonOriginalPuzzleEditor from '../src/components/DragonOriginalPuzzleEditor';
 
 type PlatformCapability = {
   id: string;
@@ -156,6 +157,12 @@ function NativeSourceEditor() {
   const [stageCount, setStageCount] = React.useState(4);
   const [searchBudget, setSearchBudget] = React.useState(8);
   const [proceduralLevels, setProceduralLevels] = React.useState(false);
+  const [customGame, setCustomGame] = React.useState(false);
+  const [validatedBoards, setValidatedBoards] = React.useState<string[][] | null>(null);
+  const handleApprovedBoards = React.useCallback((next: string[][] | null) => {
+    setValidatedBoards(next);
+    setSuccess('');
+  }, []);
   const [targets, setTargets] = React.useState<string[]>(['game_boy']);
   const [attested, setAttested] = React.useState(false);
   const [approved, setApproved] = React.useState(false);
@@ -285,13 +292,15 @@ function NativeSourceEditor() {
       palette, hero, quest_theme: questTheme, difficulty,
       stages: stageCount, candidates: searchBudget,
       project_notes: 'Original native homebrew; platform-scaled design',
-      procedural_levels: style === 'fixed_screen_puzzle' && proceduralLevels,
+      procedural_levels: style === 'fixed_screen_puzzle' && proceduralLevels && !customGame,
     },
+    authored_puzzles: customGame && style === 'fixed_screen_puzzle'
+      ? validatedBoards : null,
   });
 
   React.useEffect(() => { setPreview(null); }, [
     title, style, targets, palette, hero, questTheme,
-    difficulty, stageCount, searchBudget, proceduralLevels, attested,
+    difficulty, stageCount, searchBudget, proceduralLevels, customGame, validatedBoards, attested,
   ]);
 
   const previewTargets = async () => {
@@ -326,6 +335,11 @@ function NativeSourceEditor() {
   };
 
   const generate = async () => {
+    if (customGame && style === 'fixed_screen_puzzle' &&
+        (!validatedBoards || validatedBoards.length !== stageCount)) {
+      setFailure('Validate every authored game stage before native source export.');
+      return;
+    }
     if (busy || !isEditor || !attested || !approved || !title.trim() ||
         !/^[A-Za-z][A-Za-z0-9 ._'!-]{2,79}$/.test(title.trim()) || targets.length < 1 ||
         targets.length > MAX_TARGETS || !targets.every(id =>
@@ -554,6 +568,27 @@ function NativeSourceEditor() {
             </Text>
           </TouchableOpacity>
         )}
+        {style === 'fixed_screen_puzzle' && !usesCartridgeTargets && (
+          <>
+            <TouchableOpacity accessibilityRole="checkbox"
+              accessibilityState={{ checked: customGame }}
+              disabled={busy} style={stylesUi.consent}
+              onPress={() => {
+                setCustomGame(current => !current);
+                setProceduralLevels(false);
+                setValidatedBoards(null);
+                setSuccess('');
+              }}>
+              <Text style={stylesUi.copy}>
+                {customGame ? '☑ ' : '☐ '}Author and solve my own real native puzzle boards
+              </Text>
+            </TouchableOpacity>
+            <DragonOriginalPuzzleEditor
+              enabled={customGame} stages={stageCount}
+              onApprovedLevels={handleApprovedBoards}
+            />
+          </>
+        )}
         {usesCartridgeTargets && (
           <Text style={stylesUi.warning}>
             Cartridge adaptation: one stage and one candidate per original
@@ -628,7 +663,9 @@ function NativeSourceEditor() {
 
         <TouchableOpacity accessibilityRole="button" testID="dragon-native-export"
           disabled={busy || loading || !isEditor || !attested || !approved ||
-            targets.length < 1 || !title.trim()}
+            targets.length < 1 || !title.trim() ||
+            (customGame && style === "fixed_screen_puzzle" &&
+              (!validatedBoards || validatedBoards.length !== stageCount))}
           style={[stylesUi.action, (busy || !isEditor || !attested || !approved ||
             targets.length < 1 || loading) && stylesUi.disabled]} onPress={generate}>
           <Text style={stylesUi.actionText}>
