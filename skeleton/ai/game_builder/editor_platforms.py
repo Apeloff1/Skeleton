@@ -29,6 +29,28 @@ _NATIVE_SOURCE_ADAPTERS = {
 }
 _NATIVE_SOURCE_TARGETS = frozenset(_NATIVE_SOURCE_ADAPTERS)
 
+_PORTABLE_TILE_CODEC = {
+    "nintendo_game_boy": "gb_2bpp",
+    "nintendo_game_boy_color": "gb_2bpp",
+    "nintendo_famicom": "nes_2bpp",
+    "nintendo_snes": "snes_4bpp",
+    "sega_master_system": "sms_4bpp",
+    "sega_game_gear": "sms_4bpp",
+    "sega_mega_drive": "genesis_4bpp",
+}
+_PORTABLE_PALETTE_CODEC = {
+    "nintendo_game_boy_color": "rgb555",
+    "nintendo_snes": "rgb555",
+}
+_PORTABLE_TONE_TIMER = {
+    "nintendo_game_boy": "gameboy_pulse",
+    "nintendo_game_boy_color": "gameboy_pulse",
+    "nintendo_famicom": "nes_pulse",
+    "sega_master_system": "sn76489",
+    "sega_game_gear": "sn76489",
+    "sega_mega_drive": "sn76489",
+}
+
 
 def _option(profile: PlatformProfile, *, as_source: bool) -> dict[str, object]:
     source_ready = profile.id in _NATIVE_SOURCE_TARGETS
@@ -49,6 +71,15 @@ def _option(profile: PlatformProfile, *, as_source: bool) -> dict[str, object]:
         "capability_status": "native_source_project_only" if source_ready else "design_catalogue_only",
         "native_source_project_available": source_ready,
         "native_source_project_kind": _NATIVE_SOURCE_ADAPTERS.get(profile.id),
+        "portable_tile_codec": _PORTABLE_TILE_CODEC.get(profile.id),
+        "portable_palette_codec": _PORTABLE_PALETTE_CODEC.get(profile.id),
+        "portable_tone_timer": _PORTABLE_TONE_TIMER.get(profile.id),
+        "portable_asset_conversion_status": (
+            "offline_source_data_only"
+            if profile.id in _PORTABLE_TILE_CODEC
+            else "platform_specific_codec_not_implemented"
+        ),
+        "portable_asset_release_verified": False,
         "native_binary_built": False,
         "native_gameplay_run_verified": False,
         "distribution_licensed": False,
