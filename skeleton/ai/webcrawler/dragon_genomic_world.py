@@ -184,7 +184,17 @@ def legal_actions(address:WorldGenomeAddress,state:GenomicState)->list[dict]:
     local=cell(address,state,state.base.realm,state.base.x,state.base.y)
     env=local["genomic_environment"]
     results=[]
-    for old in options(world,state.base):
+    source_options=options(world,state.base)
+    # A finite campaign after its terminal ending or a deceased hardcore
+    # character must not re-enter ordinary play through genomic side verbs.
+    terminal=(not state.base.alive or (
+        state.base.endings_seen and not world.allows_continuation))
+    if terminal:
+        return [{
+            **old,"genomic_cost":0,
+            "source":"canonical_original_world_terminal_policy",
+        } for old in source_options]
+    for old in source_options:
         action=old["name"]
         good=bool(old["available"])
         reason=old["reason"]
