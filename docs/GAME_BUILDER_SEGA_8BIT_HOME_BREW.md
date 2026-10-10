@@ -654,3 +654,50 @@ mismatched original color plans and absent real Z80 stage-color checks.
 This work neither uses copyrighted third-party palettes nor certifies
 rights, distribution permission, physical hardware timing or compatibility
 with proprietary games. Those independent release gates remain closed.
+
+## Author your own independent native cartridge project
+
+The console builder is no longer limited to bundled example campaigns.
+Use the bounded `custom_original` profile to create a new, deterministic
+homebrew game from your own project identity, title, seed, theme and
+level configuration, with its own independently solved playable maps.
+
+```bash
+python -m scripts.game_builder.native_sega_8bit_ci \
+  --target sega_game_gear \
+  --profile custom_original \
+  --original-project-id my-original-ocean-quest \
+  --original-title 'My Original Ocean Quest' \
+  --original-seed 271828 \
+  --original-theme ocean \
+  --original-levels 4 \
+  --original-width 17 \
+  --original-height 15 \
+  --original-collectibles 5 \
+  --original-hazards 4 \
+  --original-health 4 \
+  --emit ./my-original-gamegear \
+  --author-evidence ./authorship-evidence.txt \
+  --host-reference-out ./my-original-winning-route.json
+```
+
+Supported themes: `forest`, `space`, `desert`, `ocean`, `arcade`.
+The shared SMS/GG console-safe profile allows odd map dimensions of
+9–19 columns and 9–15 rows, 1–8 stages, 1–6 collectibles per stage,
+0–24 hazards, and 1–10 initial health, subject to the source world's
+independent solvability constraint and the aggregate 48-collectible
+native progression cap. Seed values are bounded and replay-deterministic.
+The generated native `game.c`, `Makefile`, `manifest.json`, signed-source
+candidate digest and original winning-route reference are kept separate
+from any proprietary ROM or BIOS.
+
+The user-provided authorship file is a **claim and fingerprint**, not
+external proof of copyright ownership. The generator does not authorize
+publishing, reverse engineering third-party game expression, including
+copied visuals/audio, or bypassing a platform's real license terms.
+No automatically fabricated legal review, independent rights approval,
+physical hardware pass, or distribution license is asserted.
+
+The same profile can target `sega_master_system` instead of Game Gear
+while retaining original world identity and adapting actual palette,
+viewport and sprite interfaces to the destination hardware.
