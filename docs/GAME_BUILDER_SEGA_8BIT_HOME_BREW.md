@@ -144,10 +144,21 @@ The generated original ROM contains keyboard-free, real-device input handling:
 | Button 1 | Toggle original PSG sound on/off | Toggle original PSG sound on/off |
 | Button 2 | Pause/unpause game physics and controls | Toggle reduced-motion effects |
 | Start | Not available as a standard dedicated hardware key | Pause/unpause |
+| Briefly press buttons 1+2 together | Pet the original companion | Pet the original companion |
+| Hold buttons 1+2 for 25 video frames | Play a native demonstration using the authored solution | Play the same native authored demonstration |
+| After winning or losing | Button 2 starts a fresh campaign | Start begins a fresh campaign |
 
 No menu uses a proprietary logo, commercial character, game soundtrack or
-platform BIOS resource. The pause mode freezes movement, but still maintains a
-visible familiar and frame-synchronized VDP display. Reduced-motion settings
+platform BIOS resource. The pause mode freezes movement and immediately silences PSG channel zero
+to avoid a stuck note, but still maintains a visible familiar and
+frame-synchronized VDP display. Restarting after victory or defeat restores
+the original game colors instead of leaving the victory/defeat palette
+stuck on the next run. A companion pet gesture produces a brief animated
+reaction (a smile, or a cheer every fourth pet) and a fresh original short
+tone when sound is enabled. Pets do not give score, health, objectives,
+unlock gameplay ranks, or alter replay integrity. The optional attract mode
+runs the exact same native gameplay rules as a human player; a new human
+input cancels it and restores a clean original game. Reduced-motion settings
 suppress cosmetic blinking and breathing; the follower keeps a fixed offset
 rather than bouncing. Companion improvements are cosmetic, never a reason to
 make a formerly playable world unwinnable.
