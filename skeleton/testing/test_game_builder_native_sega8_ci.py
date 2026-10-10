@@ -324,3 +324,101 @@ def test_extended_native_source_profile_fails_closed_before_file_generation(tmp_
     with pytest.raises(ValueError,match="profile"):
         emit("sega_master_system",output,evidence,profile=invalid)
     assert not output.exists()
+
+
+
+@pytest.mark.parametrize("target",("sega_master_system","sega_game_gear"))
+@pytest.mark.parametrize("theme",("forest","space","desert","ocean","arcade"))
+def test_custom_independent_original_game_emits_native_source_with_exact_author_identity(
+    tmp_path,target,theme,
+):
+    author=tmp_path/"rights.txt"
+    author.write_text(
+        "Independently created puzzle rules, art, music, stage layouts.",
+        encoding="utf-8",
+    )
+    parameters={
+        "project_id":"authored-multiera-original",
+        "title":"My Original Console Journey",
+        "seed":271828,"theme":theme,"levels":1,
+        "width":13,"height":11,
+        "collectibles_per_level":2,"hazards_per_level":2,
+    }
+    path=tmp_path/target
+    receipt=emit(
+        target,path,author,profile="custom_original",original_config=parameters,
+    )
+    manifest=json.loads((path/"manifest.json").read_text(encoding="utf-8"))
+    assert receipt["original_campaign_profile"]=="custom_original"
+    assert receipt["world_digest"]==manifest["world_digest"]
+    assert receipt["source_content_digest"]==sha256(b"\0".join(
+        (path/name).read_bytes() for name in ("game.c","Makefile","manifest.json")
+    )).hexdigest()
+    assert manifest["project_id"]==parameters["project_id"]
+    assert manifest["original_color_theme"]==theme
+    assert manifest["levels"]==1
+    assert manifest["width"]==13 and manifest["height"]==11
+    assert manifest["binary_compiled"] is False
+    assert manifest["distribution_licensed"] is False
+    assert manifest["release_approved"] is False
+    assert manifest["native_per_stage_hardware_bg_palette_accents"] is True
+    assert manifest["original_native_solution_attract_mode"] is True
+    again=emit(
+        target,tmp_path/(target+"-again"),author,
+        profile="custom_original",original_config=parameters,
+    )
+    assert receipt["world_digest"]==again["world_digest"]
+    assert receipt["source_content_digest"]==again["source_content_digest"]
+
+
+@pytest.mark.parametrize("target",("sega_master_system","sega_game_gear"))
+def test_custom_original_cross_console_identity_without_copying_third_party_content(tmp_path,target):
+    evidence=tmp_path/"author.txt"
+    evidence.write_text("Source imagery and puzzle concepts created independently",encoding="utf-8")
+    cfg={
+        "project_id":"original-fixed-seed-reproducible",
+        "title":"Unique Independently Authored Maze",
+        "seed":123456,"theme":"arcade","levels":3,
+        "width":17,"height":15,
+    }
+    emitted=emit(target,tmp_path/target,evidence,profile="custom_original",original_config=cfg)
+    assert emitted["native_binary_built"] is False
+    assert emitted["rights_independently_verified"] is False
+    assert emitted["distribution_licensed"] is False
+
+
+@pytest.mark.parametrize("custom",(
+    None,{},{"project_id":"only-one"},
+    {"project_id":"a","title":"b","seed":1,"theme":"forest","levels":1,
+     "width":21},
+    {"project_id":"a","title":"b","seed":1,"theme":"forest","levels":1,
+     "height":17},
+    {"project_id":"a","title":"b","seed":1,"theme":"forest","levels":9},
+    {"project_id":"a","title":"b","seed":1,"theme":"forest","levels":8,
+     "collectibles_per_level":7},
+    {"project_id":"a","title":"b","seed":1,"theme":"forest","levels":1,
+     "third_party_rom":"secret.sms"},
+    {"project_id":"a","title":"b","seed":True,"theme":"forest","levels":1},
+    {"project_id":"a","title":"b","seed":1,"theme":"nintendo","levels":1},
+))
+def test_custom_native_original_hardware_contract_refuses_unbounded_or_licensed_override(
+    tmp_path,custom,
+):
+    author=tmp_path/"author.txt"
+    author.write_bytes(b"independently-authored content")
+    path=tmp_path/"must-not-exist"
+    with pytest.raises(ValueError):
+        emit(
+            "sega_game_gear",path,author,
+            profile="custom_original",original_config=custom,
+        )
+    assert not path.exists()
+
+
+def test_native_preset_rejects_unreviewed_custom_parameters(tmp_path):
+    author=tmp_path/"author.txt"
+    author.write_bytes(b"original license and source evidence")
+    with pytest.raises(ValueError,match="custom game overrides"):
+        emit("sega_master_system",tmp_path/"no-game",author,
+             profile="standard",original_config={"seed":9})
+    assert not (tmp_path/"no-game").exists()
