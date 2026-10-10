@@ -135,6 +135,20 @@ Larger training at production/model-development scale requires a separate,
 independently qualified infrastructure. The split cannot prove independence
 from any historical training data outside the selected folder.
 
+### Continue from a verified dataset
+
+```bash
+python -m skeleton app local-ai --improve-dataset ./curated-v1 \
+  --improve-model ./parent.json --output-model ./candidate.json \
+  --verify-sources ./notes --epochs 3 --json
+```
+
+This binds the training run to the verified dataset snapshot and retains the
+parent checkpoint. Optional `--protect-suite` requires the independent category
+benchmark. The candidate is written only after held-out improvement. See
+[native dataset continuation](ai/native-dataset-continuation-2026-10-10.md)
+for receipt replay and operating limits.
+
 ### Train a small native checkpoint on your own text
 
 The desktop window's **Train small local model…** action can train a genuine,

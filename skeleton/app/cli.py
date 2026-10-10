@@ -70,6 +70,7 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--inspect-model", action="store_true", help="validate model weights and report offline runtime limits")
     local_ai.add_argument("--prepare-dataset", help="flat folder of explicit UTF-8 .txt documents")
     local_ai.add_argument("--dataset-output", help="new directory for disjoint train/validation and identity manifest")
+    local_ai.add_argument("--improve-dataset", help="verified dataset folder for held-out checkpoint continuation")
     local_ai.add_argument("--verify-dataset", help="check published dataset hashes, split contract and canonical manifest")
     local_ai.add_argument("--verify-sources", help="optional original source folder for strict source-to-dataset verification")
     local_ai.add_argument("--validation-percent", type=int, default=25, help="source-document validation split percent (10–50)")
@@ -236,6 +237,42 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
 
     if command == "local-ai":
         from skeleton.app.local_ai import OfflineAISession, inspect_local_model, load_native_checkpoint, run_offline_ai
+
+        if args.improve_dataset:
+            if (
+                not args.improve_model or not args.output_model
+                or args.prepare_dataset or args.dataset_output or args.verify_dataset
+                or args.train_corpus or args.eval_corpus
+                or args.model or args.prompt or args.inspect_model
+                or args.compare_model or args.candidate_model or args.benchmark_suite
+                or args.exclude_train_corpus or args.replay_improvement
+                or args.load_chat or args.save_chat
+                or args.max_output_tokens != 8
+                or args.validation_percent != 25 or args.split_seed != 41
+            ):
+                print("--improve-dataset requires --improve-model and --output-model; optional --epochs, --verify-sources and --protect-suite")
+                return 2
+            from skeleton.app.local_ai_dataset import improve_native_dataset
+
+            try:
+                result = improve_native_dataset(
+                    args.improve_model, args.improve_dataset, args.output_model,
+                    epochs=args.epochs, original_sources=args.verify_sources,
+                    protected_suite=args.protect_suite,
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("verified dataset improvement rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(result, sort_keys=True, ensure_ascii=False))
+            else:
+                receipt = result["improvement"]
+                print("Native candidate checkpoint written: " + str(args.output_model))
+                print("Dataset ID: " + result["dataset"]["dataset_id"])
+                print("held-out perplexity: "
+                      + f"{receipt['baseline_perplexity']:.3f} -> {receipt['accepted_perplexity']:.3f}")
+                print("Parent checkpoint retained; no independent quality certification")
+            return 0
 
         if args.verify_dataset or args.verify_sources:
             if (

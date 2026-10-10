@@ -19,6 +19,7 @@ import json
 import os
 from pathlib import Path
 import stat
+import tempfile
 from typing import Any
 
 from skeleton.app.local_ai_training import MAX_CORPUS_BYTES, MAX_TRAINING_TOKENS
@@ -412,11 +413,11 @@ def _is_sha256(value: object) -> bool:
     )
 
 
-def verify_native_dataset(
+def _verified_dataset_snapshot(
     dataset_directory: str | Path,
     *,
     original_sources: str | Path | None = None,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], dict[str, bytes]]:
     """Read-only verification of a published deterministic native corpus.
 
     Dataset files and canonical manifest must agree byte-for-byte.
@@ -617,7 +618,7 @@ def verify_native_dataset(
         "original_sources_verified": source_verified,
         "historical_data_disjointness_proven": False,
         "model_quality_certified": False,
-    }
+    }, blobs
 
 
 
@@ -656,3 +657,65 @@ def smoke_offline_native_dataset() -> bool:
             and trained.tokenizer_digest == runtime.tokenizer_digest
             and not receipt["model_quality_certified"]
         )
+
+
+def verify_native_dataset(
+    dataset_directory: str | Path,
+    *,
+    original_sources: str | Path | None = None,
+) -> dict[str, Any]:
+    """Verify the manifest and corpora without changing any files."""
+    evidence, _ = _verified_dataset_snapshot(
+        dataset_directory, original_sources=original_sources,
+    )
+    return evidence
+
+
+def improve_native_dataset(
+    checkpoint: str | Path,
+    dataset_directory: str | Path,
+    destination: str | Path,
+    *,
+    epochs: int = 1,
+    original_sources: str | Path | None = None,
+    protected_suite: str | Path | None = None,
+) -> dict[str, Any]:
+    """Continue a native checkpoint from the exact verified dataset snapshot.
+
+    Hash-bound corpus bytes are captured by verification and supplied to the
+    existing improvement owner in a private temporary directory. Reopening
+    operator paths after verification would allow a changed file to train
+    under an earlier manifest's identity. The normal vocabulary, held-out,
+    protected-category and exclusive publication gates all remain mandatory.
+    Original source verification is a snapshot assertion, not a lock on the
+    operator's directory for the duration of training.
+    """
+    from skeleton.app.local_ai_improvement import improve_local_model
+
+    evidence, blobs = _verified_dataset_snapshot(
+        dataset_directory, original_sources=original_sources,
+    )
+    # The output must not mutate the selected dataset or source directory.
+    target = Path(destination).resolve()
+    if target.is_relative_to(Path(dataset_directory).resolve()) or (
+        original_sources is not None
+        and target.is_relative_to(Path(original_sources).resolve())
+    ):
+        raise OfflineDatasetError("candidate checkpoint must be outside dataset and source directories")
+    with tempfile.TemporaryDirectory(prefix="skeleton-verified-dataset-") as folder:
+        root = Path(folder)
+        train = root / TRAIN_FILE
+        validation = root / VALIDATION_FILE
+        _write_exclusive(train, blobs["training"])
+        _write_exclusive(validation, blobs["validation"])
+        receipt = improve_local_model(
+            checkpoint, train, validation, destination,
+            epochs=epochs, protected_suite=protected_suite,
+        ).to_dict()
+    return {
+        "schema": "skeleton.ai.native_dataset_improvement.v1",
+        "dataset": evidence,
+        "improvement": receipt,
+        "verified_snapshot_used": True,
+        "model_quality_certified": False,
+    }

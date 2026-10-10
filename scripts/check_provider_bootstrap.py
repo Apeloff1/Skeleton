@@ -124,13 +124,17 @@ def _sdk_root(name: str) -> str:
     return name.split(".", 1)[0]
 
 
-@lru_cache(maxsize=16_384)
+@lru_cache(maxsize=128)
 def _cached_python_tree(
     path_text: str,
     mtime_ns: int,
     size: int,
 ) -> ast.AST | None:
-    """Parse one unchanged Python file once per validator process."""
+    """Reuse recent parses without retaining thousands of full module ASTs.
+
+    Eviction changes parsing cost, never provider isolation decisions. Compact
+    import summaries retain their separate larger cache for repeated scans.
+    """
 
     del mtime_ns, size  # Cache-key material; content is read only on cache miss.
     try:
@@ -151,7 +155,7 @@ def _python_tree(path: Path) -> ast.AST | None:
     )
 
 
-@lru_cache(maxsize=16_384)
+@lru_cache(maxsize=128)
 def _cached_source(
     path_text: str,
     mtime_ns: int,

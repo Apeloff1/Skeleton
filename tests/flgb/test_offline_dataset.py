@@ -360,3 +360,138 @@ class TestNativeDatasetCuration(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestVerifiedDatasetImprovement(unittest.TestCase):
+    def _fixture(self, root):
+        from skeleton.ai.model_runtime import NativeLLMRuntime
+        from skeleton.ai.runtime.inference.artifact import write_local_model_artifact
+        from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
+        from skeleton.cortex.transformer import TinyTransformer
+
+        source = _sources(root)
+        prepared = root / "prepared"
+        curated = prepare_native_dataset(source, prepared)
+        parent = root / "parent.json"
+        model = TinyTransformer(
+            vocab=("user", "assistant", "hello", "world", "alpha", "beta"),
+            dim=8, ctx=96, seed=37, n_heads=2, n_layers=2, d_ff=16,
+        )
+        write_local_model_artifact(NativeRuntimeLocalModel(NativeLLMRuntime(model)), parent)
+        return source, prepared, parent, curated
+
+    def test_actual_training_binds_dataset_and_preserves_parent(self):
+        from skeleton.app.local_ai_dataset import improve_native_dataset
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source, prepared, parent, curated = self._fixture(root)
+            original = parent.read_bytes()
+            result = improve_native_dataset(
+                parent, prepared, root / "candidate.json", epochs=3,
+                original_sources=source,
+            )
+            self.assertTrue(result["verified_snapshot_used"])
+            self.assertEqual(result["dataset"]["dataset_id"], curated["dataset_id"])
+            self.assertTrue(result["dataset"]["original_sources_verified"])
+            receipt = result["improvement"]
+            self.assertEqual(receipt["train_source_sha256"], curated["training_sha256"])
+            self.assertEqual(receipt["validation_source_sha256"], curated["validation_sha256"])
+            self.assertEqual(parent.read_bytes(), original)
+            from skeleton.app.local_ai_replay import replay_local_improvement
+            receipt_file = root / "receipt.json"
+            receipt_file.write_text(json.dumps(receipt), encoding="utf-8")
+            replay = replay_local_improvement(
+                receipt_file, parent, root / "candidate.json",
+                prepared / "train.txt", prepared / "validation.txt",
+            )
+            self.assertEqual(replay["candidate_model_digest"], receipt["candidate_model_digest"])
+            self.assertLess(receipt["accepted_perplexity"], receipt["baseline_perplexity"])
+            self.assertEqual(load_native_checkpoint(root / "candidate.json").model_digest,
+                             receipt["candidate_model_digest"])
+
+    def test_tampered_corpus_refused_before_training(self):
+        from skeleton.app.local_ai_dataset import improve_native_dataset
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source, prepared, parent, _ = self._fixture(root)
+            (prepared / "train.txt").write_text("mutated corpus\n")
+            with patch("skeleton.app.local_ai_improvement.improve_local_model") as train:
+                with self.assertRaises(OfflineDatasetError):
+                    improve_native_dataset(parent, prepared, root / "candidate.json")
+                train.assert_not_called()
+            self.assertFalse((root / "candidate.json").exists())
+
+    def test_dataset_replacement_after_verification_cannot_change_training_bytes(self):
+        from skeleton.app.local_ai_dataset import improve_native_dataset
+        from skeleton.app.local_ai_improvement import improve_local_model
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source, prepared, parent, curated = self._fixture(root)
+            temporary_paths = []
+            def replace_then_train(checkpoint, train, validation, destination, **kwargs):
+                (prepared / "train.txt").write_text("unverified replacement\n")
+                self.assertEqual(hashlib.sha256(Path(train).read_bytes()).hexdigest(),
+                                 curated["training_sha256"])
+                temporary_paths.append(Path(train))
+                return improve_local_model(checkpoint, train, validation, destination, **kwargs)
+            with patch("skeleton.app.local_ai_improvement.improve_local_model", replace_then_train):
+                result = improve_native_dataset(parent, prepared, root / "candidate.json", epochs=3)
+            self.assertFalse(temporary_paths[0].exists())
+            self.assertEqual(result["improvement"]["train_source_sha256"], curated["training_sha256"])
+
+    def test_cli_and_frozen_launcher_use_verified_dataset_mode(self):
+        from skeleton.app.cli import run_app_cli
+        from skeleton.app.windows_launcher import main
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source, prepared, parent, curated = self._fixture(root)
+            for index, invoke in enumerate((run_app_cli, main)):
+                output = StringIO()
+                with redirect_stdout(output):
+                    status = invoke((["--offline-command"] if index else []) + [
+                        "local-ai", "--improve-dataset", str(prepared),
+                        "--improve-model", str(parent), "--output-model", str(root / f"candidate{index}.json"),
+                        "--verify-sources", str(source), "--epochs", "3", "--json",
+                    ])
+                self.assertEqual(status, 0, output.getvalue())
+                self.assertEqual(json.loads(output.getvalue())["dataset"]["dataset_id"], curated["dataset_id"])
+            for extra in (["--train-corpus", "unused"], ["--eval-corpus", "unused"],
+                          ["--verify-dataset", str(prepared)], ["--prompt", "hello"]):
+                with redirect_stdout(StringIO()):
+                    status = run_app_cli([
+                        "local-ai", "--improve-dataset", str(prepared), "--improve-model", str(parent),
+                        "--output-model", str(root / "refused.json"), *extra,
+                    ])
+                self.assertEqual(status, 2)
+            self.assertFalse((root / "refused.json").exists())
+
+    def test_failed_improvement_cleans_snapshot_and_preserves_parent(self):
+        from skeleton.app.local_ai_dataset import improve_native_dataset
+        from skeleton.app.local_ai_improvement import OfflineImprovementError
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source, prepared, parent, _ = self._fixture(root)
+            previous = parent.read_bytes()
+            captured = []
+            def refuse(checkpoint, train, validation, destination, **kwargs):
+                captured.extend([Path(train), Path(validation)])
+                raise OfflineImprovementError("protected category regression")
+            with patch("skeleton.app.local_ai_improvement.improve_local_model", refuse):
+                with self.assertRaisesRegex(OfflineImprovementError, "protected"):
+                    improve_native_dataset(parent, prepared, root / "candidate.json")
+            self.assertEqual(parent.read_bytes(), previous)
+            self.assertFalse((root / "candidate.json").exists())
+            self.assertTrue(captured)
+            self.assertTrue(all(not path.exists() for path in captured))
+            self.assertTrue(verify_native_dataset(prepared)["prepared_outputs_verified"])
+
+    def test_output_inside_dataset_or_sources_is_refused_before_training(self):
+        from skeleton.app.local_ai_dataset import improve_native_dataset
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source, prepared, parent, _ = self._fixture(root)
+            with patch("skeleton.app.local_ai_improvement.improve_local_model") as train:
+                for output in (prepared / "candidate.json", source / "candidate.json"):
+                    with self.assertRaisesRegex(OfflineDatasetError, "outside"):
+                        improve_native_dataset(parent, prepared, output, original_sources=source)
+                train.assert_not_called()

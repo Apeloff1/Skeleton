@@ -195,7 +195,7 @@ class TestEvaluatedOfflineImprovement(unittest.TestCase):
             source, train, heldout, dest = self._fixture(d)
             with self.assertRaisesRegex(OfflineImprovementError, "distinct"):
                 compare_local_models(source, source, heldout)
-            heldout.write_text("outofvocabulary words unknown\n", encoding="utf-8")
+            heldout.write_text("outofvocabulary words unknown tokens\n", encoding="utf-8")
             native = TinyTransformer(
                 vocab=("user", "assistant", "hello", "world", "alpha", "beta"),
                 dim=8, ctx=96, seed=47, n_heads=2, n_layers=2, d_ff=16,
