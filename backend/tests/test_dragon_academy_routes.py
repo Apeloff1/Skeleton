@@ -340,3 +340,29 @@ def test_creator_bundle_fail_closed_on_rights_and_unimplemented_platform():
     with pytest.raises(HTTPException) as denied:
         route.native_production_source_bundle(no_publication, owner=owner)
     assert denied.value.status_code == 403
+
+
+
+@pytest.mark.parametrize("changes", [
+    {"approved": 1},
+    {"approved": "true"},
+    {"original_work_attested": 1},
+    {"original_work_attested": "yes"},
+    {"seed": True},
+    {"seed": "1"},
+    {"compile_roms": True},
+    {"allow_licensed_sdk": True},
+    {"targets": ["game_boy"] * 4},
+])
+def test_native_creator_request_rejects_coerced_authority_and_extra_fields(changes):
+    from pydantic import ValidationError
+    payload = {
+        "title": "Original River Quest",
+        "style": "arcade_score_attack",
+        "targets": ["game_boy"],
+        "original_work_attested": True,
+        "approved": True,
+    }
+    payload.update(changes)
+    with pytest.raises(ValidationError):
+        route.NativeProductionSourceRequest(**payload)
