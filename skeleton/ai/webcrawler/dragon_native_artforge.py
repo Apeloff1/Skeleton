@@ -164,6 +164,16 @@ def apply_original_art(files:dict[str,str],*,art:TileArt,tiles:dict,style:str)->
     updated=dict(files)
     updated[filename],matches=re.subn(pattern,lambda _:replacement,files[filename],count=1)
     if matches!=1:raise ValueError("native original-art video section absent")
+    # The legacy tile inventory also becomes an honest record of the
+    # rewritten runtime pixels; do not leave stale pre-port sprite hashes.
+    if "dragon-pixel-art.json" in updated:
+        legacy=json.loads(updated["dragon-pixel-art.json"])
+        legacy["sprites"]=[
+            {"id":name,"fingerprint":digest}
+            for name,digest in zip(art.tile_order,art.pixel_digests)
+        ]
+        legacy["runtime_tiles_replaced_by_original_design"]=True
+        updated["dragon-pixel-art.json"]=json.dumps(legacy,sort_keys=True,indent=2)+"\n"
     updated[FILENAME]=json.dumps(asdict(art),sort_keys=True,indent=2)+"\n"
     return updated
 
@@ -186,6 +196,15 @@ def verify_original_art(files:dict[str,str],port_plan:dict|None,style:str)->dict
         manifest=json.loads(files[FILENAME])
         if manifest!=json.loads(json.dumps(asdict(art))):
             raise ValueError("cartridge art contents do not match claimed design")
+        if "dragon-pixel-art.json" in files:
+            legacy=json.loads(files["dragon-pixel-art.json"])
+            expected_sprites=[
+                {"id":name,"fingerprint":pixel}
+                for name,pixel in zip(art.tile_order,art.pixel_digests)
+            ]
+            if (legacy.get("sprites")!=expected_sprites or
+                    legacy.get("runtime_tiles_replaced_by_original_design") is not True):
+                raise ValueError("legacy pixel art catalog contradicts runtime tiles")
         source_file,pattern,replacement=source_asm(tiles,style,target)
         observed=re.search(pattern,files[source_file])
         if observed is None or observed.group() != replacement:
