@@ -129,6 +129,8 @@ class DragonWisdomPyramid:
         self.db.execute("BEGIN IMMEDIATE")
         try:
             events = self._history(owner)
+            if events and now < events[-1]["at"]:
+                raise ValueError("journal timestamps cannot move backwards")
             check(events)
             if len(events) >= 10000:
                 raise ValueError("journal event budget exhausted")
@@ -249,7 +251,7 @@ class DragonWisdomPyramid:
 
         def check(events: list[dict[str, Any]]) -> None:
             review = self._review(events, review_digest)
-            if review["disposition"] != "accepted" or now >= review["expires_at"]:
+            if review["disposition"] != "accepted" or not review["at"] <= now < review["expires_at"]:
                 raise ValueError("Wiki review unapproved or expired")
             if self.library.snapshot_root(owner, authorized=True) != review["knowledge_root"]:
                 raise ValueError("Almanac revisions changed since Wiki review")
@@ -317,7 +319,7 @@ class DragonWisdomPyramid:
         for event in reversed(promoted):
             review = self._review(events, event["review_digest"])
             if (review["digest"] in revoked or review["knowledge_root"] != root
-                    or not review["at"] <= now < review["expires_at"]
+                    or not event["at"] <= now or not review["at"] <= now < review["expires_at"]
                     or any(ref[0] in pending for ref in review["source_refs"])
                     or any(e["kind"] == "wiki_review" and e["mechanic"] == review["mechanic"]
                            and e["sequence"] > review["sequence"] and e["disposition"] != "accepted"
