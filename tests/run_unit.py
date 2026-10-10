@@ -47,6 +47,7 @@ TEST_MODULE_NAMES = (
     "skeleton.testing.test_simulation_physics_obb_edges",
     "skeleton.testing.test_simulation_physics_plane_toi",
     "skeleton.testing.test_simulation_physics_replay",
+    "skeleton.testing.test_simulation_physics_stability",
 )
 
 UNSUPPORTED_MODULE_LIFECYCLE_HOOKS = (
