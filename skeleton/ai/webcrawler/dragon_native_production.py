@@ -126,6 +126,9 @@ class ArtifactReceipt:
     source_count: int
     source_bytes: int
     binary_sha256: str | None
+    gameplay_mode: str
+    campaign_stages: int
+    hardware_budget_state: str
     evidence: str
     compiler_state: str
 
@@ -138,6 +141,8 @@ class ProductionIndex:
     target_count: int
     entries: tuple[ArtifactReceipt, ...]
     production_evidence: str
+    declared_gameplay_modes: tuple[str, ...]
+    cross_target_fidelity: str
     legal_claim: str
 
 
@@ -233,8 +238,28 @@ def validate_native_source(project: NativeProject) -> dict[str, str]:
     if "dragon-native-manifest.json" not in project.files:
         raise ValueError("missing canonical native manifest")
     native = json.loads(project.files["dragon-native-manifest.json"])
-    if native.get("target") != project.target_id or native.get("status") != "source_generated":
+    if (native.get("target") != project.target_id or
+            native.get("status") != "source_generated" or
+            native.get("style") != project.style):
         raise ValueError("native project manifest and target disagree")
+    # The embedded budget is not just a present-looking receipt: recompute the
+    # original hardware analyzer over precisely its pre-manifest inputs.
+    from .dragon_hardware_budget import analyze_project_budget
+    try:
+        declared_budget = json.loads(project.files["dragon-hardware-budget.json"])
+        prior_files = {name: content for name, content in project.files.items()
+                       if name not in ("dragon-hardware-budget.json",
+                                       "dragon-native-manifest.json", "README.md")}
+        expected_budget = asdict(analyze_project_budget(project.target_id, prior_files))
+    except (KeyError, ValueError, TypeError) as exc:
+        raise ValueError("hardware budget claim cannot be revalidated") from exc
+    if declared_budget != expected_budget or declared_budget.get("status") != "source_budget_checked_only":
+        raise ValueError("hardware budget drift or unsupported resource claim")
+    if (type(native.get("campaign_stages")) is not int or
+            not 1 <= native["campaign_stages"] <= 8 or
+            not isinstance(native.get("runtime_gameplay_mode"), str) or
+            not 1 <= len(native["runtime_gameplay_mode"]) <= 80):
+        raise ValueError("missing actual native gameplay mode or invalid stage count")
     return file_hashes
 
 
@@ -288,7 +313,7 @@ def make_source_release(
         raise ValueError("native project does not match approved production request")
     hashes = validate_native_source(project)
     if binary is not None:
-        if project.target_id not in COMPILABLE or compiler_state != "compiled_native":
+        if not request.compile_roms or project.target_id not in COMPILABLE or compiler_state != "compiled_native":
             raise ValueError("binary may be admitted only from verified compiler")
         from .dragon_native_compile import _verify
         if not _verify(project.target_id, binary):
@@ -308,6 +333,9 @@ def make_source_release(
         "source_files": hashes,
         "source_count": len(hashes),
         "source_bytes": source_total,
+        "gameplay_mode": json.loads(project.files["dragon-native-manifest.json"])["runtime_gameplay_mode"],
+        "campaign_stages": json.loads(project.files["dragon-native-manifest.json"])["campaign_stages"],
+        "hardware_budget_state": "source_budget_checked_only",
         "compiler_state": compiler_state,
         "binary_member": binary_name,
         "binary_sha256": _hash(binary) if binary is not None else None,
@@ -335,6 +363,9 @@ def make_source_release(
         archive_sha256=_hash(payload), archive_name=archive_name,
         archive_bytes=len(payload), source_count=len(hashes),
         source_bytes=source_total, binary_sha256=receipt["binary_sha256"],
+        gameplay_mode=receipt["gameplay_mode"],
+        campaign_stages=receipt["campaign_stages"],
+        hardware_budget_state=receipt["hardware_budget_state"],
         evidence=evidence, compiler_state=compiler_state,
     )
 
@@ -385,8 +416,20 @@ def verify_source_release(payload: bytes) -> dict:
             raise ValueError("native project manifest invalid") from exc
         if (native.get("target") != receipt.get("target") or
                 native.get("style") != receipt.get("style") or
-                native.get("status") != "source_generated"):
+                native.get("status") != "source_generated" or
+                native.get("runtime_gameplay_mode") != receipt.get("gameplay_mode") or
+                native.get("campaign_stages") != receipt.get("campaign_stages") or
+                receipt.get("hardware_budget_state") != "source_budget_checked_only"):
             raise ValueError("native manifest mismatches release")
+        reconstructed = NativeProject(
+            project_id=str(receipt.get("project_id", "")),
+            target_id=receipt["target"], style=receipt["style"],
+            title="recovered", status="source_generated",
+            toolchain="", output="", files=recovered_sources,
+            digest=receipt["source_fingerprint"],
+            supported_mechanics=(), deferred_mechanics=(),
+        )
+        validate_native_source(reconstructed)
         if receipt.get("target") not in CATALOG or receipt.get("style") not in STYLES:
             raise ValueError("unknown packaged target/style")
         binary_name = receipt.get("binary_member")
@@ -491,6 +534,12 @@ def publish_production(
             "source_and_rom_structure_only" if any(r.binary_sha256 for _, r in artifacts)
             else "source_only"
         ),
+        declared_gameplay_modes=tuple(sorted({r.gameplay_mode for _, r in artifacts})),
+        cross_target_fidelity=(
+            "different_implemented_modes_not_an_equivalent_port"
+            if len({r.gameplay_mode for _, r in artifacts}) > 1
+            else "matching_declared_modes_not_verified_equivalent"
+        ),
         legal_claim="attested original/authorized material; external legal verification not asserted",
     )
     listing = _canonical(asdict(index))
@@ -550,6 +599,9 @@ def verify_published_production(destination: Path, index_name: str) -> dict:
         if (target in targets or target != item["target"] or
                 receipt["request_id"] != index["request_id"] or
                 receipt["source_fingerprint"] != item["source_fingerprint"] or
+                receipt["gameplay_mode"] != item["gameplay_mode"] or
+                receipt["campaign_stages"] != item["campaign_stages"] or
+                receipt["hardware_budget_state"] != item["hardware_budget_state"] or
                 receipt["binary_sha256"] != item["binary_sha256"]):
             raise ValueError("portfolio index and archive receipts disagree")
         targets.add(target)
