@@ -15,6 +15,45 @@ def _module():
     return module
 
 
+def test_native_contract_export_overlay_is_declared_and_additive() -> None:
+    import json
+
+    from scripts.check_traceability_spine import _contract_export_mirror_valid
+
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    canonical = (ROOT / "skeleton/contracts/__init__.py").read_bytes()
+    mirrored = (ROOT / "skeleton/ai/runtime/contracts/__init__.py").read_bytes()
+    assert _contract_export_mirror_valid(canonical, mirrored, manifest)
+
+    appendix = (
+        b"\\nfrom .execution_authority import (\\n"
+        b"    ResourceBudget,\\n"
+        b")\\n\\n__all__ += [\\n"
+        b"    \\"ResourceBudget\\",\\n"
+        b"]\\n"
+    )
+    base = b"__all__ = []\\n"
+    assert _contract_export_mirror_valid(base, base + appendix, manifest)
+    assert not _contract_export_mirror_valid(
+        base, base + appendix + b"__import__('os').system('false')\\n", manifest
+    )
+    assert not _contract_export_mirror_valid(
+        base, base + appendix.replace(b'"ResourceBudget"', b'"UnboundSymbol"'), manifest
+    )
+    assert not _contract_export_mirror_valid(
+        base, base + appendix.replace(b"ResourceBudget,", b"ResourceBudget as Unsafe,"), manifest
+    )
+    assert not _contract_export_mirror_valid(
+        b"__all__ = [1]\\n", base + appendix, manifest
+    )
+    missing_owner = dict(manifest)
+    missing_owner["native_ai_owners"] = [
+        item for item in manifest["native_ai_owners"]
+        if item.get("path") != "skeleton/ai/runtime/contracts/execution_authority.py"
+    ]
+    assert not _contract_export_mirror_valid(base, base + appendix, missing_owner)
+
+
 def test_ai_file_tree_manifest_is_valid_and_drift_free() -> None:
     assert _module().validate() == []
 
