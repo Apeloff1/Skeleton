@@ -21,3 +21,11 @@ def test_target_display_samples_original_frame_without_time_inflation():
     with pytest.raises(InputTimingError):
         source_frame_at(-1,50,60)
 
+
+def test_pressed_edges_do_not_repeat_held_button_or_foreign_bit():
+    assert edge_pressed(0b0010,0b0110)==0b0100
+    assert edge_pressed(0b0010,0b0010)==0
+    assert edge_pressed(0,0b0110,mask=0b0010)==0b0010
+    with pytest.raises(InputTimingError):
+        edge_pressed(-1,0)
+
