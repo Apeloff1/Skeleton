@@ -68,14 +68,24 @@ Docker Compose plugin remains required to build and run the application services
 
 ## Architecture
 
-7-phase boot protocol:
-1. **kernel** — EventBus, EntropyPool, VectorClock, InvariantLattice
-2. **memory** — RAG, CAG, MAG, Trinity, DreamEngine, DriftDetector
-3. **intelligence** — Orchestrator, AdaptiveLearner
-4. **swarm** — SwarmMesh, PheromoneField, HiveMind, Platoons
-5. **resilience** — ResilienceFortress, CanaryRegistry
-6. **interface** — AnomalyDetector, ProvenanceLedger, Reranker, QuadRetriever
-7. **cortex** — JeevesCortex (observes the whole bus)
+12-phase boot protocol (`skeleton/bootstrap/genesis.py`, `BOOT_PHASES`):
+1. **foundation** — MerkleDAG, EventJournal (journaled bus), ReplayEngine, CapabilityKernel, Membrane, TemporalLattice
+2. **kernel** — InvariantLattice, EntropyPool, VectorClock
+3. **memory** — RAG, CAG, MAG, Trinity, RepetitionScheduler, DreamEngine, DriftDetector, DifferentialPrivacy
+4. **intelligence** — Orchestrator, AdaptiveLearner
+5. **swarm** — SwarmMesh, PheromoneField, StigmergicRouter, HiveMind, Negotiator, Platoons, Coordinator, MeshBridge
+6. **resilience** — ResilienceFortress, CanaryRegistry, ChaosHarness
+7. **interface** — AnomalyDetector, ProvenanceLedger, Reranker, Ranker, QuadRetriever
+8. **forge** — universal Forge
+9. **galaxy** — GalaxyNode, transport, consensus, election, fleet, Byzantine engine, KAG sync
+10. **contexts** — ContextFabric, ResponseCycle, CausalEngine
+11. **support** — SupportFabric + Overseer engines V1/V2/V3/V3.5 (ticked inline)
+12. **cortex** — JeevesCortex + Jeeves alias (observes the whole bus)
+
+Each phase is timed; one summary line is logged per boot against the budget in
+[`docs/engineering/PERFORMANCE_BUDGETS.md`](docs/engineering/PERFORMANCE_BUDGETS.md)
+(warn above 2.0 s, error above 5.0 s; override with `SKL_BOOT_BUDGET_MS` /
+`SKL_BOOT_CRITICAL_MS`).
 
 ## Artifact plane
 
