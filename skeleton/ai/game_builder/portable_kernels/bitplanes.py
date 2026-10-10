@@ -78,3 +78,11 @@ def encode_sms_4bpp(tile: Sequence[Sequence[int]]) -> bytes:
     return bytes(sum(((row[x] >> plane) & 1) << (7-x) for x in range(8))
                  for row in rows for plane in range(4))
 
+
+def decode_sms_4bpp(data: bytes) -> tuple[tuple[int, ...], ...]:
+    """Round-trip four Sega VDP row bitplanes with strict 32-byte admission."""
+    raw = _raw(data, 32)
+    return tuple(tuple(sum(((raw[y*4+plane] >> (7-x)) & 1) << plane
+                           for plane in range(4))
+                       for x in range(8)) for y in range(8))
+
