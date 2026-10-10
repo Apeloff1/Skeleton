@@ -2,6 +2,7 @@ import tempfile
 from skeleton.ai.webcrawler.leases import SqliteLeaseStore
 from skeleton.ai.webcrawler.traps import TrapGuard
 from skeleton.ai.webcrawler.storage import SqliteCrawlStore
+from skeleton.ai.webcrawler.migrations import SCHEMA_VERSION
 
 def test_lease_excludes_second_worker_until_expiry():
     with tempfile.TemporaryDirectory() as d:
