@@ -257,12 +257,15 @@ class DragonWisdomPyramid:
 
     def promote(self, owner: str, review_digest: str, *, now: int,
                 authorized: bool, trusted_worker: bool,
-                human_approved: bool) -> dict[str, Any]:
+                human_approved: bool,
+                approval_evidence_digest: str | None = None) -> dict[str, Any]:
         """HOAG/memory eligibility only, never model training or release authority."""
         _authority(authorized, trusted_worker)
         _hash(review_digest)
         if human_approved is not True:
             raise PermissionError("explicit human memory approval required")
+        if approval_evidence_digest is not None:
+            _hash(approval_evidence_digest)
 
         def check(events: list[dict[str, Any]]) -> None:
             review = self._review(events, review_digest)
@@ -283,6 +286,7 @@ class DragonWisdomPyramid:
         return self._append(owner, "promoted", {
             "review_digest": review_digest, "memory_scope": "advisory_design",
             "training_authorized": False, "release_authorized": False,
+            "approval_evidence_digest": approval_evidence_digest,
         }, now, check)
 
     def revoke(self, owner: str, review_digest: str, *, reason: str,
