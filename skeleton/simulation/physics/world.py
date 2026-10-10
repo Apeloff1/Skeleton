@@ -41,6 +41,7 @@ from .errors import (
     DuplicateJointError,
     JointNotFoundError,
     PhysicsSnapshotError,
+    PhysicsStabilityError,
     PhysicsValidationError,
 )
 from .islands import IslandGraph, IslandGraphStats, build_islands, solve_islands
@@ -62,6 +63,18 @@ from .snapshots import (
     verify_snapshot,
 )
 from .solver import SequentialImpulseSolver, SolverStats
+from .stability import (
+    MAX_TOTAL_SOLVER_ITERATIONS,
+    BodyMotionSample,
+    EnergyGuardMode,
+    StabilityReport,
+    body_mechanical_energy,
+    clamp_scale,
+    external_work_bound,
+    kinematic_driven_island_ids,
+    unmonitored_body_ids,
+    wake_kinematic_driven_islands,
+)
 
 MAX_WORLD_BODIES = 100_000
 MAX_WORLD_JOINTS = 100_000
@@ -99,6 +112,15 @@ def _positive(value: float, *, name: str) -> float:
     return value
 
 
+def _non_negative_finite(value: float, *, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise PhysicsValidationError(f"{name} must be numeric")
+    value = float(value)
+    if not math.isfinite(value) or value < 0.0:
+        raise PhysicsValidationError(f"{name} must be finite and non-negative")
+    return value
+
+
 def _bounded_int(value: int, *, name: str, maximum: int) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= maximum:
         raise PhysicsValidationError(f"{name} outside supported range")
@@ -129,8 +151,40 @@ class PhysicsSettings:
     max_ccd_checks: int = 65_536
     constraint_velocity_iterations: int = 8
     constraint_position_iterations: int = 4
+    # Per-step velocity change (impulse / mass, m/s) above which a body counts
+    # as disturbed for sleep purposes. Catches jitter that flips velocity sign
+    # while staying under the speed limits.
+    sleep_velocity_change: float = 0.05
+    energy_guard: EnergyGuardMode = EnergyGuardMode.OFF
+    # Relative growth of start-of-step kinetic energy tolerated per step.
+    energy_growth_tolerance: float = 0.02
+    # Absolute energy (J) tolerated per step on top of the relative budget.
+    energy_absolute_slack: float = 1.0e-6
+    # Height budget (m) per body for contact/joint position correction; the
+    # guard tolerates m*|g|*slop of potential-energy rise per monitored body.
+    energy_position_slop: float = 0.01
 
     def __post_init__(self) -> None:
+        if isinstance(self.energy_guard, str) and not isinstance(
+            self.energy_guard, EnergyGuardMode
+        ):
+            try:
+                object.__setattr__(
+                    self, "energy_guard", EnergyGuardMode(self.energy_guard)
+                )
+            except ValueError as exc:
+                raise PhysicsValidationError("unknown energy_guard mode") from exc
+        if not isinstance(self.energy_guard, EnergyGuardMode):
+            raise PhysicsValidationError("energy_guard must be EnergyGuardMode")
+        for name in (
+            "sleep_velocity_change",
+            "energy_growth_tolerance",
+            "energy_absolute_slack",
+            "energy_position_slop",
+        ):
+            object.__setattr__(
+                self, name, _non_negative_finite(getattr(self, name), name=name)
+            )
         if not isinstance(self.gravity, Vec3):
             raise PhysicsValidationError("gravity must be Vec3")
         if not isinstance(self.ccd_enabled, bool):
@@ -213,12 +267,28 @@ class PhysicsSettings:
             "constraint_position_iterations",
         ):
             _bounded_int(getattr(self, name), name=name, maximum=128)
+        total_iterations = (
+            self.velocity_iterations
+            + self.position_iterations
+            + self.constraint_velocity_iterations
+            + self.constraint_position_iterations
+        )
+        if total_iterations > MAX_TOTAL_SOLVER_ITERATIONS:
+            raise PhysicsValidationError(
+                "total solver iterations exceed the per-step stability budget"
+            )
+
+    @property
+    def sleep_after_steps(self) -> int:
+        """Consecutive quiet fixed steps required before an island sleeps."""
+
+        return max(1, math.ceil(self.sleep_after_seconds / self.fixed_dt - 1.0e-9))
 
     @property
     def fingerprint(self) -> str:
         return digest(
             {
-                "domain": "skeleton.simulation.physics.settings.v4",
+                "domain": "skeleton.simulation.physics.settings.v5",
                 "fixed_dt": self.fixed_dt,
                 "gravity": self.gravity.to_tuple(),
                 "sleep_linear_speed": self.sleep_linear_speed,
@@ -241,6 +311,11 @@ class PhysicsSettings:
                 "max_ccd_checks": self.max_ccd_checks,
                 "constraint_velocity_iterations": self.constraint_velocity_iterations,
                 "constraint_position_iterations": self.constraint_position_iterations,
+                "sleep_velocity_change": self.sleep_velocity_change,
+                "energy_guard": self.energy_guard.value,
+                "energy_growth_tolerance": self.energy_growth_tolerance,
+                "energy_absolute_slack": self.energy_absolute_slack,
+                "energy_position_slop": self.energy_position_slop,
             }
         )
 
@@ -260,6 +335,7 @@ class PhysicsStepReceipt:
     solver: SolverStats
     constraints: ConstraintStats
     islands: IslandGraphStats
+    stability: StabilityReport = StabilityReport()
 
     @property
     def changed(self) -> bool:
@@ -1030,21 +1106,74 @@ class PhysicsWorld:
 
         return tuple(events)
 
-    def _update_sleep(self, graph: IslandGraph, dt: float) -> None:
-        linear_limit_sq = self.settings.sleep_linear_speed**2
-        angular_limit_sq = self.settings.sleep_angular_speed**2
+    def _sleep_limits(self) -> tuple[float, float]:
+        return (
+            self.settings.sleep_linear_speed**2,
+            self.settings.sleep_angular_speed**2,
+        )
 
-        for island in graph.islands:
-            dynamic = tuple(self._bodies[body_id] for body_id in island.dynamic_bodies)
-            active = any(
+    def _capture_motion(self) -> dict[str, BodyMotionSample]:
+        return {
+            body.body_id: BodyMotionSample(
+                linear_velocity=body.linear_velocity,
+                angular_velocity=body.angular_velocity,
+                sleep_time=body.sleep_time,
+            )
+            for body in self.bodies()
+            if body.body_type is BodyType.DYNAMIC and body.awake
+        }
+
+    def _restore_sleep_timers(self, motion: dict[str, BodyMotionSample]) -> None:
+        # Contact/joint solvers call RigidBody.wake() on every impulse and
+        # position correction, which zeroes the quiet timer. Resting contact
+        # would then never accumulate quiet time. The timer belongs to the
+        # sleep policy, so restore it; _update_sleep decides resets.
+        for body_id, sample in motion.items():
+            body = self._bodies[body_id]
+            if body.awake:
+                body.sleep_time = sample.sleep_time
+
+    def _update_sleep(
+        self,
+        graph: IslandGraph,
+        dt: float,
+        motion: dict[str, BodyMotionSample],
+    ) -> int:
+        linear_limit_sq, angular_limit_sq = self._sleep_limits()
+        change_limit_sq = self.settings.sleep_velocity_change**2
+        required_steps = self.settings.sleep_after_steps
+        driven = kinematic_driven_island_ids(
+            graph,
+            self._bodies,
+            linear_limit_sq=linear_limit_sq,
+            angular_limit_sq=angular_limit_sq,
+        )
+        put_to_sleep = 0
+
+        def disturbed(body: RigidBody) -> bool:
+            if (
                 body.linear_velocity.length_squared() > linear_limit_sq
                 or body.angular_velocity.length_squared() > angular_limit_sq
                 or body.force.length_squared() > 0.0
                 or body.torque.length_squared() > 0.0
-                for body in dynamic
+            ):
+                return True
+            sample = motion.get(body.body_id)
+            if sample is None:
+                # Woken during this step: no quiet baseline yet.
+                return body.awake
+            return (
+                (body.linear_velocity - sample.linear_velocity).length_squared()
+                > change_limit_sq
+                or (body.angular_velocity - sample.angular_velocity).length_squared()
+                > change_limit_sq
             )
 
-            if active:
+        for island in graph.islands:
+            dynamic = tuple(self._bodies[body_id] for body_id in island.dynamic_bodies)
+            if not any(body.awake for body in dynamic):
+                continue
+            if island.island_id in driven or any(disturbed(body) for body in dynamic):
                 for body in dynamic:
                     body.sleep_time = 0.0
                 continue
@@ -1053,18 +1182,111 @@ class PhysicsWorld:
             for body in dynamic:
                 if body.awake:
                     body.sleep_time += dt
-                if body.sleep_time < self.settings.sleep_after_seconds:
+                # Count whole steps, not accumulated float seconds, so the
+                # sleep tick is exact regardless of dt rounding.
+                if round(body.sleep_time / dt) < required_steps:
                     all_ready = False
 
             if all_ready:
                 for body in dynamic:
+                    if body.awake:
+                        put_to_sleep += 1
                     body.sleep()
+        return put_to_sleep
+
+    def _guard_energy(
+        self,
+        *,
+        energy_before: dict[str, float],
+        motion: dict[str, BodyMotionSample],
+        graphs: tuple[IslandGraph, ...],
+        dt: float,
+    ) -> StabilityReport:
+        mode = self.settings.energy_guard
+        if mode is EnergyGuardMode.OFF:
+            return StabilityReport()
+        linear_limit_sq, angular_limit_sq = self._sleep_limits()
+        excluded = unmonitored_body_ids(
+            graphs,
+            self._bodies,
+            linear_limit_sq=linear_limit_sq,
+            angular_limit_sq=angular_limit_sq,
+        )
+        gravity = self.settings.gravity
+        gravity_magnitude = gravity.length()
+        monitored = tuple(
+            body
+            for body in self.bodies()
+            if body.body_type is BodyType.DYNAMIC
+            and body.body_id in energy_before
+            and body.body_id not in excluded
+        )
+        before = 0.0
+        after = 0.0
+        kinetic_before = 0.0
+        kinetic_after_awake = 0.0
+        external_work = 0.0
+        position_budget = 0.0
+        for body in monitored:
+            sample = motion.get(body.body_id)
+            before += energy_before[body.body_id]
+            if sample is not None:
+                kinetic_before += 0.5 * body.mass * sample.linear_velocity.length_squared()
+            after += body_mechanical_energy(body, gravity)
+            if body.awake:
+                kinetic_after_awake += body.kinetic_energy()
+            external_work += external_work_bound(body, sample, dt)
+            position_budget += (
+                body.mass * gravity_magnitude * self.settings.energy_position_slop
+            )
+
+        allowance = (
+            self.settings.energy_absolute_slack
+            + self.settings.energy_growth_tolerance * kinetic_before
+            + external_work
+            + position_budget
+        )
+        excess = (after - before) - allowance
+        runaway = excess > 0.0
+        clamped = False
+        scale = 1.0
+        if runaway and mode is EnergyGuardMode.RAISE:
+            raise PhysicsStabilityError(
+                f"energy runaway: gained {after - before:.6g} J, "
+                f"allowance {allowance:.6g} J"
+            )
+        if runaway and mode is EnergyGuardMode.CLAMP:
+            scale = clamp_scale(kinetic_after_awake, excess)
+            if scale < 1.0:
+                clamped = True
+                for body in monitored:
+                    if body.awake:
+                        body.linear_velocity = body.linear_velocity * scale
+                        body.angular_velocity = body.angular_velocity * scale
+                after = sum(body_mechanical_energy(body, gravity) for body in monitored)
+        return StabilityReport(
+            guard_mode=mode.value,
+            monitored_bodies=len(monitored),
+            unmonitored_bodies=sum(
+                1
+                for body in self.bodies()
+                if body.body_type is BodyType.DYNAMIC and body.body_id in excluded
+            ),
+            energy_before=before,
+            energy_after=after,
+            energy_allowance=allowance,
+            energy_excess=max(0.0, excess),
+            runaway=runaway,
+            clamped=clamped,
+            velocity_scale=scale,
+        )
 
     def _step_once(self) -> PhysicsStepReceipt:
         checkpoint = self._capture_step_checkpoint()
         dt = self.settings.fixed_dt
         before = checkpoint.state_digest
         next_tick = self._tick + 1
+        linear_limit_sq, angular_limit_sq = self._sleep_limits()
 
         try:
             previous_graph = build_islands(
@@ -1073,6 +1295,22 @@ class PhysicsWorld:
                 self.joints(),
             )
             previous_graph.propagate_awake(self._bodies)
+            kinematic_wakes = wake_kinematic_driven_islands(
+                previous_graph,
+                self._bodies,
+                linear_limit_sq=linear_limit_sq,
+                angular_limit_sq=angular_limit_sq,
+            )
+            motion = self._capture_motion()
+            energy_before = (
+                {}
+                if self.settings.energy_guard is EnergyGuardMode.OFF
+                else {
+                    body.body_id: body_mechanical_energy(body, self.settings.gravity)
+                    for body in self.bodies()
+                    if body.body_type is BodyType.DYNAMIC
+                }
+            )
 
             for body in self.bodies():
                 body.integrate_forces(dt, self.settings.gravity)
@@ -1086,6 +1324,12 @@ class PhysicsWorld:
                 self.joints(),
             )
             graph.propagate_awake(self._bodies)
+            kinematic_wakes += wake_kinematic_driven_islands(
+                graph,
+                self._bodies,
+                linear_limit_sq=linear_limit_sq,
+                angular_limit_sq=angular_limit_sq,
+            )
             island_solve = solve_islands(
                 self._bodies,
                 graph,
@@ -1098,8 +1342,15 @@ class PhysicsWorld:
             )
             solver_stats = island_solve.solver
             constraint_stats = island_solve.constraints
+            self._restore_sleep_timers(motion)
 
-            self._update_sleep(graph, dt)
+            stability = self._guard_energy(
+                energy_before=energy_before,
+                motion=motion,
+                graphs=(previous_graph, graph),
+                dt=dt,
+            )
+            put_to_sleep = self._update_sleep(graph, dt, motion)
             for body in self.bodies():
                 body.clear_accumulators()
 
@@ -1130,6 +1381,13 @@ class PhysicsWorld:
             solver=solver_stats,
             constraints=constraint_stats,
             islands=graph.stats,
+            stability=StabilityReport(
+                **{
+                    **stability.state_record(),
+                    "bodies_put_to_sleep": put_to_sleep,
+                    "bodies_woken_by_kinematic": kinematic_wakes,
+                }
+            ),
         )
 
     def step(self, steps: int = 1) -> tuple[PhysicsStepReceipt, ...]:
