@@ -47,7 +47,7 @@ def _json_default(obj: Any):
         return None
 
 
-# ── Paths ───────────────────────────────────────────────────────────────────
+# ── Paths ───────────────────────────────────────────────────────────────
 def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
     try:
         p = Path(preferred)
