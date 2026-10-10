@@ -261,3 +261,49 @@ def test_pinned_combined_report_cannot_forge_authority_or_review_binding(tmp_pat
         replace(report, legal_noninfringement_certified=True)
     with pytest.raises(ValueError):
         replace(report, report_sha256="0"*64)
+
+
+
+def test_reviewers_cannot_use_the_exact_same_key_as_external_root_authority():
+    from skeleton.ai.game_builder.release_assurance import ReviewRole, _ROLE_BY_DOMAIN
+    candidate,_,_=base_evidence()
+    root,pin=signed_root(candidate)
+    all_reviewers=list(root.reviewers)
+    all_reviewers[0]=replace(
+        all_reviewers[0],public_key_hex=root.root_public_key_hex,
+    )
+    with pytest.raises(ReleaseReviewError,match="root"):
+        replace(root,reviewers=tuple(all_reviewers))
+
+
+def test_review_signature_created_before_policy_admitted_does_not_gain_retrospective_authority():
+    candidate,legal,original=base_evidence()
+    reviewers,signatures=signed_panel(candidate)
+    root,pin=signed_root(candidate,reviewers)
+    assert root.issued_utc=="2026-10-01T00:00:00Z"
+    fake_new_issuance=replace(root,issued_utc="2026-10-11T00:00:00Z")
+    with pytest.raises(ReleaseReviewError,match="predates"):
+        pinned(candidate,legal,original,fake_new_issuance,pin,signatures)
+
+
+@pytest.mark.parametrize("name",["another-project\\nspoofed","../unauthorized","日本語-project",""])
+def test_signed_trust_scope_refuses_confusable_or_control_character_game_names(name):
+    candidate,_,_=base_evidence()
+    root,_=signed_root(candidate)
+    with pytest.raises(ReleaseReviewError):
+        replace(root,project_id=name)
+
+
+def test_reviewer_policy_epoch_bounds_prevent_extreme_integer_resource_exhaustion():
+    candidate,_,_=base_evidence()
+    root,_=signed_root(candidate)
+    with pytest.raises(ReleaseReviewError):
+        replace(root,policy_epoch=2**65)
+
+
+def test_registry_refuses_aliases_with_same_key_identifier_under_different_case():
+    candidate,_,_=base_evidence()
+    reviewers,_=signed_panel(candidate)
+    evil=replace(reviewers[1],key_id=reviewers[0].key_id.upper())
+    with pytest.raises(ReleaseReviewError):
+        signed_root(candidate,(reviewers[0],evil,reviewers[2]))
