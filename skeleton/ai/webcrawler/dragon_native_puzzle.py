@@ -325,9 +325,6 @@ def emit_native_puzzle(*,seed:int,stages:int=4,difficulty:int=4,
         if stages!=len(original_pack.levels):
             raise ValueError("authored game stage count must match emitted campaign")
     from .dragon_native_campaign_paths import design_campaign, graph_header, graph_report
-    campaign=design_campaign(
-        stages,seed=seed,mode=campaign_mode,intensity=challenge_profile,
-    )
     from .dragon_native_multipath import analyse_routes,route_report
     layouts=[];solutions=[];proofs=[];alternatives=[]
     for index in range(stages):
@@ -342,6 +339,12 @@ def emit_native_puzzle(*,seed:int,stages:int=4,difficulty:int=4,
         proofs.append(LevelProof(index,path,len(path),states,len(boxes),
              sha256("\n".join(grid).encode()).hexdigest(),
              sha256(path.encode()).hexdigest()))
+    campaign=design_campaign(
+        stages,seed=seed,mode=campaign_mode,intensity=challenge_profile,
+        stage_difficulty=tuple(
+            document["difficulty_estimate"] for document in alternatives
+        ),
+    )
     from .dragon_native_challenge_director import (
         make_challenge_plan,challenge_report,
     )
