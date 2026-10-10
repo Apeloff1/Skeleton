@@ -38,13 +38,13 @@ def make_frontier(*,seed:int=1,weather:str="clear",
     def connect(name,a,b,mode,minutes,*,price=0,fatigue=0,danger=0,
                 spectacle=0,shapes=(),requires=(),one=(),gifts=(),
                 uses=(),weather_any=(),weather_none=(),departures=(),
-                discover="",resistance=""):
+                discover="",resistance="",fuel=0,oxygen=0,mana=0):
         if mode not in MODES:raise ValueError("missing original route taxonomy mode")
         edges.append(Traverse(
             name,a,b,mode,tuple(shapes),minutes,price,fatigue,danger,spectacle,
             tuple(requires),tuple(one),tuple(gifts),tuple(uses),
             tuple(weather_any),tuple(weather_none),tuple(departures),
-            discover,resistance,
+            discover,resistance,True,fuel,oxygen,mana,
         ))
 
     # Original locations are abstract generator names, never an extracted
@@ -220,12 +220,12 @@ def make_frontier(*,seed:int=1,weather:str="clear",
     connect("reef_to_ocean","reef","open_sea","cargo_ship",180,price=30,
             shapes=("impractical","detour"))
     connect("ocean_to_goal","open_sea","citadel","motorboat",110,price=24,
-            shapes=("impractical","scenic"))
+            fuel=12,shapes=("impractical","scenic"))
     connect("reef_to_gate","reef","submerged_gate","dive",34,
-            fatigue=26,requires=("diving_kit",),
+            fatigue=26,oxygen=22,requires=("diving_kit",),
             shapes=("hidden","unlockable"),discover="diving_kit")
     connect("gate_to_goal","submerged_gate","citadel","underwater_cave",19,
-            fatigue=16,requires=("diving_kit",),
+            fatigue=16,oxygen=15,requires=("diving_kit",),
             shapes=("secret","shortcut"),discover="diving_kit")
     connect("tidal_shortcut","harbor","citadel","tidal_passage",11,
             weather_any=("high_tide",),shapes=("weather_gated","shortcut"))
@@ -246,35 +246,35 @@ def make_frontier(*,seed:int=1,weather:str="clear",
     connect("magic_circle_entry","ruined_archive","magic_circle","rune_path",26,
             requires=("rune",),shapes=("unlockable","scenic"))
     connect("astral_hop","magic_circle","dream_plane","astral_projection",73,
-            requires=("astral_attunement",),shapes=("impractical","world_transition"))
+            mana=35,requires=("astral_attunement",),shapes=("impractical","world_transition"))
     connect("dream_exit","dream_plane","citadel","dream_path",41,
-            shapes=("alternate","world_transition"))
+            mana=14,shapes=("alternate","world_transition"))
     connect("vault_teleport","sealed_vault","citadel","teleporter",2,
-            requires=("teleporter_key",),shapes=("shortcut","unlockable","secret"),
+            mana=18,requires=("teleporter_key",),shapes=("shortcut","unlockable","secret"),
             discover="forgotten_cipher")
     connect("magic_gateway","magic_circle","citadel","magic_gate",4,
-            requires=("rune","astral_attunement"),
+            mana=12,requires=("rune","astral_attunement"),
             shapes=("shortcut","unlockable"))
 
     # Space travel with access prerequisites and genuinely long paths.
     connect("spaceport_access","crossroads","spaceport","train",60,price=20,
             departures=(0,480,960),shapes=("time_gated","alternate"))
     connect("shuttle_to_orbit","spaceport","orbit","orbital_shuttle",160,
-            price=90,requires=("launch_pass","space_suit"),
+            fuel=25,price=90,requires=("launch_pass","space_suit"),
             departures=(120,600,1080),shapes=("impractical","world_transition"))
     connect("orbit_to_moon","orbit","moon_outpost","orbital_transfer",140,
-            price=40,requires=("space_suit",),shapes=("impractical","detour"))
+            fuel=20,price=40,requires=("space_suit",),shapes=("impractical","detour"))
     connect("moon_to_gate","moon_outpost","orbital_gate","space_taxi",90,
-            price=20,requires=("space_suit",),shapes=("detour","alternate"))
+            fuel=15,price=20,requires=("space_suit",),shapes=("detour","alternate"))
     connect("stargate_to_goal","orbital_gate","citadel","stargate",3,
-            requires=("stargate_key",),shapes=("shortcut","unlockable",
+            mana=20,requires=("stargate_key",),shapes=("shortcut","unlockable",
                                                "world_transition"))
     connect("asteroid_visit","orbit","asteroid","eva",60,fatigue=12,
             requires=("space_suit",),shapes=("scenic","dead_end"))
     connect("asteroid_return","asteroid","orbit","orbital_transfer",65,
             requires=("space_suit",),shapes=("return_only",))
     connect("moon_to_citadel","moon_outpost","citadel","wormhole",19,
-            requires=("stargate_key",),shapes=("shortcut","world_transition"))
+            mana=15,requires=("stargate_key",),shapes=("shortcut","world_transition"))
 
     # Synthetic seed changes costs on *some* genuinely traversable edges.
     # This is original variation, not a copied map reordering.
