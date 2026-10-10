@@ -71,3 +71,9 @@ def test_encode_genesis_packs_left_pixel_into_high_nibble():
     with pytest.raises(PortableCodecError):
         encode_genesis_4bpp(((1.0,)*8,)*8)
 
+
+def test_decode_genesis_4bpp_roundtrip_and_nibble_layout():
+    tile = tuple(tuple((x+y*3) % 16 for x in range(8)) for y in range(8))
+    assert decode_genesis_4bpp(encode_genesis_4bpp(tile)) == tile
+    with pytest.raises(PortableCodecError):
+        decode_genesis_4bpp(b"\xFF"*33)
