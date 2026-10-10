@@ -75,6 +75,9 @@ jobs:
           import json
           r=json.load(open("coleco-native-z80-cpu-attestation.json",encoding="utf-8"))
           assert r["actual_coleco_z80_cpu_gameplay_verified"] is True
+          assert r["actual_original_8x8_video_art_verified"] is True
+          assert len(r["guest_vram_original_art_sha256"]) == 64
+          assert len(r["guest_vram_original_palette_sha256"]) == 64
           assert r["original_levels_completed"] == 3
           assert r["native_binary_matches_source_exactly"] is True
           assert len(r["independent_assembled_z80_sha256"]) == 64
