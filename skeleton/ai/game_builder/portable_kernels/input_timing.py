@@ -28,3 +28,11 @@ def source_frame_at(target_frame: int, source_hz: int, target_hz: int) -> int:
     target=_int(target_hz,"target refresh Hz",24,240)
     return (index*source)//target
 
+
+def edge_pressed(previous: int, current: int, mask: int=65535) -> int:
+    """Only newly pressed controller bits trigger one-shot game actions."""
+    prior=_buttons(previous)
+    present=_buttons(current)
+    include=_buttons(mask)
+    return (~prior & present & include) & 65535
+
