@@ -538,3 +538,12 @@ def test_taste_fingerprint_changes_with_source_session_lineage():
     right = store.distill("alice", authorized=True)
     assert left.insights == right.insights
     assert left.fingerprint != right.fingerprint
+
+def test_session_idempotence_detects_corrupt_prior_evidence():
+    store = setup()
+    original = session(store)
+    store.record(original, authorized=True)
+    store.db.execute("UPDATE dragon_game_sessions SET game_label=? WHERE owner=?",
+                     ("tampered prior source", "alice"))
+    with pytest.raises(ValueError, match="evidence drift"):
+        store.record(original, authorized=True)
