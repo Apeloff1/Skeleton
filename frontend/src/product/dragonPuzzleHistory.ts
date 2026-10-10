@@ -95,6 +95,28 @@ export function paintOriginalCell(
   };
 }
 
+/** Reorder original playable campaign stages, retaining fully undoable geometry. */
+export function reorderPuzzleStage(
+  history: PuzzleHistory, from: number, to: number,
+): PuzzleHistory {
+  if (!history || !validCampaign(history.current.boards) ||
+      !Number.isInteger(from) || !Number.isInteger(to) ||
+      from < 0 || from >= history.current.boards.length ||
+      to < 0 || to >= history.current.boards.length) {
+    throw new Error('Original native campaign stage reorder out of bounds');
+  }
+  if (from === to) return history;
+  const boards = copyBoards(history.current.boards);
+  const [moved] = boards.splice(from, 1);
+  boards.splice(to, 0, moved);
+  return {
+    previous: [...history.previous, history.current].slice(-history.maxSteps),
+    current: immutableRevision(boards, to, history.current.paintCount + 1),
+    next: [],
+    maxSteps: history.maxSteps,
+  };
+}
+
 export function undoPuzzleEdit(history: PuzzleHistory): PuzzleHistory {
   if (!history.previous.length) return history;
   return {
