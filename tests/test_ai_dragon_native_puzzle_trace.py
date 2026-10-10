@@ -92,3 +92,21 @@ def test_compiled_game_state_exactly_matches_original_grid_physics(
             assert actual["solved"]==model.solved
             assert actual["moves"]==model.moves
             assert actual["pushes"]==model.pushes
+        for events in (solution[:1],solution[:min(len(solution),3)],
+                       "su"+solution[:1],solution):
+            current=simulate_grid(grid,events,level=level)
+            remaining,_=solve_grid(
+                grid,current_player=current.player,
+                current_crates=current.crates,
+            )
+            shown=subprocess.run(
+                [str(game),"--hint-at",str(level),events],
+                cwd=tmp_path,capture_output=True,text=True,timeout=25,
+            )
+            assert shown.returncode==0,(shown.stdout,shown.stderr)
+            expected_next=remaining[0] if remaining else "-"
+            expected_solved=1 if not remaining else 0
+            assert shown.stdout.strip()==(
+                f"DRAGON_NATIVE_LIVE_HINT level={level} "
+                f"next={expected_next} solved={expected_solved} digest={current.digest}"
+            )
