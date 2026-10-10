@@ -119,6 +119,77 @@ modules. The Windows CI builds, installs and invokes this public console CLI pat
 for an actual CPU training/checkpoint/inspection round-trip. Full
 frontend/backend/Mongo service assembly still uses Docker separately.
 
+### Prepare real local documents for train/validation without data leakage
+
+Rather than concatenating files manually, the built-in dataset curator can
+accept a **flat folder of 2–32 explicitly selected UTF-8 .txt documents** and
+produce a reproducible split of complete source documents. The same source is
+never split across both training and held-out partitions. Duplicated normalized
+lines and multi-token passages copied across the split fail closed. No source
+is downloaded or changed.
+
+```bash
+# Python app entry point:
+python -m skeleton app local-ai --prepare-dataset ./notes/ \
+  --dataset-output ./curated-v1 --split-seed 41 --validation-percent 25 --json
+
+# Bundled Windows app, with no Python or Docker requirement:
+Skeleton.exe --offline-command local-ai --prepare-dataset .\notes \
+  --dataset-output .\curated-v1 --json
+
+# The outputs directly feed the canonical training/evaluation paths:
+Skeleton.exe --offline-command local-ai --train-corpus .\curated-v1\train.txt \
+  --output-model .\native-curated.json --epochs 1 --json
+```
+
+Verify the published dataset independently before training or replaying a
+checkpoint. With `--verify-sources` the tool re-reads **all original documents**
+and recomputes the seeded document-level split; without source access it only
+verifies the three published files, their line/token counts and hashes.
+
+```bash
+python -m skeleton app local-ai --verify-dataset ./curated-v1 \
+  --verify-sources ./notes --json
+
+Skeleton.exe --offline-command local-ai --verify-dataset .\curated-v1 \
+  --verify-sources .\notes --json
+```
+
+The verifier rejects duplicate JSON keys, noncanonical/forged manifests,
+altered training text, wrong source assignments, symlinks and changed source
+bytes. Its success is a **local integrity check**, not a guarantee that
+original data is unbiased, that historical model training is disjoint, or
+that the model is production quality.
+
+The output directory must not already exist and contains exactly
+`train.txt`, `validation.txt` and `dataset.json`. The last file is a
+commit marker recording document filenames, original content digests, split
+assignment, normalized token counts, output SHA-256 digests, and a
+reproducible dataset identity. All files are written with exclusive creation
+so an existing dataset cannot be silently replaced. Original source files
+are checked again before publication and no model training happens
+implicitly during curation.
+
+This entry point is intentionally bounded by the *real* small native CPU
+trainer: at most 512 training tokens and 512 held-out tokens, with each
+generated file under the existing 32-KiB native text admission limit.
+Larger training at production/model-development scale requires a separate,
+independently qualified infrastructure. The split cannot prove independence
+from any historical training data outside the selected folder.
+
+### Continue from a verified dataset
+
+```bash
+python -m skeleton app local-ai --improve-dataset ./curated-v1 \
+  --improve-model ./parent.json --output-model ./candidate.json \
+  --verify-sources ./notes --epochs 3 --json
+```
+
+This binds the training run to the verified dataset snapshot and retains the
+parent checkpoint. Optional `--protect-suite` requires the independent category
+benchmark. The candidate is written only after held-out improvement. See
+[native dataset continuation](ai/native-dataset-continuation-2026-10-10.md)
+for receipt replay and operating limits.
 ### Run operator-owned GGUF weights through the existing local llama.cpp engine
 
 The offline window now offers **Load GGUF…** as well as **Load checkpoint…**.

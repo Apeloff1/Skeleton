@@ -196,6 +196,7 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert "Smoke install generated Setup.exe" in source
     assert '@("--local-ai-training-smoke")' in source
     assert '@("--local-ai-benchmark-smoke")' in source
+    assert '@("--local-ai-dataset-smoke")' in source
     assert '"--offline-command", "local-ai"' in source
     assert 'Join-Path $installDir "SkeletonCLI.exe"' in source
     assert '$cliTrain = Start-Process -FilePath $cliLauncher' in source
