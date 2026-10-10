@@ -121,7 +121,7 @@ jobs:
           assert result["executable_boot_verified"] is False
           assert result["legal_distribution_permitted"] is False
           Path("native-structure.json").write_text(
-              json.dumps(result, sort_keys=True, indent=2) + "\\n", encoding="utf-8",
+              json.dumps(result, sort_keys=True, indent=2) + "\n", encoding="utf-8",
           )
           print("STRUCTURALLY_VALID_NATIVE_HOME_BREW", record.architecture)
           PY
