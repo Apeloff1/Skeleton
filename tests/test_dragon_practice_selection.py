@@ -33,3 +33,33 @@ def test_catalog_has_100_independently_solved_distinct_original_games():
             entry.solution_steps + 4 * entry.collectible_count + 3 * entry.hazard_count
         )
         assert entry.to_payload()["release_authorized"] is False
+
+
+@pytest.mark.parametrize("theme", ["forest", "space", "desert", "ocean", "arcade"])
+def test_theme_filter_uses_real_verified_content_and_sorted_route_cost(theme):
+    entries = filter_practice_games(authorized=True, theme=theme, limit=100)
+    assert len(entries) == 20
+    assert all(row.theme == theme for row in entries)
+    assert [(row.route_cost, row.game_id) for row in entries] == sorted(
+        (row.route_cost, row.game_id) for row in entries
+    )
+    constrained = filter_practice_games(
+        authorized=True, theme=theme, min_solution_steps=50,
+        max_solution_steps=80, max_hazards=3, limit=7,
+    )
+    assert len(constrained) <= 7
+    assert all(50 <= x.solution_steps <= 80 and x.hazard_count <= 3
+               for x in constrained)
+
+
+@pytest.mark.parametrize("options", [
+    {"theme": "imaginary"}, {"min_solution_steps": -1},
+    {"max_solution_steps": 20001},
+    {"min_solution_steps": 50, "max_solution_steps": 49},
+    {"max_hazards": True}, {"limit": 0}, {"limit": 101},
+])
+def test_filter_rejects_untrusted_or_unbounded_requests(options):
+    with pytest.raises(PracticeSelectionError):
+        filter_practice_games(authorized=True, **options)
+    with pytest.raises(PermissionError):
+        filter_practice_games(authorized=1)
