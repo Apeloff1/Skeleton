@@ -375,3 +375,14 @@ def test_persisted_event_order_is_validated():
                      (json.dumps(entries),))
     with pytest.raises(ValueError, match="time order"):
         store.sessions("alice", authorized=True)
+
+def test_persisted_json_must_be_canonical():
+    import json
+    store = setup()
+    store.record(session(store), authorized=True)
+    raw = store.db.execute("SELECT observations_json FROM dragon_game_sessions").fetchone()[0]
+    altered = json.dumps(json.loads(raw), indent=2)
+    store.db.execute("UPDATE dragon_game_sessions SET observations_json=?", (altered,))
+    with pytest.raises(ValueError, match="not canonical"):
+        store.sessions("alice", authorized=True)
+
