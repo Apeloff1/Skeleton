@@ -57,6 +57,7 @@ def test_full_portfolio_really_exports_all_supported_native_machine_sources(tmp_
         "linux_desktop":"game.c",
         "macos_modern":"game.c",
         "sinclair_zx_spectrum":"game.asm",
+        "msx1":"game.asm",
     }
     assert set(mapping).issubset(_NATIVE)
     assert {p.name for p in (root/"targets").iterdir()}==set(_NATIVE)
@@ -75,6 +76,7 @@ def test_full_portfolio_really_exports_all_supported_native_machine_sources(tmp_
     assert "org 100h" in (root/"targets/dos_vga/game.asm").read_text()
     assert "0xD200" in (root/"targets/atari_400_800/game.c").read_text()
     assert "org 32768" in (root/"targets/sinclair_zx_spectrum/game.asm").read_text()
+    assert "MSX_GTSTCK" in (root/"targets/msx1/game.asm").read_text()
     with pytest.raises(FileExistsError):
         compile_native_portfolio(**args)
 
