@@ -266,7 +266,7 @@ def verify_original_z80_gameplay(
     snapshots_checked = 1
     # Only observed native CPU/VDP state enters this content-addressed chain.
     seed = sha256(
-        b"skeleton.sega8.native_gameplay.semantic_trace.v1\\0"
+        b"skeleton.sega8.native_gameplay.semantic_trace.v1\0"
         + reference["world_digest"].encode("ascii")
     ).digest()
     trace = advance_semantic_trace(seed, 0, None, first)
