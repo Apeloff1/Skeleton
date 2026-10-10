@@ -71,7 +71,10 @@ def _source(source_dir: Path) -> dict[str, Any]:
     except UnicodeError as exc:
         raise NESReproducibilityError("native NES source text encoding invalid") from exc
     digest = sha256("\0".join(texts).encode("utf-8")).hexdigest()
-    manifest = _json(parts[3], "original NES generated source")
+    try:
+        manifest = _json(parts[3], "original NES generated source")
+    except ValueError as exc:
+        raise NESReproducibilityError("original NES source manifest contains invalid JSON") from exc
     _require(
         manifest.get("schema") == "skeleton.game_builder.native_nes_source.v1"
         and manifest.get("target") == "nintendo_famicom"
