@@ -114,6 +114,12 @@ def verify(root: Path = ROOT, *, head_sha: str | None = None) -> dict[str, Any]:
             "context_digest",
             "compaction_max_tokens",
             "compacted_to:",
+            "context-compiler-v2",
+            "class ContextAllocationPolicy",
+            "_is_current_turn",
+            "_tier_quotas",
+            "current user turn plus mandatory policy exceeds provider input capacity",
+            "Trust-tier first pass",
         ),
         surface="context compiler",
         errors=errors,
@@ -316,12 +322,13 @@ def verify(root: Path = ROOT, *, head_sha: str | None = None) -> dict[str, Any]:
         else:
             for key, expected in (
                 ("gap_status", "closed"),
-                ("implementation_state", "closed"),
+                ("implementation_state", "complete"),
                 ("closure_decision", "closed"),
             ):
                 if closure_entry.get(key) != expected:
                     errors.append(
-                        f"closed context compiler gap requires closure evidence {key}=closed"
+                        "closed context compiler gap requires closure evidence "
+                        f"{key}={expected}"
                     )
             if (
                 closure_entry.get("outstanding_evidence") not in ([], None)

@@ -94,16 +94,34 @@ def test_live_p1_risk_inventory_is_deterministic_and_non_authoritative() -> None
     assert report["inventory"] == {
         "p1_primary_volume_count": 107,
         "volume_risk_count": 281,
-        "volume_gap_count": 208,
+        "volume_gap_count": 212,
         "applicable_adversarial_axis_count": 24,
-        "total_obligation_count": 513,
+        "total_obligation_count": 517,
     }
-    assert report["binding_count"] == 513
-    assert report["resolved_count"] == 513
+    assert report["live_inventory"] == {
+        "p1_primary_volume_count": 107,
+        "volume_risk_count": 281,
+        "volume_gap_count": 174,
+        "applicable_adversarial_axis_count": 24,
+        "total_obligation_count": 479,
+    }
+    assert report["binding_count"] == 517
+    assert report["live_binding_count"] == 479
+    assert report["historical_binding_count"] == 517
+    assert report["retired_binding_count"] == 38
+    assert report["retired_expected_count"] == 38
+    assert len(report["retired_obligation_ids"]) == 38
+    assert all(
+        item.startswith("P1-GAP-VOL-")
+        for item in report["retired_obligation_ids"]
+    )
+    assert report["resolved_count"] == 517
+    assert report["live_resolved_count"] == 479
+    assert report["historical_resolved_count"] == 517
     assert report["unresolved_blocking_count"] == 0
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 513,
+        "evidence": 517,
 
     }
     assert report["non_authoritative"] is True
@@ -167,7 +185,7 @@ def test_inventory_drift_fails_closed(
 
     with pytest.raises(
         RiskReconciliationError,
-        match="risk obligation inventory drift",
+        match="risk obligation inventory drift|historical retired-gap inventory",
     ):
         reconcile_repository(root, evaluated_at=NOW)
 
@@ -232,7 +250,7 @@ def test_one_real_binding_changes_only_its_own_resolution(tmp_path: Path) -> Non
 
     assert report["binding_count"] == 1
     assert report["resolved_count"] == 1
-    assert report["unresolved_blocking_count"] == 512
+    assert report["unresolved_blocking_count"] == 478
     assert report["unclassified_count"] == 280
 
 

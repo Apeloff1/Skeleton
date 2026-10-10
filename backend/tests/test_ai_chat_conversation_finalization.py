@@ -8,7 +8,7 @@ import pytest
 from fastapi import HTTPException
 
 from core.conversations import ConversationStorageUnavailable
-from core.engine_client import EngineUnavailableError
+from core.engine_client import EngineNotFoundError, EngineUnavailableError
 from skeleton.contracts.conversation import (
     ConversationAuthorType,
     ConversationMessage,
@@ -125,15 +125,22 @@ async def test_chat_commits_assistant_only_from_successful_engine_result(
         )
     )
 
+    async def wait_for_terminal(**_kwargs):
+        raise EngineNotFoundError("engine execution not found")
+
     async def execute(command):
         captured_commands.append(command)
         return SimpleNamespace(
+            operation_id=command.operation.operation_id,
             final_output="Verified terminal answer.",
             execution_id=command.execution_request.execution_id,
             verification="verification:terminal",
             evidence_refs=("evidence:terminal",),
+            provider_receipts=("provider:test:terminal",),
         )
 
+    fake_client.wait_for_terminal = wait_for_terminal
+    fake_client.wait_for_terminal = wait_for_terminal
     fake_client.execute = execute
 
     monkeypatch.setattr(route, "conversation_authority", fake_authority)
@@ -191,9 +198,13 @@ async def test_chat_never_commits_assistant_when_engine_is_unavailable(
         )
     )
 
+    async def wait_for_terminal(**_kwargs):
+        raise EngineNotFoundError("engine execution not found")
+
     async def execute(_command):
         raise EngineUnavailableError("engine unavailable")
 
+    fake_client.wait_for_terminal = wait_for_terminal
     fake_client.execute = execute
 
     monkeypatch.setattr(route, "conversation_authority", fake_authority)
@@ -280,18 +291,32 @@ async def test_chat_retry_after_assistant_commit_failure_preserves_engine_identi
         )
     )
 
+    terminal_result = None
+    waited_execution_ids = []
+
+    async def wait_for_terminal(*, execution_id, **_kwargs):
+        waited_execution_ids.append(execution_id)
+        if terminal_result is None:
+            raise EngineNotFoundError("engine execution not found")
+        return terminal_result
+
     async def execute(command):
+        nonlocal terminal_result
         captured_commands.append(command)
-        return SimpleNamespace(
+        terminal_result = SimpleNamespace(
+            operation_id=command.operation.operation_id,
             final_output="Verified terminal answer.",
             execution_id=command.execution_request.execution_id,
             verification="verification:terminal",
             evidence_refs=("evidence:terminal",),
+            provider_receipts=("provider:test:terminal",),
             tool_receipts=(),
             memory_refs=(),
             artifact_refs=(),
         )
+        return terminal_result
 
+    fake_client.wait_for_terminal = wait_for_terminal
     fake_client.execute = execute
     monkeypatch.setattr(route, "conversation_authority", fake_authority)
     monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
@@ -316,26 +341,13 @@ async def test_chat_retry_after_assistant_commit_failure_preserves_engine_identi
     assert response["success"] is True
     assert response["response"] == "Verified terminal answer."
     assert commit_attempts == 2
-    assert len(captured_commands) == 2
+    assert len(captured_commands) == 1
 
-    first, second = captured_commands
-    assert first.operation.operation_id == second.operation.operation_id
-    assert (
-        first.execution_request.execution_id
-        == second.execution_request.execution_id
-    )
-    assert first.compiled_context.context_digest == (
-        second.compiled_context.context_digest
-    )
-    assert first.compiled_context.handoff_digest == (
-        second.compiled_context.handoff_digest
-    )
-    assert first.submission_digest == second.submission_digest
+    first = captured_commands[0]
+    execution_id = first.execution_request.execution_id
+    assert waited_execution_ids == [execution_id, execution_id]
     assert first.resource_budget["max_elapsed_seconds"] == 30.0
-    assert second.resource_budget["max_elapsed_seconds"] == 30.0
-    assert response["ai_result_id"] == (
-        "engine-result:" + second.execution_request.execution_id
-    )
+    assert response["ai_result_id"] == "engine-result:" + execution_id
 
 
 @pytest.mark.asyncio

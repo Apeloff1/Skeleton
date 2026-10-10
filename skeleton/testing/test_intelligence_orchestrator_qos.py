@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import gc
 import time
+import weakref
 
 import pytest
 
-from skeleton.intelligence.orchestrator import IntelligenceOrchestrator, ReasoningResult
+from skeleton.intelligence.orchestrator import (
+    AdaptiveLearner,
+    IntelligenceOrchestrator,
+    MetaGrid,
+    ReasoningResult,
+)
 
 
 def result(task, answer: str, confidence: float) -> ReasoningResult:
@@ -277,3 +284,50 @@ def test_registration_validates_resilience_contract() -> None:
         )
     with pytest.raises(TypeError):
         orchestrator.register_handler("bad", object())
+
+
+def test_adaptive_learner_bounds_retained_history_to_memory_window() -> None:
+    learner = AdaptiveLearner(MetaGrid(memory_window=3))
+    for index in range(8):
+        learner.record_experience("reasoning", {"index": index}, index / 10.0)
+
+    stats = learner.stats()
+    assert stats["experiences"] == 8
+    assert stats["retained_experiences"] == 3
+    assert stats["evicted_experiences"] == 5
+    assert stats["memory_window"] == 3
+    assert learner.adapt("reasoning")["experiences"] == 3
+
+
+def test_adaptive_learner_ranks_capabilities_with_recent_evidence() -> None:
+    learner = AdaptiveLearner(MetaGrid(learning_rate=0.5, memory_window=8))
+    learner.record_experience("weak", {}, 0.1)
+    learner.record_experience("strong", {}, 0.9)
+    learner.record_experience("strong", {}, 1.0)
+
+    ranking = learner.rank_capabilities(limit=2)
+    assert [row["capability"] for row in ranking] == ["strong", "weak"]
+    assert ranking[0]["recent_average"] == pytest.approx(0.95)
+    assert ranking[0]["retained_experiences"] == 2
+
+
+def test_adaptive_learner_rejects_invalid_memory_window_before_recording() -> None:
+    with pytest.raises(ValueError, match="memory_window"):
+        AdaptiveLearner(MetaGrid(memory_window=0))
+
+
+def test_orchestrator_releases_completed_reasoning_tasks() -> None:
+    retained = []
+    orchestrator = IntelligenceOrchestrator()
+
+    def handler(task):
+        retained.append(weakref.ref(task))
+        return result(task, "ok", 0.9)
+
+    orchestrator.register_handler("primary", handler)
+    for index in range(32):
+        response = orchestrator.reason(f"query-{index}")
+        assert response["answer"] == "ok"
+
+    gc.collect()
+    assert all(reference() is None for reference in retained)

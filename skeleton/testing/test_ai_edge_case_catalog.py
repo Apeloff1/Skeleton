@@ -25,3 +25,48 @@ def test_edge_case_catalog_has_required_depth_and_valid_volume_links() -> None:
     assert all(e["recommended_test_modes"] for e in data["entries"])
     assert all(e["work_package_refs"] for e in data["entries"])
     assert all(set(e["work_package_refs"]) <= valid_wps for e in data["entries"])
+
+def test_catalog_rejects_duplicate_mapped_volume(tmp_path, monkeypatch) -> None:
+    data = json.loads(checker.CATALOG.read_text(encoding="utf-8"))
+    first = data["entries"][0]
+    first["mapped_volumes"].append(first["mapped_volumes"][0])
+    path = tmp_path / "catalog.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    monkeypatch.setattr(checker, "CATALOG", path)
+
+    errors = checker.validate()
+
+    assert any("mapped_volumes must be unique" in e for e in errors)
+
+
+def test_catalog_rejects_duplicate_recommended_test_mode(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    data = json.loads(checker.CATALOG.read_text(encoding="utf-8"))
+    first = data["entries"][0]
+    first["recommended_test_modes"].append(first["recommended_test_modes"][0])
+    path = tmp_path / "catalog.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    monkeypatch.setattr(checker, "CATALOG", path)
+
+    errors = checker.validate()
+
+    assert any("recommended_test_modes must be unique" in e for e in errors)
+
+
+def test_catalog_rejects_duplicate_work_package_ref(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    data = json.loads(checker.CATALOG.read_text(encoding="utf-8"))
+    first = data["entries"][0]
+    first["work_package_refs"].append(first["work_package_refs"][0])
+    path = tmp_path / "catalog.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    monkeypatch.setattr(checker, "CATALOG", path)
+
+    errors = checker.validate()
+
+    assert any("work_package_refs must be unique" in e for e in errors)
+

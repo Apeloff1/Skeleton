@@ -120,8 +120,8 @@ def verify(root: Path = ROOT, *, head_sha: str | None = None) -> dict[str, Any]:
             continue
         if row.get("gap_status") != "closed":
             errors.append(f"{gap_id} closure-evidence state is not closed")
-        if row.get("implementation_state") != "closed":
-            errors.append(f"{gap_id} implementation state is not closed")
+        if row.get("implementation_state") != "complete":
+            errors.append(f"{gap_id} implementation state is not complete")
         if row.get("closure_decision") != "closed":
             errors.append(f"{gap_id} closure decision is not closed")
         if row.get("blockers"):

@@ -124,7 +124,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         raise P3ValidationError("P3 requires closed P2 Functional-AI frontier")
     if p2_closure.get("closure_id") != "P2-FUNCTIONAL-AI-FRONTIER":
         raise P3ValidationError("P2 Functional-AI closure identity drift")
-    if p3.get("status") != "active" or backlog.get("status") != "active":
+    if p3.get("status") not in {"active", "closed"} or backlog.get("status") not in {"active", "closed"}:
         raise P3ValidationError("P3 map/backlog must be active")
     if plan.get("status") != "active":
         raise P3ValidationError("P3 T0 plan must be active")
@@ -221,13 +221,19 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
             raise P3ValidationError(f"{task_id} priority drift")
         if task.get("accountability_required") is not True:
             raise P3ValidationError(f"{task_id} lost accountability requirement")
-        if (
+        if task.get("status") != "closed" and (
             task.get("completion_checkbox") is not False
             or task.get("completion_checkbox_mark") != "[ ]"
             or task.get("implementation_signed") is not False
             or task.get("verification_signed") is not False
         ):
             raise P3ValidationError(f"{task_id} may not self-complete or self-sign")
+        if task.get("status") == "closed" and not (
+            task.get("completion_checkbox") is True
+            and task.get("implementation_signed") is True
+            and task.get("verification_signed") is True
+        ):
+            raise P3ValidationError(f"{task_id} closed requires both signoffs")
         evidence = task.get("evidence_refs")
         if not isinstance(evidence, list) or len(evidence) < 3:
             raise P3ValidationError(f"{task_id} requires source evidence refs")
@@ -256,7 +262,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         for task_id, task in tasks.items()
         if task.get("status") == "landed_unpromoted"
     }
-    allowed_status = {"blocked", "ready", "in_progress", "landed_unpromoted"}
+    allowed_status = {"blocked", "ready", "in_progress", "landed_unpromoted", "closed"}
     for task_id, task in tasks.items():
         status = task.get("status")
         if status not in allowed_status:

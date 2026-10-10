@@ -1,4 +1,7 @@
-"""Cue facade (GB-46). Tokens only. Stimulus dropped."""
+"""Cue facade (GB-46). Tokens only. Stimulus dropped.
+
+gb46 is additive. law.py, fold.py, compose.py, and capabilities.py are not forked.
+"""
 
 from __future__ import annotations
 

@@ -21,6 +21,9 @@ import { consumeHandoff } from './workbench/handoff';
 import CaptureEditor from './workbench/CaptureEditor';
 import { captureInput } from './workbench/capture';
 import type { CaptureInput } from './workbench/capture';
+import DragonCompanionPanel from './companion/DragonCompanionPanel';
+import DragonDemoPlayer from './companion/DragonDemoPlayer';
+import {useDragonAcademy} from './companion/useDragonAcademy';
 
 const C = { bg: '#0b1220', card: '#111a2e', edge: '#28364e', text: '#e2e8f0', muted: '#94a3b8', purple: '#a78bfa', green: '#86efac', red: '#fca5a5' };
 type Icon = keyof typeof Ionicons.glyphMap;
@@ -122,6 +125,7 @@ function Library({ controller, close }: { controller: WorkspaceController; close
 
 export default function ChatWorkspace() {
   const router = useRouter();
+  const dragonAcademy = useDragonAcademy();
   const { width } = useWindowDimensions();
   const [controller] = useState(() => new WorkspaceController(
     AsyncStorage,
@@ -258,7 +262,12 @@ export default function ChatWorkspace() {
         <Text style={[s.small, s.flex]}>{snapshot.notice || 'Changes could not be saved to this device.'}</Text>
         {snapshot.saveState === 'error' ? <Button icon="refresh-outline" label="Save again" onPress={controller.retrySave} /> : <TouchableOpacity accessibilityLabel="Dismiss notice" onPress={controller.dismissNotice}><Ionicons name="close" size={20} color={C.text} /></TouchableOpacity>}
       </View>}
-      <ScrollView ref={scroll} style={s.flex} contentContainerStyle={s.transcript} keyboardShouldPersistTaps="handled" testID="jeeves-transcript">
+      <View style={[s.companionDock, width < 760 && s.companionDockCompact]}>
+        <DragonCompanionPanel draft={conversation.draft} lastUserText={[...conversation.messages].reverse().find(message => message.role === 'user')?.text} academy={dragonAcademy.view} telemetry={dragonAcademy.telemetry} />
+      </View>
+      <DragonDemoPlayer demo={dragonAcademy.demo} onClose={dragonAcademy.closeDemo} />
+      {!!dragonAcademy.error && <Text accessibilityRole="alert" style={s.small}>{dragonAcademy.error}</Text>}
+      <ScrollView ref={scroll} style={s.flex} contentContainerStyle={[s.transcript, width < 760 && s.transcriptCompact]} keyboardShouldPersistTaps="handled" testID="jeeves-transcript">
         {!conversation.messages.length && <View style={s.welcome}>
           <View style={s.crest}><Ionicons name="sparkles-outline" size={34} color={C.purple} /></View>
           <Text style={s.welcomeTitle}>What shall we work on?</Text>
@@ -311,7 +320,8 @@ const s = StyleSheet.create({
   chatToolbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 12, gap: 8, borderBottomWidth: 1, borderColor: C.edge },
   chatTitle: { color: C.text, fontSize: 15, fontWeight: '700', lineHeight: 21 },
   notice: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#26223c', padding: 12 },
-  transcript: { padding: 18, paddingBottom: 30, width: '100%', maxWidth: 960, alignSelf: 'center', flexGrow: 1 },
+  companionDock: { position: 'absolute', right: 16, top: 112, width: 310, zIndex: 8 }, companionDockCompact: { position: 'relative', right: undefined, top: undefined, width: '100%', maxWidth: 420, alignSelf: 'center', paddingHorizontal: 14, paddingTop: 10 },
+  transcript: { padding: 18, paddingBottom: 30, paddingRight: 340, width: '100%', maxWidth: 1280, alignSelf: 'center', flexGrow: 1 }, transcriptCompact: { paddingRight: 18, maxWidth: 960 },
   welcome: { alignItems: 'center', justifyContent: 'center', paddingVertical: 30, gap: 16 },
   crest: { padding: 20, backgroundColor: '#241c38', borderRadius: 24, borderWidth: 1, borderColor: '#463362' },
   welcomeTitle: { fontSize: 28, fontWeight: '700', color: C.text, textAlign: 'center' },

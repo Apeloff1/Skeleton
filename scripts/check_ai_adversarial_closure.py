@@ -122,11 +122,15 @@ def validate() -> list[str]:
         axes_ref = campaign.get("axes")
         if not isinstance(axes_ref, list) or len(axes_ref) < 3:
             errors.append(f"{cid}: compound campaign must combine at least three axes")
+        elif len(set(axes_ref)) != len(axes_ref):
+            errors.append(f"{cid}: compound campaign axes must be distinct")
         elif any(ref not in EXPECTED_AXES for ref in axes_ref):
             errors.append(f"{cid}: unknown axis reference")
         wps = campaign.get("work_packages")
         if not isinstance(wps, list) or not wps:
             errors.append(f"{cid}: work_packages must be non-empty")
+        elif len(set(wps)) != len(wps):
+            errors.append(f"{cid}: work_packages must be distinct")
         elif any(wp not in known_wps for wp in wps):
             errors.append(f"{cid}: unknown work package")
         if not str(campaign.get("oracle", "")).strip():

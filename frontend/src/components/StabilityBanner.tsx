@@ -13,6 +13,9 @@ import { useTunnelStatus } from '../hooks/useTunnelStatus';
 import { useReduceMotion } from '../hooks/useReduceMotion';
 import { useFeatureFlag, FLAG } from '../feature-flags';
 import { setOfflineState } from '../../utils/safeFetch';
+import { accessibleStatusProps } from '../accessibility/runtime';
+import { useI18n } from '../i18n';
+import type { TranslationKey } from '../i18n';
 
 type Variant = 'down' | 'offline' | 'degraded' | null;
 
@@ -23,10 +26,10 @@ function decideVariant(net: 'online' | 'offline' | 'unknown', tunnel: string): V
   return null;
 }
 
-const MESSAGES: Record<Exclude<Variant, null>, { text: string; bg: string; fg: string }> = {
-  down: { text: 'Server unreachable — retrying…', bg: '#7f1d1d', fg: '#fee2e2' },
-  offline: { text: 'Offline — changes will sync when you reconnect', bg: '#7c2d12', fg: '#fff7ed' },
-  degraded: { text: 'Server is slow — some actions may be delayed', bg: '#854d0e', fg: '#fef3c7' },
+const MESSAGES: Record<Exclude<Variant, null>, { key: TranslationKey; bg: string; fg: string }> = {
+  down: { key: 'status.connectivity.down', bg: '#7f1d1d', fg: '#fee2e2' },
+  offline: { key: 'status.connectivity.offline', bg: '#7c2d12', fg: '#fff7ed' },
+  degraded: { key: 'status.connectivity.degraded', bg: '#854d0e', fg: '#fef3c7' },
 };
 
 export const StabilityBanner: React.FC<{ defaultEnabled?: boolean }> = ({ defaultEnabled = true }) => {
@@ -34,6 +37,7 @@ export const StabilityBanner: React.FC<{ defaultEnabled?: boolean }> = ({ defaul
   const net = useNetworkStatus();
   const { status: tunnel } = useTunnelStatus();
   const reduce = useReduceMotion();
+  const { t } = useI18n();
   const translateY = React.useRef(new Animated.Value(-44)).current;
 
   React.useEffect(() => {
@@ -60,6 +64,7 @@ export const StabilityBanner: React.FC<{ defaultEnabled?: boolean }> = ({ defaul
 
   if (!variant) return null;
   const message = MESSAGES[variant];
+  const messageText = t(message.key);
 
   return (
     <Animated.View
@@ -68,9 +73,13 @@ export const StabilityBanner: React.FC<{ defaultEnabled?: boolean }> = ({ defaul
         { backgroundColor: message.bg, transform: [{ translateY }] },
         { pointerEvents: 'none' },
       ]}
+      {...accessibleStatusProps(
+        messageText,
+        { assertive: variant === 'offline' || variant === 'down' },
+      )}
     >
-      <Text style={[styles.txt, { color: message.fg }]} numberOfLines={1}>
-        {message.text}
+      <Text style={[styles.txt, { color: message.fg }]} numberOfLines={1} allowFontScaling>
+        {messageText}
       </Text>
     </Animated.View>
   );

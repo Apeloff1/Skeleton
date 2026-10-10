@@ -19,6 +19,8 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
 import { bootGuard, traceStep, traceStepSync } from '../utils/bootTracer';
 import LaunchCascade from '../components/LaunchCascade';
+import { accessibleStatusProps } from '../src/accessibility/runtime';
+import { useI18n } from '../src/i18n';
 
 type Decision = 'cascade' | 'safe-mode' | null;
 
@@ -46,6 +48,7 @@ function bootGuardWithTimeout(ms: number): Promise<'safe-mode' | 'normal'> {
 
 export default function Entry() {
   const [decision, setDecision] = useState<Decision>(null);
+  const { t } = useI18n();
 
   useEffect(() => {
     // Re-mount fast-path: reuse the decision already made this process.
@@ -82,8 +85,15 @@ export default function Entry() {
 
   if (decision === null) {
     return (
-      <View style={styles.loader}>
-        <ActivityIndicator size="small" color="#a78bfa" />
+      <View
+        style={styles.loader}
+        {...accessibleStatusProps(t('status.startup_check'))}
+      >
+        <ActivityIndicator
+          size="small"
+          color="#a78bfa"
+          accessibilityElementsHidden
+        />
       </View>
     );
   }

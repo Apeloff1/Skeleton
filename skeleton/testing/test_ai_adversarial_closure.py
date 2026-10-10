@@ -41,3 +41,50 @@ def test_evidence_bundle_binds_fault_manifest_and_artifact() -> None:
 def test_breadth_freeze_is_preserved() -> None:
     data = json.loads(checker.CLOSURE.read_text(encoding="utf-8"))
     assert data["scope"]["adds_top_level_volumes"] is False
+
+def test_compound_campaign_rejects_duplicate_axes() -> None:
+    data = json.loads(checker.CLOSURE.read_text(encoding="utf-8"))
+    campaign = data["compound_campaigns"][0]
+    campaign["axes"] = [
+        campaign["axes"][0],
+        campaign["axes"][0],
+        campaign["axes"][1],
+    ]
+
+    original_load = checker._load
+
+    def fake_load(path):
+        if path == checker.CLOSURE:
+            return data
+        return original_load(path)
+
+    checker._load = fake_load
+    try:
+        errors = checker.validate()
+    finally:
+        checker._load = original_load
+
+    assert any("compound campaign axes must be distinct" in e for e in errors)
+
+
+def test_compound_campaign_rejects_duplicate_work_packages() -> None:
+    data = json.loads(checker.CLOSURE.read_text(encoding="utf-8"))
+    campaign = data["compound_campaigns"][0]
+    first = campaign["work_packages"][0]
+    campaign["work_packages"] = [first, first]
+
+    original_load = checker._load
+
+    def fake_load(path):
+        if path == checker.CLOSURE:
+            return data
+        return original_load(path)
+
+    checker._load = fake_load
+    try:
+        errors = checker.validate()
+    finally:
+        checker._load = original_load
+
+    assert any("work_packages must be distinct" in e for e in errors)
+

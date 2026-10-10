@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-18:idle_mirror_room:v1",
+  "title": "FLGB-18 idle mirror room",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "plan_id",
+    "baseline_digest",
+    "max_iterations",
+    "cpu_cap",
+    "memory_cap",
+    "output_kind"
+  ],
+  "properties": {
+    "plan_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "baseline_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "max_iterations": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000
+    },
+    "cpu_cap": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "memory_cap": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "output_kind": {
+      "const": "candidate-only"
+    }
+  }
+}

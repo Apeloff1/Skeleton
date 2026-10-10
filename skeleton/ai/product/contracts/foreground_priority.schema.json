@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-18:foreground_priority:v1",
+  "title": "FLGB-18 foreground priority",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "policy_id",
+    "foreground_reserve_cpu",
+    "foreground_reserve_memory",
+    "allow_preempt_background"
+  ],
+  "properties": {
+    "policy_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "foreground_reserve_cpu": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "foreground_reserve_memory": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "allow_preempt_background": {
+      "type": "boolean"
+    }
+  }
+}

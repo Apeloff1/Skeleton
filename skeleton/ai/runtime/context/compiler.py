@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import math
 from typing import Any, Iterable
 from uuid import NAMESPACE_URL, uuid5
 
@@ -22,7 +23,7 @@ from skeleton.contracts.context import (
 from skeleton.context.policy import ContextCompilePolicy
 
 
-COMPILER_VERSION = "context-compiler-v1"
+COMPILER_VERSION = "context-compiler-v2"
 
 
 class ContextCompilationError(RuntimeError):
@@ -51,6 +52,46 @@ _INSTRUCTION_ORDER = {
     ContextKind.OPERATION_OBJECTIVE: 2,
     ContextKind.SKILL_INSTRUCTION: 3,
 }
+
+
+@dataclass(frozen=True, slots=True)
+class ContextAllocationPolicy:
+    """Deterministic trust-tier allocation for non-control context.
+
+    The current canonical user turn is protected separately. These fractions
+    reserve first-pass capacity for the remaining evidence classes so a large
+    lower-trust retrieval set cannot crowd out authorized conversation data.
+    Unused capacity is then borrowed in trust order.
+    """
+
+    authorized_user_fraction: float = 0.50
+    untrusted_evidence_fraction: float = 0.30
+    derived_untrusted_fraction: float = 0.20
+
+    def __post_init__(self) -> None:
+        values = (
+            self.authorized_user_fraction,
+            self.untrusted_evidence_fraction,
+            self.derived_untrusted_fraction,
+        )
+        if any(
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
+            or value < 0
+            or value > 1
+            for value in values
+        ):
+            raise ValueError("context allocation fractions must be in [0,1]")
+        if abs(sum(float(value) for value in values) - 1.0) > 1e-9:
+            raise ValueError("context allocation fractions must sum to one")
+
+
+_TRUST_PACK_ORDER = (
+    ContextTrust.AUTHORIZED_USER_DATA,
+    ContextTrust.UNTRUSTED_EVIDENCE,
+    ContextTrust.DERIVED_UNTRUSTED,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,6 +200,36 @@ def _ordered_conversation(
     )
 
 
+def _is_current_turn(segment: ContextSegment, turn_id: str) -> bool:
+    return (
+        segment.kind is ContextKind.USER_MESSAGE
+        and segment.source_type == "conversation"
+        and segment.source_id == turn_id
+        and segment.trust_level is ContextTrust.AUTHORIZED_USER_DATA
+    )
+
+
+def _tier_quotas(
+    capacity: int,
+    policy: ContextAllocationPolicy,
+) -> dict[ContextTrust, int]:
+    if capacity < 0:
+        raise ContextCompilationError("evidence capacity cannot be negative")
+    fractions = (
+        policy.authorized_user_fraction,
+        policy.untrusted_evidence_fraction,
+        policy.derived_untrusted_fraction,
+    )
+    quotas = [int(capacity * fraction) for fraction in fractions]
+    remainder = capacity - sum(quotas)
+    index = 0
+    while remainder:
+        quotas[index] += 1
+        remainder -= 1
+        index = (index + 1) % len(quotas)
+    return dict(zip(_TRUST_PACK_ORDER, quotas, strict=True))
+
+
 def _segment_limit(segment: ContextSegment, budget: ContextBudget) -> int:
     limit = budget.max_segment_tokens
     if segment.kind is ContextKind.ARTIFACT:
@@ -175,11 +246,15 @@ class ContextCompiler:
         self,
         *,
         policy: ContextCompilePolicy | None = None,
+        allocation_policy: ContextAllocationPolicy | None = None,
         compiler_version: str = COMPILER_VERSION,
     ) -> None:
         if not isinstance(compiler_version, str) or not compiler_version.strip():
             raise ValueError("compiler_version must be non-empty")
         self.policy = policy or ContextCompilePolicy()
+        self.allocation_policy = allocation_policy or ContextAllocationPolicy()
+        if not isinstance(self.allocation_policy, ContextAllocationPolicy):
+            raise TypeError("allocation_policy must be ContextAllocationPolicy")
         self.compiler_version = compiler_version.strip()
 
     def compile(
@@ -252,6 +327,10 @@ class ContextCompiler:
                     raise ContextCompilationError(
                         f"required control segment exceeds token limit: {segment.segment_id}"
                     )
+                if _is_current_turn(segment, turn_id):
+                    raise ContextCompilationError(
+                        "current user turn exceeds provider segment token limit"
+                    )
                 if compaction_max_tokens is not None:
                     target = min(limit, compaction_max_tokens)
                     try:
@@ -277,9 +356,21 @@ class ContextCompiler:
 
         # Deduplicate only within the same trust/kind class. Identical text at a
         # weaker trust level must never erase a stronger canonical segment.
+        #
+        # Canonical conversation turns are identity-bearing sequence entries,
+        # not interchangeable evidence blobs. A user may legitimately repeat
+        # the exact same text in a later turn; collapsing that segment would
+        # erase causal history and can leave an assistant message without its
+        # preceding user turn in the provider projection.
         dedupe_seen: set[tuple[str, str, str]] = set()
         deduped: list[ContextSegment] = []
         for segment in sorted(admitted, key=_rank_key):
+            if segment.kind in {
+                ContextKind.USER_MESSAGE,
+                ContextKind.ASSISTANT_MESSAGE,
+            }:
+                deduped.append(segment)
+                continue
             key = (
                 segment.content_digest,
                 segment.kind.value,
@@ -301,10 +392,22 @@ class ContextCompiler:
             and segment.trust_level is ContextTrust.TRUSTED_CONTROL
             and segment.kind in _CONTROL_KINDS
         ]
+        current_turns = [
+            segment
+            for segment in deduped
+            if _is_current_turn(segment, turn_id)
+        ]
+        if len(current_turns) > 1:
+            raise ContextCompilationError(
+                "multiple canonical current user turns were supplied"
+            )
+        current_turn = current_turns[0] if current_turns else None
         optional_evidence = [
             segment
             for segment in deduped
-            if segment not in required and segment not in optional_controls
+            if segment not in required
+            and segment not in optional_controls
+            and segment is not current_turn
         ]
 
         capacity = budget.input_capacity(tools_enabled=tools_enabled)
@@ -317,7 +420,26 @@ class ContextCompiler:
         selected: list[ContextSegment] = sorted(required, key=_rank_key)
         remaining = capacity - required_tokens
 
-        # Trusted optional controls get first claim on remaining capacity.
+        # Protect the canonical current user turn before any optional control or
+        # evidence packing, while preserving the configured policy reserve.
+        policy_slack_after_required = max(
+            0,
+            budget.reserved_policy_tokens - required_tokens,
+        )
+        if current_turn is not None:
+            current_turn_capacity = max(
+                0,
+                remaining - policy_slack_after_required,
+            )
+            if current_turn.token_estimate > current_turn_capacity:
+                raise ContextCompilationError(
+                    "current user turn plus mandatory policy exceeds provider input capacity"
+                )
+            selected.append(current_turn)
+            remaining -= current_turn.token_estimate
+
+        # Trusted optional controls get first claim after the protected current
+        # turn. They may consume the policy reserve but never displace it.
         optional_control_tokens = 0
         for segment in sorted(optional_controls, key=_rank_key):
             if segment.token_estimate <= remaining:
@@ -334,12 +456,60 @@ class ContextCompiler:
         )
         evidence_capacity = max(0, remaining - protected_policy_slack)
 
-        for segment in sorted(optional_evidence, key=_rank_key):
-            if segment.token_estimate <= evidence_capacity:
-                selected.append(segment)
-                remaining -= segment.token_estimate
-                evidence_capacity -= segment.token_estimate
-            else:
+        # Trust-tier first pass. Each class gets a deterministic reservation so
+        # lower-trust retrieval cannot consume all remaining capacity before
+        # authorized user/conversation data is considered.
+        groups = {
+            trust: tuple(
+                sorted(
+                    (
+                        segment
+                        for segment in optional_evidence
+                        if segment.trust_level is trust
+                    ),
+                    key=_rank_key,
+                )
+            )
+            for trust in _TRUST_PACK_ORDER
+        }
+        unknown_trust = [
+            segment
+            for segment in optional_evidence
+            if segment.trust_level not in _TRUST_PACK_ORDER
+        ]
+        if unknown_trust:
+            raise ContextCompilationError(
+                "non-control context contains unsupported trust class"
+            )
+
+        quotas = _tier_quotas(evidence_capacity, self.allocation_policy)
+        deferred: dict[ContextTrust, list[ContextSegment]] = {
+            trust: [] for trust in _TRUST_PACK_ORDER
+        }
+        used_evidence_tokens = 0
+
+        for trust in _TRUST_PACK_ORDER:
+            tier_remaining = quotas[trust]
+            for segment in groups[trust]:
+                if segment.token_estimate <= tier_remaining:
+                    selected.append(segment)
+                    tier_remaining -= segment.token_estimate
+                    used_evidence_tokens += segment.token_estimate
+                else:
+                    deferred[trust].append(segment)
+
+        # Borrow unused reserved capacity in trust order. This keeps utilization
+        # high without allowing weaker tiers to preempt stronger candidates.
+        borrow_remaining = evidence_capacity - used_evidence_tokens
+        for trust in _TRUST_PACK_ORDER:
+            still_deferred: list[ContextSegment] = []
+            for segment in deferred[trust]:
+                if segment.token_estimate <= borrow_remaining:
+                    selected.append(segment)
+                    borrow_remaining -= segment.token_estimate
+                else:
+                    still_deferred.append(segment)
+            for segment in still_deferred:
                 omitted[segment.segment_id] = "context_budget_exhausted"
 
         instructions = tuple(
@@ -555,6 +725,7 @@ def project_provider_context(
 
 __all__ = [
     "COMPILER_VERSION",
+    "ContextAllocationPolicy",
     "ContextCompilationError",
     "ContextCompiler",
     "ProviderContextProjection",

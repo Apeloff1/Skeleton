@@ -196,6 +196,61 @@ class AccelerationReceiptTests(unittest.TestCase):
                 activate=True,
             )
 
+    def test_activation_authority_requires_boolean(self) -> None:
+        policy = self._policy()
+        for ambiguous in (1, "true", None):
+            with self.subTest(activate=ambiguous):
+                with self.assertRaisesRegex(
+                    MODULE.ReceiptIngestionError,
+                    "activate must be boolean",
+                ):
+                    MODULE.apply_receipt(
+                        policy,
+                        self._receipt(policy, f"receipt-{ambiguous!r}"),
+                        root=ROOT,
+                        activate=ambiguous,
+                    )
+
+    def test_receipt_identity_fields_require_canonical_text(self) -> None:
+        policy = self._policy()
+        for field in ("evidence_id", "candidate_id", "source_identity", "environment_id"):
+            receipt = self._receipt(policy, "receipt-canonical")
+            receipt[field] = " " + str(receipt[field])
+            with self.subTest(field=field):
+                with self.assertRaisesRegex(
+                    MODULE.ReceiptIngestionError,
+                    "canonical text",
+                ):
+                    MODULE.apply_receipt(policy, receipt, root=ROOT)
+
+    def test_loader_rejects_duplicate_authority_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "receipt.json"
+            path.write_text(
+                '{"evidence_id":"trusted","evidence_id":"shadow"}',
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                MODULE.ReceiptIngestionError,
+                "duplicate JSON object key: evidence_id",
+            ):
+                MODULE._load_object(path, label="profile receipt")
+
+    def test_loader_rejects_nonfinite_json_tokens(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "receipt.json"
+            for token in ("NaN", "Infinity", "-Infinity"):
+                with self.subTest(token=token):
+                    path.write_text(
+                        '{"max_abs_error":' + token + '}',
+                        encoding="utf-8",
+                    )
+                    with self.assertRaisesRegex(
+                        MODULE.ReceiptIngestionError,
+                        "non-finite JSON token rejected",
+                    ):
+                        MODULE._load_object(path, label="profile receipt")
+
 
 if __name__ == "__main__":
     unittest.main()

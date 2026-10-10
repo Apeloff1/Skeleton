@@ -12,6 +12,10 @@ if (process.env.IMAGE_SIZE_SECURITY_VERIFIED !== 'success') {
   console.error('[yarn-audit-policy] image-size security verifier did not succeed; blocking');
   process.exit(1);
 }
+if (process.env.NPM_COMPENSATING_SECURITY_VERIFIED !== 'success') {
+  console.error('[yarn-audit-policy] no-release npm security verifier did not succeed; blocking');
+  process.exit(1);
+}
 
 const rawAuditStatus = process.env.YARN_AUDIT_STATUS;
 if (!/^\d+$/.test(String(rawAuditStatus || ''))) {
@@ -35,12 +39,37 @@ const severityBits = Object.freeze({
 const blockingSeverityMask = severityBits.high | severityBits.critical;
 const severityNames = Object.keys(severityBits);
 
-const allowedMitigatedAdvisories = new Set([
-  // image-size has no patched npm release. These two parser-progress flaws are
-  // patched fail-closed by scripts/patch-node-modules.js and verified by
-  // scripts/verify-image-size-security.js before this policy is evaluated.
-  'GHSA-5p2g-fcmc-qvqq',
-  'GHSA-w3rx-r6r6-pgpr',
+const allowedMitigatedAdvisories = new Map([
+  [
+    'image-size',
+    new Set([
+      // Metro 0.83.x requires image-size 1.x; parser progress is locally patched and behavior-tested.
+      'GHSA-5p2g-fcmc-qvqq',
+      'GHSA-w3rx-r6r6-pgpr',
+    ]),
+  ],
+  [
+    'braces',
+    new Set([
+      // CVE-2026-93687: public string entry points are depth-bounded locally.
+      'GHSA-vfj7-8cjw-p6xm',
+    ]),
+  ],
+  [
+    'http-cache-semantics',
+    new Set([
+      // CVE-2026-93748: max-stale cannot resurrect security-zeroed entries.
+      'GHSA-ch52-4w7c-c8xp',
+    ]),
+  ],
+  [
+    'node-forge',
+    new Set([
+      // CVE-2026-85393 current GHSA plus the upstream advisory alias.
+      'GHSA-86w9-cpqp-85rv',
+      'GHSA-ppp5-5v6c-4jwp',
+    ]),
+  ],
 ]);
 
 const findings = [];
@@ -126,7 +155,8 @@ for (const line of auditText.split(/\r?\n/)) {
     ghsa,
     title: String(advisory.title || ''),
   };
-  if (item.module === 'image-size' && allowedMitigatedAdvisories.has(ghsa)) {
+  const moduleAllowlist = allowedMitigatedAdvisories.get(item.module);
+  if (moduleAllowlist && moduleAllowlist.has(ghsa)) {
     mitigated.push(item);
   } else {
     findings.push(item);

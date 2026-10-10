@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import threading
@@ -68,12 +69,15 @@ def _resolve(
     path = Path(value).expanduser()
     if not path.is_absolute():
         path = base / path
-    if reject_symlink and path.is_symlink():
-        raise LocalModelDeploymentError(f"{field} symlink is forbidden")
+    lexical=Path(os.path.abspath(path))
     try:
         resolved = path.resolve(strict=True)
     except OSError as exc:
         raise LocalModelDeploymentError(f"{field} does not exist: {path}") from exc
+    if reject_symlink and lexical!=resolved:
+        raise LocalModelDeploymentError(
+            f"{field} symlinked path component is forbidden"
+        )
     if not resolved.is_file():
         raise LocalModelDeploymentError(f"{field} must reference a regular file")
     return resolved
@@ -123,6 +127,22 @@ class LocalModelDeployment:
             raise LocalModelDeploymentError("deployment manifest root must be an object")
         if payload.get("schema_version") != SCHEMA:
             raise LocalModelDeploymentError("unsupported deployment manifest schema")
+        allowed_top_level={
+            "schema_version",
+            "runtime_kind",
+            "model_id",
+            "executable_path",
+            "executable_sha256",
+            "model_path",
+            "model_sha256",
+            "config",
+        }
+        unknown_top_level=set(payload)-allowed_top_level
+        if unknown_top_level:
+            raise LocalModelDeploymentError(
+                "unsupported deployment manifest key(s): "
+                + ", ".join(sorted(map(str,unknown_top_level)))
+            )
         if payload.get("runtime_kind") != "llama.cpp-cli":
             raise LocalModelDeploymentError("runtime_kind must be llama.cpp-cli")
         model_id = payload.get("model_id")
@@ -316,9 +336,16 @@ def _qualification_receipt(
 ) -> dict[str, Any]:
     if not hasattr(result, "model_digest") or not hasattr(result, "text"):
         raise LocalModelDeploymentError("qualification produced invalid result")
-    if result.model_digest != deployment.model_sha256:
+    if (
+        result.model_digest != deployment.model_sha256
+        or result.model_id != deployment.model_id
+    ):
         raise LocalModelDeploymentError(
             "qualification result model identity drift"
+        )
+    if result.finish_reason!="completed":
+        raise LocalModelDeploymentError(
+            "qualification did not reach a completed model response"
         )
     if result.text is None or not result.text.strip():
         raise LocalModelDeploymentError("qualification produced no textual output")

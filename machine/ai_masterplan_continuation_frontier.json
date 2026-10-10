@@ -592,7 +592,17 @@
         ],
         "completion_checkbox": false,
         "implementation_signed": false,
-        "verification_signed": false
+        "verification_signed": false,
+        "implementation_candidate": {
+          "status": "landed_pending_exact_head_validation",
+          "pull_request": 2477,
+          "merged_main_sha": "ed7035334243bb60c2b4d231cab4b86ee648ec0c",
+          "candidate_contract": "machine/ai_p3t2_storage_candidate.json",
+          "candidate_status": "implementation_candidate",
+          "exact_head_validation_required": true,
+          "exact_head_validation_status": "pending",
+          "promotion_authority": false
+        }
       },
       {
         "task_id": "P3T2-DATA-01",
@@ -620,7 +630,17 @@
         ],
         "completion_checkbox": false,
         "implementation_signed": false,
-        "verification_signed": false
+        "verification_signed": false,
+        "implementation_candidate": {
+          "status": "landed_pending_exact_head_validation",
+          "pull_request": 2484,
+          "merged_main_sha": "573658f64efc0ae8a52e08ddec256f98ce963617",
+          "candidate_contract": "machine/ai_p3t2_data_candidate.json",
+          "candidate_status": "implementation_candidate",
+          "exact_head_validation_required": true,
+          "exact_head_validation_status": "pending",
+          "promotion_authority": false
+        }
       },
       {
         "task_id": "P3T2-TRAINING-01",
@@ -649,7 +669,16 @@
         ],
         "completion_checkbox": false,
         "implementation_signed": false,
-        "verification_signed": false
+        "verification_signed": false,
+        "implementation_candidate": {
+          "status": "branch_pending_exact_head_validation",
+          "candidate_branch": "feat/p3t2-training-learning-multimodal-gapfill-20261005",
+          "candidate_contract": "machine/ai_p3t2_training_candidate.json",
+          "candidate_status": "implementation_candidate",
+          "exact_head_validation_required": true,
+          "exact_head_validation_status": "pending",
+          "promotion_authority": false
+        }
       },
       {
         "task_id": "P3T2-LEARNING-01",
@@ -674,7 +703,16 @@
         ],
         "completion_checkbox": false,
         "implementation_signed": false,
-        "verification_signed": false
+        "verification_signed": false,
+        "implementation_candidate": {
+          "status": "branch_pending_exact_head_validation",
+          "candidate_branch": "feat/p3t2-training-learning-multimodal-gapfill-20261005",
+          "candidate_contract": "machine/ai_p3t2_learning_candidate.json",
+          "candidate_status": "implementation_candidate",
+          "exact_head_validation_required": true,
+          "exact_head_validation_status": "pending",
+          "promotion_authority": false
+        }
       },
       {
         "task_id": "P3T2-MULTIMODAL-01",
@@ -705,7 +743,16 @@
         ],
         "completion_checkbox": false,
         "implementation_signed": false,
-        "verification_signed": false
+        "verification_signed": false,
+        "implementation_candidate": {
+          "status": "branch_pending_exact_head_validation",
+          "candidate_branch": "feat/p3t2-training-learning-multimodal-gapfill-20261005",
+          "candidate_contract": "machine/ai_p3t2_multimodal_candidate.json",
+          "candidate_status": "implementation_candidate",
+          "exact_head_validation_required": true,
+          "exact_head_validation_status": "pending",
+          "promotion_authority": false
+        }
       },
       {
         "task_id": "P3T2-LIFECYCLE-01",
@@ -737,7 +784,10 @@
         "verification_signed": false
       }
     ],
-    "owner_count": 6
+    "owner_count": 6,
+    "implementation_candidate_count": 5,
+    "landed_unpromoted_owner_count": 0,
+    "branch_implementation_candidate_count": 3
   },
   "reconciliation": {
     "native_training_core_volume_count": 19,

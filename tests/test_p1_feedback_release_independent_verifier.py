@@ -124,3 +124,76 @@ def test_independent_p1_verifier_rejects_reopened_gap(
         "must remain closed" in error
         for error in receipt["errors"]
     )
+
+def test_independent_p1_verifier_rejects_missing_mirror_room_engine(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    path = root / "skeleton/learning/mirror_room/engine.py"
+    path.unlink()
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "mirror_room/engine.py" in error
+        for error in receipt["errors"]
+    )
+
+
+def test_independent_p1_verifier_rejects_mirror_room_acceptance_loss(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    path = root / "skeleton/testing/test_mirror_room_core.py"
+    source = path.read_text(encoding="utf-8")
+    path.write_text(
+        source.replace(
+            "# test_core_source_and_ai_mirror_are_byte_identical\n",
+            "",
+        ),
+        encoding="utf-8",
+    )
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "test_core_source_and_ai_mirror_are_byte_identical" in error
+        for error in receipt["errors"]
+    )
+
+
+
+def test_independent_p1_verifier_rejects_missing_mirror_replay_surface(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    path = root / "skeleton/learning/mirror_room/replay.py"
+    path.unlink()
+    receipt = verify_repository(root)
+    assert receipt["valid"] is False
+    assert any("mirror_room/replay.py" in error for error in receipt["errors"])
+
+
+def test_independent_p1_verifier_rejects_missing_mirror_observatory_surface(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    path = root / "skeleton/learning/mirror_room/observability.py"
+    path.unlink()
+    receipt = verify_repository(root)
+    assert receipt["valid"] is False
+    assert any("mirror_room/observability.py" in error for error in receipt["errors"])
+
+
+def test_independent_p1_verifier_rejects_adversarial_ratchet_loss(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    path = root / "skeleton/learning/mirror_room/adversarial.py"
+    source = path.read_text(encoding="utf-8")
+    path.write_text(source.replace("# class AdversarialMirrorRoom\n", ""), encoding="utf-8")
+    receipt = verify_repository(root)
+    assert receipt["valid"] is False
+    assert any("class AdversarialMirrorRoom" in error for error in receipt["errors"])

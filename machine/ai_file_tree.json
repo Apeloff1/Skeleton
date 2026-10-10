@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "tree_version": "1.6.2",
+  "tree_version": "1.8.0",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
-  "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
+  "baseline_git_sha": "6c24e3874e15b1eb8058d3ffd6c594eb7e89d4de",
   "canonical_root": "skeleton/ai",
   "migration_mode": "strangler_mirror_then_explicit_cutover",
   "purpose": "Consolidate build-plan-relevant AI engine, governance, shell/control-plane, agent, evaluation, reliability, build-control code, historical research lineage, Jeeves, and selected legacy backend/GameForge AI recovery surfaces into one governed file tree without breaking existing imports or fabricating completion.",
@@ -66,7 +66,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "3e336c2b6992a9f71eb0741fa6f594dedec6d10f",
+      "source_git_object_sha": "6af63338b94878b89635ef799d1dd1acc157e64b",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -87,15 +87,19 @@
         "cutover:owner-sensitive"
       ],
       "move_batch": "B3-owner-sensitive",
-      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover",
+      "volume_refs": [
+        "VOL-004",
+        "VOL-007"
+      ]
     },
     {
       "id": "AIFT-CONTRACTS",
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
-      "source_git_object_sha": "41a2a9b54e37ce50322ed444b453c3d026500bd3",
-      "role": "canonical operation/conversation/context contracts",
+      "source_git_object_sha": "10e8bb62caeac7744c8250c92ecf415f1de7b436",
+      "role": "canonical operation/conversation/context/formal/localization/compliance/Definition-of-Done contracts with governed AI runtime mirrors, deterministic identity, and fail-closed evidence/maturity boundaries",
       "work_package_refs": [
         "WP-W00",
         "WP-W01",
@@ -109,17 +113,72 @@
       "move_tags": [
         "ai-tree:mapped",
         "migration:staged-mirror",
-        "cutover:parity-ready"
+        "cutover:owner-sensitive"
       ],
-      "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "move_batch": "B3-owner-sensitive",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-000",
+        "VOL-003",
+        "VOL-010",
+        "VOL-025",
+        "VOL-034",
+        "VOL-035",
+        "VOL-036",
+        "VOL-037",
+        "VOL-038",
+        "VOL-045",
+        "VOL-048",
+        "VOL-056",
+        "VOL-057",
+        "VOL-059",
+        "VOL-061",
+        "VOL-062",
+        "VOL-063",
+        "VOL-078",
+        "VOL-079",
+        "VOL-080",
+        "VOL-081",
+        "VOL-085",
+        "VOL-087",
+        "VOL-088",
+        "VOL-110",
+        "VOL-112",
+        "VOL-114",
+        "VOL-115",
+        "VOL-116",
+        "VOL-117",
+        "VOL-118",
+        "VOL-168",
+        "VOL-170",
+        "VOL-200",
+        "VOL-207",
+        "VOL-208",
+        "VOL-257",
+        "VOL-258",
+        "VOL-259",
+        "VOL-323",
+        "VOL-324",
+        "VOL-325",
+        "VOL-364"
+      ],
+      "overlay_children": [
+        "execution_authority.py"
+      ],
+      "parity_exceptions": [
+        {
+          "path": "__init__.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from .execution_authority import ("
+        }
+      ]
     },
     {
       "id": "AIFT-PERSISTENCE",
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "779b9d94b91c06cf8037449fb80217ad73caab2c",
+      "source_git_object_sha": "39b560ccd2c95a9cf068a65384458026b13dfcf5",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -142,6 +201,25 @@
       "source_disposition": "canonical_persistence_tree_with_governed_core_overlay",
       "source_exclusions": [
         "core"
+      ],
+      "volume_refs": [
+        "VOL-004",
+        "VOL-005",
+        "VOL-010",
+        "VOL-039",
+        "VOL-046",
+        "VOL-064",
+        "VOL-075",
+        "VOL-076",
+        "VOL-096",
+        "VOL-177",
+        "VOL-247",
+        "VOL-260",
+        "VOL-295",
+        "VOL-361",
+        "VOL-364",
+        "VOL-365",
+        "VOL-404"
       ]
     },
     {
@@ -149,7 +227,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "e795e85e081e7619015132a90c196c55f5668c29",
+      "source_git_object_sha": "4a7e68dc28aabfa9e7ba170c0ce076f37ad600ea",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -170,6 +248,11 @@
       ],
       "source_exclusions": [
         "domains"
+      ],
+      "volume_refs": [
+        "VOL-008",
+        "VOL-009",
+        "VOL-034"
       ]
     },
     {
@@ -193,14 +276,23 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-010",
+        "VOL-011",
+        "VOL-012",
+        "VOL-251",
+        "VOL-361",
+        "VOL-362",
+        "VOL-363"
+      ]
     },
     {
       "id": "AIFT-MEMORY",
       "source": "skeleton/memory",
       "destination": "skeleton/ai/runtime/memory",
       "kind": "tree",
-      "source_git_object_sha": "216e8c8f49ab8ae09940ffcfa3c421b4bfa1ff92",
+      "source_git_object_sha": "9715bc1e66e9ef7fdbd548f16cbb87dff2997d3e",
       "role": "memory authority and recall",
       "work_package_refs": [
         "WP-W07"
@@ -215,14 +307,23 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-010",
+        "VOL-011",
+        "VOL-012",
+        "VOL-361",
+        "VOL-362",
+        "VOL-363",
+        "VOL-365"
+      ]
     },
     {
       "id": "AIFT-INTELLIGENCE",
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "a0ba0bd7a2cd17513f43c17463e00a7d55d31299",
+      "source_git_object_sha": "8fd118c100b8a2cb411bdfe707694de28999f323",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -240,14 +341,37 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-008",
+        "VOL-009",
+        "VOL-010",
+        "VOL-011",
+        "VOL-012",
+        "VOL-013",
+        "VOL-014",
+        "VOL-025",
+        "VOL-034",
+        "VOL-037",
+        "VOL-248",
+        "VOL-251",
+        "VOL-252",
+        "VOL-253",
+        "VOL-254",
+        "VOL-255",
+        "VOL-361",
+        "VOL-362",
+        "VOL-363",
+        "VOL-369",
+        "VOL-370"
+      ]
     },
     {
       "id": "AIFT-FRONTIER",
       "source": "skeleton/frontier",
       "destination": "skeleton/ai/runtime/frontier",
       "kind": "tree",
-      "source_git_object_sha": "9204317afe2fa6bb82d87ce232bcb89dc9fc0cbd",
+      "source_git_object_sha": "76aa77aa53ff8a559b5710f1af7f19b0ea4ecffc",
       "role": "Frontier domain runtime with canonical runtime/control-plane primitives under runtime/, progression/meta systems under progression/, ecology/lifecycle systems under ecology/, commerce/cooking/crafting/energy/equipment systems under economy/, NPC/character systems under characters/, and gameplay/voyage/world systems under game/, mirrored exactly into skeleton/ai/runtime/frontier.",
       "work_package_refs": [
         "WP-W04",
@@ -264,14 +388,26 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "canonical_frontier_tree_with_flat_runtime_progression_ecology_economy_character_and_game_compatibility_shims"
+      "source_disposition": "canonical_frontier_tree_with_flat_runtime_progression_ecology_economy_character_and_game_compatibility_shims",
+      "volume_refs": [
+        "VOL-008",
+        "VOL-009",
+        "VOL-034",
+        "VOL-039",
+        "VOL-040",
+        "VOL-042",
+        "VOL-044",
+        "VOL-045",
+        "VOL-288",
+        "VOL-295"
+      ]
     },
     {
       "id": "AIFT-SKILLS",
       "source": "skeleton/skills",
       "destination": "skeleton/ai/runtime/skills",
       "kind": "tree",
-      "source_git_object_sha": "781c4da70da7fd39141c7cd8e76f19d0036f1782",
+      "source_git_object_sha": "bd0c81106081917156f01115ebc02402af287543",
       "role": "tool and skill runtime",
       "work_package_refs": [
         "WP-W13",
@@ -288,14 +424,21 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-015",
+        "VOL-028",
+        "VOL-164",
+        "VOL-165",
+        "VOL-208"
+      ]
     },
     {
       "id": "AIFT-JEEVES",
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "231f07dbc7cd12bfc98d63dc10b8d5026e59a4b0",
+      "source_git_object_sha": "6285331ae16af1a246cece822838dc6bf8074b69",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -315,7 +458,11 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-072",
+        "VOL-074"
+      ]
     },
     {
       "id": "AIFT-BUILD-PLANNING",
@@ -345,14 +492,17 @@
         "cutover:owner-sensitive"
       ],
       "move_batch": "B3-owner-sensitive",
-      "source_disposition": "canonical_automation_owner_with_legacy_core_shims"
+      "source_disposition": "canonical_automation_owner_with_legacy_core_shims",
+      "volume_refs": [
+        "VOL-004"
+      ]
     },
     {
       "id": "AIFT-ENGINE-API",
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "c966370b80a04e46f13a553c32d655a0c48df427",
+      "source_git_object_sha": "854a772974c5d5559b9b7ea5920ba1bcd7072fae",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -379,14 +529,18 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-004",
+        "VOL-020"
+      ]
     },
     {
       "id": "AIFT-VAULT",
       "source": "skeleton/vault",
       "destination": "skeleton/ai/runtime/vault",
       "kind": "tree",
-      "source_git_object_sha": "4ab17d6d08267ed36154459f6d7ee7b9ca18a077",
+      "source_git_object_sha": "64635758baba1e322aaed82dda43632c18e45350",
       "role": "data governance lifecycle and audit authority",
       "work_package_refs": [
         "WP-W00",
@@ -414,14 +568,20 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-010",
+        "VOL-027",
+        "VOL-028",
+        "VOL-174"
+      ]
     },
     {
       "id": "AIFT-AGENTS",
       "source": "skeleton/automation/agents",
       "destination": "skeleton/ai/agents/core",
       "kind": "tree",
-      "source_git_object_sha": "dadbb23a9eee8b7a172761409ef18765ab4bf718",
+      "source_git_object_sha": "c21ad1fe0d0dca814aa81987cd6b0ea9c220427b",
       "role": "canonical agent/swarm execution runtime under automation ownership",
       "work_package_refs": [
         "WP-W00",
@@ -447,14 +607,40 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "canonical_automation_agents_with_legacy_root_shims"
+      "source_disposition": "canonical_automation_agents_with_legacy_root_shims",
+      "volume_refs": [
+        "VOL-016",
+        "VOL-017",
+        "VOL-018",
+        "VOL-025",
+        "VOL-028",
+        "VOL-084",
+        "VOL-168",
+        "VOL-170",
+        "VOL-201",
+        "VOL-202",
+        "VOL-205",
+        "VOL-207",
+        "VOL-208",
+        "VOL-256",
+        "VOL-257",
+        "VOL-258",
+        "VOL-259",
+        "VOL-318",
+        "VOL-320",
+        "VOL-321",
+        "VOL-322",
+        "VOL-323",
+        "VOL-324",
+        "VOL-325"
+      ]
     },
     {
       "id": "AIFT-AUTOMATION",
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "e9e5cddc61cdfe9d76cd550b7a3106e61c65452f",
+      "source_git_object_sha": "719d3f40841100f547293b22e14c8904425c77a3",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -537,6 +723,28 @@
         "overseer",
         "shift_supervisor",
         "swarm"
+      ],
+      "volume_refs": [
+        "VOL-004",
+        "VOL-015",
+        "VOL-016",
+        "VOL-017",
+        "VOL-022",
+        "VOL-093",
+        "VOL-094",
+        "VOL-095",
+        "VOL-109",
+        "VOL-110",
+        "VOL-111",
+        "VOL-112",
+        "VOL-114",
+        "VOL-115",
+        "VOL-116",
+        "VOL-118",
+        "VOL-119",
+        "VOL-121",
+        "VOL-290",
+        "VOL-294"
       ]
     },
     {
@@ -578,8 +786,8 @@
       "source": "skeleton/observability",
       "destination": "skeleton/ai/runtime/observability",
       "kind": "tree",
-      "source_git_object_sha": "3f7f261ac997a6e7f2381b1f952643b444838cd3",
-      "role": "AI runtime observability audit and telemetry plane",
+      "source_git_object_sha": "56d1f3e52a4c65a5674b0c26f0f75ec05009bb7e",
+      "role": "AI runtime observability, telemetry, audit, provenance-bound explainability, and executable operations runbook plane",
       "work_package_refs": [
         "WP-W00",
         "WP-W01",
@@ -604,7 +812,37 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-034",
+        "VOL-066",
+        "VOL-068",
+        "VOL-069",
+        "VOL-085",
+        "VOL-091",
+        "VOL-117",
+        "VOL-180",
+        "VOL-181",
+        "VOL-182",
+        "VOL-183",
+        "VOL-184",
+        "VOL-185",
+        "VOL-186",
+        "VOL-187",
+        "VOL-191",
+        "VOL-204",
+        "VOL-235",
+        "VOL-236",
+        "VOL-279",
+        "VOL-280",
+        "VOL-282",
+        "VOL-325",
+        "VOL-390",
+        "VOL-403",
+        "VOL-404",
+        "VOL-405",
+        "VOL-406"
+      ]
     },
     {
       "id": "AIFT-CONTEXTS",
@@ -643,7 +881,7 @@
       "source": "skeleton/security",
       "destination": "skeleton/ai/runtime/security",
       "kind": "tree",
-      "source_git_object_sha": "2f46e62b5a76e6fe053d16aa751fcee099bb9a6e",
+      "source_git_object_sha": "44cecc1c1f9b291e053b8c3d1cf48af7f27be628",
       "role": "AI runtime security and activation controls",
       "work_package_refs": [
         "WP-W00",
@@ -682,14 +920,45 @@
         "cutover:owner-sensitive"
       ],
       "move_batch": "B3-owner-sensitive",
-      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover",
+      "volume_refs": [
+        "VOL-026",
+        "VOL-046",
+        "VOL-083",
+        "VOL-084",
+        "VOL-164",
+        "VOL-165",
+        "VOL-166",
+        "VOL-167",
+        "VOL-168",
+        "VOL-169",
+        "VOL-170",
+        "VOL-172",
+        "VOL-173",
+        "VOL-174",
+        "VOL-175",
+        "VOL-176",
+        "VOL-177",
+        "VOL-205",
+        "VOL-230",
+        "VOL-233",
+        "VOL-256",
+        "VOL-257",
+        "VOL-276",
+        "VOL-277",
+        "VOL-283",
+        "VOL-318",
+        "VOL-320",
+        "VOL-321",
+        "VOL-399"
+      ]
     },
     {
       "id": "AIFT-EVALUATION",
       "source": "skeleton/eval",
       "destination": "skeleton/ai/evaluation",
       "kind": "tree",
-      "source_git_object_sha": "376037bc7f3cd1ec14a200dd0fc53126fdb14d32",
+      "source_git_object_sha": "d9dff0b5bb6a90450d2feaff27289961967aa63c",
       "role": "evaluation and evidence support",
       "work_package_refs": [
         "WP-W00",
@@ -717,14 +986,50 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-024",
+        "VOL-035",
+        "VOL-070",
+        "VOL-077",
+        "VOL-082",
+        "VOL-083",
+        "VOL-101",
+        "VOL-104",
+        "VOL-105",
+        "VOL-106",
+        "VOL-107",
+        "VOL-108",
+        "VOL-168",
+        "VOL-203",
+        "VOL-206",
+        "VOL-207",
+        "VOL-208",
+        "VOL-242",
+        "VOL-248",
+        "VOL-252",
+        "VOL-296",
+        "VOL-323",
+        "VOL-324",
+        "VOL-362",
+        "VOL-363",
+        "VOL-365",
+        "VOL-369",
+        "VOL-391",
+        "VOL-405",
+        "VOL-406",
+        "VOL-414",
+        "VOL-415",
+        "VOL-419"
+      ]
     },
     {
       "id": "AIFT-KERNEL",
       "source": "skeleton/kernel",
       "destination": "skeleton/ai/runtime/kernel",
       "kind": "tree",
-      "source_git_object_sha": "1a869638d7f6ac5598566d86621cc3f49f1efbf6",
+      "source_git_object_sha": "75c2b95ba4cdf5a27aa6ab2460bbb43a1cf7a685",
       "role": "engine kernel and governance primitives",
       "work_package_refs": [
         "WP-W00",
@@ -749,14 +1054,17 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-004"
+      ]
     },
     {
       "id": "AIFT-RELIABILITY",
       "source": "skeleton/reliability",
       "destination": "skeleton/ai/runtime/reliability",
       "kind": "tree",
-      "source_git_object_sha": "ec394e725cc718fa63d071c6a30746c46689b5e6",
+      "source_git_object_sha": "a1d7859f7685e6d8344c3dbe8b5a6dc3f0fff7f2",
       "role": "runtime reliability controls",
       "work_package_refs": [
         "WP-W00",
@@ -784,15 +1092,27 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-029",
+        "VOL-102",
+        "VOL-188",
+        "VOL-288",
+        "VOL-289",
+        "VOL-290",
+        "VOL-291",
+        "VOL-292",
+        "VOL-293",
+        "VOL-294"
+      ]
     },
     {
       "id": "AIFT-LEARNING",
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "cf301feec9ebaf2ca1fcd4c406ca838e50a3cbe9",
-      "role": "controlled learning support",
+      "source_git_object_sha": "4c6cdadff67847d2a1fdbd42f346fbd735124eec",
+      "role": "controlled learning support with evidence-grounded learner-state inference, objective planning, and outcome evaluation",
       "work_package_refs": [
         "WP-W00",
         "WP-W01",
@@ -819,7 +1139,11 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-074",
+        "VOL-101"
+      ]
     },
     {
       "id": "AIFT-RESILIENCE",
@@ -851,7 +1175,11 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-189",
+        "VOL-193"
+      ]
     },
     {
       "id": "AIFT-COGNITION",
@@ -922,7 +1250,7 @@
       "source": "skeleton/repo_intelligence",
       "destination": "skeleton/ai/build/repo_intelligence",
       "kind": "tree",
-      "source_git_object_sha": "5efce02a638abdb6e7749781a2c9ab1b52ee080d",
+      "source_git_object_sha": "ff374e8c0ced7394c92873847ab670c1a5fbfae2",
       "role": "repository intelligence for build/control workflows",
       "work_package_refs": [
         "WP-W00",
@@ -947,15 +1275,19 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B2-domain-build",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-021",
+        "VOL-098"
+      ]
     },
     {
       "id": "AIFT-SIMULATION",
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "ccbbaae31345e87ec74e2d10cc22e28b2365a9aa",
-      "role": "world-model and simulation plane kept separate from real-world authority",
+      "source_git_object_sha": "3c3fdaceb4ded0a4a7394ac56d588dab4956ddb6",
+      "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
         "WP-W12"
@@ -964,7 +1296,10 @@
         "AIQ-S7-E2E-01"
       ],
       "volume_refs": [
-        "VOL-019"
+        "VOL-019",
+        "VOL-073",
+        "VOL-197",
+        "VOL-284"
       ],
       "move_tags": [
         "ai-tree:mapped",
@@ -979,7 +1314,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "0228ea9027d75e733b3c2330f28402cd52447b90",
+      "source_git_object_sha": "d749dc9d71e81911fedb5115b06d7d52a02c04dc",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -988,7 +1323,8 @@
         "AIQ-S7-E2E-01"
       ],
       "volume_refs": [
-        "VOL-023"
+        "VOL-023",
+        "VOL-101"
       ],
       "move_tags": [
         "ai-tree:mapped",
@@ -996,14 +1332,36 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "overlay_children": [
+        "clean_room_transformation.py",
+        "contracts/clean_room_transformation.schema.json",
+        "contracts/forge_10000_cycle.schema.json",
+        "contracts/forge_1000_cycle.schema.json",
+        "contracts/forge_100_cycle.schema.json",
+        "contracts/promotion_arbitration.schema.json",
+        "contracts/quality_delta.schema.json",
+        "contracts/rights_fingerprint.schema.json",
+        "contracts/rival_challenger.schema.json",
+        "contracts/rival_proposer.schema.json",
+        "contracts/rival_verifier.schema.json",
+        "contracts/source_provenance.schema.json",
+        "contracts/stop_policy.schema.json",
+        "flgb_forge_runtime.py",
+        "forge_10000_cycle.py",
+        "forge_1000_cycle.py",
+        "forge_100_cycle.py",
+        "promotion_arbitration.py",
+        "quality_delta.py",
+        "rights_fingerprint.py"
+      ]
     },
     {
       "id": "AIFT-NATIVE",
       "source": "skeleton/native",
       "destination": "skeleton/ai/runtime/native",
       "kind": "tree",
-      "source_git_object_sha": "8ae0e4662c86187ab326d264f918dfbac99ea74d",
+      "source_git_object_sha": "8c6a214853800c1be14884becffd7a13bab17803",
       "role": "high-performance native capability registry, ABI boundary and accelerated kernels",
       "volume_refs": [
         "VOL-032"
@@ -1139,8 +1497,8 @@
       "source": "skeleton/build",
       "destination": "skeleton/ai/build/core",
       "kind": "tree",
-      "source_git_object_sha": "5badce616e249e811c1f6785223469da45b8f7d7",
-      "role": "Incremental build graph and network audit are repository-engineering/build-control support for autonomous AI work.",
+      "source_git_object_sha": "35b5e3d37b97ac35a4ab2cb54162470f3ce7f470",
+      "role": "Incremental build graph, resource-bounded parallel scheduling, deterministic asset invalidation, build observability, release/remote build controls, and network audit support autonomous AI work.",
       "work_package_refs": [
         "WP-W27",
         "WP-W30"
@@ -1235,14 +1593,17 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "overlay_children": [
+        "execution_authority.py"
+      ]
     },
     {
       "id": "AIFT-DATA",
       "source": "skeleton/data",
       "destination": "skeleton/ai/runtime/data",
       "kind": "tree",
-      "source_git_object_sha": "4f15354ee8e7ea83828ece8f8460bd22722239a4",
+      "source_git_object_sha": "5c39deb49b2195a62896759b1185123f5365754e",
       "role": "Cache, event bus, schema evolution, migrations, and lineage helpers are governed runtime data/state infrastructure.",
       "work_package_refs": [
         "WP-W03",
@@ -1255,7 +1616,12 @@
       "volume_refs": [
         "VOL-005",
         "VOL-039",
-        "VOL-139"
+        "VOL-137",
+        "VOL-138",
+        "VOL-139",
+        "VOL-140",
+        "VOL-141",
+        "VOL-142"
       ],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
@@ -1269,14 +1635,14 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_governed_data_tree_exactly_mirrored_with_p3t2_ingestion_document_lineage_quality_registry_synthetic_controls"
     },
     {
       "id": "AIFT-DEVELOPER",
       "source": "skeleton/developer",
       "destination": "skeleton/ai/build/developer",
       "kind": "tree",
-      "source_git_object_sha": "62bf1024adc351ba847630fbc3e208d591226987",
+      "source_git_object_sha": "b38bc7d22d1de5e1417c32bf79a4392927a99a98",
       "role": "Developer CLI, doctor, scaffold, health, and gate tooling support the AI build/repair plane rather than core inference.",
       "work_package_refs": [
         "WP-W27",
@@ -1325,7 +1691,10 @@
         "VOL-003",
         "VOL-005",
         "VOL-028",
-        "VOL-038"
+        "VOL-038",
+        "VOL-297",
+        "VOL-298",
+        "VOL-299"
       ],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
@@ -1534,8 +1903,14 @@
         "AIQ-S7-E2E-01"
       ],
       "volume_refs": [
+        "VOL-029",
         "VOL-030",
-        "VOL-171"
+        "VOL-067",
+        "VOL-068",
+        "VOL-171",
+        "VOL-386",
+        "VOL-390",
+        "VOL-391"
       ],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
@@ -1567,7 +1942,15 @@
       ],
       "volume_refs": [
         "VOL-029",
-        "VOL-030"
+        "VOL-030",
+        "VOL-031",
+        "VOL-381",
+        "VOL-382",
+        "VOL-385",
+        "VOL-392",
+        "VOL-397",
+        "VOL-398",
+        "VOL-399"
       ],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
@@ -1691,8 +2074,8 @@
       "source": "skeleton/repo_machine",
       "destination": "skeleton/ai/build/repo_machine",
       "kind": "tree",
-      "source_git_object_sha": "1f4854df16014f163a44a7b2bb52a5495d26879d",
-      "role": "Repository model, impact, workgraph, governance, and stewardship are direct substrate for the engineering-agent vertical slice.",
+      "source_git_object_sha": "1520a1f5ce0a59af8d75ac757eacaff27eca3c54",
+      "role": "Repository model, impact, workgraph, governance, stewardship, ownership-aware maintenance, and bounded cleanup authority for autonomous repository engineering.",
       "work_package_refs": [
         "WP-W11",
         "WP-W12",
@@ -1773,7 +2156,7 @@
       "source": "skeleton/automation/swarm",
       "destination": "skeleton/ai/agents/swarm",
       "kind": "tree",
-      "source_git_object_sha": "5a69b6573beb734f92aafbd6e7220d8a9e1b3951",
+      "source_git_object_sha": "eec4dbb2cf19e3238ffe7dbd5789bc8f855f22ac",
       "role": "Agent mesh, DAG scheduling, handoff, negotiation, and bounded wave execution belong in the canonical multi-agent plane.",
       "work_package_refs": [
         "WP-W15",
@@ -1840,7 +2223,7 @@
       "source": "skeleton/tools/integrations",
       "destination": "skeleton/ai/runtime/tools/integrations",
       "kind": "tree",
-      "source_git_object_sha": "7a342bbbcfac4bd26124df1c96bbf86df1b183d7",
+      "source_git_object_sha": "f9d5390927342827fb052b429159f07d4583fb23",
       "role": "Connectors/webhooks/credential references are privileged tool-edge integrations and belong under governed tool execution.",
       "work_package_refs": [
         "WP-W13",
@@ -2117,8 +2500,8 @@
       "source": "skeleton/forge/creator",
       "destination": "skeleton/ai/forge/creator",
       "kind": "tree",
-      "source_git_object_sha": "9080deea277fd96dfdcfc8697682afc075f2f036",
-      "role": "Canonical engine-neutral intent compiler and reversible design-edit surface under skeleton/forge/creator; mirrored exactly into AI Forge.",
+      "source_git_object_sha": "d4e8468d645159d658d2706a6829e04197205530",
+      "role": "Canonical engine-neutral intent compilation, persistent design graph, typed command surface, transactional preview, semantic diff, reversible generated-state history, approval boundaries, and work leases under skeleton/forge/creator; mirrored exactly into AI Forge.",
       "work_package_refs": [
         "WP-W12",
         "WP-W27"
@@ -2539,7 +2922,7 @@
       "destination": "skeleton/ai/research/historical/sheaf",
       "kind": "tree",
       "source_git_object_sha": "d9164c7fee370ad9680b0cabe39253f56e0c3b68",
-      "role": "Sheaf/Čech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
+      "role": "Sheaf/\u010cech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
       "work_package_refs": [
         "WP-W09",
         "WP-W26"
@@ -2647,7 +3030,7 @@
       "source": "skeleton/config",
       "destination": "skeleton/ai/runtime/config",
       "kind": "tree",
-      "source_git_object_sha": "deb783b39705076d2559cc263b51ed46054dfdfd",
+      "source_git_object_sha": "13f1b59dff5ca688f80925468dd2026c138a035f",
       "role": "typed engine configuration, secret references, immutable settings and redacted configuration snapshots",
       "work_package_refs": [
         "WP-W00",
@@ -2670,7 +3053,10 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "volume_refs": [
+        "VOL-192"
+      ]
     },
     {
       "id": "AIFT-AI-SHELL",
@@ -4671,7 +5057,25 @@
         "VOL-139"
       ],
       "overlay_children": [
-        "chronicle"
+        "admission.py",
+        "algorithm_lifecycle.py",
+        "archive.py",
+        "attestation.py",
+        "chronicle",
+        "commitments.py",
+        "crypto_backends.py",
+        "crypto_inventory.py",
+        "execution_receipt.py",
+        "horizon_assessment.py",
+        "horizon_signals.py",
+        "key_lifecycle.py",
+        "portable_bundle.py",
+        "quorum.py",
+        "receipt_migration.py",
+        "runtime_bridge.py",
+        "signature_capabilities.py",
+        "signed_envelope.py",
+        "trust_policy.py"
       ],
       "move_tags": [
         "ai-tree:mapped",
@@ -4689,7 +5093,7 @@
       "source": "skeleton/knowledge",
       "destination": "skeleton/ai/runtime/knowledge",
       "kind": "tree",
-      "source_git_object_sha": "518f871ec380c08d8226adbfb0122493efd85d13",
+      "source_git_object_sha": "b3d713a209d0afb4616b86393f01202dfb31b608",
       "role": "Canonical reusable knowledge and reasoning substrate parent with independently governed graph primitives.",
       "work_package_refs": [
         "WP-W09",
@@ -4720,7 +5124,7 @@
       "source": "skeleton/tools",
       "destination": "skeleton/ai/runtime/tools",
       "kind": "tree",
-      "source_git_object_sha": "63239f151af1b31b36db84ead936f9557aa62fb1",
+      "source_git_object_sha": "8e510627d2f55a55b43756934102e3303b168e1e",
       "role": "Canonical governed tool-edge runtime parent with independently governed connector and webhook integrations.",
       "work_package_refs": [
         "WP-W13",
@@ -4809,6 +5213,23 @@
         "galaxy",
         "mesh",
         "network"
+      ],
+      "volume_refs": [
+        "VOL-029",
+        "VOL-030",
+        "VOL-031",
+        "VOL-067",
+        "VOL-068",
+        "VOL-381",
+        "VOL-382",
+        "VOL-385",
+        "VOL-386",
+        "VOL-390",
+        "VOL-391",
+        "VOL-392",
+        "VOL-397",
+        "VOL-398",
+        "VOL-399"
       ]
     },
     {
@@ -4816,7 +5237,7 @@
       "source": "skeleton/research/__init__.py",
       "destination": "skeleton/ai/research/__init__.py",
       "kind": "file",
-      "source_git_object_sha": "8d4beabff6281e385dd926a5ff2911c4b3ee401d",
+      "source_git_object_sha": "0c1404f3a32f1cc2d5beda6fe3a6c85abf0469c3",
       "role": "Research namespace entrypoint; social and existing AI research lineage remain independently governed.",
       "work_package_refs": [
         "WP-W11"
@@ -4830,7 +5251,34 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "canonical_namespace_entrypoint_with_independently_governed_children"
+      "source_disposition": "canonical_namespace_entrypoint_with_independently_governed_children",
+      "volume_refs": [
+        "VOL-001"
+      ]
+    },
+    {
+      "id": "AIFT-RESEARCH-SOURCE-LINEAGE",
+      "source": "skeleton/research/source_lineage.py",
+      "destination": "skeleton/ai/research/source_lineage.py",
+      "kind": "file",
+      "source_git_object_sha": "4441277ceba8e76c1c75c5e442d62fb8f49e9842",
+      "role": "Canonical research source-lineage and evidence tracking surface mirrored exactly into governed AI research quarantine.",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "research_lineage_quarantine_mirror_pending_independent_cutover_validation",
+      "volume_refs": [
+        "VOL-001"
+      ]
     },
     {
       "id": "AIFT-ECS-ADAPTER",
@@ -4881,6 +5329,521 @@
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_execution_sandbox_tree_exactly_mirrored",
       "source_git_object_sha": "90d13b5535593ffd5ff55f244725665f9bd5896a"
+    },
+    {
+      "id": "AIFT-STORAGE",
+      "source": "skeleton/storage",
+      "destination": "skeleton/ai/runtime/storage",
+      "kind": "tree",
+      "source_git_object_sha": "7d69c3755ebd4c0d153e144ad0b47cf564dd4c48",
+      "role": "governed content addressing, cache identity, and durable saga compensation state",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-STATE-02",
+        "AIQ-S4-EXEC-01"
+      ],
+      "volume_refs": [
+        "VOL-133",
+        "VOL-135",
+        "VOL-136"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "canonical_governed_storage_tree_with_exact_ai_runtime_mirror"
+    },
+    {
+      "id": "AIFT-MODELING",
+      "source": "skeleton/modeling",
+      "destination": "skeleton/ai/modeling",
+      "kind": "tree",
+      "source_git_object_sha": "1bcb7a49b30c8176993615924d8eae3676f70277",
+      "role": "Model registry, training, evaluation, and publication support for the governed model-development program.",
+      "work_package_refs": [
+        "WP-W28",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-006"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve bounded resource and provenance contracts",
+        "preserve credential and execution authority boundaries",
+        "keep candidate/extension behavior outside production promotion authority unless explicitly admitted",
+        "prove canonical and governed mirror parity before import inversion"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-TRAINING",
+      "source": "skeleton/training",
+      "destination": "skeleton/ai/training",
+      "kind": "tree",
+      "source_git_object_sha": "3a8e30f9fd6cdd74379e3b0050534db0154f77c0",
+      "role": "Governed AI training plane for durable training control, distributed topology, checkpoint/resume, elastic recovery, bounded observability, evaluation gates, post-training experiments, curriculum, RL environment, and verifier-model support.",
+      "work_package_refs": [
+        "WP-W28",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-006",
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve training run, checkpoint, and recovery identity",
+        "keep research/post-training candidates isolated from production promotion authority",
+        "preserve bounded resource, privacy, and observability contracts",
+        "prove canonical and governed tree parity before import inversion"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "overlay_children": [
+        "__init__.py",
+        "adapter_training.py",
+        "bitemporal_authority.py",
+        "candidate_weights.py",
+        "checkpoint_lineage.py",
+        "contamination_scan.py",
+        "contracts/adapter_training.schema.json",
+        "contracts/candidate_weights.schema.json",
+        "contracts/checkpoint_lineage.schema.json",
+        "contracts/contamination_scan.schema.json",
+        "contracts/dataset_lineage.schema.json",
+        "contracts/dataset_rights.schema.json",
+        "contracts/deduplication.schema.json",
+        "contracts/distillation.schema.json",
+        "contracts/mirror_room_evaluation.schema.json",
+        "contracts/post_training.schema.json",
+        "contracts/promotion_gate.schema.json",
+        "contracts/training_manifest.schema.json",
+        "dataset_lineage.py",
+        "dataset_rights.py"
+      ]
+    },
+    {
+      "id": "AIFT-DOCUMENTATION",
+      "source": "skeleton/documentation",
+      "destination": "skeleton/ai/build/documentation",
+      "kind": "tree",
+      "source_git_object_sha": "a7b5d69200c63c3a2d526cec0828111f21381329",
+      "role": "Deterministic human/generated documentation runtime supporting AI build, plan, validation, and operator-facing artifact maintenance without granting model execution authority.",
+      "work_package_refs": [
+        "WP-W27",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-089",
+        "VOL-090"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve human-authored text ownership boundaries",
+        "preserve deterministic source and generator digest identity",
+        "keep documentation generation outside model execution authority",
+        "prove canonical and governed mirror parity before import inversion"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-ARTIFACTS",
+      "source": "skeleton/artifacts",
+      "destination": "skeleton/ai/runtime/extensions/artifacts",
+      "kind": "tree",
+      "source_git_object_sha": "eaaf487f9aae5300ac1e30e51016f8e8eff15a0c",
+      "role": "Governed artifact and multimodal-ingestion contracts that admit bounded content before decode and preserve content-addressed transformation lineage.",
+      "work_package_refs": [
+        "WP-W28",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-153"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve bounded resource and provenance contracts",
+        "preserve credential and execution authority boundaries",
+        "keep candidate/extension behavior outside production promotion authority unless explicitly admitted",
+        "prove canonical and governed mirror parity before import inversion"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-VISION",
+      "source": "skeleton/vision",
+      "destination": "skeleton/ai/runtime/extensions/vision",
+      "kind": "tree",
+      "source_git_object_sha": "c43edb466e54e474bdecfc5ca679f131e04bfcf0",
+      "role": "Resource-bounded image asset, region, result, and model-provenance contracts.",
+      "work_package_refs": [
+        "WP-W28",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-154"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve bounded resource and provenance contracts",
+        "preserve credential and execution authority boundaries",
+        "keep candidate/extension behavior outside production promotion authority unless explicitly admitted",
+        "prove canonical and governed mirror parity before import inversion"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-DOCUMENT-VISION",
+      "source": "skeleton/document_vision",
+      "destination": "skeleton/ai/runtime/extensions/document_vision",
+      "kind": "tree",
+      "source_git_object_sha": "d2fa1a00f1ceea4e65d72663bd11eebc46c4ebb0",
+      "role": "Coordinate-bound document OCR/native-text fusion contracts with explicit evidence-region provenance.",
+      "work_package_refs": [
+        "WP-W28",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-155"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve bounded resource and provenance contracts",
+        "preserve credential and execution authority boundaries",
+        "keep candidate/extension behavior outside production promotion authority unless explicitly admitted",
+        "prove canonical and governed mirror parity before import inversion"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-AUDIO",
+      "source": "skeleton/audio",
+      "destination": "skeleton/ai/runtime/extensions/audio",
+      "kind": "tree",
+      "source_git_object_sha": "f2ad8147ee93559713bcabff91ee54ce221f76f6",
+      "role": "Bounded audio asset, segmentation, timestamp, confidence, and model-provenance contracts.",
+      "work_package_refs": [
+        "WP-W28",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-156"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve bounded resource and provenance contracts",
+        "preserve credential and execution authority boundaries",
+        "keep candidate/extension behavior outside production promotion authority unless explicitly admitted",
+        "prove canonical and governed mirror parity before import inversion"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-SPEECH",
+      "source": "skeleton/speech",
+      "destination": "skeleton/ai/runtime/extensions/speech",
+      "kind": "tree",
+      "source_git_object_sha": "d3a506a872c278bb43b973864e721ad9e0a90baa",
+      "role": "Stateful live speech session, backpressure, transcript finalization, reconnect, barge-in, and cancellation contracts.",
+      "work_package_refs": [
+        "WP-W28",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-157"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve bounded resource and provenance contracts",
+        "preserve credential and execution authority boundaries",
+        "keep candidate/extension behavior outside production promotion authority unless explicitly admitted",
+        "prove canonical and governed mirror parity before import inversion"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-VIDEO",
+      "source": "skeleton/video",
+      "destination": "skeleton/ai/runtime/extensions/video",
+      "kind": "tree",
+      "source_git_object_sha": "9ba1af3fedd4f293369326f67c3cb67efdffe290",
+      "role": "Resource-bounded temporal video and frame-sampling provenance contracts.",
+      "work_package_refs": [
+        "WP-W28",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-158"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve bounded resource and provenance contracts",
+        "preserve credential and execution authority boundaries",
+        "keep candidate/extension behavior outside production promotion authority unless explicitly admitted",
+        "prove canonical and governed mirror parity before import inversion"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-CONNECTORS",
+      "source": "skeleton/connectors",
+      "destination": "skeleton/ai/runtime/extensions/connectors",
+      "kind": "tree",
+      "source_git_object_sha": "77c88748d04c4ed58739dc3569be0d148e5fa766",
+      "role": "Scoped connector definitions, opaque credential references, sessions, paging, and result contracts for governed external integration.",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-161"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve bounded resource and provenance contracts",
+        "preserve credential and execution authority boundaries",
+        "keep candidate/extension behavior outside production promotion authority unless explicitly admitted",
+        "prove canonical and governed mirror parity before import inversion"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-PLUGINS",
+      "source": "skeleton/plugins",
+      "destination": "skeleton/ai/runtime/extensions/plugins",
+      "kind": "tree",
+      "source_git_object_sha": "95ee1473526944558cff5b921a2de74690d73651",
+      "role": "Permissioned reversible plugin lifecycle and grant contracts under governed extension runtime authority.",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-162",
+        "VOL-163"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve bounded resource and provenance contracts",
+        "preserve credential and execution authority boundaries",
+        "keep candidate/extension behavior outside production promotion authority unless explicitly admitted",
+        "prove canonical and governed mirror parity before import inversion"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-SUPPLY-CHAIN",
+      "source": "skeleton/supply_chain",
+      "destination": "skeleton/ai/runtime/extensions/supply_chain",
+      "kind": "tree",
+      "source_git_object_sha": "9e6703dc1d07b7a1b6a2ea109e527d29ac8c5000",
+      "role": "Model BOM, provenance, dependency, and supply-chain evidence contracts supporting governed AI artifact and model release qualification.",
+      "work_package_refs": [
+        "WP-W20",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-178",
+        "VOL-179"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve content-addressed component and dependency identity",
+        "preserve provenance and release evidence across mirror/cutover",
+        "keep supply-chain metadata outside model execution authority",
+        "prove canonical and governed mirror parity before import inversion"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-MULTIMODAL",
+      "source": "skeleton/multimodal",
+      "destination": "skeleton/ai/runtime/multimodal",
+      "kind": "tree",
+      "source_git_object_sha": "749fcccb8e312baf5b50b7bb006984e806bb3e04",
+      "role": "Typed multimodal ingestion, provenance, sanitization, and cross-modal artifact contracts for completed VOL-020 runtime behavior.",
+      "work_package_refs": [
+        "WP-W28",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-020"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve modality provenance and source identity",
+        "treat embedded instructions and metadata as untrusted evidence",
+        "preserve bounded sanitization and ingestion semantics",
+        "prove canonical and governed mirror parity before import inversion"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-INFERENCE",
+      "source": "skeleton/inference",
+      "destination": "skeleton/ai/runtime/inference/core",
+      "kind": "tree",
+      "source_git_object_sha": "f96b863b26eb4e7ca3e7ddc57eaa859a3cdf1eca",
+      "role": "Core inference session, provider-bridge, replay, and async-runtime compatibility plane staged beneath the canonical inference runtime without colliding with native local/neural/KV engines.",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W19",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-007"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve deterministic session and replay semantics",
+        "preserve provider authority boundaries",
+        "keep native local/neural/KV implementations independently owned",
+        "prove canonical and governed mirror parity before import inversion"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     }
   ],
   "ci_enforcement": {
@@ -4900,7 +5863,7 @@
     "signed_at_utc": null,
     "git_sha": null,
     "evidence_refs": [],
-    "statement": "Pending fresh implementation signoff for the reconciled 154-mapping current-main payload after exact-head CI and full object/parity audit.",
+    "statement": "Pending fresh implementation signoff for the reconciled 178-mapping current-main payload after exact-head CI and full object/parity audit.",
     "signature_method": null
   },
   "verification_signoff": {
@@ -4923,6 +5886,81 @@
     "policy": "Every concrete masterplan skeleton/* implementation root must be migrated, intentionally external with an architecture owner, covered by a migrated alias, or absent. A planned-but-absent engine root appearing later fails validation until classified.",
     "intentionally_external": [
       {
+        "path": "backend/core",
+        "owner": "product/backend core namespace",
+        "reason": "backend core remains product integration authority; only explicitly named legacy AI recovery files are governed by AIFT-V2 compatibility mappings"
+      },
+      {
+        "path": "backend/core/api_contract_registry.py",
+        "owner": "product/backend API contracts",
+        "reason": "backend API registry describes product routes and does not own canonical AI runtime contracts"
+      },
+      {
+        "path": "backend/core/operation_projection.py",
+        "owner": "product/backend projection",
+        "reason": "product projection remains backend/application authority"
+      },
+      {
+        "path": "backend/core/operation_stream_transport.py",
+        "owner": "product/backend transport",
+        "reason": "backend operation-stream transport remains product transport integration"
+      },
+      {
+        "path": "backend/core/operator_control_projection.py",
+        "owner": "product/backend projection",
+        "reason": "operator-control projection is a product-facing view over governed control authority"
+      },
+      {
+        "path": "backend/core/product_shell_projection.py",
+        "owner": "product/backend projection",
+        "reason": "product-shell projection is application-facing and remains outside engine ownership"
+      },
+      {
+        "path": "backend/core/routes_registry.py",
+        "owner": "product/backend API contracts",
+        "reason": "backend route registry remains product/API assembly authority"
+      },
+      {
+        "path": "backend/core/tenant_storage_boundary.py",
+        "owner": "product/backend tenant boundary",
+        "reason": "tenant product storage boundary remains backend integration authority"
+      },
+      {
+        "path": "backend/core/workspace_projection.py",
+        "owner": "product/backend projection",
+        "reason": "workspace projection remains product/application authority"
+      },
+      {
+        "path": "backend/routes",
+        "owner": "product/backend API namespace",
+        "reason": "backend route namespace is product-facing; AI-owned implementations are mirrored only through explicit governed mappings"
+      },
+      {
+        "path": "backend/routes/governance.py",
+        "owner": "product/backend API",
+        "reason": "HTTP governance route is a product API adapter; governance engine ownership remains in governed runtime planes"
+      },
+      {
+        "path": "backend/routes/operation_stream.py",
+        "owner": "product/backend API",
+        "reason": "HTTP operation-stream route remains product transport authority"
+      },
+      {
+        "path": "backend/services/database.py",
+        "owner": "product/backend persistence adapter",
+        "reason": "product database adapter remains outside canonical AI engine ownership"
+      },
+      {
+        "path": "backend/services/rag_service.py",
+        "owner": "product/backend retrieval adapter",
+        "reason": "product-facing RAG service remains an adapter over governed retrieval/runtime ownership"
+      },
+      {
+        "path": "backend/services/rag_state_repository.py",
+        "owner": "product/backend retrieval state adapter",
+        "reason": "backend RAG state integration remains product persistence authority rather than canonical AI engine ownership"
+      },
+      {
         "path": "skeleton/app",
         "owner": "product/application assembly",
         "reason": "application manifest and product runtime assembly remain outside engine implementation ownership"
@@ -4943,24 +5981,24 @@
         "reason": "release/deployment ownership validates the AI engine but must not be nested inside it"
       },
       {
-        "path": "skeleton/release",
-        "owner": "deployment-release plane",
-        "reason": "release SLO and promotion policy are deployment-release authority and remain intentionally outside canonical AI engine ownership"
-      },
-      {
         "path": "skeleton/deployment",
         "owner": "deployment-release plane",
         "reason": "deployment support remains release infrastructure"
       },
       {
-        "path": "skeleton/testing",
-        "owner": "evidence/test plane",
-        "reason": "test evidence remains repository-level and must exercise both legacy compatibility paths and canonical AI destinations"
+        "path": "skeleton/release",
+        "owner": "deployment-release plane",
+        "reason": "release SLO and promotion policy are deployment-release authority and remain intentionally outside canonical AI engine ownership"
       },
       {
         "path": "skeleton/shells",
         "owner": "shell/product compatibility surfaces",
         "reason": "shell/UI adapters remain product-facing compatibility surfaces rather than canonical AI engine ownership"
+      },
+      {
+        "path": "skeleton/testing",
+        "owner": "evidence/test plane",
+        "reason": "test evidence remains repository-level and must exercise both legacy compatibility paths and canonical AI destinations"
       }
     ],
     "covered_aliases": [
@@ -5111,33 +6149,19 @@
       }
     ],
     "planned_but_absent": [
-      "skeleton/artifacts",
-      "skeleton/audio",
       "skeleton/autonomy",
       "skeleton/compute",
-      "skeleton/connectors",
       "skeleton/document",
-      "skeleton/document_vision",
       "skeleton/education",
       "skeleton/experiments",
       "skeleton/hardware",
-      "skeleton/inference",
-      "skeleton/modeling",
-      "skeleton/multimodal",
       "skeleton/planning",
-      "skeleton/plugins",
       "skeleton/policy",
       "skeleton/product",
       "skeleton/product_shell",
       "skeleton/repo_engineering",
       "skeleton/routing",
       "skeleton/safety",
-      "skeleton/speech",
-      "skeleton/storage",
-      "skeleton/training",
-      "skeleton/verification",
-      "skeleton/video",
-      "skeleton/vision",
       "skeleton/workers"
     ],
     "non_engine_root_exclusions": [
@@ -5157,7 +6181,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "154_mapping_transfer_v2_wave_2b_reconciled_current_main_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "178_mapping_plus_24_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -5254,7 +6278,7 @@
       }
     }
   ],
-  "assignment_basis_git_sha": "2291e57f40c55b4aa705faa64a5e5c1ae34e437a",
+  "assignment_basis_git_sha": "6c24e3874e15b1eb8058d3ffd6c594eb7e89d4de",
   "assignment_policy": {
     "version": "1.0.0",
     "source_identity": "Each pending assignment is bound to the source Git tree/blob object on assignment_basis_git_sha.",
@@ -5263,6 +6287,11 @@
     "external_rule": "Product, packaging, deployment, architecture-authority, and accelerator roots stay outside skeleton/ai unless separately reclassified."
   },
   "retained_outside_ai_tree": [
+    {
+      "path": "skeleton/inference",
+      "owner": "provider-neutral inference runtime",
+      "reason": "Canonical bounded inference runtime remains at skeleton/inference; provider authority remains at skeleton/provider_runtime.py pending explicit ownership cutover."
+    },
     {
       "path": "skeleton/README.py",
       "owner": "package documentation",
@@ -5697,12 +6726,27 @@
       "path": "skeleton/foundation/architecture",
       "owner": "architecture compatibility/history",
       "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/main_guard",
+      "owner": "repository-machine control boundary",
+      "reason": "main-guard enforces repository and CI integrity outside canonical AI runtime ownership"
+    },
+    {
+      "path": "skeleton/ops",
+      "owner": "operations/release tooling",
+      "reason": "operational cockpit, release/preview hygiene, and smoke-verdict tooling stay outside canonical AI runtime ownership"
+    },
+    {
+      "path": "skeleton/verification",
+      "owner": "verification and assurance infrastructure",
+      "reason": "Repository verification/evidence infrastructure remains outside canonical AI runtime ownership; it validates AI and non-AI surfaces without becoming product runtime authority."
     }
   ],
   "classification_coverage": {
-    "status": "closed_after_all_preclassified_moves",
+    "status": "closed_after_completed_work_fill",
     "rule": "Every first-level skeleton/* path is either a governed mapping source, a pending assignment source, an architecture-approved external path, an explicit exclusion, or retained_outside_ai_tree.",
-    "source_head": "0c867cca9131f14532b31fce627f176f9119ba17"
+    "source_head": "3f80b3d303aa2bdd99d70375b2ea3162f1f70921"
   },
   "priority_one_migration": {
     "status": "mirrored_governed_cutover_pending",
@@ -5778,8 +6822,8 @@
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
     "note": "TREE-030 canonicalized School under skeleton/learning/school, retained skeleton/school as an explicitly classified compatibility boundary, preserved exact AI School parity, and left acquired.py as the only AIFT-LEARNING overlay.",
-    "current_mapping_count": 154,
-    "audit_scope_status": "validated_134_mapping_line_extended_to_154_requires_full_refresh",
+    "current_mapping_count": 178,
+    "audit_scope_status": "validated historical line extended_to_177_requires_full_exact_head_refresh",
     "pending_mapping_ids": [
       "AIFT-V2B-GAMEFORGE-AGENTS",
       "AIFT-V2B-GAMEFORGE-JEEVES",
@@ -5928,21 +6972,22 @@
   },
   "pre_move_readiness": {
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
-    "governed_mapping_count": 162,
+    "governed_mapping_count": 178,
     "pending_assignment_count": 0,
     "retained_outside_ai_tree_count": 86,
     "batch_counts": {
-      "B3-owner-sensitive": 8,
-      "B1-core-runtime": 59,
-      "B2-domain-build": 13,
-      "B4-research-quarantine": 54,
+      "B3-owner-sensitive": 9,
+      "B1-core-runtime": 72,
+      "B2-domain-build": 14,
+      "B4-research-quarantine": 55,
       "B3-compat-convergence": 28
     },
     "fresh_object_audit_required": true,
     "global_cutover_blockers": [
       "BASE-FRONTEND-SSR-RAF-01"
     ],
-    "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion."
+    "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
+    "native_ai_owner_count": 24
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -5976,6 +7021,862 @@
       "head_sha": "299c7ed0b2aa0bf767b9adacd51f7e4cb1e672e1",
       "refreshed_mapping_count": 11,
       "policy": "Current-main semantic mapping metadata preserved; #2441 readiness/version corrections merged and all source identities recomputed against the reconciled repair tree."
+    },
+    "p3t2_storage_compensation_recovery": {
+      "base_storage_head_sha": "eff5e6952834c8cd86a57eed5975b476a9302b88",
+      "refreshed_source_tree_sha": "d1f46cc03da625048f00cc653856b030fa2eed79",
+      "policy": "Persisted compensation payloads are recoverable only while a saga is compensating and are returned in reverse applied-effect order; canonical and AI-runtime storage mirrors remain byte-identical."
+    },
+    "p3t2_storage_file_tree_reconciliation": {
+      "source_main_sha": "a64d9b75524a5a8143fe24c2bf22e4b5a5e617cd",
+      "status": "candidate_pending_exact_head_ci",
+      "refreshed_mapping_ids": [
+        "AIFT-CONTRACTS",
+        "AIFT-PERSISTENCE",
+        "AIFT-ENGINE-API",
+        "AIFT-VAULT"
+      ],
+      "governed_mapping_count": 163,
+      "batch_counts": {
+        "B3-owner-sensitive": 8,
+        "B1-core-runtime": 60,
+        "B2-domain-build": 13,
+        "B4-research-quarantine": 54,
+        "B3-compat-convergence": 28
+      },
+      "policy": "Refresh exact Git object identities and aggregate mapping counts after P3T2 storage and subsequent current-main merges; this metadata repair grants no cutover, completion, promotion, implementation signoff, or independent verification authority."
+    },
+    "p3t2_data_candidate": {
+      "implementation_head_sha": "6ea2f5bb41bd6f0fe01e2ed35d6cc21e0a3239c5",
+      "source_tree_sha": "5c39deb49b2195a62896759b1185123f5365754e",
+      "task_id": "P3T2-DATA-01",
+      "volume_refs": [
+        "VOL-137",
+        "VOL-138",
+        "VOL-139",
+        "VOL-140",
+        "VOL-141",
+        "VOL-142"
+      ],
+      "policy": "Applied after current-main global mapping reconciliation; preserves existing mapping identities while binding the hardened P3-T2 data implementation tree, adversarial validation, and exact mirror evidence without granting closure authority."
+    },
+    "masterplan_completion_ai_tree_reconciliation_2026_10_05": {
+      "base_main_sha": "03a5ff12967a0d597784112a1208c73718098d5b",
+      "repaired_mapping_count": 5,
+      "repaired_mappings": [
+        {
+          "id": "AIFT-CONTRACTS",
+          "files": [
+            "architecture_fitness.py",
+            "project_metrics.py",
+            "roadmap_control.py",
+            "technical_debt.py",
+            "technology_radar.py",
+            "traceability.py"
+          ]
+        },
+        {
+          "id": "AIFT-PERSISTENCE",
+          "files": [
+            "foundation_recovery.py"
+          ]
+        },
+        {
+          "id": "AIFT-AUTOMATION",
+          "files": [
+            "__init__.py",
+            "architecture_fitness.py",
+            "build_order.py",
+            "completion_model.py",
+            "definition_of_done.py",
+            "independent_review.py",
+            "master_appendices.py",
+            "priority_engine.py",
+            "roadmap_control.py",
+            "technical_debt.py",
+            "technology_radar.py",
+            "traceability.py",
+            "transactional_workspace.py",
+            "work_packages.py"
+          ],
+          "volume_refs": [
+            "VOL-004"
+          ]
+        },
+        {
+          "id": "AIFT-OBSERVABILITY",
+          "files": [
+            "project_metrics.py"
+          ]
+        },
+        {
+          "id": "AIFT-SECURITY",
+          "files": [
+            "zero_trust.py"
+          ]
+        }
+      ],
+      "refreshed_source_identity_count": 164,
+      "volume_refs": [
+        "VOL-112",
+        "VOL-113",
+        "VOL-114",
+        "VOL-115",
+        "VOL-116",
+        "VOL-117",
+        "VOL-118",
+        "VOL-119",
+        "VOL-120",
+        "VOL-121"
+      ],
+      "policy": "Restore declared source-to-AI staged-mirror parity while honoring source exclusions, overlays, and compatibility-facade exceptions; reconcile landed implementation evidence without granting completion signoff, cutover, source retirement, or independent-verification authority.",
+      "external_authority_confirmations": [
+        {
+          "volume_ref": "VOL-120",
+          "path": "skeleton/app/final_assembly.py",
+          "classification": "intentionally_external",
+          "owner": "product/application assembly"
+        }
+      ]
+    },
+    "completed_work_fill_2026_10_05": {
+      "base_main_sha": "3f80b3d303aa2bdd99d70375b2ea3162f1f70921",
+      "added_mapping_count": 12,
+      "added_mapping_ids": [
+        "AIFT-ARTIFACTS",
+        "AIFT-AUDIO",
+        "AIFT-CONNECTORS",
+        "AIFT-DOCUMENT-VISION",
+        "AIFT-DOCUMENTATION",
+        "AIFT-MODELING",
+        "AIFT-PLUGINS",
+        "AIFT-SPEECH",
+        "AIFT-SUPPLY-CHAIN",
+        "AIFT-TRAINING",
+        "AIFT-VIDEO",
+        "AIFT-VISION"
+      ],
+      "exact_tree_mirror_count": 11,
+      "repaired_existing_mirror_file_count": 11,
+      "policy": "Govern already-landed completed/implemented AI capability roots as staged exact-object mirrors; preserve legacy imports and external product/backend ownership; grant no cutover, source retirement, completion signature, or independent-verification authority."
+    },
+    "completed_work_fill_2026_10_05_followup": {
+      "base_main_sha": "a37b0bbf7d21c1d0e37ee2f8131fe53b0b43466c",
+      "repaired_mapping_ids": [
+        "AIFT-RELIABILITY"
+      ],
+      "files": [
+        "skeleton/reliability/distributed_execution.py"
+      ],
+      "volume_refs": [
+        "VOL-102"
+      ],
+      "policy": "Exact Git-object staged mirror refresh after the post-#2899 VOL-102 rebuild; no cutover, source retirement, completion promotion, or independent-verification authority."
+    },
+    "completed_work_fill_followup_2026_10_05": {
+      "base_main_sha": "0f1a76f115b78f97dc5abb2b9a9d694682a23f7f",
+      "repaired_file_count": 8,
+      "repaired_mappings": [
+        "AIFT-AUTOMATION",
+        "AIFT-REPO-INTELLIGENCE",
+        "AIFT-SIMULATION"
+      ],
+      "volume_refs": [
+        "VOL-019",
+        "VOL-022",
+        "VOL-073",
+        "VOL-094",
+        "VOL-095",
+        "VOL-098"
+      ],
+      "policy": "Mirror exact current-main Git objects for governed completed-work sources while preserving legacy owners, compatibility facades, source exclusions, and staged-mirror cutover rules. No completion signature or source retirement authority is granted.",
+      "external_authority_confirmations": [
+        {
+          "path": "backend/services/database.py",
+          "owner": "product/backend persistence adapter"
+        },
+        {
+          "path": "backend/services/ai_service.py",
+          "owner": "product/backend AI adapter"
+        },
+        {
+          "path": "backend/services/rag_service.py",
+          "owner": "product/backend retrieval adapter"
+        },
+        {
+          "path": "backend/services/rag_state_repository.py",
+          "owner": "product/backend retrieval state adapter"
+        },
+        {
+          "path": "backend/routes/governance.py",
+          "owner": "product/backend API"
+        },
+        {
+          "path": "backend/routes/operation_stream.py",
+          "owner": "product/backend API"
+        },
+        {
+          "path": "backend/routes",
+          "owner": "product/backend API namespace"
+        },
+        {
+          "path": "backend/core/operation_stream_transport.py",
+          "owner": "product/backend transport"
+        },
+        {
+          "path": "backend/core/operation_projection.py",
+          "owner": "product/backend projection"
+        },
+        {
+          "path": "backend/core/api_contract_registry.py",
+          "owner": "product/backend API contracts"
+        },
+        {
+          "path": "backend/core/routes_registry.py",
+          "owner": "product/backend API contracts"
+        },
+        {
+          "path": "backend/core/product_shell_projection.py",
+          "owner": "product/backend projection"
+        },
+        {
+          "path": "backend/core/tenant_storage_boundary.py",
+          "owner": "product/backend tenant boundary"
+        },
+        {
+          "path": "backend/core/operator_control_projection.py",
+          "owner": "product/backend projection"
+        },
+        {
+          "path": "backend/core/workspace_projection.py",
+          "owner": "product/backend projection"
+        },
+        {
+          "path": "backend/core",
+          "owner": "product/backend core namespace"
+        }
+      ],
+      "completed_work_external_policy": "Backend product/API adapters remain external to canonical AI engine ownership; explicit AIFT-V2 compatibility mappings remain narrower exceptions for legacy AI recovery surfaces."
+    },
+    "completed_work_ai_tree_fill_2026_10_05": {
+      "base_main_sha": "909ebf8b316c75cc345c46b9ca1d6d190faf28ee",
+      "refreshed_source_identity_count": 177,
+      "added_mappings": [
+        {
+          "id": "AIFT-MULTIMODAL",
+          "source": "skeleton/multimodal",
+          "destination": "skeleton/ai/runtime/multimodal",
+          "source_tree_sha": "749fcccb8e312baf5b50b7bb006984e806bb3e04",
+          "volume_refs": [
+            "VOL-020"
+          ]
+        }
+      ],
+      "repaired_mappings": [
+        {
+          "id": "AIFT-PERSISTENCE",
+          "files": [
+            "foundation_recovery.py"
+          ]
+        },
+        {
+          "id": "AIFT-VAULT",
+          "files": [
+            "deletion_proof.py"
+          ]
+        }
+      ],
+      "preserved_completed_ownership": [
+        {
+          "id": "AIFT-DOCUMENTATION",
+          "volume_refs": [
+            "VOL-089",
+            "VOL-090"
+          ],
+          "destination": "skeleton/ai/build/documentation"
+        }
+      ],
+      "policy": "Fill completed AI implementation ownership and restore exact staged-mirror parity without source retirement, import inversion, backend/product ownership capture, or completion-signature authority."
+    },
+    "completed_volume_traceability_2026_10_05": {
+      "base_main_sha": "8a71027899f99f58068ec8ca1fc8d82b1254116b",
+      "added_traceability_edge_count": 42,
+      "affected_mapping_ids": [
+        "AIFT-AGENTS",
+        "AIFT-FORGE",
+        "AIFT-FRONTIER",
+        "AIFT-MESH",
+        "AIFT-NETWORK",
+        "AIFT-PERSISTENCE",
+        "AIFT-RESEARCH",
+        "AIFT-RESEARCH-SOURCE-LINEAGE"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-017",
+        "VOL-018",
+        "VOL-025",
+        "VOL-028",
+        "VOL-029",
+        "VOL-031",
+        "VOL-039",
+        "VOL-067",
+        "VOL-068",
+        "VOL-084",
+        "VOL-101",
+        "VOL-168",
+        "VOL-170",
+        "VOL-201",
+        "VOL-202",
+        "VOL-205",
+        "VOL-207",
+        "VOL-208",
+        "VOL-256",
+        "VOL-257",
+        "VOL-258",
+        "VOL-259",
+        "VOL-318",
+        "VOL-320",
+        "VOL-321",
+        "VOL-322",
+        "VOL-323",
+        "VOL-324",
+        "VOL-325",
+        "VOL-381",
+        "VOL-382",
+        "VOL-385",
+        "VOL-386",
+        "VOL-390",
+        "VOL-391",
+        "VOL-392",
+        "VOL-397",
+        "VOL-398",
+        "VOL-399"
+      ],
+      "mirrored_files": [
+        "skeleton/frontier/event_architecture.py -> skeleton/ai/runtime/frontier/event_architecture.py",
+        "skeleton/frontier/runtime/event_architecture.py -> skeleton/ai/runtime/frontier/runtime/event_architecture.py",
+        "skeleton/frontier/runtime/operation_stream_store.py -> skeleton/ai/runtime/frontier/runtime/operation_stream_store.py"
+      ],
+      "policy": "Restore exact current-main staged-mirror parity and require every mature masterplan volume whose implementation path resolves to a governed AI-tree source or destination to be referenced by the most-specific owning mapping. This grants no completion, cutover, source-retirement, or independent-verification authority."
+    },
+    "completed_work_ai_tree_refresh_2026_10_05": {
+      "base_main_sha": "0e38037c096059b12bd6447fe5e502f81218f870",
+      "refreshed_mapping_count": 3,
+      "refreshed_mappings": [
+        {
+          "id": "AIFT-INTELLIGENCE",
+          "files": [
+            "__init__.py",
+            "router_registry.py"
+          ]
+        },
+        {
+          "id": "AIFT-DEVELOPER",
+          "files": [
+            "bootstrap.py"
+          ]
+        }
+      ],
+      "refreshed_source_identity_count": 177,
+      "completed_volume_count": 209,
+      "unclassified_completed_implementation_paths": 0,
+      "policy": "Restore staged-mirror parity for completed governed work without source retirement, import cutover, product/backend ownership expansion, or fabricated completion authority."
+    },
+    "completed_work_volume_ref_backfill_2026_10_05": {
+      "mapping_id": "AIFT-CONTRACTS",
+      "added_volume_refs": [
+        "VOL-003"
+      ],
+      "mature_volume_count": 209,
+      "remaining_missing_mature_volume_mapping_links": 0,
+      "policy": "Bind already-completed canonical contract work to its governed AI-tree mapping without changing implementation ownership, maturity, or completion authority."
+    },
+    "mature_volume_traceability_refresh_2026_10_05": {
+      "source_plan_head_sha": "cd454ca86090a3e03dbce349ca3b23ba54553be5",
+      "mature_volume_count": 209,
+      "added_links": [
+        {
+          "volume_ref": "VOL-188",
+          "mapping_id": "AIFT-RELIABILITY"
+        },
+        {
+          "volume_ref": "VOL-191",
+          "mapping_id": "AIFT-OBSERVABILITY"
+        },
+        {
+          "volume_ref": "VOL-206",
+          "mapping_id": "AIFT-EVALUATION"
+        }
+      ],
+      "remaining_unclassified_mature_implementation_paths": 0,
+      "remaining_missing_mature_volume_mapping_links": 0,
+      "policy": "Reflect newly promoted completed work in governed AI-tree traceability without changing implementation ownership or completion authority."
+    },
+    "native_ai_completed_work_governance_2026_10_05": {
+      "native_owner_count": 10,
+      "mature_ai_native_implementation_path_count": 23,
+      "mature_volume_count": 209,
+      "policy": "Govern completed implementations born directly inside skeleton/ai without fabricating legacy source mappings; residual native tree owners exclude authority already held by more-specific migration destinations."
+    },
+    "mature_volume_traceability_backfill_2026_10_05": {
+      "base_main_sha": "ae8f8dd30f133adfc3f09d861ee635591e07f654",
+      "affected_mapping_count": 5,
+      "added_volume_ref_count": 19,
+      "added_volume_refs": {
+        "AIFT-DISTRIBUTED": [
+          "VOL-029",
+          "VOL-030",
+          "VOL-031",
+          "VOL-067",
+          "VOL-068",
+          "VOL-381",
+          "VOL-382",
+          "VOL-385",
+          "VOL-386",
+          "VOL-390",
+          "VOL-391",
+          "VOL-392",
+          "VOL-397",
+          "VOL-398",
+          "VOL-399"
+        ],
+        "AIFT-SIMULATION": [
+          "VOL-197"
+        ],
+        "AIFT-CONTRACTS": [
+          "VOL-200"
+        ],
+        "AIFT-EVALUATION": [
+          "VOL-203"
+        ],
+        "AIFT-OBSERVABILITY": [
+          "VOL-204"
+        ]
+      },
+      "policy": "Bind already-landed mature implementation volumes to their existing governed AI-tree owners without moving product/backend authority, changing runtime behavior, granting cutover, or asserting independent completion verification."
+    },
+    "mature_volume_path_reconciliation_2026_10_05": {
+      "base_main_sha": "43867c098e9beb4851c6dc1cc936f8e196e64720",
+      "repaired_volume_count": 9,
+      "repaired_stale_path_count": 11,
+      "repaired_volumes": [
+        "VOL-007",
+        "VOL-020",
+        "VOL-103",
+        "VOL-188",
+        "VOL-189",
+        "VOL-190",
+        "VOL-191",
+        "VOL-192",
+        "VOL-193"
+      ],
+      "added_mapping_volume_refs": {
+        "AIFT-ENGINE-API": [
+          "VOL-020"
+        ],
+        "AIFT-RESILIENCE": [
+          "VOL-189",
+          "VOL-193"
+        ],
+        "AIFT-CONFIG": [
+          "VOL-192"
+        ]
+      },
+      "policy": "Replace stale or shorthand mature-volume implementation paths with current repository owners and bind newly exposed governed AI owners without changing runtime behavior, cutover authority, implementation maturity, completion signatures, or independent verification."
     }
-  }
+  },
+  "native_ai_owners": [
+    {
+      "id": "AIFT-NATIVE-AI-PACKAGE",
+      "path": "skeleton/ai/__init__.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI package export surface for AI-native capabilities.",
+      "volume_refs": [
+        "VOL-113"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-SPECIALIZATION-DOMAIN",
+      "path": "skeleton/ai/specialization/domain_registry.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native specialization/domain registry.",
+      "volume_refs": [
+        "VOL-071"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-FUNCTIONAL-TRANSACTION",
+      "path": "skeleton/ai/functional_transaction.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native functional transaction boundary.",
+      "volume_refs": [
+        "VOL-097"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-BUILD-ROOT",
+      "path": "skeleton/ai/build",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual AI-native build/engineering surfaces not owned by more-specific mirrored build mappings.",
+      "volume_refs": [
+        "VOL-098",
+        "VOL-100",
+        "VOL-259",
+        "VOL-263",
+        "VOL-264",
+        "VOL-265",
+        "VOL-266"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-RESEARCH-RUNTIME",
+      "path": "skeleton/ai/research.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native research runtime distinct from quarantined research mirrors.",
+      "volume_refs": [
+        "VOL-099"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-AGENTS-ROOT",
+      "path": "skeleton/ai/agents",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual AI-native multi-agent engineering surfaces outside mirrored Jeeves/core/swarm subtrees.",
+      "volume_refs": [
+        "VOL-100",
+        "VOL-201",
+        "VOL-202",
+        "VOL-203",
+        "VOL-204",
+        "VOL-205",
+        "VOL-206",
+        "VOL-207",
+        "VOL-237"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-CAPABILITY-MAP",
+      "path": "skeleton/ai/capability_map.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI capability-map runtime.",
+      "volume_refs": [
+        "VOL-113"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-EXTENSIONS-ROOT",
+      "path": "skeleton/ai/runtime/extensions",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual AI-native extension ecosystem/multimodal surfaces outside mirrored extension domains.",
+      "volume_refs": [
+        "VOL-159",
+        "VOL-160",
+        "VOL-163"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-DEFERRED-RUNTIME",
+      "path": "skeleton/ai/runtime/deferred",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native deferred capability runtime and qualification surfaces.",
+      "volume_refs": [
+        "VOL-188",
+        "VOL-189",
+        "VOL-190",
+        "VOL-191",
+        "VOL-192",
+        "VOL-193",
+        "VOL-194",
+        "VOL-196",
+        "VOL-197",
+        "VOL-198"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-ARTIFACT-REVIEW",
+      "path": "skeleton/ai/artifact_review.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native artifact review implementation.",
+      "volume_refs": [
+        "VOL-209"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-AI-README",
+      "path": "skeleton/ai/README.md",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical documentation for the governed AI assembly tree and its ownership rules.",
+      "volume_refs": [
+        "VOL-000"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-ASSISTANT-ROOT",
+      "path": "skeleton/ai/assistant",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native assistant control-plane, context, tooling, routing, provenance, memory, automation, and handoff surfaces.",
+      "volume_refs": [
+        "VOL-097"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-COMPAT-ROOT",
+      "path": "skeleton/ai/compat",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual compatibility package surfaces not claimed by more-specific convergence mappings; compatibility never creates independent production authority.",
+      "volume_refs": [
+        "VOL-003",
+        "VOL-060",
+        "VOL-261"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-INTEGRATIONS-ROOT",
+      "path": "skeleton/ai/integrations",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native bounded integration adapters and open-source interoperability surfaces.",
+      "volume_refs": [
+        "VOL-007",
+        "VOL-162",
+        "VOL-343"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PLANNING-ROOT",
+      "path": "skeleton/ai/planning",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native construction/planning authority support distinct from mirrored runtime planning implementations.",
+      "volume_refs": [
+        "VOL-014",
+        "VOL-095"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-PROVIDERS-ROOT",
+      "path": "skeleton/ai/providers",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual provider package/export surfaces around more-specific governed provider contract and runtime mappings.",
+      "volume_refs": [
+        "VOL-007",
+        "VOL-227",
+        "VOL-228",
+        "VOL-229",
+        "VOL-239",
+        "VOL-240"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-RESEARCH-ROOT",
+      "path": "skeleton/ai/research",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual AI-native research and quarantined external reference material not claimed by more-specific historical/acquired/legacy mappings.",
+      "volume_refs": [
+        "VOL-001",
+        "VOL-099",
+        "VOL-106",
+        "VOL-409"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-RUNTIME-ROOT",
+      "path": "skeleton/ai/runtime",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual canonical AI-native runtime surfaces\u2014including autonomous engineering, effects, local inference, learning foundation, training, functional AI, provider runtime, and system completion\u2014not claimed by more-specific mappings or native owners.",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-007",
+        "VOL-015",
+        "VOL-022",
+        "VOL-097",
+        "VOL-119",
+        "VOL-143",
+        "VOL-231",
+        "VOL-232"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-GOVERNANCE-ROOT",
+      "path": "skeleton/ai/governance",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native October 2026 governance cards, health, administration, and engineering-standards evidence surfaces.",
+      "volume_refs": [
+        "VOL-221",
+        "VOL-222",
+        "VOL-223",
+        "VOL-224",
+        "VOL-225",
+        "VOL-226",
+        "VOL-234"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-GAME-BUILDER-ROOT",
+      "path": "skeleton/ai/game_builder",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native dual-rival game-builder control, canon, rights, evaluation, resilience, assurance, resource, debt, and release runtime surfaces.",
+      "volume_refs": [
+        "VOL-073",
+        "VOL-101",
+        "VOL-197"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-AI-ROOT-RESIDUAL",
+      "path": "skeleton/ai",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": true,
+      "role": "Residual canonical AI-native top-level modules not claimed by more-specific migration mappings or native subtree owners; prevents ownership ambiguity while preserving specific descendant authorities.",
+      "volume_refs": [
+        "VOL-084",
+        "VOL-097",
+        "VOL-098",
+        "VOL-099",
+        "VOL-100",
+        "VOL-101",
+        "VOL-102",
+        "VOL-113",
+        "VOL-164",
+        "VOL-197",
+        "VOL-201",
+        "VOL-202",
+        "VOL-203",
+        "VOL-204",
+        "VOL-205",
+        "VOL-206",
+        "VOL-207",
+        "VOL-209",
+        "VOL-210",
+        "VOL-217",
+        "VOL-218",
+        "VOL-237",
+        "VOL-238",
+        "VOL-239",
+        "VOL-240",
+        "VOL-241",
+        "VOL-243",
+        "VOL-247",
+        "VOL-248",
+        "VOL-249",
+        "VOL-250",
+        "VOL-251",
+        "VOL-252",
+        "VOL-258",
+        "VOL-259",
+        "VOL-261",
+        "VOL-263",
+        "VOL-264",
+        "VOL-265",
+        "VOL-266",
+        "VOL-285",
+        "VOL-286",
+        "VOL-287",
+        "VOL-320",
+        "VOL-321",
+        "VOL-322",
+        "VOL-323",
+        "VOL-325",
+        "VOL-336",
+        "VOL-337",
+        "VOL-338",
+        "VOL-339",
+        "VOL-343",
+        "VOL-361",
+        "VOL-362",
+        "VOL-363",
+        "VOL-364",
+        "VOL-365",
+        "VOL-381",
+        "VOL-382",
+        "VOL-385",
+        "VOL-386",
+        "VOL-398",
+        "VOL-400",
+        "VOL-411",
+        "VOL-412",
+        "VOL-413",
+        "VOL-414"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-EXECUTION-AUTHORITY-CONTRACTS",
+      "path": "skeleton/ai/runtime/contracts/execution_authority.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "volume_refs": [
+        "VOL-084",
+        "VOL-097",
+        "VOL-131",
+        "VOL-164",
+        "VOL-300"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-EXECUTION-AUTHORITY-CORE",
+      "path": "skeleton/ai/runtime/core/execution_authority.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "volume_refs": [
+        "VOL-084",
+        "VOL-097",
+        "VOL-131",
+        "VOL-164",
+        "VOL-300"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-MATHEMATICS-ROOT",
+      "path": "skeleton/ai/mathematics",
+      "kind": "tree",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Canonical AI-native deterministic mathematical reference substrate for stable numerics, linear algebra, probability, optimization, and runtime parity evidence; no independent knowledge, model, promotion, or execution authority.",
+      "volume_refs": [
+        "VOL-012"
+      ]
+    }
+  ]
 }

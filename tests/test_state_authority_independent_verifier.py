@@ -27,12 +27,19 @@ def _fixture_root(tmp_path: Path) -> Path:
             encoding="utf-8"
         )
     )
+    master = json.loads(
+        (verifier.ROOT / verifier.MASTERPLAN_PATH).read_text(
+            encoding="utf-8"
+        )
+    )
     _write_json(root / verifier.TOPOLOGY_PATH, topology)
     _write_json(root / verifier.BACKUP_POLICY_PATH, policy)
+    _write_json(root / verifier.MASTERPLAN_PATH, master)
 
     for relative in (
         verifier.COMPOSE_PATH,
         verifier.RECOVERY_WORKFLOW_PATH,
+        verifier.RELEASE_WORKFLOW_PATH,
     ):
         source = verifier.ROOT / relative
         target = root / relative
@@ -43,6 +50,8 @@ def _fixture_root(tmp_path: Path) -> Path:
         Path("scripts/state_backup_bundle.py"),
         Path("scripts/state_recovery_drill.py"),
         Path("scripts/verify_state_authority_closure.py"),
+        verifier.MIGRATION_TOOL_PATH,
+        verifier.MIGRATION_TEST_PATH,
     ):
         target = root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -78,13 +87,23 @@ def _mutate_policy(root: Path, mutate) -> None:
     _write_json(path, payload)
 
 
+def _mutate_masterplan(root: Path, mutate) -> None:
+    path = root / verifier.MASTERPLAN_PATH
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    mutate(payload)
+    _write_json(path, payload)
+
+
 def test_repository_state_authority_verifier_accepts_current_contract() -> None:
     receipt = verifier.verify_repository(verifier.ROOT)
 
     assert receipt["valid"] is True
     assert receipt["errors"] == []
-    assert receipt["verifier"] == "independent-state-authority-v1"
+    assert receipt["verifier"] == "independent-state-authority-v2"
+    assert receipt["volume"] == "VOL-005"
     assert len(receipt["authority_digest"]) == 64
+    assert len(receipt["volume_binding"]["binding_digest"]) == 64
+    assert len(receipt["receipt_digest"]) == 64
     assert {
         item["id"]
         for item in receipt["authoritative_domains"]
@@ -240,3 +259,152 @@ def test_verifier_allows_other_explicit_unbound_gap_but_not_state_gap(
         == error
         for error in receipt["errors"]
     )
+
+
+
+def test_verifier_rejects_partial_authoritative_status(
+    tmp_path: Path,
+) -> None:
+    root = _fixture_root(tmp_path)
+
+    def mutate(payload):
+        domain = next(
+            item
+            for item in payload["state_domains"]
+            if item["id"] == "engine-mongo-state"
+        )
+        domain["status"] = "declared-partial"
+
+    _mutate_topology(root, mutate)
+    receipt = verifier.verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "engine-mongo-state remains partially bound" in error
+        for error in receipt["errors"]
+    )
+
+
+def test_verifier_rejects_retired_authority_gap_reference(
+    tmp_path: Path,
+) -> None:
+    root = _fixture_root(tmp_path)
+
+    def mutate(payload):
+        domain = next(
+            item
+            for item in payload["state_domains"]
+            if item["id"] == "canonical-ai-memory-records"
+        )
+        domain["gap"] = "gap-memory-durable-authority"
+
+    _mutate_topology(root, mutate)
+    receipt = verifier.verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "canonical-ai-memory-records retains retired gap" in error
+        for error in receipt["errors"]
+    )
+
+
+def test_verifier_rejects_lost_release_migration_binding(
+    tmp_path: Path,
+) -> None:
+    root = _fixture_root(tmp_path)
+    path = root / verifier.RELEASE_WORKFLOW_PATH
+    source = path.read_text(encoding="utf-8")
+    source = source.replace(
+        verifier.MIGRATION_TOOL_PATH.as_posix(),
+        "scripts/missing-state-migration-compatibility.py",
+    )
+    path.write_text(source, encoding="utf-8")
+
+    receipt = verifier.verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "Release migration gate lost state rehearsal binding" in error
+        for error in receipt["errors"]
+    )
+
+
+def test_verifier_rejects_topology_migration_contract_drift(
+    tmp_path: Path,
+) -> None:
+    root = _fixture_root(tmp_path)
+
+    def mutate(payload):
+        payload["migration_compatibility"]["release_workflow"] = (
+            ".github/workflows/other.yml"
+        )
+
+    _mutate_topology(root, mutate)
+    receipt = verifier.verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "migration_compatibility.release_workflow" in error
+        for error in receipt["errors"]
+    )
+
+
+def test_verifier_rejects_vol005_binding_drift(tmp_path: Path) -> None:
+    root = _fixture_root(tmp_path)
+
+    def mutate(payload):
+        volume = next(
+            row for row in payload["volumes"] if row["key"] == "VOL-005"
+        )
+        volume["tests"].remove(
+            "tests/test_state_authority_independent_verifier.py"
+        )
+
+    _mutate_masterplan(root, mutate)
+    receipt = verifier.verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "VOL-005 test binding incomplete" in error
+        for error in receipt["errors"]
+    )
+
+
+def test_verifier_rejects_cleared_vol005_gap_without_signoff(
+    tmp_path: Path,
+) -> None:
+    root = _fixture_root(tmp_path)
+
+    def mutate(payload):
+        volume = next(
+            row for row in payload["volumes"] if row["key"] == "VOL-005"
+        )
+        volume["gaps"] = []
+        volume["completion_checkbox"] = False
+        volume["completion_checkbox_mark"] = "[ ]"
+
+    _mutate_masterplan(root, mutate)
+    receipt = verifier.verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert "VOL-005 cannot clear qualification gap before signoff" in receipt["errors"]
+
+
+def test_verifier_accepts_signed_vol005_binding(tmp_path: Path) -> None:
+    root = _fixture_root(tmp_path)
+
+    def mutate(payload):
+        volume = next(
+            row for row in payload["volumes"] if row["key"] == "VOL-005"
+        )
+        volume["gaps"] = []
+        volume["completion_checkbox"] = True
+        volume["completion_checkbox_mark"] = "[x]"
+        volume["implementation_status"] = "verified"
+
+    _mutate_masterplan(root, mutate)
+    receipt = verifier.verify_repository(root)
+
+    assert receipt["valid"] is True
+    assert receipt["errors"] == []
+    assert receipt["volume_binding"]["completion_checkbox"] is True

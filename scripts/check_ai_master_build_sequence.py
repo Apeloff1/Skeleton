@@ -54,6 +54,7 @@ def validate() -> list[str]:
     wp_owner: dict[str, str] = {}
     all_stage_refs: set[int] = set()
     id_set = set(ids)
+    wave_rank = {wave_id: index for index, wave_id in enumerate(ids)}
     graph: dict[str, list[str]] = {}
     for wave in waves:
         wid = wave.get("id", "?")
@@ -61,6 +62,8 @@ def validate() -> list[str]:
         if not isinstance(refs, list) or not refs:
             errors.append(f"{wid}: work_packages must be non-empty")
             refs = []
+        elif len(refs) != len(set(refs)):
+            errors.append(f"{wid}: work_packages must be unique")
         for ref in refs:
             if ref not in EXPECTED_WPS:
                 errors.append(f"{wid}: unknown work package {ref}")
@@ -72,14 +75,27 @@ def validate() -> list[str]:
         if not isinstance(stages, list):
             errors.append(f"{wid}: aiq_stage_refs must be a list")
         else:
+            if len(stages) != len(set(stages)):
+                errors.append(f"{wid}: aiq_stage_refs must be unique")
             all_stage_refs.update(x for x in stages if isinstance(x, int))
 
         deps = wave.get("hard_dependencies")
         if not isinstance(deps, list):
             errors.append(f"{wid}: hard_dependencies must be a list")
             deps = []
+        elif len(deps) != len(set(deps)):
+            errors.append(f"{wid}: hard_dependencies must be unique")
         if any(dep not in id_set for dep in deps):
             errors.append(f"{wid}: hard dependency references unknown wave")
+        for dep in deps:
+            if (
+                dep in wave_rank
+                and wid in wave_rank
+                and wave_rank[dep] >= wave_rank[wid]
+            ):
+                errors.append(
+                    f"{wid}: hard dependency {dep} must reference an earlier wave"
+                )
         graph[wid] = deps
 
         for field in (
@@ -95,6 +111,8 @@ def validate() -> list[str]:
             elif field == "gating_vertical_slices":
                 if not isinstance(value, list):
                     errors.append(f"{wid}: gating_vertical_slices must be a list")
+                elif len(value) != len(set(value)):
+                    errors.append(f"{wid}: gating_vertical_slices must be unique")
             elif not isinstance(value, list) or not value:
                 errors.append(f"{wid}: {field} must be non-empty")
 

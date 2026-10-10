@@ -18,9 +18,18 @@
     "audit:policy:test": "node ./scripts/test-enforce-yarn-audit.js",
     "test:operation-stream": "node --test scripts/test-operation-stream-reducer.mjs scripts/test-operation-stream-session.mjs",
     "test:conversation": "node --test scripts/test-conversation-projection.mjs",
+    "test:dragon-companion": "node scripts/test-dragon-companion.cjs && node scripts/test-dragon-living-motion.cjs && node scripts/test-dragon-progression.cjs",
     "test:skeleton-forge": "node --test scripts/skeleton-forge/*.test.cjs",
     "test:forge-operator": "node --test scripts/forge-operator/*.test.cjs",
-    "test:product-projection": "node --test scripts/test-product-projection.mjs"
+    "test:product-projection": "node --test scripts/test-product-projection.mjs",
+    "test:accessibility": "node --test scripts/test-accessibility-contract.mjs",
+    "test:localization": "node --test scripts/test-localization-contract.mjs",
+    "test:dragon-wire": "node scripts/test-dragon-canonical-wire.cjs",
+    "test:product-journeys": "node --test scripts/test-product-journeys.mjs",
+    "test:build-lifecycle": "node --test scripts/test-build-job-lifecycle.mjs",
+    "test:knowledge-experience": "node --test scripts/test-knowledge-experience.mjs",
+    "test:world-workbench": "node --test scripts/test-world-workbench.mjs",
+    "test:design-review": "node --test scripts/test-design-review.mjs"
   },
   "engines": {
     "node": ">=24"
@@ -96,8 +105,8 @@
   "private": true,
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
   "resolutions": {
-    "**/minimatch/brace-expansion": "1.1.20",
-    "shell-quote": "1.10.0",
+    "**/minimatch/brace-expansion": "1.1.21",
+    "shell-quote": "1.11.0",
     "tar": "7.5.21",
     "undici": "6.28.1",
     "js-yaml": "3.15.2",
@@ -109,6 +118,7 @@
     "@expo/plist/@xmldom/xmldom": "0.8.15",
     "speech-rule-engine/@xmldom/xmldom": "0.9.12",
     "node-fetch": "2.7.0",
-    "isomorphic-fetch/node-fetch": "2.7.0"
+    "isomorphic-fetch/node-fetch": "2.7.0",
+    "**/decode-uri-component": "0.5.0"
   }
 }

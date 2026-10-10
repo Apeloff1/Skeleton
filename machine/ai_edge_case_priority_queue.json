@@ -46,7 +46,7 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_scoped_capability_security_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/jeeves/agent/tools.py",
@@ -57,10 +57,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-HIST-SYS-019",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 2,
@@ -84,7 +84,7 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "proven_fail_closed_compaction_trust_geometry_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/context/compaction.py",
@@ -93,10 +93,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-OBSCURE-018",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 3,
@@ -119,7 +119,7 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_unicode_authority_and_routing_identity_boundary_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/security/text_identity.py",
@@ -129,10 +129,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-CONTRACT-010",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 4,
@@ -154,7 +154,7 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_unicode_authority_and_routing_identity_boundary_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/security/text_identity.py",
@@ -164,10 +164,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-CONTRACT-009",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 5,
@@ -190,7 +190,7 @@
         "integration",
         "adversarial_eval"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_fail_closed_backup_erasure_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/memory/vector.py",
@@ -202,10 +202,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-DATA-010",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 6,
@@ -232,10 +232,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-008",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 7,
@@ -263,10 +263,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-009",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 8,
@@ -287,7 +287,7 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_context_non_authority_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/ai/context_provenance.py",
@@ -297,10 +297,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-001",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 9,
@@ -321,7 +321,7 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_tool_output_non_authority_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/ai/context_provenance.py",
@@ -331,10 +331,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-002",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 10,
@@ -355,7 +355,7 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_policy_retention_and_context_pressure_proof_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/context/compiler.py",
@@ -368,10 +368,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-013",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 11,
@@ -392,7 +392,7 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_registry_backed_approval_authority_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/ai/context_provenance.py",
@@ -402,10 +402,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-030",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 12,
@@ -426,7 +426,7 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_strict_json_parser_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/jeeves/planning/serialization.py",
@@ -435,10 +435,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-CONTRACT-001",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 13,
@@ -459,7 +459,7 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_strict_canonical_signing_bytes_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/contracts/canonical.py",
@@ -469,10 +469,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-CONTRACT-020",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 14,
@@ -493,7 +493,7 @@
         "recovery_drill",
         "integration"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_archive_fail_closed_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/security/archive_sandbox.py",
@@ -502,10 +502,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-005",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 15,
@@ -527,7 +527,7 @@
         "integration",
         "adversarial_eval"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_archive_fail_closed_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/security/archive_sandbox.py",
@@ -536,10 +536,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-006",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 16,
@@ -561,7 +561,7 @@
         "integration",
         "adversarial_eval"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_archive_fail_closed_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/security/archive_sandbox.py",
@@ -570,10 +570,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-007",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 17,
@@ -596,7 +596,7 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_curated_discovery_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/ai/catalog.py",
@@ -607,10 +607,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-OBSCURE-024",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 18,
@@ -630,7 +630,7 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_privacy_bounded_fallback_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/ai/model_port.py",
@@ -640,10 +640,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-021",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 19,
@@ -660,7 +660,7 @@
       "recommended_test_modes": [
         "regression"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_source_propagated_vector_erasure_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/memory/vector.py",
@@ -672,10 +672,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-DATA-009",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 20,
@@ -693,7 +693,7 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_atomic_single_use_approval_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/ai/approval.py",
@@ -703,10 +703,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-001",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 21,
@@ -724,7 +724,7 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_fail_closed_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/security/outbound_url.py",
@@ -733,10 +733,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-011",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 22,
@@ -754,7 +754,7 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_credential_aware_secret_safe_observability_and_error_redaction_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/ai/observation_policy.py",
@@ -773,10 +773,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-015",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 23,
@@ -794,7 +794,7 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_process_boundary_and_trusted_environment_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/environment.py",
@@ -808,10 +808,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-016",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 24,
@@ -830,7 +830,7 @@
         "negative_test",
         "platform_test"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_process_boundary_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/environment.py",
@@ -841,17 +841,17 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-018",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 25,
       "id": "HIST-SYS-020",
       "priority": "P0",
       "criticality": "critical",
-      "title": "Saltzer–Schroeder principles",
+      "title": "Saltzer\u2013Schroeder principles",
       "domain": "security",
       "work_package_refs": [
         "WP-W13",
@@ -865,7 +865,7 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_fail_safe_policy_and_least_privilege_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/security/policy_engine.py",
@@ -879,10 +879,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-HIST-SYS-020",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 26,
@@ -904,7 +904,7 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_curated_and_principal_scoped_capability_discovery_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/ai/catalog.py",
@@ -918,10 +918,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-OBSCURE-025",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 27,
@@ -940,7 +940,7 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_governed_memory_writeback_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/memory/policy.py",
@@ -949,10 +949,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-003",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 28,
@@ -970,7 +970,7 @@
         "negative_test",
         "platform_test"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_symlink_escape_fail_closed_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/security/rooted_fs.py",
@@ -979,10 +979,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-002",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 29,
@@ -1002,7 +1002,7 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_inode_hardlink_rejection_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/security/rooted_fs.py",
@@ -1011,10 +1011,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-003",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 30,
@@ -1034,7 +1034,7 @@
         "negative_test",
         "platform_test"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_decoded_path_structural_guard_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/security/decoded_path.py",
@@ -1044,10 +1044,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-004",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 31,
@@ -1064,7 +1064,7 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_fail_closed_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/security/outbound_url.py",
@@ -1073,10 +1073,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-012",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 32,
@@ -1093,7 +1093,7 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_fail_closed_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/security/outbound_url.py",
@@ -1102,10 +1102,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-013",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 33,
@@ -1122,7 +1122,7 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_fail_closed_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/security/outbound_url.py",
@@ -1131,10 +1131,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-014",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 34,
@@ -1152,7 +1152,7 @@
         "negative_test",
         "platform_test"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_temp_race_fail_closed_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/security/rooted_fs.py",
@@ -1161,10 +1161,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-017",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 35,
@@ -1183,7 +1183,7 @@
         "fault_injection",
         "property"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_process_boundary_and_trusted_environment_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/environment.py",
@@ -1197,10 +1197,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-019",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 36,
@@ -1220,7 +1220,7 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "evidence_pending",
+      "status": "planned",
       "disposition": "implemented_dual_axis_information_policy_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/ai/context_provenance.py",
@@ -1231,10 +1231,10 @@
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-HIST-SYS-021",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 37,
@@ -1265,10 +1265,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-HIST-AI-002",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 38,
@@ -1297,10 +1297,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-DIST-020",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 39,
@@ -1329,10 +1329,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-DIST-021",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 40,
@@ -1359,10 +1359,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-HIST-SYS-003",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 41,
@@ -1389,10 +1389,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-DATA-002",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 42,
@@ -1419,10 +1419,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-DATA-007",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 43,
@@ -1449,10 +1449,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-DIST-010",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 44,
@@ -1477,10 +1477,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-DIST-027",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 45,
@@ -1507,10 +1507,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-OBSCURE-005",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 46,
@@ -1538,10 +1538,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-OBSCURE-010",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 47,
@@ -1569,10 +1569,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-OBSCURE-029",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 48,
@@ -1599,10 +1599,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-DATA-005",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 49,
@@ -1628,10 +1628,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-HIST-SYS-025",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 50,
@@ -1658,10 +1658,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-OBSCURE-014",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 51,
@@ -1684,10 +1684,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-OBSCURE-021",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 52,
@@ -1711,10 +1711,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-CONTRACT-013",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 53,
@@ -1737,10 +1737,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-DATA-001",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 54,
@@ -1765,10 +1765,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-DATA-006",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 55,
@@ -1791,10 +1791,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-DIST-007",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 56,
@@ -1815,10 +1815,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-DIST-024",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "rank": 57,
@@ -1841,10 +1841,10 @@
       "evidence": [],
       "accepted_risk": null,
       "accountability_id": "ACC-OBSCURE-007",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     }
   ]
 }

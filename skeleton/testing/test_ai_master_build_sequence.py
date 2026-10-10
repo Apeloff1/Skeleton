@@ -71,3 +71,39 @@ def test_every_wave_has_ready_done_handoff_and_review_questions() -> None:
         assert wave["definition_of_done"]
         assert wave["handoff_outputs"]
         assert wave["review_questions"]
+
+def test_later_wave_cannot_be_a_hard_dependency(monkeypatch, tmp_path) -> None:
+    data = json.loads(checker.SEQUENCE.read_text(encoding="utf-8"))
+    mutated = json.loads(json.dumps(data))
+    mutated["waves"][0]["hard_dependencies"] = ["MBW-01"]
+    path = tmp_path / "sequence.json"
+    path.write_text(json.dumps(mutated), encoding="utf-8")
+    monkeypatch.setattr(checker, "SEQUENCE", path)
+
+    errors = checker.validate()
+
+    assert any(
+        "MBW-00: hard dependency MBW-01 must reference an earlier wave"
+        in error
+        for error in errors
+    )
+
+
+def test_wave_identity_reference_lists_must_be_unique(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    data = json.loads(checker.SEQUENCE.read_text(encoding="utf-8"))
+    mutated = json.loads(json.dumps(data))
+    first = mutated["waves"][1]
+    first["hard_dependencies"].append(first["hard_dependencies"][0])
+    first["aiq_stage_refs"].append(first["aiq_stage_refs"][0])
+    path = tmp_path / "sequence.json"
+    path.write_text(json.dumps(mutated), encoding="utf-8")
+    monkeypatch.setattr(checker, "SEQUENCE", path)
+
+    errors = checker.validate()
+
+    assert any("hard_dependencies must be unique" in error for error in errors)
+    assert any("aiq_stage_refs must be unique" in error for error in errors)
+

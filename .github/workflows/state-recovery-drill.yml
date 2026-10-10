@@ -6,7 +6,11 @@ on:
       - "machine/ai_build_accountability.json"
       - "machine/ai_accountability_closure_map.json"
       - "scripts/state_recovery_drill.py"
+      - "scripts/state_migration_compatibility.py"
       - "scripts/state_backup_bundle.py"
+      - "scripts/check_state_topology.py"
+      - "machine/ai_master_plan.json"
+      - "skeleton/testing/test_state_migration_compatibility.py"
       - "scripts/verify_state_authority_closure.py"
       - "tests/test_state_authority_independent_verifier.py"
       - "skeleton/testing/test_state_recovery_drill.py"
@@ -139,8 +143,15 @@ on:
       - "skeleton/persistence/execution_repository.py"
       - "skeleton/api/engine_service.py"
       - "skeleton/skills/tool_receipt_store.py"
+      - "skeleton/ai/runtime/observability/cost_governor.py"
+      - "skeleton/intelligence/admission_runtime.py"
+      - "skeleton/intelligence/quota.py"
       - "skeleton/intelligence/quota_sqlite.py"
       - "skeleton/intelligence/shared_pressure.py"
+      - "skeleton/testing/test_cost_governor_reattach.py"
+      - "skeleton/testing/test_cost_governor_unknown_usage_reattach.py"
+      - "skeleton/testing/test_cost_governor_shared_pressure_reattach.py"
+      - "skeleton/testing/test_cost_governor_admission_intent_recovery.py"
       - "skeleton/config/settings.py"
       - "machine/state_topology.json"
       - "machine/ai_app_construction.json"
@@ -195,6 +206,9 @@ jobs:
           "pydantic-settings==2.15.0"
           "fastapi==0.136.1"
 
+      - name: Validate canonical state topology
+        run: python scripts/check_state_topology.py --json
+
       - name: Run pure recovery and backup contract tests
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -202,6 +216,55 @@ jobs:
           python -m pytest -q --noconftest
           skeleton/testing/test_state_recovery_drill.py
           skeleton/testing/test_state_backup_bundle.py
+          skeleton/testing/test_state_migration_compatibility.py
+
+      - name: Rehearse legacy durable-state migration compatibility
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/state_migration_compatibility.py
+          --workdir "${RUNNER_TEMP}/skeleton_state_migration_compatibility"
+          --output "${RUNNER_TEMP}/state-migration-compatibility.json"
+          --print-evidence
+
+      - name: Assert exact-head state migration receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              (Path(os.environ["RUNNER_TEMP"]) / "state-migration-compatibility.json")
+              .read_text(encoding="utf-8")
+          )
+          assert receipt["schema_version"] == 1
+          assert receipt["kind"] == "vol005-state-migration-compatibility"
+          assert receipt["head_sha"] == os.environ["EXPECTED_SHA"]
+          assert receipt["volume"] == "VOL-005"
+          assert receipt["passed"] is True
+          assert set(receipt["stores"]) == {"execution", "tool_receipts", "quota"}
+          assert receipt["topology"]["closed_gap_references"] == 0
+          assert receipt["topology"]["partial_authorities"] == 0
+          assert len(receipt["workflow_binding"]["recovery"]["digest"]) == 64
+          assert len(receipt["workflow_binding"]["release"]["digest"]) == 64
+          assert len(receipt["volume_binding"]["binding_digest"]) == 64
+          assert len(receipt["receipt_digest"]) == 64
+          print("VOL-005 state migration exact-head receipt OK")
+          print(receipt["receipt_digest"])
+          PY
+
+      - name: Verify durable AI admission recovery contracts
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_cost_governor_reattach.py
+          skeleton/testing/test_cost_governor_unknown_usage_reattach.py
+          skeleton/testing/test_cost_governor_shared_pressure_reattach.py
+          skeleton/testing/test_cost_governor_admission_intent_recovery.py
 
       - name: Verify P2 bind recovery checkpoint contracts
         env:
@@ -634,7 +697,8 @@ jobs:
               )
           )
           assert receipt["schema_version"] == 1
-          assert receipt["verifier"] == "independent-state-authority-v1"
+          assert receipt["verifier"] == "independent-state-authority-v2"
+          assert receipt["volume"] == "VOL-005"
           assert receipt["head_sha"] == os.environ["EXPECTED_SHA"]
           assert receipt["valid"] is True
           assert receipt["errors"] == []
@@ -642,6 +706,10 @@ jobs:
           assert len(receipt["authoritative_domains"]) >= 12
           assert len(receipt["derived_domains"]) == 3
           assert len(receipt["backup_stores"]) == 8
-          print("independent-state-authority: exact-head receipt OK")
+          assert len(receipt["volume_binding"]["binding_digest"]) == 64
+          assert len(receipt["receipt_digest"]) == 64
+          print("independent-state-authority: exact-head VOL-005 receipt OK")
           print("authority digest:", receipt["authority_digest"])
+          print("volume binding:", receipt["volume_binding"]["binding_digest"])
+          print("receipt digest:", receipt["receipt_digest"])
           PY

@@ -32,6 +32,23 @@ Mandatory build accountability: [`BUILD_ACCOUNTABILITY_LEDGER.md`](BUILD_ACCOUNT
 
 Machine accountability ledger: [`machine/ai_build_accountability.json`](../../machine/ai_build_accountability.json)
 
+Fast masterplan parse index: [`machine/ai_masterplan_parse_index.json`](../../machine/ai_masterplan_parse_index.json)
+
+Parse-index freshness validator: [`scripts/check_ai_masterplan_parse_index.py`](../../scripts/check_ai_masterplan_parse_index.py)
+
+
+### Fast masterplan parsing protocol
+
+For status, signing, and next-work scans, read `machine/ai_masterplan_parse_index.json` before loading the full masterplan/accountability pair.
+
+1. Confirm the index's two `sources.*.git_blob_sha` values still match the current Git blobs for `machine/ai_master_plan.json` and `machine/ai_build_accountability.json`.
+2. If they match, treat `fast_sets.fully_complete` as settled for implementation/verification-gap parsing and skip implementation-signature reconciliation for already implementation-signed records.
+3. Use `fast_sets.gap_free_waiting_verification` as the narrow independent-verification frontier.
+4. Use `fast_sets.implementation_unsigned` as the construction/signing frontier.
+5. If either source identity differs, reject the index as stale and regenerate it with `python scripts/check_ai_masterplan_parse_index.py --write` before relying on any fast set.
+
+The parse index is a derived navigation accelerator only. It never replaces the canonical masterplan or accountability ledger and never grants completion authority.
+
 Master build sequence: [`MASTER_BUILD_SEQUENCE.md`](MASTER_BUILD_SEQUENCE.md)
 
 Machine build sequence: [`machine/ai_master_build_sequence.json`](../../machine/ai_master_build_sequence.json)
@@ -104,6 +121,78 @@ Exotic systems depth: [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md)
 
 Machine exotic catalogue: [`machine/ai_exotic_systems_catalog.json`](../../machine/ai_exotic_systems_catalog.json)
 
+Advanced AI 100-level authority: [`ADVANCED_AI_100_LEVELS.md`](ADVANCED_AI_100_LEVELS.md)
+
+Machine Advanced-AI-100 authority: [`machine/advanced_ai_structure_100.json`](../../machine/advanced_ai_structure_100.json)
+
+Advanced-AI-100 maturity ledger: [`machine/advanced_ai_maturity_ledger.json`](../../machine/advanced_ai_maturity_ledger.json)
+
+Frontier-96 post-enterprise ladder: [`FRONTIER_96_AI_LADDER.md`](FRONTIER_96_AI_LADDER.md)
+
+Machine Frontier-96 contract: [`machine/frontier_96_ai_ladder.json`](../../machine/frontier_96_ai_ladder.json)
+
+Frontier-96 validator: [`scripts/check_frontier_96_ladder.py`](../../scripts/check_frontier_96_ladder.py)
+
+CS-300 computer-science ladder: [`CS_300_COMPUTER_SCIENCE_LADDER.md`](CS_300_COMPUTER_SCIENCE_LADDER.md)
+
+Machine CS-300 contract: [`machine/cs_300_computer_science_ladder.json`](../../machine/cs_300_computer_science_ladder.json)
+
+CS-300 validator: [`scripts/check_cs_300_ladder.py`](../../scripts/check_cs_300_ladder.py)
+
+CS-300 exact-head workflow: [`.github/workflows/cs-300-authority.yml`](../../.github/workflows/cs-300-authority.yml)
+
+Learning-400 + Adversarial-400 plan: [`LEARNING_400_ADVERSARIAL_400.md`](LEARNING_400_ADVERSARIAL_400.md)
+
+Machine Learning-400 + Adversarial-400 authority: [`machine/learning_400_adversarial_400.json`](../../machine/learning_400_adversarial_400.json)
+
+Learning-400 validator: [`scripts/check_learning_400_adversarial_400.py`](../../scripts/check_learning_400_adversarial_400.py)
+
+Learning-400 exact-head workflow: [`.github/workflows/learning-400-adversarial-400.yml`](../../.github/workflows/learning-400-adversarial-400.yml)
+
+Project Self-Improvement-1000 plan: [`PROJECT_SELF_IMPROVEMENT_1000.md`](PROJECT_SELF_IMPROVEMENT_1000.md)
+
+Machine PSI-1000 authority: [`machine/project_self_improvement_1000.json`](../../machine/project_self_improvement_1000.json)
+
+Mirror-room epoch state machine: [`machine/project_self_improvement_epoch_contract.json`](../../machine/project_self_improvement_epoch_contract.json)
+
+PSI-1000 idle opportunity scheduler: [`machine/project_self_improvement_idle_scheduler.json`](../../machine/project_self_improvement_idle_scheduler.json)
+
+PSI-1000 validator: [`scripts/check_project_self_improvement_1000.py`](../../scripts/check_project_self_improvement_1000.py)
+
+PSI-1000 exact-head workflow: [`.github/workflows/project-self-improvement-1000.yml`](../../.github/workflows/project-self-improvement-1000.yml)
+
+ESS-1000 essential completeness plan: [`ESSENTIALS_1000.md`](ESSENTIALS_1000.md)
+
+Machine ESS-1000 authority: [`machine/essentials_1000.json`](../../machine/essentials_1000.json)
+
+ESS-1000 validator: [`scripts/check_essentials_1000.py`](../../scripts/check_essentials_1000.py)
+
+ESS-1000 exact-head workflow: [`.github/workflows/essentials-1000.yml`](../../.github/workflows/essentials-1000.yml)
+
+ESS-1000 closure protocol: [`machine/essentials_1000_closure_protocol.json`](../../machine/essentials_1000_closure_protocol.json)
+
+ESS-1000 gap ledger: [`machine/essentials_1000_gap_ledger.json`](../../machine/essentials_1000_gap_ledger.json)
+
+ESS-1000 priority policy: [`machine/essentials_1000_priority_policy.json`](../../machine/essentials_1000_priority_policy.json)
+
+ESS-1000 execution frontier: [`machine/essentials_1000_execution_frontier.json`](../../machine/essentials_1000_execution_frontier.json)
+
+Competitive AI engineering ladder: [`../architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md`](../architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md)
+
+Machine competitive engineering authority: [`machine/competitive_ai_engineering_ladder.json`](../../machine/competitive_ai_engineering_ladder.json)
+
+Competitive benchmark governance: [`../architecture/COMPETITIVE_AI_BENCHMARK_GOVERNANCE.md`](../architecture/COMPETITIVE_AI_BENCHMARK_GOVERNANCE.md)
+
+Machine benchmark-governance authority: [`machine/competitive_ai_benchmark_governance.json`](../../machine/competitive_ai_benchmark_governance.json)
+
+AI Game Builder 500-level authority: [`../architecture/AI_GAME_BUILDER_500_LEVELS.md`](../architecture/AI_GAME_BUILDER_500_LEVELS.md)
+
+Machine game-builder authority: [`machine/ai_game_builder_500_levels.json`](../../machine/ai_game_builder_500_levels.json)
+
+Machine dual-rival forge authority: [`machine/ai_game_builder_dual_rival_forge.json`](../../machine/ai_game_builder_dual_rival_forge.json)
+
+Masterplan overlay reconciliation validator: [`scripts/check_masterplan_overlay_reconciliation.py`](../../scripts/check_masterplan_overlay_reconciliation.py)
+
 ## Purpose
 
 This index is the canonical navigation root for the full Skeleton AI architecture, research, construction, validation, release, and operations program. It incorporates the architecture-planning passes that expanded the target from a model wrapper into a complete AI platform: durable state, provider-neutral inference, context, memory, retrieval, knowledge, cognition, planning, governed tools, agents, swarms, multimodal processing, repository engineering, research, training, evaluation, security, distributed compute, installation, release, and production operations.
@@ -166,8 +255,33 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 50. `machine/openai_oss_assimilation.json`
 51. `docs/plan/XAI_GROK_OSS_ASSIMILATION_2026-09-25.md`
 52. `machine/xai_grok_oss_assimilation.json`
+53. `docs/plan/FRONTIER_96_AI_LADDER.md`
+54. `machine/frontier_96_ai_ladder.json`
+55. `scripts/check_frontier_96_ladder.py`
+56. `docs/plan/CS_300_COMPUTER_SCIENCE_LADDER.md`
+57. `machine/cs_300_computer_science_ladder.json`
+58. `scripts/check_cs_300_ladder.py`
+59. `.github/workflows/cs-300-authority.yml`
+60. `docs/plan/LEARNING_400_ADVERSARIAL_400.md`
+61. `machine/learning_400_adversarial_400.json`
+62. `scripts/check_learning_400_adversarial_400.py`
+63. `.github/workflows/learning-400-adversarial-400.yml`
+64. `docs/plan/PROJECT_SELF_IMPROVEMENT_1000.md`
+65. `machine/project_self_improvement_1000.json`
+66. `machine/project_self_improvement_epoch_contract.json`
+67. `scripts/check_project_self_improvement_1000.py`
+68. `.github/workflows/project-self-improvement-1000.yml`
+69. `machine/project_self_improvement_idle_scheduler.json`
+70. `docs/plan/ESSENTIALS_1000.md`
+71. `machine/essentials_1000.json`
+72. `scripts/check_essentials_1000.py`
+73. `.github/workflows/essentials-1000.yml`
+74. `machine/essentials_1000_closure_protocol.json`
+75. `machine/essentials_1000_gap_ledger.json`
+76. `machine/essentials_1000_priority_policy.json`
+77. `machine/essentials_1000_execution_frontier.json`
 
-The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the historical implementation-depth frontier and its machine-checkable reconciliation contract. Items 43–45 define the bounded P1 trustworthy-production maturity frontier and its dependency-ordered 44-task execution DAG. Items 46–48 define the P2 capability-expansion boundary sourced exactly from P1's 314 deferred volumes, with explicit scheduled/queued ownership and fail-closed dependency validation. Items 49–52 deepen the frozen research/provider/runtime volumes with pinned OpenAI and xAI/Grok OSS provenance and bounded interoperability; they do not add a new architecture volume or completion authority.
+The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the historical implementation-depth frontier and its machine-checkable reconciliation contract. Items 43–45 define the bounded P1 trustworthy-production maturity frontier and its dependency-ordered 44-task execution DAG. Items 46–48 define the P2 capability-expansion boundary sourced exactly from P1's 314 deferred volumes, with explicit scheduled/queued ownership and fail-closed dependency validation. Items 49–52 deepen the frozen research/provider/runtime volumes with pinned OpenAI and xAI/Grok OSS provenance and bounded interoperability. Items 53–55 define and validate the post-enterprise Frontier-96 qualification overlay. Items 56–59 define and validate the CS-300 cutting-edge computer-science overlay above Frontier-96, including its exact-head CI authority. Items 60–63 define and enforce the paired Learning-400 + Adversarial-400 program for knowledge acquisition, web/video/document learning, project-derived learning, native weight creation, continual candidate improvement and equal-size adversarial qualification. Items 64–69 define PSI-1000: a per-project 1000-level self-improvement template with immediate foreground-idle mirror-room activation, strict preemption, bounded epochs, candidate-only mutation and receipt-backed promotion. Items 70–77 define ESS-1000, the 1000-level non-compensable completeness floor paired to PSI-1000, its revocable closure protocol, explicit 1000-record gap ledger, hard-order severity policy, and 99-lane execution frontier so unresolved essentials outrank optional self-improvement and stale evidence reopens previously closed gaps. None of these overlays adds a new architecture volume; they raise depth and evidence requirements while preserving the VOL-420 breadth freeze.
 
 ## Index laws
 
@@ -719,3 +833,35 @@ The frozen volume structure also carries a machine-validated exotic-systems rese
 Exotics are depth, not breadth: each candidate must map to existing volumes and collectively cover all W00–W30 work packages, default to no production authority, preserve a canonical fallback, expose an independent kill switch, and earn promotion through reproducible comparative evidence plus ordinary maturity/accountability gates.
 
 See [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md) and [`machine/ai_exotic_systems_catalog.json`](../../machine/ai_exotic_systems_catalog.json).
+
+
+## Cumulative overlay reconciliation inventory
+
+78. `docs/architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md`
+79. `machine/competitive_ai_engineering_ladder.json`
+80. `docs/architecture/COMPETITIVE_AI_BENCHMARK_GOVERNANCE.md`
+81. `machine/competitive_ai_benchmark_governance.json`
+82. `docs/architecture/AI_GAME_BUILDER_500_LEVELS.md`
+83. `machine/ai_game_builder_500_levels.json`
+84. `machine/ai_game_builder_dual_rival_forge.json`
+85. `scripts/check_masterplan_overlay_reconciliation.py`
+86. `tests/test_masterplan_overlay_reconciliation.py`
+87. `.github/workflows/masterplan-overlay-reconciliation.yml`
+
+Items 53-77 remain authoritative and cumulative. Advanced-AI-100 is explicitly machine-registered in plan 2.5.0. Items 78-81 add falsifiable frontier-comparison engineering and anti-gaming benchmark governance. Items 82-84 add the dual-rival game-builder overlay. Items 85-87 make accidental authority rollback a fail-closed regression.
+
+
+Functional LLM + Game Builder 20MB+ deep-closure atlas (legacy 10MB path retained): [`FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md`](FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md)
+
+Pass-2 authority: **52,648,747 bytes**, **23,328 deep-closure atoms**, runtime/implementation verification still unsigned.
+
+Machine authority: [`machine/functional_llm_game_builder_10mb_manifest.json`](../../machine/functional_llm_game_builder_10mb_manifest.json)
+
+Coverage validator: [`scripts/check_functional_llm_game_builder_10mb.py`](../../scripts/check_functional_llm_game_builder_10mb.py)
+
+Exact-head workflow: [`.github/workflows/functional-llm-game-builder-masterplan.yml`](../../.github/workflows/functional-llm-game-builder-masterplan.yml)
+
+
+Functional LLM + Game Builder execution backlog: [`machine/functional_llm_game_builder_execution_backlog.json`](../../machine/functional_llm_game_builder_execution_backlog.json)
+
+Execution-backlog validator: [`scripts/check_functional_llm_game_builder_execution_backlog.py`](../../scripts/check_functional_llm_game_builder_execution_backlog.py)

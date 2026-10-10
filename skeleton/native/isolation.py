@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import json
 import math
 import os
@@ -25,6 +26,10 @@ class IsolatedProcessResult:
     returncode: int
     payload: Any
     stderr: str
+    request_digest: str
+    response_digest: str
+    isolation_mode: str = "subprocess-json" 
+    authority_scope: str = "native-isolation-evidence-only"
 
 
 def run_json_process(
@@ -69,6 +74,7 @@ def run_json_process(
         raise AcceleratorIsolationError(
             "accelerator request must be canonical-JSON serializable"
         ) from exc
+    request_digest = hashlib.sha256(encoded).hexdigest()
     if len(encoded) > max_input_bytes:
         raise AcceleratorIsolationError("accelerator request exceeds input bound")
 
@@ -213,10 +219,19 @@ def run_json_process(
         )
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise AcceleratorIsolationError("accelerator returned invalid JSON") from exc
+    response_bytes = json.dumps(
+        result,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
     return IsolatedProcessResult(
         returncode=returncode,
         payload=result,
         stderr=stderr,
+        request_digest=request_digest,
+        response_digest=hashlib.sha256(response_bytes).hexdigest(),
     )
 
 

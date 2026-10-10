@@ -6,10 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-118",
     "title": "Roadmap Control",
-    "required_gap_texts": [
-      "bind roadmap to build DAG",
-      "materialize revision lineage"
-    ]
+    "required_gap_texts": []
   },
   "sources": [
     "machine/ai_master_build_sequence.json",
@@ -201,7 +198,7 @@
       "depends_on": [],
       "work_package_refs": [],
       "volume_refs": [],
-      "status": "landed_unpromoted",
+      "status": "closed",
       "acceptance_gates": [
         "source task evidence and masterplan obligations remain authoritative"
       ]
@@ -226,7 +223,7 @@
         "VOL-058",
         "VOL-116"
       ],
-      "status": "landed_unpromoted",
+      "status": "closed",
       "acceptance_gates": [
         "source task evidence and masterplan obligations remain authoritative"
       ]
@@ -253,7 +250,7 @@
         "VOL-130",
         "VOL-131"
       ],
-      "status": "landed_unpromoted",
+      "status": "closed",
       "acceptance_gates": [
         "source task evidence and masterplan obligations remain authoritative"
       ]
@@ -281,7 +278,7 @@
         "VOL-118",
         "VOL-119"
       ],
-      "status": "landed_unpromoted",
+      "status": "closed",
       "acceptance_gates": [
         "source task evidence and masterplan obligations remain authoritative"
       ]
@@ -300,7 +297,7 @@
         "VOL-117",
         "VOL-120"
       ],
-      "status": "landed_unpromoted",
+      "status": "closed",
       "acceptance_gates": [
         "source task evidence and masterplan obligations remain authoritative"
       ]
@@ -317,7 +314,7 @@
         "VOL-089",
         "VOL-090"
       ],
-      "status": "landed_unpromoted",
+      "status": "closed",
       "acceptance_gates": [
         "source task evidence and masterplan obligations remain authoritative"
       ]
@@ -334,7 +331,7 @@
         "VOL-032",
         "VOL-033"
       ],
-      "status": "landed_unpromoted",
+      "status": "closed",
       "acceptance_gates": [
         "source task evidence and masterplan obligations remain authoritative"
       ]
@@ -353,7 +350,7 @@
         "VOL-132",
         "VOL-134"
       ],
-      "status": "landed_unpromoted",
+      "status": "closed",
       "acceptance_gates": [
         "source task evidence and masterplan obligations remain authoritative"
       ]
@@ -374,7 +371,7 @@
         "VOL-172",
         "VOL-175"
       ],
-      "status": "landed_unpromoted",
+      "status": "closed",
       "acceptance_gates": [
         "source task evidence and masterplan obligations remain authoritative"
       ]
@@ -390,7 +387,7 @@
       "volume_refs": [
         "VOL-007"
       ],
-      "status": "landed_unpromoted",
+      "status": "closed",
       "acceptance_gates": [
         "source task evidence and masterplan obligations remain authoritative"
       ]
@@ -408,7 +405,7 @@
         "VOL-091",
         "VOL-096"
       ],
-      "status": "landed_unpromoted",
+      "status": "closed",
       "acceptance_gates": [
         "source task evidence and masterplan obligations remain authoritative"
       ]
@@ -428,7 +425,7 @@
         "VOL-097",
         "VOL-104"
       ],
-      "status": "landed_unpromoted",
+      "status": "closed",
       "acceptance_gates": [
         "source task evidence and masterplan obligations remain authoritative"
       ]

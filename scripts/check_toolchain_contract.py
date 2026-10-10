@@ -13,6 +13,9 @@ FULL_DEPLOY_NEEDS = "needs: [skeleton-test, java-accelerators, assembly-accelera
 PYTHON_VERSION = "3.11.16"
 NODE_VERSION = "24.20.0"
 UV_REQUIRED_VERSION = "==0.12.15"
+JAVA_BOOTSTRAP_MAJOR = 21
+GIT_BOOTSTRAP_MINIMUM = "2.40"
+BOOTSTRAP_COMMAND = "mise run bootstrap"
 RUFF_CI_VERSION = "0.9.10"
 RUFF_DEV_REQUIREMENT = "ruff>=0.9,<0.17"
 EXPO_SDK_VERSION = "~54.0.35"
@@ -67,7 +70,7 @@ DEPENDENCY_SECURITY_MARKERS = (
     "python-sbom.cdx.json",
     "Enforce Python vulnerability policy",
     "yarn audit --groups dependencies --level high --json",
-    "anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26",
+    "anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c",
     "format: cyclonedx-json",
     "frontend-sbom.cdx.json",
     "Enforce JavaScript vulnerability policy",
@@ -156,6 +159,62 @@ def main() -> int:
         root_project.get("tool", {}).get("uv", {}).get("required-version")
         == UV_REQUIRED_VERSION,
         f"repository uv must be pinned to {UV_REQUIRED_VERSION}",
+        failures,
+    )
+
+    mise = tomllib.loads(read(".mise.toml"))
+    bootstrap = json.loads(read("machine/toolchain_bootstrap.json"))
+    bootstrap_tools = bootstrap.get("installed_toolchains", {})
+    require(
+        bootstrap.get("schema_version") == 1
+        and bootstrap.get("manager") == "mise"
+        and bootstrap.get("manager_config") == ".mise.toml",
+        "toolchain bootstrap manifest identity drifted",
+        failures,
+    )
+    require(
+        bootstrap.get("bootstrap_command") == BOOTSTRAP_COMMAND,
+        f"canonical bootstrap command must remain {BOOTSTRAP_COMMAND}",
+        failures,
+    )
+    require(
+        bootstrap_tools
+        == {
+            "python": PYTHON_VERSION,
+            "node": NODE_VERSION,
+            "uv": UV_REQUIRED_VERSION.removeprefix("=="),
+        },
+        "bootstrap tool pins drifted from canonical CI/toolchain pins",
+        failures,
+    )
+    require(
+        mise.get("tools") == bootstrap_tools,
+        ".mise.toml tool pins drifted from bootstrap manifest",
+        failures,
+    )
+    bootstrap_task = mise.get("tasks", {}).get("bootstrap", {})
+    require(
+        bootstrap_task.get("run")
+        == [
+            "mise install",
+            "mise exec -- python scripts/verify_toolchain_bootstrap.py",
+        ],
+        "mise bootstrap task must install pins then verify the resulting environment",
+        failures,
+    )
+    require(
+        bootstrap.get("verified_capabilities")
+        == {
+            "java_major": JAVA_BOOTSTRAP_MAJOR,
+            "git_minimum": GIT_BOOTSTRAP_MINIMUM,
+        },
+        "bootstrap host capability floor drifted",
+        failures,
+    )
+    require(
+        (ROOT / "scripts/verify_toolchain_bootstrap.py").is_file()
+        and (ROOT / "skeleton/testing/test_toolchain_bootstrap.py").is_file(),
+        "toolchain bootstrap verifier/regression surface missing",
         failures,
     )
 

@@ -7,6 +7,8 @@ on:
     paths:
       - "machine/p1_required_gate_authority.json"
       - "machine/ai_master_plan.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_terminal_closure.json"
       - "skeleton/contracts/promotion_gates.py"
       - "skeleton/ai/runtime/contracts/promotion_gates.py"
       - "skeleton/contracts/__init__.py"
@@ -23,6 +25,8 @@ on:
     paths:
       - "machine/p1_required_gate_authority.json"
       - "machine/ai_master_plan.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_terminal_closure.json"
       - "skeleton/contracts/promotion_gates.py"
       - "skeleton/ai/runtime/contracts/promotion_gates.py"
       - "skeleton/contracts/__init__.py"
@@ -38,8 +42,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: p1-required-gate-authority-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Evidence-critical: exact-head signing verification must survive unrelated main churn.
+  group: p1-required-gate-authority-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:

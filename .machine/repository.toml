@@ -22,7 +22,7 @@ oversized_generic_lines = 2400
 
 [[zone]]
 name = "repository-machine"
-prefixes = [".machine/", "machine/", "skeleton/repo_machine/"]
+prefixes = [".machine/", "machine/", "skeleton/repo_machine/", "skeleton/main_guard/"]
 owner = "repository-control-plane"
 criticality = "high"
 purpose = "Canonical repository taxonomy, machine-readable maps, topology, ownership and bounded stewardship."
@@ -626,6 +626,8 @@ lifecycle = "canonical"
 [ignore]
 prefixes = [
   ".git/",
+  # Generated machine artifacts are outputs of the indexer, not inventory inputs.
+  ".machine/",
   # Local runtime state, never source inventory. Canonical provenance remains indexed.
   ".skeleton/",
   "chronicle/",

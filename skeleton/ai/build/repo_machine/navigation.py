@@ -42,19 +42,38 @@ class NavigationIndex:
         self.model = model
         self._root = _Node("")
         self._paths = {item.path: item for item in model.files}
+        self._zones_by_prefix = {}
+        self._files_by_zone: dict[str, tuple[FileRecord, ...]] = {}
+        self._files_by_kind: dict[str, tuple[FileRecord, ...]] = {}
         self._build()
 
     def _build(self) -> None:
+        by_zone: dict[str, list[FileRecord]] = {}
         for record in self.model.files:
+            by_zone.setdefault(record.zone, []).append(record)
             node = self._root
             node.files += 1
             node.source += int(record.kind == "source")
             node.tests += int(record.kind == "test")
+            prefix = ""
             for part in PurePosixPath(record.path).parts[:-1]:
+                prefix = f"{prefix}/{part}".strip("/")
+                self._zones_by_prefix.setdefault(prefix, set()).add(record.zone)
                 node = node.children.setdefault(part, _Node(part))
                 node.files += 1
                 node.source += int(record.kind == "source")
                 node.tests += int(record.kind == "test")
+        self._files_by_zone = {
+            zone: tuple(sorted(records, key=lambda item: item.path))
+            for zone, records in by_zone.items()
+        }
+        by_kind: dict[str, list[FileRecord]] = {}
+        for record in self.model.files:
+            by_kind.setdefault(record.kind.casefold(), []).append(record)
+        self._files_by_kind = {
+            kind: tuple(sorted(records, key=lambda item: item.path))
+            for kind, records in by_kind.items()
+        }
 
     def directory(self, prefix: str = "") -> NavigationEntry:
         normalized = prefix.strip("/")
@@ -65,11 +84,7 @@ class NavigationIndex:
                     return NavigationEntry(normalized, 0, 0, 0, (), ())
                 node = node.children[part]
         path_prefix = normalized + "/" if normalized else ""
-        zones = tuple(sorted({
-            record.zone
-            for path, record in self._paths.items()
-            if path.startswith(path_prefix)
-        }))
+        zones = tuple(sorted(self._zones_by_prefix.get(normalized, set())))
         return NavigationEntry(
             prefix=normalized,
             files=node.files,
@@ -90,7 +105,13 @@ class NavigationIndex:
         needle = name_contains.casefold().strip()
         kind_set = {item.casefold() for item in kinds}
         values: list[FileRecord] = []
-        for record in self.model.files:
+        if zone:
+            records = self._files_by_zone.get(zone, ())
+        elif len(kind_set) == 1:
+            records = self._files_by_kind.get(next(iter(kind_set)), ())
+        else:
+            records = self.model.files
+        for record in records:
             if zone and record.zone != zone:
                 continue
             if needle and needle not in record.path.casefold():

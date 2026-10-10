@@ -11,7 +11,7 @@
   "provider_bootstrap": {
     "mandatory": true,
     "mode": "fail_closed",
-    "rule": "Every AI development agent and every credential-bearing AI provider activation must load the active architecture, construction, capability-interface, state-topology, typed-schema, concrete-capability, implementation-handoff, closure-evidence, and human-manual contracts before changing or serving the system.",
+    "rule": "Every AI development agent and credential-bearing AI provider activation must load the active architecture, construction, capability-interface, state-topology, typed-schema, concrete-capability, implementation-handoff, closure-evidence, October-2026 enterprise-superiority, enterprise-implementation-dossier, and human-manual authorities before changing or serving the system.",
     "must_read": [
       "machine/manifest.json",
       "machine/architecture.json",
@@ -22,6 +22,8 @@
       "machine/ai_capabilities.json",
       "machine/ai_implementation_handoff.json",
       "machine/ai_closure_evidence.json",
+      "machine/enterprise_ai_superiority.json",
+      "machine/enterprise_ai_implementation_notes_index.json",
       "docs/AI_APP_CONSTRUCTION_MANUAL.md"
     ],
     "development_provider_entrypoints": [
@@ -1644,6 +1646,18 @@
       "kind": "release",
       "command": "repository required checks + immutable artifact provenance",
       "required": true
+    },
+    {
+      "id": "enterprise-ai-superiority",
+      "kind": "static",
+      "command": "python scripts/check_enterprise_ai_superiority.py --json",
+      "required": true
+    },
+    {
+      "id": "enterprise-ai-implementation-notes",
+      "kind": "static",
+      "command": "python scripts/check_enterprise_ai_implementation_notes.py --json",
+      "required": true
     }
   ],
   "runtime_model_providers": [
@@ -1707,6 +1721,30 @@
       "activation_rule": "secondary configuration is all-or-nothing; partial configuration fails closed",
       "failover_rule": "eligible only after ProviderUnavailableError or ProviderInvocationError; policy/governance/admission failures never fail over",
       "privacy_ceiling": "confidential-with-tenant; restricted external transfer denied"
+    },
+    {
+      "id": "local",
+      "state": "active",
+      "adapter": "skeleton/ai/runtime/inference/local.py:LocalModelAdapter",
+      "protocol": "provider-neutral local artifact inference",
+      "architecture_read_required": true,
+      "construction_manual_read_required": true,
+      "activation_receipt_required": true,
+      "credentials": [],
+      "required_configuration": [
+        "AI_LOCAL_MODEL_PATH"
+      ],
+      "optional_configuration": [
+        "AI_LOCAL_MODEL_CACHE_SIZE",
+        "AI_LOCAL_MODEL_SEED"
+      ],
+      "capabilities": [
+        "text-generation"
+      ],
+      "undeclared_capability_policy": "deny",
+      "network_policy": "none; local artifact execution only",
+      "execution_owner": "skeleton/provider_runtime.py",
+      "activation_rule": "local artifact identity must validate before activation; hosted fallback is not implicit"
     }
   ],
   "gap_policy": {
@@ -3514,7 +3552,10 @@
     "migration/preflight evidence when persistence changes",
     "artifact/SBOM/provenance references",
     "canary/smoke evidence",
-    "rollback target and trigger criteria"
+    "rollback target and trigger criteria",
+    "enterprise AI superiority exact-head validator output",
+    "all-421-volume October 2026 implementation dossier validator output",
+    "enterprise system architecture exact-head validator and independent receipt"
   ],
   "construction_work_packages": [
     {
@@ -9158,7 +9199,7 @@
   "runtime_schema_catalog": {
     "schema_version": 1,
     "status": "active",
-    "catalog_version": "1.0.0",
+    "catalog_version": "1.1.0",
     "path": "machine/ai_runtime_schemas.json",
     "policy": "typed schema catalog refines canonical envelopes; field/enum/type changes require contract-version compatibility review",
     "envelope_record_map": {

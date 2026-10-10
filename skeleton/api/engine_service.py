@@ -2455,6 +2455,52 @@ class EngineExecutionService:
             )
         return stored
 
+    def handoff_binding(
+        self,
+        execution_id: str,
+        *,
+        verified_service_principal: str,
+        actor_id: str,
+        tenant_id: str,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Return the durable non-content context binding for one execution."""
+
+        stored = self._stored_for_access(
+            execution_id,
+            verified_service_principal=verified_service_principal,
+            scope="engine:read",
+            now=now,
+        )
+        operation = stored.command.operation
+        actor = str(actor_id).strip()
+        tenant = str(tenant_id).strip()
+        if actor != operation.actor_id or tenant != operation.tenant_id:
+            raise EngineServiceError(
+                "engine execution belongs to a different actor or tenant"
+            )
+        handoff = stored.command.compiled_context
+        return {
+            "operation_id": handoff.operation_id,
+            "execution_id": handoff.execution_id,
+            "turn_id": handoff.turn_id,
+            "tenant_id": handoff.tenant_id,
+            "actor_id": operation.actor_id,
+            "context_id": handoff.context_id,
+            "context_digest": handoff.context_digest,
+            "compiler_version": handoff.compiler_version,
+            "source_snapshot": [
+                [segment_id, digest]
+                for segment_id, digest in handoff.source_snapshot
+            ],
+            "data_class": handoff.data_class,
+            "purpose": handoff.purpose,
+            "handoff_digest": handoff.handoff_digest,
+            "capability": operation.capability,
+            "idempotency_key": operation.idempotency_key,
+            "trace_id": operation.trace_id,
+        }
+
     def pending_tool_approvals(
         self,
         execution_id: str,
@@ -2810,7 +2856,6 @@ class EngineExecutionService:
             verified_service_principal=verified_service_principal,
             scope="engine:cancel",
             now=now,
-            require_live_delegation=True,
         )
         operation = stored.command.operation
         if actor_id is not None and str(actor_id).strip() != operation.actor_id:
@@ -2823,6 +2868,12 @@ class EngineExecutionService:
             )
         current = self.repository.get(execution_id)
         if not current.terminal and not current.cancellation_requested:
+            self._validate(
+                stored.command,
+                verified_service_principal=verified_service_principal,
+                required_scope="engine:cancel",
+                now=now,
+            )
             self.repository.request_cancel(
                 execution_id,
                 expected_version=current.version,

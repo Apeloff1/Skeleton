@@ -5,6 +5,14 @@ on:
     branches:
       - main
     paths:
+      - "skeleton/learning/mirror_room/**"
+      - "skeleton/ai/learning/mirror_room/**"
+      - "skeleton/testing/test_mirror_room_core.py"
+      - "skeleton/testing/test_mirror_room_adversarial.py"
+      - "skeleton/testing/test_mirror_room_content_delivery.py"
+      - "skeleton/testing/test_mirror_room_observability.py"
+      - ".github/workflows/mirror-room-core.yml"
+      - ".github/workflows/mirror-room-extensions.yml"
       - "skeleton/learning/promotion.py"
       - "skeleton/learning/__init__.py"
       - "skeleton/release/slo_promotion.py"
@@ -21,6 +29,14 @@ on:
       - "masterplan/p1-provider-redundancy-close-20260927-clean3"
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "skeleton/learning/mirror_room/**"
+      - "skeleton/ai/learning/mirror_room/**"
+      - "skeleton/testing/test_mirror_room_core.py"
+      - "skeleton/testing/test_mirror_room_adversarial.py"
+      - "skeleton/testing/test_mirror_room_content_delivery.py"
+      - "skeleton/testing/test_mirror_room_observability.py"
+      - ".github/workflows/mirror-room-core.yml"
+      - ".github/workflows/mirror-room-extensions.yml"
       - "skeleton/learning/promotion.py"
       - "skeleton/learning/__init__.py"
       - "skeleton/release/slo_promotion.py"
@@ -68,14 +84,13 @@ jobs:
           "pydantic>=2.13.5"
           "pydantic-settings>=2.15.0"
 
-      - name: Run feedback promotion contracts
+      - name: Run feedback and release contracts
         run: >-
           python -m pytest -q --noconftest
           skeleton/testing/test_feedback_promotion.py
-
-      - name: Run release SLO promotion contracts
-        run: >-
-          python -m pytest -q --noconftest
+          skeleton/testing/test_mirror_room_adversarial.py
+          skeleton/testing/test_mirror_room_content_delivery.py
+          skeleton/testing/test_mirror_room_observability.py
           skeleton/testing/test_release_slo_promotion.py
 
   independent-p1-verifier:
@@ -114,35 +129,6 @@ jobs:
           --evidence-out .p1-feedback-release.json
           --print-evidence
 
-
-  p1-ledger-closure:
-    name: P1 feedback release ledger closure
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    env:
-      PYTHONPATH: "."
-      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-
-    steps:
-      - name: Check out exact PR head
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
-        with:
-          persist-credentials: false
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.11.16"
-
-      - name: Verify exact-head P1 surfaces and ledger
-        env:
-          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
-        run: >-
-          python scripts/verify_p1_feedback_release_closure.py
-          --evidence-out .p1-feedback-release-ledger.json
-          --print-evidence
-
       - name: Assert exact-head closed P1 gap state
         env:
           EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
@@ -153,9 +139,7 @@ jobs:
           from pathlib import Path
 
           receipt = json.loads(
-              Path(".p1-feedback-release-ledger.json").read_text(
-                  encoding="utf-8"
-              )
+              Path(".p1-feedback-release.json").read_text(encoding="utf-8")
           )
           if receipt.get("head_sha") != os.environ["EXPECTED_SHA"].strip():
               raise SystemExit("P1 closure receipt head mismatch")
@@ -172,3 +156,4 @@ jobs:
               )
           print("P1 feedback/release closed at exact head", receipt["head_sha"])
           PY
+

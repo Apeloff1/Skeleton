@@ -127,6 +127,35 @@ def load_manifest(path: str | Path) -> Mapping[str, object]:
     return payload
 
 
+def validate_manifest(payload: Mapping[str, object]) -> None:
+    """Fail closed on structural corruption in a machine manifest."""
+    if payload.get("format") != "skeleton-repository-machine-manifest" or payload.get("version") != 1:
+        raise ValueError("unsupported machine manifest format")
+    state = payload.get("state")
+    if not isinstance(state, dict):
+        raise ValueError("machine manifest state missing")
+    files = state.get("files")
+    if not isinstance(files, list):
+        raise ValueError("machine manifest file inventory missing")
+    paths: list[str] = []
+    for item in files:
+        if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+            raise ValueError("machine manifest contains an invalid file record")
+        path = item["path"]
+        if not path or path.startswith("/") or path == ".machine" or path.startswith(".machine/"):
+            raise ValueError("machine manifest contains an invalid generated-artifact path")
+        paths.append(path)
+    if paths != sorted(paths) or len(paths) != len(set(paths)):
+        raise ValueError("machine manifest file inventory must be sorted and unique")
+    metadata = state.get("metadata")
+    if not isinstance(metadata, dict) or metadata.get("file_count") != len(files):
+        raise ValueError("machine manifest metadata/file count mismatch")
+    if bool(state.get("truncated")):
+        raise ValueError("machine manifest inventory is truncated")
+    if payload.get("checksum") != _checksum(state):
+        raise ValueError("machine manifest checksum mismatch")
+
+
 def _zones(state: Mapping[str, object]) -> dict[str, str]:
     result: dict[str, str] = {}
     raw = state.get("subsystems", [])

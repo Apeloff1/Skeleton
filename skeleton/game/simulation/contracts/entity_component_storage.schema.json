@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-10:entity_component_storage:v1",
+  "title": "FLGB-10 entity component storage",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "component_id",
+    "schema_digest",
+    "value_digest"
+  ],
+  "properties": {
+    "component_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "schema_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "value_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

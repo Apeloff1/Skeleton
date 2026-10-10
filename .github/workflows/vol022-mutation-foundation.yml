@@ -1,0 +1,91 @@
+name: VOL-022 Mutation Lease Foundation
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/automation/transactional_workspace.py"
+      - "skeleton/automation/independent_review.py"
+      - "skeleton/automation/repository_transaction.py"
+      - "skeleton/testing/test_vol022_transactional_workspace.py"
+      - "skeleton/testing/test_vol022_independent_review.py"
+      - "skeleton/testing/test_vol022_repository_transaction.py"
+      - ".github/workflows/vol022-mutation-foundation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skeleton/automation/transactional_workspace.py"
+      - "skeleton/automation/independent_review.py"
+      - "skeleton/automation/repository_transaction.py"
+      - "skeleton/testing/test_vol022_transactional_workspace.py"
+      - "skeleton/testing/test_vol022_independent_review.py"
+      - "skeleton/testing/test_vol022_repository_transaction.py"
+      - ".github/workflows/vol022-mutation-foundation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vol022-mutation-foundation-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  mutation-foundation:
+    name: Lease-isolated mutation lifecycle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install targeted test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          .
+          "pytest>=8,<9"
+      - name: Compile mutation foundation
+        run: >-
+          python -m compileall -q
+          skeleton/automation/transactional_workspace.py
+          skeleton/automation/independent_review.py
+          skeleton/automation/repository_transaction.py
+      - name: Run mutation foundation regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_vol022_transactional_workspace.py
+          skeleton/testing/test_vol022_independent_review.py
+          skeleton/testing/test_vol022_repository_transaction.py
+      - name: Reject repository-authority escalation tokens
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          paths = (
+              Path("skeleton/automation/transactional_workspace.py"),
+              Path("skeleton/automation/independent_review.py"),
+              Path("skeleton/automation/repository_transaction.py"),
+          )
+          required = {
+              "workspace-proposal-only",
+              "review-evidence-only",
+              "repository-engineering-evidence-only",
+          }
+          source = "\n".join(path.read_text(encoding="utf-8") for path in paths)
+          missing = sorted(required - {token for token in required if token in source})
+          if missing:
+              raise SystemExit(f"missing authority-boundary tokens: {missing}")
+          if "contents: write" in source or "git push" in source:
+              raise SystemExit("VOL-022 evidence/runtime surface must not own repository publication")
+          print("VOL-022 mutation foundation authority boundary: OK")
+          PY

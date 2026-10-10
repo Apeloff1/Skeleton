@@ -1,0 +1,65 @@
+{
+  "schema_version": "skeleton.tool_effect_reconciliation.contract.v1",
+  "gap_id": "G015",
+  "title": "Non-idempotent side-effect compensation",
+  "authority": {
+    "canonical_owner": "skeleton/skills/tool_effect_reconciliation.py",
+    "ai_mirror": "skeleton/ai/runtime/skills/tool_effect_reconciliation.py",
+    "receipt_authority": "skeleton/skills/tool_receipt_store.py",
+    "saga_authority": "skeleton/skills/tool_saga.py"
+  },
+  "invariants": [
+    "pending reservation is never automatically re-executed after process loss",
+    "reconciliation requires exact request identity plus independent evidence references",
+    "reconciliation never invokes the original tool handler",
+    "effect_committed becomes a terminal succeeded receipt without metering a new tool call",
+    "effect_absent becomes a terminal failed receipt and does not reuse the original idempotency key",
+    "effect_compensated becomes a terminal failed receipt carrying durable compensation evidence",
+    "identical reconciliation replay is stable and conflicting evidence fails closed",
+    "saga recovery never double-compensates an effect already proved absent or compensated"
+  ],
+  "terminal_decisions": {
+    "effect_committed": {
+      "status": "succeeded",
+      "error_code": null,
+      "requires": [
+        "result_ref"
+      ]
+    },
+    "effect_absent": {
+      "status": "failed",
+      "error_code": "reconciled_effect_absent",
+      "requires": []
+    },
+    "effect_compensated": {
+      "status": "failed",
+      "error_code": "reconciled_effect_compensated",
+      "requires": [
+        "compensation_ref"
+      ]
+    }
+  },
+  "privacy": {
+    "persist_raw_arguments": false,
+    "persist_raw_results": false,
+    "persisted_binding": [
+      "request digest",
+      "evidence digest",
+      "evidence refs",
+      "observer identity",
+      "authority ref",
+      "terminal receipt identity"
+    ]
+  },
+  "validation": [
+    "skeleton/testing/test_tool_effect_reconciliation.py",
+    "skeleton/testing/test_tool_receipt_store.py",
+    "skeleton/testing/test_tool_saga.py",
+    ".github/workflows/non-idempotent-effect-reconciliation.yml"
+  ],
+  "claim_limit": "Implementation evidence only; independent exact-head evidence is required before verified_closed.",
+  "exact_head": {
+    "base_sha": "be408977891328b78522074c1fe693267b01ce5b",
+    "mode": "pull_request_exact_head"
+  }
+}

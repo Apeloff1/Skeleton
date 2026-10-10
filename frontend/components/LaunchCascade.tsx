@@ -13,6 +13,11 @@ import { useRouter } from 'expo-router';
 import { safeGetItem, safeSetItem } from '../utils/safeStorage';
 import { traceStep, traceStepSync } from '../utils/bootTracer';
 import { readBootCache } from '../src/boot';
+import {
+  accessibleButtonProps,
+  accessibleStatusProps,
+} from '../src/accessibility/runtime';
+import { useI18n } from '../src/i18n';
 
 const ATTEMPT_KEY = '@launcher/attempt:v1';
 const WELCOME_FLAG_KEY = '@codedock:welcome_seen:v1';
@@ -51,17 +56,28 @@ function Layer0_BootLauncher({
 }
 
 function Layer1_Static({ onEnter, onSkip }: { onEnter: () => void; onSkip: () => void }) {
+  const { t } = useI18n();
   return (
     <View style={[styles.fill, { backgroundColor: '#0a0a14' }]}>
       <View style={styles.center}>
-        <Text style={styles.title}>Skeleton</Text>
-        <Text style={styles.tagline}>Unified Product</Text>
+        <Text style={styles.title}>{t('app.name')}</Text>
+        <Text style={styles.tagline}>{t('app.tagline')}</Text>
         <Text style={styles.subtitle}>Create, Play, Learn and Operate from one consolidated shell.</Text>
-        <TouchableOpacity style={styles.primaryBtn} onPress={onEnter} activeOpacity={0.8}>
-          <Text style={styles.primaryBtnText}>Open Skeleton</Text>
+        <TouchableOpacity
+          style={styles.primaryBtn}
+          onPress={onEnter}
+          activeOpacity={0.8}
+          {...accessibleButtonProps(t('launcher.open'))}
+        >
+          <Text style={styles.primaryBtnText}>{t('launcher.open')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onSkip} hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }} style={{ marginTop: 18 }}>
-          <Text style={styles.tapHint}>Use minimal launcher</Text>
+        <TouchableOpacity
+          onPress={onSkip}
+          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+          style={[styles.textControl, { marginTop: 18 }]}
+          {...accessibleButtonProps(t('launcher.minimal'))}
+        >
+          <Text style={styles.tapHint}>{t('launcher.minimal')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -69,18 +85,28 @@ function Layer1_Static({ onEnter, onSkip }: { onEnter: () => void; onSkip: () =>
 }
 
 function Layer2_Minimal({ onEnter, onSkip }: { onEnter: () => void; onSkip: () => void }) {
+  const { t } = useI18n();
   return (
     <View style={[styles.fill, { backgroundColor: '#0a0a14', justifyContent: 'center' }]}>
       <View style={{ paddingHorizontal: 32 }}>
-        <Text style={[styles.title, { fontSize: 28 }]}>Skeleton</Text>
+        <Text style={[styles.title, { fontSize: 28 }]}>{t('app.name')}</Text>
         <Text style={[styles.subtitle, { marginBottom: 28 }]}>
           Minimal launcher — animations disabled for stability.
         </Text>
-        <TouchableOpacity style={styles.primaryBtn} onPress={onEnter} activeOpacity={0.8}>
-          <Text style={styles.primaryBtnText}>Enter Product</Text>
+        <TouchableOpacity
+          style={styles.primaryBtn}
+          onPress={onEnter}
+          activeOpacity={0.8}
+          {...accessibleButtonProps(t('launcher.enter_product'))}
+        >
+          <Text style={styles.primaryBtnText}>{t('launcher.enter_product')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onSkip} style={[styles.secondaryBtn, { marginTop: 12 }]}>
-          <Text style={styles.secondaryBtnText}>Open Recovery (Safe Mode)</Text>
+        <TouchableOpacity
+          onPress={onSkip}
+          style={[styles.secondaryBtn, { marginTop: 12 }]}
+          {...accessibleButtonProps(t('recovery.safe_mode'))}
+        >
+          <Text style={styles.secondaryBtnText}>{t('recovery.safe_mode')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -88,18 +114,28 @@ function Layer2_Minimal({ onEnter, onSkip }: { onEnter: () => void; onSkip: () =
 }
 
 function Layer3_SafeMode({ goSafeMode, retryFromTop }: { goSafeMode: () => void; retryFromTop: () => void }) {
+  const { t } = useI18n();
   return (
     <View style={[styles.fill, { backgroundColor: '#0a0a14', justifyContent: 'center' }]}>
       <View style={{ paddingHorizontal: 32 }}>
         <Text style={[styles.title, { fontSize: 24, color: '#fbbf24' }]}>Launcher fallback</Text>
         <Text style={[styles.subtitle, { marginBottom: 24 }]}>
-          We had trouble starting the app. Pick a recovery option:
+          {t('recovery.boot_failed')}
         </Text>
-        <TouchableOpacity style={styles.primaryBtn} onPress={goSafeMode} activeOpacity={0.8}>
-          <Text style={styles.primaryBtnText}>Open Safe Mode</Text>
+        <TouchableOpacity
+          style={styles.primaryBtn}
+          onPress={goSafeMode}
+          activeOpacity={0.8}
+          {...accessibleButtonProps(t('recovery.safe_mode'))}
+        >
+          <Text style={styles.primaryBtnText}>{t('recovery.safe_mode')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={retryFromTop} style={[styles.secondaryBtn, { marginTop: 12 }]}>
-          <Text style={styles.secondaryBtnText}>Retry launcher (start over)</Text>
+        <TouchableOpacity
+          onPress={retryFromTop}
+          style={[styles.secondaryBtn, { marginTop: 12 }]}
+          {...accessibleButtonProps(t('recovery.retry'))}
+        >
+          <Text style={styles.secondaryBtnText}>{t('recovery.retry')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -108,6 +144,7 @@ function Layer3_SafeMode({ goSafeMode, retryFromTop }: { goSafeMode: () => void;
 
 export default function LaunchCascade() {
   const router = useRouter();
+  const { t } = useI18n();
   const [layer, setLayer] = React.useState<number>(0);
   const [ready, setReady] = React.useState(false);
   const escalateLockRef = React.useRef(false);
@@ -209,8 +246,11 @@ export default function LaunchCascade() {
 
   if (!ready) {
     return (
-      <View style={[styles.fill, styles.center, { backgroundColor: '#0a0a14' }]}>
-        <ActivityIndicator size="small" color="#a78bfa" />
+      <View
+        style={[styles.fill, styles.center, { backgroundColor: '#0a0a14' }]}
+        {...accessibleStatusProps(t('status.starting'))}
+      >
+        <ActivityIndicator size="small" color="#a78bfa" accessibilityElementsHidden />
       </View>
     );
   }
@@ -261,5 +301,6 @@ const styles = StyleSheet.create({
     borderRadius: 999, alignItems: 'center', minHeight: 48, justifyContent: 'center',
   },
   secondaryBtnText: { color: '#a78bfa', fontSize: 13, fontWeight: '700' },
+  textControl: { minHeight: 44, justifyContent: 'center' },
   tapHint: { color: '#9ca3af', fontSize: 12, fontStyle: 'italic' },
 });

@@ -44,6 +44,15 @@ and it fails unless all of these constituent gates succeed for the same head:
   against the workflow MongoDB service;
 - **Lint Type Security** — runs backend Ruff, the canonical frontend lint/type
   and high-confidence security gates, plus the pinned full-history Gitleaks scan.
+- **PR Automation Tests** — compiles the automation packages and runs the
+  auto-merge, runner-v2, repository-machine, and filesystem/tool transaction
+  contracts.
+
+The machine-readable copy of this list is `.github/ci/required-checks.json`;
+`scripts/check_required_checks_policy.py` fails the `Quarantine Policy` lane if
+the workflow, docs, or owner protection script drift from it, and
+`scripts/merge_readiness_status.py --pr <n>` reports the live verdict for any
+pull request or commit.
 
 `main` branch protection should require the stable **Merge Readiness** job. The
 existing dedicated workflows remain valuable defense in depth and may also be

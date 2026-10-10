@@ -2,14 +2,11 @@
   "schema_version": "skeleton.repository_engineering_policy.v1",
   "policy_version": "0.1.0",
   "status": "active",
-  "purpose": "Bind autonomous repository mutation to inspect→plan→lease→edit→build→test→review→verify with transactional workspace and independent verification.",
+  "purpose": "Bind autonomous repository mutation to inspect\u2192plan\u2192lease\u2192edit\u2192build\u2192test\u2192review\u2192verify with transactional workspace and independent verification.",
   "masterplan_binding": {
     "volume_ref": "VOL-022",
     "title": "Autonomous Repository Engineering",
-    "required_gap_texts": [
-      "transactional workspace layer incomplete",
-      "independent reviewer/verifier routing needs full integration"
-    ]
+    "required_gap_texts": []
   },
   "phases": [
     {

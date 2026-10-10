@@ -1,5 +1,12 @@
 """Provider-independent local model execution for the Skeleton AI runtime."""
 
+from .artifact import (
+    LoadedLocalModel,
+    LocalModelArtifactError,
+    LocalModelArtifactReceipt,
+    load_local_model_artifact,
+    write_local_model_artifact,
+)
 from .deployment import (
     LocalModelDeployment,
     LocalModelDeploymentError,
@@ -32,6 +39,15 @@ from .local import (
 )
 
 __all__ = [
+    "NativeRuntimeBackendError",
+    "NativeRuntimeLocalModel",
+    "NativeTransformerModel",
+    "build_native_transformer_adapter",
+    "LoadedLocalModel",
+    "LocalModelArtifactError",
+    "LocalModelArtifactReceipt",
+    "load_local_model_artifact",
+    "write_local_model_artifact",
     "LocalModelDeployment",
     "LocalModelDeploymentError",
     "LOCAL_MODEL_DEPLOYMENT_SCHEMA",
@@ -57,3 +73,26 @@ __all__ = [
     "LocalToolCall",
     "ReferenceNGramModel",
 ]
+
+
+# The executable native transformer depends on Cortex; import only when selected.
+from importlib import import_module as _inference_import_module
+
+_NATIVE_EXPORTS = {
+    "NativeTransformerModel": ".native_transformer",
+    "build_native_transformer_adapter": ".native_transformer",
+}
+
+
+def __getattr__(name: str):
+    if name in {"NativeRuntimeBackendError", "NativeRuntimeLocalModel"}:
+        from importlib import import_module
+        result = getattr(import_module(".native_runtime", __name__), name)
+        globals()[name] = result
+        return result
+    module = _NATIVE_EXPORTS.get(name)
+    if module is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(_inference_import_module(module, __name__), name)
+    globals()[name] = value
+    return value

@@ -80,6 +80,42 @@ def _signoff_errors(record_id: str, label: str, signoff: object) -> list[str]:
     return errors
 
 
+def _timeline_errors(record_id: str, record: object) -> list[str]:
+    """Reject chronologically impossible signed accountability lifecycles."""
+    if not isinstance(record, dict):
+        return [f"{record_id}: record must be an object"]
+
+    errors: list[str] = []
+    started = _utc(record.get("started_at_utc"))
+    completed = _utc(record.get("completed_at_utc"))
+    impl = record.get("implementation_signoff")
+    verify = record.get("verification_signoff")
+    impl_at = (
+        _utc(impl.get("signed_at_utc"))
+        if isinstance(impl, dict) and impl.get("signed") is True
+        else None
+    )
+    verify_at = (
+        _utc(verify.get("signed_at_utc"))
+        if isinstance(verify, dict) and verify.get("signed") is True
+        else None
+    )
+
+    if started is not None and impl_at is not None and impl_at < started:
+        errors.append(f"{record_id}: implementation signoff predates started_at_utc")
+    if started is not None and verify_at is not None and verify_at < started:
+        errors.append(f"{record_id}: verification signoff predates started_at_utc")
+    if impl_at is not None and verify_at is not None and verify_at < impl_at:
+        errors.append(f"{record_id}: verification signoff predates implementation signoff")
+    if completed is not None and impl_at is not None and completed < impl_at:
+        errors.append(f"{record_id}: completed_at_utc predates implementation signoff")
+    if completed is not None and verify_at is not None and completed < verify_at:
+        errors.append(f"{record_id}: completed_at_utc predates verification signoff")
+    if started is not None and completed is not None and completed < started:
+        errors.append(f"{record_id}: completed_at_utc predates started_at_utc")
+    return errors
+
+
 def _exception_errors(record_id: str, exc: object) -> list[str]:
     if not isinstance(exc, dict):
         return [f"{record_id}: same-signer verification requires independence_exception"]
@@ -109,7 +145,13 @@ def validate() -> list[str]:
     if errors:
         return errors
 
-    ledger = json.loads(LEDGER.read_text(encoding="utf-8"))
+    raw_ledger = LEDGER.read_text(encoding="utf-8").strip()
+    if not raw_ledger:
+        return ["accountability ledger is empty; use the fail-closed recovery utility"]
+    try:
+        ledger = json.loads(raw_ledger)
+    except json.JSONDecodeError as exc:
+        return [f"accountability ledger is invalid JSON: {exc}"]
     master = json.loads(MASTER.read_text(encoding="utf-8"))
     queue = json.loads(QUEUE.read_text(encoding="utf-8"))
     p1 = json.loads(P1.read_text(encoding="utf-8"))
@@ -166,6 +208,7 @@ def validate() -> list[str]:
         verify = record.get("verification_signoff")
         errors.extend(_signoff_errors(rid, "implementation_signoff", impl))
         errors.extend(_signoff_errors(rid, "verification_signoff", verify))
+        errors.extend(_timeline_errors(rid, record))
         impl_signed = isinstance(impl, dict) and impl.get("signed") is True
         verify_signed = isinstance(verify, dict) and verify.get("signed") is True
 

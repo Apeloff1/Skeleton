@@ -255,8 +255,8 @@ def _machine_receipt(root: Path, errors: list[str]) -> dict[str, Any]:
             errors.append("closed Stage-6 gap requires closed handoff")
         if closure_entry.get("closure_decision") != "closed":
             errors.append("closed Stage-6 gap requires closed closure decision")
-        if closure_entry.get("implementation_state") != "closed":
-            errors.append("closed Stage-6 gap requires closed implementation state")
+        if closure_entry.get("implementation_state") != "complete":
+            errors.append("closed Stage-6 gap requires complete implementation state")
         if closure_entry.get("outstanding_evidence"):
             errors.append("closed Stage-6 gap has outstanding evidence")
         if closure_entry.get("blockers"):

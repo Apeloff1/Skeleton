@@ -8,10 +8,7 @@
       "volume_ref": "VOL-070",
       "title": "Quality Vector",
       "accountability_id": "ACC-VOL-070",
-      "required_gap_texts": [
-        "bind dimensions to eval suites",
-        "define non-compensable failure rules"
-      ],
+      "required_gap_texts": [],
       "risks": [
         "aggregate score hides failure",
         "metric correlation bias",
@@ -27,10 +24,7 @@
       "volume_ref": "VOL-081",
       "title": "Formal Methods",
       "accountability_id": "ACC-VOL-081",
-      "required_gap_texts": [
-        "select P0 formal targets",
-        "establish model-to-code traceability"
-      ],
+      "required_gap_texts": [],
       "risks": [
         "spec/code drift",
         "state explosion",
@@ -38,18 +32,24 @@
       ],
       "contracts": [
         "FormalSpecification",
+        "FormalAssumption",
+        "ImplementationBinding",
+        "StateVariable",
+        "FormalState",
         "ProofObligation",
-        "Counterexample"
+        "ProofResult",
+        "Counterexample",
+        "FormalRunReport",
+        "FormalSpecificationRegistry",
+        "ModelSemantics",
+        "BoundedModelChecker"
       ]
     },
     {
       "volume_ref": "VOL-117",
       "title": "Project Metrics",
       "accountability_id": "ACC-VOL-117",
-      "required_gap_texts": [
-        "define metric registry",
-        "bind progress percentages to traceable state"
-      ],
+      "required_gap_texts": [],
       "risks": [
         "vanity metrics",
         "Goodhart effects",
@@ -65,10 +65,7 @@
       "volume_ref": "VOL-120",
       "title": "Final Assembly Test",
       "accountability_id": "ACC-VOL-120",
-      "required_gap_texts": [
-        "materialize final assembly harness",
-        "bind release promotion to final evidence digest"
-      ],
+      "required_gap_texts": [],
       "risks": [
         "integration-only failure",
         "environment mismatch",

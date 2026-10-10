@@ -13,9 +13,11 @@ on:
       - "*"
       - "**"
 
+# Preserve one feedback stream per source gate while coalescing retries and
+# superseded attempts for the same immutable workflow-run + source-workflow identity.
 concurrency:
-  group: autonomous-build-feedback-${{ github.event_name }}-${{ github.event.workflow_run.head_branch }}
-  cancel-in-progress: false
+  group: autonomous-build-feedback-${{ github.event.workflow_run.head_sha }}-${{ github.event.workflow_run.workflow_id }}
+  cancel-in-progress: true
 
 permissions:
   actions: read
@@ -23,7 +25,11 @@ permissions:
 
 jobs:
   feedback:
-    if: github.event.workflow_run.event == 'pull_request'
+    if: >-
+      github.event.workflow_run.event == 'pull_request'
+      && github.event.workflow_run.head_repository.full_name == github.repository
+      && github.event.workflow_run.conclusion != 'cancelled'
+      && github.event.workflow_run.conclusion != 'skipped'
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     env:
@@ -44,6 +50,9 @@ jobs:
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v6.1.0
         with:
           python-version: '3.11.16'
+
+      - name: Install feedback test runner
+        run: python -m pip install --disable-pip-version-check 'pytest>=7.0.0'
 
       - name: Verify event/head boundary
         shell: bash

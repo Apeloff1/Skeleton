@@ -11,8 +11,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MACHINE = ROOT / "machine" / "ai_master_plan.json"
+EXECUTION_FRONTIER = ROOT / "machine" / "ai_execution_frontier_20260924.json"
 INDEX = ROOT / "docs" / "plan" / "MASTER_INDEX.md"
 PLAN = ROOT / "docs" / "plan" / "MASTER_PLAN.md"
+COMPETITIVE_LADDER = ROOT / "machine" / "competitive_ai_engineering_ladder.json"
+GAME_BUILDER = ROOT / "machine" / "ai_game_builder_500_levels.json"
+GAME_BUILDER_DUEL = ROOT / "machine" / "ai_game_builder_dual_rival_forge.json"
 DEPTH_000_040 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_000_040.md"
 DEPTH_041_080 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_041_080.md"
 DEPTH_081_120 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_081_120.md"
@@ -27,25 +31,31 @@ DEPTH_401_420 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_401_420.md"
 
 EXPECTED_FIRST = 0
 EXPECTED_LAST = 420
-_CLOSED_GAP_IMPLEMENTATION_STATES = {"hardened", "production"}
+_GAP_OPTIONAL_IMPLEMENTATION_STATES = {
+    "evidence_pending",
+    "implemented",
+    "integrated",
+    "verified",
+    "hardened",
+    "production",
+}
 
 
 def _depth_field_requires_nonempty(
     volume: dict[str, object],
     field: str,
 ) -> bool:
-    """Depth passes require gaps until implementation is hardened.
+    """Require planning gaps only until implementation is materially closed.
 
-    A permanently non-empty gaps field would make the master-plan depth
-    contract impossible to reconcile with the maturity contract, which
-    correctly requires hardened/production implementations to have no
-    unresolved gaps.
+    Gap inventory describes unresolved implementation work. Once implementation
+    has materialized, independent evidence and maturity may still be pending
+    without requiring artificial gaps to remain open.
     """
 
     return not (
         field == "gaps"
         and volume.get("implementation_status")
-        in _CLOSED_GAP_IMPLEMENTATION_STATES
+        in _GAP_OPTIONAL_IMPLEMENTATION_STATES
     )
 EXPECTED_COUNT = EXPECTED_LAST - EXPECTED_FIRST + 1
 
@@ -70,6 +80,135 @@ def validate(data: dict) -> list[str]:
     errors: list[str] = []
     if data.get("schema_version") != 1:
         errors.append("schema_version must equal 1")
+    competitive = data.get("competitive_engineering_ladder")
+    if not isinstance(competitive, dict):
+        errors.append("competitive_engineering_ladder must be an object")
+    else:
+        if competitive.get("authority") != "machine/competitive_ai_engineering_ladder.json":
+            errors.append("competitive engineering authority path drifted")
+        if competitive.get("human_spec") != "docs/architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md":
+            errors.append("competitive engineering human spec path drifted")
+        if competitive.get("schema_version") != "skeleton.competitive_ai_engineering_ladder.v1":
+            errors.append("competitive engineering schema binding drifted")
+        if competitive.get("family_count") != 20:
+            errors.append("competitive engineering family_count must equal 20")
+        if competitive.get("levels_per_family") != 10:
+            errors.append("competitive engineering levels_per_family must equal 10")
+        if competitive.get("total_levels") != 200:
+            errors.append("competitive engineering total_levels must equal 200")
+        if not COMPETITIVE_LADDER.is_file():
+            errors.append("competitive engineering machine authority is missing")
+        else:
+            try:
+                ladder = json.loads(COMPETITIVE_LADDER.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                errors.append(f"cannot parse competitive engineering authority: {exc}")
+            else:
+                if not isinstance(ladder, dict):
+                    errors.append("competitive engineering authority root must be an object")
+                else:
+                    levels = ladder.get("levels")
+                    families = ladder.get("families")
+                    if not isinstance(families, list) or len(families) != 20:
+                        errors.append("competitive engineering authority must contain 20 families")
+                    if not isinstance(levels, list) or len(levels) != 200:
+                        errors.append("competitive engineering authority must contain 200 levels")
+                    elif (
+                        levels[0].get("id") != "ENG-001"
+                        or levels[-1].get("id") != "ENG-200"
+                    ):
+                        errors.append("competitive engineering authority range must be ENG-001..ENG-200")
+
+    game_builder = data.get("ai_game_builder_500_levels")
+    if not isinstance(game_builder, dict):
+        errors.append("ai_game_builder_500_levels must be an object")
+    else:
+        expected_bindings = {
+            "authority": "machine/ai_game_builder_500_levels.json",
+            "dual_rival_authority": "machine/ai_game_builder_dual_rival_forge.json",
+            "human_spec": "docs/architecture/AI_GAME_BUILDER_500_LEVELS.md",
+            "schema_version": "skeleton.ai_game_builder_500_levels.v1",
+        }
+        for field, expected_value in expected_bindings.items():
+            if game_builder.get(field) != expected_value:
+                errors.append(f"AI game builder {field} binding drifted")
+        for field, expected_value in (
+            ("family_count", 50),
+            ("levels_per_family", 10),
+            ("total_levels", 500),
+            ("stages_per_round", 3),
+        ):
+            if game_builder.get(field) != expected_value:
+                errors.append(f"AI game builder {field} must equal {expected_value}")
+        if game_builder.get("effort_modes") != {
+            "forge_100": 100,
+            "forge_1000": 1000,
+            "forge_10000": 10000,
+        }:
+            errors.append("AI game builder effort modes must equal 100/1000/10000")
+        if game_builder.get("wall_clock_deadline") is not None:
+            errors.append("AI game builder wall_clock_deadline must be null")
+        if not GAME_BUILDER.is_file():
+            errors.append("AI game builder machine authority is missing")
+        else:
+            try:
+                builder_authority = json.loads(GAME_BUILDER.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                errors.append(f"cannot parse AI game builder authority: {exc}")
+            else:
+                topology = builder_authority.get("topology", {})
+                if not isinstance(topology, dict):
+                    errors.append("AI game builder topology must be an object")
+                else:
+                    if topology.get("family_count") != 50:
+                        errors.append("AI game builder authority must contain 50 families")
+                    if topology.get("total_levels") != 500:
+                        errors.append("AI game builder authority must contain 500 levels")
+                families = builder_authority.get("families")
+                if not isinstance(families, list) or len(families) != 50:
+                    errors.append("AI game builder authority family registry must contain 50 entries")
+        if not GAME_BUILDER_DUEL.is_file():
+            errors.append("AI game builder dual-rival authority is missing")
+        else:
+            try:
+                duel_authority = json.loads(GAME_BUILDER_DUEL.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                errors.append(f"cannot parse AI game builder dual-rival authority: {exc}")
+            else:
+                modes = duel_authority.get("effort_modes", {})
+                for key, rounds in (("forge_100", 100), ("forge_1000", 1000), ("forge_10000", 10000)):
+                    mode = modes.get(key) if isinstance(modes, dict) else None
+                    if not isinstance(mode, dict) or mode.get("rounds") != rounds:
+                        errors.append(f"AI game builder {key} round count drifted")
+                    elif mode.get("stages_per_round") != 3:
+                        errors.append(f"AI game builder {key} stages_per_round must equal 3")
+                    elif mode.get("wall_clock_deadline") is not None:
+                        errors.append(f"AI game builder {key} wall-clock deadline must be null")
+
+    execution_frontier = data.get("execution_frontier")
+    if not isinstance(execution_frontier, dict):
+        errors.append("execution_frontier must be an object")
+    elif not EXECUTION_FRONTIER.is_file():
+        errors.append("execution_frontier machine contract is missing")
+    else:
+        try:
+            canonical_frontier = json.loads(
+                EXECUTION_FRONTIER.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError) as exc:
+            errors.append(f"cannot parse execution_frontier machine contract: {exc}")
+        else:
+            if execution_frontier.get("machine_contract") != (
+                "machine/ai_execution_frontier_20260924.json"
+            ):
+                errors.append("execution_frontier machine contract path drifted")
+            if execution_frontier.get("frontier_id") != canonical_frontier.get("frontier_id"):
+                errors.append("execution_frontier frontier_id drifted")
+            if execution_frontier.get("queue_snapshot") != canonical_frontier.get("queue_snapshot"):
+                errors.append(
+                    "execution_frontier queue_snapshot disagrees with canonical frontier"
+                )
+
     engineering = data.get("engineering_pass")
     if not isinstance(engineering, dict):
         errors.append("engineering_pass must be an object")

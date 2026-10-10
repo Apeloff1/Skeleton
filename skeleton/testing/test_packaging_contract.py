@@ -43,7 +43,7 @@ def test_runtime_image_excludes_development_payload() -> None:
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
 
     assert '.[dev]' not in dockerfile
-    assert "pip install --no-cache-dir ." in dockerfile
+    assert 'pip install --no-cache-dir ".[local-inference]"' in dockerfile
     assert "pip install --no-cache-dir -e" not in dockerfile
     assert "COPY tests" not in dockerfile
     assert "USER appuser" in dockerfile

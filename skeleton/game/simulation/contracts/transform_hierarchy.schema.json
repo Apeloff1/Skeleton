@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-10:transform_hierarchy:v1",
+  "title": "FLGB-10 transform hierarchy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "entity_id",
+    "parent_id",
+    "local_position"
+  ],
+  "properties": {
+    "entity_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "parent_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 256
+    },
+    "local_position": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "integer"
+      }
+    }
+  }
+}

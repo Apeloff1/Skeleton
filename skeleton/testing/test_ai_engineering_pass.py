@@ -50,3 +50,58 @@ def test_engineering_pass_links_atomic_task_matrix() -> None:
     task = data["task_propagation"]
     assert task["machine_contract"] == "machine/ai_engineering_task_matrix.json"
     assert task["human_contract"] == "docs/plan/ENGINEERING_TASK_MATRIX.md"
+
+def test_engineering_profile_rejects_duplicate_obligations(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    data = json.loads(checker.ENGINEERING.read_text(encoding="utf-8"))
+    mutated = json.loads(json.dumps(data))
+    profile = mutated["work_package_profiles"][0]
+    profile["principal_failure_modes"].append(
+        profile["principal_failure_modes"][0]
+    )
+    path = tmp_path / "engineering.json"
+    path.write_text(json.dumps(mutated), encoding="utf-8")
+    monkeypatch.setattr(checker, "ENGINEERING", path)
+
+    errors = checker.validate()
+
+    assert any(
+        "WP-W00: principal_failure_modes must be unique" in error
+        for error in errors
+    )
+
+
+def test_engineering_closure_chain_rejects_duplicate_stage(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    data = json.loads(checker.ENGINEERING.read_text(encoding="utf-8"))
+    mutated = json.loads(json.dumps(data))
+    mutated["closure_chain"].append(mutated["closure_chain"][0])
+    path = tmp_path / "engineering.json"
+    path.write_text(json.dumps(mutated), encoding="utf-8")
+    monkeypatch.setattr(checker, "ENGINEERING", path)
+
+    errors = checker.validate()
+
+    assert "closure_chain must not contain duplicate stages" in errors
+
+
+def test_budget_binding_fields_must_be_unique(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    data = json.loads(checker.ENGINEERING.read_text(encoding="utf-8"))
+    mutated = json.loads(json.dumps(data))
+    fields = mutated["budget_binding_policy"]["required_fields"]
+    fields.append(fields[0])
+    path = tmp_path / "engineering.json"
+    path.write_text(json.dumps(mutated), encoding="utf-8")
+    monkeypatch.setattr(checker, "ENGINEERING", path)
+
+    errors = checker.validate()
+
+    assert "budget binding policy required_fields must be unique" in errors
+

@@ -1,7 +1,7 @@
 {
   "schema_version": "skeleton.ai.p3.execution_map.v1",
   "map_version": "0.1.0",
-  "status": "active",
+  "status": "closed",
   "title": "P3 Autonomous Intelligence Expansion",
   "purpose": "Canonical machine authority for the post-Functional-AI expansion frontier.",
   "authority": {
@@ -623,7 +623,7 @@
     "p3_full_completion_requires_all_257_source_volumes_resolved": true
   },
   "masterplan_alignment": {
-    "required_plan_version": "1.6.0",
+    "required_plan_version": "2.6.0",
     "required_master_status": "active",
     "breadth_freeze": {
       "enabled": true,
@@ -741,7 +741,7 @@
     "in_progress_count": 0,
     "ready_count": 0,
     "blocked_count": 0,
-    "landed_unpromoted_count": 6,
+    "landed_unpromoted_count": 0,
     "scheduled_volume_count": 23,
     "queued_volume_count": 234,
     "source_volume_count": 257

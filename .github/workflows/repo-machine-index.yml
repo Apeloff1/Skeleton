@@ -1,0 +1,109 @@
+name: Repository machine index
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - ".machine/**"
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repo-machine-index-main
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout triggering revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Build machine index
+        run: |
+          python -m pip install .
+          mkdir -p .machine
+          skeleton-repo-machine --root . --output .machine/repository-machine.json --build-code-search .machine/code-search-index.json
+          python - <<'PY'
+          from hashlib import sha256
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
+          from skeleton.repo_machine.code_search import load_code_search_index
+          from skeleton.repo_machine.manifest import load_manifest, validate_manifest
+
+          manifest_path = Path(".machine/repository-machine.json")
+          code_index_path = Path(".machine/code-search-index.json")
+          manifest = load_manifest(manifest_path)
+          validate_manifest(manifest)
+          code_index = load_code_search_index(
+              code_index_path,
+              expected_fingerprint=manifest["fingerprint"],
+          )
+          files = manifest["state"]["files"]
+          summary = code_index.summary()
+          print(f"Machine index contains {len(files)} files.")
+          print(
+              f"Code search contains {summary['documents']} documents, "
+              f"{summary['terms']} terms, {summary['postings']} postings."
+          )
+
+          checked_out_sha = subprocess.check_output(
+              ["git", "rev-parse", "HEAD"],
+              text=True,
+          ).strip()
+          event_sha = os.environ["GITHUB_SHA"]
+          if checked_out_sha != event_sha:
+              raise RuntimeError(
+                  f"artifact source mismatch: checkout={checked_out_sha} event={event_sha}"
+              )
+
+          artifact_files = (manifest_path, code_index_path)
+          provenance = {
+              "schema": "skeleton.repository-machine-artifact.v1",
+              "source_commit": checked_out_sha,
+              "repository_fingerprint": manifest["fingerprint"],
+              "files": {
+                  path.as_posix(): {
+                      "sha256": sha256(path.read_bytes()).hexdigest(),
+                      "size_bytes": path.stat().st_size,
+                  }
+                  for path in artifact_files
+              },
+          }
+          Path(".machine/index-artifact-manifest.json").write_text(
+              json.dumps(provenance, sort_keys=True, separators=(",", ":")) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Publish machine indexes as workflow artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: repository-machine-index-${{ github.sha }}
+          path: |
+            .machine/repository-machine.json
+            .machine/code-search-index.json
+            .machine/index-artifact-manifest.json
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+          compression-level: 9

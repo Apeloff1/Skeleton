@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-17:rights_fingerprint:v1",
+  "title": "FLGB-17 rights fingerprint",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_digest",
+    "fingerprint_digest",
+    "corpus_version_digest",
+    "threshold_ppm"
+  ],
+  "properties": {
+    "artifact_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "fingerprint_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "corpus_version_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "threshold_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    }
+  }
+}

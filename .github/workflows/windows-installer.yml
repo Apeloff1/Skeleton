@@ -148,6 +148,13 @@ jobs:
             throw "installed Skeleton.exe launch smoke exited $($launch.ExitCode)"
           }
 
+          # The command below performs actual bounded native transformer
+          # inference inside the frozen executable. No Docker/credentials/GUI.
+          $nativeSmoke = Start-Process -FilePath $launcher -ArgumentList @("--local-ai-smoke") -Wait -PassThru
+          if ($nativeSmoke.ExitCode -ne 0) {
+            throw "installed Skeleton.exe native offline inference smoke exited $($nativeSmoke.ExitCode)"
+          }
+
           $uninstaller = Join-Path $installDir "unins000.exe"
           if (-not (Test-Path -LiteralPath $uninstaller)) {
             throw "uninstaller missing"

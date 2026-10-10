@@ -7,6 +7,8 @@ on:
     paths:
       - "machine/p1_reproducibility_policy.json"
       - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_terminal_closure.json"
       - "skeleton/contracts/reproducibility.py"
       - "skeleton/ai/runtime/contracts/reproducibility.py"
       - "scripts/check_p1_reproducibility.py"
@@ -22,6 +24,8 @@ on:
     paths:
       - "machine/p1_reproducibility_policy.json"
       - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_terminal_closure.json"
       - "skeleton/contracts/reproducibility.py"
       - "skeleton/ai/runtime/contracts/reproducibility.py"
       - "scripts/check_p1_reproducibility.py"
@@ -36,8 +40,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: p1-reproducibility-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Evidence-critical: exact-head signing verification must survive unrelated main churn.
+  group: p1-reproducibility-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:

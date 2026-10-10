@@ -35,9 +35,33 @@ jobs:
         run: |
           set -euo pipefail
 
-          current="$(gh api "repos/${GH_REPO}/code-scanning/default-setup")"
-          echo "CodeQL default setup:"
-          jq '{state, languages, query_suite, schedule, updated_at}' <<<"${current}"
+          api_error_file="$(mktemp)"
+          trap 'rm -f "${api_error_file}"' EXIT
+
+          if current="$(gh api "repos/${GH_REPO}/code-scanning/default-setup" 2>"${api_error_file}")"; then
+            echo "CodeQL default setup:"
+            jq '{state, languages, query_suite, schedule, updated_at}' <<<"${current}"
+          elif grep -Eq 'HTTP 403|Resource not accessible by integration' "${api_error_file}"; then
+            echo "::warning::CodeQL default-setup state is not readable by this integration; issue #${TRACKING_ISSUE} remains the admin boundary."
+            {
+              echo "## CodeQL admin setting remains externally unverifiable"
+              echo
+              echo "GitHub denied this integration read access to the CodeQL default-setup endpoint."
+              echo "This is the known admin-permission boundary tracked by issue #${TRACKING_ISSUE}; the guard will not create a red CI loop for this expected 403."
+              echo
+              echo "Required state:"
+              echo "- actions"
+              echo "- python"
+              echo "- javascript-typescript"
+              echo "- query suite: extended"
+              echo
+              echo "Tracking issue: #${TRACKING_ISSUE}"
+            } >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          else
+            echo "::error::Unable to read CodeQL default setup from GitHub API for an unexpected reason."
+            exit 1
+          fi
 
           configured=0
           if [[ "$(jq -r '.state // ""' <<<"${current}")" == "configured" ]] && \

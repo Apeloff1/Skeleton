@@ -117,7 +117,16 @@ def test_client_history_is_ignored_but_project_context_is_used(
         captured["retrieval"] = query
         return []
 
-    async def generate(query, recalled, needs_reasoning, conversation_context=""):
+    async def generate(query, recalled, needs_reasoning, conversation_context="", **kwargs):
+        conversation_context = "\n".join(
+            [
+                str(kwargs.get("project_context") or ""),
+                *[
+                    f"{item.role}: {item.content}"
+                    for item in (kwargs.get("conversation_history") or ())
+                ],
+            ]
+        ).strip()
         captured["prompt"] = conversation_context
         captured["query"] = query
         return {"text": "Follow-up answer", "tier": "free", "model": "test"}
@@ -134,8 +143,8 @@ def test_client_history_is_ignored_but_project_context_is_used(
     assert response.json()["history_source"] == "canonical"
     assert "Godot 2D platformer" in captured["retrieval"]
     assert "move the player" not in captured["retrieval"]
-    assert '"role": "assistant"' not in captured["prompt"]
-    assert '"current_question": "What about collisions?"' in captured["prompt"]
+    assert "move the player" not in captured["prompt"]
+    assert captured["prompt"] == "Godot 2D platformer"
     assert captured["query"] == "What about collisions?"
 
 
@@ -233,10 +242,13 @@ def test_unavailable_paid_engine_is_not_labeled_as_paid_generation(
     monkeypatch.setattr(route.free_tier, "decide", lambda _: "paid")
     monkeypatch.setattr(route, "EngineChat", UnavailableChat)
 
-    result = asyncio.run(route._generate_text("question", [], True))
+    with pytest.raises(route.HTTPException) as exc_info:
+        asyncio.run(route._generate_text("question", [], True))
 
-    assert result["tier"] == "local"
-    assert result["model"] == "unavailable-fallback"
+    assert exc_info.value.status_code == 503
+    assert "generative engine execution is unavailable" in str(
+        exc_info.value.detail
+    )
 
 
 def test_paid_generation_uses_engine_and_keeps_context_as_user_data(
@@ -248,18 +260,37 @@ def test_paid_generation_uses_engine_and_keeps_context_as_user_data(
     class RecordingChat:
         def __init__(self, *args, **kwargs):
             seen["init"] = {"args": args, **kwargs}
+            seen["history"] = []
+            seen["evidence"] = []
 
         def with_max_tokens(self, value):
             seen["max_tokens"] = value
+            return self
+
+        def add_history_message(self, role, content):
+            seen["history"].append((role, content))
+            return self
+
+        def add_evidence(self, source_id, content, *, kind="retrieval_evidence"):
+            seen["evidence"].append((source_id, content, kind))
             return self
 
         async def send_message(self, message):
             seen["message"] = message
             return SimpleNamespace(
                 text="engine answer",
+                operation_id="engine-operation-jeeves-1",
                 execution_id="engine-exec-jeeves-1",
+                context_id="engine-context-jeeves-1",
+                context_digest="a" * 64,
+                context_source_snapshot=(("source", "b" * 64),),
+                context_compiler_version="test-compiler",
                 verification="verification:jeeves",
                 evidence_refs=("evidence:jeeves",),
+                provider_receipts=("provider:test:jeeves",),
+                tool_receipts=(),
+                memory_refs=(),
+                artifact_refs=(),
             )
 
     monkeypatch.setattr(route.free_tier, "decide", lambda _: "paid")
@@ -274,7 +305,11 @@ def test_paid_generation_uses_engine_and_keeps_context_as_user_data(
         )
     )
 
-    assert "PROJECT_CONTEXT_SENTINEL" in seen["message"].text
+    assert seen["message"].text == "follow-up"
+    assert any(
+        kind == "artifact" and "PROJECT_CONTEXT_SENTINEL" in content
+        for _source_id, content, kind in seen["evidence"]
+    )
     policy = seen["init"]["instruction_policy"]
     assert "PROJECT_CONTEXT_SENTINEL" not in policy.instructions
     assert policy.policy_id == "backend.jeeves.chat"
@@ -405,7 +440,16 @@ def test_server_transcript_overrides_conflicting_client_history(route, monkeypat
     ])
     captured = {}
 
-    async def generate(query, recalled, needs_reasoning, conversation_context=""):
+    async def generate(query, recalled, needs_reasoning, conversation_context="", **kwargs):
+        conversation_context = "\n".join(
+            [
+                str(kwargs.get("project_context") or ""),
+                *[
+                    f"{item.role}: {item.content}"
+                    for item in (kwargs.get("conversation_history") or ())
+                ],
+            ]
+        ).strip()
         captured["context"] = conversation_context
         return {"text": "next answer", "tier": "free", "model": "test"}
 
@@ -436,7 +480,7 @@ def test_stable_client_message_id_replays_without_second_generation(route, monke
     collection = _MemoryChatCollection()
     calls = {"count": 0}
 
-    async def generate(query, recalled, needs_reasoning, conversation_context=""):
+    async def generate(query, recalled, needs_reasoning, conversation_context="", **kwargs):
         calls["count"] += 1
         return {"text": "stable answer", "tier": "free", "model": "test"}
 
@@ -460,7 +504,7 @@ def test_stable_client_message_id_replays_without_second_generation(route, monke
 def test_client_message_id_conflict_is_rejected(route, monkeypatch):
     collection = _MemoryChatCollection()
 
-    async def generate(query, recalled, needs_reasoning, conversation_context=""):
+    async def generate(query, recalled, needs_reasoning, conversation_context="", **kwargs):
         return {"text": "stable answer", "tier": "free", "model": "test"}
 
     with _chat_client(route, monkeypatch, collection, generate) as transport:
@@ -492,7 +536,16 @@ def test_legacy_history_is_never_model_visible_or_persisted(
     collection = _MemoryChatCollection()
     contexts = []
 
-    async def generate(query, recalled, needs_reasoning, conversation_context=""):
+    async def generate(query, recalled, needs_reasoning, conversation_context="", **kwargs):
+        conversation_context = "\n".join(
+            [
+                str(kwargs.get("project_context") or ""),
+                *[
+                    f"{item.role}: {item.content}"
+                    for item in (kwargs.get("conversation_history") or ())
+                ],
+            ]
+        ).strip()
         contexts.append(conversation_context)
         return {
             "text": f"answer-{len(contexts)}",
@@ -549,7 +602,16 @@ def test_client_history_is_ignored_when_legacy_migration_store_is_unavailable(
     def unavailable_collection():
         raise OSError("legacy storage unavailable")
 
-    async def generate(query, recalled, needs_reasoning, conversation_context=""):
+    async def generate(query, recalled, needs_reasoning, conversation_context="", **kwargs):
+        conversation_context = "\n".join(
+            [
+                str(kwargs.get("project_context") or ""),
+                *[
+                    f"{item.role}: {item.content}"
+                    for item in (kwargs.get("conversation_history") or ())
+                ],
+            ]
+        ).strip()
         captured["context"] = conversation_context
         return {"text": "canonical", "tier": "free", "model": "test"}
 
@@ -802,8 +864,18 @@ def test_canonical_jeeves_mode_migrates_legacy_then_owns_new_turns(
         recalled,
         needs_reasoning,
         conversation_context="",
+        **kwargs,
     ):
         calls["count"] += 1
+        conversation_context = "\n".join(
+            [
+                str(kwargs.get("project_context") or ""),
+                *[
+                    f"{item.role}: {item.content}"
+                    for item in (kwargs.get("conversation_history") or ())
+                ],
+            ]
+        ).strip()
         assert "legacy question" in conversation_context
         assert "legacy answer" in conversation_context
         return {
@@ -972,9 +1044,19 @@ def test_incomplete_canonical_turn_resumes_after_crash_without_duplicate_history
         recalled,
         needs_reasoning,
         conversation_context="",
+        **kwargs,
     ):
         del recalled, needs_reasoning
         captured["calls"] += 1
+        conversation_context = "\n".join(
+            [
+                str(kwargs.get("project_context") or ""),
+                *[
+                    f"{item.role}: {item.content}"
+                    for item in (kwargs.get("conversation_history") or ())
+                ],
+            ]
+        ).strip()
         captured["contexts"].append(conversation_context)
         assert query == "resume question"
         return {
@@ -1014,7 +1096,7 @@ def test_incomplete_canonical_turn_resumes_after_crash_without_duplicate_history
     context = captured["contexts"][0]
     assert "prior question" in context
     assert "prior answer" in context
-    assert context.count("resume question") == 1
+    assert context.count("resume question") == 0
 
     messages = canonical.messages[seeded_thread.thread_id]
     assert [message.author_type.value for message in messages] == [
@@ -1142,12 +1224,28 @@ def test_jeeves_engine_identity_is_scoped_to_canonical_turn(
         def with_max_tokens(self, *_args, **_kwargs):
             return self
 
+        def add_history_message(self, _role, _content):
+            return self
+
+        def add_evidence(self, _source_id, _content, *, kind="retrieval_evidence"):
+            del kind
+            return self
+
         async def send_message(self, _message):
             return SimpleNamespace(
                 text="engine answer",
+                operation_id="engine-operation",
                 execution_id="engine-execution",
+                context_id="engine-context",
+                context_digest="c" * 64,
+                context_source_snapshot=(),
+                context_compiler_version="test-compiler",
                 verification="verified",
                 evidence_refs=(),
+                provider_receipts=(),
+                tool_receipts=(),
+                memory_refs=(),
+                artifact_refs=(),
             )
 
     monkeypatch.setattr(route, "EngineChat", CaptureChat)
@@ -1217,9 +1315,19 @@ def test_idless_pending_jeeves_turn_resumes_with_server_assigned_identity(
         recalled,
         needs_reasoning,
         conversation_context="",
+        **kwargs,
     ):
         del recalled, needs_reasoning
         captured["calls"] += 1
+        conversation_context = "\n".join(
+            [
+                str(kwargs.get("project_context") or ""),
+                *[
+                    f"{item.role}: {item.content}"
+                    for item in (kwargs.get("conversation_history") or ())
+                ],
+            ]
+        ).strip()
         captured["contexts"].append(conversation_context)
         assert query == "resume without client id"
         return {

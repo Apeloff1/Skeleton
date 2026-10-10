@@ -9,6 +9,7 @@ on:
       - "machine/ai_build_accountability.json"
       - "machine/ai_p1_execution_map.json"
       - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_p1_terminal_closure.json"
       - "skeleton/contracts/maturity_reconciliation.py"
       - "skeleton/ai/runtime/contracts/maturity_reconciliation.py"
       - "skeleton/contracts/__init__.py"
@@ -26,6 +27,7 @@ on:
       - "machine/ai_build_accountability.json"
       - "machine/ai_p1_execution_map.json"
       - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_p1_terminal_closure.json"
       - "skeleton/contracts/maturity_reconciliation.py"
       - "skeleton/ai/runtime/contracts/maturity_reconciliation.py"
       - "skeleton/contracts/__init__.py"
@@ -40,8 +42,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: p1-maturity-reconciliation-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Evidence-critical: exact-head signing verification must survive unrelated main churn.
+  group: p1-maturity-reconciliation-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:

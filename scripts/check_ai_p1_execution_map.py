@@ -259,6 +259,8 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
         if not isinstance(deps, list):
             errors.append(f"{lane_id}: depends_on must be a list")
             deps = []
+        elif len(deps) != len(set(str(item) for item in deps)):
+            errors.append(f"{lane_id}: depends_on must not contain duplicates")
         dep_set = {str(item) for item in deps}
         lane_graph[lane_id] = dep_set
         unknown_deps = dep_set - set(lane_by_id)
@@ -273,10 +275,14 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
         if not isinstance(primary, list):
             errors.append(f"{lane_id}: primary_volume_refs must be a list")
             primary = []
+        elif len(primary) != len(set(str(item) for item in primary)):
+            errors.append(f"{lane_id}: primary_volume_refs must not contain duplicates")
         supporting = lane.get("supporting_volume_refs")
         if not isinstance(supporting, list):
             errors.append(f"{lane_id}: supporting_volume_refs must be a list")
             supporting = []
+        elif len(supporting) != len(set(str(item) for item in supporting)):
+            errors.append(f"{lane_id}: supporting_volume_refs must not contain duplicates")
 
         lane_volume_refs[lane_id] = {
             str(item) for item in [*primary, *supporting]
@@ -305,6 +311,8 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
         if not isinstance(refs, list) or not refs:
             errors.append(f"{lane_id}: master_build_wave_refs must be non-empty")
             refs = []
+        elif len(refs) != len(set(str(item) for item in refs)):
+            errors.append(f"{lane_id}: master_build_wave_refs must not contain duplicates")
         referenced_packages: set[str] = set()
         for wave_ref in refs:
             wave = wave_by_id.get(str(wave_ref))
@@ -319,6 +327,8 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
         if not isinstance(declared_packages, list) or not declared_packages:
             errors.append(f"{lane_id}: work_package_refs must be non-empty")
             declared_packages = []
+        elif len(declared_packages) != len(set(str(item) for item in declared_packages)):
+            errors.append(f"{lane_id}: work_package_refs must not contain duplicates")
         missing_packages = {
             str(item) for item in declared_packages
         } - referenced_packages
@@ -371,10 +381,10 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
             continue
         pid = str(phase.get("id") or "?")
         sequence = phase.get("sequence")
-        if isinstance(sequence, int):
+        if isinstance(sequence, int) and not isinstance(sequence, bool):
             actual_sequences.add(sequence)
         else:
-            errors.append(f"{pid}: sequence must be an integer")
+            errors.append(f"{pid}: sequence must be a non-boolean integer")
         refs = phase.get("lane_refs")
         if not isinstance(refs, list) or not refs:
             errors.append(f"{pid}: lane_refs must be non-empty")
@@ -500,6 +510,8 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
         if not isinstance(refs, list):
             errors.append(f"{task_id}: volume_refs must be a list")
             refs = []
+        elif len(refs) != len(set(str(item) for item in refs)):
+            errors.append(f"{task_id}: volume_refs must not contain duplicates")
         for ref in refs:
             ref = str(ref)
             if ref not in volume_by_ref:
@@ -517,6 +529,8 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
         if not isinstance(deps, list):
             errors.append(f"{task_id}: depends_on must be a list")
             deps = []
+        elif len(deps) != len(set(str(item) for item in deps)):
+            errors.append(f"{task_id}: depends_on must not contain duplicates")
         dep_set = {str(item) for item in deps}
         task_graph[task_id] = dep_set
         unknown = dep_set - set(task_by_id)
@@ -532,11 +546,15 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
         task_acceptance = task.get("acceptance")
         if not isinstance(task_acceptance, list) or len(task_acceptance) < 3:
             errors.append(f"{task_id}: acceptance must contain at least three checks")
+        elif len(task_acceptance) != len(set(str(item) for item in task_acceptance)):
+            errors.append(f"{task_id}: acceptance must not contain duplicates")
 
         task_packages = task.get("work_package_refs")
         if not isinstance(task_packages, list) or not task_packages:
             errors.append(f"{task_id}: work_package_refs must be non-empty")
             task_packages = []
+        elif len(task_packages) != len(set(str(item) for item in task_packages)):
+            errors.append(f"{task_id}: work_package_refs must not contain duplicates")
         lane_packages = set(
             str(item)
             for item in lane_by_id.get(lane_id, {}).get("work_package_refs", [])
@@ -548,6 +566,8 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
             value = task.get(field)
             if not isinstance(value, list) or not value:
                 errors.append(f"{task_id}: {field} must be non-empty")
+            elif len(value) != len(set(str(item) for item in value)):
+                errors.append(f"{task_id}: {field} must not contain duplicates")
         recovery = task.get("rollback_or_recovery")
         if not isinstance(recovery, str) or not recovery.strip():
             errors.append(f"{task_id}: rollback_or_recovery must be non-empty")

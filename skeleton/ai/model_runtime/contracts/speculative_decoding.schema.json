@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-02:speculative_decoding:v1",
+  "title": "FLGB-02 speculative decoding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "request_id",
+    "draft_model_digest",
+    "target_model_digest",
+    "proposed_tokens",
+    "accepted_prefix"
+  ],
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "draft_model_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "target_model_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "proposed_tokens": {
+      "type": "array",
+      "maxItems": 1000000,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 2147483647
+      }
+    },
+    "accepted_prefix": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

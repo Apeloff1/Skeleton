@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-09:project_manifest:v1",
+  "title": "FLGB-09 project manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "project_id",
+    "revision",
+    "schema_version",
+    "world_ids",
+    "config_digest",
+    "dependency_lock_digest",
+    "rights_manifest_digest",
+    "parent_manifest_digest"
+  ],
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "world_ids": {
+      "type": "array",
+      "maxItems": 4096,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "config_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "dependency_lock_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rights_manifest_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "parent_manifest_digest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

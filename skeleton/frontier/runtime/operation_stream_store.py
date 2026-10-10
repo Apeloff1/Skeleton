@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import hashlib
+import hmac
 import json
 from pathlib import Path
 import re
@@ -30,13 +32,35 @@ from skeleton.frontier.runtime.operation_stream import (
     StreamReplayGapError,
     StreamTerminalError,
 )
+from skeleton.frontier.runtime.event_architecture import EventRetentionPolicy
 
 
 class StreamStoreCorruptionError(StreamContractError):
     """Persisted stream state cannot be interpreted safely."""
 
 
+@dataclass(frozen=True, slots=True)
+class StreamIntegrityReport:
+    """Bounded consistent-snapshot verification of one durable operation."""
+
+    operation_id: str
+    compacted_through: int
+    latest_sequence: int
+    retained_events: int
+    terminal: bool
+    terminal_sequence: int | None
+    consumer_count: int
+    content_sha256: str
+
+
 _CONSUMER_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+
+
+def _integrity_digest(value: object) -> str:
+    if (type(value) is not str or len(value) != 64 or
+            any(char not in "0123456789abcdef" for char in value)):
+        raise StreamContractError("expected stream integrity digest must be lowercase SHA-256 hex")
+    return value
 
 
 def _consumer_id(value: str) -> str:
@@ -259,7 +283,7 @@ class SQLiteOperationEventStore:
                 parse_constant=_reject_constant,
                 object_pairs_hook=_unique_object,
             )
-        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        except (json.JSONDecodeError, TypeError, ValueError, RecursionError) as exc:
             raise StreamStoreCorruptionError("persisted stream payload is invalid") from exc
         if not isinstance(value, dict):
             raise StreamStoreCorruptionError("persisted stream payload must be an object")
@@ -990,6 +1014,95 @@ class SQLiteOperationEventStore:
                 self._connection.execute("ROLLBACK")
                 raise
 
+    def compact_with_retention(
+        self,
+        operation_id: str,
+        policy: EventRetentionPolicy,
+        *,
+        now: datetime | None = None,
+    ) -> int:
+        """Compact to the policy-bounded active-consumer watermark atomically.
+
+        This is the retention-aware counterpart to compact_acknowledged(). It
+        refuses to invent acknowledgement when no active consumer exists and
+        always preserves the policy's required replay tail.
+        """
+        if not isinstance(policy, EventRetentionPolicy):
+            raise StreamContractError("policy must be EventRetentionPolicy")
+        instant = _aware_utc(now)
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                head = self._ensure_head(operation_id)
+                current = _persisted_int(
+                    head["compacted_through"],
+                    "compacted_through",
+                )
+                ack_row = self._connection.execute(
+                    """
+                    SELECT MIN(acknowledged_through)
+                    FROM operation_stream_consumer
+                    WHERE namespace = ? AND operation_id = ? AND lease_expires_at > ?
+                    """,
+                    (self.namespace, operation_id, instant.isoformat()),
+                ).fetchone()
+                acknowledged = (
+                    None
+                    if ack_row is None or ack_row[0] is None
+                    else _persisted_int(
+                        ack_row[0],
+                        "acknowledged_through",
+                    )
+                )
+                latest_row = self._connection.execute(
+                    """
+                    SELECT COALESCE(MAX(sequence), ?)
+                    FROM operation_stream_event
+                    WHERE namespace = ? AND operation_id = ?
+                    """,
+                    (current, self.namespace, operation_id),
+                ).fetchone()
+                latest = _persisted_int(
+                    latest_row[0],
+                    "latest_sequence",
+                )
+                terminal_raw = head["terminal"]
+                if terminal_raw not in (0, 1, False, True):
+                    raise StreamStoreCorruptionError(
+                        "terminal must be persisted as boolean integer"
+                    )
+                decision = policy.plan(
+                    compacted_through=current,
+                    latest_sequence=latest,
+                    acknowledged_through=acknowledged,
+                    terminal=bool(terminal_raw),
+                )
+                target = decision.compact_through
+                if target <= current:
+                    self._connection.execute("COMMIT")
+                    return 0
+
+                cursor = self._connection.execute(
+                    """
+                    DELETE FROM operation_stream_event
+                    WHERE namespace = ? AND operation_id = ? AND sequence <= ?
+                    """,
+                    (self.namespace, operation_id, target),
+                )
+                self._connection.execute(
+                    """
+                    UPDATE operation_stream_head
+                    SET compacted_through = ?
+                    WHERE namespace = ? AND operation_id = ?
+                    """,
+                    (target, self.namespace, operation_id),
+                )
+                self._connection.execute("COMMIT")
+                return int(cursor.rowcount)
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
     def compact_through(self, operation_id: str, sequence: int) -> int:
         if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 0:
             raise ValueError("sequence must be a non-negative integer")
@@ -1035,6 +1148,214 @@ class SQLiteOperationEventStore:
                 self._connection.execute("ROLLBACK")
                 raise
 
+    def audit_operation(
+        self,
+        operation_id: str,
+        *,
+        max_events: int = 100_000,
+        batch_size: int = 512,
+        expected_sha256: str | None = None,
+    ) -> StreamIntegrityReport:
+        """Verify canonical replay from a single SQLite transaction snapshot.
+
+        A bounded operator/recovery check, not a proof against an attacker who
+        rewrites the whole database. An already-compacted prefix cannot be
+        inspected, and without a separate signed witness deleting a tail is
+        not detectable if no retained terminal marker remains.
+        """
+        if type(max_events) is not int or not 1 <= max_events <= 1_000_000:
+            raise ValueError("max_events must be between 1 and 1000000")
+        if type(batch_size) is not int or not 1 <= batch_size <= 4096:
+            raise ValueError("batch_size must be between 1 and 4096")
+        # Validate operation_id at the original stream boundary.
+        OperationEventLog(operation_id, capacity=1)
+        if expected_sha256 is not None:
+            _integrity_digest(expected_sha256)
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                result = self._audit_locked(
+                    operation_id, max_events=max_events, batch_size=batch_size,
+                )
+                if expected_sha256 is not None and not hmac.compare_digest(
+                    expected_sha256, result.content_sha256
+                ):
+                    raise StreamStoreCorruptionError(
+                        "durable stream differs from trusted integrity witness"
+                    )
+                self._connection.execute("COMMIT")
+                return result
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def _audit_locked(
+        self, operation_id: str, *, max_events: int, batch_size: int,
+    ) -> StreamIntegrityReport:
+        """Run the bounded integrity check within a caller-owned SQLite txn."""
+        head = self._ensure_head(operation_id)
+        compacted = _persisted_int(
+            head["compacted_through"], "compacted_through",
+        )
+        raw_terminal = head["terminal"]
+        if type(raw_terminal) is not int or raw_terminal not in (0, 1):
+            raise StreamStoreCorruptionError("invalid persisted terminal flag")
+        terminal = bool(raw_terminal)
+        witness = hashlib.sha256()
+        # Domain-separate the evidence so it cannot be confused with other
+        # application receipts and bind the full operation/namespace identity.
+        witness.update(b"skeleton.operation-stream.integrity.v1\n")
+        witness.update(json.dumps(
+            {
+                "namespace": self.namespace,
+                "operation_id": operation_id,
+                "compacted_through": compacted,
+                "terminal": terminal,
+            },
+            sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+        ).encode("utf-8"))
+        witness.update(b"\n")
+        # A checkpoint watermark must never leave older rows
+        # physically retained. Detect partial/corrupted compaction.
+        old_rows = self._connection.execute(
+            """
+            SELECT COUNT(*) FROM operation_stream_event
+            WHERE namespace = ? AND operation_id = ? AND sequence <= ?
+            """,
+            (self.namespace, operation_id, compacted),
+        ).fetchone()
+        if old_rows[0]:
+            raise StreamStoreCorruptionError(
+                "events remain below durable compaction watermark"
+            )
+        expected = compacted + 1
+        count = 0
+        terminal_sequence: int | None = None
+        while True:
+            rows = self._connection.execute(
+                """
+                SELECT operation_id, sequence, event_id, event_type,
+                       timestamp, payload_json
+                FROM operation_stream_event
+                WHERE namespace = ? AND operation_id = ? AND sequence >= ?
+                ORDER BY sequence ASC LIMIT ?
+                """,
+                (
+                    self.namespace, operation_id, expected,
+                    min(batch_size, max_events - count + 1),
+                ),
+            ).fetchall()
+            if not rows:
+                break
+            for row in rows:
+                if count >= max_events:
+                    raise StreamStoreCorruptionError(
+                        "operation integrity scan event budget exceeded"
+                    )
+                event = self._event_from_row(row)
+                if event.sequence != expected:
+                    raise StreamStoreCorruptionError(
+                        "durable event sequence gap or duplicate"
+                    )
+                if event.operation_id != operation_id:
+                    raise StreamStoreCorruptionError(
+                        "durable event operation identity mismatch"
+                    )
+                if terminal_sequence is not None:
+                    raise StreamStoreCorruptionError(
+                        "event follows a terminal event"
+                    )
+                if event.terminal:
+                    terminal_sequence = event.sequence
+                witness.update(json.dumps(
+                    event.as_dict(), sort_keys=True, separators=(",", ":"),
+                    ensure_ascii=True, allow_nan=False,
+                ).encode("utf-8"))
+                witness.update(b"\n")
+                count += 1
+                expected += 1
+            if len(rows) < batch_size:
+                break
+        latest = expected - 1
+        if terminal_sequence is not None and not terminal:
+            raise StreamStoreCorruptionError(
+                "terminal event exists but head remains nonterminal"
+            )
+        if terminal and count == 0 and compacted == 0:
+            raise StreamStoreCorruptionError(
+                "terminal head exists without any durable history"
+            )
+        if terminal and count and terminal_sequence != latest:
+            raise StreamStoreCorruptionError(
+                "terminal head disagrees with retained tail"
+            )
+        aggregates = self._connection.execute(
+            """
+            SELECT COUNT(*), MIN(acknowledged_through), MAX(acknowledged_through)
+            FROM operation_stream_consumer
+            WHERE namespace = ? AND operation_id = ?
+            """,
+            (self.namespace, operation_id),
+        ).fetchone()
+        consumer_count = _persisted_int(aggregates[0], "consumer_count")
+        if consumer_count:
+            for value in aggregates[1:]:
+                if _persisted_int(value, "acknowledged_through") > latest:
+                    raise StreamStoreCorruptionError(
+                        "consumer acknowledgement exceeds durable event head"
+                    )
+        result = StreamIntegrityReport(
+            operation_id, compacted, latest, count, terminal,
+            terminal_sequence, consumer_count, witness.hexdigest(),
+        )
+        return result
+
+    def replay_verified(
+        self,
+        cursor: ReplayCursor,
+        *,
+        limit: int = 1000,
+        max_audit_events: int = 100_000,
+        expected_sha256: str | None = None,
+    ) -> tuple[StreamEvent, ...]:
+        """Refuse replay if the retained stream fails integrity checks."""
+        if not isinstance(cursor, ReplayCursor):
+            raise StreamContractError("ReplayCursor required")
+        if type(limit) is not int or not 1 <= limit <= 4096:
+            raise ValueError("verified replay limit must be between 1 and 4096")
+        if type(max_audit_events) is not int or not 1 <= max_audit_events <= 1_000_000:
+            raise ValueError("max_audit_events must be between 1 and 1000000")
+        if expected_sha256 is not None:
+            _integrity_digest(expected_sha256)
+        # One SQLite transaction now witnesses *both* the checked stream
+        # state and the selected replay events. A concurrent process cannot
+        # compact, append or tamper with the stream between verification and
+        # event selection. This is local transactional integrity, not remote
+        # signature/consensus authority.
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                report = self._audit_locked(
+                    cursor.operation_id, max_events=max_audit_events,
+                    batch_size=512,
+                )
+                if expected_sha256 is not None and not hmac.compare_digest(
+                    expected_sha256, report.content_sha256
+                ):
+                    raise StreamStoreCorruptionError(
+                        "durable stream differs from trusted integrity witness"
+                    )
+                if cursor.after_sequence < report.compacted_through:
+                    raise StreamReplayGapError(
+                        "verified cursor predates durable retained history"
+                    )
+                events = self.replay(cursor, limit=limit)
+                self._connection.execute("COMMIT")
+                return events
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
     def head(self, operation_id: str) -> dict[str, Any]:
         with self._lock:
             head = self._ensure_head(operation_id)
@@ -1069,6 +1390,7 @@ class SQLiteOperationEventStore:
 
 
 __all__ = [
+    "StreamIntegrityReport",
     "SQLiteOperationEventStore",
     "StreamConsumerCheckpoint",
     "StreamWorkerLease",

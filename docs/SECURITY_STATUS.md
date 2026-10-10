@@ -7,7 +7,7 @@ Status here is descriptive, not a substitute for GitHub issue state. Issue #540 
 ## Status vocabulary
 
 - **Canonical** — source-controlled enforcement runs inside `.github/workflows/merge-readiness.yml` or a script/test directly invoked by its required jobs.
-- **Supplemental** — source-controlled enforcement exists in another workflow or test path but is not itself one of the four aggregate Merge Readiness jobs.
+- **Supplemental** — source-controlled enforcement exists in another workflow or test path but is not itself one of the five aggregate Merge Readiness lanes.
 - **Admin-only** — the repository can document or detect the requirement, but GitHub repository/organization settings must enforce it.
 - **Pending** — tracked hardening work remains before the control can be called complete.
 
@@ -15,7 +15,7 @@ Status here is descriptive, not a substitute for GitHub issue state. Issue #540 
 
 | Control | Enforcement | Regression / evidence | Status | Remaining risk |
 | --- | --- | --- | --- | --- |
-| Stable aggregate merge summary | `.github/workflows/merge-readiness.yml`; `scripts/check_merge_readiness_contract.py` | quarantine/unit/integration/quality jobs feed the single `Merge Readiness` summary | Canonical | `main` is currently unprotected, so the repository cannot force the summary to be required without admin settings. |
+| Stable aggregate merge summary | `.github/workflows/merge-readiness.yml`; `scripts/check_merge_readiness_contract.py` | quarantine/unit/integration/quality/PR-automation lanes (`.github/ci/required-checks.json`) feed the single `Merge Readiness` summary | Canonical | `main` is currently unprotected, so the repository cannot force the summary to be required without admin settings. |
 | Third-party action immutability | `backend/scripts/check_workflow_security.py` | `backend/tests/test_workflow_security_gate.py` covers tag/unversioned action rejection and SHA-pinned acceptance | Canonical | Repository administrators can still bypass source-controlled CI while `main` is unprotected. |
 | Checkout credential persistence | `backend/scripts/check_workflow_security.py` | `backend/tests/test_workflow_security_gate.py`; `backend/tests/test_workflow_security_checkout_credentials.py` covers missing/true/false values plus sibling-`env`, nested-mapping, block, and flow-style bypasses | Canonical | Same branch-protection/admin bypass risk. |
 | Untrusted workflow event/input shell boundary | `backend/scripts/check_workflow_input_security.py`, composed by `check_workflow_security.py` | `backend/tests/test_workflow_input_security_gate.py`; `backend/tests/test_workflow_event_shell_security.py` | Canonical | New expression forms require continuing regression coverage. |
@@ -77,7 +77,7 @@ Status here is descriptive, not a substitute for GitHub issue state. Issue #540 
 The following guarantees cannot be completed by repository source changes alone:
 
 1. **Protect `main`.** Current branch metadata reports `protected: false`.
-2. **Require `CI/CD / Merge Readiness`.** Required status-check enforcement is currently off and no required contexts/checks are configured.
+2. **Require `Merge Readiness`.** Required status-check enforcement is currently off and no required contexts/checks are configured.
 3. **Prevent ordinary direct bypass.** Review requirements, bypass actors, rulesets, and emergency administrator authority are GitHub repository/organization settings.
 4. **Protect environments and deployment credentials.** Environment reviewers, secret access, provider IAM, token lifetime, revocation, and audit retention live outside the source tree.
 5. **Guarantee registry/artifact immutability.** External package/container registries and artifact stores must enforce their own retention and immutability policies.

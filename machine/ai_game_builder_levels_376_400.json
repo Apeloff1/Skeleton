@@ -1,0 +1,1634 @@
+{
+  "schema_version": "skeleton.ai_game_builder_levels_shard.v1",
+  "manifest": "machine/ai_game_builder_500_levels.json",
+  "start": 376,
+  "end": 400,
+  "count": 25,
+  "levels": [
+    {
+      "id": "GBL-376",
+      "ordinal": 376,
+      "family_id": "GB38",
+      "family": "Save, Load, Replay & Migration",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Persist full game state, migrate schemas, reproduce sessions and recover safely across versions and failures.",
+      "owner": "skeleton/jeeves/game_engine_saves.py",
+      "batches": [
+        "B025",
+        "B049",
+        "B072"
+      ],
+      "metrics": [
+        "state fidelity",
+        "migration safety",
+        "replay determinism",
+        "corruption recovery"
+      ],
+      "requirements": [
+        "Run deterministic builds, perf benchmarks, target matrices, fault injection and replay equivalence checks.",
+        "Attack partial save, schema mismatch, replay divergence, corrupt checkpoint.",
+        "Persist failing traces/artifacts as regressions."
+      ],
+      "adversarial": [
+        "partial save",
+        "schema mismatch",
+        "replay divergence",
+        "corrupt checkpoint",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-376 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-377",
+      "ordinal": 377,
+      "family_id": "GB38",
+      "family": "Save, Load, Replay & Migration",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Persist full game state, migrate schemas, reproduce sessions and recover safely across versions and failures.",
+      "owner": "skeleton/jeeves/game_engine_saves.py",
+      "batches": [
+        "B025",
+        "B049",
+        "B072"
+      ],
+      "metrics": [
+        "state fidelity",
+        "migration safety",
+        "replay determinism",
+        "corruption recovery"
+      ],
+      "requirements": [
+        "Improve state fidelity, migration safety, replay determinism, corruption recovery jointly with player experience, reliability, accessibility and maintainability.",
+        "Reject average-only wins that worsen tails, startup, memory or correctness.",
+        "Keep champion unless candidate is Pareto-safe."
+      ],
+      "adversarial": [
+        "partial save",
+        "schema mismatch",
+        "replay divergence",
+        "corrupt checkpoint",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-377 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-378",
+      "ordinal": 378,
+      "family_id": "GB38",
+      "family": "Save, Load, Replay & Migration",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Persist full game state, migrate schemas, reproduce sessions and recover safely across versions and failures.",
+      "owner": "skeleton/jeeves/game_engine_saves.py",
+      "batches": [
+        "B025",
+        "B049",
+        "B072"
+      ],
+      "metrics": [
+        "state fidelity",
+        "migration safety",
+        "replay determinism",
+        "corruption recovery"
+      ],
+      "requirements": [
+        "Support artifact/source diff, version migration, rollback and exact checkpoint recovery.",
+        "Resume exact toolchain/canon/rival/evaluator identities.",
+        "Prove failed release/build attempts leave no half-published authority."
+      ],
+      "adversarial": [
+        "partial save",
+        "schema mismatch",
+        "replay divergence",
+        "corrupt checkpoint",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-378 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-379",
+      "ordinal": 379,
+      "family_id": "GB38",
+      "family": "Save, Load, Replay & Migration",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Persist full game state, migrate schemas, reproduce sessions and recover safely across versions and failures.",
+      "owner": "skeleton/jeeves/game_engine_saves.py",
+      "batches": [
+        "B025",
+        "B049",
+        "B072"
+      ],
+      "metrics": [
+        "state fidelity",
+        "migration safety",
+        "replay determinism",
+        "corruption recovery"
+      ],
+      "requirements": [
+        "Run Forge-100/1000/10000, exactly three stages each, no wall-clock deadline.",
+        "Stress target permutations and long optimization/build sequences under bounded compute/storage.",
+        "Detect overfitting to benchmark hardware and cumulative build drift."
+      ],
+      "adversarial": [
+        "partial save",
+        "schema mismatch",
+        "replay divergence",
+        "corrupt checkpoint",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-379 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "deep-effort platform report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-380",
+      "ordinal": 380,
+      "family_id": "GB38",
+      "family": "Save, Load, Replay & Migration",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Persist full game state, migrate schemas, reproduce sessions and recover safely across versions and failures.",
+      "owner": "skeleton/jeeves/game_engine_saves.py",
+      "batches": [
+        "B025",
+        "B049",
+        "B072"
+      ],
+      "metrics": [
+        "state fidelity",
+        "migration safety",
+        "replay determinism",
+        "corruption recovery"
+      ],
+      "requirements": [
+        "Require independent exact-head reproducibility/performance evidence.",
+        "Block rights/provenance, security, performance-tail, behavior-equivalence or rollback failures.",
+        "Expire qualification on material source/toolchain/model/evaluator drift."
+      ],
+      "adversarial": [
+        "partial save",
+        "schema mismatch",
+        "replay divergence",
+        "corrupt checkpoint",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-380 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "deep-effort platform report",
+        "independent verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-381",
+      "ordinal": 381,
+      "family_id": "GB39",
+      "family": "Performance & Optimization",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Optimize CPU, GPU, memory, streaming, loading, frame pacing and network cost without changing intended behavior.",
+      "owner": "skeleton/jeeves/game_engine_timing.py",
+      "batches": [
+        "B045",
+        "B059",
+        "B074"
+      ],
+      "metrics": [
+        "frame time",
+        "tail stalls",
+        "memory budget",
+        "behavioral equivalence"
+      ],
+      "requirements": [
+        "Specify Performance & Optimization: Optimize CPU, GPU, memory, streaming, loading, frame pacing and network cost without changing intended behavior.",
+        "Declare target budgets, supported platforms/states, hard invariants and acceptance fixtures.",
+        "Bind skeleton/jeeves/game_engine_timing.py and B045, B059, B074."
+      ],
+      "adversarial": [
+        "p99 hitch",
+        "memory leak",
+        "optimization-induced behavior change",
+        "streaming thrash",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-381 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-382",
+      "ordinal": 382,
+      "family_id": "GB39",
+      "family": "Performance & Optimization",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Optimize CPU, GPU, memory, streaming, loading, frame pacing and network cost without changing intended behavior.",
+      "owner": "skeleton/jeeves/game_engine_timing.py",
+      "batches": [
+        "B045",
+        "B059",
+        "B074"
+      ],
+      "metrics": [
+        "frame time",
+        "tail stalls",
+        "memory budget",
+        "behavioral equivalence"
+      ],
+      "requirements": [
+        "Define typed build/runtime state, artifact identity, hashes, versions, provenance and deterministic serialization.",
+        "Make target-specific deltas explicit.",
+        "Define invalid/unsupported states and compatibility."
+      ],
+      "adversarial": [
+        "p99 hitch",
+        "memory leak",
+        "optimization-induced behavior change",
+        "streaming thrash",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-382 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-383",
+      "ordinal": 383,
+      "family_id": "GB39",
+      "family": "Performance & Optimization",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Optimize CPU, GPU, memory, streaming, loading, frame pacing and network cost without changing intended behavior.",
+      "owner": "skeleton/jeeves/game_engine_timing.py",
+      "batches": [
+        "B045",
+        "B059",
+        "B074"
+      ],
+      "metrics": [
+        "frame time",
+        "tail stalls",
+        "memory budget",
+        "behavioral equivalence"
+      ],
+      "requirements": [
+        "Implement through canonical build/runtime pipelines with pinned inputs and governed provenance.",
+        "Record toolchains/models/transforms and retain reference behavior.",
+        "Use transactional/idempotent outputs and rollback-safe publication."
+      ],
+      "adversarial": [
+        "p99 hitch",
+        "memory leak",
+        "optimization-induced behavior change",
+        "streaming thrash",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-383 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-384",
+      "ordinal": 384,
+      "family_id": "GB39",
+      "family": "Performance & Optimization",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Optimize CPU, GPU, memory, streaming, loading, frame pacing and network cost without changing intended behavior.",
+      "owner": "skeleton/jeeves/game_engine_timing.py",
+      "batches": [
+        "B045",
+        "B059",
+        "B074"
+      ],
+      "metrics": [
+        "frame time",
+        "tail stalls",
+        "memory budget",
+        "behavioral equivalence"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote, alternating rivals.",
+        "Opponent attacks regressions, portability, tail behavior and reproducibility and submits a better candidate.",
+        "Deterministic evidence gates decide promotion."
+      ],
+      "adversarial": [
+        "p99 hitch",
+        "memory leak",
+        "optimization-induced behavior change",
+        "streaming thrash",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-384 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-385",
+      "ordinal": 385,
+      "family_id": "GB39",
+      "family": "Performance & Optimization",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Optimize CPU, GPU, memory, streaming, loading, frame pacing and network cost without changing intended behavior.",
+      "owner": "skeleton/jeeves/game_engine_timing.py",
+      "batches": [
+        "B045",
+        "B059",
+        "B074"
+      ],
+      "metrics": [
+        "frame time",
+        "tail stalls",
+        "memory budget",
+        "behavioral equivalence"
+      ],
+      "requirements": [
+        "Verify coupling with assets, saves, networking, gameplay, rendering, security, accessibility and release contracts.",
+        "Propagate changed budgets/contracts.",
+        "Reject local optimization/export wins that alter intended game behavior."
+      ],
+      "adversarial": [
+        "p99 hitch",
+        "memory leak",
+        "optimization-induced behavior change",
+        "streaming thrash",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-385 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-386",
+      "ordinal": 386,
+      "family_id": "GB39",
+      "family": "Performance & Optimization",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Optimize CPU, GPU, memory, streaming, loading, frame pacing and network cost without changing intended behavior.",
+      "owner": "skeleton/jeeves/game_engine_timing.py",
+      "batches": [
+        "B045",
+        "B059",
+        "B074"
+      ],
+      "metrics": [
+        "frame time",
+        "tail stalls",
+        "memory budget",
+        "behavioral equivalence"
+      ],
+      "requirements": [
+        "Run deterministic builds, perf benchmarks, target matrices, fault injection and replay equivalence checks.",
+        "Attack p99 hitch, memory leak, optimization-induced behavior change, streaming thrash.",
+        "Persist failing traces/artifacts as regressions."
+      ],
+      "adversarial": [
+        "p99 hitch",
+        "memory leak",
+        "optimization-induced behavior change",
+        "streaming thrash",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-386 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-387",
+      "ordinal": 387,
+      "family_id": "GB39",
+      "family": "Performance & Optimization",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Optimize CPU, GPU, memory, streaming, loading, frame pacing and network cost without changing intended behavior.",
+      "owner": "skeleton/jeeves/game_engine_timing.py",
+      "batches": [
+        "B045",
+        "B059",
+        "B074"
+      ],
+      "metrics": [
+        "frame time",
+        "tail stalls",
+        "memory budget",
+        "behavioral equivalence"
+      ],
+      "requirements": [
+        "Improve frame time, tail stalls, memory budget, behavioral equivalence jointly with player experience, reliability, accessibility and maintainability.",
+        "Reject average-only wins that worsen tails, startup, memory or correctness.",
+        "Keep champion unless candidate is Pareto-safe."
+      ],
+      "adversarial": [
+        "p99 hitch",
+        "memory leak",
+        "optimization-induced behavior change",
+        "streaming thrash",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-387 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-388",
+      "ordinal": 388,
+      "family_id": "GB39",
+      "family": "Performance & Optimization",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Optimize CPU, GPU, memory, streaming, loading, frame pacing and network cost without changing intended behavior.",
+      "owner": "skeleton/jeeves/game_engine_timing.py",
+      "batches": [
+        "B045",
+        "B059",
+        "B074"
+      ],
+      "metrics": [
+        "frame time",
+        "tail stalls",
+        "memory budget",
+        "behavioral equivalence"
+      ],
+      "requirements": [
+        "Support artifact/source diff, version migration, rollback and exact checkpoint recovery.",
+        "Resume exact toolchain/canon/rival/evaluator identities.",
+        "Prove failed release/build attempts leave no half-published authority."
+      ],
+      "adversarial": [
+        "p99 hitch",
+        "memory leak",
+        "optimization-induced behavior change",
+        "streaming thrash",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-388 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-389",
+      "ordinal": 389,
+      "family_id": "GB39",
+      "family": "Performance & Optimization",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Optimize CPU, GPU, memory, streaming, loading, frame pacing and network cost without changing intended behavior.",
+      "owner": "skeleton/jeeves/game_engine_timing.py",
+      "batches": [
+        "B045",
+        "B059",
+        "B074"
+      ],
+      "metrics": [
+        "frame time",
+        "tail stalls",
+        "memory budget",
+        "behavioral equivalence"
+      ],
+      "requirements": [
+        "Run Forge-100/1000/10000, exactly three stages each, no wall-clock deadline.",
+        "Stress target permutations and long optimization/build sequences under bounded compute/storage.",
+        "Detect overfitting to benchmark hardware and cumulative build drift."
+      ],
+      "adversarial": [
+        "p99 hitch",
+        "memory leak",
+        "optimization-induced behavior change",
+        "streaming thrash",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-389 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "deep-effort platform report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-390",
+      "ordinal": 390,
+      "family_id": "GB39",
+      "family": "Performance & Optimization",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Optimize CPU, GPU, memory, streaming, loading, frame pacing and network cost without changing intended behavior.",
+      "owner": "skeleton/jeeves/game_engine_timing.py",
+      "batches": [
+        "B045",
+        "B059",
+        "B074"
+      ],
+      "metrics": [
+        "frame time",
+        "tail stalls",
+        "memory budget",
+        "behavioral equivalence"
+      ],
+      "requirements": [
+        "Require independent exact-head reproducibility/performance evidence.",
+        "Block rights/provenance, security, performance-tail, behavior-equivalence or rollback failures.",
+        "Expire qualification on material source/toolchain/model/evaluator drift."
+      ],
+      "adversarial": [
+        "p99 hitch",
+        "memory leak",
+        "optimization-induced behavior change",
+        "streaming thrash",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-390 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "deep-effort platform report",
+        "independent verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-391",
+      "ordinal": 391,
+      "family_id": "GB40",
+      "family": "Build, Export & Platform Packaging",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Compile reproducible platform artifacts with target-specific settings, assets, manifests, security, provenance and rollback.",
+      "owner": "skeleton/jeeves/game_engine_export.py",
+      "batches": [
+        "B004",
+        "B010",
+        "B064"
+      ],
+      "metrics": [
+        "reproducibility",
+        "platform correctness",
+        "package integrity",
+        "release rollback"
+      ],
+      "requirements": [
+        "Specify Build, Export & Platform Packaging: Compile reproducible platform artifacts with target-specific settings, assets, manifests, security, provenance and rollback.",
+        "Declare target budgets, supported platforms/states, hard invariants and acceptance fixtures.",
+        "Bind skeleton/jeeves/game_engine_export.py and B004, B010, B064."
+      ],
+      "adversarial": [
+        "nondeterministic build",
+        "missing asset",
+        "unsafe manifest",
+        "platform configuration drift",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-391 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-392",
+      "ordinal": 392,
+      "family_id": "GB40",
+      "family": "Build, Export & Platform Packaging",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Compile reproducible platform artifacts with target-specific settings, assets, manifests, security, provenance and rollback.",
+      "owner": "skeleton/jeeves/game_engine_export.py",
+      "batches": [
+        "B004",
+        "B010",
+        "B064"
+      ],
+      "metrics": [
+        "reproducibility",
+        "platform correctness",
+        "package integrity",
+        "release rollback"
+      ],
+      "requirements": [
+        "Define typed build/runtime state, artifact identity, hashes, versions, provenance and deterministic serialization.",
+        "Make target-specific deltas explicit.",
+        "Define invalid/unsupported states and compatibility."
+      ],
+      "adversarial": [
+        "nondeterministic build",
+        "missing asset",
+        "unsafe manifest",
+        "platform configuration drift",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-392 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-393",
+      "ordinal": 393,
+      "family_id": "GB40",
+      "family": "Build, Export & Platform Packaging",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Compile reproducible platform artifacts with target-specific settings, assets, manifests, security, provenance and rollback.",
+      "owner": "skeleton/jeeves/game_engine_export.py",
+      "batches": [
+        "B004",
+        "B010",
+        "B064"
+      ],
+      "metrics": [
+        "reproducibility",
+        "platform correctness",
+        "package integrity",
+        "release rollback"
+      ],
+      "requirements": [
+        "Implement through canonical build/runtime pipelines with pinned inputs and governed provenance.",
+        "Record toolchains/models/transforms and retain reference behavior.",
+        "Use transactional/idempotent outputs and rollback-safe publication."
+      ],
+      "adversarial": [
+        "nondeterministic build",
+        "missing asset",
+        "unsafe manifest",
+        "platform configuration drift",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-393 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-394",
+      "ordinal": 394,
+      "family_id": "GB40",
+      "family": "Build, Export & Platform Packaging",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Compile reproducible platform artifacts with target-specific settings, assets, manifests, security, provenance and rollback.",
+      "owner": "skeleton/jeeves/game_engine_export.py",
+      "batches": [
+        "B004",
+        "B010",
+        "B064"
+      ],
+      "metrics": [
+        "reproducibility",
+        "platform correctness",
+        "package integrity",
+        "release rollback"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote, alternating rivals.",
+        "Opponent attacks regressions, portability, tail behavior and reproducibility and submits a better candidate.",
+        "Deterministic evidence gates decide promotion."
+      ],
+      "adversarial": [
+        "nondeterministic build",
+        "missing asset",
+        "unsafe manifest",
+        "platform configuration drift",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-394 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-395",
+      "ordinal": 395,
+      "family_id": "GB40",
+      "family": "Build, Export & Platform Packaging",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Compile reproducible platform artifacts with target-specific settings, assets, manifests, security, provenance and rollback.",
+      "owner": "skeleton/jeeves/game_engine_export.py",
+      "batches": [
+        "B004",
+        "B010",
+        "B064"
+      ],
+      "metrics": [
+        "reproducibility",
+        "platform correctness",
+        "package integrity",
+        "release rollback"
+      ],
+      "requirements": [
+        "Verify coupling with assets, saves, networking, gameplay, rendering, security, accessibility and release contracts.",
+        "Propagate changed budgets/contracts.",
+        "Reject local optimization/export wins that alter intended game behavior."
+      ],
+      "adversarial": [
+        "nondeterministic build",
+        "missing asset",
+        "unsafe manifest",
+        "platform configuration drift",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-395 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-396",
+      "ordinal": 396,
+      "family_id": "GB40",
+      "family": "Build, Export & Platform Packaging",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Compile reproducible platform artifacts with target-specific settings, assets, manifests, security, provenance and rollback.",
+      "owner": "skeleton/jeeves/game_engine_export.py",
+      "batches": [
+        "B004",
+        "B010",
+        "B064"
+      ],
+      "metrics": [
+        "reproducibility",
+        "platform correctness",
+        "package integrity",
+        "release rollback"
+      ],
+      "requirements": [
+        "Run deterministic builds, perf benchmarks, target matrices, fault injection and replay equivalence checks.",
+        "Attack nondeterministic build, missing asset, unsafe manifest, platform configuration drift.",
+        "Persist failing traces/artifacts as regressions."
+      ],
+      "adversarial": [
+        "nondeterministic build",
+        "missing asset",
+        "unsafe manifest",
+        "platform configuration drift",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-396 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-397",
+      "ordinal": 397,
+      "family_id": "GB40",
+      "family": "Build, Export & Platform Packaging",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Compile reproducible platform artifacts with target-specific settings, assets, manifests, security, provenance and rollback.",
+      "owner": "skeleton/jeeves/game_engine_export.py",
+      "batches": [
+        "B004",
+        "B010",
+        "B064"
+      ],
+      "metrics": [
+        "reproducibility",
+        "platform correctness",
+        "package integrity",
+        "release rollback"
+      ],
+      "requirements": [
+        "Improve reproducibility, platform correctness, package integrity, release rollback jointly with player experience, reliability, accessibility and maintainability.",
+        "Reject average-only wins that worsen tails, startup, memory or correctness.",
+        "Keep champion unless candidate is Pareto-safe."
+      ],
+      "adversarial": [
+        "nondeterministic build",
+        "missing asset",
+        "unsafe manifest",
+        "platform configuration drift",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-397 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-398",
+      "ordinal": 398,
+      "family_id": "GB40",
+      "family": "Build, Export & Platform Packaging",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Compile reproducible platform artifacts with target-specific settings, assets, manifests, security, provenance and rollback.",
+      "owner": "skeleton/jeeves/game_engine_export.py",
+      "batches": [
+        "B004",
+        "B010",
+        "B064"
+      ],
+      "metrics": [
+        "reproducibility",
+        "platform correctness",
+        "package integrity",
+        "release rollback"
+      ],
+      "requirements": [
+        "Support artifact/source diff, version migration, rollback and exact checkpoint recovery.",
+        "Resume exact toolchain/canon/rival/evaluator identities.",
+        "Prove failed release/build attempts leave no half-published authority."
+      ],
+      "adversarial": [
+        "nondeterministic build",
+        "missing asset",
+        "unsafe manifest",
+        "platform configuration drift",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-398 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-399",
+      "ordinal": 399,
+      "family_id": "GB40",
+      "family": "Build, Export & Platform Packaging",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Compile reproducible platform artifacts with target-specific settings, assets, manifests, security, provenance and rollback.",
+      "owner": "skeleton/jeeves/game_engine_export.py",
+      "batches": [
+        "B004",
+        "B010",
+        "B064"
+      ],
+      "metrics": [
+        "reproducibility",
+        "platform correctness",
+        "package integrity",
+        "release rollback"
+      ],
+      "requirements": [
+        "Run Forge-100/1000/10000, exactly three stages each, no wall-clock deadline.",
+        "Stress target permutations and long optimization/build sequences under bounded compute/storage.",
+        "Detect overfitting to benchmark hardware and cumulative build drift."
+      ],
+      "adversarial": [
+        "nondeterministic build",
+        "missing asset",
+        "unsafe manifest",
+        "platform configuration drift",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-399 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "deep-effort platform report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-400",
+      "ordinal": 400,
+      "family_id": "GB40",
+      "family": "Build, Export & Platform Packaging",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Compile reproducible platform artifacts with target-specific settings, assets, manifests, security, provenance and rollback.",
+      "owner": "skeleton/jeeves/game_engine_export.py",
+      "batches": [
+        "B004",
+        "B010",
+        "B064"
+      ],
+      "metrics": [
+        "reproducibility",
+        "platform correctness",
+        "package integrity",
+        "release rollback"
+      ],
+      "requirements": [
+        "Require independent exact-head reproducibility/performance evidence.",
+        "Block rights/provenance, security, performance-tail, behavior-equivalence or rollback failures.",
+        "Expire qualification on material source/toolchain/model/evaluator drift."
+      ],
+      "adversarial": [
+        "nondeterministic build",
+        "missing asset",
+        "unsafe manifest",
+        "platform configuration drift",
+        "supply/provenance drift",
+        "optimization violating whole-game consistency"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "source/tool provenance known",
+        "behavior equivalence",
+        "bounded resources",
+        "reproducible/recoverable artifacts",
+        "release integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-400 fixture",
+        "exact-head/toolchain identity",
+        "rival transcript",
+        "target/performance report",
+        "provenance manifest",
+        "replay/build evidence",
+        "quality delta",
+        "deep-effort platform report",
+        "independent verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    }
+  ]
+}

@@ -14,6 +14,7 @@ from collections import deque
 from collections.abc import Sequence as SequenceABC
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from ipaddress import IPv4Address, IPv6Address, ip_address
 import base64
 import hashlib
@@ -55,6 +56,7 @@ from skeleton.intelligence.admission_runtime import (
     AdmissionRuntime,
     AdmissionRuntimeError,
 )
+from skeleton.shells.cancellation import CancellationToken
 from skeleton.vault.data_governance import (
     DataGovernanceDenied,
     ProviderTransferRequest,
@@ -95,6 +97,10 @@ class ProviderProtocolViolationError(ProviderInvocationError):
 
 class ProviderPolicyError(ProviderError):
     """Raised when governance or admission denies provider-bound work."""
+
+
+class _ProviderUsageIncompleteError(ProviderPolicyError):
+    """Raised after dispatch when token actuals are not accountable."""
 
 
 def _read_provider_json(response: Any) -> Mapping[str, Any]:
@@ -257,6 +263,15 @@ class ProviderResponse:
     context_digest: str | None = None
     context_source_snapshot: tuple[tuple[str, str], ...] = field(default_factory=tuple)
     context_compiler_version: str | None = None
+    execution_receipt_digest: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.execution_receipt_digest is not None and (
+            not isinstance(self.execution_receipt_digest, str)
+            or len(self.execution_receipt_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in self.execution_receipt_digest)
+        ):
+            raise ValueError("execution_receipt_digest must be lowercase sha256")
 
 
 @dataclass(frozen=True, slots=True)
@@ -275,6 +290,7 @@ class ProviderImageRequest:
     estimated_cost_usd: float = 0.0
     resource_budget: ResourceBudget = field(default_factory=ResourceBudget)
     governance_context: GovernanceContext | None = None
+    deadline: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -307,6 +323,7 @@ class ProviderSpeechRequest:
     estimated_cost_usd: float = 0.0
     resource_budget: ResourceBudget = field(default_factory=ResourceBudget)
     governance_context: GovernanceContext | None = None
+    deadline: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -419,8 +436,9 @@ class ProviderAdapter(ABC):
         data_class: str = "internal",
         tenant_id: str | None = None,
         operation_id: str | None = None,
+        deadline: datetime | None = None,
     ) -> ProviderImageResponse:
-        del image, count, size, data_class, tenant_id, operation_id
+        del image, count, size, data_class, tenant_id, operation_id, deadline
         raise ProviderUnavailableError(
             f"provider does not implement image variation: {self.provider_id}"
         )
@@ -435,8 +453,9 @@ class ProviderAdapter(ABC):
         data_class: str = "internal",
         tenant_id: str | None = None,
         operation_id: str | None = None,
+        deadline: datetime | None = None,
     ) -> ProviderImageResponse:
-        del image, prompt, mask, size, data_class, tenant_id, operation_id
+        del image, prompt, mask, size, data_class, tenant_id, operation_id, deadline
         raise ProviderUnavailableError(
             f"provider does not implement image editing: {self.provider_id}"
         )
@@ -612,6 +631,7 @@ class FailoverProviderAdapter(ProviderAdapter):
         data_class: str = "internal",
         tenant_id: str | None = None,
         operation_id: str | None = None,
+        deadline: datetime | None = None,
     ) -> ProviderImageResponse:
         return await self.primary.create_image_variation(
             image,
@@ -620,6 +640,7 @@ class FailoverProviderAdapter(ProviderAdapter):
             data_class=data_class,
             tenant_id=tenant_id,
             operation_id=operation_id,
+            deadline=deadline,
         )
 
     async def edit_image(
@@ -632,6 +653,7 @@ class FailoverProviderAdapter(ProviderAdapter):
         data_class: str = "internal",
         tenant_id: str | None = None,
         operation_id: str | None = None,
+        deadline: datetime | None = None,
     ) -> ProviderImageResponse:
         return await self.primary.edit_image(
             image,
@@ -641,6 +663,7 @@ class FailoverProviderAdapter(ProviderAdapter):
             data_class=data_class,
             tenant_id=tenant_id,
             operation_id=operation_id,
+            deadline=deadline,
         )
 
     async def synthesize_speech(
@@ -871,26 +894,80 @@ def _provider_structured_output_payload(
     }
 
 
-def _remaining_provider_timeout(
-    request: ProviderRequest,
+def _remaining_deadline_timeout(
+    deadline: datetime | None,
     configured_timeout: float,
+    *,
+    label: str,
+    now: datetime | None = None,
 ) -> float:
+    """Return a hard per-call timeout bounded by an optional absolute deadline."""
+
     timeout = float(configured_timeout)
-    if request.deadline is None:
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise ProviderPolicyError(f"{label} timeout must be finite and positive")
+    if deadline is None:
         return timeout
-    deadline = request.deadline
     if (
         not isinstance(deadline, datetime)
         or deadline.tzinfo is None
         or deadline.utcoffset() is None
     ):
-        raise ProviderPolicyError("model provider deadline must be timezone-aware")
+        raise ProviderPolicyError(f"{label} deadline must be timezone-aware")
+    instant = datetime.now(timezone.utc) if now is None else now
+    if instant.tzinfo is None or instant.utcoffset() is None:
+        raise ProviderPolicyError(f"{label} clock must be timezone-aware")
     remaining = (
-        deadline.astimezone(timezone.utc) - datetime.now(timezone.utc)
+        deadline.astimezone(timezone.utc)
+        - instant.astimezone(timezone.utc)
     ).total_seconds()
     if remaining <= 0:
-        raise ProviderInvocationError("model provider deadline exceeded")
+        raise ProviderInvocationError(f"{label} deadline exceeded")
     return max(0.001, min(timeout, remaining))
+
+
+def _remaining_provider_timeout(
+    request: ProviderRequest,
+    configured_timeout: float,
+) -> float:
+    return _remaining_deadline_timeout(
+        request.deadline,
+        configured_timeout,
+        label="model provider",
+    )
+
+
+async def _await_bounded_provider_call(
+    factory: Callable[[], Any],
+    *,
+    deadline: datetime | None,
+    configured_timeout: float,
+    label: str,
+) -> Any:
+    """Execute one provider coroutine under a hard timeout/deadline fence.
+
+    The factory is invoked only after the deadline is proven live, so expired
+    work never reaches provider I/O. Timeout cancellation is translated into a
+    provider-boundary error while external task cancellation is deliberately
+    allowed to propagate unchanged.
+    """
+
+    if not callable(factory):
+        raise TypeError("provider call factory must be callable")
+    timeout = _remaining_deadline_timeout(
+        deadline,
+        configured_timeout,
+        label=label,
+    )
+    try:
+        awaitable = factory()
+        if not inspect.isawaitable(awaitable):
+            raise ProviderInvocationError(
+                f"{label} call factory did not return an awaitable"
+            )
+        return await asyncio.wait_for(awaitable, timeout=timeout)
+    except asyncio.TimeoutError as exc:
+        raise ProviderInvocationError(f"{label} deadline exceeded") from exc
 
 
 def _provider_field(value: object, key: str, default: object = None) -> object:
@@ -1024,14 +1101,115 @@ def _extract_provider_structured_output(
     )
 
 
+def _billing_decimal(
+    value: object,
+    *,
+    field: str,
+) -> tuple[Decimal, str] | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise ProviderProtocolViolationError(
+            f"model provider {field} is invalid"
+        )
+    raw = str(value).strip()
+    if not raw:
+        raise ProviderProtocolViolationError(
+            f"model provider {field} is invalid"
+        )
+    try:
+        parsed = Decimal(raw)
+    except (InvalidOperation, ValueError) as exc:
+        raise ProviderProtocolViolationError(
+            f"model provider {field} is invalid"
+        ) from exc
+    if not parsed.is_finite() or parsed < 0:
+        raise ProviderProtocolViolationError(
+            f"model provider {field} is invalid"
+        )
+    return parsed, raw
+
+
+def _provider_billing_metadata(
+    response: object,
+    usage: object | None,
+) -> tuple[str | None, str | None]:
+    """Return one non-conflicting explicit billed USD amount, if supplied."""
+
+    candidates: list[tuple[Decimal, str, str]] = []
+
+    def add_usd(value: object, field: str) -> None:
+        parsed = _billing_decimal(value, field=field)
+        if parsed is not None:
+            number, raw = parsed
+            candidates.append((number, raw, "USD"))
+
+    def add_billed(
+        owner: object | None,
+        *,
+        field_prefix: str,
+    ) -> None:
+        if owner is None:
+            return
+        raw_cost = _provider_field(owner, "billed_cost", None)
+        if raw_cost is None:
+            return
+        currency = _provider_field(owner, "currency", None)
+        if not isinstance(currency, str) or not currency.strip():
+            raise ProviderProtocolViolationError(
+                "model provider billed cost is missing currency"
+            )
+        normalized_currency = currency.strip().upper()
+        if normalized_currency != "USD":
+            raise ProviderProtocolViolationError(
+                "model provider billed cost currency is unsupported"
+            )
+        parsed = _billing_decimal(
+            raw_cost,
+            field=f"{field_prefix} billed cost",
+        )
+        assert parsed is not None
+        number, raw = parsed
+        candidates.append((number, raw, normalized_currency))
+
+    if usage is not None:
+        add_usd(
+            _provider_field(usage, "cost_usd", None),
+            "usage cost_usd",
+        )
+        add_billed(usage, field_prefix="usage")
+
+    add_usd(
+        _provider_field(response, "cost_usd", None),
+        "response cost_usd",
+    )
+    add_billed(response, field_prefix="response")
+
+    if not candidates:
+        return None, None
+
+    expected = candidates[0][0]
+    if any(number != expected for number, _raw, _currency in candidates[1:]):
+        raise ProviderProtocolViolationError(
+            "model provider returned conflicting billed cost metadata"
+        )
+
+    # Preserve decimal text rather than binary-float round-tripping.
+    return candidates[0][1], "USD"
+
+
 def _normalized_provider_usage(
     response: object,
     *,
     estimated_cost_usd: float,
 ) -> ProviderUsage:
     usage = _provider_field(response, "usage", None)
+    billed_cost, billed_currency = _provider_billing_metadata(
+        response,
+        usage,
+    )
     if usage is None:
-        source = "estimate"
+        source = "provider" if billed_cost is not None else "estimate"
         input_tokens = output_tokens = cached_tokens = reasoning_tokens = total = None
     else:
         source = "provider"
@@ -1073,8 +1251,12 @@ def _normalized_provider_usage(
             reasoning_tokens=token(reasoning_tokens),
             total_tokens=token(total),
             estimated_cost=estimated,
-            billed_cost=None,
-            currency="USD" if estimated is not None else None,
+            billed_cost=billed_cost,
+            currency=(
+                billed_currency
+                if billed_currency is not None
+                else ("USD" if estimated is not None else None)
+            ),
             usage_source=source,
         )
     except ProviderProtocolError as exc:
@@ -1592,23 +1774,42 @@ def _actual_provider_usage(
     estimate: UsageEstimate,
     wall_seconds: float,
     attempts_used: int = 1,
+    normalized_usage: ProviderUsage | None = None,
 ) -> UsageEstimate:
     usage = (
         response.get("usage")
         if isinstance(response, Mapping)
         else getattr(response, "usage", None)
     )
-    if isinstance(usage, Mapping):
+    if normalized_usage is not None:
+        input_value = normalized_usage.input_tokens
+        output_value = normalized_usage.output_tokens
+        if normalized_usage.billed_cost is not None:
+            if normalized_usage.currency != "USD":
+                raise ProviderProtocolViolationError(
+                    "normalized billed cost must use USD"
+                )
+            billed = _billing_decimal(
+                normalized_usage.billed_cost,
+                field="normalized billed cost",
+            )
+            assert billed is not None
+            actual_cost = float(billed[0])
+        else:
+            actual_cost = estimate.cost_usd
+    elif isinstance(usage, Mapping):
         input_value = usage.get("input_tokens")
         output_value = usage.get("output_tokens")
+        actual_cost = estimate.cost_usd
     else:
         input_value = getattr(usage, "input_tokens", None)
         output_value = getattr(usage, "output_tokens", None)
+        actual_cost = estimate.cost_usd
 
     return UsageEstimate(
         input_tokens=_usage_int(input_value, estimate.input_tokens),
         output_tokens=_usage_int(output_value, estimate.output_tokens),
-        cost_usd=estimate.cost_usd,
+        cost_usd=actual_cost,
         wall_seconds=max(0.0, float(wall_seconds)),
         provider_attempts=max(1, int(attempts_used)),
         tool_calls=estimate.tool_calls,
@@ -1659,6 +1860,114 @@ def _release_provider_lease(
         # Preserve the provider failure as the primary error. A runtime
         # implementation must keep release idempotent/recoverable.
         pass
+
+
+def _provider_usage_event_id(
+    lease: AdmissionLease,
+    kind: str,
+) -> str:
+    material = (lease.lease_id + "\x1f" + kind).encode("utf-8")
+    return (
+        "provider-"
+        + kind
+        + "-"
+        + hashlib.sha256(material).hexdigest()[:24]
+    )
+
+
+def _meter_provider_actual_usage(
+    runtime: AdmissionRuntime,
+    lease: AdmissionLease,
+    actual: UsageEstimate,
+) -> None:
+    """Persist an idempotent provider charge before terminal reconciliation."""
+
+    if lease.quota_reservation is None:
+        return
+    try:
+        runtime.record_usage_event(
+            lease.operation_id,
+            _provider_usage_event_id(lease, "actual"),
+            "provider",
+            actual,
+        )
+    except AdmissionError:
+        # Completion still reconciles known actual usage and records overrun.
+        runtime.metrics_registry.inc(
+            "provider.actual_usage_meter_rejected_total"
+        )
+    except AdmissionRuntimeError:
+        runtime.metrics_registry.inc(
+            "provider.actual_usage_meter_error_total"
+        )
+
+
+def _finalize_provider_usage(
+    runtime: AdmissionRuntime,
+    lease: AdmissionLease,
+    actual: UsageEstimate,
+) -> None:
+    _meter_provider_actual_usage(runtime, lease, actual)
+    runtime.complete(lease.operation_id, actual)
+
+
+def _quarantine_provider_usage(
+    runtime: AdmissionRuntime,
+    lease: AdmissionLease,
+    *,
+    reason: str,
+) -> bool:
+    """Fence ambiguous post-dispatch spend instead of treating it as zero."""
+
+    if lease.quota_reservation is None:
+        _release_provider_lease(runtime, lease)
+        return False
+
+    try:
+        runtime.mark_usage_unknown(
+            lease.operation_id,
+            _provider_usage_event_id(lease, "unknown"),
+            "provider",
+            reason,
+        )
+        runtime.metrics_registry.inc(
+            "provider.unknown_usage_quarantined_total"
+        )
+    except AdmissionRuntimeError:
+        # Never release durable reservation state after ambiguous dispatch.
+        runtime.metrics_registry.inc(
+            "provider.unknown_usage_marker_error_total"
+        )
+    return True
+
+
+def _require_accountable_provider_usage(
+    runtime: AdmissionRuntime,
+    lease: AdmissionLease,
+    usage: ProviderUsage,
+) -> None:
+    """Fail closed when a durable text call lacks provider token actuals.
+
+    Request estimates remain valid admission inputs, but they are not rewritten
+    as observed token usage after a provider has returned a response.
+    Compatibility runtimes without durable quota reservations retain the
+    historical estimate fallback because there is no durable accounting state
+    to quarantine.
+    """
+
+    if lease.quota_reservation is None:
+        return
+    missing: list[str] = []
+    if usage.input_tokens is None:
+        missing.append("input_tokens")
+    if usage.output_tokens is None:
+        missing.append("output_tokens")
+    if not missing:
+        return
+    raise _ProviderUsageIncompleteError(
+        "model provider usage metadata incomplete:"
+        + ",".join(missing)
+    )
 
 
 def _media_operation_id(
@@ -1929,16 +2238,21 @@ class OpenAIProviderAdapter(ProviderAdapter):
             if request.max_output_tokens is not None
             else min(4_096, request.resource_budget.max_output_tokens)
         )
+        request_timeout = _remaining_provider_timeout(
+            request,
+            self.timeout_seconds,
+        )
         lease, estimate = _admit_provider_request(
             self.admission_runtime,
             request,
             tenant_id=effective_tenant_id,
             requested_output_tokens=requested_output,
-            timeout_seconds=self.timeout_seconds,
+            timeout_seconds=request_timeout,
             provider_attempts=self.max_retries + 1,
         )
 
         started = time.perf_counter()
+        dispatched = False
         try:
             client = self._get_client()
             messages: list[dict[str, str]] = [
@@ -1967,19 +2281,15 @@ class OpenAIProviderAdapter(ProviderAdapter):
             if structured_payload is not None:
                 kwargs["text"] = structured_payload
 
-            timeout_seconds = _remaining_provider_timeout(
-                request,
-                self.timeout_seconds,
-            )
+            timeout_seconds = request_timeout
             try:
-                response = await asyncio.wait_for(
-                    client.responses.create(**kwargs),
-                    timeout=timeout_seconds,
+                dispatched = True
+                response = await _await_bounded_provider_call(
+                    lambda: client.responses.create(**kwargs),
+                    deadline=request.deadline,
+                    configured_timeout=timeout_seconds,
+                    label="model provider",
                 )
-            except asyncio.TimeoutError as exc:
-                raise ProviderInvocationError(
-                    "model provider deadline exceeded"
-                ) from exc
             except ProviderError:
                 raise
             except Exception as exc:
@@ -1993,8 +2303,27 @@ class OpenAIProviderAdapter(ProviderAdapter):
                     text=(str(raw_text) if raw_text is not None else None),
                 )
             )
+            _require_accountable_provider_usage(
+                self.admission_runtime,
+                lease,
+                usage,
+            )
+        except _ProviderUsageIncompleteError:
+            _quarantine_provider_usage(
+                self.admission_runtime,
+                lease,
+                reason="provider-usage-metadata-incomplete",
+            )
+            raise
         except BaseException:
-            _release_provider_lease(self.admission_runtime, lease)
+            if dispatched:
+                _quarantine_provider_usage(
+                    self.admission_runtime,
+                    lease,
+                    reason="provider-dispatch-or-response-ambiguous",
+                )
+            else:
+                _release_provider_lease(self.admission_runtime, lease)
             raise
 
         latency_seconds = max(0.0, time.perf_counter() - started)
@@ -2002,11 +2331,20 @@ class OpenAIProviderAdapter(ProviderAdapter):
             response,
             estimate=estimate,
             wall_seconds=latency_seconds,
+            normalized_usage=usage,
         )
         try:
-            self.admission_runtime.complete(lease.operation_id, actual)
+            _finalize_provider_usage(
+                self.admission_runtime,
+                lease,
+                actual,
+            )
         except AdmissionRuntimeError as exc:
-            _release_provider_lease(self.admission_runtime, lease)
+            _quarantine_provider_usage(
+                self.admission_runtime,
+                lease,
+                reason="provider-usage-reconciliation-failed",
+            )
             raise ProviderPolicyError(
                 "model provider usage reconciliation failed"
             ) from exc
@@ -2046,6 +2384,11 @@ class OpenAIProviderAdapter(ProviderAdapter):
         if request.quality not in {"standard", "hd", "low", "medium", "high", "auto"}:
             raise ProviderInvocationError("image provider quality is unsupported")
 
+        media_timeout = _remaining_deadline_timeout(
+            request.deadline,
+            self.timeout_seconds,
+            label="image provider",
+        )
         governance, lease, estimate = _require_media_policy(
             provider_id=self.provider_id,
             purpose=request.purpose,
@@ -2056,22 +2399,29 @@ class OpenAIProviderAdapter(ProviderAdapter):
             estimated_cost_usd=request.estimated_cost_usd,
             resource_budget=request.resource_budget,
             governance_context=request.governance_context,
-            timeout_seconds=self.timeout_seconds,
+            timeout_seconds=media_timeout,
             provider_attempts=self.max_retries + 1,
             output_tokens=request.count,
             admission_runtime=self.admission_runtime,
         )
         started = time.perf_counter()
+        dispatched = False
         try:
             client = self._get_client()
             try:
-                response = await client.images.generate(
-                    model=request.model,
-                    prompt=request.prompt,
-                    size=request.size,
-                    quality=request.quality,
-                    n=request.count,
-                    response_format="b64_json",
+                dispatched = True
+                response = await _await_bounded_provider_call(
+                    lambda: client.images.generate(
+                        model=request.model,
+                        prompt=request.prompt,
+                        size=request.size,
+                        quality=request.quality,
+                        n=request.count,
+                        response_format="b64_json",
+                    ),
+                    deadline=request.deadline,
+                    configured_timeout=self.timeout_seconds,
+                    label="image provider",
                 )
             except ProviderError:
                 raise
@@ -2079,7 +2429,14 @@ class OpenAIProviderAdapter(ProviderAdapter):
                 raise ProviderInvocationError("image provider request failed") from exc
             images = _extract_b64_images(response, fallback_prompt=request.prompt)
         except BaseException:
-            _release_provider_lease(self.admission_runtime, lease)
+            if dispatched:
+                _quarantine_provider_usage(
+                    self.admission_runtime,
+                    lease,
+                    reason="provider-dispatch-or-response-ambiguous",
+                )
+            else:
+                _release_provider_lease(self.admission_runtime, lease)
             raise
 
         latency_seconds = max(0.0, time.perf_counter() - started)
@@ -2089,9 +2446,17 @@ class OpenAIProviderAdapter(ProviderAdapter):
             artifact_bytes=_image_artifact_bytes(images),
         )
         try:
-            self.admission_runtime.complete(lease.operation_id, actual)
+            _finalize_provider_usage(
+                self.admission_runtime,
+                lease,
+                actual,
+            )
         except AdmissionRuntimeError as exc:
-            _release_provider_lease(self.admission_runtime, lease)
+            _quarantine_provider_usage(
+                self.admission_runtime,
+                lease,
+                reason="provider-usage-reconciliation-failed",
+            )
             raise ProviderPolicyError(
                 "image provider usage reconciliation failed"
             ) from exc
@@ -2117,6 +2482,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
         data_class: str = "internal",
         tenant_id: str | None = None,
         operation_id: str | None = None,
+        deadline: datetime | None = None,
     ) -> ProviderImageResponse:
         if not isinstance(image, bytes) or not image:
             raise ProviderInvocationError("image variation source must be non-empty bytes")
@@ -2127,6 +2493,11 @@ class OpenAIProviderAdapter(ProviderAdapter):
         if size not in {"256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"}:
             raise ProviderInvocationError("image variation size is unsupported")
 
+        media_timeout = _remaining_deadline_timeout(
+            deadline,
+            self.timeout_seconds,
+            label="image variation provider",
+        )
         governance, lease, estimate = _require_media_policy(
             provider_id=self.provider_id,
             purpose="image-variation",
@@ -2136,7 +2507,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
             content=image,
             estimated_cost_usd=0.0,
             resource_budget=ResourceBudget(),
-            timeout_seconds=self.timeout_seconds,
+            timeout_seconds=media_timeout,
             provider_attempts=self.max_retries + 1,
             output_tokens=count,
             admission_runtime=self.admission_runtime,
@@ -2144,20 +2515,36 @@ class OpenAIProviderAdapter(ProviderAdapter):
         source = io.BytesIO(image)
         source.name = "image.png"
         started = time.perf_counter()
+        dispatched = False
         try:
             client = self._get_client()
             try:
-                response = await client.images.create_variation(
-                    image=source,
-                    n=count,
-                    size=size,
-                    response_format="b64_json",
+                dispatched = True
+                response = await _await_bounded_provider_call(
+                    lambda: client.images.create_variation(
+                        image=source,
+                        n=count,
+                        size=size,
+                        response_format="b64_json",
+                    ),
+                    deadline=deadline,
+                    configured_timeout=self.timeout_seconds,
+                    label="image variation provider",
                 )
+            except ProviderError:
+                raise
             except Exception as exc:
                 raise ProviderInvocationError("image variation request failed") from exc
             images = _extract_b64_images(response, fallback_prompt="variation")
         except BaseException:
-            _release_provider_lease(self.admission_runtime, lease)
+            if dispatched:
+                _quarantine_provider_usage(
+                    self.admission_runtime,
+                    lease,
+                    reason="provider-dispatch-or-response-ambiguous",
+                )
+            else:
+                _release_provider_lease(self.admission_runtime, lease)
             raise
 
         latency_seconds = max(0.0, time.perf_counter() - started)
@@ -2167,9 +2554,17 @@ class OpenAIProviderAdapter(ProviderAdapter):
             artifact_bytes=_image_artifact_bytes(images),
         )
         try:
-            self.admission_runtime.complete(lease.operation_id, actual)
+            _finalize_provider_usage(
+                self.admission_runtime,
+                lease,
+                actual,
+            )
         except AdmissionRuntimeError as exc:
-            _release_provider_lease(self.admission_runtime, lease)
+            _quarantine_provider_usage(
+                self.admission_runtime,
+                lease,
+                reason="provider-usage-reconciliation-failed",
+            )
             raise ProviderPolicyError(
                 "image variation usage reconciliation failed"
             ) from exc
@@ -2196,6 +2591,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
         data_class: str = "internal",
         tenant_id: str | None = None,
         operation_id: str | None = None,
+        deadline: datetime | None = None,
     ) -> ProviderImageResponse:
         if not isinstance(image, bytes) or not image:
             raise ProviderInvocationError("image edit source must be non-empty bytes")
@@ -2213,6 +2609,11 @@ class OpenAIProviderAdapter(ProviderAdapter):
         if size not in {"256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"}:
             raise ProviderInvocationError("image edit size is unsupported")
 
+        media_timeout = _remaining_deadline_timeout(
+            deadline,
+            self.timeout_seconds,
+            label="image edit provider",
+        )
         governance, lease, estimate = _require_media_policy(
             provider_id=self.provider_id,
             purpose="image-edit",
@@ -2222,7 +2623,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
             content=image + prompt.encode("utf-8"),
             estimated_cost_usd=0.0,
             resource_budget=ResourceBudget(),
-            timeout_seconds=self.timeout_seconds,
+            timeout_seconds=media_timeout,
             provider_attempts=self.max_retries + 1,
             admission_runtime=self.admission_runtime,
         )
@@ -2240,15 +2641,31 @@ class OpenAIProviderAdapter(ProviderAdapter):
             mask_file.name = "mask.png"
             kwargs["mask"] = mask_file
         started = time.perf_counter()
+        dispatched = False
         try:
             client = self._get_client()
             try:
-                response = await client.images.edit(**kwargs)
+                dispatched = True
+                response = await _await_bounded_provider_call(
+                    lambda: client.images.edit(**kwargs),
+                    deadline=deadline,
+                    configured_timeout=self.timeout_seconds,
+                    label="image edit provider",
+                )
+            except ProviderError:
+                raise
             except Exception as exc:
                 raise ProviderInvocationError("image edit request failed") from exc
             images = _extract_b64_images(response, fallback_prompt=prompt)
         except BaseException:
-            _release_provider_lease(self.admission_runtime, lease)
+            if dispatched:
+                _quarantine_provider_usage(
+                    self.admission_runtime,
+                    lease,
+                    reason="provider-dispatch-or-response-ambiguous",
+                )
+            else:
+                _release_provider_lease(self.admission_runtime, lease)
             raise
 
         latency_seconds = max(0.0, time.perf_counter() - started)
@@ -2258,9 +2675,17 @@ class OpenAIProviderAdapter(ProviderAdapter):
             artifact_bytes=_image_artifact_bytes(images),
         )
         try:
-            self.admission_runtime.complete(lease.operation_id, actual)
+            _finalize_provider_usage(
+                self.admission_runtime,
+                lease,
+                actual,
+            )
         except AdmissionRuntimeError as exc:
-            _release_provider_lease(self.admission_runtime, lease)
+            _quarantine_provider_usage(
+                self.admission_runtime,
+                lease,
+                reason="provider-usage-reconciliation-failed",
+            )
             raise ProviderPolicyError(
                 "image edit usage reconciliation failed"
             ) from exc
@@ -2297,6 +2722,11 @@ class OpenAIProviderAdapter(ProviderAdapter):
         if request.response_format not in {"mp3", "wav", "opus", "aac", "flac", "pcm"}:
             raise ProviderInvocationError("speech provider format is unsupported")
 
+        media_timeout = _remaining_deadline_timeout(
+            request.deadline,
+            self.timeout_seconds,
+            label="speech provider",
+        )
         governance, lease, estimate = _require_media_policy(
             provider_id=self.provider_id,
             purpose=request.purpose,
@@ -2307,20 +2737,27 @@ class OpenAIProviderAdapter(ProviderAdapter):
             estimated_cost_usd=request.estimated_cost_usd,
             resource_budget=request.resource_budget,
             governance_context=request.governance_context,
-            timeout_seconds=self.timeout_seconds,
+            timeout_seconds=media_timeout,
             provider_attempts=self.max_retries + 1,
             admission_runtime=self.admission_runtime,
         )
         started = time.perf_counter()
+        dispatched = False
         try:
             client = self._get_client()
             try:
-                response = await client.audio.speech.create(
-                    model=request.model,
-                    voice=request.voice,
-                    input=request.text,
-                    speed=speed,
-                    response_format=request.response_format,
+                dispatched = True
+                response = await _await_bounded_provider_call(
+                    lambda: client.audio.speech.create(
+                        model=request.model,
+                        voice=request.voice,
+                        input=request.text,
+                        speed=speed,
+                        response_format=request.response_format,
+                    ),
+                    deadline=request.deadline,
+                    configured_timeout=self.timeout_seconds,
+                    label="speech provider",
                 )
                 raw = getattr(response, "content", None)
                 if raw is None:
@@ -2329,7 +2766,12 @@ class OpenAIProviderAdapter(ProviderAdapter):
                         raise ProviderInvocationError("speech provider returned malformed response")
                     raw = reader()
                     if inspect.isawaitable(raw):
-                        raw = await raw
+                        raw = await _await_bounded_provider_call(
+                            lambda: raw,
+                            deadline=request.deadline,
+                            configured_timeout=self.timeout_seconds,
+                            label="speech provider response read",
+                        )
             except ProviderError:
                 raise
             except Exception as exc:
@@ -2341,7 +2783,14 @@ class OpenAIProviderAdapter(ProviderAdapter):
             if len(audio) > _MAX_PROVIDER_MEDIA_BYTES:
                 raise ProviderInvocationError("speech provider response exceeded size limit")
         except BaseException:
-            _release_provider_lease(self.admission_runtime, lease)
+            if dispatched:
+                _quarantine_provider_usage(
+                    self.admission_runtime,
+                    lease,
+                    reason="provider-dispatch-or-response-ambiguous",
+                )
+            else:
+                _release_provider_lease(self.admission_runtime, lease)
             raise
 
         latency_seconds = max(0.0, time.perf_counter() - started)
@@ -2351,9 +2800,17 @@ class OpenAIProviderAdapter(ProviderAdapter):
             artifact_bytes=len(audio),
         )
         try:
-            self.admission_runtime.complete(lease.operation_id, actual)
+            _finalize_provider_usage(
+                self.admission_runtime,
+                lease,
+                actual,
+            )
         except AdmissionRuntimeError as exc:
-            _release_provider_lease(self.admission_runtime, lease)
+            _quarantine_provider_usage(
+                self.admission_runtime,
+                lease,
+                reason="provider-usage-reconciliation-failed",
+            )
             raise ProviderPolicyError(
                 "speech provider usage reconciliation failed"
             ) from exc
@@ -2416,8 +2873,9 @@ class OpenAICompatibleSecondaryAdapter(OpenAIProviderAdapter):
         data_class: str = "internal",
         tenant_id: str | None = None,
         operation_id: str | None = None,
+        deadline: datetime | None = None,
     ) -> ProviderImageResponse:
-        del image, count, size, data_class, tenant_id, operation_id
+        del image, count, size, data_class, tenant_id, operation_id, deadline
         raise ProviderUnavailableError(
             "secondary provider capability is not declared: image-variation"
         )
@@ -2432,8 +2890,9 @@ class OpenAICompatibleSecondaryAdapter(OpenAIProviderAdapter):
         data_class: str = "internal",
         tenant_id: str | None = None,
         operation_id: str | None = None,
+        deadline: datetime | None = None,
     ) -> ProviderImageResponse:
-        del image, prompt, mask, size, data_class, tenant_id, operation_id
+        del image, prompt, mask, size, data_class, tenant_id, operation_id, deadline
         raise ProviderUnavailableError(
             "secondary provider capability is not declared: image-editing"
         )
@@ -2554,7 +3013,16 @@ class OpenAISyncProviderAdapter:
     def _decode_response(response: Any) -> Mapping[str, Any]:
         return _read_provider_json(response)
 
-    def generate_sync(self, request: ProviderRequest) -> ProviderResponse:
+    def generate_sync(
+        self,
+        request: ProviderRequest,
+        *,
+        cancellation: CancellationToken | None = None,
+    ) -> ProviderResponse:
+        if cancellation is not None:
+            if not isinstance(cancellation, CancellationToken):
+                raise TypeError("cancellation must be CancellationToken")
+            cancellation.require_active()
         model = _validate_request(request, default_model=self.model)
         self._ensure_architecture()
 
@@ -2586,12 +3054,16 @@ class OpenAISyncProviderAdapter:
             if request.max_output_tokens is not None
             else min(4_096, request.resource_budget.max_output_tokens)
         )
+        request_timeout = _remaining_provider_timeout(
+            request,
+            self.timeout_seconds,
+        )
         lease, estimate = _admit_provider_request(
             self.admission_runtime,
             request,
             tenant_id=effective_tenant_id,
             requested_output_tokens=requested_output,
-            timeout_seconds=self.timeout_seconds,
+            timeout_seconds=request_timeout,
             provider_attempts=self.max_retries + 1,
         )
 
@@ -2638,19 +3110,27 @@ class OpenAISyncProviderAdapter:
         started = time.perf_counter()
         last_error: BaseException | None = None
         attempts_used = 0
+        dispatched = False
         try:
             for _attempt in range(self.max_retries + 1):
+                if cancellation is not None:
+                    cancellation.require_active()
                 attempts_used += 1
                 try:
                     timeout_seconds = _remaining_provider_timeout(
                         request,
-                        self.timeout_seconds,
+                        request_timeout,
                     )
+                    if cancellation is not None:
+                        cancellation.require_active()
+                    dispatched = True
                     with urllib.request.urlopen(
                         outbound,
                         timeout=timeout_seconds,
                     ) as response:
                         payload = self._decode_response(response)
+                    if cancellation is not None:
+                        cancellation.require_active()
                     raw_text = self._extract_response_text(payload)
                     (
                         text,
@@ -2663,6 +3143,11 @@ class OpenAISyncProviderAdapter:
                         request,
                         text=raw_text,
                     )
+                    _require_accountable_provider_usage(
+                        self.admission_runtime,
+                        lease,
+                        usage,
+                    )
                     request_id = payload.get("id")
                     latency_seconds = max(0.0, time.perf_counter() - started)
                     actual = _actual_provider_usage(
@@ -2670,14 +3155,22 @@ class OpenAISyncProviderAdapter:
                         estimate=estimate,
                         wall_seconds=latency_seconds,
                         attempts_used=attempts_used,
+                        normalized_usage=usage,
                     )
+                    if cancellation is not None:
+                        cancellation.require_active()
                     try:
-                        self.admission_runtime.complete(
-                            lease.operation_id,
+                        _finalize_provider_usage(
+                            self.admission_runtime,
+                            lease,
                             actual,
                         )
                     except AdmissionRuntimeError as exc:
-                        _release_provider_lease(self.admission_runtime, lease)
+                        _quarantine_provider_usage(
+                            self.admission_runtime,
+                            lease,
+                            reason="provider-usage-reconciliation-failed",
+                        )
                         raise ProviderPolicyError(
                             "model provider usage reconciliation failed"
                         ) from exc
@@ -2708,6 +3201,8 @@ class OpenAISyncProviderAdapter:
                 except ProviderError:
                     raise
                 except TimeoutError as exc:
+                    if cancellation is not None and cancellation.cancelled:
+                        cancellation.require_active()
                     last_error = exc
                     if request.deadline is not None:
                         deadline = request.deadline.astimezone(timezone.utc)
@@ -2721,13 +3216,36 @@ class OpenAISyncProviderAdapter:
                     OSError,
                     ValueError,
                 ) as exc:
+                    if cancellation is not None and cancellation.cancelled:
+                        cancellation.require_active()
                     last_error = exc
                     continue
+        except _ProviderUsageIncompleteError:
+            _quarantine_provider_usage(
+                self.admission_runtime,
+                lease,
+                reason="provider-usage-metadata-incomplete",
+            )
+            raise
         except BaseException:
-            _release_provider_lease(self.admission_runtime, lease)
+            if dispatched:
+                _quarantine_provider_usage(
+                    self.admission_runtime,
+                    lease,
+                    reason="provider-dispatch-or-response-ambiguous",
+                )
+            else:
+                _release_provider_lease(self.admission_runtime, lease)
             raise
 
-        _release_provider_lease(self.admission_runtime, lease)
+        if dispatched:
+            _quarantine_provider_usage(
+                self.admission_runtime,
+                lease,
+                reason="provider-dispatch-or-response-ambiguous",
+            )
+        else:
+            _release_provider_lease(self.admission_runtime, lease)
         raise ProviderInvocationError("model provider request failed") from last_error
 
 
@@ -2781,6 +3299,66 @@ class ProviderRegistry:
         active = os.getenv("AI_PROVIDER", "openai").strip().lower() or "openai"
         timeout = _env_float("AI_TIMEOUT_SECONDS", 45.0, minimum=1.0)
         retries = _env_int("AI_MAX_RETRIES", 2, minimum=0)
+        secondary_values = {
+            "api_key": os.getenv("AI_SECONDARY_API_KEY", "").strip(),
+            "base_url": os.getenv("AI_SECONDARY_BASE_URL", "").strip(),
+            "model": os.getenv("AI_SECONDARY_MODEL", "").strip(),
+        }
+        verification_model = os.getenv(
+            "AI_VERIFICATION_MODEL",
+            "",
+        ).strip()
+
+        if active == "local":
+            if any(secondary_values.values()):
+                raise ProviderUnavailableError(
+                    "local provider mode forbids secondary external provider configuration"
+                )
+            if verification_model:
+                raise ProviderUnavailableError(
+                    "local provider mode forbids semantic verifier configuration"
+                )
+            model_path = os.getenv("AI_LOCAL_MODEL_PATH", "").strip()
+            if not model_path:
+                raise ProviderUnavailableError(
+                    "local provider model artifact is not configured"
+                )
+            try:
+                from skeleton.ai.runtime.inference import (
+                    LocalInferenceEngine,
+                    LocalModelAdapter,
+                    LocalModelArtifactError,
+                    load_local_model_artifact,
+                )
+
+                loaded = load_local_model_artifact(model_path)
+                cache_size = _env_int(
+                    "AI_LOCAL_MODEL_CACHE_SIZE",
+                    128,
+                    minimum=0,
+                )
+                default_seed = _env_int(
+                    "AI_LOCAL_MODEL_SEED",
+                    0,
+                    minimum=0,
+                )
+                local_adapter = LocalModelAdapter(
+                    LocalInferenceEngine(
+                        loaded.model,
+                        cache_size=cache_size,
+                    ),
+                    default_seed=default_seed,
+                    artifact_status=loaded.receipt.as_dict(),
+                )
+            except (LocalModelArtifactError, TypeError, ValueError) as exc:
+                raise ProviderUnavailableError(
+                    "local provider model artifact failed activation"
+                ) from exc
+            return cls(
+                [local_adapter],
+                active="local",
+            )
+
         adapter = OpenAIProviderAdapter(
             timeout_seconds=timeout,
             max_retries=retries,
@@ -2789,11 +3367,6 @@ class ProviderRegistry:
         adapters: list[ProviderAdapter] = [adapter]
         fallback_ids: tuple[str, ...] = ()
 
-        secondary_values = {
-            "api_key": os.getenv("AI_SECONDARY_API_KEY", "").strip(),
-            "base_url": os.getenv("AI_SECONDARY_BASE_URL", "").strip(),
-            "model": os.getenv("AI_SECONDARY_MODEL", "").strip(),
-        }
         configured_secondary = any(secondary_values.values())
         if configured_secondary:
             missing = [
@@ -2832,10 +3405,6 @@ class ProviderRegistry:
             else:
                 fallback_ids = (secondary.provider_id,)
 
-        verification_model = os.getenv(
-            "AI_VERIFICATION_MODEL",
-            "",
-        ).strip()
         verification_adapter = None
         if verification_model and verification_model != adapter.model:
             verification_adapter = OpenAIProviderAdapter(

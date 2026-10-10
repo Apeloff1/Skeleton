@@ -289,3 +289,42 @@ def test_ci_verifier_rejects_workflow_definition_digest_tamper() -> None:
         match="checks digest does not match",
     ):
         SpineCiQualificationVerify().verify(tampered)
+
+
+def test_ci_qualification_identity_is_deterministic_and_exact_head_bound() -> None:
+    first = SpineCiQualification().qualify(
+        receipt=_receipt(),
+        expected_head_sha=HEAD,
+        authenticate=lambda candidate: True,
+    )
+    second = SpineCiQualification().qualify(
+        receipt=_receipt(),
+        expected_head_sha=HEAD,
+        authenticate=lambda candidate: True,
+    )
+    assert first["qualification_identity"] == second["qualification_identity"]
+    assert len(first["qualification_identity"]) == 64
+
+    changed = _receipt()
+    changed["checks"][0]["run_id"] += 1000
+    third = SpineCiQualification().qualify(
+        receipt=changed,
+        expected_head_sha=HEAD,
+        authenticate=lambda candidate: True,
+    )
+    assert third["qualification_identity"] != first["qualification_identity"]
+
+
+def test_ci_verifier_rejects_qualification_identity_tamper() -> None:
+    card = SpineCiQualification().qualify(
+        receipt=_receipt(),
+        expected_head_sha=HEAD,
+        authenticate=lambda candidate: True,
+    )
+    tampered = copy.deepcopy(card)
+    tampered["qualification_identity"] = "0" * 64
+    with pytest.raises(
+        SpineCiQualificationVerifyError,
+        match="qualification identity mismatch",
+    ):
+        SpineCiQualificationVerify().verify(tampered)

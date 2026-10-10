@@ -1,11 +1,20 @@
-"""Compatibility facade for the repository-automation model provider.
+"""Non-owning compatibility facade for the canonical implementation at skeleton.automation.free_model.
 
-Credential and network ownership intentionally remain in
-`skeleton.automation.free_model` while the AI file-tree migration is staged.
-This destination is a pure re-export and must not acquire provider credentials,
-SDK imports, or network behavior of its own.
+This AI-tree surface deliberately owns no provider credentials or network policy.
+Attribute fallback preserves compatibility while the legacy owner remains authoritative
+until explicit migration cutover.
 """
+from __future__ import annotations
 
-from skeleton.automation.free_model import FreeModelClient, ModelError, redact_secrets
+import skeleton.automation.free_model as _impl
+from skeleton.automation.free_model import *  # noqa: F401,F403
 
-__all__ = ["FreeModelClient", "ModelError", "redact_secrets"]
+__all__ = tuple(getattr(_impl, "__all__", tuple(name for name in dir(_impl) if not name.startswith("_"))))
+
+
+def __getattr__(name: str):
+    return getattr(_impl, name)
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(dir(_impl)))

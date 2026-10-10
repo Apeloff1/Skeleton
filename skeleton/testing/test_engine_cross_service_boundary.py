@@ -6,7 +6,7 @@ from fastapi import FastAPI
 import httpx
 import pytest
 
-from core.engine_client import EngineClient, EngineClientConfig
+from core.engine_client import EngineClient, EngineClientConfig, EngineClientError
 from core.engine_text import EngineTextError, EngineTextRequest, execute_engine_text
 from skeleton.api.engine_authority import EngineAuthorityRegistry, EngineServiceGrant
 from skeleton.api.engine_routes import (
@@ -44,7 +44,14 @@ class _Provider:
         self.requests.append(request)
         self.started.set()
         if self.gate is not None:
-            await self.gate.wait()
+            try:
+                await self.gate.wait()
+            except asyncio.CancelledError:
+                # This fixture models an upstream provider request that cannot
+                # be cancelled once dispatched. The runtime must still account
+                # for its eventual receipt while fencing the late result from
+                # becoming final output.
+                await self.gate.wait()
         return ProviderResponse(
             text=self.text,
             provider=self.provider_id,
@@ -173,6 +180,31 @@ async def test_cross_service_golden_journey_and_retry_are_single_execution(tmp_p
     assert status["execution_state"] == "completed"
     assert status["operation_state"] == "completed"
     assert status["result_ref"] == "execution-result:" + first.execution_id
+
+    binding = await client.handoff_binding(
+        first.execution_id,
+        actor_id="backend-ai",
+        tenant_id="tenant-a",
+    )
+    assert binding.execution_id == first.execution_id
+    assert binding.operation_id == first.operation_id
+    assert binding.actor_id == "backend-ai"
+    assert binding.tenant_id == "tenant-a"
+    assert binding.capability == "assistant.compat"
+    assert binding.idempotency_key == request.idempotency_key
+    assert binding.context_id == first.context_id
+    assert binding.context_digest == first.context_digest
+    assert binding.source_snapshot == first.context_source_snapshot
+    assert binding.compiler_version == first.context_compiler_version
+    assert not hasattr(binding, "prompt")
+    assert not hasattr(binding, "instructions")
+
+    with pytest.raises(EngineClientError):
+        await client.handoff_binding(
+            first.execution_id,
+            actor_id="other-actor",
+            tenant_id="tenant-a",
+        )
 
     events = await client.events(
         first.execution_id,

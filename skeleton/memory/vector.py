@@ -14,6 +14,7 @@ by implementing the same `embed(text) -> list[float]` interface.
 from __future__ import annotations
 
 import hashlib
+import heapq
 import math
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -45,6 +46,8 @@ class HashEmbedder:
     """
 
     def __init__(self, dims: int = 256):
+        if isinstance(dims, bool) or not isinstance(dims, int) or dims < 1:
+            raise ValueError("dims must be a positive integer")
         self.dims = dims
 
     def embed(self, text: str) -> List[float]:
@@ -95,7 +98,10 @@ class VectorStore:
         use_asm_acceleration: bool = False,
         asm_accelerator: Any = None,
     ):
+        if isinstance(dims, bool) or not isinstance(dims, int) or dims < 1:
+            raise ValueError("dims must be a positive integer")
         self._embedder_fn: Callable[[str], List[float]] = embedder or HashEmbedder(dims).embed
+        self._dimensions: int | None = dims if embedder is None else None
         self._entries: Dict[str, VectorEntry] = {}
         self._stats = {"added": 0, "queries": 0}
         self._use_jvm_acceleration = bool(use_jvm_acceleration)
@@ -128,6 +134,25 @@ class VectorStore:
             "prepared_invalidations": 0,
         }
 
+    def _embed(self, text: str) -> List[float]:
+        raw = self._embedder_fn(text)
+        if not isinstance(raw, list):
+            raise TypeError("embedder must return list[float]")
+        _unit_norm(raw)
+        dimensions = len(raw)
+        if self._dimensions is None:
+            self._dimensions = dimensions
+        elif dimensions != self._dimensions:
+            raise ValueError(
+                f"embedding dimension drift: expected {self._dimensions}, got {dimensions}"
+            )
+        return [float(value) for value in raw]
+
+    @staticmethod
+    def _validate_top_k(top_k: int) -> None:
+        if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 0:
+            raise ValueError("top_k must be a non-negative integer")
+
     @staticmethod
     def _retention_source_id(chunk: Chunk, explicit_source_id: str | None) -> str:
         source_id = explicit_source_id
@@ -139,7 +164,7 @@ class VectorStore:
         return source_id
 
     def add(self, chunk: Chunk, *, source_id: str | None = None) -> None:
-        vector = self._embedder_fn(chunk.text)
+        vector = self._embed(chunk.text)
         norm = _unit_norm(vector)
         retention_source_id = self._retention_source_id(chunk, source_id)
         self._entries[chunk.chunk_id] = VectorEntry(
@@ -169,12 +194,48 @@ class VectorStore:
             )
         return len(texts)
 
+    @staticmethod
+    def _cosine_similarity(
+        query_vector: List[float],
+        query_norm: float,
+        entry: VectorEntry,
+    ) -> float:
+        dot = sum(q * value for q, value in zip(query_vector, entry.vector))
+        return dot / (query_norm * entry.norm)
+
+    @classmethod
+    def _python_top_k(
+        cls,
+        query_vector: List[float],
+        query_norm: float,
+        candidates: List[VectorEntry],
+        top_k: int,
+    ) -> List[Tuple[float, VectorEntry]]:
+        """Return stable top-k cosine matches without sorting the full corpus."""
+        if top_k <= 0 or not candidates:
+            return []
+        limit = min(top_k, len(candidates))
+        ranked = heapq.nlargest(
+            limit,
+            (
+                (
+                    cls._cosine_similarity(query_vector, query_norm, entry),
+                    -index,
+                    entry,
+                )
+                for index, entry in enumerate(candidates)
+            ),
+            key=lambda item: (item[0], item[1]),
+        )
+        return [(similarity, entry) for similarity, _stable_index, entry in ranked]
+
     def query(self, text: str, top_k: int = 5, metadata_filter: Optional[Dict[str, Any]] = None) -> List[ScoredChunk]:
+        self._validate_top_k(top_k)
         self._stats["queries"] += 1
-        if not self._entries:
+        if top_k == 0 or not self._entries:
             return []
 
-        qv = self._embedder_fn(text)
+        qv = self._embed(text)
         qnorm = _unit_norm(qv)
         candidates = [
             entry
@@ -236,16 +297,10 @@ class VectorStore:
             except Exception:
                 self._asm_acceleration["fallbacks"] += 1
 
-        scored: List[Tuple[float, VectorEntry]] = []
-        for entry in candidates:
-            dot = sum(q * v for q, v in zip(qv, entry.vector))
-            sim = dot / (qnorm * entry.norm)
-            scored.append((sim, entry))
-
-        scored.sort(key=lambda x: x[0], reverse=True)
+        scored = self._python_top_k(qv, qnorm, candidates, top_k)
         return [
-            ScoredChunk(chunk=e.chunk, score=(sim + 1.0) / 2.0, plane="rag")  # map [-1,1] -> [0,1]
-            for sim, e in scored[:top_k]
+            ScoredChunk(chunk=e.chunk, score=(sim + 1.0) / 2.0, plane="rag")
+            for sim, e in scored
         ]
 
     def query_many(
@@ -261,12 +316,13 @@ class VectorStore:
         owns embedding, metadata filtering, stable result construction, stats,
         and the complete fallback path.
         """
+        self._validate_top_k(top_k)
         queries = list(texts)
         if not queries:
             return []
 
         self._stats["queries"] += len(queries)
-        if not self._entries:
+        if top_k == 0 or not self._entries:
             return [[] for _ in queries]
 
         candidates = [
@@ -279,7 +335,7 @@ class VectorStore:
 
         embedded: List[Tuple[List[float], float]] = []
         for text in queries:
-            vector = self._embedder_fn(text)
+            vector = self._embed(text)
             norm = _unit_norm(vector)
             embedded.append((vector, norm))
 
@@ -351,12 +407,12 @@ class VectorStore:
 
         output: List[List[ScoredChunk]] = []
         for query_vector, query_norm in embedded:
-            scored: List[Tuple[float, VectorEntry]] = []
-            for entry in candidates:
-                dot = sum(q * value for q, value in zip(query_vector, entry.vector))
-                similarity = dot / (query_norm * entry.norm)
-                scored.append((similarity, entry))
-            scored.sort(key=lambda item: item[0], reverse=True)
+            scored = self._python_top_k(
+                query_vector,
+                query_norm,
+                candidates,
+                top_k,
+            )
             output.append(
                 [
                     ScoredChunk(
@@ -364,10 +420,76 @@ class VectorStore:
                         score=(similarity + 1.0) / 2.0,
                         plane="rag",
                     )
-                    for similarity, entry in scored[:top_k]
+                    for similarity, entry in scored
                 ]
             )
         return output
+
+    def query_diverse(
+        self,
+        text: str,
+        top_k: int = 5,
+        metadata_filter: Optional[Dict[str, Any]] = None,
+        *,
+        candidate_multiplier: int = 4,
+        diversity: float = 0.35,
+    ) -> List[ScoredChunk]:
+        """Retrieve relevant but non-redundant context with bounded MMR."""
+        self._validate_top_k(top_k)
+        if (
+            isinstance(candidate_multiplier, bool)
+            or not isinstance(candidate_multiplier, int)
+            or candidate_multiplier < 1
+            or candidate_multiplier > 64
+        ):
+            raise ValueError("candidate_multiplier must be an integer within [1, 64]")
+        if (
+            isinstance(diversity, bool)
+            or not isinstance(diversity, (int, float))
+            or not math.isfinite(float(diversity))
+            or not 0.0 <= float(diversity) <= 1.0
+        ):
+            raise ValueError("diversity must be finite and within [0, 1]")
+        if top_k == 0 or not self._entries:
+            return []
+        candidate_limit = min(
+            len(self._entries),
+            max(top_k, top_k * candidate_multiplier),
+        )
+        ranked = self.query(
+            text,
+            top_k=candidate_limit,
+            metadata_filter=metadata_filter,
+        )
+        if len(ranked) <= 1 or float(diversity) == 0.0:
+            return ranked[:top_k]
+        selected: List[int] = [0]
+        remaining = list(range(1, len(ranked)))
+        redundancy = [0.0] * len(ranked)
+        weight = float(diversity)
+        while remaining and len(selected) < top_k:
+            selected_entry = self._entries[ranked[selected[-1]].chunk.chunk_id]
+            for index in remaining:
+                candidate_entry = self._entries[ranked[index].chunk.chunk_id]
+                cosine = self._cosine_similarity(
+                    candidate_entry.vector,
+                    candidate_entry.norm,
+                    selected_entry,
+                )
+                normalized = max(0.0, min(1.0, (cosine + 1.0) / 2.0))
+                redundancy[index] = max(redundancy[index], normalized)
+
+            best_index = max(
+                remaining,
+                key=lambda index: (
+                    (1.0 - weight) * ranked[index].score
+                    - weight * redundancy[index],
+                    -index,
+                ),
+            )
+            selected.append(best_index)
+            remaining.remove(best_index)
+        return [ranked[index] for index in selected]
 
     def query_threshold(
         self,
@@ -396,7 +518,7 @@ class VectorStore:
         if not self._entries:
             return []
 
-        qv = self._embedder_fn(text)
+        qv = self._embed(text)
         qnorm = _unit_norm(qv)
         candidates = [
             entry
@@ -526,7 +648,7 @@ class VectorStore:
 
         embedded: List[Tuple[List[float], float]] = []
         for text in queries:
-            vector = self._embedder_fn(text)
+            vector = self._embed(text)
             norm = _unit_norm(vector)
             embedded.append((vector, norm))
 
@@ -820,5 +942,5 @@ class VectorStore:
         return {
             **self._stats,
             "documents": len(self._entries),
-            "dimensions": len(self._embedder_fn("probe")),
+            "dimensions": self._dimensions or 0,
         }

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-09:editor_recovery:v1",
+  "title": "FLGB-09 editor recovery",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "project_id",
+    "manifest_digest",
+    "snapshot_digest",
+    "journal_digest",
+    "replay_cursor",
+    "recovered_manifest_digest"
+  ],
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "manifest_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "snapshot_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "journal_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "replay_cursor": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "recovered_manifest_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

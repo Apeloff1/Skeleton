@@ -17,7 +17,7 @@ import hashlib
 import math
 import threading
 import time
-from typing import Any
+from typing import Any, Callable
 
 from skeleton.cognition.telemetry import MetricRegistry
 from skeleton.intelligence.admission import (
@@ -56,6 +56,7 @@ class AdmissionRuntimeConflict(AdmissionRuntimeError):
 
 
 _USAGE_CATEGORIES = {"tool", "artifact", "storage", "provider", "other"}
+_UNKNOWN_USAGE_PREFIX = "unknown:"
 _USAGE_FIELDS = (
     "input_tokens",
     "output_tokens",
@@ -93,6 +94,58 @@ def _observe_usage_delta(
         )
 
 
+def _effective_actual_usage(
+    reported: UsageEstimate,
+    quota_completion: QuotaCompletion | None,
+) -> UsageEstimate:
+    """Join reported runtime usage with any larger durable metered usage."""
+
+    if quota_completion is None:
+        return reported
+    observed = quota_completion.actual
+    return UsageEstimate(
+        input_tokens=max(reported.input_tokens, observed.input_tokens),
+        output_tokens=max(reported.output_tokens, observed.output_tokens),
+        cost_usd=max(reported.cost_usd, observed.cost_usd),
+        wall_seconds=reported.wall_seconds,
+        provider_attempts=reported.provider_attempts,
+        tool_calls=max(reported.tool_calls, observed.tool_calls),
+        artifact_bytes=max(
+            reported.artifact_bytes,
+            observed.artifact_bytes,
+        ),
+        storage_bytes=max(
+            reported.storage_bytes,
+            observed.storage_bytes,
+        ),
+    )
+
+
+def _operation_budget_overruns(
+    decision: AdmissionDecision,
+    actual: UsageEstimate,
+) -> tuple[str, ...]:
+    """Return operation-budget dimensions exceeded by terminal actual usage."""
+
+    limits: dict[str, int | float] = {
+        field: (
+            getattr(decision.estimated, field)
+            + decision.remaining[field]
+        )
+        for field in _USAGE_FIELDS
+    }
+    exceeded: list[str] = []
+    for field in _USAGE_FIELDS:
+        value = getattr(actual, field)
+        limit = limits[field]
+        if field in {"cost_usd", "wall_seconds"}:
+            if float(value) > float(limit) + 1e-12:
+                exceeded.append(field)
+        elif int(value) > int(limit):
+            exceeded.append(field)
+    return tuple(exceeded)
+
+
 def _wall_time(value: float | None, *, field: str) -> float:
     number = time.time() if value is None else float(value)
     if not math.isfinite(number) or number < 0:
@@ -115,10 +168,19 @@ def _request_fingerprint(request: AdmissionRequest) -> str:
     return hashlib.sha256(material).hexdigest()
 
 
-def _lease_id(
+def admission_lease_id(
     decision: AdmissionDecision,
     reservation: QuotaReservation | None,
 ) -> str:
+    """Return the deterministic identity of an admission + quota lease."""
+
+    if not isinstance(decision, AdmissionDecision):
+        raise TypeError("decision must be AdmissionDecision")
+    if reservation is not None and not isinstance(
+        reservation,
+        QuotaReservation,
+    ):
+        raise TypeError("reservation must be QuotaReservation")
     material = "\x1f".join(
         (
             decision.decision_id,
@@ -126,6 +188,13 @@ def _lease_id(
         )
     ).encode("utf-8")
     return "lease-" + hashlib.sha256(material).hexdigest()[:24]
+
+
+def _lease_id(
+    decision: AdmissionDecision,
+    reservation: QuotaReservation | None,
+) -> str:
+    return admission_lease_id(decision, reservation)
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,13 +230,31 @@ class AdmissionCompletion:
     lease: AdmissionLease
     quota_completion: QuotaCompletion | None
     completed_at: float
+    effective_actual: UsageEstimate | None = None
+    operation_overrun_dimensions: tuple[str, ...] = ()
+
+    @property
+    def operation_overrun(self) -> bool:
+        return bool(self.operation_overrun_dimensions)
 
     def as_dict(self) -> dict[str, Any]:
+        actual = self.effective_actual
         return {
             "lease_id": self.lease.lease_id,
             "operation_id": self.lease.operation_id,
             "tenant_id": self.lease.tenant_id,
             "completed_at": self.completed_at,
+            "effective_actual": (
+                None
+                if actual is None
+                else {
+                    field: getattr(actual, field)
+                    for field in _USAGE_FIELDS
+                }
+            ),
+            "operation_overrun_dimensions": list(
+                self.operation_overrun_dimensions
+            ),
             "quota": (
                 None
                 if self.quota_completion is None
@@ -299,15 +386,36 @@ class AdmissionRuntime:
                 "tenant_quota_unavailable"
             ) from exc
 
+    def ensure_tenant_quota(self, tenant_id: str) -> None:
+        """Materialize default quota configuration without allocating authority.
+
+        Durable recovery/preflight may need to inspect a tenant before a fresh
+        reservation exists. Creating the tenant's configured quota is metadata
+        initialization only: it does not reserve concurrency, tokens, cost,
+        tool calls, artifact bytes, or storage bytes.
+        """
+
+        tenant = str(tenant_id).strip()
+        if not tenant:
+            raise AdmissionRuntimeError("tenant_id is required")
+        with self._lock:
+            self._ensure_tenant_quota(tenant)
+
     def admit(
         self,
         request: AdmissionRequest,
         *,
         now_monotonic: float | None = None,
         now_wall: float | None = None,
+        decision_sink: Callable[
+            [AdmissionDecision, float],
+            None,
+        ] | None = None,
     ) -> AdmissionLease:
         if not isinstance(request, AdmissionRequest):
             raise TypeError("request must be an AdmissionRequest")
+        if decision_sink is not None and not callable(decision_sink):
+            raise TypeError("decision_sink must be callable")
         wall = _wall_time(now_wall, field="now_wall")
         fingerprint = _request_fingerprint(request)
 
@@ -348,6 +456,13 @@ class AdmissionRuntime:
                 evaluated,
                 now_monotonic=now_monotonic,
             )
+            if decision_sink is not None:
+                try:
+                    decision_sink(decision, wall)
+                except Exception as exc:
+                    raise AdmissionRuntimeError(
+                        "admission_decision_persistence_failed"
+                    ) from exc
 
             shared_lease: SharedPressureLease | None = None
             if self.shared_pressure_ledger is not None:
@@ -408,6 +523,429 @@ class AdmissionRuntime:
                 shared_pressure_lease=shared_lease,
             )
             return lease
+
+    def shared_pressure_lease_for_operation(
+        self,
+        operation_id: str,
+    ) -> SharedPressureLease | None:
+        """Return the process-local shared-pressure receipt for active work."""
+
+        operation = str(operation_id).strip()
+        if not operation:
+            raise AdmissionRuntimeError("operation_id is required")
+        with self._lock:
+            active = self._active.get(operation)
+            if active is None:
+                raise AdmissionRuntimeError(
+                    "operation has no active admission lease"
+                )
+            return active.shared_pressure_lease
+
+    def require_effect_authority(
+        self,
+        operation_id: str,
+        *,
+        now_wall: float | None = None,
+    ) -> AdmissionLease:
+        """Require live authority immediately before an external effect.
+
+        Terminal accounting is intentionally not gated by this method: callers
+        must still be able to reconcile actual usage after a slow or ambiguous
+        effect. Effectful boundaries should call this immediately before
+        dispatch so an expired durable pressure lease cannot authorize new work.
+        """
+
+        operation = str(operation_id).strip()
+        if not operation:
+            raise AdmissionRuntimeError("operation_id is required")
+        wall = _wall_time(now_wall, field="now_wall")
+
+        with self._lock:
+            active = self._active.get(operation)
+            if active is None:
+                raise AdmissionRuntimeError(
+                    "operation has no active admission lease"
+                )
+            shared = active.shared_pressure_lease
+            ledger = self.shared_pressure_ledger
+            if ledger is None:
+                if shared is not None:
+                    raise AdmissionRuntimeConflict(
+                        "active shared pressure lease has no configured ledger"
+                    )
+                return active.lease
+            if shared is None:
+                raise AdmissionRuntimeError(
+                    "effect authority requires shared pressure lease"
+                )
+            finder = getattr(ledger, "lease_for_operation", None)
+            if not callable(finder):
+                raise AdmissionRuntimeError(
+                    "shared pressure ledger does not support live authority lookup"
+                )
+            try:
+                persisted = finder(
+                    self.shared_pressure_scope,
+                    operation,
+                    now=wall,
+                )
+            except SharedPressureError as exc:
+                raise AdmissionRuntimeError(
+                    "effect_authority_unavailable"
+                ) from exc
+            if persisted is None:
+                raise AdmissionRuntimeConflict(
+                    "effect authority expired"
+                )
+            if persisted != shared:
+                raise AdmissionRuntimeConflict(
+                    "effect authority does not match active lease"
+                )
+            return active.lease
+
+    def reattach(
+        self,
+        request: AdmissionRequest,
+        lease: AdmissionLease,
+        *,
+        shared_pressure_lease: SharedPressureLease | None = None,
+        now_wall: float | None = None,
+    ) -> AdmissionLease:
+        """Restore an already-durable lease without re-running admission.
+
+        This is deliberately narrower than admit. It may only restore a lease
+        whose quota reservation still exists exactly in the configured ledger.
+        No quota is reserved and current local pressure is not used to
+        invalidate work already durably admitted before restart.
+        """
+
+        if not isinstance(request, AdmissionRequest):
+            raise TypeError("request must be an AdmissionRequest")
+        if not isinstance(lease, AdmissionLease):
+            raise TypeError("lease must be an AdmissionLease")
+        if (
+            shared_pressure_lease is not None
+            and not isinstance(shared_pressure_lease, SharedPressureLease)
+        ):
+            raise TypeError(
+                "shared_pressure_lease must be SharedPressureLease"
+            )
+        wall = _wall_time(now_wall, field="now_wall")
+        if self.shared_pressure_ledger is None:
+            if shared_pressure_lease is not None:
+                raise AdmissionRuntimeConflict(
+                    "recovered shared pressure lease has no configured ledger"
+                )
+        else:
+            if shared_pressure_lease is None:
+                raise AdmissionRuntimeError(
+                    "shared_pressure_reattach_requires_durable_lease_metadata"
+                )
+            if (
+                shared_pressure_lease.scope != self.shared_pressure_scope
+                or shared_pressure_lease.operation_id != request.operation_id
+                or shared_pressure_lease.tenant_id != request.tenant_id
+                or shared_pressure_lease.owner_id
+                != self.shared_pressure_owner_id
+                or shared_pressure_lease.priority != request.priority
+            ):
+                raise AdmissionRuntimeConflict(
+                    "durable shared pressure lease identity does not match runtime"
+                )
+        if self.quota_ledger is None or lease.quota_reservation is None:
+            raise AdmissionRuntimeError(
+                "durable_reattach_requires_quota_reservation"
+            )
+        if (
+            lease.operation_id != request.operation_id
+            or lease.tenant_id != request.tenant_id
+            or lease.decision.capability != request.capability
+        ):
+            raise AdmissionRuntimeConflict(
+                "durable lease identity does not match request"
+            )
+        if not lease.decision.admitted:
+            raise AdmissionRuntimeConflict(
+                "durable lease is not an admitted decision"
+            )
+        if lease.decision.estimated != request.estimate:
+            raise AdmissionRuntimeConflict(
+                "durable lease estimate does not match request"
+            )
+
+        remaining = lease.decision.remaining
+        required_remaining = {
+            "input_tokens": max(
+                0,
+                request.budget.max_input_tokens
+                - request.estimate.input_tokens,
+            ),
+            "output_tokens": max(
+                0,
+                request.budget.max_output_tokens
+                - request.estimate.output_tokens,
+            ),
+            "cost_usd": max(
+                0.0,
+                request.budget.max_cost_usd
+                - request.estimate.cost_usd,
+            ),
+            "wall_seconds": max(
+                0.0,
+                request.budget.max_wall_seconds
+                - request.estimate.wall_seconds,
+            ),
+            "provider_attempts": max(
+                0,
+                request.budget.max_provider_attempts
+                - request.estimate.provider_attempts,
+            ),
+            "tool_calls": max(
+                0,
+                request.budget.max_tool_calls
+                - request.estimate.tool_calls,
+            ),
+            "artifact_bytes": max(
+                0,
+                request.budget.max_artifact_bytes
+                - request.estimate.artifact_bytes,
+            ),
+            "storage_bytes": max(
+                0,
+                request.budget.max_storage_bytes
+                - request.estimate.storage_bytes,
+            ),
+        }
+        expected_remaining_keys = set(required_remaining) | {
+            "concurrency",
+            "queue_depth",
+        }
+        if set(remaining) != expected_remaining_keys:
+            raise AdmissionRuntimeConflict(
+                "durable lease remaining budget fields do not match request"
+            )
+        for field, expected in required_remaining.items():
+            if remaining[field] != expected:
+                raise AdmissionRuntimeConflict(
+                    "durable lease remaining budget does not match request"
+                )
+        concurrency = remaining["concurrency"]
+        queue_depth = remaining["queue_depth"]
+        if (
+            isinstance(concurrency, bool)
+            or not isinstance(concurrency, int)
+            or concurrency < 0
+            or concurrency > request.budget.max_concurrency
+            or isinstance(queue_depth, bool)
+            or not isinstance(queue_depth, int)
+            or queue_depth < 0
+            or queue_depth > request.budget.max_queue_depth
+        ):
+            raise AdmissionRuntimeConflict(
+                "durable lease pressure remainder is invalid"
+            )
+
+        reservation = lease.quota_reservation
+        if (
+            reservation.operation_id != request.operation_id
+            or reservation.tenant_id != request.tenant_id
+        ):
+            raise AdmissionRuntimeConflict(
+                "durable quota reservation identity does not match request"
+            )
+        if lease.lease_id != _lease_id(
+            lease.decision,
+            reservation,
+        ):
+            raise AdmissionRuntimeConflict(
+                "durable lease id does not match decision and reservation"
+            )
+        expected_quota = reservation.estimate
+        if (
+            expected_quota.operations != 1
+            or expected_quota.input_tokens != request.estimate.input_tokens
+            or expected_quota.output_tokens != request.estimate.output_tokens
+            or expected_quota.cost_usd != request.estimate.cost_usd
+            or expected_quota.tool_calls != request.estimate.tool_calls
+            or expected_quota.artifact_bytes != request.estimate.artifact_bytes
+            or expected_quota.storage_bytes != request.estimate.storage_bytes
+        ):
+            raise AdmissionRuntimeConflict(
+                "durable quota estimate does not match request"
+            )
+
+        recovery_reader = getattr(
+            self.quota_ledger,
+            "recovery_state_for_operation",
+            None,
+        )
+        if not callable(recovery_reader):
+            raise AdmissionRuntimeError(
+                "quota ledger does not support atomic durable recovery lookup"
+            )
+
+        fingerprint = _request_fingerprint(request)
+        with self._lock:
+            current = self._active.get(request.operation_id)
+            if current is not None:
+                if (
+                    current.request_fingerprint != fingerprint
+                    or current.lease != lease
+                    or current.shared_pressure_lease
+                    != shared_pressure_lease
+                ):
+                    raise AdmissionRuntimeConflict(
+                        "operation already has a different active admission lease"
+                    )
+                return current.lease
+
+            if self.shared_pressure_ledger is not None:
+                shared_finder = getattr(
+                    self.shared_pressure_ledger,
+                    "lease_for_operation",
+                    None,
+                )
+                if not callable(shared_finder):
+                    raise AdmissionRuntimeError(
+                        "shared pressure ledger does not support durable lease lookup"
+                    )
+                try:
+                    persisted_shared = shared_finder(
+                        self.shared_pressure_scope,
+                        request.operation_id,
+                        now=wall,
+                    )
+                except SharedPressureError as exc:
+                    raise AdmissionRuntimeError(
+                        "durable_shared_pressure_unavailable"
+                    ) from exc
+                if persisted_shared is None:
+                    raise AdmissionRuntimeConflict(
+                        "durable shared pressure lease is no longer active"
+                    )
+                if persisted_shared != shared_pressure_lease:
+                    raise AdmissionRuntimeConflict(
+                        "durable shared pressure lease does not match journal"
+                    )
+
+            try:
+                recovery_state = recovery_reader(
+                    request.tenant_id,
+                    request.operation_id,
+                )
+            except QuotaError as exc:
+                raise AdmissionRuntimeError(
+                    "durable_recovery_state_unavailable"
+                ) from exc
+            if recovery_state is None:
+                raise AdmissionRuntimeConflict(
+                    "durable quota reservation is no longer active"
+                )
+            persisted, unresolved = recovery_state
+            if persisted != reservation:
+                raise AdmissionRuntimeConflict(
+                    "durable quota reservation does not match lease"
+                )
+
+            recovered_unknown: dict[str, UnknownUsageMarker] = {}
+            for event in unresolved:
+                if (
+                    event.reservation_id != reservation.reservation_id
+                    or event.operation_id != request.operation_id
+                    or not event.category.startswith(
+                        _UNKNOWN_USAGE_PREFIX
+                    )
+                ):
+                    raise AdmissionRuntimeConflict(
+                        "durable unknown usage identity is invalid"
+                    )
+                category = event.category[len(_UNKNOWN_USAGE_PREFIX):]
+                if category not in _USAGE_CATEGORIES:
+                    raise AdmissionRuntimeConflict(
+                        "durable unknown usage category is invalid"
+                    )
+                recovered_unknown[event.event_id] = UnknownUsageMarker(
+                    event_id=event.event_id,
+                    operation_id=request.operation_id,
+                    category=category,
+                    reason="durable-unknown-usage-recovered",
+                    recorded_at=event.recorded_at,
+                )
+
+            self._active[request.operation_id] = _ActiveLease(
+                lease=lease,
+                request_fingerprint=fingerprint,
+                unknown_usage=recovered_unknown,
+                shared_pressure_lease=shared_pressure_lease,
+            )
+            self.metrics_registry.inc("admission.reattached_total")
+            if recovered_unknown:
+                self.metrics_registry.inc(
+                    "admission.unknown_usage_reattached_total",
+                    len(recovered_unknown),
+                )
+            return lease
+
+    def settle_shared_pressure_recovery(
+        self,
+        lease: SharedPressureLease | None,
+        *,
+        now_wall: float | None = None,
+    ) -> SharedPressureLease | None:
+        """Release exact durable pressure authority during terminal recovery."""
+
+        ledger = self.shared_pressure_ledger
+        owner = self.shared_pressure_owner_id
+        scope = self.shared_pressure_scope
+        if lease is None:
+            if ledger is None:
+                return None
+            raise AdmissionRuntimeError(
+                "shared_pressure_recovery_metadata_missing"
+            )
+        if ledger is None or owner is None or scope is None:
+            raise AdmissionRuntimeError(
+                "shared_pressure_recovery_runtime_missing"
+            )
+        if (
+            lease.scope != scope
+            or lease.owner_id != owner
+        ):
+            raise AdmissionRuntimeConflict(
+                "shared pressure recovery lease identity does not match runtime"
+            )
+
+        finder = getattr(ledger, "lease_for_operation", None)
+        if not callable(finder):
+            raise AdmissionRuntimeError(
+                "shared pressure ledger does not support durable lease lookup"
+            )
+        try:
+            persisted = finder(
+                scope,
+                lease.operation_id,
+                now=_wall_time(now_wall, field="now_wall"),
+            )
+        except SharedPressureError as exc:
+            raise AdmissionRuntimeError(
+                "shared_pressure_recovery_lookup_failed"
+            ) from exc
+
+        if persisted is None:
+            # Expiry/reaping is already a terminal release of shared capacity.
+            return None
+        if persisted != lease:
+            raise AdmissionRuntimeConflict(
+                "shared pressure recovery lease does not match durable ledger"
+            )
+        try:
+            return ledger.release(lease.lease_id, owner)
+        except SharedPressureConflict as exc:
+            raise AdmissionRuntimeConflict(str(exc)) from exc
+        except SharedPressureError as exc:
+            raise AdmissionRuntimeError(
+                "shared_pressure_recovery_release_failed"
+            ) from exc
 
     def _release_shared_pressure(
         self,
@@ -620,10 +1158,21 @@ class AdmissionRuntime:
 
             existing = active.unknown_usage.get(event)
             if existing is not None:
-                if (
-                    existing.category != normalized_category
-                    or existing.reason != normalized_reason
-                ):
+                if existing.category != normalized_category:
+                    raise AdmissionRuntimeConflict(
+                        "unknown usage event replayed with different inputs"
+                    )
+                if existing.reason == "durable-unknown-usage-recovered":
+                    restored = UnknownUsageMarker(
+                        event_id=existing.event_id,
+                        operation_id=existing.operation_id,
+                        category=existing.category,
+                        reason=normalized_reason,
+                        recorded_at=existing.recorded_at,
+                    )
+                    active.unknown_usage[event] = restored
+                    return restored
+                if existing.reason != normalized_reason:
                     raise AdmissionRuntimeConflict(
                         "unknown usage event replayed with different inputs"
                     )
@@ -758,26 +1307,47 @@ class AdmissionRuntime:
                         "quota_completion_unavailable"
                     ) from exc
 
+            effective_actual = _effective_actual_usage(
+                actual,
+                quota_completion,
+            )
+            operation_overruns = _operation_budget_overruns(
+                active.lease.decision,
+                effective_actual,
+            )
+
             if active.shared_pressure_lease is not None:
                 self._release_shared_pressure(
                     active.shared_pressure_lease
                 )
             self.metrics_registry.inc("admission.completed_total")
+            if operation_overruns:
+                self.metrics_registry.inc(
+                    "admission.operation_overrun_total"
+                )
+                for dimension in operation_overruns:
+                    self.metrics_registry.inc(
+                        "admission.operation_overrun."
+                        + dimension
+                        + "_total"
+                    )
             _observe_usage(
                 self.metrics_registry,
                 "actual",
-                actual,
+                effective_actual,
             )
             _observe_usage_delta(
                 self.metrics_registry,
                 active.lease.decision.estimated,
-                actual,
+                effective_actual,
             )
             self._active.pop(operation)
             return AdmissionCompletion(
                 lease=active.lease,
                 quota_completion=quota_completion,
                 completed_at=wall,
+                effective_actual=effective_actual,
+                operation_overrun_dimensions=operation_overruns,
             )
 
     def release(
@@ -846,4 +1416,5 @@ __all__ = [
     "AdmissionRuntimeConflict",
     "AdmissionRuntimeError",
     "UnknownUsageMarker",
+    "admission_lease_id",
 ]

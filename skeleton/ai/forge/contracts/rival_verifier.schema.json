@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-17:rival_verifier:v1",
+  "title": "FLGB-17 rival verifier",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "verification_id",
+    "proposal_digest",
+    "challenge_digest",
+    "quality_ppm",
+    "risk_ppm",
+    "rights_clear",
+    "verifier_id",
+    "evidence_digest"
+  ],
+  "properties": {
+    "verification_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "proposal_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "challenge_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "quality_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "risk_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "rights_clear": {
+      "type": "boolean"
+    },
+    "verifier_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "evidence_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
