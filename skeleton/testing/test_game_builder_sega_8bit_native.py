@@ -284,3 +284,41 @@ def test_animated_original_familiar_has_actual_native_sprite_graphics_and_audio(
     assert manifest["emulator_playthrough_verified"] is False
     assert manifest["physical_hardware_verified"] is False
     assert manifest["release_approved"] is False
+
+
+
+@pytest.mark.parametrize("target",("sega_master_system","sega_game_gear"))
+def test_original_native_console_has_replay_preserving_accessibility_and_pause(target):
+    world=_world()
+    plain=compile_native_sega_8bit(world,_rights(world),target,authorized=True)
+    accessible=compile_native_sega_8bit(
+        world,_rights(world),target,authorized=True,
+        reduced_motion=True,audio_enabled=False,
+    )
+    assert plain.content_digest!=accessible.content_digest
+    baseline=json.loads(plain.manifest_json)
+    settings=json.loads(accessible.manifest_json)
+    assert baseline["world_digest"] == settings["world_digest"] == world.digest
+    assert baseline["reference_safe_replay_digest"] == settings["reference_safe_replay_digest"]
+    assert settings["default_audio_enabled"] is False
+    assert settings["default_reduced_motion"] is True
+    assert settings["companion_progression_changes_core_gameplay"] is False
+    assert "reduced_motion=1;" in accessible.game_c
+    assert "sound_enabled=0;" in accessible.game_c
+    assert "reduced_motion=0;" in plain.game_c
+    assert "sound_enabled=1;" in plain.game_c
+    assert "SMS_getKeysPressed();" in accessible.game_c
+    assert "if (paused || won || lost || pending_count) continue;" in accessible.game_c
+    assert "if (reduced_motion) return;" in accessible.game_c
+    assert "if (!sound_enabled) return;" in accessible.game_c
+    assert "PSG_PORT=0x9F" in accessible.game_c
+    assert "GG_KEY_START" in accessible.game_c
+    assert "PORT_A_KEY_2" in accessible.game_c
+    assert settings["native_joypad_pause_controls"] is True
+    assert settings["native_sound_toggle_controls"] is True
+    for bad in ("yes",1,None):
+        with pytest.raises(Sega8BitNativeError,match="boolean"):
+            compile_native_sega_8bit(
+                world,_rights(world),target,authorized=True,
+                reduced_motion=bad,
+            )
