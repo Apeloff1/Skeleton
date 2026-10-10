@@ -71,3 +71,11 @@ def test_lfsr_noise_replays_seed_without_unbounded_state():
     assert set(first)=={-32767,32767}
     with pytest.raises(AudioKernelError):
         noise_lfsr_pcm(0,1)
+
+def test_adsr_envelope_respects_phase_lengths_and_release_zero():
+    env=adsr_envelope(10,attack=2,decay=2,sustain=16384,release=2)
+    assert env[0]<env[1]==32767
+    assert env[3]==16384
+    assert env[5]==16384 and env[-1]==0
+    with pytest.raises(AudioKernelError):
+        adsr_envelope(4,attack=2,decay=2,sustain=1000,release=1)
