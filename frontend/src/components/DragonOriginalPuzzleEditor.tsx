@@ -92,6 +92,13 @@ export default function DragonOriginalPuzzleEditor({
   const fetchEpoch = React.useRef(0);
   const hintEpoch = React.useRef(0);
   const [liveHint, setLiveHint] = React.useState('');
+  const routeEpoch = React.useRef(0);
+  const [routeBusy, setRouteBusy] = React.useState(false);
+  const [selectedRoute, setSelectedRoute] = React.useState<string | null>(null);
+  const [routeChoices, setRouteChoices] = React.useState<Array<{
+    path: string; moves: number; pushes: number;
+    visited_cells: number; risky_pushes: number; variation: string; solver: string;
+  }> | null>(null);
   const [hintBusy, setHintBusy] = React.useState(false);
 
   React.useEffect(() => {
@@ -153,6 +160,13 @@ export default function DragonOriginalPuzzleEditor({
     })();
     return () => { cancelled = true; controller.abort(); };
   }, [enabled, stages, onApprovedLevels]);
+
+  React.useEffect(() => {
+    routeEpoch.current += 1;
+    setRouteBusy(false);
+    setRouteChoices(null);
+    setSelectedRoute(null);
+  }, [boards, current, validated]);
 
   if (!enabled) return null;
 
@@ -430,16 +444,63 @@ export default function DragonOriginalPuzzleEditor({
     }
   };
 
-  const walkthrough = validated?.stages[current]?.shortest_solution ?? '';
-  const beginWalkthrough = () => {
-    if (busy || validating || !validated || !boards[current] || !walkthrough) return;
+  const walkthrough = selectedRoute ??
+    validated?.stages[current]?.shortest_solution ?? '';
+  const findAlternatives = async () => {
+    if (!validated || !boards[current] || routeBusy || busy || validating) return;
+    const generation = ++routeEpoch.current;
+    setRouteBusy(true);
+    setRouteChoices(null);
+    try {
+      const response=await fetch(ENDPOINT + '/multiple-routes', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        cache: 'no-store',
+        body: JSON.stringify({ rows: boards[current],
+                               max_routes: 4, search_budget: 4000 }),
+      });
+      if (!response.ok) throw new Error('Multiple original routes could not be proven.');
+      const result=await response.json() as {
+        ok: boolean; routes: unknown[]; exhaustive_alternatives: boolean;
+      };
+      if (!result.ok || !Array.isArray(result.routes) ||
+          result.routes.length<1 || result.routes.length>4 ||
+          result.exhaustive_alternatives!==false ||
+          result.routes.some((route: unknown) => {
+            if (!route || typeof route!=='object') return true;
+            const value=route as Record<string,unknown>;
+            return typeof value.path!=='string' ||
+              !/^[wasd]{1,400}$/.test(value.path) ||
+              value.moves !==value.path.length ||
+              typeof value.pushes!=='number' ||
+              typeof value.visited_cells!=='number' ||
+              typeof value.risky_pushes!=='number' ||
+              typeof value.variation!=='string' ||
+              typeof value.solver!=='string';
+          })) throw new Error('Native multiple-route evidence was incomplete.');
+      if (generation===routeEpoch.current) {
+        setRouteChoices(result.routes as NonNullable<typeof routeChoices>);
+      }
+    } catch (error) {
+      if (generation===routeEpoch.current)
+        setStatus(error instanceof Error ? error.message : 'Alternate game route search failed.');
+    } finally {
+      if (generation===routeEpoch.current) setRouteBusy(false);
+    }
+  };
+
+  const beginWalkthrough = (alternate?: string) => {
+    const chosen=alternate ?? walkthrough;
+    if (busy || validating || !validated || !boards[current] ||
+        !/^[wasd]{1,400}$/.test(chosen)) return;
     try {
       hintEpoch.current += 1;
     setHintBusy(false);
       setLiveHint('');
       setPlay(parseNativeBoard(boards[current]));
       setDemoCursor(0);
-      setStatus('Follow the independently solved shortest route, one actual game move at a time.');
+      setSelectedRoute(chosen);
+      setStatus('Following the selected independently solved original game route.');
     } catch {
       setStatus('The original game board could not be replayed.');
     }
@@ -577,6 +638,40 @@ export default function DragonOriginalPuzzleEditor({
           {play ? 'Exit local game playtest' : 'Play-test my original game board'}
         </Text>
       </TouchableOpacity>
+      {validated && (
+        <View style={styles.results}>
+          <TouchableOpacity accessibilityRole="button"
+            disabled={routeBusy || busy || validating}
+            onPress={findAlternatives} style={styles.fileButton}>
+            <Text style={styles.actionText}>
+              {routeBusy ? 'Comparing independent route solvers…' :
+                'Explore genuinely different ways to win'}
+            </Text>
+          </TouchableOpacity>
+          {routeChoices && <>
+            <Text style={styles.help}>
+              {routeChoices.length} verified routes located; unobserved alternatives
+              remain possible. Distinct crate strategies and different
+              navigation are identified separately.
+            </Text>
+            {routeChoices.map((choice,index) => (
+              <TouchableOpacity key={choice.path+index}
+                accessibilityRole="button"
+                onPress={() => beginWalkthrough(choice.path)}
+                style={styles.fileButton}>
+                <Text style={styles.actionText}>
+                  {index+1}. {choice.variation.replace(/_/g,' ')}
+                  {' · '}{choice.moves} moves · {choice.pushes} pushes
+                </Text>
+                <Text style={styles.help}>
+                  {choice.solver} · {choice.visited_cells} locations
+                  {' · '}{choice.risky_pushes} near-wall pushes
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </>}
+        </View>
+      )}
       {validated && !!walkthrough && (
         <TouchableOpacity accessibilityRole="button"
           disabled={busy || validating}
