@@ -325,3 +325,12 @@ def test_route_coverage_is_fraction_of_safe_map_not_elapsed_steps():
     assert route_coverage_ppm(p, proof) == expected
     assert 0 < expected < 1_000_000
 
+
+def test_collectible_spread_uses_walkable_distance_not_wall_ignoring_geometry():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    d = objective_dispersion(p)
+    assert d["pairs"] == 3
+    assert d["minimum_steps"] == 3
+    assert d["maximum_steps"] == 6
+    assert d["mean_steps_ppm"] == 4_000_000
+
