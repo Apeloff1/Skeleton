@@ -10,7 +10,7 @@ from .dragon_retro_assets import BITMAPS
 PIXELS=("dragon","dragon_blink","dragon_walk","star")
 SCHEMA="skeleton.ai.dragon.original_native_sdl_puzzle.v1"
 
-C_GRAPHICS=r'''/* Original Dragon graphical native game, no WebView/HTML layer.
+C_GRAPHICS=r'''/* Original Dragon SDL2 graphical native game, no WebView/HTML layer.
    All movement and goals use the same real game engine as main.c. */
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
