@@ -29,6 +29,7 @@ from .dos_native_export import compile_native_dos, export_native_dos
 from .atari8_native_export import compile_native_atari8, export_native_atari8
 from .apple2_native_export import compile_native_apple2, export_native_apple2
 from .spectrum_native_export import compile_native_spectrum, export_native_spectrum
+from .sega_8bit_native_export import compile_native_sega_8bit, export_native_sega_8bit
 from .msx1_native_export import compile_native_msx1, export_native_msx1
 from .platform_registry import default_registry
 from .playable_simulation import demonstrate_solvable
@@ -47,6 +48,8 @@ _NATIVE = {
     "atari_400_800": "atari8_cc65",
     "apple_ii": "apple2_cc65",
     "sinclair_zx_spectrum": "spectrum_z80asm",
+    "sega_master_system": "sms_sdcc_z80",
+    "sega_game_gear": "gg_sdcc_z80",
     "msx1": "msx1_z80asm",
 }
 
@@ -130,6 +133,11 @@ def build_game(
         project = compile_native_spectrum(world, source, authorized=True)
         folder = export_native_spectrum(project, output, authorized=True)
         artifact_type = "native_spectrum_48k_z80_tap_source"
+        digest = project.content_digest
+    elif kind in ("sms_sdcc_z80", "gg_sdcc_z80"):
+        project = compile_native_sega_8bit(world, source, target, authorized=True)
+        folder = export_native_sega_8bit(project, output, authorized=True)
+        artifact_type = "native_sega_8bit_sdcc_vdp_original_game_source"
         digest = project.content_digest
     elif kind == "msx1_z80asm":
         project = compile_native_msx1(world, source, authorized=True)
