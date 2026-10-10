@@ -12,7 +12,8 @@ from hashlib import sha256
 import json
 from pathlib import Path
 
-from skeleton.ai.game_builder.sega_8bit_rom import validate_rom_file
+from skeleton.ai.game_builder.sega_8bit_rom import validate_rom_file, validate_rom
+from skeleton.ai.game_builder.native_release_intake import _read_bounded
 
 MAX_INSTRUCTIONS = 3_000_000
 DEFAULT_FRAME_INSTRUCTIONS = 25000
@@ -191,10 +192,11 @@ def boot_rom(
         raise SDCCSegaBootError("invalid bounded instruction limit")
     if type(frame_instructions) is not int or not 500 <= frame_instructions <= 100_000:
         raise SDCCSegaBootError("invalid synthetic VBlank cadence")
-    actual = validate_rom_file(path, target)
-    binary = path.read_bytes()  # path was validated above; digest is rechecked below
-    if sha256(binary).hexdigest() != actual["sha256"]:
-        raise SDCCSegaBootError("cartridge bytes changed after validation")
+    # Intake once, with the repository's no-follow descriptor reader.
+    # Do not reopen the path after checking it: a concurrent symlink swap
+    # could otherwise change which bytes the Z80 CPU actually executes.
+    binary = _read_bounded(path, max_bytes=32768)
+    actual = validate_rom(binary, target)
     try:
         from z80_python import Z80CPU
     except ImportError as exc:
