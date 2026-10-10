@@ -156,6 +156,36 @@ def test_image_and_audio_findings_are_separate_and_cannot_auto_clear():
     assert report.release_permitted is False
 
 
+@pytest.mark.parametrize("mutation", [
+    {"legal_infringement_determined": True},
+    {"matched_bytes": False},
+    {"reference_sha256": "0" * 64},
+    {"media_similarity_score": float("nan")},
+    {"media_similarity_score": 1.3},
+    {"signal": "LEGAL_ORIGINALITY_CERTIFIED"},
+    {"submitted_id": ""},
+    {"category": "source_code"},
+])
+def test_media_review_evidence_cannot_forge_legal_or_bytes_certainty(mutation):
+    matching = compare_media(
+        fingerprint_image("submission", synthetic_png()),
+        fingerprint_image("reference", synthetic_png()),
+    )
+    assert isinstance(matching, MediaMatchEvidence)
+    with pytest.raises(MediaScreenError):
+        replace(matching, **mutation)
+
+
+def test_perceptual_media_signal_remains_advisory_not_a_legal_decision():
+    matching = compare_media(
+        fingerprint_wav("submission", synthetic_wav()),
+        fingerprint_wav("other", synthetic_wav()),
+    )
+    assert matching is not None
+    assert matching.signal == "EXACT_MEDIA_BYTES"
+    assert matching.legal_infringement_determined is False
+
+
 def test_media_can_be_compared_without_storing_third_party_bytes_in_report():
     s = fingerprint_wav("own-music", synthetic_wav())
     r = fingerprint_wav("other-music", synthetic_wav(invert_envelope=True))
