@@ -34,7 +34,7 @@ def doc(letter: str) -> ReviewedDocument:
             start=0, end=len("Original input buffering"),
             stance="supports", confidence_ppm=900000,
             dependence_group="publisher-" + letter,
-            tags=("input", "buffering"),
+            tags=("buffering", "input"),
         ),),
     )
 
