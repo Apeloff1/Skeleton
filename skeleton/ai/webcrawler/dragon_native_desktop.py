@@ -175,6 +175,27 @@ def _puzzle_proof(source_archive: bytes) -> tuple[dict, dict[str, str]]:
             raise ValueError("native puzzle level proof hashes changed")
         if row.get("optimal_within_abstract_grid") is not True:
             raise ValueError("puzzle optimality scope absent")
+    from .dragon_native_multipath import verify_route_report
+    from .dragon_native_challenge_director import (
+        make_challenge_plan,challenge_report,
+    )
+    routes=proof.get("route_analysis")
+    if not isinstance(routes,list) or len(routes)!=len(rows):
+        raise ValueError("native puzzle independent path diversity missing")
+    for index,route_entry in enumerate(routes):
+        if not isinstance(route_entry,dict) or route_entry.get("stage")!=index:
+            raise ValueError("native stage route evidence ordering changed")
+        board=(authored.levels[index].rows if authored is not None else
+               transformed_level(index,expected_seed,difficulty,
+                                 procedural=procedural))
+        verify_route_report(board,route_entry)
+    plan=make_challenge_plan(
+        tuple(routes),
+        profile=proof.get("challenge_profile", "balanced"),
+        branching=campaign.mode=="branching" and len(rows)>=3,
+    )
+    if json.loads(json.dumps(challenge_report(plan)))!=proof.get("challenge_director"):
+        raise ValueError("native intended game challenge curve evidence differs")
     # Independently regenerate the canonical C99 executable, level header
     # and entire proof from the verified authored/generated map specification.
     # A recomputed ZIP SHA alone could otherwise conceal modified native code
