@@ -99,8 +99,12 @@ def _adapt_portable_design(request: "ProductionRequest", target_id: str):
         adjustments.append("search_budget_reduced_to_one_candidate")
     if palette != profile.palette:
         adjustments.append("palette_adapted_to_cartridge_safe_class")
-    if desktop and request.style=="world_route_adventure":
+    if desktop and request.style in ("world_route_adventure","maze_route_adventure"):
         adjustments.append("original_route_world_is_one_free_roam_goal_not_multistage_puzzle_campaign")
+        if request.style=="maze_route_adventure":
+            adjustments.append("maze_grid_is_6_by_6_and_all_rooms_have_independent_completion_proofs")
+            adjustments.append("maze_completion_requires_restart_after_exhausting_arbitrary_action_budgets")
+            adjustments.append("scenic_secret_and_detour_geometry_generated_from_original_seed")
         adjustments.append("art_theme_hero_and_candidate_budget_not_yet_used_by_abstract_route_emitter")
         adjustments.append("world_mode_simulates_traversal_not_vehicle_specific_physics")
     if not desktop:
