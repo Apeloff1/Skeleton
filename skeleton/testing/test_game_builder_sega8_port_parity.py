@@ -93,6 +93,10 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
                 "source_content_digest": str(index) * 64,
                 "world_digest": WORLD, "original_controller_actions_verified": 256,
                 "original_levels_verified": 3,
+                "original_reference_final_score": 390,
+                "original_reference_final_companion_rank": 2,
+                "original_reference_final_stage_index": 2,
+                "original_reference_final_gems_remaining": 0,
                 "authoritative_reference_sha256": str(index + 6) * 64,
                 "full_console_emulator_playthrough_verified": False,
                 "physical_hardware_verified": False, "release_approved": False,
@@ -141,6 +145,11 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
             "native_attract_demo_performed_first_original_move": True,
             "native_attract_demo_user_cancel_restored_game": True,
             "original_levels_replayed": 3,
+            "native_z80_vdp_final_score": 390,
+            "native_z80_vdp_final_companion_rank": 2,
+            "native_z80_vdp_final_stage_index": 2,
+            "native_z80_vdp_final_gems_remaining": 0,
+            "native_z80_vdp_final_health": 4,
             "controller_actions_replayed": 256,
             "hardware_screen_states_verified": 257,
             "semantic_controller_screen_trace_sha256": "f"*64,
@@ -201,6 +210,10 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
             "source_content_digest": str(index+6)*64,
             "authoritative_reference_sha256": str(index+3)*64,
             "original_levels_verified": 8,
+            "original_reference_final_score": 1280,
+            "original_reference_final_companion_rank": 7,
+            "original_reference_final_stage_index": 7,
+            "original_reference_final_gems_remaining": 0,
             "original_controller_actions_verified": 1100,
             "original_demo_controller_actions_verified": 1100,
             "original_demo_screen_trace_sha256": "5"*64,
@@ -229,6 +242,11 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
             "source_content_digest": str(index+6)*64,
             "original_route_sha256": str(index+3)*64,
             "original_levels_replayed": 8,
+            "native_z80_vdp_final_score": 1280,
+            "native_z80_vdp_final_companion_rank": 7,
+            "native_z80_vdp_final_stage_index": 7,
+            "native_z80_vdp_final_gems_remaining": 0,
+            "native_z80_vdp_final_health": 4,
             "controller_actions_replayed": 1100,
             "hardware_screen_states_verified": 1101,
             "semantic_controller_screen_trace_sha256": "6"*64,
@@ -279,6 +297,8 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     assert receipt["original_on_cartridge_demo_equivalent_across_platforms"] is True
     assert receipt["original_stage_hardware_color_parity_verified"] is True
     assert receipt["extended_eight_worlds_gameplay_parity_verified"] is True
+    assert receipt["extended_eight_worlds_final_score_from_guest_z80"] == 1280
+    assert receipt["extended_eight_worlds_final_companion_rank_from_guest_z80"] == 7
     assert receipt["extended_eight_worlds_autonomous_replay_verified_on_both_platforms"] is True
     assert receipt["extended_eight_worlds_native_controller_actions_verified_per_platform"] == 1100
     assert receipt["extended_eight_worlds_original_world_digest"] == "8"*64
@@ -328,6 +348,13 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     ("ext_boot", "hardware_boot_smoke_verified", False),
     ("ext_boot", "rom_sha256", "0"*64),
     ("ext_guest", "original_levels_replayed", 7),
+    ("ext_guest", "native_z80_vdp_final_score", 1270),
+    ("ext_guest", "native_z80_vdp_final_companion_rank", 6),
+    ("ext_guest", "native_z80_vdp_final_gems_remaining", 1),
+    ("ext_host", "original_reference_final_score", 1281),
+    ("ext_host", "original_reference_final_companion_rank", 6),
+    ("native_route", "native_z80_vdp_final_score", 0),
+    ("host", "original_reference_final_score", 391),
     ("ext_guest", "controller_actions_replayed", 200),
     ("ext_guest", "original_companion_rank_and_reward_verified", False),
     ("ext_guest", "native_attract_demo_full_solution_verified_on_guest_z80", False),
