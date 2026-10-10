@@ -125,6 +125,9 @@ def test_retry_is_bounded_and_backed_off():
     assert e.step(now=5) is None
     assert e.step(now=6) is None
     assert len(f.calls) == 3
+    # A failed network operation still consumes the global crawl budget;
+    # otherwise a repeatedly failing legacy fetcher can evade request caps.
+    assert e.budget.requests == 3
 
 
 def test_robots_bootstrap_is_self_directed_and_budgeted():
