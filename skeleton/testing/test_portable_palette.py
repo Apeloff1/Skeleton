@@ -14,3 +14,11 @@ def test_rgb555_packs_each_channel_into_5_bits():
     with pytest.raises(PaletteError):
         encode_rgb555((True,0,0))
 
+
+def test_rgb555_roundtrip_quantization_bounded():
+    for r,g,b in ((0,0,0),(255,255,255),(17,127,233)):
+        decoded=decode_rgb555(encode_rgb555((r,g,b)))
+        assert all(abs(a-b)<=5 for a,b in zip((r,g,b),decoded))
+    with pytest.raises(PaletteError):
+        decode_rgb555(0x8000)
+
