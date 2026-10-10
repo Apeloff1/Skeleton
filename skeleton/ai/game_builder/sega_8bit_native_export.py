@@ -72,6 +72,7 @@ static unsigned int score;
 static unsigned char companion_clock, companion_mood, companion_drawn, mood_hold;
 static unsigned char hero_pose;
 static unsigned char bond_collected, bond_rank;
+static unsigned char paused, reduced_motion, sound_enabled;
 static unsigned char sound_frames, sound_phase;
 static const unsigned char bond_goal[7] = { 3, 7, 12, 18, 25, 33, 42 };
 __sfr __at (0x7F) PSG_PORT;
@@ -117,6 +118,7 @@ static void flush_pending(void) {
 /* Three-channel PSG-compatible hardware; isolated channel 0 for short,
  * self-authored notes. All writes are SDCC Z80 hardware I/O, never samples. */
 static void psg_start(unsigned int period, unsigned char frames) {
+    if (!sound_enabled) return;
     PSG_PORT=(unsigned char)(0x80 | (period & 15));
     PSG_PORT=(unsigned char)((period >> 4) & 63);
     PSG_PORT=0x9C; /* attenuated channel-0 volume, not a loud tone */
@@ -195,13 +197,14 @@ static void render_following_sprite(void) {
     unsigned int y=(unsigned int)(TOP+hero_y)*8U;
     SMS_initSprites();
     if (y>=13U && x<=247U) {
-        y-=((companion_clock & 16) ? 10U : 12U);
+        y-=reduced_motion ? 11U : ((companion_clock & 16) ? 10U : 12U);
         SMS_addSprite((unsigned char)x,(unsigned char)y,companion_mood);
     }
     SMS_copySpritestoSAT();
 }
 static void animate_companion(void) {
     unsigned char pose;
+    if (reduced_motion) return;
     ++companion_clock;
     if (mood_hold) {
         --mood_hold;
@@ -292,7 +295,7 @@ static void advance(int dx, int dy) {
     queue_hud(tile);
 }
 void main(void) {
-    unsigned int keys;
+    unsigned int keys, pressed;
     SMS_displayOff();
     SMS_loadTiles(original_tiles, 0, sizeof(original_tiles));
     SMS_useFirstHalfTilesforSprites(1);
@@ -324,15 +327,39 @@ void main(void) {
     bond_rank=bond_collected=0;
     companion_mood=BUDDY_IDLE;
     sound_frames=0;
+    reduced_motion=__DEFAULT_REDUCED_MOTION__;
+    sound_enabled=__DEFAULT_AUDIO_ENABLED__;
+    paused=0;
     PSG_PORT=0x9F;
     load_level();
     for (;;) {
         SMS_waitForVBlank();
+        pressed=SMS_getKeysPressed();
+#ifdef TARGET_GG
+        if (pressed & GG_KEY_START) {
+            paused=!paused;
+            queue_tile(LEFT+18,HUD_Y,paused ? BUDDY_BLINK : BUDDY_HAPPY);
+            companion_drawn=paused ? BUDDY_BLINK : BUDDY_HAPPY;
+        }
+        if (pressed & PORT_A_KEY_2) reduced_motion=!reduced_motion;
+#else
+        if (pressed & PORT_A_KEY_2) {
+            paused=!paused;
+            queue_tile(LEFT+18,HUD_Y,paused ? BUDDY_BLINK : BUDDY_HAPPY);
+            companion_drawn=paused ? BUDDY_BLINK : BUDDY_HAPPY;
+        }
+#endif
+        if (pressed & PORT_A_KEY_1) {
+            sound_enabled=!sound_enabled;
+            if (!sound_enabled) { sound_frames=0; PSG_PORT=0x9F; }
+        }
         flush_pending();
-        psg_tick();
-        animate_companion();
+        if (!paused) {
+            psg_tick();
+            animate_companion();
+        }
         render_following_sprite();
-        if (won || lost || pending_count) continue;
+        if (paused || won || lost || pending_count) continue;
         if (move_cooldown) { --move_cooldown; continue; }
         keys=SMS_getKeysStatus();
         if (keys & PORT_A_KEY_UP) {
@@ -477,9 +504,12 @@ def _tiles() -> str:
 
 def compile_native_sega_8bit(
     world: PlayableWorld, source: HomebrewSource, target: str, *, authorized: bool,
+    reduced_motion: bool = False, audio_enabled: bool = True,
 ) -> Sega8BitSourceProject:
     if type(authorized) is not bool or not authorized:
         raise PermissionError("Sega original homebrew generation requires explicit authorization")
+    if type(reduced_motion) is not bool or type(audio_enabled) is not bool:
+        raise Sega8BitNativeError("audio and reduced-motion preferences must be boolean")
     if not isinstance(world, PlayableWorld) or not isinstance(source, HomebrewSource):
         raise Sega8BitNativeError("typed authored game and homebrew source required")
     if target not in _TARGETS:
@@ -512,6 +542,8 @@ def compile_native_sega_8bit(
         "__GEMS__":str(world.intent.collectibles_per_level),
         "__HEALTH__":str(world.intent.starting_health),
         "__LEFT__":str(left),"__TOP__":str(top),"__HUD__":str(hud),
+        "__DEFAULT_REDUCED_MOTION__":str(int(reduced_motion)),
+        "__DEFAULT_AUDIO_ENABLED__":str(int(audio_enabled)),
         "__TILES__":_tiles(),"__MAPS__":"\n\n".join(maps),
         "__POINTERS__":", ".join(f"stage_{level.index}" for level in world.levels),
         "__START_X__":", ".join(str(l.start[0]) for l in world.levels),
@@ -540,6 +572,10 @@ def compile_native_sega_8bit(
         "title":world.intent.title,
         "native_psg_reactive_audio":True,
         "native_animated_companion":True,
+        "default_audio_enabled":audio_enabled,
+        "default_reduced_motion":reduced_motion,
+        "native_joypad_pause_controls":True,
+        "native_sound_toggle_controls":True,
         "original_companion_pose_count":5,
         "original_hero_pose_count":2,
         "companion_bond_ranks":8,
