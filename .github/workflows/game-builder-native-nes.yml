@@ -5,6 +5,8 @@ on:
     paths:
       - 'skeleton/ai/game_builder/**'
       - 'scripts/game_builder/native_nes_ci.py'
+      - 'scripts/game_builder/nes_reproducibility_ci.py'
+      - 'skeleton/testing/test_game_builder_nes_reproducibility.py'
       - '.github/workflows/game-builder-native-nes.yml'
   workflow_dispatch:
 
@@ -13,7 +15,7 @@ permissions:
 
 concurrency:
   group: game-builder-nes-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   original-nes-game:
@@ -30,6 +32,9 @@ jobs:
             /skeleton/ai/capability_map.py
             /skeleton/ai/game_builder/
             /scripts/game_builder/native_nes_ci.py
+            /scripts/game_builder/nes_reproducibility_ci.py
+            /scripts/game_builder/sega_reproducibility_ci.py
+            /skeleton/testing/test_game_builder_nes_reproducibility.py
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -39,20 +44,50 @@ jobs:
           sudo apt-get install -y --no-install-recommends cc65 make
           ca65 --version
           ld65 --version
+      - name: Unit-check original NES source, mapper and two-build integrity
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+        run: |
+          python -m pip install --disable-pip-version-check "pytest>=8.4,<9"
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_nes_reproducibility.py
       - name: Compile source-authored worlds to real NES iNES ROM
         env:
           PYTHONPATH: .
         run: |
           set -euo pipefail
+          # Both generated originals derive from the same authored world,
+          # but are produced into independent directories and compiled twice.
           python scripts/game_builder/native_nes_ci.py --emit nes-world-src > nes-source-evidence.json
+          python scripts/game_builder/native_nes_ci.py --emit nes-world-second > nes-second-source-evidence.json
           make -C nes-world-src
+          make -C nes-world-second
           test -s nes-world-src/build/skeleton-original.nes
+          test -s nes-world-second/build/skeleton-original.nes
           python scripts/game_builder/native_nes_ci.py --verify-rom nes-world-src/build/skeleton-original.nes > nes-compiled-rom-verification.json
+          FIRST_ROM_SHA="$(sha256sum nes-world-src/build/skeleton-original.nes | cut -d' ' -f1)"
+          cmp nes-world-src/build/skeleton-original.nes nes-world-second/build/skeleton-original.nes
+          python scripts/game_builder/nes_reproducibility_ci.py \
+            --first-source nes-world-src --second-source nes-world-second \
+            --first-rom nes-world-src/build/skeleton-original.nes \
+            --second-rom nes-world-second/build/skeleton-original.nes \
+            --first-evidence nes-source-evidence.json \
+            --second-evidence nes-second-source-evidence.json \
+            --expected-rom-sha256 "$FIRST_ROM_SHA" \
+            --receipt-out nes-independent-rebuild-proof.json
           python - <<'PY'
           import json
           result=json.load(open("nes-compiled-rom-verification.json", encoding="utf-8"))
           assert result["ines_header_verified"] and result["mapper_0_prg_chr_verified"]
           assert not result["emulator_playthrough_verified"]
+          proof=json.load(open("nes-independent-rebuild-proof.json", encoding="utf-8"))
+          assert proof["two_distinct_source_directories_checked"] is True
+          assert proof["identical_generated_source_bytes"] is True
+          assert proof["exact_nrom_prg_chr_bytes_match"] is True
+          assert proof["file_backed_interrupt_vectors_checked"] is True
+          assert proof["rom_sha256"] == result["sha256"]
+          assert proof["emulator_gameplay_verified"] is False
+          assert proof["physical_hardware_verified"] is False
+          assert proof["publication_authorized"] is False
           print("Compiled genuine native NES cartridge", result["sha256"])
           PY
       - name: Save ROM with provenance and reproducible build source
@@ -64,5 +99,7 @@ jobs:
             nes-world-src/manifest.json
             nes-compiled-rom-verification.json
             nes-source-evidence.json
+            nes-second-source-evidence.json
+            nes-independent-rebuild-proof.json
           if-no-files-found: error
           retention-days: 7
