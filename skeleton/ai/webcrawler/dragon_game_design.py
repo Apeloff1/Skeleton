@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass,asdict
 from hashlib import sha256
 import json,re
+import os,stat
 from pathlib import Path
 from .dragon_native_targets import STYLES,CATALOG
 
@@ -89,19 +90,52 @@ def verify_design(design: GameDesign) -> GameDesign:
     return design
 
 def load_design(path:Path)->GameDesign:
-    path=Path(path)
-    if path.is_symlink() or not path.is_file() or path.stat().st_size>16384:
-        raise ValueError("game design must be a small regular JSON file")
-    raw=path.read_text(encoding="utf-8")
-    if len(raw.encode())>16384:
-        raise ValueError("game design too large")
+    """Safely read one stable, small UTF-8 design from an operator-owned path.
+
+    Retain the opened file's identity across the read, so changing a source
+    path into a symlink or different file cannot bypass input validation.
+    """
+    path=Path(path).expanduser()
+    try:
+        initial=path.lstat()
+        if not stat.S_ISREG(initial.st_mode) or not 1 <= initial.st_size <= 16384:
+            raise ValueError("game design must be a small regular JSON file")
+        flags=(os.O_RDONLY | getattr(os,"O_BINARY",0)
+               | getattr(os,"O_CLOEXEC",0) | getattr(os,"O_NOFOLLOW",0)
+               | getattr(os,"O_NONBLOCK",0))
+        fd=os.open(path,flags)
+        with os.fdopen(fd,"rb") as stream:
+            opened=os.fstat(stream.fileno())
+            if (not stat.S_ISREG(opened.st_mode)
+                    or (initial.st_dev,initial.st_ino)!=(opened.st_dev,opened.st_ino)):
+                raise ValueError("game design source changed during admission")
+            payload=stream.read(16385)
+            final=os.fstat(stream.fileno())
+        current=path.lstat()
+        if (not stat.S_ISREG(current.st_mode)
+                or (current.st_dev,current.st_ino)!=(opened.st_dev,opened.st_ino)
+                or (final.st_dev,final.st_ino,final.st_size,final.st_mtime_ns)
+                !=(opened.st_dev,opened.st_ino,opened.st_size,opened.st_mtime_ns)
+                or len(payload)!=opened.st_size):
+            raise ValueError("game design source changed during admission")
+    except OSError as exc:
+        raise ValueError("game design must be a readable regular JSON file") from exc
+    if not 1 <= len(payload) <= 16384:
+        raise ValueError("game design exceeds byte limit")
+    try:
+        raw=payload.decode("utf-8",errors="strict")
+    except UnicodeError as exc:
+        raise ValueError("game design must be strict UTF-8") from exc
     def no_duplicate(pairs):
         result={}
         for k,v in pairs:
             if k in result:raise ValueError("duplicate game design field")
             result[k]=v
         return result
-    return parse_design(json.loads(raw,object_pairs_hook=no_duplicate))
+    def no_nonfinite(value):
+        raise ValueError("non-finite game design values are forbidden")
+    return parse_design(json.loads(raw,object_pairs_hook=no_duplicate,
+                                   parse_constant=no_nonfinite))
 
 def starter_design(*,title="Dragon Deep Quest",target="pc_linux",
                    genre="roguelike",seed=1)->dict:
