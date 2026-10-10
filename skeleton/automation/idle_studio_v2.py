@@ -43,6 +43,7 @@ from .idle_studio import (
     task_fingerprint,
 )
 from .task_squad import reject_non_evidence_payload
+from .shift_supervisor.consumer_plan import canonical_queue_drained
 
 PACKAGE_VERSION = 2
 MAX_PACKAGE_BYTES = 1_500_000
@@ -501,6 +502,8 @@ def canonical_idle_work_items(state: Mapping[str, Any]) -> tuple[tuple[WorkItem,
     """
 
     supervisor = state.get("_shift_supervisor")
+    if canonical_queue_drained(supervisor, "idle"):
+        return (), ""
     if not isinstance(supervisor, Mapping) or supervisor.get("status") != "loaded":
         raise ValueError("canonical shift-supervisor state was not loaded")
     if supervisor.get("team") != "idle":
@@ -601,6 +604,10 @@ def propose(state_path: Path, package_path: Path, audit_path: Path, report_path:
                 "reason": safety.reason,
             }
         )
+    elif canonical_queue_drained(data.get("_shift_supervisor"), "idle"):
+        status = "idle-no-work"
+        generation_id = ""
+        planner = PlannerDecision((), "canonical-queue-drained")
     elif not repository_is_idle(runs, current_run_id):
         status = "busy"
         generation_id = ""

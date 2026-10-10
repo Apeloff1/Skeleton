@@ -286,6 +286,68 @@ def test_consumer_binds_loaded_plan_to_sha256_digest():
     assert supervisor["plan_digest_sha256"] == expected
 
 
+def _drained_team_state(team: str):
+    state = _state()
+    state["issues"][0]["body"] = _body([
+        {
+            "id": "finished-1",
+            "title": "Previously reviewed job",
+            "description": "No remaining executable work.",
+            "status": "done",
+            "target_team": team,
+        },
+    ])
+    consumed, _ = consume_plan(
+        state, team=team,
+        now=datetime(2026, 9, 16, 10, 10, tzinfo=timezone.utc),
+        max_age_minutes=20,
+    )
+    return consumed
+
+
+@pytest.mark.parametrize("team", ["night", "idle"])
+def test_completed_canonical_queue_is_read_only_no_work(team, tmp_path):
+    from skeleton.automation.shift_supervisor.consumer_plan import canonical_queue_drained
+    state = _drained_team_state(team)
+    supervisor = state["_shift_supervisor"]
+    assert supervisor["status"] == "complete"
+    assert canonical_queue_drained(supervisor, team)
+    assert not canonical_queue_drained(supervisor, "idle" if team == "night" else "night")
+    if team == "night":
+        from skeleton.automation.supervised_studio import _canonical_items
+        from skeleton.automation.completion_campaign import CampaignState, allocate_supervisor_state
+        path = tmp_path / "repo-state.json"
+        path.write_text(json.dumps(state), encoding="utf-8")
+        assert _canonical_items(path, max_tasks=16) == ([], "")
+        campaign = CampaignState(campaign_id="test-campaign")
+        before = campaign.last_allocation_sha256
+        result = allocate_supervisor_state(state, campaign)
+        assert result == {"status": "canonical_queue_drained", "authorized_plan_ids": []}
+        assert campaign.last_allocation_sha256 == before
+        assert "allocation" not in state["_shift_supervisor"]
+    else:
+        from skeleton.automation.idle_studio_v2 import canonical_idle_work_items
+        assert canonical_idle_work_items(state) == ((), "")
+
+
+@pytest.mark.parametrize("tamper", [
+    {"status": "loaded"},
+    {"source": "untrusted"},
+    {"plan_digest_sha256": "0" * 64},
+    {"plan_items": [{"id": "forged"}]},
+    {"generation_id": "forged"},
+    {"progress": {"terminal": True, "team": "night"}},
+])
+def test_terminal_queue_rejects_mutation_without_issuing_work(tamper):
+    from skeleton.automation.shift_supervisor.consumer_plan import canonical_queue_drained
+    from skeleton.automation.completion_campaign import CampaignState, allocate_supervisor_state
+    state = _drained_team_state("night")
+    state["_shift_supervisor"].update(tamper)
+    assert not canonical_queue_drained(state["_shift_supervisor"], "night")
+    with pytest.raises(ValueError, match="loaded canonical supervisor"):
+        allocate_supervisor_state(state, CampaignState(campaign_id="test-campaign"))
+
+
 def test_decode_durable_state_rejects_oversized_issue_body():
     with pytest.raises(CanonicalPlanError, match="issue body exceeds"):
         decode_durable_state("x" * 2_000_001)
