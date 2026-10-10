@@ -42,7 +42,7 @@ def main(argv: list[str] | None = None) -> int:
         target = directory / (item.game_id + ".html")
         if target.exists() or target.is_symlink():
             parser.error(f"refusing to overwrite existing game: {target.name}")
-        write_playable_html(bundle, target, authorized=True)
+        write_playable_html(bundle, target, authorized=True, overwrite=False)
         print(f"{item.game_id}\t{item.world_digest}\t{target}")
     return 0
 
