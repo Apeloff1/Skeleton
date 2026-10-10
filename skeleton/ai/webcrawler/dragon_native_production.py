@@ -796,6 +796,9 @@ def verify_source_bundle(bundle: bytes) -> dict:
                 raise ValueError("tampered nested release")
             receipt = verify_source_release(payload)
             target = receipt["target"]
+            expected_name = "dragon-" + target + "-" + _hash(payload)[:20] + ".zip"
+            if name != expected_name:
+                raise ValueError("nested content-addressed archive filename differs")
             if (target in seen or row.get("target") != target or
                     receipt["request_id"] != index["request_id"] or
                     receipt["source_fingerprint"] != row.get("source_fingerprint") or
@@ -962,6 +965,9 @@ def verify_published_production(destination: Path, index_name: str) -> dict:
             raise ValueError("portfolio archive changed after publishing")
         receipt = verify_source_release(payload)
         target = receipt["target"]
+        expected_name = "dragon-" + target + "-" + _hash(payload)[:20] + ".zip"
+        if name != expected_name:
+            raise ValueError("published content-addressed filename disagrees")
         if (target in targets or target != item["target"] or
                 receipt["request_id"] != index["request_id"] or
                 receipt["source_fingerprint"] != item["source_fingerprint"] or
