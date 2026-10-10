@@ -37,11 +37,12 @@ class RecrawlResearchCandidate:
 
 
 class _GatedFetcher:
-    def __init__(self, fetcher, dispatcher, ticket, sample_provider, clock):
+    def __init__(self, fetcher, dispatcher, ticket, sample_provider, consent_provider, clock):
         self.fetcher = fetcher
         self.dispatcher = dispatcher
         self.ticket = ticket
         self.sample_provider = sample_provider
+        self.consent_provider = consent_provider
         self.clock = clock
         self.requests = 0
 
@@ -50,7 +51,7 @@ class _GatedFetcher:
         at = int(self.clock())
         if not self.dispatcher.authorize_chunk(
             self.ticket, self.sample_provider(), now=at, authorized=True,
-            trusted_worker=True, consent=True,
+            trusted_worker=True, consent=self.consent_provider(),
         ):
             raise PermissionError("recrawl lease/preemption/consent is no longer valid")
         if self.requests >= 5:
@@ -65,6 +66,7 @@ class _GatedFetcher:
 def run_admitted_recrawl(
     dispatcher: DragonRecrawlDispatcher, *, owner: str,
     sample_provider: Callable[[], HardwareSample],
+    consent_provider: Callable[[], bool],
     fetcher: SafeHttpFetcher, now: int,
     authorized: bool, trusted_worker: bool, consent: bool,
     clock: Callable[[], float] = time.time,
@@ -82,10 +84,12 @@ def run_admitted_recrawl(
     if not isinstance(dispatcher, DragonRecrawlDispatcher):
         raise TypeError("Dragon recrawl scheduler required")
     _id(owner); _time(now)
-    if not callable(sample_provider) or not callable(clock) or not callable(sleep):
+    if not callable(sample_provider) or not callable(consent_provider) or not callable(clock) or not callable(sleep):
         raise ValueError("runtime worker callbacks required")
     if not isinstance(fetcher, SafeHttpFetcher) or fetcher.bind_dns_to_socket is not True:
         raise PermissionError("socket-bound public destination transport required")
+    if consent_provider() is not True:
+        raise PermissionError("current acquisition consent revoked")
     sample = sample_provider()
     ticket = dispatcher.begin(
         owner, sample, now=now, authorized=True,
@@ -115,7 +119,7 @@ def run_admitted_recrawl(
             max_retries=0, max_links_per_document=0,
         )
         guarded = _GatedFetcher(fetcher, dispatcher, ticket,
-                                sample_provider, clock)
+                                sample_provider, consent_provider, clock)
         engine = CrawlEngine(guarded, policy=bounded_policy,
                              budget=CrawlBudget(max_requests=5,
                                                 max_bytes=1_200_000,
@@ -133,7 +137,7 @@ def run_admitted_recrawl(
         sleep(delay)
         if not dispatcher.authorize_chunk(
             ticket, sample_provider(), now=int(clock()), authorized=True,
-            trusted_worker=True, consent=True,
+            trusted_worker=True, consent=consent_provider(),
         ):
             return None
         result = engine.step(now=max(float(clock()), float(now) + delay))
