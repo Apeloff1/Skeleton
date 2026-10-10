@@ -77,6 +77,17 @@ def parse_design(data:object)->GameDesign:
         data["candidates"],data["seed"],data["difficulty"],hero,theme,notes,
         sha256(canonical.encode()).hexdigest())
 
+
+def verify_design(design: GameDesign) -> GameDesign:
+    """Reject forged dataclass instances before they affect native source output."""
+    if not isinstance(design, GameDesign):
+        raise ValueError("canonical GameDesign required")
+    fields = {key: getattr(design, key) for key in FIELDS}
+    rebuilt = parse_design(fields)
+    if rebuilt != design:
+        raise ValueError("game design digest or controls mutated after admission")
+    return design
+
 def load_design(path:Path)->GameDesign:
     path=Path(path)
     if path.is_symlink() or not path.is_file() or path.stat().st_size>16384:
@@ -104,4 +115,4 @@ def starter_design(*,title="Dragon Deep Quest",target="pc_linux",
     }
 
 def design_manifest(design:GameDesign)->dict:
-    return asdict(design)
+    return asdict(verify_design(design))
