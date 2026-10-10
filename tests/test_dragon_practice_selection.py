@@ -86,3 +86,36 @@ def test_progression_respects_theme_and_refuses_insufficient_choices():
             plan_practice_progression(authorized=True, count=count)
     with pytest.raises(PermissionError):
         plan_practice_progression(authorized="yes", count=3)
+
+
+def test_actual_practice_attempt_is_reexecuted_not_trusted_metadata():
+    game = load_practice_game("dragon-practice-001", authorized=True)
+    verified = verified_practice_run(
+        game.game_id, game.proof, authorized=True,
+    )
+    assert verified["completed"] is True
+    assert verified["status"] == "won"
+    assert verified["steps"] == len(game.proof.action_receipts)
+    assert verified["world_digest"] == game.world.digest
+    assert verified["training_authorized"] is False
+    assert verified["memory_promotion_authorized"] is False
+    partial = play_actions(game.world, (), authorized=True)
+    advisory = verified_practice_run(game.game_id, partial, authorized=True)
+    assert advisory["completed"] is False
+    assert advisory["status"] == "playing"
+    with pytest.raises(PermissionError):
+        verified_practice_run(game.game_id, game.proof, authorized="true")
+
+
+def test_practice_attempt_rejects_foreign_world_and_manipulated_ledger():
+    left = load_practice_game("dragon-practice-001", authorized=True)
+    right = load_practice_game("dragon-practice-002", authorized=True)
+    with pytest.raises(ValueError):
+        verified_practice_run(left.game_id, right.proof, authorized=True)
+    forged = replace(
+        left.proof, action_receipts=left.proof.action_receipts[:-1],
+    )
+    with pytest.raises(ValueError):
+        verified_practice_run(left.game_id, forged, authorized=True)
+    with pytest.raises(PracticeSelectionError):
+        verified_practice_run(left.game_id, object(), authorized=True)
