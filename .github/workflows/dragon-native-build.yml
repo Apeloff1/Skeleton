@@ -104,6 +104,9 @@ jobs:
             tests/test_ai_dragon_native_campaign_paths.py \
             tests/test_ai_dragon_native_challenge_director.py \
             tests/test_ai_dragon_native_level_curation.py \
+            tests/test_ai_dragon_route_world.py \
+            tests/test_ai_dragon_route_native_game.py \
+            tests/test_ai_dragon_route_native_integration.py \
             tests/test_ai_dragon_native_puzzle_graphics.py \
             tests/test_ai_webcrawler_dragon_native_projects.py \
             tests/test_ai_webcrawler_dragon_native_compile.py \
@@ -476,6 +479,71 @@ jobs:
         with:
           name: dragon-original-gameplay-sdl-frames
           path: /tmp/original-game-media/dragon-original-game-frames-*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  native-world-route-simulation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check original game world source parser and route schemas
+        run: |
+          set -euo pipefail
+          python -m compileall -q \
+            skeleton/ai/webcrawler/dragon_route_taxonomy.py \
+            skeleton/ai/webcrawler/dragon_route_world.py \
+            skeleton/ai/webcrawler/dragon_route_world_factory.py \
+            skeleton/ai/webcrawler/dragon_route_world_variants.py \
+            skeleton/ai/webcrawler/dragon_route_native_game.py
+      - name: Install strictly local Python testing dependencies
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Compile and replay true weather/secret/free-roam C99 games
+        run: |
+          set -euo pipefail
+          python -m pytest -q \
+            tests/test_ai_dragon_route_world.py \
+            tests/test_ai_dragon_route_native_game.py \
+            tests/test_ai_dragon_route_native_integration.py
+      - name: Build a playable original rainy game source distribution
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from skeleton.ai.webcrawler.dragon_route_world_factory import make_frontier
+          from skeleton.ai.webcrawler.dragon_route_native_game import emit_route_game
+          world,traveller=make_frontier(seed=1977,weather="rain",hour=8)
+          files=emit_route_game(world,traveller,authorized=True)
+          root=Path("/tmp/dragon-original-route-world")
+          for name,source in files.items():
+              location=root/name
+              location.parent.mkdir(parents=True,exist_ok=True)
+              location.write_text(source)
+          PY
+          make -C /tmp/dragon-original-route-world
+          /tmp/dragon-original-route-world/dragon_route_game --selftest \
+            | tee /tmp/original-route-world-proof.txt
+          grep 'DRAGON_ORIGINAL_ROUTE_PASS name=outer_space' /tmp/original-route-world-proof.txt
+          grep 'DRAGON_ORIGINAL_ROUTE_PASS name=secret' /tmp/original-route-world-proof.txt
+          grep 'DRAGON_ORIGINAL_ROUTE_PASS name=rain' /tmp/original-route-world-proof.txt
+          grep 'DRAGON_ORIGINAL_WORLD_PASS' /tmp/original-route-world-proof.txt
+      - name: Publish original-game source, actual native ELF and replay proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-original-free-roam-multimodal-game
+          path: |
+            /tmp/dragon-original-route-world/src/main.c
+            /tmp/dragon-original-route-world/include/dragon_route_world.h
+            /tmp/dragon-original-route-world/dragon-original-route-proof.json
+            /tmp/dragon-original-route-world/Makefile
+            /tmp/dragon-original-route-world/CMakeLists.txt
+            /tmp/dragon-original-route-world/dragon_route_game
+            /tmp/original-route-world-proof.txt
           if-no-files-found: error
           retention-days: 7
 
