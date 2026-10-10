@@ -408,3 +408,12 @@ def test_persisted_notes_cannot_bypass_byte_budget():
     with pytest.raises(ValueError, match="cell validation"):
         store.sessions("alice", authorized=True)
 
+
+def test_history_aggregate_memory_cap(monkeypatch):
+    import skeleton.ai.webcrawler.dragon_game_mechanics as module
+    store = setup()
+    store.record(session(store), authorized=True)
+    monkeypatch.setattr(module, "MAX_HISTORY_BYTES", 8)
+    with pytest.raises(ValueError, match="history memory"):
+        store.sessions("alice", authorized=True)
+
