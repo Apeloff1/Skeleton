@@ -150,6 +150,8 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     assert receipt["independent_native_rom_formats_verified"] is True
     assert receipt["real_z80_startup_checked_per_platform"] is True
     assert receipt["native_cartridge_rebuild_byte_equality_checked_per_platform"] is True
+    assert set(receipt["native_rebuild_provenance_sha256_by_platform"]) == set(EXTS)
+    assert all(len(value)==64 for value in receipt["native_rebuild_provenance_sha256_by_platform"].values())
     assert receipt["original_controller_actions_verified_per_platform"] == 256
     assert receipt["world_digest"] == WORLD
     assert receipt["full_native_z80_gameplay_replay_verified"] is False
@@ -274,3 +276,36 @@ def test_cross_port_refuses_checksum_correct_but_rebuilt_ROM_digest_replacement(
     path.write_text(json.dumps(data),encoding="utf-8")
     with pytest.raises(Sega8PortParityError,match="cartridge_sha256"):
         verify_ports(tmp_path)
+
+
+
+def test_cross_port_output_refuses_linked_or_existing_receipt(tmp_path):
+    from scripts.game_builder.sega_reproducibility_ci import emit_receipt
+    _fixtures(tmp_path)
+    result=verify_ports(tmp_path)
+    destination=tmp_path/"original-port-proof.json"
+    emit_receipt(destination,result)
+    initial=destination.read_bytes()
+    with pytest.raises(FileExistsError):
+        emit_receipt(destination,{"release_approved":True})
+    assert destination.read_bytes()==initial
+    external=tmp_path/"target.json"
+    external.write_text('{"original":true}',encoding="utf-8")
+    alias=tmp_path/"alias.json"
+    alias.symlink_to(external)
+    with pytest.raises(OSError):
+        emit_receipt(alias,result)
+    assert json.loads(external.read_text())=={"original":True}
+
+
+def test_cross_port_output_parent_symlink_cannot_redirect_a_game_receipt(tmp_path):
+    from scripts.game_builder.sega_reproducibility_ci import emit_receipt
+    _fixtures(tmp_path)
+    result=verify_ports(tmp_path)
+    actual=tmp_path/"actual-root"
+    actual.mkdir()
+    alias=tmp_path/"linked-output"
+    alias.symlink_to(actual,target_is_directory=True)
+    with pytest.raises(ValueError):
+        emit_receipt(alias/"evidence.json",result)
+    assert list(actual.iterdir())==[]
