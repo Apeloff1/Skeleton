@@ -39,3 +39,15 @@ def test_store_constructor_and_direct_migrations_produce_identical_schema(tmp_pa
         assert migrate(store.db) == SCHEMA_VERSION
     finally:
         store.close()
+
+
+def test_migration_fails_closed_when_versioned_base_table_disappears():
+    import pytest
+    db = sqlite3.connect(":memory:")
+    migrate(db)
+    db.execute("DROP TABLE checkpoints")
+    with pytest.raises(ValueError, match="missing canonical base tables"):
+        migrate(db)
+    # The existing owner database must not be silently reinitialized.
+    assert db.execute("SELECT name FROM sqlite_master WHERE name='checkpoints'").fetchone() is None
+    assert db.execute("SELECT version FROM schema_version").fetchone() == (SCHEMA_VERSION,)
