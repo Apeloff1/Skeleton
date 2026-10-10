@@ -36,6 +36,7 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
       { id: 'build', title: 'Build', description: 'Compile a project into a runnable artifact.', operation: 'build.submit', legacyHref: '/apk-build' },
       { id: 'inspect', title: 'Inspect pipeline', description: 'Review build stages and generated artifacts.', operation: 'pipeline.inspect', legacyHref: '/ai-pipeline' },
       { id: 'native-homebrew', title: 'Native homebrew', description: 'Generate original console and PC source archives with explicit rights approval.', operation: 'dragon.native.sources', href: '/dragon-native-production' },
+      { id: 'route-world', title: 'Multi-path world explorer', description: 'Play and build original worlds with public transport, weather, secrets, long detours, free roaming, magical and space routes.', operation: 'dragon.routes.world', href: '/dragon-route-world' },
     ],
   },
   {
@@ -47,6 +48,7 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     backendSurface: '/api/worldforge',
     actions: [
       { id: 'world', title: 'Create world', description: 'Generate terrain, regions, travel and environment rules.', operation: 'world.create' },
+      { id: 'world-routes', title: 'Author route networks', description: 'Compare original multimodal journey graphs, gates, hidden paths, detours, alternate goals and challenge routes.', operation: 'world.routes.author', href: '/dragon-route-world' },
       { id: 'systems', title: 'Author systems', description: 'Compose quests, economy, crafting, NPCs and progression.', operation: 'world.systems.compose' },
       { id: 'assets', title: 'Forge assets', description: 'Generate and organize reusable world assets.', operation: 'asset.forge' },
     ],
