@@ -242,6 +242,11 @@ __all__ = [
 from importlib import import_module as _game_builder_import_module
 
 _KNOWLEDGE_EXPORTS = {
+    "PortableAssetError": ".portable_kernels",
+    "PortableTileBundle": ".portable_kernels",
+    "compile_original_tile_bundle": ".portable_kernels",
+    "verify_original_tile_roundtrip": ".portable_kernels",
+    "emit_original_tile_source": ".portable_kernels",
     "PortableCodecError": ".portable_kernels",
     "encode_gb_2bpp": ".portable_kernels",
     "decode_gb_2bpp": ".portable_kernels",
