@@ -681,4 +681,19 @@ def verify_route_proof(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof"]
+def portfolio_diversity_ppm(portfolio: Sequence[RouteProof]) -> int:
+    """Mean pairwise corridor novelty; a single route yields zero diversity."""
+    if (not isinstance(portfolio, (list, tuple)) or not portfolio
+            or len(portfolio) > 16
+            or any(not isinstance(p, RouteProof) for p in portfolio)
+            or len({p.problem_digest for p in portfolio}) != 1):
+        raise MultipathError("portfolio needs 1–16 proofs for the same level")
+    if len(portfolio) == 1:
+        return 0
+    values = [route_diversity_ppm(a, b)
+              for index, a in enumerate(portfolio) for b in portfolio[index+1:]]
+    return sum(values) // len(values)
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm"]
