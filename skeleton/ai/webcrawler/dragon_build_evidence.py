@@ -16,7 +16,7 @@ from .dragon_native_practice import DragonNativePracticeLab
 from .dragon_native_compile import _verify
 from .dragon_practice_lab import _owner,_time
 
-ROM_EXTENSIONS={"game_boy":"gb","game_boy_color":"gbc","nes":"nes"}
+ROM_EXTENSIONS={"game_boy":"gb","game_boy_color":"gbc","nes":"nes","lynx":"lnx"}
 MAX_ROM_BYTES=2_000_000
 
 @dataclass(frozen=True)

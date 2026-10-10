@@ -18,6 +18,9 @@ on:
       - 'skeleton/ai/webcrawler/dragon_native_thumby.py'
       - 'skeleton/ai/webcrawler/dragon_native_lynx.py'
       - 'skeleton/ai/webcrawler/dragon_lynx_release.py'
+      - 'skeleton/ai/webcrawler/dragon_build_evidence.py'
+      - 'skeleton/ai/webcrawler/dragon_native_compile.py'
+      - 'skeleton/ai/webcrawler/dragon_native_curriculum.py'
       - 'skeleton/ai/webcrawler/dragon_native_vita_saturn.py'
       - 'skeleton/ai/webcrawler/dragon_vic20_tiny.py'
       - 'skeleton/ai/webcrawler/dragon_desktop_abi.py'
@@ -35,6 +38,7 @@ on:
       - 'tests/test_ai_webcrawler_dragon_native_thumby.py'
       - 'tests/test_ai_webcrawler_dragon_lynx_vita_saturn.py'
       - 'tests/test_ai_webcrawler_dragon_lynx_release.py'
+      - 'tests/test_ai_webcrawler_dragon_lynx_evidence.py'
       - 'tests/test_ai_webcrawler_dragon_compatible_revisions.py'
       - 'tests/test_ai_webcrawler_dragon_desktop_abi.py'
       - 'tests/test_ai_webcrawler_dragon_platform_matrix.py'
@@ -80,6 +84,7 @@ jobs:
             tests/test_ai_webcrawler_dragon_native_thumby.py \
             tests/test_ai_webcrawler_dragon_lynx_vita_saturn.py \
             tests/test_ai_webcrawler_dragon_lynx_release.py \
+            tests/test_ai_webcrawler_dragon_lynx_evidence.py \
             tests/test_ai_webcrawler_dragon_compatible_revisions.py \
             tests/test_ai_webcrawler_dragon_desktop_abi.py \
             tests/test_ai_webcrawler_dragon_platform_matrix.py

@@ -73,8 +73,10 @@ static void play(unsigned char buttons){
 }
 int main(void){
  unsigned char buttons;
- if(tgi_install(tgi_static_stddrv)!=TGI_ERR_OK)return 1;
- tgi_init();CLI();
+ tgi_install(tgi_static_stddrv);
+ tgi_init();
+ if(tgi_geterror()!=0)return 1;
+ CLI();
  while(tgi_busy()){}
  if(joy_install(joy_static_stddrv)!=JOY_ERR_OK)return 2;
  new_game();
