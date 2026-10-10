@@ -116,13 +116,17 @@ def _puzzle_proof(source_archive: bytes) -> tuple[dict, dict[str, str]]:
     from .dragon_native_puzzle import transformed_level, solve_grid
     expected_seed = proof["seed"]
     difficulty = proof["difficulty"]
+    procedural = proof.get("procedural", False)
+    if type(procedural) is not bool:
+        raise ValueError("procedural source level claim is not a boolean")
     if (type(expected_seed) is not int or not 0 <= expected_seed <= 0xffffffff or
             type(difficulty) is not int or not 1 <= difficulty <= 10):
         raise ValueError("invalid puzzle replay parameters")
     for number, row in enumerate(rows):
         if not isinstance(row, dict) or row.get("stage") != number:
             raise ValueError("puzzle stages are not canonical or contiguous")
-        layout = transformed_level(number, expected_seed, difficulty)
+        layout = transformed_level(number, expected_seed, difficulty,
+                                   procedural=procedural)
         solution, explored = solve_grid(layout)
         if row.get("solution") != solution or row.get("steps") != len(solution):
             raise ValueError("native puzzle solution does not replay")
@@ -240,7 +244,10 @@ def build_native_puzzle_executable(
         from .dragon_native_puzzle_trace import simulate_grid, parse_native_state_line
         transcripts = []
         for level in range(1, proof["stages"] + 1):
-            puzzle = transformed_level(level - 1, proof["seed"], proof["difficulty"])
+            puzzle = transformed_level(
+                level - 1, proof["seed"], proof["difficulty"],
+                procedural=proof.get("procedural", False),
+            )
             solution, _ = solve_grid(puzzle)
             for commands in (
                 solution, "r" + solution, solution[:4] + "r" + solution,
