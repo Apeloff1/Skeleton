@@ -13,7 +13,7 @@ from pathlib import Path
 import re
 from typing import Any
 
-from skeleton.ai.game_builder.native_release_intake import _read_bounded, NativeIntakeError
+from skeleton.ai.game_builder.native_release_intake import _json, _read_bounded, NativeIntakeError
 
 _TARGETS = {"sega_master_system": "sms", "sega_game_gear": "gg"}
 _SHA = re.compile(r"[0-9a-f]{64}\Z")
@@ -26,7 +26,7 @@ class Sega8PortParityError(ValueError):
 
 def _read(path: Path) -> dict[str, Any]:
     try:
-        data = json.loads(_read_bounded(path, max_bytes=MAX_RECEIPT))
+        data = _json(_read_bounded(path, max_bytes=MAX_RECEIPT), "original Sega cross-port evidence")
     except (NativeIntakeError, OSError, UnicodeDecodeError, ValueError) as exc:
         raise Sega8PortParityError("receipt is linked, invalid, or beyond evidence budget") from exc
     if not isinstance(data, dict):
@@ -55,6 +55,68 @@ def _sha(value: object, label: str) -> str:
     return value
 
 
+
+_REPRO_FALSE = (
+    "two_compiler_executions_independently_verified",
+    "source_rights_independently_verified",
+    "gameplay_execution_verified",
+    "real_console_hardware_verified",
+    "developer_toolchain_authenticity_proven",
+    "publication_licensed",
+)
+
+
+def _check_rebuilt_provenance(
+    receipt: dict[str, Any], compilation: dict[str, Any],
+    manifest: dict[str, Any], target: str,
+) -> None:
+    """Ensure the release candidate and twice-checked cartridge are identical."""
+    if receipt.get("schema") != "skeleton.game_builder.sega_reproducibility.v1":
+        raise Sega8PortParityError("required double-ROM comparison evidence absent")
+    for field in _REPRO_FALSE:
+        if receipt.get(field) is not False:
+            raise Sega8PortParityError("ROM reproducibility cannot grant hardware/legal approval")
+    for field in (
+        "checked_two_distinct_artifact_paths", "exact_rom_bytes_match",
+        "source_and_authorship_digests_match",
+    ):
+        if receipt.get(field) is not True:
+            raise Sega8PortParityError("missing actual two-file native ROM comparison")
+    expected = {
+        "target": target,
+        "source_sha256": compilation["source_sha256"],
+        "author_declaration_sha256": manifest["source_rights_evidence_sha256"],
+        "world_sha256": manifest["world_digest"],
+        "reference_replay_sha256": manifest["reference_safe_replay_digest"],
+        "toolchain_git_revision": compilation.get("toolchain_revision"),
+        "cartridge_sha256": compilation["rom_sha256"],
+        "cartridge_bytes": 32768,
+    }
+    for key, value in expected.items():
+        if receipt.get(key) != value:
+            raise Sega8PortParityError(
+                "reproducible ROM evidence not bound to the compiled game: " + key
+            )
+    _sha(receipt.get("comparison_sha256"), "reproducible ROM receipt")
+    core = {key: value for key, value in receipt.items() if key != "comparison_sha256"}
+    try:
+        expected_digest = sha256(json.dumps(
+            core, sort_keys=True, ensure_ascii=False, allow_nan=False,
+            separators=(",", ":"),
+        ).encode("utf-8")).hexdigest()
+    except (TypeError, ValueError) as exc:
+        raise Sega8PortParityError("invalid reproducible ROM receipt values") from exc
+    if receipt["comparison_sha256"] != expected_digest:
+        raise Sega8PortParityError("reproducible ROM receipt digest does not match facts")
+    fields = set(expected) | {
+        "schema", "comparison_sha256",
+        "checked_two_distinct_artifact_paths", "exact_rom_bytes_match",
+        "source_and_authorship_digests_match", *_REPRO_FALSE,
+    }
+    if set(receipt) != fields:
+        raise Sega8PortParityError("unreviewed additional field in ROM comparison evidence")
+
+
 def verify_ports(root: Path) -> dict[str, object]:
     if root.is_symlink() or not root.is_dir():
         raise Sega8PortParityError("existing ordinary evidence root required")
@@ -64,6 +126,7 @@ def verify_ports(root: Path) -> dict[str, object]:
         compile_evidence = _select(root, target, target+"-compilation-evidence.json")
         host = _select(root, target, target+"-host-gameplay-receipt.json")
         boot = _select(root, target, target+"-real-z80-boot.json")
+        reproducible = _select(root, target, target+"-reproducibility.json")
         if (meta.get("schema") != "skeleton.game_builder.native_sega8_source.v1"
             or meta.get("platform") != target or meta.get("target_rom_suffix") != ext):
             raise Sega8PortParityError("native platform manifest mismatch")
@@ -118,6 +181,7 @@ def verify_ports(root: Path) -> dict[str, object]:
                     raise Sega8PortParityError(
                         f"native port evidence has an unreviewed or missing {key} claim"
                     )
+        _check_rebuilt_provenance(reproducible, compile_evidence, meta, target)
         source = _sha(compile_evidence.get("source_sha256"), "source")
         rom = _sha(compile_evidence.get("rom_sha256"), "ROM")
         if (
@@ -143,6 +207,7 @@ def verify_ports(root: Path) -> dict[str, object]:
         _sha(meta.get("source_rights_evidence_sha256"), "rights evidence")
         records[target] = {
             "manifest": meta, "compile": compile_evidence, "host": host, "boot": boot,
+            "reproducibility": reproducible,
         }
 
     sms = records["sega_master_system"]
@@ -177,6 +242,7 @@ def verify_ports(root: Path) -> dict[str, object]:
         "gameplay_parity_verified": True,
         "independent_native_rom_formats_verified": True,
         "real_z80_startup_checked_per_platform": True,
+        "native_cartridge_rebuild_byte_equality_checked_per_platform": True,
         "full_native_z80_gameplay_replay_verified": False,
         "physical_hardware_verified": False,
         "rights_independently_verified": False,
