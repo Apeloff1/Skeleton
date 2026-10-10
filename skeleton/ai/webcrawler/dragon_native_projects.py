@@ -580,6 +580,10 @@ def render_native_project(*,title:str,target_id:str,style:str,
                 creation.world,creation.traveller,authorized=True,
                 maze_creation=creation,
             )
+            if design is not None:
+                from .dragon_game_design import design_manifest
+                files["dragon-game-design.json"]=json.dumps(
+                    design_manifest(design),sort_keys=True,indent=2)+"\n"
             files["README.routes.md"]=(
                 "# Constructively complete original multi-path maze adventure\n\n"
                 "A complete C99 original playable game whose source includes "
@@ -589,7 +593,7 @@ def render_native_project(*,title:str,target_id:str,style:str,
                 "are real graph actions, not copied game content. A restart "
                 "is available after deliberate exhaustion of time/actions.\n"
             )
-        elif style in ("world_route_adventure","maze_route_adventure"):
+        elif style=="world_route_adventure":
             from .dragon_route_world_factory import make_frontier
             from .dragon_route_native_game import emit_route_game
             world,visitor=make_frontier(seed=seed,weather="clear",hour=8)
@@ -789,7 +793,7 @@ def render_native_project(*,title:str,target_id:str,style:str,
                   else "game_boy_scrolling_platformer" if target_id=="game_boy" and style=="side_scrolling_platformer"
                   else "original_collectible_chase"
               ),"campaign_stages": (
-                  (1 if style=="world_route_adventure" else
+                  (1 if style in ("world_route_adventure","maze_route_adventure") else
                    design.stages if design is not None else 4)
                   if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck")
                   else 1
