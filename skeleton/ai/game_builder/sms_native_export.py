@@ -166,8 +166,8 @@ ReadPad:
     jp z, MoveRight
     jp GameLoop
 VictoryIdle:
-    ld a, 0A2h               ; Freeze with an original bright green backdrop.
-    out (VDP_CTRL), a
+    ; Final original game artwork remains visible. Never emit half of a
+    ; VDP control command, which would corrupt the hardware address latch.
     jp GameLoop
 DefeatIdle:
     jp GameLoop
@@ -254,7 +254,11 @@ AddColumn:
     ld de, 10
     add hl, de
     ld (Score), hl
-    ld a, 090h              ; PSG channel 0 loud chime, muted on next frame.
+    ld a, 084h              ; SN76489 channel 0 tone low nibble.
+    out (PSG_PORT), a
+    ld a, 012h              ; Tone upper six bits: original authored note.
+    out (PSG_PORT), a
+    ld a, 093h              ; One-frame audible volume, then muted.
     out (PSG_PORT), a
     jp Redraw
 
