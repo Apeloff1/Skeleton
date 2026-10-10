@@ -117,7 +117,8 @@ def test_native_multimodal_game_zip_requires_original_rights_and_editor_approval
     with ZipFile(BytesIO(source.body)) as file:
         assert set(file.namelist())=={
             "src/main.c","include/dragon_route_world.h",
-            "dragon-original-route-proof.json","Makefile","README.md",
+            "dragon-original-route-proof.json","Makefile","CMakeLists.txt",
+            "README.md",
         }
         manifest=json.loads(file.read("dragon-original-route-proof.json"))
         assert manifest["schema"]=="skeleton.ai.dragon.original_native_route_game.v1"
