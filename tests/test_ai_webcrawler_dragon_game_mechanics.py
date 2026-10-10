@@ -322,3 +322,12 @@ def test_history_reads_are_bounded_and_ordered_across_sessions():
     assert len(result) == 2
     assert [s.session_id for s in result] == sorted(s.session_id for s in result)
 
+
+def test_corrupt_stored_observation_json_fails_closed():
+    store = setup()
+    store.record(session(store), authorized=True)
+    store.db.execute("UPDATE dragon_game_sessions SET observations_json=? WHERE owner=?",
+                     ("{corrupted", "alice"))
+    with pytest.raises(ValueError, match="JSON corrupt"):
+        store.sessions("alice", authorized=True)
+
