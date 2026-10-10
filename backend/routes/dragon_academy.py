@@ -1158,6 +1158,49 @@ def native_world_codex_tiles(
             detail="Original source world or native graphics format unsupported") from None
 
 
+class NativeCodexBundleRequest(NativeCodexWorldRequest):
+    target:str=Field(default="game_boy",pattern=r"^[a-z0-9_]{2,48}$")
+    chunks:StrictInt=Field(default=1,ge=1,le=4)
+    rights_attested:StrictBool=Field(default=False)
+
+
+@router.post("/native/production/worlds/codex/source-bundle")
+def native_world_codex_source_bundle(
+    body:NativeCodexBundleRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from base64 import b64encode
+    from dataclasses import asdict
+    from skeleton.ai.webcrawler.dragon_world_codex import unrank
+    from skeleton.ai.webcrawler.dragon_codex_bundle import (
+        publish_codex_source,verify_codex_source,
+    )
+    try:
+        source=unrank(body.index)
+        product=publish_codex_source(
+            source,body.target,chunks=body.chunks,
+            rights_attested=body.rights_attested)
+        independently=verify_codex_source(
+            source,product,chunks=body.chunks)
+    except PermissionError:
+        raise HTTPException(status_code=403,
+            detail="Source-game owner must explicitly attest original content rights") from None
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original game source bundle violates format or source integrity") from None
+    metadata=asdict(product)
+    metadata.pop("zip_bytes")
+    filename="dragon-original-codex-"+source.codex_digest[:12]+"-"+body.target+".zip"
+    return {
+        "ok":True,"filename":filename,
+        "source_bundle":metadata,
+        "archive_base64":b64encode(product.zip_bytes).decode("ascii"),
+        "independent_source_verification":independently,
+        "scope":"reproducible original source art/gameplay, "
+                 "no precompiled console ROM or third-party SDK license",
+    }
+
+
 class NativeGenomicWorldRequest(BaseModel):
     """Arbitrary-precision design address is a DECIMAL STRING, never a float."""
     model_config=ConfigDict(extra="forbid")
