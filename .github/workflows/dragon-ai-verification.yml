@@ -88,6 +88,8 @@ jobs:
             tests/test_dragon_wisdom_pyramid.py \
             tests/test_dragon_wisdom_refresh_bridge.py \
             tests/test_dragon_recrawl_dispatch.py \
+            tests/test_dragon_wisdom_authority.py \
+            tests/test_dragon_wisdom_operational.py \
             tests/test_dragon_wisdom_integration.py \
             tests/test_dragon_visual_play_integration.py \
             tests/test_dragon_evidence_timestamp_compatibility.py; do
