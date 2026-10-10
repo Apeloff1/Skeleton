@@ -150,9 +150,9 @@ static int hints_selftest(void){
   for(int i=0;i<dragon_solution_length[level];i++)
    if(!perform(proof[i]))return 15;
   if(!level_done()||shortest_hint()!=0)return 16;
-  printf("PUZZLE_HINT_PASS level=%d\\n",level+1);
+  printf("PUZZLE_HINT_PASS level=%d\n",level+1);
  }
- printf("DRAGON_NATIVE_PUZZLE_HINTS PASS stages=%d\\n",LEVEL_COUNT);
+ printf("DRAGON_NATIVE_PUZZLE_HINTS PASS stages=%d\n",LEVEL_COUNT);
  return 0;
 }
 '''
