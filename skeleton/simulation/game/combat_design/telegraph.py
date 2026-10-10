@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import math
 from typing import FrozenSet, Iterable, List, Sequence, Tuple, Union
 
 HUMAN_REACTION_MS = 250
@@ -72,7 +73,7 @@ class AttackTelegraph:
     persistent_zone: bool = False
 
     def __post_init__(self) -> None:
-        if not self.name or len(self.name) > 64:
+        if not isinstance(self.name, str) or not self.name or len(self.name) > 64:
             raise ValueError("bad telegraph name")
         if not isinstance(self.tier, ThreatTier):
             raise ValueError("tier must be ThreatTier")
@@ -81,8 +82,13 @@ class AttackTelegraph:
                 raise ValueError(f"{label}_ms out of bounds")
         if self.active_ms == 0:
             raise ValueError("active_ms must be > 0")
-        if not all(isinstance(c, TelegraphChannel) for c in self.channels):
+        if not isinstance(self.channels, frozenset) or not all(isinstance(c, TelegraphChannel) for c in self.channels):
             raise ValueError("channels must be TelegraphChannel")
+        if type(self.persistent_zone) is not bool:
+            raise ValueError("persistent_zone must be boolean")
+        for value in (self.damage_fraction, self.escape_distance_m):
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                raise ValueError("telegraph numeric fields must be finite numbers")
         if not (0.0 <= self.damage_fraction <= 5.0):
             raise ValueError("damage_fraction out of bounds")
         if not (0.0 <= self.escape_distance_m <= 100.0):

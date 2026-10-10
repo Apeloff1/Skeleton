@@ -87,3 +87,58 @@ clearable by casuals on STORY.
 
 The package is extend-only (no existing module imports it). Reverting the
 commit removes it with no migration.
+
+## Measured designer balance report
+
+The existing encounter owner exposes `evaluate_encounter_design(...)` and the
+operator CLI below. It runs the same deterministic seed cohort for all twelve
+combinations of story/normal/heroic/mythic and casual/core/expert. Reports give
+clear/death/timeout counts, conditional mean/p95 clear time (null with no
+clears), mean hits and remaining HP, exact per-trial identities and scaled
+readability findings. The two-cycle audit includes the rotation seam. A high
+clear rate does not erase an unreadable attack. The report never applies a
+balance change or certifies fairness for real players.
+
+```bash
+python -m scripts.balance_combat_encounter --input ./encounter.json \
+  --seeds 32 --deadline-ms 120000
+```
+
+Example input (explicit original encounter, no game/asset execution):
+
+```json
+{
+  "schema": "combat.encounter_input.v1",
+  "enemy_hp": 1000,
+  "player_max_hp": 1000,
+  "player_dps": 1000,
+  "rotation": [
+    {"name": "cleave", "tier": "minor", "windup_ms": 600,
+     "active_ms": 300, "recovery_ms": 400,
+     "channels": ["body_anim", "vfx_glow"], "damage_fraction": 0.1}
+  ]
+}
+```
+
+The 64-KiB input rejects links, changing file identity, duplicate JSON fields,
+non-finite/bool stats, unknown fields and malformed attacks. Corpus size is at
+most 64 attacks. Reports admit 1–128 seeds, 1–300000 ms per trial; the existing
+individual simulator admits at most one hour. Numerical stats must be finite
+and within 1e-6..1e9. Inputs/digest bind the actual profile parameters and every
+attack, not just profile names and abbreviated reaction logs.
+
+Simulation uses continuous player DPS and enemy damage at windup+active end.
+A player kill is timed to the next whole millisecond within either the windup
+or recovery, and wins an equal-time tie with attack resolution. No event can
+occur after the deadline. Digest format is now `combat.encounter.v2`: older
+simulation digests are not asserted equivalent. This is report identity, not
+signed release or independent human evidence.
+
+Construction/operations: L00–L02 keep the existing combat simulation owner and
+add only an offline CLI/report schema. L03–L06 retain explicit bounded local
+inputs and no provider, network, user-state or tenant authority. L07–L10 use
+seed replay, reconciled cohort counts, deadline and input adversarial tests;
+JSON reports provide reproducible inspection, not measured consumer p95 runtime
+latency or player-experience certification. L11–L13 require exact-head combat
+and wider repository gates; retain original encounter settings and rollback by
+reverting this increment. No masterplan maturity or release rights are raised.

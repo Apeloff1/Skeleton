@@ -8,6 +8,7 @@ on:
       - "skeleton/simulation/game/combat_design/**"
       - "skeleton/simulation/game/mechanics_depth/tick_clock.py"
       - "skeleton/testing/test_combat_design.py"
+      - "scripts/balance_combat_encounter.py"
       - "docs/game/COMBAT_DESIGN_SPEC.md"
       - ".github/workflows/combat-design.yml"
   push:
@@ -16,6 +17,7 @@ on:
       - "skeleton/simulation/game/combat_design/**"
       - "skeleton/simulation/game/mechanics_depth/tick_clock.py"
       - "skeleton/testing/test_combat_design.py"
+      - "scripts/balance_combat_encounter.py"
       - "docs/game/COMBAT_DESIGN_SPEC.md"
       - ".github/workflows/combat-design.yml"
 
@@ -50,6 +52,7 @@ jobs:
           python -m compileall -q
           skeleton/simulation/game/combat_design
           skeleton/testing/test_combat_design.py
+          scripts/balance_combat_encounter.py
       - name: Run combat design regressions
         env:
           PYTHONPATH: "."

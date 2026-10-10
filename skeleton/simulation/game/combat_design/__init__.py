@@ -56,6 +56,7 @@ from .encounter_sim import (
     EncounterOutcome,
     SkillProfile,
     balance_table,
+    evaluate_encounter_design,
     clear_rate,
     sample_reaction_ms,
     simulate_encounter,
@@ -74,5 +75,5 @@ __all__ = [
     "build_zone_curve", "compose_encounter", "encounter_budget",
     "time_to_kill_s", "validate_curve",
     "CASUAL", "CORE", "EXPERT", "EncounterOutcome", "SkillProfile",
-    "balance_table", "clear_rate", "sample_reaction_ms", "simulate_encounter",
+    "balance_table", "evaluate_encounter_design", "clear_rate", "sample_reaction_ms", "simulate_encounter",
 ]

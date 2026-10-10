@@ -304,3 +304,91 @@ def test_balance_table_is_json_and_complete():
     assert json.loads(text) == table
     assert set(table) >= {"damage", "telegraph", "difficulty", "ttk_targets_s", "budget_cost", "skill_profiles", "sim"}
     assert table["telegraph"]["tiers"]["lethal"]["max_damage_fraction"] is None
+
+
+def test_deadline_never_resolves_future_attack_or_clear():
+    result = simulate_encounter(**_boss_kwargs(enemy_hp=1e8, max_time_ms=100))
+    assert result.reason == "timeout"
+    assert result.time_ms == 100
+    assert result.attacks == result.hits_taken == result.dodges == 0
+    assert result.player_hp_fraction == 1.0
+    # The previous full-cycle accounting claimed a kill after this deadline.
+    result = simulate_encounter(**_boss_kwargs(enemy_hp=1000, max_time_ms=100))
+    assert not result.cleared
+    assert result.time_ms == 100
+
+
+def test_continuous_damage_clear_time_is_exact_in_windup_and_recovery():
+    early = simulate_encounter(**_boss_kwargs(enemy_hp=80, max_time_ms=100))
+    assert early.cleared and early.time_ms == 100 and early.attacks == 0
+    recovery = simulate_encounter(**_boss_kwargs(enemy_hp=800, rotation=[_cleave()]))
+    assert recovery.cleared and recovery.time_ms == 1000
+    assert recovery.attacks == 1
+    assert recovery.attacks == recovery.hits_taken + recovery.dodges
+
+
+@pytest.mark.parametrize("field,value", [
+    ("player_dps", float("nan")), ("player_max_hp", float("inf")),
+    ("enemy_hp", True), ("move_speed_mps", float("inf")),
+    ("max_time_ms", True), ("max_time_ms", 100.5), ("seed", True),
+])
+def test_simulation_rejects_unbounded_or_ambiguous_input(field, value):
+    with pytest.raises(ValueError):
+        simulate_encounter(**_boss_kwargs(**{field: value}))
+
+
+def test_outcome_identity_binds_all_design_and_profile_inputs():
+    from skeleton.simulation.game.combat_design import SkillProfile
+    a = simulate_encounter(**_boss_kwargs(enemy_hp=80, max_time_ms=500))
+    b = simulate_encounter(**_boss_kwargs(enemy_hp=80, max_time_ms=501))
+    assert a.time_ms == b.time_ms == 100
+    assert a.digest != b.digest
+    alternate = SkillProfile(CORE.name, CORE.reaction_mean_ms + 1, CORE.reaction_sd_ms, CORE.dps_efficiency)
+    c = simulate_encounter(**_boss_kwargs(enemy_hp=80, max_time_ms=500, profile=alternate))
+    assert a.digest != c.digest  # same name isn't the same profile
+
+
+def test_design_matrix_is_reproducible_and_reconciles_every_trial():
+    from skeleton.simulation.game.combat_design import evaluate_encounter_design
+    args = dict(enemy_hp=1000, rotation=_rotation(), player_max_hp=1000, player_dps=1000, n_seeds=4, max_time_ms=5000)
+    a = evaluate_encounter_design(**args)
+    assert a == evaluate_encounter_design(**args)
+    assert len(a["rows"]) == 12
+    assert len(a["digest"]) == 64
+    assert a["human_playtesting"] is False and a["auto_apply"] is False
+    for row in a["rows"]:
+        assert row["clears"] + row["deaths"] + row["timeouts"] == 4
+        assert len(row["outcome_digests"]) == 4
+        assert row["p95_clear_ms"] is None or row["p95_clear_ms"] <= 5000
+    # Harder tiers can exceed a damage tier's authored ceiling even when
+    # simulations clear. Report must not confuse survivability with fairness.
+    assert any(row["readability_violations"] for row in a["rows"])
+
+
+def test_balance_cli_consumes_real_file_and_rejects_ambiguous_json(tmp_path, capsys):
+    from scripts.balance_combat_encounter import main
+    config = {
+        "schema": "combat.encounter_input.v1", "enemy_hp": 1000,
+        "player_max_hp": 1000, "player_dps": 1000,
+        "rotation": [{"name": "cleave", "tier": "minor", "windup_ms": 600,
+                      "active_ms": 300, "recovery_ms": 400,
+                      "channels": ["body_anim", "vfx_glow"], "damage_fraction": 0.1}],
+    }
+    source = tmp_path / "encounter.json"
+    source.write_text(json.dumps(config))
+    assert main(["--input", str(source), "--seeds", "2"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["schema"] == "combat.design_report.v1"
+    assert len(report["rows"]) == 12
+    assert report["inputs"]["rotation"][0]["name"] == "cleave"
+    source.write_text('{"schema":"combat.encounter_input.v1","schema":"forged"}')
+    assert main(["--input", str(source)]) == 1
+    assert json.loads(capsys.readouterr().out)["error"] == "combat_design_input_rejected"
+
+
+@pytest.mark.parametrize("field,value", [("n_seeds", 129), ("n_seeds", True), ("max_time_ms", 300001)])
+def test_design_report_work_budget_is_enforced(field, value):
+    from skeleton.simulation.game.combat_design import evaluate_encounter_design
+    args = dict(enemy_hp=1000, rotation=_rotation(), player_max_hp=1000, player_dps=1000)
+    with pytest.raises(ValueError):
+        evaluate_encounter_design(**args, **{field: value})
