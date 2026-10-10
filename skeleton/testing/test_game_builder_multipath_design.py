@@ -361,3 +361,12 @@ def test_route_proof_verifier_rejects_forged_cost_or_trajectory():
     with pytest.raises(MultipathError, match="deterministic replay"):
         verify_route_proof(p, replace(route, positions=tuple(reversed(route.positions))))
 
+
+def test_portfolio_diversity_requires_real_distinct_routes():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    routes = route_portfolio(p, max_routes=3)
+    assert portfolio_diversity_ppm((routes[0],)) == 0
+    assert portfolio_diversity_ppm(routes) > 0
+    with pytest.raises(MultipathError):
+        portfolio_diversity_ppm((routes[0], solve_route(RouteProblem.from_rows(HAZARD_LEVEL))))
+
