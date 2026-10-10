@@ -37,6 +37,18 @@ class T(unittest.TestCase):
  def test_false_complete(self):
   r=self.fixture();p=r/"machine/repository_engineering_control.json";d=json.loads(p.read_text());d["completion"]["p2_task_snapshot"][0]["derived_state"]="verified_complete";p.write_text(json.dumps(d))
   with self.assertRaisesRegex(M.Error,"completion derived-state drift"):M.validate(r)
+ def test_open_trace_debt_metric_matches_actual_graph(self):
+  source=json.loads((ROOT/"machine/master_traceability.json").read_text(encoding="utf-8"))
+  control=json.loads((ROOT/"machine/repository_engineering_control.json").read_text(encoding="utf-8"))
+  debt=next(x for x in control["debt"] if x["debt_id"]=="DEBT-P2-TRACE-EVIDENCE")
+  self.assertEqual(debt["interest_metric"]["name"],"requirements_without_evidence")
+  self.assertEqual(debt["interest_metric"]["value"],source["summary"]["requirements_without_evidence"])
+  self.assertGreater(debt["interest_metric"]["value"],0)
+ def test_forged_trace_debt_reduction_rejected(self):
+  r=self.fixture();p=r/"machine/repository_engineering_control.json";d=json.loads(p.read_text())
+  debt=next(x for x in d["debt"] if x["debt_id"]=="DEBT-P2-TRACE-EVIDENCE")
+  debt["interest_metric"]["value"]=0;p.write_text(json.dumps(d))
+  with self.assertRaisesRegex(M.Error,"trace debt count drift"):M.validate(r)
  def test_trace_policy_missing(self):
   r=self.fixture();p=r/"machine/master_traceability.json";d=json.loads(p.read_text());d.setdefault("policy",{}).pop("impact_rule",None);p.write_text(json.dumps(d))
   with self.assertRaisesRegex(M.Error,"trace impact rule missing"):M.validate(r)

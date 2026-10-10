@@ -6,7 +6,7 @@
   "source_pins": {
     "master_plan": {
       "path": "machine/ai_master_plan.json",
-      "git_blob_sha": "1eac3bd5aa251c72e864c4f0ae3e3d5625ee9682"
+      "git_blob_sha": "1733c3843d7dfe3e1bb609b65e1dee5686285942"
     },
     "advanced_ladder": {
       "path": "machine/advanced_ai_structure_100.json",
@@ -14,11 +14,11 @@
     },
     "accountability_index": {
       "path": "machine/ai_masterplan_parse_index.json",
-      "git_blob_sha": "bba4a05e16ec082481486af3691ff63091b4dc18"
+      "git_blob_sha": "6b991b81313fa794679d6510c90b97de04ebe497"
     },
     "accountability": {
       "path": "machine/ai_build_accountability.json",
-      "git_blob_sha": "17813f9acb6ad5f8faea3f3232930fff7e5e339b"
+      "git_blob_sha": "eb7e52f8291ff4217afc76c793ef74d51ec41534"
     }
   },
   "invariants": [

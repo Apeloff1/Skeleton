@@ -221,12 +221,16 @@ class TestOfflineNativeTraining(unittest.TestCase):
 
         invalid = (
             ["--model", "model.json", "--inspect-model", "--epochs", "3"],
+            ["--model", "model.json", "--inspect-model", "--epochs", "1"],
+            ["--model", "model.json", "--inspect-model", "--max-output-tokens", "8"],
             ["--benchmark-suite", "suite.json", "--model", "base.json", "--epochs", "2"],
             ["--replay-improvement", "receipt.json", "--compare-model", "base.json",
              "--candidate-model", "new.json", "--train-corpus", "train.txt",
              "--eval-corpus", "heldout.txt", "--epochs", "3"],
             ["--train-corpus", "train.txt", "--output-model", "new.json",
              "--max-output-tokens", "17"],
+            ["--train-corpus", "train.txt", "--output-model", "new.json",
+             "--max-output-tokens", "8"],
             ["--improve-model", "base.json", "--train-corpus", "train.txt",
              "--eval-corpus", "heldout.txt", "--output-model", "new.json",
              "--max-output-tokens", "17"],

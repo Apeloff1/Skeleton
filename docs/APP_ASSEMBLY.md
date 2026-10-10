@@ -56,6 +56,48 @@ python -m skeleton app local-ai --model ./native-runtime.json \\
 Skeleton.exe --local-ai
 ```
 
+### Check real offline functionality after installation
+
+The user-facing, Docker-free native AI acceptance mode runs actual finite
+native-model inference with private chat-transcript round-trip, actual bounded
+CPU gradient training with artifact reload, and a two-checkpoint categorical
+benchmark. It uses disposable local files and **does not** qualify the
+general quality of any model, ship pretrained weights, download GGUF weights,
+or install a llama.cpp runtime.
+
+```powershell
+SkeletonCLI.exe --offline-command local-ai --self-check --json
+```
+
+For developers without the Windows installer:
+
+```bash
+python -m skeleton app local-ai --self-check --json
+```
+
+A successful exit code `0` means **only** these three concrete packaged-native
+functions completed. Exit `1` means at least one function failed, with
+per-check success/failure and exception *class only* (local error paths and
+prompts are not echoed). Passing does not certify useful pretrained-model
+quality, GGUF readiness, independent security, enterprise release or
+end-to-end Docker-based services. The exact same mode is exercised in the
+installed-executable Windows CI workflow.
+
+### Two distinct Windows executables for reliable offline operation
+
+The installer ships **`Skeleton.exe`** as a windowed desktop launcher and
+**`SkeletonCLI.exe`** as a console-capable executable. Both are fully frozen
+Python runtimes built from the same source; neither requires a separate
+Python interpreter, provider connection or Docker for the native AI command
+path. They deliberately use different subsystems for output: the desktop
+app opens windows, whereas the console app supports real stdout/stderr,
+redirected JSON receipts, exit status codes and shell automation.
+
+This split is required on Windows because a PyInstaller `--windowed`
+executable may have no usable stdout/stderr and therefore cannot reliably
+serve a command-line JSON API. Run the commands below with
+`SkeletonCLI.exe`, not `Skeleton.exe`.
+
 ### Run native AI commands directly from the installed Windows executable
 
 No external Python executable, Docker daemon, hosted API credentials or
@@ -65,15 +107,15 @@ can be invoked through the installed executable:
 
 ```powershell
 # Run in PowerShell, from a directory with UTF-8 source data:
-Skeleton.exe --offline-command local-ai --train-corpus .\notes.txt --output-model .\checkpoint.json --epochs 1 --json
-Skeleton.exe --offline-command local-ai --model .\checkpoint.json --inspect-model --json
-Skeleton.exe --offline-command local-ai --model .\checkpoint.json --prompt "hello" --json
-Skeleton.exe --offline-command local-ai --benchmark-suite .\suite.json --model .\checkpoint.json --json
+SkeletonCLI.exe --offline-command local-ai --train-corpus .\notes.txt --output-model .\checkpoint.json --epochs 1 --json
+SkeletonCLI.exe --offline-command local-ai --model .\checkpoint.json --inspect-model --json
+SkeletonCLI.exe --offline-command local-ai --model .\checkpoint.json --prompt "hello" --json
+SkeletonCLI.exe --offline-command local-ai --benchmark-suite .\suite.json --model .\checkpoint.json --json
 ```
 
 The `--offline-command` mode is deliberately restricted to `local-ai`:
 it cannot activate Docker services, arbitrary shell commands or Python
-modules. The Windows CI builds, installs and invokes this public CLI path
+modules. The Windows CI builds, installs and invokes this public console CLI path
 for an actual CPU training/checkpoint/inspection round-trip. Full
 frontend/backend/Mongo service assembly still uses Docker separately.
 
@@ -148,6 +190,44 @@ parent checkpoint. Optional `--protect-suite` requires the independent category
 benchmark. The candidate is written only after held-out improvement. See
 [native dataset continuation](ai/native-dataset-continuation-2026-10-10.md)
 for receipt replay and operating limits.
+### Run operator-owned GGUF weights through the existing local llama.cpp engine
+
+The offline window now offers **Load GGUF…** as well as **Load checkpoint…**.
+The GGUF path requires you to choose *both* an existing local llama.cpp
+executable and your own GGUF weight file. The selected local executable is
+run as an explicit subprocess after a confirmation dialog. Skeleton does
+not download a model, install the binary, invoke a shell, or forward hosted
+provider credentials. Prefer binaries and model weights you trust.
+
+The same operation is available in the headless canonical application CLI,
+including in the installed Windows executable:
+
+```powershell
+SkeletonCLI.exe --offline-command local-ai `
+  --llama-executable "C:\path\to\llama-cli.exe" `
+  --gguf-model "D:\models\my-model.gguf" `
+  --prompt "Describe your offline capabilities" `
+  --max-output-tokens 128 --json
+```
+
+Model and executable bytes are content-hashed; both identities are validated
+before inference. The existing `llama.cpp` execution plane prohibits
+remote acquisition flags, sanitizes its child process environment, writes
+the prompt to a private local file rather than argv, limits output and
+deadline, and observes cancellation. These are local-process protections,
+not a guarantee that an arbitrary operator-selected executable is benign.
+
+The receipt labels llama.cpp token counts as **estimated** and exposes
+`execution_receipt_digest: null` when the upstream backend has not produced
+one. The GUI keeps only ephemeral conversation history for GGUF because
+Skeleton cannot currently bind those turns to a verified GGUF tokenizer
+identity. **Native checkpoint transcript import/export, CPU training and
+category benchmarks apply only to native checkpoints**, not GGUF.
+
+GGUF quality depends entirely on the user's actual model weights. Bundling
+a local process adapter does not bundle trained weights or establish a
+general-purpose model-quality certificate. Full Docker service assembly
+remains a separate deployment profile.
 
 ### Train a small native checkpoint on your own text
 

@@ -356,6 +356,52 @@ class TestEvaluatedOfflineImprovement(unittest.TestCase):
             self.assertEqual(len(receipt.protected_suite_digest), 64)
             self.assertEqual(source.read_bytes(), original)
 
+    def test_protected_training_selects_earlier_safe_epoch(self) -> None:
+        """A later lower-loss but unsafe epoch cannot shadow a valid candidate."""
+        from skeleton.app.local_ai_benchmark import SCHEMA
+
+        with tempfile.TemporaryDirectory() as directory:
+            source, train, heldout, dest = self._fixture(directory)
+            suite = Path(directory) / "protected.json"
+            suite.write_text(json.dumps({
+                "schema": SCHEMA,
+                "cases": [
+                    {"id": "one", "category": "dialog", "text": "alpha beta user"},
+                    {"id": "two", "category": "dialog", "text": "beta alpha user"},
+                    {"id": "three", "category": "safety", "text": "assistant beta alpha"},
+                    {"id": "four", "category": "safety", "text": "alpha assistant beta"},
+                ],
+            }), encoding="utf-8")
+            before = source.read_bytes()
+            verdicts = [
+                {"passes_local_regression_gate": True},
+                {"passes_local_regression_gate": False},
+                {"passes_local_regression_gate": True},
+            ]
+            # Epoch 1: safer but worse than epoch 2. Epoch 2 is rejected
+            # and should never be published or recorded as best_epoch.
+            with patch(
+                "skeleton.app.local_ai_improvement._token_weighted_perplexity",
+                side_effect=[4.0, 3.0, 2.0, 3.0],
+            ), patch(
+                "skeleton.app.local_ai_benchmark.compare_benchmark_results",
+                side_effect=verdicts,
+            ) as checked:
+                receipt = improve_local_model(
+                    source, train, heldout, dest, epochs=2,
+                    protected_suite=suite,
+                )
+            self.assertEqual(checked.call_count, 3)
+            self.assertEqual(receipt.best_epoch, 1)
+            self.assertEqual(receipt.attempted_epochs, 2)
+            self.assertEqual(receipt.accepted_perplexity, 3.0)
+            self.assertTrue(receipt.protected_suite_passed)
+            self.assertEqual(source.read_bytes(), before)
+            self.assertNotEqual(
+                load_native_checkpoint(dest).model_digest,
+                load_native_checkpoint(source).model_digest,
+            )
+
     def test_cli_protected_suite_requires_improvement_command(self) -> None:
         from skeleton.app.cli import run_app_cli
 

@@ -250,16 +250,37 @@ def improve_local_model(
         observed = _token_weighted_perplexity(model, heldout_lines)
         if not math.isfinite(observed) or observed <= 0:
             raise OfflineImprovementError("candidate produced nonfinite held-out perplexity")
-        if observed < best_score - MIN_VALIDATION_IMPROVEMENT:
-            best_score = observed
-            best_epoch = epoch
-            best_snapshot = model.snapshot()
+        if observed >= best_score - MIN_VALIDATION_IMPROVEMENT:
+            continue
+        snapshot = model.snapshot()
+        if protected_evidence is not None:
+            from skeleton.app.local_ai_benchmark import (
+                _evaluate_backend, compare_benchmark_results,
+            )
+
+            # Evaluate this epoch's actual weights, not the source baseline
+            # and not a later epoch selected exclusively by held-out loss.
+            tested = NativeRuntimeLocalModel(
+                NativeLLMRuntime(TinyTransformer.from_snapshot(snapshot))
+            )
+            comparison = compare_benchmark_results(
+                protected_baseline, _evaluate_backend(protected_evidence, tested),
+            )
+            if not comparison["passes_local_regression_gate"]:
+                continue
+        best_score = observed
+        best_epoch = epoch
+        best_snapshot = snapshot
 
     if not best_epoch or best_snapshot is None:
         # A failed evaluation never calls the writer and cannot overwrite the
         # original model; evidence of training work alone is not promotion.
         raise OfflineImprovementError(
-            "no held-out improvement; candidate refused and parent checkpoint retained"
+            (
+                "no eligible improvement passed protected benchmark categories"
+                if protected_evidence is not None
+                else "no held-out improvement; candidate refused and parent checkpoint retained"
+            )
         )
     trained = TinyTransformer.from_snapshot(best_snapshot)
     candidate = NativeRuntimeLocalModel(NativeLLMRuntime(trained))
@@ -275,9 +296,10 @@ def improve_local_model(
             _evaluate_backend, compare_benchmark_results,
         )
 
-        guarded_result = _evaluate_backend(protected_evidence, candidate)
+        # Recheck the *published* candidate independently of the in-epoch
+        # test and refuse any snapshot/reload scoring divergence.
         guarded_verdict = compare_benchmark_results(
-            protected_baseline, guarded_result,
+            protected_baseline, _evaluate_backend(protected_evidence, candidate),
         )
         if not guarded_verdict["passes_local_regression_gate"]:
             raise OfflineImprovementError(

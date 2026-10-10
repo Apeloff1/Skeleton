@@ -67,6 +67,9 @@ def _parser() -> argparse.ArgumentParser:
 
     local_ai = sub.add_parser("local-ai", help="run native AI locally, without Docker or provider credentials")
     local_ai.add_argument("--model", help="native content-addressed checkpoint for headless inference")
+    local_ai.add_argument("--gguf-model", help="explicit local GGUF open-weight artifact for llama.cpp inference")
+    local_ai.add_argument("--llama-executable", help="explicit local llama.cpp executable (not downloaded)")
+
     local_ai.add_argument("--inspect-model", action="store_true", help="validate model weights and report offline runtime limits")
     local_ai.add_argument("--prepare-dataset", help="flat folder of explicit UTF-8 .txt documents")
     local_ai.add_argument("--dataset-output", help="new directory for disjoint train/validation and identity manifest")
@@ -75,6 +78,7 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--verify-sources", help="optional original source folder for strict source-to-dataset verification")
     local_ai.add_argument("--validation-percent", type=int, default=25, help="source-document validation split percent (10–50)")
     local_ai.add_argument("--split-seed", type=int, default=41, help="reproducible source-document split seed")
+    local_ai.add_argument("--self-check", action="store_true", help="verify bundled offline native inference, CPU training and benchmarking")
     local_ai.add_argument("--train-corpus", help="train a bounded CPU native checkpoint from a local UTF-8 text file")
     local_ai.add_argument("--improve-model", help="previous native checkpoint for independent held-out improvement")
     local_ai.add_argument("--compare-model", help="baseline checkpoint for read-only held-out comparison")
@@ -87,10 +91,10 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--replay-improvement", help="verify JSON receipt by regenerating exact native weights in temporary storage")
 
     local_ai.add_argument("--output-model", help="new native checkpoint filename for --train-corpus")
-    local_ai.add_argument("--epochs", type=int, default=1, help="bounded native CPU training passes (1-4)")
+    local_ai.add_argument("--epochs", type=int, default=None, help="bounded native CPU training passes (1-4)")
 
     local_ai.add_argument("--prompt", help="headless text request (requires --model)")
-    local_ai.add_argument("--max-output-tokens", type=int, default=8)
+    local_ai.add_argument("--max-output-tokens", type=int, default=None)
     local_ai.add_argument("--json", action="store_true", dest="as_json", help="print a bound inference receipt")
     local_ai.add_argument("--load-chat", help="restore verified turns from explicit model-bound local transcript")
     local_ai.add_argument("--save-chat", help="atomically export model-bound local transcript after inference")
@@ -244,10 +248,11 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 or args.prepare_dataset or args.dataset_output or args.verify_dataset
                 or args.train_corpus or args.eval_corpus
                 or args.model or args.prompt or args.inspect_model
+                or args.gguf_model or args.llama_executable or args.self_check
                 or args.compare_model or args.candidate_model or args.benchmark_suite
                 or args.exclude_train_corpus or args.replay_improvement
                 or args.load_chat or args.save_chat
-                or args.max_output_tokens != 8
+                or args.max_output_tokens is not None
                 or args.validation_percent != 25 or args.split_seed != 41
             ):
                 print("--improve-dataset requires --improve-model and --output-model; optional --epochs, --verify-sources and --protect-suite")
@@ -257,7 +262,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             try:
                 result = improve_native_dataset(
                     args.improve_model, args.improve_dataset, args.output_model,
-                    epochs=args.epochs, original_sources=args.verify_sources,
+                    epochs=args.epochs if args.epochs is not None else 1, original_sources=args.verify_sources,
                     protected_suite=args.protect_suite,
                 )
             except (ValueError, RuntimeError, OSError) as exc:
@@ -278,12 +283,13 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             if (
                 not args.verify_dataset or args.prepare_dataset or args.dataset_output
                 or args.model or args.prompt or args.inspect_model
+                or args.gguf_model or args.llama_executable or args.self_check
                 or args.train_corpus or args.output_model or args.improve_model
                 or args.compare_model or args.candidate_model or args.eval_corpus
                 or args.benchmark_suite or args.exclude_train_corpus
                 or args.protect_suite or args.replay_improvement
                 or args.load_chat or args.save_chat
-                or args.epochs != 1 or args.max_output_tokens != 8
+                or args.epochs is not None or args.max_output_tokens is not None
                 or args.validation_percent != 25 or args.split_seed != 41
             ):
                 print("dataset verification requires --verify-dataset and optional --verify-sources only")
@@ -311,13 +317,14 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             if (
                 not args.prepare_dataset or not args.dataset_output
                 or args.model or args.prompt or args.inspect_model
+                or args.gguf_model or args.llama_executable or args.self_check
                 or args.train_corpus or args.output_model or args.improve_model
                 or args.compare_model or args.candidate_model or args.eval_corpus
                 or args.benchmark_suite or args.exclude_train_corpus
                 or args.protect_suite or args.replay_improvement
                 or args.load_chat or args.save_chat
                 or args.verify_dataset or args.verify_sources
-                or args.epochs != 1 or args.max_output_tokens != 8
+                or args.epochs is not None or args.max_output_tokens is not None
             ):
                 print("local-ai dataset preparation requires only --prepare-dataset, --dataset-output and optional split controls")
                 return 2
@@ -345,20 +352,73 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         if args.validation_percent != 25 or args.split_seed != 41:
             print("--validation-percent and --split-seed require --prepare-dataset")
             return 2
+        if args.self_check:
+            if any((
+                args.model, args.gguf_model, args.llama_executable,
+                args.inspect_model, args.train_corpus, args.improve_model,
+                args.compare_model, args.candidate_model, args.eval_corpus,
+                args.benchmark_suite, args.exclude_train_corpus, args.protect_suite,
+                args.replay_improvement, args.output_model, args.prompt,
+                args.load_chat, args.save_chat,
+                args.epochs is not None, args.max_output_tokens is not None,
+            )):
+                print("local-ai --self-check does not accept model, dataset or training options")
+                return 2
+            from skeleton.app.local_ai_acceptance import run_offline_acceptance
+
+            result = run_offline_acceptance()
+            if args.as_json:
+                print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+            else:
+                for check in result["checks"]:
+                    print(("[PASS] " if check["passed"] else "[FAIL] ") + str(check["name"]))
+                print("Offline native self-check: " + ("PASS" if result["passed"] else "FAIL"))
+                print("Model quality, GGUF weights and enterprise release: not certified")
+            return 0 if result["passed"] else 1
+
+        if args.gguf_model or args.llama_executable:
+            if (
+                not args.gguf_model or not args.llama_executable or not args.prompt
+                or args.model or args.inspect_model or args.train_corpus
+                or args.improve_model or args.compare_model or args.candidate_model
+                or args.eval_corpus or args.benchmark_suite or args.exclude_train_corpus
+                or args.protect_suite or args.replay_improvement or args.output_model
+                or args.load_chat or args.save_chat or args.epochs is not None
+            ):
+                print("GGUF inference requires --gguf-model, --llama-executable and --prompt only")
+                return 2
+            from skeleton.app.local_ai_gguf import generate_local_gguf_sync
+
+            try:
+                evidence = generate_local_gguf_sync(
+                    args.llama_executable, args.gguf_model, args.prompt,
+                    max_output_tokens=(
+                        args.max_output_tokens if args.max_output_tokens is not None
+                        else 128
+                    ),
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local GGUF request rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(evidence, ensure_ascii=False, sort_keys=True))
+            else:
+                print(evidence["text"])
+            return 0
 
         # Never accept tuning switches that a mode would silently ignore.
         # A replay always uses epochs pinned inside its original receipt;
         # inspection, evaluation and inference do not train any weights.
-        if args.epochs != 1 and (
+        if args.epochs is not None and (
             not args.train_corpus
             or args.replay_improvement
             or args.compare_model
-            or args.candidate_model and not args.improve_model
+            or (args.candidate_model and not args.improve_model)
             or args.benchmark_suite
         ):
             print("--epochs applies only to local training or continued training")
             return 2
-        if args.max_output_tokens != 8 and (
+        if args.max_output_tokens is not None and (
             args.train_corpus or args.improve_model or args.replay_improvement
             or args.benchmark_suite or args.compare_model or args.candidate_model
             or args.inspect_model
@@ -476,7 +536,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             try:
                 receipt = improve_local_model(
                     args.improve_model, args.train_corpus, args.eval_corpus,
-                    args.output_model, epochs=args.epochs,
+                    args.output_model, epochs=args.epochs if args.epochs is not None else 1,
                     protected_suite=args.protect_suite,
                 )
             except (ValueError, RuntimeError, OSError) as exc:
@@ -502,7 +562,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             from skeleton.app.local_ai_training import train_local_text
 
             try:
-                receipt = train_local_text(args.train_corpus, args.output_model, epochs=args.epochs)
+                receipt = train_local_text(args.train_corpus, args.output_model, epochs=args.epochs if args.epochs is not None else 1)
             except (ValueError, RuntimeError, OSError) as exc:
                 print("local-ai training rejected: " + type(exc).__name__ + ": " + str(exc))
                 return 1
@@ -549,7 +609,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 session = OfflineAISession(load_native_checkpoint(args.model))
                 if args.load_chat:
                     session.import_transcript(args.load_chat)
-                answer = asyncio.run(session.ask(args.prompt, max_output_tokens=args.max_output_tokens))
+                answer = asyncio.run(session.ask(args.prompt, max_output_tokens=args.max_output_tokens if args.max_output_tokens is not None else 8))
                 chat_digest = session.export_transcript(args.save_chat) if args.save_chat else None
             except (ValueError, RuntimeError, OSError) as exc:
                 print("local-ai request rejected: " + type(exc).__name__ + ": " + str(exc))

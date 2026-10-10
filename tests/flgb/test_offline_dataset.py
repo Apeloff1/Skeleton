@@ -456,7 +456,9 @@ class TestVerifiedDatasetImprovement(unittest.TestCase):
                 self.assertEqual(status, 0, output.getvalue())
                 self.assertEqual(json.loads(output.getvalue())["dataset"]["dataset_id"], curated["dataset_id"])
             for extra in (["--train-corpus", "unused"], ["--eval-corpus", "unused"],
-                          ["--verify-dataset", str(prepared)], ["--prompt", "hello"]):
+                          ["--verify-dataset", str(prepared)], ["--prompt", "hello"],
+                          ["--gguf-model", "unused"], ["--llama-executable", "unused"],
+                          ["--self-check"], ["--max-output-tokens", "8"]):
                 with redirect_stdout(StringIO()):
                     status = run_app_cli([
                         "local-ai", "--improve-dataset", str(prepared), "--improve-model", str(parent),
