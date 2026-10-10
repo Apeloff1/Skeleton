@@ -10,6 +10,7 @@ from hashlib import sha256
 
 from .contracts import canonical_digest
 from .practice_game_library import load_practice_game, list_practice_games
+from .playable_simulation import GameReplay, verify_replay
 
 
 class PracticeSelectionError(ValueError):
@@ -123,3 +124,31 @@ def plan_practice_progression(
     if len(set(indices)) != count:
         raise PracticeSelectionError("practice progression repeated a game")
     return tuple(available[index] for index in indices)
+
+
+def verified_practice_run(
+    game_id: str, replay: GameReplay, *, authorized: bool,
+) -> dict[str, object]:
+    """Re-simulate a player attempt; emit a privacy-light result receipt."""
+    if authorized is not True:
+        raise PermissionError("practice run verification requires authorization")
+    if not isinstance(replay, GameReplay):
+        raise PracticeSelectionError("typed practice replay required")
+    game = load_practice_game(game_id, authorized=True)
+    verify_replay(game.world, replay, authorized=True)
+    state = replay.final_state
+    return {
+        "schema": "skeleton.dragon.practice_game_attempt.v1",
+        "game_id": game_id,
+        "world_digest": game.world.digest,
+        "replay_digest": replay.digest,
+        "status": state.status,
+        "health_remaining": state.health,
+        "score": state.score,
+        "steps": state.steps,
+        "reference_solution_steps": len(game.proof.action_receipts),
+        "completed": state.status == "won",
+        "independent_quality_approved": False,
+        "training_authorized": False,
+        "memory_promotion_authorized": False,
+    }
