@@ -336,6 +336,8 @@ def evaluate_independent_review(
     reviewers = {r.key_id:r for r in trust_registry if isinstance(r, TrustedReviewer)}
     if len(reviewers) != len(trust_registry):
         raise ReleaseReviewError("duplicate or malformed external trust keys")
+    if len({r.key_id.casefold() for r in trust_registry}) != len(trust_registry):
+        raise ReleaseReviewError("ambiguous signer key identity in external reviewer registry")
     if len({r.reviewer_id.casefold() for r in trust_registry}) != len(trust_registry):
         raise ReleaseReviewError("multiple keys for one reviewer require separate key rotation")
     if len({r.public_key_hex for r in trust_registry}) != len(trust_registry):
