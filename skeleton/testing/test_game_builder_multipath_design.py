@@ -307,3 +307,13 @@ def test_hazard_exposure_counts_near_misses_without_collision():
     assert route_exposure_score(p, route, radius=2) > 0
     assert route_exposure_score(p, route, radius=1) <= route_exposure_score(p, route, radius=2)
 
+
+def test_navigation_friction_changes_with_extra_turns_and_revisits():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    clean = solve_route(p)
+    looping = evaluate_route(p, ("down", "up") + clean.actions)
+    assert route_friction_ppm(p, clean) == 0
+    assert route_friction_ppm(p, looping) > 0
+    with pytest.raises(MultipathError):
+        route_friction_ppm(p, clean, turn_weight=-1)
+
