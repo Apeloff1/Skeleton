@@ -45,3 +45,13 @@ def test_ay38910_psg_12bit_tone_range():
     with pytest.raises(AudioKernelError):
         ay38910_tone_period(0)
 
+
+def test_pulse_pcm_duty_phase_and_sampling_bounds():
+    pcm=pulse_pcm(1000,8000,8)
+    assert pcm==(32767,)*4+(-32767,)*4
+    assert pulse_pcm(1000,8000,16)[:8]==pcm
+    with pytest.raises(AudioKernelError):
+        pulse_pcm(6000,8000,8)
+    with pytest.raises(AudioKernelError):
+        pulse_pcm(100,8000,8,duty_num=2,duty_den=2)
+
