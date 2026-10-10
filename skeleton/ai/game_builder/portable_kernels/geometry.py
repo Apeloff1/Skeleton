@@ -64,3 +64,15 @@ def bresenham_line(start: object, end: object) -> tuple[tuple[int,int],...]:
         if twice<=dx:
             error+=dx
             y0+=step_y
+
+def line_of_sight(rows: object, start: object, target: object) -> bool:
+    """Grid ray visibility that never sees through walls or off-map tiles."""
+    grid=_grid(rows)
+    a=_point(start)
+    b=_point(target)
+    width,height=len(grid[0]),len(grid)
+    if any(not (0<=x<width and 0<=y<height) for x,y in (a,b)):
+        raise GeometryError("ray origin or target outside map")
+    if grid[a[1]][a[0]]=="#":
+        raise GeometryError("ray starts inside opaque wall")
+    return all(grid[y][x]!="#" for x,y in bresenham_line(a,b)[1:])
