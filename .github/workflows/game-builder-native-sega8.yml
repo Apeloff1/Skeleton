@@ -12,6 +12,10 @@ on:
       - "skeleton/ai/game_builder/playable_world.py"
       - "skeleton/ai/game_builder/port_planner.py"
       - "scripts/game_builder/native_sega_8bit_ci.py"
+      - "scripts/game_builder/sega8_source_replay.py"
+      - "scripts/game_builder/sega8_host_shim.h"
+      - "scripts/game_builder/sega8_host_replay.c"
+      - "skeleton/testing/test_game_builder_sega8_host_replay.py"
       - "scripts/game_builder/sega_reproducibility_ci.py"
       - "skeleton/ai/game_builder/sega_reproducibility.py"
       - "skeleton/testing/test_game_builder_sega_reproducibility.py"
@@ -74,7 +78,30 @@ jobs:
         run: |
           python -m scripts.game_builder.native_sega_8bit_ci \
             --target "$TARGET" --emit "output/$TARGET" \
-            --author-evidence /tmp/original-sega-authorship.txt > "/tmp/$TARGET-generated-source.json"
+            --author-evidence /tmp/original-sega-authorship.txt \
+            --host-reference-out "/tmp/$TARGET-source-game-route.json" \
+            > "/tmp/$TARGET-generated-source.json"
+      - name: Host-compile actual original game C and replay authoritative actions
+        env:
+          TARGET: ${{ matrix.platform }}
+        run: |
+          python -m scripts.game_builder.sega8_source_replay \
+            --source-dir "output/$TARGET" \
+            --reference "/tmp/$TARGET-source-game-route.json" \
+            --receipt-out "/tmp/$TARGET-host-gameplay-receipt.json"
+          python - <<'PY'
+          import json,os
+          target=os.environ["TARGET"]
+          r=json.load(open("/tmp/"+target+"-host-gameplay-receipt.json",encoding="utf-8"))
+          assert r["native_game_c_compiled_and_executed_on_host"] is True
+          assert r["all_level_completion_verified"] is True
+          assert r["original_companion_rank_progression_verified"] is True
+          assert r["original_score_and_screen_state_verified"] is True
+          assert r["original_controller_actions_verified"] > 50
+          assert r["full_console_emulator_playthrough_verified"] is False
+          assert r["physical_hardware_verified"] is False
+          assert r["release_approved"] is False
+          PY
       - name: Build actual original cartridge with SDCC and devkitSMS
         env:
           TARGET: ${{ matrix.platform }}
@@ -169,6 +196,8 @@ jobs:
             output/${{ matrix.platform }}/manifest.json
             /tmp/${{ matrix.platform }}-compilation-evidence.json
             /tmp/${{ matrix.platform }}-reproducibility.json
+            /tmp/${{ matrix.platform }}-source-game-route.json
+            /tmp/${{ matrix.platform }}-host-gameplay-receipt.json
           if-no-files-found: error
           retention-days: 7
       # No ROM is published: legal review and real emulator or hardware
