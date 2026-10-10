@@ -109,3 +109,35 @@ def distance_field(rows: object, origin: object) -> tuple[tuple[int,...],...]:
                 costs[ny][nx]=costs[y][x]+1
                 queue.append((nx,ny))
     return tuple(tuple(row) for row in costs)
+
+def astar_path(rows: object, origin: object, destination: object) -> tuple[tuple[int,int],...]:
+    """Optimal grid path with deterministic tie order and hard map-size cap."""
+    grid=_grid(rows)
+    start=_point(origin)
+    goal=_point(destination)
+    width,height=len(grid[0]),len(grid)
+    if any(not(0<=x<width and 0<=y<height) or grid[y][x]=="#"
+           for x,y in (start,goal)):
+        raise GeometryError("A* endpoints must lie on traversable tiles")
+    queue=[(abs(start[0]-goal[0])+abs(start[1]-goal[1]),0,start[1],start[0])]
+    previous={start:None}
+    cost={start:0}
+    while queue:
+        _,steps,y,x=heappop(queue)
+        current=(x,y)
+        if steps!=cost[current]:
+            continue
+        if current==goal:
+            reverse=[]
+            while current is not None:
+                reverse.append(current)
+                current=previous[current]
+            return tuple(reversed(reverse))
+        for nxt in walkable_tile_neighbors(grid,current):
+            alternative=steps+1
+            if alternative<cost.get(nxt,4097):
+                cost[nxt]=alternative
+                previous[nxt]=current
+                priority=alternative+abs(nxt[0]-goal[0])+abs(nxt[1]-goal[1])
+                heappush(queue,(priority,alternative,nxt[1],nxt[0]))
+    return ()
