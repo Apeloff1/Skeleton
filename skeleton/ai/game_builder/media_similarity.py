@@ -74,6 +74,34 @@ class MediaMatchEvidence:
     media_similarity_score: float | None
     legal_infringement_determined: bool = False
 
+    def __post_init__(self) -> None:
+        if self.category not in {"artwork", "music_audio"}:
+            raise MediaScreenError("unsupported media review category")
+        if any(not isinstance(x, str) or not 1 <= len(x) <= 128
+               or any(ord(c) < 32 for c in x)
+               for x in (self.submitted_id, self.reference_id)):
+            raise MediaScreenError("media review identities must be bounded text")
+        if any(not isinstance(x, str) or len(x) != 64
+               or any(c not in "0123456789abcdef" for c in x)
+               for x in (self.submitted_sha256, self.reference_sha256)):
+            raise MediaScreenError("media review digests must be canonical")
+        if self.signal not in {
+            "EXACT_MEDIA_BYTES", "VISUAL_PERCEPTUAL_REVIEW", "WAV_ENERGY_ENVELOPE_REVIEW",
+        }:
+            raise MediaScreenError("unsupported media review signal")
+        if (type(self.matched_bytes) is not bool or
+                self.matched_bytes != (self.signal == "EXACT_MEDIA_BYTES")):
+            raise MediaScreenError("media byte-match signal inconsistent")
+        if (self.matched_bytes
+                and self.submitted_sha256 != self.reference_sha256):
+            raise MediaScreenError("identical media requires identical content hashes")
+        if (self.media_similarity_score is None or type(self.media_similarity_score) not in (float, int)
+                or not isfinite(self.media_similarity_score)
+                or not 0 <= self.media_similarity_score <= 1):
+            raise MediaScreenError("invalid bounded media review score")
+        if self.legal_infringement_determined is not False:
+            raise MediaScreenError("media similarity cannot determine legal infringement")
+
 
 def fingerprint_image(media_id: str, data: bytes) -> MediaFingerprint:
     """dHash triage for images; no OCR or reproducing reference images."""
