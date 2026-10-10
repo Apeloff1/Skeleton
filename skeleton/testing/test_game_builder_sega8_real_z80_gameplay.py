@@ -12,7 +12,9 @@ import pytest
 from scripts.game_builder.emulate_sega8_sdcc_boot import Sega8Machine
 from scripts.game_builder.sega8_real_z80_gameplay import (
     Sega8NativeGameplayError, _glyph, _read_project, observe_actual_gameplay,
-    verify_original_z80_gameplay,
+    verify_original_z80_gameplay, advance_semantic_trace,
+    ActualZ80GameSession, MAX_TOTAL_GAMEPLAY_FRAMES,
+    MAX_TOTAL_GAMEPLAY_INSTRUCTIONS, MAX_INSTRUCTION_FRAMES,
 )
 
 
@@ -127,3 +129,64 @@ def test_native_source_manifest_type_bounds_and_release_gate_fail_closed(tmp_pat
     manifest.symlink_to(outside)
     with pytest.raises(Exception):
         _read_project(source,target)
+
+
+
+def test_native_semantic_trace_is_deterministic_for_same_screen_and_actions_across_consoles():
+    seed=bytes.fromhex("0f"*32)
+    game_state={
+        "level":0,"x":1,"y":2,"health":5,"score":0,
+        "gems_remaining":4,"bond_rank":0,
+    }
+    first=advance_semantic_trace(seed,0,None,game_state)
+    right=advance_semantic_trace(first,1,"right",{**game_state,"x":2})
+    assert right==advance_semantic_trace(
+        advance_semantic_trace(seed,0,None,game_state),
+        1,"right",{**game_state,"x":2},
+    )
+    assert right!=advance_semantic_trace(first,1,"left",{**game_state,"x":2})
+    assert right!=advance_semantic_trace(first,1,"right",{**game_state,"x":3})
+    assert right!=advance_semantic_trace(first,2,"right",{**game_state,"x":2})
+    assert right!=advance_semantic_trace(first,1,"right",{**game_state,"score":10,"x":2})
+    assert len(right)==32
+
+
+@pytest.mark.parametrize("index,button,state",[
+    (0,"right",{"level":0,"x":1,"y":2,"health":5,"score":0,"gems_remaining":4,"bond_rank":0}),
+    (1,None,{"level":0,"x":1,"y":2,"health":5,"score":0,"gems_remaining":4,"bond_rank":0}),
+    (-1,"left",{"level":0,"x":1,"y":2,"health":5,"score":0,"gems_remaining":4,"bond_rank":0}),
+    (1,"jump",{"level":0,"x":1,"y":2,"health":5,"score":0,"gems_remaining":4,"bond_rank":0}),
+    (1,"right",{"level":0,"x":1,"y":2,"health":5,"score":0,"gems_remaining":4,"bond_rank":False}),
+    (1,"right",{"level":0,"x":1,"y":2,"health":5,"score":0,"gems_remaining":4}),
+    (1,"right",{"level":0,"x":1,"y":2,"health":5,"score":0,"gems_remaining":4,"bond_rank":0,"copied_game":"bad"}),
+])
+def test_native_semantic_transcript_rejects_forged_or_invalid_controller_screen_fields(
+    index,button,state,
+):
+    with pytest.raises(Sega8NativeGameplayError):
+        advance_semantic_trace(bytes(32),index,button,state)
+
+
+@pytest.mark.parametrize("invalid",[bytes(31),bytes(33),None,"f"*64,b"",True])
+def test_native_semantic_transcript_never_accepts_non_digest_parent(invalid):
+    state={
+        "level":0,"x":0,"y":0,"health":5,"score":0,
+        "gems_remaining":3,"bond_rank":0,
+    }
+    with pytest.raises(Sega8NativeGameplayError):
+        advance_semantic_trace(invalid,0,None,state)
+
+
+def test_bounded_native_gameplay_denies_runaway_frame_before_running_cpu():
+    session=object.__new__(ActualZ80GameSession)
+    session.frames=MAX_TOTAL_GAMEPLAY_FRAMES
+    with pytest.raises(Sega8NativeGameplayError,match="frame cap"):
+        session.step_frame("up")
+
+
+def test_bounded_native_gameplay_denies_runaway_instructions_before_running_cpu():
+    session=object.__new__(ActualZ80GameSession)
+    session.frames=0
+    session.instructions=MAX_TOTAL_GAMEPLAY_INSTRUCTIONS-MAX_INSTRUCTION_FRAMES+1
+    with pytest.raises(Sega8NativeGameplayError,match="instruction budget"):
+        session.step_frame("left")
