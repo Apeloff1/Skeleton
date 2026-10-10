@@ -155,6 +155,8 @@ def test_real_air_plane_ferry_and_space_itineraries_consume_time_money_and_gates
     assert "wormhole" in space.modes
     assert "world_transition" in space.shapes
     assert space.elapsed_minutes>180
+    assert space.fuel_used==45
+    assert space.mana_used==15
     assert space.money_spent>ferry.money_spent
     assert space.sights>0
     no_ticket=replace(hero,cash=50)
@@ -251,3 +253,53 @@ def test_route_search_refuses_unbounded_or_unverifiable_planning_intent(conditio
     world,hero=make_frontier()
     with pytest.raises(ValueError):
         plan(world,hero,**{condition[0]:condition[1]})
+
+
+
+def test_underwater_tunnels_pay_actual_bounded_oxygen_and_do_not_magic_refill():
+    world,traveller=make_frontier(seed=1977)
+    actions=("walk_to_bazaar","harbor_path","harbor_to_reef",
+             "reef_to_gate","gate_to_goal")
+    dive=replay(world,actions,traveller)
+    assert dive.success
+    assert dive.oxygen_used==37
+    assert dive.fuel_used==0 and dive.mana_used==0
+    assert "dive" in dive.modes
+    exhausted=replace(traveller,oxygen=36)
+    with pytest.raises(ValueError,match="locked or unsafe"):
+        replay(world,actions,exhausted)
+    with pytest.raises(ValueError):
+        replay(world,actions,replace(traveller,oxygen=-1))
+
+
+def test_space_travel_and_arcane_shortcuts_require_actual_fuel_and_mana():
+    world,hero=make_frontier(seed=1977)
+    flight=("spaceport_access","shuttle_to_orbit",
+            "orbit_to_moon","moon_to_citadel")
+    for resource in ("fuel","mana"):
+        with pytest.raises(ValueError):
+            replay(world,flight,replace(hero,**{resource:0}))
+    magic=("forest_entry","forest_to_ruins",
+           "magic_circle_entry","magic_gateway")
+    assert replay(world,magic,hero).mana_used==12
+    with pytest.raises(ValueError):
+        replay(world,magic,replace(hero,mana=11))
+
+
+def test_original_multimodal_free_roaming_reports_live_resource_visibility():
+    world,hero=make_frontier(seed=1977)
+    route=("walk_to_bazaar","harbor_path","harbor_to_reef")
+    at_reef=experience(world,hero,path=route)
+    assert at_reef["remaining_oxygen"]==60
+    assert at_reef["remaining_fuel"]==60
+    assert at_reef["remaining_mana"]==60
+    dive=next(x for x in at_reef["options"] if x["edge"]=="reef_to_gate")
+    assert dive["available"] is True
+    assert dive["oxygen"]==22
+    underwater=experience(world,hero,path=route+("reef_to_gate",))
+    assert underwater["remaining_oxygen"]==38
+    assert underwater["world_position"]=="submerged_gate"
+    drained=experience(world,replace(hero,oxygen=20),path=route)
+    blocked=next(x for x in drained["options"] if x["edge"]=="reef_to_gate")
+    assert not blocked["available"]
+    assert blocked["access"]=="oxygen_required"
