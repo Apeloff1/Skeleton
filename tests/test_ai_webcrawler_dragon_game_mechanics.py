@@ -397,3 +397,14 @@ def test_persisted_game_label_tampering_invalidates_session_identity():
     with pytest.raises(ValueError, match="identity differs"):
         store.distill("alice", authorized=True)
 
+
+def test_persisted_notes_cannot_bypass_byte_budget():
+    import json
+    store = setup()
+    store.record(session(store), authorized=True)
+    original = json.loads(store.db.execute("SELECT observations_json FROM dragon_game_sessions").fetchone()[0])
+    original[0][2] = "X" * 6000
+    store.db.execute("UPDATE dragon_game_sessions SET observations_json=?", (json.dumps(original),))
+    with pytest.raises(ValueError, match="cell validation"):
+        store.sessions("alice", authorized=True)
+
