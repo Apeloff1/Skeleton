@@ -240,6 +240,9 @@ class GameMechanicsMemory:
         """, (owner, limit)).fetchall()
         sessions = []
         for session_id, label, duration, raw in rows:
+            if (not isinstance(raw, str)
+                    or len(raw.encode("utf-8")) > MAX_STORED_SESSION_BYTES):
+                raise ValueError("stored game observations exceed byte budget")
             observations = tuple(
                 GameObservation(t, Mechanic(m), d, c, PreferenceSignal(p), u)
                 for t, m, d, c, p, u in json.loads(raw)
