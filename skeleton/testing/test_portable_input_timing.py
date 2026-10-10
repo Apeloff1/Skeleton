@@ -54,3 +54,12 @@ def test_trigger_hysteresis_eliminates_oscillating_threshold_clicks():
     with pytest.raises(InputTimingError):
         digital_hysteresis((100,),press=10000,release=12000)
 
+
+def test_eight_way_controller_ports_cardinals_and_diagonals():
+    assert axis_to_eightway(0,0)=="neutral"
+    assert axis_to_eightway(32767,-32768)=="ne"
+    assert axis_to_eightway(-32768,32767)=="sw"
+    assert axis_to_eightway(8192,0)=="neutral"
+    with pytest.raises(InputTimingError):
+        axis_to_eightway(True,0)
+
