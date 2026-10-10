@@ -14,3 +14,10 @@ def test_walkable_neighbors_ordering_and_wall_bounds():
         walkable_tile_neighbors(grid,(0,0))
     with pytest.raises(GeometryError):
         walkable_tile_neighbors(("x",),(0,0))
+
+def test_bresenham_line_exact_integer_pixel_coverage():
+    assert bresenham_line((0,0),(3,0))==((0,0),(1,0),(2,0),(3,0))
+    assert bresenham_line((0,0),(3,3))==((0,0),(1,1),(2,2),(3,3))
+    assert bresenham_line((3,0),(0,0))==tuple(reversed(bresenham_line((0,0),(3,0))))
+    with pytest.raises(GeometryError):
+        bresenham_line((-1,0),(0,0))
