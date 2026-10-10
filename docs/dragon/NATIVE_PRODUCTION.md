@@ -538,6 +538,54 @@ capture, verified controller hardware, OS signing, independent publisher
 authentication, or subjective game quality. The cross-platform build
 gates must still pass on the exact PR head before production signoff.
 
+### Original-game editor: reversible painting, stage order and live exact hints
+
+The authenticated native creator now provides a **full reversible authoring
+session** rather than a one-way 12×10 paint canvas:
+
+- Up to 96 real whole-campaign undo/redo snapshots, covering wall/goal/crate
+  edits, hero relocation as a **single undoable operation**, and stage
+  reordering. Any new edit discards the redo branch, and imported packs start
+  fresh history. The source is in
+  \`frontend/src/product/dragonPuzzleHistory.ts\` and its executable Node24
+  regression suite—not just a visual button.
+- Stage sequencing controls reorder the actual emitted boards while preserving
+  the authored grids. Changing the stage order or any map tile immediately
+  invalidates previous source-export approval and any pending live hint.
+- Exact authenticated level validation supplies the shortest proven move
+  sequence for each board. The Expo editor can **step through** those
+  actual local Sokoban moves in a guided walkthrough and detects divergence
+  from the expected optimal path. A walkthrough is a demonstration, not a
+  claim of user skill or an AI learning credit.
+- The creator can ask for a **fresh current-position hint** after deviating
+  from the walkthrough. The guarded
+  \`POST /api/dragon-academy/native/production/puzzle/current-hint\` endpoint
+  accepts only a bounded 12×10 symbolic board and integer player/crate
+  positions, rejects overlaps and unknown fields, and uses the *same* exact
+  bounded BFS solver as the original level generator.
+- Native C99 \`dragon_game --hint-at STAGE MOVES\` replays movement,
+  undo/reset and returns its live shortest move and state fingerprint.
+  Compiler-gated tests compare that answer against the independent Python
+  solver and full original state digest at off-script positions.
+
+The Python hint endpoint is editor/admin-only and never invokes a compiler,
+ROM, filesystem toolchain, crawler, account promotion or remote model.
+It returns abstract-grid solvability scope—not hardware evidence. Hint results
+are invalidated when editing, switching stages, manually moving, undoing
+or replaying proof steps; they cannot silently approve changed source.
+
+\`\`\`sh
+# After a locally authorized real Linux game has been generated and built:
+./dragon_game --hint-at 1 d
+# Output: DRAGON_NATIVE_LIVE_HINT ... with actual current-state digest.
+\`\`\`
+
+\`frontend/scripts/test-dragon-native-puzzle-history.mjs\` checks the bounded
+96-step edit budget, stage-aware undo/redo, avatar relocation, alternate
+branches and input bounds. CI runs it together with the real original game
+preview physics test. The native compiler tests cover modified-position
+optimality, malformed action sequences and solved-state response semantics.
+
 ### Release verification and index integrity
 
 A release index is **not trusted merely because its archive hashes match**.
