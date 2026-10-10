@@ -45,6 +45,12 @@ _BASE = r"""/* Original independently-authored Z80 homebrew: __TARGET__.
 #define EXIT 4
 #define HERO 5
 #define DIGIT_BASE 6
+#define HERO_ALT 16
+#define BUDDY_IDLE 17
+#define BUDDY_BLINK 18
+#define BUDDY_HAPPY 19
+#define BUDDY_SAD 20
+#define BUDDY_CHEER 21
 
 static const unsigned char original_tiles[] = {
 __TILES__
@@ -62,6 +68,11 @@ static unsigned char board[MAP_SIZE];
 static unsigned char level_index, hero_x, hero_y, health, gems_left;
 static unsigned char won, lost, move_cooldown;
 static unsigned int score;
+/* Companion personality, graphics frames and real PSG audio are native. */
+static unsigned char companion_clock, companion_mood, companion_drawn, mood_hold;
+static unsigned char hero_pose;
+static unsigned char sound_frames, sound_phase;
+__sfr __at (0x7F) PSG_PORT;
 #define VRAM_QUEUE_CAPACITY 16
 #define VRAM_WRITES_PER_FRAME 3
 static unsigned char pending_x[VRAM_QUEUE_CAPACITY], pending_y[VRAM_QUEUE_CAPACITY];
@@ -101,6 +112,25 @@ static void flush_pending(void) {
     pending_count=remaining;
 }
 
+/* Three-channel PSG-compatible hardware; isolated channel 0 for short,
+ * self-authored notes. All writes are SDCC Z80 hardware I/O, never samples. */
+static void psg_start(unsigned int period, unsigned char frames) {
+    PSG_PORT=(unsigned char)(0x80 | (period & 15));
+    PSG_PORT=(unsigned char)((period >> 4) & 63);
+    PSG_PORT=0x92; /* fixed, quiet volume; no sampled or proprietary audio */
+    sound_frames=frames;
+    sound_phase=0;
+}
+static void psg_tick(void) {
+    if (sound_frames==0) return;
+    --sound_frames;
+    ++sound_phase;
+    if ((sound_phase & 3)==0) {
+        /* Original two-step arpeggiation, bounded to audio channel zero. */
+        PSG_PORT=(unsigned char)(0x80 | ((sound_phase >> 2) & 15));
+    }
+    if (sound_frames==0) PSG_PORT=0x9F; /* mute channel 0 */
+}
 /* All tile writes happen with the display off or immediately after VBlank. */
 static void write_cell(unsigned char x, unsigned char y) {
     SMS_setTileatXY(LEFT+x, TOP+y, board[(unsigned int)y*WIDTH+x]);
@@ -118,6 +148,8 @@ static void draw_hud(void) {
     SMS_setTileatXY(LEFT+14, HUD_Y, DIGIT_BASE+((score/100)%10));
     SMS_setTileatXY(LEFT+15, HUD_Y, DIGIT_BASE+((score/10)%10));
     SMS_setTileatXY(LEFT+16, HUD_Y, DIGIT_BASE+(score%10));
+    SMS_setTileatXY(LEFT+18, HUD_Y, companion_mood);
+    companion_drawn=companion_mood;
 }
 static void queue_hud(unsigned char tile) {
     if (tile==GEM) {
@@ -139,11 +171,34 @@ static void queue_hud(unsigned char tile) {
 static void draw_hero(void) {
     SMS_setTileatXY(LEFT+hero_x, TOP+hero_y, HERO);
 }
+static void animate_companion(void) {
+    unsigned char pose;
+    ++companion_clock;
+    if (mood_hold) {
+        --mood_hold;
+        pose=companion_mood;
+    } else {
+        pose=((companion_clock & 63)==0) ? BUDDY_BLINK : BUDDY_IDLE;
+        companion_mood=pose;
+    }
+    if (pose!=companion_drawn && pending_count==0) {
+        queue_tile(LEFT+18,HUD_Y,pose);
+        companion_drawn=pose;
+    }
+    if (pending_count==0 && (companion_clock & 31)==0) {
+        hero_pose=(hero_pose==HERO) ? HERO_ALT : HERO;
+        queue_tile(LEFT+hero_x,TOP+hero_y,hero_pose);
+    }
+}
 static void load_level(void) {
     unsigned int i;
     unsigned char x, y;
     SMS_displayOff();
     pending_count=0; /* old-stage writes cannot leak into the new level */
+    companion_mood=BUDDY_CHEER;
+    mood_hold=60;
+    companion_drawn=BUDDY_IDLE;
+    hero_pose=HERO;
     gems_left = GEMS_PER_LEVEL;
     hero_x = authored_spawn_x[level_index];
     hero_y = authored_spawn_y[level_index];
@@ -158,6 +213,9 @@ static void load_level(void) {
 }
 static void end_game(unsigned char victory) {
     if (victory) won=1; else lost=1;
+    companion_mood=victory ? BUDDY_CHEER : BUDDY_SAD;
+    mood_hold=180;
+    psg_start(victory ? 230 : 880, 32);
 #ifdef TARGET_GG
     GG_setBGPaletteColor(3, victory ? 0x0F0 : 0x00F);
 #else
@@ -180,7 +238,13 @@ static void advance(int dx, int dy) {
         board[position]=FLOOR;
         --gems_left;
         score+=10;
+        companion_mood=BUDDY_HAPPY;
+        mood_hold=45;
+        psg_start(300, 12);
     } else if (tile==HAZARD) {
+        companion_mood=BUDDY_SAD;
+        mood_hold=45;
+        psg_start(700, 18);
         if (health!=0) --health;
         if (health==0) end_game(0);
     } else if (tile==EXIT) {
@@ -188,10 +252,12 @@ static void advance(int dx, int dy) {
         if (level_index==LEVEL_COUNT) {
             end_game(1);
         } else {
+            psg_start(380, 20);
             load_level();
             return;
         }
     }
+    hero_pose=HERO;
     queue_tile(LEFT+hero_x,TOP+hero_y,HERO);
     queue_hud(tile);
 }
@@ -214,10 +280,17 @@ void main(void) {
     health=INITIAL_HEALTH;
     score=0;
     won=lost=move_cooldown=0;
+    companion_clock=0;
+    hero_pose=HERO;
+    companion_mood=BUDDY_IDLE;
+    sound_frames=0;
+    PSG_PORT=0x9F;
     load_level();
     for (;;) {
         SMS_waitForVBlank();
         flush_pending();
+        psg_tick();
+        animate_companion();
         if (won || lost || pending_count) continue;
         if (move_cooldown) { --move_cooldown; continue; }
         keys=SMS_getKeysStatus();
@@ -328,6 +401,23 @@ def _tiles() -> str:
             "00" + (num[y-1].replace("1", "3") if 1 <= y <= 5 else "000") + "000"
             for y in range(8)
         ))
+    # Six native animation phases: sparkle pose, curious, blink, joy, injury,
+    # and celebration. No third-party sprites, screenshots or sampled art.
+    authored_poses = (
+        ("00333300","03111130","31133113","31311313",
+         "31133113","03111130","30300303","03033030"),
+        ("00111100","01333310","13333331","33033033",
+         "33033033","33000033","03333330","00333300"),
+        ("00111100","01333310","13333331","33000033",
+         "33333333","33000033","03333330","00333300"),
+        ("00111100","01333310","13333331","33033033",
+         "33000033","33100133","03111130","00333300"),
+        ("00111100","01333310","13333331","33033033",
+         "33000033","33311333","03111130","00333300"),
+        ("03033030","30333303","13333331","33033033",
+         "33000033","33111133","03333330","30300303"),
+    )
+    chars.extend(authored_poses)
     result: list[str] = []
     for tile in chars:
         for row in tile:
@@ -336,7 +426,7 @@ def _tiles() -> str:
             for plane in range(4):
                 value = sum(((int(p) >> plane) & 1) << (7-x) for x,p in enumerate(row))
                 result.append(f"0x{value:02x}")
-    if len(result) != 16 * 32:
+    if len(result) != 22 * 32:
         raise Sega8BitNativeError("console VDP tile length invalid")
     return ",\n".join(
         "    " + ", ".join(result[i:i+16])
