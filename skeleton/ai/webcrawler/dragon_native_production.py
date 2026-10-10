@@ -292,6 +292,48 @@ def plan_production(request: ProductionRequest) -> tuple[TargetPlan, ...]:
     return tuple(decisions)
 
 
+
+
+def preview_native_portfolio(request: ProductionRequest) -> dict:
+    """Read-only source feasibility and exact port adaptations, not an approval."""
+    plans = plan_production(request)
+    candidates = []
+    for plan in plans:
+        if plan.state != "source_ready":
+            candidates.append({
+                **asdict(plan), "adaptations": (),
+                "target_design_digest": None,
+                "target_palette": None,
+                "target_stages": None,
+                "target_candidates": None,
+            })
+            continue
+        _, port = _adapt_portable_design(request, plan.target)
+        candidates.append({
+            **asdict(plan),
+            "adaptations": tuple(port["port_adjustments"]) if port else (),
+            "target_design_digest": port["target_design_digest"] if port else None,
+            "target_palette": port["target_palette"] if port else None,
+            "target_stages": port["target_stages"] if port else None,
+            "target_candidates": port["target_candidates"] if port else None,
+        })
+    allowed = bool(candidates) and all(x["state"] == "source_ready" for x in candidates)
+    return {
+        "schema": SCHEMA,
+        "status": "source_ready" if allowed else "blocked",
+        "request_id": request.request_id,
+        "candidate_count": len(candidates),
+        "targets": candidates,
+        "can_export_sources": allowed,
+        "evidence": "none",
+        "claim_boundary": (
+            "Read-only native source feasibility, no generated code, ROM, "
+            "playtest, rights clearance or approved publication"
+        ),
+    }
+
+
+
 def _path(name: str) -> str:
     if (not isinstance(name, str) or not 1 <= len(name) <= 180 or
             not SAFE_NAME.fullmatch(name) or "\\" in name):
