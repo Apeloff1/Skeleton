@@ -159,6 +159,44 @@ The legacy source-only requests without \`portable_design\` remain supported.
 No console or PC product can claim functionality it has not actually
 implemented.
 
+### Feasibility preview before resource-consuming source emission
+
+The creator screen supports a separate **Preview hardware adaptations**
+action. The authenticated \`POST /api/dragon-academy/native/production/preview\`
+endpoint invokes source/target admission and the canonical typed game design
+translator, returning a target-by-target feasibility decision, actual target
+palette, permitted stage and candidate counts, and exact adaptation notes.
+It **does not call native source emitters**, run a compiler, create files,
+award rewards, or grant production approval. Rights attestation is still
+explicit; pressing Preview does not substitute for the separate generation
+approval. The preview is invalidated after any input change.
+
+### Verified game evolution across successive native releases
+
+Operator tooling supports a new offline comparison command:
+
+\`\`\`sh
+python -m skeleton.ai.webcrawler.dragon_native_production compare \
+  --previous-dir ./release-v1 --previous-index dragon-production-<previous>.json \
+  --current-dir ./release-v2 --current-index dragon-production-<current>.json
+\`\`\`
+
+Both input portfolios must first pass the complete source, ROM-structure
+(where present), hardware-budget, index and manifest verification.
+The comparison then classifies every platform as \`identical\`,
+\`source_changed\`, \`binary_changed_only\`,
+\`release_receipt_changed_only\`, \`target_added\` or
+\`target_removed\`. It identifies changed gameplay modes, campaign counts,
+portable design digests, toolchain evidence and verification levels.
+The review signals distinguish source changes that call for new gameplay
+testing from binary/receipt-only changes that still require new build review.
+
+This is usable for original-game iteration and port upgrading, without
+claiming that content changes are automatically improvements or that an
+emulator has proved the game playable. The verifier binds both manifests'
+content digests before comparing them, preventing a read-after-verification
+manifest replacement from masquerading as a trustworthy diff.
+
 ### Release verification and index integrity
 
 A release index is **not trusted merely because its archive hashes match**.
