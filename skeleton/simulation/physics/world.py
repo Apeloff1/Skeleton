@@ -7,7 +7,11 @@ from dataclasses import dataclass
 from ..ecs.canonical import digest
 from .body import BodyType, RigidBody
 from .calculations import PhysicsAggregate, aggregate_physics
-from .ccd import ContinuousCollisionDetector, TOIEvent
+from .ccd import (
+    CONVEX_TOI_DISTANCE_TOLERANCE,
+    ContinuousCollisionDetector,
+    TOIEvent,
+)
 from .character import (
     CharacterGroundState,
     CharacterMoveResult,
@@ -890,8 +894,13 @@ class PhysicsWorld:
         for body in self.bodies():
             body.integrate_velocity(dt)
 
-    def _bias_toi_pair_into_contact(self, event: TOIEvent) -> None:
-        slop = self.settings.ccd_contact_slop
+    def _bias_toi_pair_into_contact(
+        self,
+        event: TOIEvent,
+        *,
+        extra: float = 0.0,
+    ) -> None:
+        slop = self.settings.ccd_contact_slop + extra
         if slop <= 0.0:
             return
         body_a = self._bodies[event.body_a]
@@ -916,6 +925,19 @@ class PhysicsWorld:
             self._bodies[event.body_a],
             self._bodies[event.body_b],
         )
+        if manifold is None:
+            # General convex TOI may stop up to its distance tolerance short of
+            # contact, which can exceed a small configured slop (the default
+            # 1e-7 is tighter than the 1e-6 TOI tolerance). Close that residual
+            # gap once, deterministically, instead of failing the whole step.
+            self._bias_toi_pair_into_contact(
+                event,
+                extra=CONVEX_TOI_DISTANCE_TOLERANCE,
+            )
+            manifold = detect_collision(
+                self._bodies[event.body_a],
+                self._bodies[event.body_b],
+            )
         if manifold is None:
             raise PhysicsValidationError(
                 "CCD TOI failed to produce a resolvable contact manifold"

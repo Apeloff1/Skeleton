@@ -17,7 +17,7 @@ from .body import BodyType, RigidBody
 from .convex import convex_plane_time_of_impact, convex_time_of_impact
 from .errors import PhysicsValidationError
 from .math3d import EPSILON, Vec3
-from .queries import Ray, RayHit, sphere_cast_body
+from .queries import Ray, sphere_cast_body
 from .shapes import (
     BoxShape,
     CapsuleShape,
@@ -28,6 +28,10 @@ from .shapes import (
 )
 
 MAX_CCD_CHECKS = 1_000_000
+# General convex TOI stops once the pair is within this separation. The world
+# must be able to close at least this gap before narrow phase, independent of
+# the configured contact slop.
+CONVEX_TOI_DISTANCE_TOLERANCE = 1.0e-6
 
 
 def _validate_dt(dt: float) -> float:
@@ -467,7 +471,7 @@ class ContinuousCollisionDetector:
                     dt,
                     max_iterations=128,
                     distance_iterations=64,
-                    distance_tolerance=1.0e-6,
+                    distance_tolerance=CONVEX_TOI_DISTANCE_TOLERANCE,
                     time_tolerance=1.0e-9,
                 )
                 if hit is None:
@@ -527,7 +531,7 @@ class ContinuousCollisionDetector:
                     plane,
                     dt,
                     max_iterations=64,
-                    distance_tolerance=1.0e-6,
+                    distance_tolerance=CONVEX_TOI_DISTANCE_TOLERANCE,
                     time_tolerance=1.0e-9,
                 )
                 if hit is None:
