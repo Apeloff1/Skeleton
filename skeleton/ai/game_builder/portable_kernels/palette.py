@@ -35,3 +35,9 @@ def decode_rgb555(word: object) -> tuple[int,int,int]:
     q = lambda x: (x*255+15)//31
     return q(n&31),q((n>>5)&31),q((n>>10)&31)
 
+
+def encode_rgb565(pixel: object) -> int:
+    """16-bit RGB565 with six green bits for desktop and embedded displays."""
+    r,g,b = _rgb(pixel)
+    return ((r*31+127)//255)<<11 | ((g*63+127)//255)<<5 | ((b*31+127)//255)
+
