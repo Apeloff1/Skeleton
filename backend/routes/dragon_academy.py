@@ -890,6 +890,139 @@ def native_living_world_temporal_maze(
     }
 
 
+class NativeCodexWorldRequest(BaseModel):
+    """Exact 1024-bit+ world identity; Python decimal, never a JS float."""
+    model_config=ConfigDict(extra="forbid")
+    index:str=Field(default="0",strict=True,min_length=1,max_length=400,
+                    pattern=r"^(0|[1-9][0-9]*)$")
+
+
+class NativeCodexWorldEditRequest(NativeCodexWorldRequest):
+    changes:dict[str,StrictInt]=Field(default_factory=dict,max_length=128)
+
+
+class NativeCodexWorldPlayRequest(NativeCodexWorldRequest):
+    actions:list[str]=Field(default_factory=list,max_length=96)
+
+
+class NativeCodexWorldGatewayRequest(NativeCodexWorldRequest):
+    domain:str=Field(default="topology",pattern=r"^[a-z_]{2,32}$")
+
+
+class NativeCodexWorldPlatformRequest(NativeCodexWorldRequest):
+    target:str=Field(default="game_boy",pattern=r"^[a-z0-9_]{2,48}$")
+    chunks:StrictInt=Field(default=1,ge=1,le=4)
+
+
+@router.get("/native/production/worlds/codex/capabilities")
+def native_world_codex_capabilities(
+    owner:str=Depends(_principal),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_world_codex import summary
+    from skeleton.ai.webcrawler.dragon_native_targets import CATALOG
+    return {"ok":True,"codex":summary(),
+            "registered_native_targets":len(CATALOG),
+            "claim":"1024-bit reversible world configuration capacity, "
+                    "not 128 finished simulation/physics engines or hardware ports"}
+
+
+@router.post("/native/production/worlds/codex/inspect")
+def native_world_codex_inspect(
+    body:NativeCodexWorldRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from dataclasses import asdict
+    from skeleton.ai.webcrawler.dragon_world_codex import unrank
+    from skeleton.ai.webcrawler.dragon_world_codex_runtime import start,report
+    try:
+        source=unrank(body.index)
+        return {"ok":True,"design":asdict(source),
+                "game":report(source,start(source),detail=True)}
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="World Codex address is invalid or unsupported") from None
+
+
+@router.post("/native/production/worlds/codex/edit")
+def native_world_codex_edit(
+    body:NativeCodexWorldEditRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from dataclasses import asdict
+    from skeleton.ai.webcrawler.dragon_world_codex import edit
+    try:
+        edited=edit(body.index,body.changes)
+        return {"ok":True,"new_decimal_index":edited.decimal_index,
+                "updated":asdict(edited),"changed_axes":sorted(body.changes)}
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original Codex axis or level unsupported") from None
+
+
+@router.post("/native/production/worlds/codex/play")
+def native_world_codex_play(
+    body:NativeCodexWorldPlayRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_world_codex import unrank
+    from skeleton.ai.webcrawler.dragon_world_codex_runtime import replay,report
+    try:
+        source=unrank(body.index)
+        game=replay(source,tuple(body.actions))
+        return {"ok":True,"replayed_actions":list(body.actions),
+                "game":report(source,game)}
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Codex world choice is unavailable or blocked by an actual gate") from None
+
+
+@router.post("/native/production/worlds/codex/unlock-witness")
+def native_world_codex_unlock_witness(
+    body:NativeCodexWorldGatewayRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_world_codex import unrank
+    from skeleton.ai.webcrawler.dragon_world_codex_runtime import proof_of_access
+    try:
+        return {"ok":True,**proof_of_access(unrank(body.index),body.domain)}
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original world passage has no replayed access witness") from None
+
+
+@router.post("/native/production/worlds/codex/compile-target")
+def native_world_codex_compile_target(
+    body:NativeCodexWorldPlatformRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_world_codex import unrank
+    from skeleton.ai.webcrawler.dragon_codex_platforms import (
+        content_pack,verify_content_pack,
+    )
+    try:
+        source=unrank(body.index)
+        package=content_pack(source,body.target,chunks=body.chunks)
+        evidence=verify_content_pack(source,package)
+        return {"ok":True,"package":package,"independent_verification":evidence}
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original world content could not fit registered platform profile") from None
+
+
+@router.post("/native/production/worlds/codex/platforms")
+def native_world_codex_platforms(
+    body:NativeCodexWorldRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_world_codex import unrank
+    from skeleton.ai.webcrawler.dragon_codex_platforms import target_preview
+    try:
+        return {"ok":True,**target_preview(unrank(body.index),limit=60)}
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original world codex platform discovery failed") from None
+
+
 class NativeGenomicWorldRequest(BaseModel):
     """Arbitrary-precision design address is a DECIMAL STRING, never a float."""
     model_config=ConfigDict(extra="forbid")
