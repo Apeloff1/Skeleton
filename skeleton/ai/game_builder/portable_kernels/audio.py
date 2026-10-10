@@ -46,3 +46,17 @@ def ay38910_tone_period(hertz: int, *, master_clock: int=1773400) -> int:
     clock=_integer(master_clock,"AY clock",1000000,8000000)
     return max(1,min(4095,(clock+8*hz)//(16*hz)))
 
+
+def pulse_pcm(hertz: int, sample_rate: int, count: int,
+              *, duty_num: int=1, duty_den: int=2) -> tuple[int,...]:
+    """Integer-phase signed PCM pulse oscillator with bounded duty cycle."""
+    rate=_integer(sample_rate,"PCM sample rate",4000,96000)
+    hz=_integer(hertz,"pulse oscillator Hz",1,rate//2)
+    samples=_integer(count,"PCM sample count",1,32768)
+    denominator=_integer(duty_den,"duty denominator",2,64)
+    numerator=_integer(duty_num,"duty numerator",1,denominator-1)
+    duration=rate*denominator
+    threshold=rate*numerator
+    return tuple(32767 if (i*hz*denominator)%duration < threshold else -32767
+                 for i in range(samples))
+
