@@ -139,6 +139,45 @@ def policy(worker, job, now=NOW+1):
                   reference_use_permitted=True, ssrf_checked=True, expires_at=now+100)
 
 
+def test_almanac_worker_progress_is_durable_without_promoting_knowledge(library):
+    worker = setup_worker(library)
+    initial = worker.status("owner", authorized=True)
+    assert initial["total"] == 2
+    assert initial["stage_queues"]["policy"] == 2
+    assert initial["completed_stage_slots"] == 0
+    assert initial["remaining_stage_slots"] == 2 * 5
+    assert initial["stage_progress_ppm"] == 0
+    assert initial["active_leases"] == 0
+    assert initial["neural_training_executed"] is False
+    assert initial["rights_or_memory_promotion_authorized"] is False
+
+    leased = claim(worker)
+    assert leased is not None
+    in_progress = worker.status("owner", authorized=True)
+    assert in_progress["active_leases"] == 1
+    assert in_progress["completed_stage_slots"] == 0
+    assert in_progress["attempts_since_last_stage"] == 1
+
+    policy(worker, leased)
+    after = worker.status("owner", authorized=True)
+    assert after["active_leases"] == 0
+    assert after["stage_queues"]["fetch"] == 1
+    assert after["stage_queues"]["policy"] == 1
+    assert after["completed_stage_slots"] == 1
+    assert after["remaining_stage_slots"] == 9
+    assert after["stage_progress_ppm"] == 100_000
+    assert not after["rights_or_memory_promotion_authorized"]
+
+
+def test_almanac_status_empty_tenant_never_reports_fake_completion(library):
+    worker = SequentialAlmanacWorker(DragonAlmanacs(library))
+    empty = worker.status("empty-tenant", authorized=True)
+    assert empty["total"] == 0
+    assert empty["stage_progress_ppm"] == 0
+    assert empty["active_leases"] == 0
+    assert sum(empty["stage_queues"].values()) == 0
+
+
 def test_sequential_lease_fences_replay_and_expired_worker(library):
     w = setup_worker(library); first = claim(w)
     assert claim(w, NOW+1) is None
