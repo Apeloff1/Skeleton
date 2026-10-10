@@ -16,7 +16,6 @@ start emulators, or bypass permission gates. Output is a NEW directory only.
 from __future__ import annotations
 
 import argparse
-from hashlib import sha256
 import json
 from pathlib import Path
 
@@ -38,6 +37,7 @@ from .platform_registry import default_registry
 from .playable_simulation import demonstrate_solvable
 from .playable_world import GameBuildIntent, generate_playable_world
 from .port_planner import HomebrewSource
+from .rights_evidence import read_rights_evidence
 
 _NATIVE = {
     "windows_modern": "sdl2_c11",
@@ -58,8 +58,6 @@ _NATIVE = {
     "sega_master_system": "sms_z80asm",
 }
 
-_MAX_EVIDENCE_FILE = 8 * 1024 * 1024
-
 
 def build_game(
     *, target: str, basis: str, project_id: str, title: str, seed: int,
@@ -74,16 +72,7 @@ def build_game(
         raise ValueError("no real native source adapter for requested platform")
     if basis not in default_registry().profiles:
         raise ValueError("unregistered historical design basis")
-    path = Path(rights_evidence)
-    if path.is_symlink() or not path.is_file():
-        raise ValueError("authorship/rights evidence must be an ordinary local file")
-    if not 0 < path.stat().st_size <= _MAX_EVIDENCE_FILE:
-        raise ValueError("authorship/rights file empty or exceeds input capacity")
-    evidence_hash = sha256()
-    with path.open("rb") as stream:
-        while fragment := stream.read(256 * 1024):
-            evidence_hash.update(fragment)
-    evidence = evidence_hash.hexdigest()
+    evidence = read_rights_evidence(rights_evidence).document_sha256
     source = HomebrewSource(
         project_id=project_id, platform_id=basis, rights_basis="project_owned",
         evidence_sha256=evidence, creative_identity=creative_identity,
