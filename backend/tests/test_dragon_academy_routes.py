@@ -471,3 +471,60 @@ def test_native_creator_preview_discloses_blocked_licensed_sdk():
         "ps5": "blocked",
     }
     assert "no generated code" in report["claim_boundary"]
+
+
+
+@pytest.mark.parametrize("hero,theme,palette", [
+    ("hatchling", "crystals", "dmg_green"),
+    ("robot", "clockwork", "modern_neon"),
+    ("astronaut", "space", "vga_dusk"),
+    ("pilot", "volcano", "handheld"),
+    ("explorer", "forest", "cga"),
+    ("knight", "ice", "crt_arcade"),
+])
+def test_original_native_2bpp_pixel_preview_matches_real_emitter(hero, theme, palette):
+    from skeleton.ai.webcrawler.dragon_native_artforge import original_tiles
+    req = route.NativeProductionPixelArtPreview(
+        hero=hero, quest_theme=theme, palette=palette,
+        seed=41, target="game_boy",
+    )
+    result = route.native_production_art_preview(req, owner=identity())
+    assert result["ok"] and result["hero"] == hero
+    assert result["target"] == "game_boy"
+    assert len(result["frames"]) == 4
+    expected = original_tiles(
+        hero=hero, theme=theme, seed=41,
+        palette=result["applied_palette"],
+    )
+    assert result["frames"]["hero"] == expected["dragon"]
+    assert result["frames"]["collectible"] == expected["star"]
+    assert len(result["gb_tiles_sha256"]) == 64
+    assert all(set("".join(frame)) <= set("0123")
+               for frame in result["frames"].values())
+    assert "not certified" in result["claim_boundary"]
+
+
+@pytest.mark.parametrize("changes", [
+    {"target": "ps5"},
+    {"target": "../../local"},
+    {"hero": "third_party_famous_character"},
+    {"quest_theme": "game_franchise"},
+    {"palette": "unknown_video_palette"},
+])
+def test_original_pixel_preview_denies_nonexistent_or_unlicensed_assets(changes):
+    req = route.NativeProductionPixelArtPreview(**changes)
+    with pytest.raises(HTTPException) as denied:
+        route.native_production_art_preview(req, owner=identity())
+    assert denied.value.status_code == 422
+
+
+@pytest.mark.parametrize("fields", [
+    {"seed": True},
+    {"seed": "42"},
+    {"seed": -1},
+    {"hero": "robot", "custom_rom_path": "third_party.gb"},
+])
+def test_original_pixel_preview_is_strictly_typed_and_has_no_unsafe_inputs(fields):
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        route.NativeProductionPixelArtPreview(**fields)
