@@ -162,7 +162,7 @@ def test_policy_confidence_rejects_boolean_and_nonfinite():
 
 def test_owner_identity_rejects_control_and_whitespace():
     store = setup()
-    for bad in (" alice", "alice ", "alice\\nother", "alice\\x00shadow"):
+    for bad in (" alice", "alice ", ""alice" + chr(10) + "other"", ""alice" + chr(0) + "shadow""):
         with pytest.raises(ValueError, match="owner"):
             store.sessions(bad, authorized=True)
 
@@ -188,7 +188,7 @@ def test_raw_video_retention_flag_requires_explicit_false():
 def test_game_labels_reject_embedded_control_characters():
     from dataclasses import replace
     store = setup()
-    for name in ("Example\\x00Game", "Example\\nGame"):
+    for name in (""Example" + chr(0) + "Game"", ""Example" + chr(10) + "Game""):
         with pytest.raises(ValueError, match="game label"):
             store.record(replace(session(store), game_label=name), authorized=True)
 
@@ -252,4 +252,11 @@ def test_session_identity_rejects_invalid_digest_and_replay():
     for bad in ("A" * 64, "0" * 64, "not-a-digest"):
         with pytest.raises(ValueError, match="session identifier"):
             store.record(replace(base, session_id=bad), authorized=True)
+
+
+def test_read_limit_requires_integer_not_boolean():
+    store = setup()
+    for value in (True, 1.5, -1, 1001):
+        with pytest.raises(ValueError, match="history limit"):
+            store.sessions("alice", authorized=True, limit=value)
 
