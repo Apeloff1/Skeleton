@@ -75,6 +75,48 @@ class RecrawlWorkerLifecycleTests(TestCase):
         arguments.update(kwargs)
         return dispatcher.begin(**arguments)
 
+    def test_preview_is_read_only_and_owner_bound(self):
+        ledger = global_ledger()
+        dispatcher, _ = self.run_dispatch(global_sched=ledger)
+        report = dispatcher.preview(OWNER, sample(), now=NOW, authorized=True)
+        self.assertEqual(report["schema"], "skeleton.dragon.recrawl_preview.v1")
+        self.assertEqual(report["pending_visible"], 1)
+        self.assertEqual(report["items"][0]["order_digest"], self.queued["order_digest"])
+        self.assertEqual(report["items"][0]["state"], "queued_unleased")
+        self.assertTrue(report["items"][0]["source_revision_current"])
+        self.assertFalse(report["execution_authorized"])
+        self.assertFalse(report["network_io_performed"])
+        self.assertFalse(report["memory_promotion_authorized"])
+        self.assertEqual(ledger.active_grants(), ())
+        self.assertEqual(dispatcher.active, {})
+        with self.assertRaises(PermissionError):
+            dispatcher.preview(OWNER, sample(), now=NOW, authorized=False)
+        with self.assertRaises(PermissionError):
+            dispatcher.preview("other-tenant", sample(), now=NOW, authorized=True)
+        with self.assertRaises(ValueError):
+            dispatcher.preview(OWNER, None, now=NOW, authorized=True)
+        with self.assertRaises(ValueError):
+            dispatcher.preview(OWNER, sample(), now=NOW, authorized=True, limit=True)
+
+    def test_preview_reflects_real_leases_and_review_handoff_without_granting_rights(self):
+        ledger = global_ledger()
+        dispatcher, _ = self.run_dispatch(global_sched=ledger)
+        ticket = self.start(dispatcher)
+        self.assertIsNotNone(ticket)
+        active = dispatcher.preview(OWNER, sample(), now=NOW, authorized=True)
+        self.assertEqual(active["active_worker_count"], 1)
+        self.assertEqual(active["items"][0]["state"], "active_worker")
+        self.assertEqual(len(ledger.active_grants()), 1)
+        dispatcher.stopped(ticket, authorized=True, trusted_worker=True,
+                           worker_stopped=True)
+        stopped = dispatcher.preview(OWNER, sample(), now=NOW, authorized=True)
+        self.assertEqual(stopped["awaiting_review_count"], 1)
+        self.assertEqual(stopped["items"][0]["state"], "awaiting_independent_review")
+        self.assertEqual(ledger.active_grants(), ())
+        dispatcher.abandon(ticket, authorized=True, trusted_worker=True)
+        retriable = dispatcher.preview(OWNER, sample(), now=NOW, authorized=True)
+        self.assertEqual(retriable["items"][0]["state"], "queued_unleased")
+
     def test_local_advisory_capacity_is_not_execution_authority(self):
         dispatcher, session = self.run_dispatch()
         self.assertIsNone(self.start(dispatcher))
