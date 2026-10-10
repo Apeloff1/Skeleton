@@ -38,6 +38,47 @@ def test_invalid_hardware(field, value):
         hardware(**{field: value})
 
 
+@pytest.mark.parametrize("field,value", [
+    ("pressure", "high"),
+    ("battery_fraction", None),
+    ("sampled_at", "yesterday"),
+    ("sampled_at", True),
+    ("sampled_at", -1),
+])
+def test_telemetry_type_confusion_fails_as_value_error(field, value):
+    with pytest.raises(ValueError):
+        hardware(**{field: value})
+
+
+@pytest.mark.parametrize("now", [None, "now", True, -1, float("nan")])
+def test_resource_planner_rejects_malformed_clock_without_raw_type_error(now):
+    with pytest.raises(ValueError, match="resource request"):
+        plan_resources(hardware(), now=now, foreground=True)
+
+
+def test_scheduler_rejects_missing_hardware_type_and_malformed_task_collections():
+    session = DragonResourceSession()
+    with pytest.raises(ValueError, match="resource request"):
+        session.dispatch((SessionTask("safe", "user", 1024, 1),), None, now=10)
+    for tasks in ([SessionTask("safe", "user", 1024, 1)], (object(),), "not tasks"):
+        with pytest.raises(ValueError, match="typed bounded tuple"):
+            session.dispatch(tasks, hardware(), now=10)
+
+
+@pytest.mark.parametrize("bad_task", [
+    SessionTask("", "user", 1024, 1),
+    SessionTask("x\\ncontrol", "user", 1024, 1),
+    SessionTask("task", "not-a-lane", 1024, 1),
+    SessionTask("task", "user", 0, 1),
+    SessionTask("task", "user", True, 1),
+    SessionTask("task", "user", 1024, 0),
+    SessionTask("task", "user", 1024, False),
+])
+def test_worker_resource_reservations_validate_scalar_identity_and_budget(bad_task):
+    with pytest.raises(ValueError):
+        bad_task.request()
+
+
 def test_background_reservation_not_released_until_stopped():
     session = DragonResourceSession()
     bg = SessionTask('learn', 'acquisition', 16 * 1024**2, 1)
