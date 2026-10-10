@@ -165,7 +165,9 @@ class GameMechanicsMemory:
                 raise ValueError("unknown game mechanic or preference")
             if not isinstance(obs.description, str) or not 1 <= len(obs.description) <= self.policy.max_note_chars:
                 raise ValueError("invalid observation note")
-            if not isfinite(obs.confidence) or not 0 <= obs.confidence <= 1:
+            if (type(obs.confidence) not in (int, float)
+                    or not 0 <= obs.confidence <= 1
+                    or not isfinite(obs.confidence)):
                 raise ValueError("invalid observation confidence")
             if obs.preference is not PreferenceSignal.UNKNOWN and not obs.user_confirmed:
                 raise PermissionError("taste signals require explicit user confirmation")
