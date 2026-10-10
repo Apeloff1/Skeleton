@@ -104,6 +104,25 @@ class PreparedText:
         if flattened != self.windows:
             raise TokenizerContractError("batch/window accounting mismatch")
 
+    @property
+    def digest(self) -> str:
+        """Identity of the exact normalized sequence and deterministic batching.
+
+        Chunk boundaries cannot change this receipt, whereas normalization
+        policy, original byte provenance, window order or batch grouping do.
+        """
+        return digest_json({
+            "schema": "skeleton.ai.prepared-text.v1",
+            "pipeline_digest": self.pipeline_digest,
+            "raw_text_digest": self.raw_text_digest,
+            "normalized_text_digest": self.normalized_text_digest,
+            "sequence_digest": self.sequence.digest,
+            "window_digests": [window.digest for window in self.windows],
+            "batch_windows": [
+                [window.digest for window in batch.windows] for batch in self.batches
+            ],
+        })
+
 
 @dataclass(frozen=True, order=True)
 class TemporalInstant:
