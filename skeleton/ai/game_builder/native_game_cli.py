@@ -49,7 +49,6 @@ _NATIVE = {
     "atari_400_800": "atari8_cc65",
     "apple_ii": "apple2_cc65",
     "sinclair_zx_spectrum": "spectrum_z80asm",
-    "sega_master_system": "sms_sdcc_z80",
     "sega_game_gear": "gg_sdcc_z80",
     "msx1": "msx1_z80asm",
     "sega_master_system": "sms_z80asm",
