@@ -282,7 +282,7 @@ def test_game_engine_refuses_forged_worlds_unavailable_actions_and_raw_state():
 def test_hardcore_survival_world_can_end_player_run_without_ending_game_universe():
     world=create_world(world_id=404,style="hardcore_roguelike")
     assert world.lifecycle=="permadeath"
-    journey=replay(world,("wait",)*70)
+    journey=replay(world,("wait",)*57)
     assert not journey.alive
     assert journey.health==0
     assert not describe(world,journey)["playable"]
