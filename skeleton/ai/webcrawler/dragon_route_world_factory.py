@@ -275,6 +275,8 @@ def make_frontier(*,seed:int=1,weather:str="clear",
     ]
     world=World(tuple(places),tuple(edges),"crossroads","citadel",
                 (weather,),True,"generated_original",MAX_MINUTES)
+    from .dragon_route_world_variants import mutate_original_world
+    world=mutate_original_world(world,seed=seed)
     validate_world(world)
     return world,Traveller(cash=240,energy=100,max_energy=100,
                            start_minute=hour*60)
