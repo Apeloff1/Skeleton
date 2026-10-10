@@ -558,3 +558,12 @@ def test_removed_hazard_opens_shortest_risk_free_original_path():
     with pytest.raises(MultipathError):
         remove_hazard(p, (2, 1), authorized=True)
 
+
+def test_hazard_relocation_preserves_count_and_safe_proof():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    moved = relocate_hazard(p, (4, 4), (3, 2), authorized=True)
+    assert moved.after.hazards == frozenset({(3, 2)})
+    assert moved.after.digest != p.digest
+    assert moved.safe_proof.hazard_visits == 0
+    assert verify_route_proof(moved.after, moved.safe_proof)
+
