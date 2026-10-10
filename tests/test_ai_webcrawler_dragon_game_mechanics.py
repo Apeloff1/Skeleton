@@ -244,3 +244,12 @@ def test_observation_note_refuses_control_and_surrogate_text():
         with pytest.raises(ValueError, match="observation note"):
             store.record(session(store, observations=(replace(base, description=bad),)), authorized=True)
 
+
+def test_session_identity_rejects_invalid_digest_and_replay():
+    from dataclasses import replace
+    store = setup()
+    base = session(store)
+    for bad in ("A" * 64, "0" * 64, "not-a-digest"):
+        with pytest.raises(ValueError, match="session identifier"):
+            store.record(replace(base, session_id=bad), authorized=True)
+
