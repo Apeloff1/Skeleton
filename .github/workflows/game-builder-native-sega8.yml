@@ -12,6 +12,9 @@ on:
       - "skeleton/ai/game_builder/playable_world.py"
       - "skeleton/ai/game_builder/port_planner.py"
       - "scripts/game_builder/native_sega_8bit_ci.py"
+      - "scripts/game_builder/sega_reproducibility_ci.py"
+      - "skeleton/ai/game_builder/sega_reproducibility.py"
+      - "skeleton/testing/test_game_builder_sega_reproducibility.py"
       - "skeleton/testing/test_game_builder_sega_8bit_native.py"
       - "skeleton/testing/test_game_builder_sega_8bit_rom.py"
   workflow_dispatch:
@@ -121,6 +124,9 @@ jobs:
             sega_game_gear) EXT=gg ;;
             *) exit 3 ;;
           esac
+          FIRST_IMAGE="/tmp/$TARGET-first.$EXT"
+          cp "output/$TARGET/build/skeleton-original.$EXT" "$FIRST_IMAGE"
+          chmod 0400 "$FIRST_IMAGE"
           BEFORE="$(sha256sum "output/$TARGET/build/skeleton-original.$EXT" | cut -d' ' -f1)"
           make -C "output/$TARGET" clean
           make -C "output/$TARGET" \
@@ -130,8 +136,31 @@ jobs:
             MAKESMS="$PWD/.external/devkitSMS/tools/makesms/src/makesms"
           AFTER="$(sha256sum "output/$TARGET/build/skeleton-original.$EXT" | cut -d' ' -f1)"
           test "$BEFORE" = "$AFTER"
-          printf 'target=%s\nfirst_sha256=%s\nrebuild_sha256=%s\nreproducible=true\n' \
-            "$TARGET" "$BEFORE" "$AFTER" > "/tmp/$TARGET-reproducibility.txt"
+          cmp "$FIRST_IMAGE" "output/$TARGET/build/skeleton-original.$EXT"
+          SOURCE_DIGEST="$(python -c 'import json,os; print(json.load(open("/tmp/"+os.environ["TARGET"]+"-generated-source.json", encoding="utf-8"))["source_content_digest"])')"
+          AUTHORSHIP_DIGEST="$(python -c 'import json,os; print(json.load(open("/tmp/"+os.environ["TARGET"]+"-generated-source.json", encoding="utf-8"))["rights_evidence_sha256"])')"
+          python -m scripts.game_builder.sega_reproducibility_ci \
+            --target "$TARGET" --source-dir "output/$TARGET" \
+            --first-rom "$FIRST_IMAGE" \
+            --rebuilt-rom "output/$TARGET/build/skeleton-original.$EXT" \
+            --first-evidence "/tmp/$TARGET-compilation-evidence.json" \
+            --source-sha256 "$SOURCE_DIGEST" \
+            --author-sha256 "$AUTHORSHIP_DIGEST" \
+            --toolchain-revision 533ae572c897cf44f1da865013ebf690134301a3 \
+            --receipt-out "/tmp/$TARGET-reproducibility.json"
+          python - <<'PY'
+          import json, os
+          with open("/tmp/"+os.environ["TARGET"]+"-reproducibility.json",encoding="utf-8") as stream:
+              evidence=json.load(stream)
+          assert evidence["checked_two_distinct_artifact_paths"] is True
+          assert evidence["exact_rom_bytes_match"] is True
+          assert evidence["source_and_authorship_digests_match"] is True
+          assert evidence["two_compiler_executions_independently_verified"] is False
+          assert evidence["source_rights_independently_verified"] is False
+          assert evidence["gameplay_execution_verified"] is False
+          assert evidence["publication_licensed"] is False
+          print("SEGA_NATIVE_REBUILD_FINGERPRINT_MATCH", evidence["cartridge_sha256"])
+          PY
       - name: Publish limited, non-distribution CI evidence only
         uses: actions/upload-artifact@v4
         with:
@@ -139,7 +168,7 @@ jobs:
           path: |
             output/${{ matrix.platform }}/manifest.json
             /tmp/${{ matrix.platform }}-compilation-evidence.json
-            /tmp/${{ matrix.platform }}-reproducibility.txt
+            /tmp/${{ matrix.platform }}-reproducibility.json
           if-no-files-found: error
           retention-days: 7
       # No ROM is published: legal review and real emulator or hardware
