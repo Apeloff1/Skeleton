@@ -165,6 +165,7 @@ static void draw_hud(void) {
     SMS_setTileatXY(LEFT+10, HUD_Y, DIGIT_BASE+((level_index+1)%10));
     SMS_setTileatXY(LEFT+11, HUD_Y, HERO);
     SMS_setTileatXY(LEFT+12, HUD_Y, DIGIT_BASE+bond_rank);
+    SMS_setTileatXY(LEFT+13, HUD_Y, DIGIT_BASE+((score/1000)%10));
     SMS_setTileatXY(LEFT+14, HUD_Y, DIGIT_BASE+((score/100)%10));
     SMS_setTileatXY(LEFT+15, HUD_Y, DIGIT_BASE+((score/10)%10));
     SMS_setTileatXY(LEFT+16, HUD_Y, DIGIT_BASE+(score%10));
@@ -195,6 +196,7 @@ static void queue_hud(unsigned char tile) {
         queue_tile(LEFT+10,HUD_Y,DIGIT_BASE+((level_index+1)%10));
     }
     if (tile==GEM) {
+        queue_tile(LEFT+13,HUD_Y,DIGIT_BASE+((score/1000)%10));
         queue_tile(LEFT+14,HUD_Y,DIGIT_BASE+((score/100)%10));
         queue_tile(LEFT+15,HUD_Y,DIGIT_BASE+((score/10)%10));
         queue_tile(LEFT+16,HUD_Y,DIGIT_BASE+(score%10));
@@ -275,7 +277,7 @@ static void advance(int dx, int dy) {
     if (nx<0 || ny<0 || nx>=WIDTH || ny>=HEIGHT) return;
     position=(unsigned int)ny*WIDTH+(unsigned int)nx;
     tile=board[position];
-    if (tile==WALL || (tile==EXIT && gems_left!=0)) return;
+    if (tile==WALL) return; /* early gate visits do not auto-complete */
 
     queue_tile(LEFT+hero_x,TOP+hero_y,board[(unsigned int)hero_y*WIDTH+hero_x]);
     hero_x=(unsigned char)nx;
@@ -294,11 +296,12 @@ static void advance(int dx, int dy) {
         psg_start(700, 18);
         if (health!=0) --health;
         if (health==0) end_game(0);
-    } else if (tile==EXIT) {
-        ++level_index;
-        if (level_index==LEVEL_COUNT) {
-            end_game(1);
+    } else if (tile==EXIT && gems_left==0) {
+        score+=100; /* exact Python reference reward on completed gate */
+        if (level_index+1==LEVEL_COUNT) {
+            end_game(1); /* keep terminal level index within bounds */
         } else {
+            ++level_index;
             psg_start(380, 20);
             load_level();
             return;
