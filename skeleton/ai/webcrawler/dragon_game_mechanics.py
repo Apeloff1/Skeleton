@@ -356,6 +356,13 @@ class GameMechanicsMemory:
                     f"Offer alternatives to {mechanic.value.replace('_', ' ')} "
                     "mechanics; confirm tradeoffs with the user."
                 )
+        conflicting = any(
+            {obs.preference for obs, _ in values
+             if obs.user_confirmed and obs.preference in
+             (PreferenceSignal.ENJOYED, PreferenceSignal.DISLIKED)}
+            == {PreferenceSignal.ENJOYED, PreferenceSignal.DISLIKED}
+            for values in groups.values()
+        )
         fingerprint = sha256(json.dumps(
             [owner, [(x.mechanic.value, x.observation_count,
                       x.preference_score, x.confidence) for x in insights]],
