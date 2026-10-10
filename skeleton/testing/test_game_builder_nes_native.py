@@ -63,6 +63,17 @@ def test_native_nes_rom_generator_has_real_6502_ppu_memory_map_and_original_leve
     assert meta["format"] == "ines_nrom256_mapper0"
     assert meta["levels"] == 3
     assert meta["reference_safe_moves"] == sum(len(level.safe_solution) for level in world.levels)
+    assert meta["original_first_controller_action"] == world.levels[0].safe_solution[0]
+    assert meta["original_first_player_spawn"] == list(world.levels[0].start)
+    from skeleton.ai.game_builder.nes_native_export import _TILE_INDEX
+    expected_bg=bytearray()
+    for line in world.levels[0].rows:
+        expected_bg.extend(_TILE_INDEX[tile] for tile in line)
+        expected_bg.extend(bytes(32-len(line)))
+    expected_bg.extend(bytes(32*(30-len(world.levels[0].rows))))
+    from hashlib import sha256
+    assert len(expected_bg)==960
+    assert meta["original_stage_zero_bg_sha256"]==sha256(expected_bg).hexdigest()
     assert meta["cartridge_built"] is False
     assert meta["hardware_verified"] is False
     out = export_native_nes(original, tmp_path / "nes-source", authorized=True)
