@@ -426,3 +426,12 @@ def test_bounded_history_can_read_multiple_small_sessions():
         store.record(value, authorized=True)
     assert len(store.sessions("alice", authorized=True)) == 2
 
+
+def test_session_history_budget_fail_closed_after_first_row(monkeypatch):
+    import skeleton.ai.webcrawler.dragon_game_mechanics as module
+    store = setup()
+    store.record(session(store), authorized=True)
+    monkeypatch.setattr(module, "MAX_HISTORY_BYTES", 0)
+    with pytest.raises(ValueError, match="history memory"):
+        store.sessions("alice", authorized=True)
+
