@@ -274,6 +274,14 @@ class GameMechanicsMemory:
                 GameObservation(t, Mechanic(m), d, c, PreferenceSignal(p), u)
                 for t, m, d, c, p, u in recorded
             )
+            expected = sha256(json.dumps(
+                [owner, label, duration, recorded],
+                separators=(",", ":"), ensure_ascii=True,
+            ).encode()).hexdigest()
+            if (not isinstance(session_id, str)
+                    or re.fullmatch(r"[0-9a-f]{64}", session_id) is None
+                    or not hmac.compare_digest(session_id, expected)):
+                raise ValueError("persisted session identity differs from its evidence")
             sessions.append(GameSession(
                 session_id, owner, label, duration, observations, True, True,
             ))
