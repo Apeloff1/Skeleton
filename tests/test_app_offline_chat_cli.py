@@ -4,13 +4,15 @@ from __future__ import annotations
 from contextlib import redirect_stdout, redirect_stderr
 from io import StringIO
 import json
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
 from skeleton.ai.model_runtime.offline_chat import OfflineChatStore
-from skeleton.app.offline_chat_cli import main
+from skeleton.app.offline_chat_cli import _read_reference_file, main
 from skeleton.cortex.transformer import TinyTransformer
 
 
@@ -223,6 +225,35 @@ class HeadlessOfflineChatTests(unittest.TestCase):
         code, output, errors = self._run("--list-references")
         self.assertEqual(code, 0, errors)
         self.assertEqual(json.loads(output), [])
+
+    def test_reference_read_rejects_path_swap_between_check_and_open(self):
+        source = self.directory / "reference.md"
+        replacement = self.directory / "replacement.md"
+        source.write_text("Original owner-selected knowledge.", encoding="utf-8")
+        replacement.write_text("Changed reference after validation.", encoding="utf-8")
+        direct_open = os.open
+        changed = False
+
+        def replace_then_open(file, flags, *args, **kwargs):
+            nonlocal changed
+            if not changed and os.fspath(file) == os.fspath(source):
+                changed = True
+                os.replace(replacement, source)
+            return direct_open(file, flags, *args, **kwargs)
+
+        with patch("skeleton.app.offline_chat_cli.os.open",
+                   side_effect=replace_then_open):
+            with self.assertRaisesRegex(
+                ValueError, "reference changed during file admission"
+            ):
+                _read_reference_file(source)
+        self.assertTrue(changed)
+
+    def test_reference_read_accepts_stable_file_exact_bytes(self):
+        source = self.directory / "stable.md"
+        content = "Evidence for offline device ports and hardware limits."
+        source.write_text(content, encoding="utf-8")
+        self.assertEqual(_read_reference_file(source), content)
 
     def test_listing_empty_store_does_not_create_phantom_session(self):
         code, output, errors = self._run("--list", "--json")
