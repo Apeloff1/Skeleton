@@ -61,7 +61,9 @@ def test_spicy_original_worlds_have_deliberate_recovery_chapters_not_only_peaks(
             stage=stage,seed=1977,difficulty=6,
             procedural=False,profile="spicy")
         worlds.append(report)
-    assert worlds[1].tension_role=="higher_tension"
+    assert worlds[1].tension_role=="deliberate_frustration_spike_with_escape"
+    assert worlds[5].tension_role=="deliberate_frustration_spike_with_escape"
+    assert worlds[0].tension_role=="exploration"
     assert worlds[3].tension_role=="deliberate_recovery"
     assert worlds[7].tension_role=="deliberate_recovery"
     for record in (worlds[3],worlds[7]):
