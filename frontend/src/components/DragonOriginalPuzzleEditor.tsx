@@ -23,6 +23,7 @@ import {
 import {
   type PuzzleHistory, initializePuzzleHistory, paintOriginalCell,
   undoPuzzleEdit, redoPuzzleEdit, canUndoPuzzle, canRedoPuzzle,
+  reorderPuzzleStage,
   type DrawTile,
 } from '../product/dragonPuzzleHistory';
 
@@ -177,6 +178,24 @@ export default function DragonOriginalPuzzleEditor({
     setDemoCursor(-1);
     setStatus('Board paint history changed. Validate the campaign before native export.');
     onApprovedLevels(null);
+  };
+
+  const moveStage = (direction: -1 | 1) => {
+    if (!editHistory || busy || validating || play) return;
+    const destination = current + direction;
+    if (destination < 0 || destination >= boards.length) return;
+    try {
+      const update = reorderPuzzleStage(editHistory, current, destination);
+      setEditHistory(update);
+      setBoards(update.current.boards.map(stage => [...stage]));
+      setCurrent(destination);
+      setValidated(null);
+      setDemoCursor(-1);
+      setStatus('Game stage order changed. Revalidate the campaign before source export.');
+      onApprovedLevels(null);
+    } catch {
+      setStatus('Could not reorder original game stages.');
+    }
   };
 
   const validate = async () => {
@@ -426,6 +445,24 @@ export default function DragonOriginalPuzzleEditor({
           {editHistory.previous.length} undo steps · {editHistory.next.length} redo steps
         </Text>}
       </View>
+      {boards.length > 1 && (
+        <View style={styles.fileActions}>
+          <TouchableOpacity accessibilityRole="button"
+            accessibilityLabel={'Move original stage ' + (current + 1) + ' earlier'}
+            disabled={!editHistory || busy || validating || !!play || current === 0}
+            onPress={() => moveStage(-1)}
+            style={[styles.fileButton, (current === 0 || busy || validating || !!play) && styles.disabled]}>
+            <Text style={styles.actionText}>Move stage earlier</Text>
+          </TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button"
+            accessibilityLabel={'Move original stage ' + (current + 1) + ' later'}
+            disabled={!editHistory || busy || validating || !!play || current === boards.length - 1}
+            onPress={() => moveStage(1)}
+            style={[styles.fileButton, (current === boards.length - 1 || busy || validating || !!play) && styles.disabled]}>
+            <Text style={styles.actionText}>Move stage later</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       {busy && <ActivityIndicator color="#8fd2b2" />}
       <View style={styles.board}>
         {active.map((line, y) => (
