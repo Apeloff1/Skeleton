@@ -592,3 +592,21 @@ def test_public_taste_snapshot_does_not_expose_raw_gameplay_notes():
     assert "Timing-based interaction" not in json.dumps(receipt)
     with pytest.raises(PermissionError):
         store.public_taste_snapshot("alice", authorized=1)
+
+def test_mechanic_insight_cannot_publish_invalid_evidence_numbers():
+    from dataclasses import replace
+    from skeleton.ai.webcrawler.dragon_game_mechanics import MechanicInsight
+    store = setup()
+    store.record(session(store), authorized=True)
+    base = store.distill("alice", authorized=True).insights[0]
+    assert isinstance(base, MechanicInsight)
+    for update in (
+        {"observation_count": True},
+        {"supporting_sessions": 3},
+        {"preference_score": float("nan")},
+        {"confidence": 1.2},
+        {"user_confirmed": 1},
+        {"examples": ("bad" + chr(10) + "note",)},
+    ):
+        with pytest.raises(ValueError, match="mechanic insight"):
+            replace(base, **update)
