@@ -550,7 +550,8 @@ def _dragon_living_world(body:NativeLivingWorldRequest):
 @router.get("/native/production/worlds/catalog")
 def native_living_world_catalog(owner:str=Depends(_principal))->dict:
     from skeleton.ai.webcrawler.dragon_living_world import catalog
-    return {"ok":True,**catalog()}
+    from skeleton.ai.webcrawler.dragon_living_world_lattice import lattice_capabilities
+    return {"ok":True,**catalog(),"compositional_lattice":lattice_capabilities()}
 
 
 @router.post("/native/production/worlds/preview")
@@ -887,6 +888,33 @@ def native_living_world_temporal_maze(
         "shifting_topology":geography,
         "scope":"two real optional-waypoint path solvers, not forced whole-world victory",
     }
+
+
+class NativeIndexedLivingDesignRequest(BaseModel):
+    """One actual generated design and a replayable route, never bulk minting."""
+    model_config=ConfigDict(extra="forbid")
+    design_index:StrictInt=Field(default=0,ge=0,lt=5_000_000_000)
+    route_slot:StrictInt=Field(default=0,ge=0,le=9)
+
+
+@router.post("/native/production/worlds/indexed-design")
+def native_living_world_indexed_design(
+    body:NativeIndexedLivingDesignRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_living_world_lattice import (
+        DESIGN_ADDRESS_COUNT,route_at_design_index,
+    )
+    if body.design_index>=DESIGN_ADDRESS_COUNT:
+        raise HTTPException(status_code=422,
+            detail="Original generator design index outside valid compositional lattice")
+    try:
+        report=route_at_design_index(
+            body.design_index,path_slot=body.route_slot)
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Requested original game address has no valid replayable route") from None
+    return {"ok":True,**report}
 
 
 class NativeAtlasWorldRequest(BaseModel):
