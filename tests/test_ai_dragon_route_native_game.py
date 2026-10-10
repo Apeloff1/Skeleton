@@ -43,6 +43,14 @@ def test_real_world_project_emits_native_c99_transitions_and_exact_python_proofs
         assert item["elapsed"]==expected.elapsed_minutes
         assert item["spent"]==expected.money_spent
         assert item["danger"]==expected.risk
+        assert item["fuel"]==expected.fuel_used
+        assert item["oxygen"]==expected.oxygen_used
+        assert item["mana"]==expected.mana_used
+    by_name={item["name"]:item for item in audit["probes"]}
+    assert by_name["outer_space"]["fuel"]==45
+    assert by_name["outer_space"]["mana"]==15
+    assert by_name["underwater"]["oxygen"]==37
+    assert by_name["magic"]["mana"]==12
 
 
 def test_native_game_export_requires_explicit_original_rights_authorization():
