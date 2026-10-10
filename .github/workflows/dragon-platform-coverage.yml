@@ -17,6 +17,7 @@ on:
       - 'skeleton/ai/webcrawler/dragon_native_arduboy.py'
       - 'skeleton/ai/webcrawler/dragon_native_thumby.py'
       - 'skeleton/ai/webcrawler/dragon_native_lynx.py'
+      - 'skeleton/ai/webcrawler/dragon_lynx_release.py'
       - 'skeleton/ai/webcrawler/dragon_native_vita_saturn.py'
       - 'skeleton/ai/webcrawler/dragon_vic20_tiny.py'
       - 'skeleton/ai/webcrawler/dragon_desktop_abi.py'
@@ -33,6 +34,7 @@ on:
       - 'tests/test_ai_webcrawler_dragon_micro_handhelds.py'
       - 'tests/test_ai_webcrawler_dragon_native_thumby.py'
       - 'tests/test_ai_webcrawler_dragon_lynx_vita_saturn.py'
+      - 'tests/test_ai_webcrawler_dragon_lynx_release.py'
       - 'tests/test_ai_webcrawler_dragon_compatible_revisions.py'
       - 'tests/test_ai_webcrawler_dragon_desktop_abi.py'
       - 'tests/test_ai_webcrawler_dragon_platform_matrix.py'
@@ -77,6 +79,7 @@ jobs:
             tests/test_ai_webcrawler_dragon_micro_handhelds.py \
             tests/test_ai_webcrawler_dragon_native_thumby.py \
             tests/test_ai_webcrawler_dragon_lynx_vita_saturn.py \
+            tests/test_ai_webcrawler_dragon_lynx_release.py \
             tests/test_ai_webcrawler_dragon_compatible_revisions.py \
             tests/test_ai_webcrawler_dragon_desktop_abi.py \
             tests/test_ai_webcrawler_dragon_platform_matrix.py
@@ -97,6 +100,33 @@ jobs:
           print("DRAGON_ORIGINAL_6502_BUILD_PASS",m["linked_count"],
                 "linked",m["unlinked_count"],"unlinked")
           PY
+      - name: Build real original Atari Lynx 65C02 cartridge and verify binary provenance
+        run: |
+          python -m skeleton.ai.webcrawler.dragon_lynx_release \
+            --out _dragon_evidence/lynx-native --seed 1989
+          python - <<'PY'
+          from pathlib import Path
+          from hashlib import sha256
+          import json
+          root=Path("_dragon_evidence/lynx-native")
+          r=json.loads((root/"dragon-lynx-release.json").read_text())
+          binary=(root/"build/dragon.lnx").read_bytes()
+          assert binary[:4]==b"LYNX"
+          assert sha256(binary).hexdigest()==r["cartridge_sha256"]
+          assert sha256((root/"dragon-original-lynx.zip").read_bytes()).hexdigest()==r["package_sha256"]
+          assert r["native_compiler_pass"] is True
+          assert r["real_hardware_pass"] is False
+          assert r["emulator_controller_replay_pass"] is False
+          print("DRAGON_REAL_LYNX_CC65_CARTRIDGE_PASS",r["cartridge_sha256"])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dragon-original-lynx-65c02-cartridge
+          path: |
+            _dragon_evidence/lynx-native/dragon-original-lynx.zip
+            _dragon_evidence/lynx-native/dragon-lynx-release.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Export machine-readable hardware readiness evidence
         run: |
           mkdir -p _dragon_evidence

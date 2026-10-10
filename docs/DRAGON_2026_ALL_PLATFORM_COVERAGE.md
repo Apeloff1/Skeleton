@@ -625,3 +625,27 @@ Developer toolchain references used for the new implementations:
 - Atari Lynx cart compiler: https://cc65.github.io/doc/cc65.html
 - Jo Engine official Saturn build conventions: https://www.jo-engine.org/
 - PS Vita VitaSDK public toolchain: https://vitasdk.org/
+
+## Original Lynx cartridge artifact lane
+
+The all-era CI now performs a **real cc65 cl65 Atari Lynx cross-build**
+using a target-specific linker and source-bound release command. It
+checks the actual .lnx cartridge magic, version and size, hashes C
+source and linked ROM, and packages the original C, exact Makefile,
+cartridge and machine-readable compile receipt in a deterministic ZIP.
+
+The CI upload is conditional on a successful compiler run and a real
+LYNX header. It cannot be substituted with a text file renamed .lnx.
+The builder refuses nonempty output directories, symlinks or malformed
+binary formats and imposes compilation and ROM size limits.
+
+Operator command, after installing cc65 and make:
+
+    python -m skeleton.ai.webcrawler.dragon_lynx_release \
+      --out /tmp/dragon-original-lynx --seed 1989
+
+Successful compiler evidence still does not establish emulated input
+replay, Suzy/Mikey frame/audio timing, player enjoyment, or compatibility
+on physical Lynx devices. Those stages are explicitly false in the
+build report and require later separate validation. No publisher
+license or proprietary assets are inferred.
