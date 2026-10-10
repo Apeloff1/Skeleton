@@ -425,7 +425,8 @@ class DragonWisdomPyramid:
                                      key=lambda x: (x["priority"], x["sequence"]))[:limit])
 
     def hoag_view(self, owner: str, *, now: int, authorized: bool,
-                  limit: int = 32) -> dict[str, Any]:
+                  limit: int = 32,
+                  require_signed_approval: bool = False) -> dict[str, Any]:
         """Never exposes source text, unreviewed claims or revoked memories."""
         if authorized is not True:
             raise PermissionError("authenticated owner required")
@@ -433,6 +434,8 @@ class DragonWisdomPyramid:
         _time(now)
         if type(limit) is not int or not 1 <= limit <= 64:
             raise ValueError("invalid view limit")
+        if type(require_signed_approval) is not bool:
+            raise ValueError("explicit signed approval policy required")
         events = self._history(owner)
         pending = self._open_orders(events)
         root = self.library.snapshot_root(owner, authorized=True)
@@ -443,6 +446,9 @@ class DragonWisdomPyramid:
         for event in reversed(promoted):
             review = self._review(events, event["review_digest"])
             if (review["digest"] in revoked or review["knowledge_root"] != root
+                    or (require_signed_approval and (
+                        not isinstance(event.get("approval_evidence_digest"), str)
+                        or not _HASH.fullmatch(event["approval_evidence_digest"])))
                     or not event["at"] <= now or not review["at"] <= now < review["expires_at"]
                     or review["mechanic"] in seen_mechanics
                     or any(ref[0] in pending for ref in review["source_refs"])
