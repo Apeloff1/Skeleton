@@ -75,6 +75,9 @@ class Traverse:
     secret_token:str=""
     hazard_resistance:str=""
     one_way:bool=True
+    fuel:int=0
+    oxygen:int=0
+    mana:int=0
 
 @dataclass(frozen=True)
 class World:
@@ -95,6 +98,9 @@ class Traveller:
     energy:int=100
     max_energy:int=100
     start_minute:int=480
+    fuel:int=60
+    oxygen:int=60
+    mana:int=60
 
 @dataclass(frozen=True)
 class Waypoint:
@@ -114,6 +120,12 @@ class Waypoint:
     fatigue:int
     spectacle:int
     traversed_places:tuple[str,...]
+    fuel:int
+    oxygen:int
+    mana:int
+    fuel_spent:int
+    oxygen_spent:int
+    mana_spent:int
 
 @dataclass(frozen=True)
 class Journey:
@@ -139,6 +151,9 @@ class Journey:
     success:bool
     original_content_only:bool
     digest:str
+    fuel_used:int=0
+    oxygen_used:int=0
+    mana_used:int=0
 
 @dataclass(frozen=True)
 class RouteSearch:
@@ -197,7 +212,8 @@ def validate_world(world:World)->None:
         _ids(edge.shapes,limit=16)
         for field,high in (("minutes",1440),("price",10000),
                            ("fatigue",100),("danger",100),
-                           ("spectacle",100)):
+                           ("spectacle",100),("fuel",100),
+                           ("oxygen",100),("mana",100)):
             _number(getattr(edge,field),1 if field=="minutes" else 0,high,field)
         for field in ("requires","requires_one","grants","consumes"):
             _ids(getattr(edge,field))
@@ -240,6 +256,9 @@ def validate_traveller(traveller:Traveller):
     _number(traveller.max_energy,1,1000,"maximum stamina")
     _number(traveller.energy,0,traveller.max_energy,"starting stamina")
     _number(traveller.start_minute,0,MAX_MINUTES,"starting clock")
+    _number(traveller.fuel,0,1000,"starting fuel")
+    _number(traveller.oxygen,0,1000,"starting oxygen")
+    _number(traveller.mana,0,1000,"starting magic resource")
 
 
 def _node_index(world:World):
@@ -259,6 +278,7 @@ def _begin(world:World,traveller:Traveller)->Waypoint:
         min(traveller.max_energy,traveller.energy+start.energy_refill),
         traveller.start_minute,0,1<<index[world.start],0,(),
         0,0,0,0,0,start.scenic_value,(world.start,),
+        traveller.fuel,traveller.oxygen,traveller.mana,0,0,0,
     )
 
 def _apply(world:World,traveller:Traveller,state:Waypoint,edge:Traverse,
@@ -275,7 +295,9 @@ def _apply(world:World,traveller:Traveller,state:Waypoint,edge:Traverse,
     if edge.weather_none and conditions.intersection(edge.weather_none):return None
     waiting=_depart(edge,state.clock)
     if state.elapsed+waiting+edge.minutes>world.max_minutes:return None
-    if state.money<edge.price or state.energy<edge.fatigue:return None
+    if (state.money<edge.price or state.energy<edge.fatigue or
+            state.fuel<edge.fuel or state.oxygen<edge.oxygen or
+            state.mana<edge.mana):return None
     if len(state.route)>=MAX_HOPS:return None
     target=world.places[idx[edge.destination]]
     bit=1<<idx[edge.destination]
@@ -309,6 +331,9 @@ def _apply(world:World,traveller:Traveller,state:Waypoint,edge:Traverse,
         state.fatigue+edge.fatigue,
         state.spectacle+edge.spectacle+(target.scenic_value if first_visit else 0),
         state.traversed_places+(edge.destination,),
+        state.fuel-edge.fuel,state.oxygen-edge.oxygen,state.mana-edge.mana,
+        state.fuel_spent+edge.fuel,state.oxygen_spent+edge.oxygen,
+        state.mana_spent+edge.mana,
     )
 
 def _cost(edge:Traverse,wait:int,objective:str,reused:int)->int:
@@ -373,7 +398,7 @@ def plan(world:World,traveller:Traveller=Traveller(),*,
     # state growth while allowing explicit fare/fuel/stamina constraints.
     def state_key(st):
         return (st.place,st.tokens,st.visits,st.requirements,
-                st.clock%1440,st.money,st.energy,
+                st.clock%1440,st.money,st.energy,st.fuel,st.oxygen,st.mana,
                 min(st.elapsed,minimum_minutes))
     best={state_key(initial):0}
     priority=[(0,0,initial)]
@@ -428,7 +453,9 @@ def replay(world:World,route:tuple[str,...],traveller:Traveller=Traveller(),*,
     canonical={
         "objective":objective,"edges":route,"places":state.traversed_places,
         "minutes":state.elapsed,"money":state.spent,"risk":state.danger,
-        "energy":state.fatigue,"modes":modes,"shapes":sorted(set(shapes)),
+        "energy":state.fatigue,
+        "fuel":state.fuel_spent,"oxygen":state.oxygen_spent,
+        "mana":state.mana_spent,"modes":modes,"shapes":sorted(set(shapes)),
         "weather":world.environment,
     }
     digest=sha256(json.dumps(canonical,sort_keys=True,separators=(",",":")
@@ -439,6 +466,7 @@ def replay(world:World,route:tuple[str,...],traveller:Traveller=Traveller(),*,
         state.movement_minutes,state.waiting_minutes,state.elapsed,
         state.spent,state.danger,state.fatigue,state.spectacle,loops,
         footprint,secret,unlockable,environmental,True,True,digest,
+        state.fuel_spent,state.oxygen_spent,state.mana_spent,
     )
 
 def experience(world:World,traveller:Traveller=Traveller(), *,
@@ -483,6 +511,9 @@ def experience(world:World,traveller:Traveller=Traveller(), *,
                     reason="weather_restricted"
                 elif state.money<edge.price:reason="fare_required"
                 elif state.energy<edge.fatigue:reason="stamina_required"
+                elif state.fuel<edge.fuel:reason="fuel_required"
+                elif state.oxygen<edge.oxygen:reason="oxygen_required"
+                elif state.mana<edge.mana:reason="magic_resource_required"
                 elif state.elapsed+_depart(edge,state.clock)+edge.minutes>world.max_minutes:
                     reason="travel_time_exhausted"
                 else:reason="progress_or_equipment_locked"
@@ -493,6 +524,7 @@ def experience(world:World,traveller:Traveller=Traveller(), *,
                 "time_minutes":edge.minutes,
                 "waiting_minutes":_depart(edge,state.clock),
                 "price":edge.price,"fatigue":edge.fatigue,
+                "fuel":edge.fuel,"oxygen":edge.oxygen,"mana":edge.mana,
                 "danger":edge.danger,"scenic":edge.spectacle,
                 "access":reason,"available":allowed is not None,
             })
@@ -506,6 +538,9 @@ def experience(world:World,traveller:Traveller=Traveller(), *,
         "known_tokens":sorted(state.tokens),
         "remaining_cash":state.money,
         "remaining_energy":state.energy,
+        "remaining_fuel":state.fuel,
+        "remaining_oxygen":state.oxygen,
+        "remaining_mana":state.mana,
         "elapsed_minutes":state.elapsed,
         "waiting_minutes":state.waiting_minutes,
         "clock_minute":state.clock%1440,
