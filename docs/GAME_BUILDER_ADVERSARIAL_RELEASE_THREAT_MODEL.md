@@ -118,3 +118,20 @@ author provenance, lawful target SDK/hardware access, reviewed third-party
 licenses/credits, signed authority snapshot from an external root, complete
 byte-bound review, actual qualified native gameplay validation and a separate
 responsible-publisher decision. Change any component, and revalidate.
+
+
+## October 10 — Cross-build Sega source and cartridge defenses
+
+The verified pipeline now separates (a) deterministic re-authoring of game
+C/Makefile/manifest into a distinct folder, (b) an initial SDCC/toolchain
+cartridge build and its exact binary + rights receipt, (c) a clean second
+SDCC build, and (d) file-descriptor-protected comparison of both original
+ROMs and their source/rights/world/replay provenance. The new receipts
+distinguish byte equality from authenticated compiler runs, proof of
+authorship, legal distribution permission and emulator/hardware gameplay.
+
+See `skeleton/ai/game_builder/sega_reproducibility.py`, the offline
+`scripts/game_builder/sega_reproducibility_ci.py`, and the dedicated
+adversarial test suite. The only publishable outputs of this verification
+flow are short JSON evidence records. It does not make commercial
+copyrighted title/content copying lawful.
