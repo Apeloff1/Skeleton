@@ -101,7 +101,9 @@ def emit(
     world = generate_playable_world(intent, authorized=True)
     rights = HomebrewSource(
         project_id=intent.project_id,
-        platform_id="bandai_wonderswan",
+        # These worlds are authored *for* the requested native console.
+        # Do not invent a WonderSwan origin just to obtain a port blueprint.
+        platform_id=target,
         rights_basis="project_owned",
         evidence_sha256=author_reference,
         creative_identity=(
@@ -122,6 +124,8 @@ def emit(
         "schema": "skeleton.game_builder.native_sega8_original_source_receipt.v1",
         "target": target, "output_directory": str(folder),
         "original_campaign_profile": profile,
+        "native_source_authoring_platform": target,
+        "third_party_console_origin_claimed": False,
         "source_content_digest": project.content_digest,
         "world_digest": world.digest,
         "winning_replay_digest": replay.digest,
