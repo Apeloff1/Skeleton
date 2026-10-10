@@ -132,3 +132,11 @@ def test_policy_rejects_type_confusion():
     with pytest.raises(ValueError, match="CapturePolicy"):
         GameMechanicsMemory(sqlite3.connect(":memory:"), policy=None)
 
+
+def test_policy_strict_observation_resource_budget():
+    from skeleton.ai.webcrawler.dragon_game_mechanics import CapturePolicy
+    for attr in ("max_observations", "max_note_chars", "max_sessions_per_owner"):
+        options = {attr: True}
+        with pytest.raises(ValueError):
+            GameMechanicsMemory(sqlite3.connect(":memory:"), policy=CapturePolicy(**options))
+
