@@ -29,6 +29,7 @@ from .dos_native_export import compile_native_dos, export_native_dos
 from .atari8_native_export import compile_native_atari8, export_native_atari8
 from .apple2_native_export import compile_native_apple2, export_native_apple2
 from .spectrum_native_export import compile_native_spectrum, export_native_spectrum
+from .msx1_native_export import compile_native_msx1, export_native_msx1
 from .platform_registry import default_registry
 from .playable_simulation import demonstrate_solvable
 from .playable_world import GameBuildIntent, generate_playable_world
@@ -46,6 +47,7 @@ _NATIVE = {
     "atari_400_800": "atari8_cc65",
     "apple_ii": "apple2_cc65",
     "sinclair_zx_spectrum": "spectrum_z80asm",
+    "msx1": "msx1_z80asm",
 }
 
 _MAX_EVIDENCE_FILE = 8 * 1024 * 1024
@@ -128,6 +130,11 @@ def build_game(
         project = compile_native_spectrum(world, source, authorized=True)
         folder = export_native_spectrum(project, output, authorized=True)
         artifact_type = "native_spectrum_48k_z80_tap_source"
+        digest = project.content_digest
+    elif kind == "msx1_z80asm":
+        project = compile_native_msx1(world, source, authorized=True)
+        folder = export_native_msx1(project, output, authorized=True)
+        artifact_type = "native_msx1_z80_16kb_bios_rom_source"
         digest = project.content_digest
     else:
         project = compile_native_desktop(world, source, target, authorized=True)
