@@ -15,10 +15,10 @@ import os
 from pathlib import Path
 import sqlite3
 import time
-from typing import Iterator
+from typing import Annotated, Iterator
 
 from fastapi import APIRouter, Depends, HTTPException, Path as URLPath, Query, Response
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StringConstraints
 
 from routes.gameforge_auth import get_current_user
 from skeleton.ai.webcrawler.dragon_practice_lab import DragonPracticeLab
@@ -187,6 +187,14 @@ def native_production_art_preview(
     }
 
 
+NativeOriginalGridRow = Annotated[
+    str, StringConstraints(min_length=12, max_length=12, pattern=r"^[#.@$o]{12}$")
+]
+NativeOriginalGrid = Annotated[
+    list[NativeOriginalGridRow], Field(min_length=10, max_length=10)
+]
+
+
 class NativeProductionDesignBody(BaseModel):
     """Optional original game controls; never interpreted as executable source."""
     model_config = ConfigDict(extra="forbid")
@@ -212,7 +220,7 @@ class NativeProductionSourceRequest(BaseModel):
     rights_reference: str = Field(default="", max_length=240)
     approved: StrictBool = Field(default=False)
     portable_design: NativeProductionDesignBody | None = Field(default=None)
-    authored_puzzles: list[list[str]] | None = Field(default=None, max_length=8)
+    authored_puzzles: list[NativeOriginalGrid] | None = Field(default=None, max_length=8)
 
 
 def _native_source_editor(user: dict | None = Depends(get_current_user)) -> str:
@@ -255,7 +263,7 @@ def _make_native_production_request(body: NativeProductionSourceRequest):
 class NativePuzzleGridValidationRequest(BaseModel):
     """Small bounded original authored-grid validation; never compiles source."""
     model_config = ConfigDict(extra="forbid")
-    levels: list[list[str]] = Field(min_length=1, max_length=8)
+    levels: list[NativeOriginalGrid] = Field(min_length=1, max_length=8)
 
 
 @router.post("/native/production/puzzle/validate")
