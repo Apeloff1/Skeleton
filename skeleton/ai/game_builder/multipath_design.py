@@ -335,9 +335,16 @@ def route_portfolio(
     seen: set[tuple[str, ...]] = set()
     penalties: dict[Edge, int] = {}
     for _ in range(max_routes * 3):
-        proof = solve_route(problem, algorithm="dijkstra",
-                            edge_penalties=penalties,
-                            max_expansions=max_expansions)
+        candidate = solve_route(problem, algorithm="dijkstra",
+                                edge_penalties=penalties,
+                                max_expansions=max_expansions)
+        # Search penalties encourage diversity; they are NOT charges or
+        # gameplay costs incurred by the player. Re-admit exact actions
+        # with physical unit-cost replay before storing the receipt.
+        proof = evaluate_route(
+            problem, candidate.actions, solver="diversity_dijkstra",
+            expanded_states=candidate.expanded_states,
+        )
         if proof.actions not in seen:
             seen.add(proof.actions)
             found.append(proof)
