@@ -57,6 +57,10 @@ class Sega8Machine:
         self.io_control_writes = 0
         self.interrupts_issued = 0
         self.io_reads = 0
+        # Count *guest* controller-port reads while a real physical button
+        # signal is asserted. Playback cannot pass by host-writing game RAM.
+        self.active_joypad_reads = 0
+        self.active_joypad_bits_observed = 0
         self.z80_tstates = 0
         self.vcounter_reads = 0
         self.vcounter_b0_seen = False
@@ -95,6 +99,9 @@ class Sega8Machine:
         low = port & 0xFF
         self.io_reads += 1
         if low == 0xDC:
+            if self.controller != 0xFF:
+                self.active_joypad_reads += 1
+                self.active_joypad_bits_observed |= (~self.controller) & 0x0F
             return self.controller
         if low == 0xDD:
             return self.controller_high
