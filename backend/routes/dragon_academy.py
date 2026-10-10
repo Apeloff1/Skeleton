@@ -130,6 +130,18 @@ def native_targets(owner: str = Depends(_principal)) -> dict:
             "supported_matrix":practice_matrix()}
 
 
+class NativeProductionDesignBody(BaseModel):
+    """Optional original game controls; never interpreted as executable source."""
+    model_config = ConfigDict(extra="forbid")
+    palette: str = Field(default="vga_dusk", max_length=30)
+    hero: str = Field(default="hatchling", max_length=32)
+    quest_theme: str = Field(default="ancient_ruins", max_length=32)
+    difficulty: StrictInt = Field(default=4, ge=1, le=10)
+    stages: StrictInt = Field(default=4, ge=1, le=8)
+    candidates: StrictInt = Field(default=8, ge=1, le=24)
+    project_notes: str = Field(default="Original native homebrew; platform-scaled design", max_length=200)
+
+
 class NativeProductionSourceRequest(BaseModel):
     """Strict browser-only original source export, never privileged ROM compilation."""
     model_config = ConfigDict(extra="forbid")
@@ -141,6 +153,7 @@ class NativeProductionSourceRequest(BaseModel):
     rights_basis: str = Field(default="original_homebrew", max_length=40)
     rights_reference: str = Field(default="", max_length=240)
     approved: StrictBool = Field(default=False)
+    portable_design: NativeProductionDesignBody | None = Field(default=None)
 
 
 def _native_source_editor(user: dict | None = Depends(get_current_user)) -> str:
@@ -173,7 +186,7 @@ def native_production_source_bundle(
         raise HTTPException(status_code=403,
                             detail="Explicit publication and original rights attestation required")
     from skeleton.ai.webcrawler.dragon_native_production import (
-        ProductionRequest, build_source_bundle,
+        PortableGameDesign, ProductionRequest, build_source_bundle,
     )
     try:
         request = ProductionRequest(
@@ -181,6 +194,8 @@ def native_production_source_bundle(
             original_work_attested=body.original_work_attested,
             rights_basis=body.rights_basis, rights_reference=body.rights_reference,
             seed=body.seed, max_portfolio_bytes=3_000_000,
+            portable_design=(PortableGameDesign(**body.portable_design.model_dump())
+                             if body.portable_design is not None else None),
         )
         payload, index = build_source_bundle(request, authorized=True)
     except (ValueError, PermissionError):
