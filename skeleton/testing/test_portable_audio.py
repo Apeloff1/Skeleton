@@ -14,3 +14,10 @@ def test_gb_tone_pitch_admission_and_11bit_period():
     with pytest.raises(AudioKernelError):
         gameboy_pulse_period(0)
 
+
+def test_gb_tone_decoder_rounds_and_refuses_reserved_bits():
+    assert abs(gameboy_pulse_frequency(gameboy_pulse_period(523))-523)<3
+    assert gameboy_pulse_frequency(0)==64.0
+    with pytest.raises(AudioKernelError):
+        gameboy_pulse_frequency(2048)
+
