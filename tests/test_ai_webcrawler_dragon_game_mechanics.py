@@ -341,3 +341,12 @@ def test_stored_observation_shape_refuses_partial_records():
         with pytest.raises(ValueError, match="invalid shape"):
             store.sessions("alice", authorized=True)
 
+
+def test_tampered_stored_metadata_is_rejected():
+    store = setup()
+    store.record(session(store), authorized=True)
+    store.db.execute("UPDATE dragon_game_sessions SET duration_ms=? WHERE owner=?",
+                     (-1, "alice"))
+    with pytest.raises(ValueError, match="metadata invalid"):
+        store.sessions("alice", authorized=True)
+
