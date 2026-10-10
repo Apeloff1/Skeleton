@@ -29,3 +29,11 @@ def test_pressed_edges_do_not_repeat_held_button_or_foreign_bit():
     with pytest.raises(InputTimingError):
         edge_pressed(-1,0)
 
+
+def test_release_edges_only_when_button_transitions_high_to_low():
+    assert edge_released(0b1110,0b0100)==0b1010
+    assert edge_released(0b0100,0b0100)==0
+    assert edge_released(0b1110,0b0100,0b0010)==0b0010
+    with pytest.raises(InputTimingError):
+        edge_released(0,65536)
+
