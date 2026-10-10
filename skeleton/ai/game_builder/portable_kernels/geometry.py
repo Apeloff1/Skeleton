@@ -147,3 +147,39 @@ def rect_intersects(first: object, second: object) -> bool:
     ax,ay,aw,ah=_rect(first)
     bx,by,bw,bh=_rect(second)
     return ax<bx+bw and bx<ax+aw and ay<by+bh and by<ay+ah
+
+def swept_aabb_hit(moving: object, obstacle: object, dx: int,
+                   dy: int) -> Fraction | None:
+    """First exact time-of-impact on [0,1] for two bounded rectangles.
+
+    Rational slab calculations avoid non-deterministic float rounding across
+    CPUs. Stationary separated axes cannot collide; retreating edge contact
+    is not a new hit.
+    """
+    ax,ay,aw,ah=_rect(moving)
+    bx,by,bw,bh=_rect(obstacle)
+    vx=_int(dx,"frame delta x",-2048,2048)
+    vy=_int(dy,"frame delta y",-2048,2048)
+    if rect_intersects(moving,obstacle):
+        return Fraction(0)
+    start=[]
+    stop=[]
+    for left,size,target,target_size,delta in (
+        (ax,aw,bx,bw,vx),(ay,ah,by,bh,vy)
+    ):
+        if delta==0:
+            if left>=target+target_size or target>=left+size:
+                return None
+            start.append(Fraction(-1))
+            stop.append(Fraction(2))
+        elif delta>0:
+            start.append(Fraction(target-(left+size),delta))
+            stop.append(Fraction(target+target_size-left,delta))
+        else:
+            start.append(Fraction(target+target_size-left,delta))
+            stop.append(Fraction(target-(left+size),delta))
+    entry=max(Fraction(0),*start)
+    departure=min(Fraction(1),*stop)
+    if entry>departure or departure<=0:
+        return None
+    return entry
