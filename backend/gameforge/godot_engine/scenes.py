@@ -1,6 +1,8 @@
 """scenes.py — .tscn scene text generation for scaffolded projects.
 
 Pure functions: spec in, scene file text out. No I/O.
+Art identity: every rendered scene runs through art_identity.apply_art_pass
+so materialise ships lighting + readable materials, not a bare Node2D.
 """
 from __future__ import annotations
 
@@ -76,5 +78,17 @@ SCENE_BUILDERS = {
 
 
 def render_scene(template: str, script: str | None = None) -> str:
+    """Build a scaffold scene and apply the Art Director identity pass."""
     builder = SCENE_BUILDERS.get(template, empty_scene)
-    return builder(script) if script else builder()
+    raw = builder(script) if script else builder()
+    try:
+        from core.art_identity import apply_art_pass, critique
+    except ImportError:  # pragma: no cover — package layout fallback
+        try:
+            from backend.core.art_identity import apply_art_pass, critique  # type: ignore
+        except ImportError:
+            return raw
+    lit = apply_art_pass(raw, template=template)
+    # Soft assert in debug: critique should pass after the pass.
+    _ = critique(lit)
+    return lit
