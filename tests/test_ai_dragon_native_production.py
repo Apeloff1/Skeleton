@@ -404,3 +404,49 @@ def test_modified_source_with_forged_hash_table_rejected():
     }, raw)
     with pytest.raises(ValueError, match="fingerprint"):
         verify_source_release(modified)
+
+
+
+def test_memory_only_app_bundle_compiles_no_rom_and_writes_no_files(tmp_path, monkeypatch):
+    from skeleton.ai.webcrawler.dragon_native_production import (
+        build_source_bundle, verify_source_bundle,
+    )
+    monkeypatch.chdir(tmp_path)
+    before = set(tmp_path.iterdir())
+    spec = request(targets=("game_boy", "nes"), max_portfolio_bytes=3_000_000)
+    blob1, idx1 = build_source_bundle(spec, authorized=True)
+    blob2, idx2 = build_source_bundle(spec, authorized=True)
+    assert blob1 == blob2 and idx1 == idx2
+    assert set(tmp_path.iterdir()) == before
+    assert idx1["production_evidence"] == "source_only"
+    assert verify_source_bundle(blob1)["target_count"] == 2
+    with ZipFile(BytesIO(blob1)) as files:
+        assert "production-index.json" in files.namelist()
+        assert len(files.namelist()) == 3
+
+
+def test_memory_bundle_rejects_compilation_and_excessive_targets():
+    from skeleton.ai.webcrawler.dragon_native_production import build_source_bundle
+    with pytest.raises(PermissionError):
+        build_source_bundle(request(), authorized=False)
+    with pytest.raises(PermissionError):
+        build_source_bundle(request(compile_roms=True), authorized=True)
+    with pytest.raises(ValueError):
+        build_source_bundle(request(targets=("game_boy", "nes", "pc_linux", "pc_macos"),
+                                    max_portfolio_bytes=3_000_000), authorized=True)
+
+
+def test_memory_bundle_detects_adversarial_nested_mutation():
+    from skeleton.ai.webcrawler.dragon_native_production import (
+        build_source_bundle, verify_source_bundle,
+    )
+    raw, _ = build_source_bundle(request(max_portfolio_bytes=3_000_000),
+                                 authorized=True)
+    with ZipFile(BytesIO(raw)) as original:
+        inner = next(n for n in original.namelist() if n.startswith("releases/"))
+    compromised = rezip({inner: b"modified nested source"}, raw)
+    with pytest.raises(ValueError, match="tampered"):
+        verify_source_bundle(compromised)
+    compromised = rezip({}, raw, extras=[("releases/alien.zip", b"x")])
+    with pytest.raises(ValueError, match="unrecognized"):
+        verify_source_bundle(compromised)
