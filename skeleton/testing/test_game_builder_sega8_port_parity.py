@@ -6,6 +6,7 @@ execution nor include firmware, game ROMs, or outside expressive material.
 from __future__ import annotations
 
 from copy import deepcopy
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
@@ -20,6 +21,7 @@ from scripts.game_builder.sega8_port_parity import (
 WORLD = "a" * 64
 REPLAY = "b" * 64
 RIGHTS = "c" * 64
+TOOLCHAIN = "533ae572c897cf44f1da865013ebf690134301a3"
 EXTS = {"sega_master_system": "sms", "sega_game_gear": "gg"}
 
 
@@ -54,6 +56,7 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
                 "reference_safe_replay_digest": REPLAY,
                 "source_rights_evidence_sha256": RIGHTS,
                 "source_sha256": str(index) * 64,
+                "toolchain_revision": TOOLCHAIN,
                 "rom_sha256": str(index + 3) * 64,
                 "physical_hardware_verified": False,
                 "distribution_licensed": False, "release_approved": False,
@@ -92,11 +95,38 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
                 "release_approved": False,
             },
         }
+
+        comparable = {
+            "schema": "skeleton.game_builder.sega_reproducibility.v1",
+            "target": target,
+            "source_sha256": str(index)*64,
+            "author_declaration_sha256": RIGHTS,
+            "world_sha256": WORLD,
+            "reference_replay_sha256": REPLAY,
+            "toolchain_git_revision": TOOLCHAIN,
+            "cartridge_sha256": str(index+3)*64,
+            "cartridge_bytes": 32768,
+            "checked_two_distinct_artifact_paths": True,
+            "exact_rom_bytes_match": True,
+            "source_and_authorship_digests_match": True,
+            "two_compiler_executions_independently_verified": False,
+            "source_rights_independently_verified": False,
+            "gameplay_execution_verified": False,
+            "real_console_hardware_verified": False,
+            "developer_toolchain_authenticity_proven": False,
+            "publication_licensed": False,
+        }
+        comparable["comparison_sha256"] = sha256(json.dumps(
+            comparable, sort_keys=True, ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")).hexdigest()
+        content["reproducibility"] = comparable
         paths = {
             "manifest": source / "manifest.json",
             "compile": root / (target + "-compilation-evidence.json"),
             "host": root / (target + "-host-gameplay-receipt.json"),
             "boot": root / (target + "-real-z80-boot.json"),
+            "reproducibility": root / (target + "-reproducibility.json"),
         }
         for name, path in paths.items():
             path.write_text(json.dumps(content[name], indent=2), encoding="utf-8")
@@ -119,6 +149,7 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     assert receipt["gameplay_parity_verified"] is True
     assert receipt["independent_native_rom_formats_verified"] is True
     assert receipt["real_z80_startup_checked_per_platform"] is True
+    assert receipt["native_cartridge_rebuild_byte_equality_checked_per_platform"] is True
     assert receipt["original_controller_actions_verified_per_platform"] == 256
     assert receipt["world_digest"] == WORLD
     assert receipt["full_native_z80_gameplay_replay_verified"] is False
@@ -141,6 +172,15 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     ("boot", "physical_hardware_verified", True),
     ("compile", "real_rom_structure_verified", False),
     ("compile", "rom_sha256", "0" * 64),
+    ("reproducibility", "cartridge_sha256", "0" * 64),
+    ("reproducibility", "toolchain_git_revision", "a" * 40),
+    ("reproducibility", "source_sha256", "b" * 64),
+    ("reproducibility", "world_sha256", "c" * 64),
+    ("reproducibility", "author_declaration_sha256", "d" * 64),
+    ("reproducibility", "source_rights_independently_verified", True),
+    ("reproducibility", "checked_two_distinct_artifact_paths", False),
+    ("reproducibility", "gameplay_execution_verified", True),
+    ("reproducibility", "comparison_sha256", "e" * 64),
 ))
 def test_cross_port_rights_and_machine_evidence_mismatches_fail_closed(
     tmp_path, evidence, field, replacement,
@@ -178,4 +218,59 @@ def test_cross_port_rejects_artifact_hardlinks(tmp_path):
     extra = tmp_path / "outside-duplicate"
     os.link(ref, extra)
     with pytest.raises(Sega8PortParityError):
+        verify_ports(tmp_path)
+
+
+
+def test_cross_port_refuses_missing_rebuild_receipt_even_after_compiled_rom_boot(tmp_path):
+    files=_fixtures(tmp_path)
+    files["sega_game_gear"]["reproducibility"].unlink()
+    with pytest.raises(Sega8PortParityError,match="missing/ambiguous"):
+        verify_ports(tmp_path)
+
+
+@pytest.mark.parametrize("value",[None,0,"false",True,1,[],{"forged":"game"}])
+def test_cross_port_refuses_fake_executable_provenance_status(tmp_path,value):
+    files=_fixtures(tmp_path)
+    _mutate(files["sega_master_system"]["reproducibility"],
+            "two_compiler_executions_independently_verified",value)
+    with pytest.raises(Sega8PortParityError):
+        verify_ports(tmp_path)
+
+
+def test_cross_port_refuses_duplicate_json_properties_in_game_reproducibility(tmp_path):
+    files=_fixtures(tmp_path)
+    path=files["sega_game_gear"]["reproducibility"]
+    data=path.read_bytes()
+    # Duplicate schema values are ambiguous across JSON parsers.
+    path.write_bytes(data.replace(b'{"schema":',b'{"schema":"fake", "schema":',1))
+    with pytest.raises(Sega8PortParityError):
+        verify_ports(tmp_path)
+
+
+def test_cross_port_refuses_unreviewed_property_with_recalculated_digest(tmp_path):
+    files=_fixtures(tmp_path)
+    path=files["sega_master_system"]["reproducibility"]
+    data=json.loads(path.read_text(encoding="utf-8"))
+    data["commercial_game_shipped"]=True
+    data.pop("comparison_sha256")
+    data["comparison_sha256"]=sha256(json.dumps(
+        data,sort_keys=True,separators=(",", ":"),ensure_ascii=False,
+    ).encode("utf-8")).hexdigest()
+    path.write_text(json.dumps(data),encoding="utf-8")
+    with pytest.raises(Sega8PortParityError,match="unreviewed"):
+        verify_ports(tmp_path)
+
+
+def test_cross_port_refuses_checksum_correct_but_rebuilt_ROM_digest_replacement(tmp_path):
+    files=_fixtures(tmp_path)
+    path=files["sega_game_gear"]["reproducibility"]
+    data=json.loads(path.read_text(encoding="utf-8"))
+    data["cartridge_sha256"]="0"*64
+    data.pop("comparison_sha256")
+    data["comparison_sha256"]=sha256(json.dumps(
+        data,sort_keys=True,separators=(",", ":"),ensure_ascii=False,
+    ).encode("utf-8")).hexdigest()
+    path.write_text(json.dumps(data),encoding="utf-8")
+    with pytest.raises(Sega8PortParityError,match="cartridge_sha256"):
         verify_ports(tmp_path)
