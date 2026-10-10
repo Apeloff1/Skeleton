@@ -898,6 +898,33 @@
         "skeleton/testing/test_reference_provenance.py",
         "docs/architecture/REFERENCE_PROVENANCE.md"
       ]
+    },
+    {
+      "id": "dragon-conversation-micro-projection",
+      "owner_plane": "retrieval",
+      "physical_store": "backend-data-volume",
+      "logical_location": "Existing Dragon SQLite connection / dragon_conversation_micro_logs and dragon_conversation_micro_terms",
+      "authority": "derived",
+      "source_of_truth": false,
+      "status": "library-adapter-implemented-production-binding-pending",
+      "data_classes": [
+        "confidential"
+      ],
+      "transaction_scope": "SQLite transactional checkpoint identity and postings; writer lock precedes capacity checks",
+      "consistency": "Ten committed canonical message references plus caller-bound topic facets; authorized tenant/owner/thread/active-branch lookup; expiry and digest checks; never transcript or training authority",
+      "retention": "Explicit retention consent and caller-supplied expiry; thread deletion and expire adapters remove projections and postings; production lifecycle hook pending",
+      "backup_restore": "Discard/rebuild only from currently authorized canonical conversation windows; on-disk reopen regression verifies projection restart; projection loss does not alter canonical messages",
+      "migration": "Additive create-if-absent projection tables; disable adapter and delete/rebuild derived tables on rollback",
+      "derived_from": [
+        "conversation-thread-state",
+        "conversation-message-state"
+      ],
+      "rebuildable": true,
+      "evidence": [
+        "skeleton/ai/webcrawler/dragon_conversation_micro_logs.py",
+        "tests/test_ai_dragon_resource_cognition.py",
+        "docs/ai/dragon-resource-cognition-2026-10-10.md"
+      ]
     }
   ],
   "state_flows": [

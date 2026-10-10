@@ -47,3 +47,16 @@ for (const name of ['DragonWisdomSquares.tsx', 'DragonCompanionPanel.tsx', 'useD
   assert.equal((output.diagnostics || []).filter(x => x.category === ts.DiagnosticCategory.Error).length, 0);
 }
 console.log('Dragon wisdom display: valid terminal cards and malformed-input rejection passed');
+const waitingSource = fs.readFileSync(path.join(root, 'dragonMagicEightBall.ts'), 'utf8');
+const waitingOutput = ts.transpileModule(waitingSource, {compilerOptions: {
+  module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022,
+}});
+const waitingModule = {exports: {}};
+vm.runInNewContext(waitingOutput.outputText, {module: waitingModule, exports: waitingModule.exports}, {timeout: 1000});
+assert.equal(waitingModule.exports.DRAGON_WAIT_PHRASES.length, 24);
+assert.equal(new Set(waitingModule.exports.DRAGON_WAIT_PHRASES).size, 24);
+assert.equal(waitingModule.exports.dragonWaitingBubble('operation-1'), waitingModule.exports.dragonWaitingBubble('operation-1'));
+assert.ok(waitingModule.exports.DRAGON_WAIT_PHRASES.includes(waitingModule.exports.dragonWaitingBubble('')));
+assert.ok(!/fetch\(|setInterval\(|setTimeout\(|AsyncStorage|provider/i.test(waitingSource));
+assert.ok(fs.readFileSync(path.join(root, 'DragonCompanionPanel.tsx'), 'utf8').includes('waiting message, not an answer'));
+console.log('Dragon software waiting toy: 24 bounded deterministic phrases, no model/network/timer passed');

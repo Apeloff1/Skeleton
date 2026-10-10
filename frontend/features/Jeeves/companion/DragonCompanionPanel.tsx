@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DragonCompanion from './DragonCompanion';
 import DragonQuestBoard from './DragonQuestBoard';
 import DragonWisdomSquares from './DragonWisdomSquares';
+import { dragonWaitingBubble } from './dragonMagicEightBall';
 import type { DragonWisdomReview } from './dragonWisdomReview';
 import type{NativeAttempt,NativeTarget,NativeCurriculum}from './dragonNativeTargets';
 import {type DragonPracticeProgress,type DragonPracticeAttempt,type DragonPracticeSubscription,validateDragonProgress} from './dragonProgression';
@@ -41,11 +42,12 @@ export interface CompanionAcademyInput {
   practiceBusy?:boolean;
 }
 
-export default function DragonCompanionPanel({ draft, lastUserText, telemetry, academy }: {
+export default function DragonCompanionPanel({ draft, lastUserText, telemetry, academy, waitingRequestId }: {
   draft: string;
   lastUserText?: string;
   telemetry?: CompanionTelemetry;
   academy?: CompanionAcademyInput;
+  waitingRequestId?: string | null;
 }) {
   const [showResearch, setShowResearch] = useState(false);
   const [showAcademy,setShowAcademy]=useState(false);
@@ -70,6 +72,10 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry, a
     ? companionFromCrawler(telemetry.kind, telemetry.payload)
     : companionForConversation(interest);
   return <View style={s.panel}>
+    {waitingRequestId && <View accessibilityLiveRegion="polite" style={s.metric}>
+      <Text style={s.value}>{dragonWaitingBubble(waitingRequestId)}</Text>
+      <Text style={s.note}>Magic 8 Ball · waiting message, not an answer</Text>
+    </View>}
     <DragonCompanion state={state} motion={motion} reducedMotion={systemReducedMotion}
       level={verifiedProgress?.level} unlocked={verifiedProgress?.unlocked} />
     <View style={s.motionRow}><Text style={s.label}>Animation · 120 tiny moments</Text>{(['full','gentle','off'] as const).map(choice => <Pressable key={choice} accessibilityRole="button" accessibilityState={{selected:motion===choice}} onPress={() => setMotion(choice)} style={[s.motionButton,motion===choice && s.motionSelected]}><Text style={s.value}>{choice}</Text></Pressable>)}</View>

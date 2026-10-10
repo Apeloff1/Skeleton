@@ -14,12 +14,14 @@
   ],
   "integration_surfaces": [
     "skeleton/ai/agents/core/scheduler.py",
-    "skeleton/automation/agents/scheduler.py"
+    "skeleton/automation/agents/scheduler.py",
+    "skeleton/ai/webcrawler/dragon_resource_session.py"
   ],
   "acceptance_tests": [
     "skeleton/testing/test_global_resource_scheduler.py",
     "skeleton/testing/test_global_resource_swarm_integration.py",
-    "tests/test_scheduler.py"
+    "tests/test_scheduler.py",
+    "tests/test_ai_dragon_resource_cognition.py"
   ],
   "invariants": [
     "all planes share one physical capacity ledger",
@@ -35,7 +37,8 @@
     "swarm execution attempts acquire and release global grants",
     "cancelled swarm work cancels pending global admission",
     "dead-letter requeue advances resource identity epoch",
-    "implementation state cannot self-grant verification or completion"
+    "implementation state cannot self-grant verification or completion",
+    "Dragon local planning cannot grant execution authority without the shared global capacity ledger"
   ],
   "exact_head_workflow": ".github/workflows/global-resource-scheduler.yml",
   "completion_authority": false

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from .dragon_video_history import DragonVideoHistory
 from .dragon_video_discovery import VideoCandidate,VideoProposal,rank_similar_videos
 from .dragon_idle_planner import IdleVideoPlanner
+from .dragon_resource_session import HardwareSample, plan_resources
 
 @dataclass(frozen=True)
 class IdleVideoRequest:
@@ -25,10 +26,16 @@ class IdleVideoResult:
 
 def plan_idle_video_research(request:IdleVideoRequest,history:DragonVideoHistory,
                              planner:IdleVideoPlanner,catalog:tuple[VideoCandidate,...],
-                             *,max_results:int=20)->IdleVideoResult:
+                             *,max_results:int=20,
+                             hardware:HardwareSample|None=None)->IdleVideoResult:
     if not request.owner or len(request.owner)>128:raise ValueError('invalid owner')
     if not request.allow_history or not request.allow_discovery:
         raise PermissionError('watch history and discovery consent required')
+    if hardware is not None:
+        resource_plan=plan_resources(hardware,now=request.now,foreground=False)
+        if not resource_plan.background_allowed:
+            return IdleVideoResult((),0)
+        max_results=min(max_results,resource_plan.retrieval_candidates)
     visits=history.recent(request.owner,limit=100)
     proposals=rank_similar_videos(visits,catalog,max_results=max_results)
     pending=planner.propose(proposals,now=request.now,consent=request.allow_discovery)

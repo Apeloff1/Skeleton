@@ -1,0 +1,79 @@
+# Dragon resource-aware cognition extension — 10 October 2026
+
+Status: implemented library composition and mounted chat waiting toy; production-wide rollout remains open. This extends draft PR #3605. No enterprise/SOTA qualification or entire-volume completion is claimed.
+
+## Ownership and application placement
+
+- `skeleton/ai/webcrawler/dragon_reasoning_matrix.py`: bounded four-state evidence logic, exception policies, and evidence-gap search queries. Missing/expired facts remain unknown. Contradictions remain visible. WHEN/HOW/WHY/WHAT/WHERE/THIS/THAT/THERE are explicit typed bindings, not an unvalidated natural-language resolver.
+- `dragon_microknowledge.py`: a rebuildable projection of `DragonKnowledgeGraph`, using covering posting/facet indexes. Canonical concept text is not duplicated. Query-time principal, facet, expiry and content-digest checks precede context use.
+- `dragon_resource_session.py`: a composition adapter over the existing product scheduler and canonical `skeleton/kernel/global_resource_scheduler.py` physical-capacity owner. No new runtime/service/provider owner. A shared injected global scheduler charges CPU, memory, GPU, I/O and provider tokens across sessions; planning without it never grants execution authority. Hardware samples expire after five seconds; all time inputs use the caller's same clock domain.
+- `dragon_companion_runtime.DragonCognitionSession`: combines evidence eligibility, hardware/resource policy, retrieval and canonical scheduler dispatch. It returns explicit checkpoint IDs; only executing workers can acknowledge stopped resources.
+- `dragon_idle_service.plan_idle_video_research`: optional hardware admission defers low-battery, thermally limited, busy or stale-telemetry background proposals before history lookup. Existing consent checks still precede access. Legacy callers without telemetry retain their existing behavior; this is not yet a global hardware enforcement rollout.
+- `dragon_capability_gap_matrix.py`: ranks independently supplied, attributable, unexpired coverage deficits across genre/era/engine/story/time-setting and other game factors. These are deterministic priority estimates, not a newly deployed adversarial model or empirical predictions.
+- `dragon_conversation_micro_logs.py`: a derived ten-step conversation-window projection. The existing canonical conversation repository remains authoritative. Retention consent and principal match are required; training eligibility requires a separate explicit flag. No feature starts training.
+- `frontend/features/Jeeves/companion/dragonMagicEightBall.ts`: 24 software phrases, no model/network/timer/storage. Mounted in `DragonCompanionPanel` through `ChatWorkspace`'s existing active request identity. The labelled waiting bubble disappears with the request. It never enters the transcript as the model's answer. Includes playful yes/no/maybe phrases explicitly labelled as toy output; the real answer is still pending. These are not factual verdicts.
+
+## Microknowledge design
+
+A chunk is one bounded canonical concept (at most 4096 UTF-8 bytes), an evidence reference, expiry and domain-specific facets. Retrieval coefficients are quantized integers 0–255; they are lexical relevance weights, not neural parameters, confidence probabilities or proof of truth. The projection stores indexes and digests only. The source statement remains at its existing owner.
+
+Supported facets: genre, era, engine, platform, story, timesetting, mechanic, rendering, input, audio and accessibility. Hard factor matching occurs before candidate LIMIT. This prevents a large modern-engine collection from hiding the applicable historical match. Unknown factor coverage is reported explicitly. Selected content is labelled untrusted reference material and cannot supply system policy or release authority.
+
+Per query: at most 16 terms, 256 candidates, 64 KiB serialized context, 4 KiB serialized chunk and 200,000 SQLite VM instructions. Per owner: 10,000 indexed concepts. A high-frequency query that exceeds its instruction budget fails with a narrow-query diagnostic. No whole-graph scan or embedding model is necessary. Deletion removes postings and facets. Drift/corruption requires rebuild from the canonical graph, not repair of authoritative content.
+
+SQLite connections are worker-owned and not concurrently shared during bounded retrieval (the VM progress callback is connection scoped). Capacity decisions take the SQLite writer lock before checking counts. There is no global process cache growing with every user.
+
+## Hardware and time policy
+
+User work takes priority. Background order: autonomous actions, idle actions, training, acquisition/distillation. Hardware generation or game release year does not grant resources: a phone may retrieve modern technical knowledge, while an overloaded desktop must defer. Scope follows measured headroom and proven compiler/runtime capability.
+
+Foreground memory admission uses at most half currently available memory, capped at 512 MiB. Background uses at most one eighth. Below an 8 MiB work envelope, pressure >=95%, thermal limitation or stale telemetry: defer. Below 20% battery while unplugged: no new background work. Background pressure must be below 50%. CPU budgets remain 1–4 scheduler units, not a promise of OS core pinning.
+
+When foreground arrives, checkpointable background tasks are asked to yield. All background reservations remain charged until `stopped(task_id)` acknowledgement. Foreground cannot begin while a background worker remains active, including a noncheckpointable worker. This prevents the common unsafe shortcut of assuming a cancellation request instantly frees RAM. Missing acknowledgements require existing worker supervision; this adapter never kills another process.
+
+High effort is advisory only: foreground, pressure below 25%, and at least a 128 MiB admitted memory envelope. Other admitted work uses low effort. Global vector reservations include explicit declared provider tokens, GPU milliseconds and I/O tokens. Model routing, monetary cost, actual KV-cache allocations, privacy and execution remain controlled by canonical provider/accounting owners. Local planning reports `execution_authorized=false`; callers must require a global grant, not merely foreground readiness. The system must re-sample before every chunk/tool/model launch; an initial admission is not permission to ignore future thermal or battery changes.
+
+Time permits short resumable chunks, not unlimited energy or spend. There is no infinite worker loop or provider call in these modules. Android/iOS background lifetime and battery restrictions still require native adapters. Official guidance: https://developer.android.com/develop/background-work ; https://docs.python.org/3/library/sqlite3.html ; https://www.sqlite.org/queryplanner.html .
+
+## Conversation microcosm
+
+Exactly ten contiguous, committed canonical message steps on the active branch create one immutable checkpoint. The projection contains indexed game-topic bulletpoints and message IDs, not raw transcript text or hidden reasoning. Arbitrary chat content cannot become trusted public knowledge. New hypotheses must pass the existing acquisition/provenance/human-review gates.
+
+Context recall reads only the current authorized tenant/owner/thread/branch, at most ten checkpoints and unexpired rows with digest verification. A restart test reopens a real on-disk SQLite database. Explicit thread deletion removes the projection/index; expiry removes both. The production conversation deletion/retention and context-compiler integrations must invoke these lifecycle adapters before rollout. This module does not silently add a second authoritative hard-drive transcript.
+
+Adversarial coverage input is distinct from conversation observations. The gap matrix requires expected/passed check counts, a review reference, expiry and importance. It ranks missing coverage rather than pretending repeated conversation interest is competence. Deployment must bind these inputs to the canonical independently verified review receipt; the dataclass alone is not receipt authentication.
+
+## L00–L13 evidence and operational boundaries
+
+| Level | Implementation / remaining gate |
+|---|---|
+| L00 | Existing crawler, product scheduler, canonical graph/conversation and frontend owners |
+| L01 | Pure modules; no new service/provider SDK or worker authority |
+| L02 | Bounded immutable dataclasses; explicit unknown/conflict and typed factor vocabulary |
+| L03 | Authorization/consent before retrieval/checkpoint; evidence before dispatch |
+| L04 | Reserved resources, checkpoint request, stop acknowledgement, foreground admission |
+| L05 | Derived SQLite tables; canonical graph/conversation remain authority; restart/idempotency tests |
+| L06 | Tenant/owner/thread/branch isolation; untrusted context label; separate training consent |
+| L07 | Missing/stale evidence, pressure, thermal, battery, invalid facts, corruption and retry policies |
+| L08 | Explicit reasons, bytes/candidates/digests, gap evidence references; no raw transcript telemetry |
+| L09 | Bounded memory/CPU/context/query VM work; reproducible local benchmark, no device superiority claim |
+| L10 | Resource, logic, scope, expiry, corruption, restart, composition and software-toy tests |
+| L11 | Opt-in cognition/telemetry adapters; additive projection schema; rollback disables adapters and rebuilds projections |
+| L12 | Worker supplies trusted current telemetry and stop acknowledgements; existing runtime supervision handles stalled workers |
+| L13 | Full platform hardware telemetry, all worker integration, native background service, model-backed review and low-end end-to-end qualification remain open |
+
+The application-wide hardware guarantee requested by the user is NOT yet complete. The phone-to-original-game and Windows large-project journeys need consumer hardware acceptance, native engine execution and actual provider/resource integration. This extension supplies the bounded composition and mounted waiting behavior rather than falsely claiming those journeys work end to end.
+
+## Validation
+
+Focused tests: `tests/test_ai_dragon_resource_cognition.py` (35 passed). Full Dragon suite and full frontend TypeScript are run separately. The new waiting toy checks run in the existing `test-dragon-wisdom.cjs` CI step. The original mandatory implementation-notes validator has the previously reproduced baseline stale-summary failure; it must not be bypassed or masked.
+
+Reproduce the local retrieval comparison with `python scripts/benchmark_dragon_microknowledge.py`. It uses 1000 synthetic canonical concepts, 40 interleaved queries per method, matching top-20 IDs and identical lexical query input. Results are container diagnostics, not phone/Windows benchmarks or production p99 certification. The existing full-scan path includes its canonical graph audit; the new path validates each selected concept digest and does not replace that whole-graph integrity function.
+
+Local benchmark result (Linux x86_64, Python 3.12.14, SQLite 3.53.1): full scan p50/p95/p99 5.341/5.801/6.029 ms; micro index 1.306/1.581/1.680 ms. These are the specific observed synthetic run, not universal speed guarantees.
+
+A concurrent admission regression checks that eight requests never exceed two admitted session CPU units. Cross-tenant sessions sharing the canonical global ledger cannot overbook its CPU/provider-token budget. Resource decisions remain advisory if the global ledger is not supplied.
+
+The canonical global-scheduler regression suite reports 12 passed and one fairness/aging test failed. The identical failure was reproduced in untouched baseline 79fe3870. This extension does not rewrite that independent scheduler policy. Product/global priority conventions differ and the adapter explicitly translates user priority to global 0; a regression verifies it.
+
+State topology explicitly registers the consented conversation projection as derived and production binding pending. The global resource contract records the Dragon adapter and its focused acceptance suite. Both topology and global resource contract validators pass.
