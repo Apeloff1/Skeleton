@@ -321,7 +321,7 @@ class OfflineChatStore:
         serialized = transcript.to_json()
         if len(serialized.encode("utf-8")) > MAX_TRANSCRIPT_BYTES:
             raise RuntimeContractError("system message exceeds persisted budget")
-        sid = secrets.token_urlsafe(24)
+        sid = "s_" + secrets.token_urlsafe(24)
         with self._transaction():
             self._db.execute(
                 "INSERT INTO offline_sessions VALUES (?, ?, ?, 0, ?, ?)",
@@ -531,7 +531,7 @@ class OfflineChatStore:
             forked = ChatTranscript(parent.transcript.messages[
                 :system_count + 2 * after_turn
             ])
-            new_id = secrets.token_urlsafe(24)
+            new_id = "s_" + secrets.token_urlsafe(24)
             self._db.execute(
                 "INSERT INTO offline_sessions VALUES (?, ?, ?, ?, ?, ?)",
                 (new_id, model_digest, tokenizer_digest, after_turn,
@@ -713,7 +713,7 @@ class OfflineChatStore:
         serialized = transcript.to_json()
         if len(serialized.encode("utf-8")) > MAX_TRANSCRIPT_BYTES:
             raise RuntimeContractError("restored conversation exceeds byte budget")
-        new_id = secrets.token_urlsafe(24)
+        new_id = "s_" + secrets.token_urlsafe(24)
         with self._transaction():
             self._db.execute(
                 "INSERT INTO offline_sessions VALUES (?, ?, ?, ?, ?, ?)",

@@ -388,6 +388,52 @@ class GroundedOfflineReceiptTests(unittest.TestCase):
             )), manifest,
         )
 
+    def test_tail_query_evidence_is_supplied_and_survives_durable_replay(self):
+        self.question = "Explain the NES vblank sprite DMA budget"
+        self.digest = grounded_request_digest(_digest_request(self.question, self.config))
+        source = "General introduction. " * 17 + "NES vblank sprite DMA budget uses 513 CPU cycles."
+        self.refs.add_text("Hardware notes", source)
+        hits = self.refs.search(self.question, limit=1)
+        self.assertGreater(hits[0]["passage"].find("NES"), 220)
+        manifest = prepare_evidence(self.question, self.digest, hits, self.model, self.token)
+        citation = manifest["citations"][0]
+        self.assertIn("513 CPU cycles", citation["passage"])
+        self.assertGreater(citation["char_start"], hits[0]["char_start"])
+        self.assertEqual(source[citation["char_start"]:citation["char_end"]], citation["passage"])
+        self._commit(manifest)
+        self.assertEqual(self.store.turn_evidence(self.sid, self.model, self.token), [manifest])
+        restored = self.store.import_bundle(self.store.export_bundle(self.sid, self.model, self.token), self.model, self.token)
+        self.assertEqual(self.store.turn_evidence(restored, self.model, self.token), [manifest])
+
+    def test_unicode_matching_preserves_original_source_coordinates(self):
+        for word, question in [("ＮＥＳ", "nes"), ("Straße", "strasse"), ("cafe\u0301", "café")]:
+            with self.subTest(word=word):
+                source = "Context. " * 45 + word + " timing measurement is reproducible."
+                document = self.refs.add_text("Unicode reference " + word, source)
+                hits = [hit for hit in self.refs.search(question, limit=3) if hit["document_id"] == document["document_id"]]
+                self.assertTrue(hits)
+                manifest = prepare_evidence(question, self.digest, hits[:1], self.model, self.token)
+                citation = manifest["citations"][0]
+                self.assertIn(word, citation["passage"])
+                self.assertEqual(source[citation["char_start"]:citation["char_end"]], citation["passage"])
+                self.assertEqual(sha256(citation["passage"].encode()).hexdigest(), citation["passage_sha256"])
+
+    def test_query_window_prefers_distinct_terms_and_is_deterministic(self):
+        source = "alpha " * 30 + "neutral filler " * 14 + "beta gamma form a distinct evidence pair."
+        self.refs.add_text("Coverage", source)
+        hits = self.refs.search("alpha beta gamma", limit=1)
+        first = prepare_evidence("alpha beta gamma", self.digest, hits, self.model, self.token)
+        second = prepare_evidence("alpha beta gamma", self.digest, hits, self.model, self.token)
+        self.assertEqual(first, second)
+        self.assertIn("beta gamma", first["citations"][0]["passage"])
+
+    def test_bad_original_hit_is_not_repaired_by_truncation(self):
+        hits = self.refs.search("depth", limit=1)
+        for changed in ({"char_end": hits[0]["char_end"] + 1}, {"document_sha256": None},
+                        {"document_id": "source] injected reference"}, {"passage": None}):
+            with self.subTest(changed=changed), self.assertRaises(RuntimeContractError):
+                prepare_evidence(self.question, self.digest, [dict(hits[0], **changed)], self.model, self.token)
+
     def test_recognized_citation_identifier_is_not_claimed_as_factual_support(self):
         manifest = self._snapshot()
         valid = manifest["citations"][0]["citation"]

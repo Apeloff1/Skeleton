@@ -29,7 +29,10 @@ def _stable(value: Any) -> bytes:
 
 
 def _digest(data: str) -> str:
-    return sha256(data.encode("utf-8")).hexdigest()
+    try:
+        return sha256(data.encode("utf-8")).hexdigest()
+    except UnicodeError as exc:
+        raise RuntimeContractError("invalid grounding source text") from exc
 
 
 def grounded_request_digest(plain_digest: str) -> str:
@@ -48,6 +51,8 @@ def _citation(hit: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeContractError("invalid local source passage")
     if (not isinstance(hit["passage"], str) or not hit["passage"]
             or not isinstance(hit["title"], str) or not hit["title"]
+            or not isinstance(hit["document_id"], str)
+            or re.fullmatch(r"[A-Za-z0-9_-]{1,128}", hit["document_id"]) is None
             or type(hit["chunk_index"]) is not int or hit["chunk_index"] < 0
             or type(hit["char_start"]) is not int or hit["char_start"] < 0
             or type(hit["char_end"]) is not int
@@ -55,7 +60,7 @@ def _citation(hit: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeContractError("invalid local source provenance")
     if len(hit["passage"]) != hit["char_end"] - hit["char_start"]:
         raise RuntimeContractError("local source excerpt position mismatch")
-    if (len(hit["document_sha256"]) != 64
+    if (not isinstance(hit["document_sha256"], str) or len(hit["document_sha256"]) != 64
             or any(c not in "0123456789abcdef" for c in hit["document_sha256"])):
         raise RuntimeContractError("invalid source document digest")
     expect_id = (
@@ -72,6 +77,43 @@ def _citation(hit: dict[str, Any]) -> dict[str, Any]:
         "document_id", "title", "document_sha256", "chunk_index",
         "char_start", "char_end", "passage", "citation",
     )} | {"passage_sha256": _digest(hit["passage"])}
+
+
+def _excerpt_start(question: str, passage: str) -> int:
+    """Select an exact original-text window by lexical query coverage.
+
+    Normalization is used only to compare terms. Offsets always index the
+    untouched source, including ligatures, casefold expansion and accents.
+    This ranks relevance; it cannot establish factual or semantic support.
+    """
+    from .offline_knowledge import _terms
+    terms = set(_terms(question))
+    maximum = max(0, len(passage) - MAX_EXCERPT_CHARS)
+    if not terms or not maximum:
+        return 0
+    # Keep combining marks attached to their original word for normalization.
+    spans = [(match.start(), match.end(), terms.intersection(_terms(match.group())))
+             for match in re.finditer(r"[^\W_]+(?:[\u0300-\u036f]+[^\W_]*)*", passage)]
+    matches = [(start, end, words) for start, end, words in spans if words]
+    if not matches:
+        return 0
+    candidates = {0, maximum}
+    for start, end, _ in matches:
+        candidates.update(max(0, min(maximum, position))
+                          for position in (start, start - 40, end - MAX_EXCERPT_CHARS))
+
+    def rank(start):
+        included = [(left, words) for left, right, words in matches
+                    if start <= left and right <= start + MAX_EXCERPT_CHARS]
+        covered = set().union(*(words for _, words in included))
+        # Repeated boilerplate must not outweigh rare query terms. Keep useful
+        # trailing explanation, rather than ending precisely on the last term.
+        rarity = sum(1 / sum(term in words for _, _, words in matches)
+                     for term in sorted(covered))
+        target = min(maximum, max(0, min((left for left, _ in included), default=40) - 40))
+        return len(covered), rarity, -abs(start - target), -start
+
+    return max(candidates, key=rank)
 
 
 def _prompt_suffix(citations: list[dict[str, Any]]) -> str:
@@ -95,12 +137,17 @@ def prepare_evidence(question: str, request_digest: str, hits: list[dict[str, An
         raise RuntimeContractError("no bounded local evidence available for grounding")
     citations = []
     for hit in hits:
+        # Validate the complete search hit before narrowing it. A malformed
+        # full-source offset must not be laundered by excerpt recomputation.
+        _citation(hit)
         # Search verifies the full source chunk first. Record only the exact
-        # prefix that will actually be presented to the model, with truthful
+        # relevant window that will actually be presented to the model, with truthful
         # character offsets into the original SHA-pinned document.
-        excerpt = hit["passage"][:MAX_EXCERPT_CHARS]
+        start = _excerpt_start(question, hit["passage"])
+        excerpt = hit["passage"][start:start + MAX_EXCERPT_CHARS]
         selected = dict(hit, passage=excerpt,
-                        char_end=hit["char_start"] + len(excerpt))
+                        char_start=hit["char_start"] + start,
+                        char_end=hit["char_start"] + start + len(excerpt))
         citations.append(_citation(selected))
     if len({item["citation"] for item in citations}) != len(citations):
         raise RuntimeContractError("duplicate offline grounding source")
@@ -143,7 +190,10 @@ def validate_evidence(value: Any, question: str, request_digest: str,
             raise RuntimeContractError("invalid saved grounding citation")
         original = {key: value for key, value in item.items()
                     if key != "passage_sha256"} | {"score": 0.0}
-        rendered = _citation(original)
+        try:
+            rendered = _citation(original)
+        except RuntimeContractError as exc:
+            raise RuntimeContractError("saved grounding source invalid") from exc
         if rendered != item or item["citation"] in known:
             raise RuntimeContractError("grounding citation was altered")
         known.add(item["citation"])

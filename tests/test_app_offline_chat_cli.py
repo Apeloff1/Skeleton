@@ -259,6 +259,22 @@ class HeadlessOfflineChatTests(unittest.TestCase):
         self.assertEqual(code, 0, errors)
         self.assertTrue(json.loads(output)["text"])
 
+    def test_create_import_and_fork_never_emit_option_like_session_ids(self):
+        from unittest.mock import patch
+        with patch('skeleton.ai.model_runtime.offline_chat.secrets.token_urlsafe',
+                   side_effect=['-created', '-imported', '-forked']):
+            with OfflineChatStore(self.database) as store:
+                original = store.create(self.model_digest, self.tokenizer_digest)
+                imported = store.import_bundle(store.export_bundle(original, self.model_digest, self.tokenizer_digest),
+                                               self.model_digest, self.tokenizer_digest)
+                forked = store.fork(original, self.model_digest, self.tokenizer_digest)
+        for sid in (original, imported, forked):
+            self.assertTrue(sid.startswith('s_'))
+            code, output, errors = self._run('--session', sid, '--message', 'hello',
+                                            '--max-output-tokens', '2', '--json')
+            self.assertEqual(code, 0, errors)
+            self.assertEqual(json.loads(output)['session_id'], sid)
+
 
 if __name__ == "__main__":
     unittest.main()
