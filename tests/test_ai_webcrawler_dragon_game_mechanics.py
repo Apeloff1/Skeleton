@@ -271,3 +271,10 @@ def test_session_id_must_have_canonical_lowercase_content_digest():
         with pytest.raises(ValueError, match="session identifier"):
             store.record(replace(good, session_id=forged), authorized=True)
 
+
+def test_session_reads_require_explicit_boolean_true():
+    store = setup()
+    for authorization in (1, "yes", None):
+        with pytest.raises(PermissionError, match="authorization"):
+            store.sessions("alice", authorized=authorization)
+
