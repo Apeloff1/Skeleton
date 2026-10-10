@@ -121,6 +121,28 @@ class GameReplay:
     final_state: PlayState
     initial_state_digest: str
 
+    def __post_init__(self) -> None:
+        if (type(self.world_digest) is not str or len(self.world_digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in self.world_digest)):
+            raise GameplayError("replay world digest invalid")
+        if (type(self.initial_state_digest) is not str
+                or len(self.initial_state_digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in self.initial_state_digest)):
+            raise GameplayError("replay initial state digest invalid")
+        if (not isinstance(self.action_receipts, tuple)
+                or len(self.action_receipts) > MAX_REPLAY_ACTIONS
+                or any(not isinstance(row, ActionReceipt) for row in self.action_receipts)):
+            raise GameplayError("replay receipt collection invalid")
+        if not isinstance(self.final_state, PlayState):
+            raise GameplayError("replay final state invalid")
+        if self.world_digest != self.final_state.world_digest:
+            raise GameplayError("replay and final state world mismatch")
+        if self.action_receipts and (
+            self.action_receipts[-1].after_digest != self.final_state.digest
+            or self.action_receipts[0].before_digest != self.initial_state_digest
+        ):
+            raise GameplayError("replay boundary receipts invalid")
+
     @property
     def digest(self) -> str:
         return canonical_digest(self.to_payload())
