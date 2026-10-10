@@ -280,14 +280,24 @@ int main(int argc,char**argv){
 '''
 
 def emit_native_puzzle(*,seed:int,stages:int=4,difficulty:int=4,
-                       procedural:bool=False)->dict[str,str]:
+                       procedural:bool=False,
+                       authored_levels:tuple[tuple[str,...],...]|None=None)->dict[str,str]:
     if isinstance(stages,bool) or not isinstance(stages,int) or not 1<=stages<=MAX_LEVELS:
         raise ValueError("native puzzle stages must be 1..8")
     if type(procedural) is not bool:
         raise ValueError("procedural native puzzle flag must be a boolean")
+    original_pack=None
+    if authored_levels is not None:
+        if procedural:
+            raise ValueError("custom authored campaign and procedural mode are exclusive")
+        from .dragon_native_puzzle_authoring import validate_authored_levels
+        original_pack=validate_authored_levels(authored_levels)
+        if stages!=len(original_pack.levels):
+            raise ValueError("authored game stage count must match emitted campaign")
     layouts=[];solutions=[];proofs=[]
     for index in range(stages):
-        grid=transformed_level(index,seed,difficulty,procedural=procedural)
+        grid=(original_pack.levels[index].rows if original_pack is not None
+              else transformed_level(index,seed,difficulty,procedural=procedural))
         path,states=solve_grid(grid)
         start,boxes,goals,walls=_parse(grid)
         layouts.append(grid);solutions.append(path)
@@ -337,6 +347,10 @@ clean:
       "search":"exact bounded BFS over player location and crate set",
       "seed":seed,"stages":stages,"difficulty":difficulty,
       "procedural":procedural,
+      "authoring_mode":"authored" if original_pack is not None else "generated",
+      "authoring_digest":original_pack.digest if original_pack is not None else None,
+      "authored_level_rows":[list(level.rows) for level in original_pack.levels]
+                             if original_pack is not None else None,
       "level_proofs":[asdict(p) for p in proofs],
       "native_runtime_test_required":True,
       "proof_scope":"optimal abstract grid moves, not C executable verification",
