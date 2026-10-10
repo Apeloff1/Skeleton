@@ -174,6 +174,15 @@ def verify_ports(root: Path) -> dict[str, object]:
             or native_route.get("native_restart_restores_original_theme_verified") is not True
             or native_route.get("actual_victory_palette_verified") is not True
             or native_route.get("native_attract_demo_chord_started_from_victory") is not True
+            or native_route.get("native_attract_demo_full_solution_verified_on_guest_z80") is not True
+            or type(native_route.get("native_attract_demo_controller_free_actions_verified")) is not int
+            or native_route.get("native_attract_demo_controller_free_actions_verified")
+               != native_route.get("controller_actions_replayed")
+            or native_route.get("native_attract_demo_semantic_trace_sha256")
+               != native_route.get("semantic_controller_screen_trace_sha256")
+            or type(native_route.get("native_attract_demo_screen_frames")) is not int
+            or native_route["native_attract_demo_screen_frames"]
+               < native_route.get("controller_actions_replayed", 0)
             or native_route.get("native_attract_demo_performed_first_original_move") is not True
             or native_route.get("native_attract_demo_user_cancel_restored_game") is not True
         ):
@@ -336,6 +345,9 @@ def verify_ports(root: Path) -> dict[str, object]:
         "real_z80_startup_checked_per_platform": True,
         "original_on_cartridge_demo_equivalent_across_platforms": True,
         "native_attract_demo_entry_and_cancel_verified_on_both_platforms": True,
+        "native_autonomous_full_game_replayed_on_both_platforms": True,
+        "native_autonomous_guest_semantic_trace_sha256":
+            sms["native_route"]["native_attract_demo_semantic_trace_sha256"],
         "original_demo_controller_actions_verified_per_platform":
             sms["host"]["original_demo_controller_actions_verified"],
         "original_demo_solution_sha256":
