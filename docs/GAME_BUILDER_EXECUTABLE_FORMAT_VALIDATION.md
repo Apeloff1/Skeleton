@@ -112,3 +112,53 @@ milestones, not fictional green status fields.
 
 Do not merge until exact-head CI is green, and do not interpret focused
 format tests as closure of repository-wide unrelated failing gates.
+
+
+## Original NES NROM-256 reproducibility (October 10, 2026)
+
+A dedicated **real 6502 NES cartridge** acceptance path now complements the
+Sega Master System / Game Gear progression. The NROM source exporter emits
+original world-specific ca65 assembly, linker configuration, NES cartridge
+header and original 2bpp sprite/background artwork. The native NES workflow
+uses the open-source `cc65` compiler and linker; it does not download
+copyrighted commercial NES games, redistributable firmware or a proprietary SDK.
+
+New verified-format implementation:
+- `scripts/game_builder/native_nes_ci.py` reads actual ROM bytes with the
+  repository's bounded, descriptor-based no-follow intake. In addition to
+  mapper-zero iNES and exact 32 KiB PRG / 8 KiB CHR bank sizes, it checks
+  file-backed **6502 reset, NMI and IRQ vectors**. A file with a recognizable
+  `NES\x1a` prefix but invalid startup is not admitted.
+- `scripts/game_builder/nes_reproducibility_ci.py` compares **two separately
+  generated original source trees** and their actual independently built
+  NROM cartridge bytes. It enforces four exact source files (`main.s`,
+  `nes.cfg`, `Makefile`, `manifest.json`), permits a separately
+  bounded compiler output directory, rejects extra/unreviewed source files
+  and linked code, checks the original world/rights/safe-route identities,
+  verifies both PRG and CHR regions byte for byte, and re-checks their
+  SHA-256 digests after structural inspection.
+- `skeleton/testing/test_game_builder_nes_reproducibility.py` attacks
+  missing/modified source, proprietary extras, symlinked directories,
+  swapped ROM files, iNES mapper violations, reset/interrupt vectors,
+  false source rights claims, oversized native input, FIFOs, and
+  checksum/ROM substitutions.
+- `.github/workflows/game-builder-native-nes.yml` now actually runs
+  two independent authoring exports and two native `ca65`/`ld65`
+  compilations. It asserts matching ROM bytes, original-source identity,
+  safe-route provenance and no unearned publication/hardware claims.
+  The dedicated tests also run under `game-hardware-archive.yml`.
+
+**Evidence boundaries:** A two-build SHA-256 match means actual inspected
+binary bytes are identical; the offline verifier cannot independently attest
+that two compiler processes genuinely executed. A structurally plausible
+NROM with reset/NMI/IRQ code is **not** proof of a completed NES game route.
+The pipeline deliberately records `emulator_gameplay_verified=false`,
+`physical_hardware_verified=false`,
+`third_party_rights_independently_cleared=false` and
+`publication_authorized=false`. A full 6502 CPU + PPU + APU + controller
+simulation, real reference-route acceptance, reproducible SDK provenance and
+external copyright/license review remain distinct unfinished milestones.
+
+A synthetic ROM in the adversarial unit tests is a **format-validation
+fixture only**. The real platform workflow invokes ca65/ld65 against the
+original exported assembly, independently of that fixture.
