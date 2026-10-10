@@ -69,6 +69,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Check native game sources and creator script syntax before toolchain installation
+        run: |
+          set -euo pipefail
+          python -m compileall -q skeleton/ai/webcrawler/dragon_native_*.py
+          python -m compileall -q backend/routes/dragon_academy.py
+          node --check frontend/scripts/test-dragon-native-puzzle-preview.mjs
       - name: Install native ROM toolchain prerequisites
         run: |
           sudo apt-get update
@@ -93,6 +99,7 @@ jobs:
             tests/test_ai_dragon_native_puzzle_variants.py \
             tests/test_ai_dragon_native_puzzle_authoring.py \
             tests/test_ai_dragon_native_puzzle_challenge.py \
+            tests/test_ai_dragon_native_puzzle_save.py \
             tests/test_ai_dragon_native_puzzle_graphics.py \
             tests/test_ai_webcrawler_dragon_native_projects.py \
             tests/test_ai_webcrawler_dragon_native_compile.py \
