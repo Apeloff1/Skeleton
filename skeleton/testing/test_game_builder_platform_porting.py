@@ -288,7 +288,7 @@ def test_native_desktop_exports_a_exact_three_level_replay_without_html() -> Non
 def test_editor_distinguishes_real_native_source_generation_from_certified_binaries():
     form = editor_platform_form()
     assert form["native_source_project_destinations"] == [
-        "apple_ii", "atari_400_800", "commodore_64", "dos_vga", "linux_desktop", "macos_modern", "nintendo_famicom", "nintendo_game_boy", "nintendo_game_boy_color", "windows_modern",
+        "apple_ii", "atari_400_800", "commodore_64", "dos_vga", "linux_desktop", "macos_modern", "nintendo_famicom", "nintendo_game_boy", "nintendo_game_boy_color", "sinclair_zx_spectrum", "windows_modern",
     ]
     assert form["source_export_status"] == "three_desktop_three_rom_one_c64_one_dos_one_atari8_one_apple2_native_sources"
     assert form["export_status"] == "no_native_target_verified"
@@ -297,7 +297,8 @@ def test_editor_distinguishes_real_native_source_generation_from_certified_binar
         option = native[target]
         assert option["native_source_project_available"] is True
         assert option["native_source_project_kind"] == (
-            "cc65_6502_apple2_applesingle_source" if target == "apple_ii"
+            "z80asm_spectrum_ula_keyboard_rom_tap_source" if target == "sinclair_zx_spectrum"
+            else "cc65_6502_apple2_applesingle_source" if target == "apple_ii"
             else "cc65_6502_antic_gtia_pokey_xex_source" if target == "atari_400_800"
             else "nasm_8086_pc_textmode_com_source" if target == "dos_vga"
             else "cc65_6510_vic_ii_sid_prg_source" if target == "commodore_64"
@@ -314,6 +315,6 @@ def test_editor_distinguishes_real_native_source_generation_from_certified_binar
         assert native[target]["native_source_project_available"] is False
         assert native[target]["native_source_project_kind"] is None
     route = editor_portability_context("nec_pc_fx")
-    assert route["native_source_project_destination_count"] == 10
+    assert route["native_source_project_destination_count"] == 11
     assert route["native_export_destination_count"] == 0
-    assert sum(option["native_source_project_available"] for option in route["targets"]) == 10
+    assert sum(option["native_source_project_available"] for option in route["targets"]) == 11
