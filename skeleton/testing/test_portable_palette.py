@@ -64,3 +64,10 @@ def test_palette_nearest_is_weighted_and_first_tie_wins():
     with pytest.raises(PaletteError):
         nearest_palette_index((0,0,0), ())
 
+
+def test_palettization_preserves_rectangular_geometry():
+    pixels=(((255,0,0),(0,0,255)),((0,0,255),(255,0,0)))
+    assert index_image(pixels,((255,0,0),(0,0,255)))==((0,1),(1,0))
+    with pytest.raises(PaletteError):
+        index_image((((0,0,0),), ((0,0,0),(1,1,1))),((0,0,0),))
+
