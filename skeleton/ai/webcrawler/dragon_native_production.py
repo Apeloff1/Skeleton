@@ -40,8 +40,11 @@ class PortableGameDesign:
     stages: int = 4
     candidates: int = 8
     project_notes: str = "Original native homebrew; platform-scaled design"
+    procedural_levels: bool = False
 
     def validate(self) -> None:
+        if type(self.procedural_levels) is not bool:
+            raise ValueError("procedural game levels must be explicit boolean")
         from .dragon_game_design import PALETTES, HEROES, THEMES
         if self.palette not in PALETTES or self.hero not in HEROES or self.quest_theme not in THEMES:
             raise ValueError("portable palette, hero or theme is not supported")
@@ -212,6 +215,11 @@ class ProductionRequest:
             if not isinstance(self.portable_design, PortableGameDesign):
                 raise ValueError("typed portable design required")
             self.portable_design.validate()
+            if self.portable_design.procedural_levels and (
+                    self.style != "fixed_screen_puzzle" or
+                    any(target not in ("pc_linux","pc_windows","pc_macos","steam_deck")
+                        for target in self.targets)):
+                raise ValueError("procedural source levels support original desktop puzzles only")
             if not re.fullmatch(r"[A-Za-z][A-Za-z0-9 ._'!\-]{2,79}", self.title):
                 raise ValueError("portable game designs need a bounded native-compatible title")
 
@@ -446,6 +454,7 @@ def _render(request: ProductionRequest, target_id: str) -> NativeProject:
         mechanics=(Mechanic.MOVEMENT, Mechanic.EXPLORATION),
         authorized=True,
         design=adapted_design,
+        procedural_puzzles=bool(request.portable_design and request.portable_design.procedural_levels),
     )
 
 
