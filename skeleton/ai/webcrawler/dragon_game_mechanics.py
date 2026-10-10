@@ -97,7 +97,9 @@ class GameTasteProfile:
 class GameMechanicsMemory:
     def __init__(self, db: sqlite3.Connection,
                  *, policy: CapturePolicy = CapturePolicy()):
-        if not 1 <= policy.max_session_seconds <= 14400:
+        if not isinstance(policy, CapturePolicy):
+            raise ValueError("CapturePolicy required")
+        if type(policy.max_session_seconds) is not int or not 1 <= policy.max_session_seconds <= 14400:
             raise ValueError("invalid capture duration budget")
         if not 1 <= policy.max_observations <= 100000:
             raise ValueError("invalid observation budget")
