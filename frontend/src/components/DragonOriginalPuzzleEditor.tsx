@@ -107,6 +107,7 @@ export default function DragonOriginalPuzzleEditor({
     setPlay(null);
     setDemoCursor(-1);
     hintEpoch.current += 1;
+    setHintBusy(false);
     setLiveHint('');
     setHintBusy(false);
     setCurrent(0);
@@ -171,6 +172,7 @@ export default function DragonOriginalPuzzleEditor({
     setPlay(null);
     setDemoCursor(-1);
     hintEpoch.current += 1;
+    setHintBusy(false);
     setLiveHint('');
     setStatus('');
     onApprovedLevels(null);
@@ -186,6 +188,7 @@ export default function DragonOriginalPuzzleEditor({
     setValidated(null);
     setDemoCursor(-1);
     hintEpoch.current += 1;
+    setHintBusy(false);
     setLiveHint('');
     setStatus('Board paint history changed. Validate the campaign before native export.');
     onApprovedLevels(null);
@@ -203,6 +206,7 @@ export default function DragonOriginalPuzzleEditor({
       setValidated(null);
       setDemoCursor(-1);
       hintEpoch.current += 1;
+    setHintBusy(false);
       setLiveHint('');
       setStatus('Game stage order changed. Revalidate the campaign before source export.');
       onApprovedLevels(null);
@@ -289,6 +293,7 @@ export default function DragonOriginalPuzzleEditor({
       const rows = (parsed.levels as string[][]).map(grid => [...grid]);
       setBoards(rows);
       hintEpoch.current += 1;
+    setHintBusy(false);
       setLiveHint('');
       setEditHistory(initializePuzzleHistory(rows));
       setPlay(null);
@@ -354,6 +359,7 @@ export default function DragonOriginalPuzzleEditor({
     if (busy || validating) return;
     if (play) {
       hintEpoch.current += 1;
+    setHintBusy(false);
       setLiveHint('');
       setPlay(null);
       setDemoCursor(-1);
@@ -363,6 +369,7 @@ export default function DragonOriginalPuzzleEditor({
     try {
       setDemoCursor(-1);
       hintEpoch.current += 1;
+    setHintBusy(false);
       setLiveHint('');
       setPlay(parseNativeBoard(boards[current]));
       setStatus('Local design playtest only. Exact solver validation remains required before export.');
@@ -375,6 +382,7 @@ export default function DragonOriginalPuzzleEditor({
     if (busy || validating || !play) return;
     try {
       hintEpoch.current += 1;
+    setHintBusy(false);
       setLiveHint('');
       setDemoCursor(-1);
       setPlay(stepNativePreview(play, action));
@@ -427,6 +435,7 @@ export default function DragonOriginalPuzzleEditor({
     if (busy || validating || !validated || !boards[current] || !walkthrough) return;
     try {
       hintEpoch.current += 1;
+    setHintBusy(false);
       setLiveHint('');
       setPlay(parseNativeBoard(boards[current]));
       setDemoCursor(0);
@@ -447,6 +456,7 @@ export default function DragonOriginalPuzzleEditor({
       return;
     }
     hintEpoch.current += 1;
+    setHintBusy(false);
     setLiveHint('');
     setPlay(next);
     setDemoCursor(demoCursor + 1);
@@ -487,7 +497,8 @@ export default function DragonOriginalPuzzleEditor({
           <TouchableOpacity key={index} accessibilityRole="button"
             accessibilityState={{ selected: index === current }}
             onPress={() => {
-              hintEpoch.current += 1; setLiveHint('');
+              hintEpoch.current += 1;
+    setHintBusy(false); setLiveHint('');
               setCurrent(index); setPlay(null); setDemoCursor(-1);
             }}
             style={[styles.tool, index === current && styles.selected]}>
