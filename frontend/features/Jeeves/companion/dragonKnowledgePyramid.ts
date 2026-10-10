@@ -23,7 +23,7 @@ export type DragonKnowledgeView = {
  authority:'advisory_only';
 };
 const HASH=/^[a-f0-9]{64}$/;
-const ID=/^[A-Za-z0-9][A-Za-z0-9.:-]{0,127}$/;
+const ID=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const record=(v:unknown):v is Record<string,unknown>=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const bounded=(x:unknown,max:number)=>typeof x==='number'&&Number.isSafeInteger(x)&&x>=0&&x<=max;
 
