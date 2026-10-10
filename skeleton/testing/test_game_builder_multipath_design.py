@@ -462,3 +462,16 @@ def test_pareto_frontier_retains_genuine_speed_risk_choices():
     assert all(verify_route_proof(p, r) for r in frontier)
     assert pareto_hazard_routes(RouteProblem.from_rows(OPEN_LEVEL))[0].hazard_visits == 0
 
+
+def test_shortest_dag_enumeration_never_pads_with_worse_routes():
+    rows = (
+        "#########", "#S......#", "#.......#", "#...C...#",
+        "#.......#", "#......G#", "#.......#", "#.......#", "#########",
+    )
+    p = RouteProblem.from_rows(rows)
+    choices = enumerate_shortest_routes(p, limit=6)
+    assert len(choices) >= 2
+    assert len({q.actions for q in choices}) == len(choices)
+    assert all(q.steps == solve_route(p).steps for q in choices)
+    assert all(verify_route_proof(p, q) for q in choices)
+
