@@ -48,3 +48,11 @@ def encode_nes_2bpp(tile: Sequence[Sequence[int]]) -> bytes:
     return bytes(sum(((row[x] >> plane) & 1) << (7-x) for x in range(8))
                  for plane in (0, 1) for row in rows)
 
+
+def decode_nes_2bpp(data: bytes) -> tuple[tuple[int, ...], ...]:
+    """Invert authentic NES 16-byte planar CHR tiles."""
+    raw = _raw(data, 16)
+    return tuple(tuple(((raw[y] >> (7-x)) & 1) |
+                       (((raw[8+y] >> (7-x)) & 1) << 1)
+                       for x in range(8)) for y in range(8))
+
