@@ -8,9 +8,12 @@
  */
 import React from 'react';
 import {
-  ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { authHeaders } from '../auth/gameforgeAuth';
 import { API_BASE } from '../../utils/apiBase';
 
@@ -187,6 +190,96 @@ export default function DragonOriginalPuzzleEditor({
     }
   };
 
+  const loadOriginalPack = async () => {
+    if (busy || validating) return;
+    setStatus('');
+    try {
+      const picked = await DocumentPicker.getDocumentAsync({
+        type: ['application/json', 'text/plain'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (picked.canceled || !picked.assets?.length) return;
+      const file = picked.assets[0];
+      if (typeof file.size !== 'number' || file.size < 20 || file.size > 8192) {
+        throw new Error('Original game level pack must be at most 8 KiB.');
+      }
+      let data: string;
+      if (Platform.OS === 'web' && file.file) {
+        data = await file.file.text();
+      } else {
+        data = await FileSystem.readAsStringAsync(file.uri, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+      }
+      if (data.length > 8192) throw new Error('Original level pack too large.');
+      const parsed = JSON.parse(data) as {
+        schema?: unknown; levels?: unknown; level_count?: unknown;
+      };
+      if (parsed?.schema !== 'skeleton.ai.dragon.original_puzzle_level_pack.v1' ||
+          !Array.isArray(parsed.levels) || parsed.level_count !== stages ||
+          parsed.levels.length !== stages || !parsed.levels.every(boundedBoard)) {
+        throw new Error('Imported original map does not match this campaign size.');
+      }
+      const rows = (parsed.levels as string[][]).map(grid => [...grid]);
+      setBoards(rows);
+      setValidated(null);
+      setCurrent(0);
+      onApprovedLevels(null);
+      setStatus('Level pack loaded. Run exact solver validation before exporting.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Original map import failed.');
+    }
+  };
+
+  const saveOriginalPack = async () => {
+    if (!validated || validated.total_stages !== boards.length ||
+        !/^[a-f0-9]{64}$/.test(validated.digest)) return;
+    const document = {
+      schema: 'skeleton.ai.dragon.original_puzzle_level_pack.v1',
+      level_count: boards.length,
+      levels: boards,
+      digest: validated.digest,
+      claim: 'source-only original authored grids, proved solvable, not legally cleared',
+    };
+    const raw = JSON.stringify(document, null, 2) + '\n';
+    if (raw.length > 8192) {
+      setStatus('Level pack exceeds local game design archive limit.');
+      return;
+    }
+    const name = 'dragon-original-levels-' + validated.digest.slice(0, 16) + '.json';
+    try {
+      if (Platform.OS === 'web') {
+        const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' }));
+        try {
+          const anchor = document.createElement('a');
+          anchor.href = url; anchor.download = name;
+          document.body.appendChild(anchor);
+          anchor.click(); anchor.remove();
+        } finally {
+          setTimeout(() => URL.revokeObjectURL(url), 15_000);
+        }
+      } else {
+        if (!FileSystem.documentDirectory) {
+          throw new Error('Local original game file storage unavailable.');
+        }
+        const uri = FileSystem.documentDirectory + name;
+        await FileSystem.writeAsStringAsync(uri, raw, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri, {
+            mimeType: 'application/json',
+            dialogTitle: 'Share original Dragon puzzle levels',
+          });
+        }
+      }
+      setStatus('Validated original game design saved. It can be imported again.');
+    } catch {
+      setStatus('Unable to export original level-pack JSON from this device.');
+    }
+  };
+
   const active = boards[current] || newBoard();
 
   return (
@@ -246,6 +339,19 @@ export default function DragonOriginalPuzzleEditor({
         Grid data only—no scripts, commercial maps or third-party characters.
         Changing a cell immediately revokes its previous validation.
       </Text>
+      <View style={styles.fileActions}>
+        <TouchableOpacity accessibilityRole="button" disabled={busy || validating}
+          style={[styles.fileButton, (busy || validating) && styles.disabled]}
+          onPress={loadOriginalPack}>
+          <Text style={styles.actionText}>Import original level JSON</Text>
+        </TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button"
+          disabled={busy || validating || !validated}
+          style={[styles.fileButton, !validated && styles.disabled]}
+          onPress={saveOriginalPack}>
+          <Text style={styles.actionText}>Save approved level JSON</Text>
+        </TouchableOpacity>
+      </View>
       <TouchableOpacity accessibilityRole="button" disabled={busy || validating}
         style={[styles.action, (busy || validating) && styles.disabled]}
         onPress={validate}>
@@ -279,6 +385,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11, paddingVertical: 9 },
   selected: { backgroundColor: '#477b61' },
   toolText: { color: '#e4ffef', fontSize: 13 },
+  fileActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  fileButton: { padding: 10, borderRadius: 9, backgroundColor: '#284e5c' },
   board: { backgroundColor: '#122027', alignSelf: 'center', padding: 5, gap: 0 },
   row: { flexDirection: 'row', justifyContent: 'center' },
   cell: { width: 23, height: 23, alignItems: 'center',
