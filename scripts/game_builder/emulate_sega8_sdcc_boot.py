@@ -17,6 +17,11 @@ from skeleton.ai.game_builder.native_release_intake import _read_bounded
 MAX_INSTRUCTIONS = 3_000_000
 DEFAULT_FRAME_INSTRUCTIONS = 25000
 MAX_FRAMES = 128
+# NTSC Sega VDP scanline clock: 228 Z80 T-states per line, 262 lines/frame.
+# Scanline counter 0x00..0xDA then 0xD5..0xFF on 192-line NTSC consoles.
+_TSTATES_PER_LINE = 228
+_LINES_PER_FRAME = 262
+_FRAME_TSTATES = _TSTATES_PER_LINE * _LINES_PER_FRAME
 _MAP_NAMES = {"sega_master_system": "sms", "sega_game_gear": "gg"}
 
 
@@ -52,6 +57,10 @@ class Sega8Machine:
         self.io_control_writes = 0
         self.interrupts_issued = 0
         self.io_reads = 0
+        self.z80_tstates = 0
+        self.vcounter_reads = 0
+        self.vcounter_b0_seen = False
+        self.vcounter_c8_seen = False
 
     def read(self, address: int) -> int:
         address &= 0xFFFF
@@ -69,6 +78,19 @@ class Sega8Machine:
             )
         self.ram[(address - 0xC000) & 0x1FFF] = value & 0xFF
 
+    @property
+    def vcounter(self) -> int:
+        """Actual port 0x7E value for the current NTSC display scanline."""
+        scanline = (self.z80_tstates // _TSTATES_PER_LINE) % _LINES_PER_FRAME
+        if scanline < 219:
+            return scanline
+        return 0xD5 + (scanline - 219)
+
+    def advance_tstates(self, value: int) -> None:
+        if type(value) is not int or not 1 <= value <= 64:
+            raise SDCCSegaBootError("invalid actual Z80 instruction-cycle count")
+        self.z80_tstates += value
+
     def read_port(self, port: int) -> int:
         low = port & 0xFF
         self.io_reads += 1
@@ -84,7 +106,18 @@ class Sega8Machine:
             status = 0x80 if self.frame_ready else 0x00
             self.frame_ready = False
             return status
-        if low in (0xBE, 0x7E, 0x7F):
+        if low == 0x7E:
+            # devkitSMS SMS_init() busy-waits for lines 0xB0 and 0xC8
+            # *before* VDP register initialization or EI. A constant FF
+            # deadlocks both otherwise playable original cartridge ports.
+            self.vcounter_reads += 1
+            current = self.vcounter
+            if current == 0xB0:
+                self.vcounter_b0_seen = True
+            if current == 0xC8:
+                self.vcounter_c8_seen = True
+            return current
+        if low in (0xBE, 0x7F):
             return 0xFF
         if low in (0x3F, 0x3E):
             return 0xFF
@@ -175,6 +208,8 @@ class Sega8Machine:
             raise SDCCSegaBootError("compiled game did not draw expected zero-score HUD")
         if not 17 <= background["companion_expression_tile"] <= 21:
             raise SDCCSegaBootError("real game omitted original companion expression")
+        if not self.vcounter_b0_seen or not self.vcounter_c8_seen:
+            raise SDCCSegaBootError("devkitSMS boot did not encounter genuine scanline counter transitions")
         if self.vdp_read_status < 1:
             raise SDCCSegaBootError("compiled Z80 game never acknowledged a video interrupt")
         return background
@@ -225,7 +260,7 @@ def boot_rom(
             if frames > MAX_FRAMES:
                 raise SDCCSegaBootError("hardware boot frame budget exceeded")
         try:
-            cpu.step()
+            machine.advance_tstates(cpu.step())
         except SDCCSegaBootError:
             raise
         except Exception as exc:
@@ -243,6 +278,8 @@ def boot_rom(
             "compiled Sega cartridge did not initialize and draw expected game "
             f"in {max_instructions} CPU instructions; "
             f"VDP writes={machine.vdp_writes}, CRAM writes={machine.cram_writes}, "
+            f"V-counter reads={machine.vcounter_reads}, "
+            f"B0 seen={machine.vcounter_b0_seen}, C8 seen={machine.vcounter_c8_seen}, "
             f"PSG writes={machine.psg_writes}, status reads={machine.vdp_read_status}; "
             f"PC samples={sample_pc}; reset vector={binary[:16].hex()}; "
             f"final_pc={cpu.pc:#06x} sp={cpu.sp:#06x} halted={cpu.halted}; "
@@ -258,6 +295,9 @@ def boot_rom(
         "rom_sha256": actual["sha256"],
         "real_compiled_z80_cpu_instructions_executed": n,
         "synthetic_vblank_interrupts_issued": machine.interrupts_issued,
+        "native_vdp_vcounter_b0_observed": machine.vcounter_b0_seen,
+        "native_vdp_vcounter_c8_observed": machine.vcounter_c8_seen,
+        "real_z80_tstates_executed": machine.z80_tstates,
         "vdp_name_table_base": observed["name_table_base"],
         "game_hero_rendered": True,
         "original_companion_rendered": True,
