@@ -72,6 +72,16 @@ type SignedAdvance={ok:boolean;new_checkpoint:string;cumulative_actions:number;
   current:GameState;surroundings:Tile[];current_history_digest:string};
 type SignedInspect={ok:boolean;current:GameState;surroundings:Tile[];
   checkpoint_bound_to_authenticated_owner:boolean};
+type TemporalPlan={
+  ok:boolean;
+  target:{realm:number;x:number;y:number};
+  solvers:{both_confirmed:boolean;same_optimal_turn_count:boolean;
+    bfs:{steps:string[];actual_turns:number;expanded:number;waiting_turns:number};
+    astar:{steps:string[];actual_turns:number;expanded:number;waiting_turns:number}};
+  shifting_topology:{distinct_topologies:number;
+    phases:Array<{phase:number;links:Array<{at:number[];open:string[]}>}>};
+  scope:string;
+};
 
 const fallbackStyles=[
   'creative_sandbox','survival_sandbox','open_world_story',
@@ -124,6 +134,8 @@ function LivingWorldEditor(){
   const [sessionMode,setSessionMode]=React.useState(false);
   const [portfolio,setPortfolio]=React.useState<Portfolio|null>(null);
   const [guided,setGuided]=React.useState<Alternative|null>(null);
+  const [temporal,setTemporal]=React.useState<TemporalPlan|null>(null);
+  const [temporalFrom,setTemporalFrom]=React.useState(0);
   const [busy,setBusy]=React.useState(false);
   const [failure,setFailure]=React.useState('');
   const [notice,setNotice]=React.useState('');
@@ -144,7 +156,7 @@ function LivingWorldEditor(){
     setBusy(false);setGame(null);setPreview(null);setTerrain([]);
     setHistory([]);setSessionToken(null);setPreviousTokens([]);
     setSessionMode(false);setPortfolio(null);setGuided(null);
-    setFailure('');setNotice('');
+    setTemporal(null);setFailure('');setNotice('');
   };
   const changeStyle=(next:string)=>{
     setStyle(next);
@@ -174,7 +186,8 @@ function LivingWorldEditor(){
       if(ticket===runId.current){
         setPreview(snapshot);setGame(snapshot.player);
         setTerrain(snapshot.tiles);setHistory([]);setPortfolio(null);
-        setGuided(null);setSessionToken(signed?.new_checkpoint||null);
+        setGuided(null);setTemporal(null);
+        setSessionToken(signed?.new_checkpoint||null);
         setPreviousTokens([]);setSessionMode(!!signed?.new_checkpoint);
         if(!signed)setNotice(
           'Long-session signing is unavailable; bounded world replay remains playable.');
@@ -286,6 +299,35 @@ function LivingWorldEditor(){
       if(ticket===runId.current)setFailure(
         caught instanceof Error?caught.message:'Route analysis failed.');
     }finally{if(ticket===runId.current)setBusy(false);}
+  };
+  const analyzeShiftingMaze=async()=>{
+    if(!preview||!game||busy||!preview.world.shifting_routes)return;
+    const ticket=++runId.current;
+    setBusy(true);setFailure('');setTemporal(null);
+    try{
+      const body={
+        ...config,
+        checkpoint_token:sessionToken,
+        moves:sessionToken?[]:history,
+        delta_x:2,delta_y:1,search_budget:2500,horizon:32,radius:2,
+      };
+      const report=await apiPost<TemporalPlan>('/maze/analyze',body);
+      if(!report.ok||report.shifting_topology.phases.length!==8||
+         report.shifting_topology.distinct_topologies<2)
+        throw new Error('Original dynamic-wall proof is incomplete.');
+      if(ticket===runId.current){
+        setTemporal(report);setTemporalFrom(game.player.turn);
+      }
+    }catch(caught){
+      if(ticket===runId.current)setFailure(caught instanceof Error
+        ?caught.message:'Could not analyze actual shifting walls.');
+    }finally{if(ticket===runId.current)setBusy(false);}
+  };
+  const stepTemporalRoute=()=>{
+    if(!temporal||!game||busy)return;
+    const offset=game.player.turn-temporalFrom;
+    const next=temporal.solvers.astar.steps[offset];
+    if(typeof next==='string')move(next);
   };
   const restartWorld=async()=>{
     if(!preview||busy)return;
@@ -592,6 +634,57 @@ function LivingWorldEditor(){
             </TouchableOpacity>
           </View>}
         </View>
+        {preview.world.shifting_routes&&<View style={s.panel}>
+          <Text style={s.heading}>Moving-maze route intelligence</Text>
+          <Text style={s.copy}>
+            The maze topology changes after each real game action.
+            Compare independent time-expanded BFS and A* routes to an
+            optional nearby destination. A world win is not required.
+          </Text>
+          <TouchableOpacity style={[s.action,busy&&s.disabled]}
+            onPress={analyzeShiftingMaze} disabled={busy}>
+            <Text style={s.actionText}>
+              Analyze actual shifting walls with two solvers
+            </Text>
+          </TouchableOpacity>
+          {temporal&&<>
+            <Text style={s.copy}>
+              {temporal.shifting_topology.distinct_topologies} measured
+              door layouts across 8 phases · waypoint
+              ({temporal.target.x},{temporal.target.y})
+            </Text>
+            <Text style={s.copy}>
+              BFS: {temporal.solvers.bfs.actual_turns} moves /
+              {' '}{temporal.solvers.bfs.expanded} search states ·
+              A*: {temporal.solvers.astar.actual_turns} moves /
+              {' '}{temporal.solvers.astar.expanded} search states
+            </Text>
+            <Text style={s.hint}>
+              {temporal.solvers.both_confirmed
+                ?'Both independent planners verified a path through the real game.'
+                :'The bounded search did not prove a route; this does not mean the world has no win.'}
+            </Text>
+            <View style={s.chips}>
+              {temporal.shifting_topology.phases.map(phase=>(
+                <View key={phase.phase} style={s.chip}>
+                  <Text style={s.text}>
+                    Phase {phase.phase+1}: {phase.links.reduce(
+                      (sum,room)=>sum+room.open.length,0)} open links
+                  </Text>
+                </View>
+              ))}
+            </View>
+            {temporal.solvers.both_confirmed&&
+             game.player.turn-temporalFrom<
+               temporal.solvers.astar.steps.length&&
+              <TouchableOpacity style={[s.action,busy&&s.disabled]}
+                disabled={busy} onPress={stepTemporalRoute}>
+                <Text style={s.actionText}>
+                  Play next verified shifting-maze waypoint step
+                </Text>
+              </TouchableOpacity>}
+          </>}
+        </View>}
         <View style={s.panel}>
           <Text style={s.heading}>Alternatives are actual gameplay</Text>
           <TouchableOpacity style={[s.action,busy&&s.disabled]}
