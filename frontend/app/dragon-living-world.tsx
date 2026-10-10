@@ -185,24 +185,44 @@ function LivingWorldEditor(){
     }finally{if(ticket===runId.current)setBusy(false);}
   };
   const move=async(action:string)=>{
-    if(!editor||busy||!game||!preview||history.length>=192)return;
+    if(!editor||busy||!game||!preview||
+       (history.length>=192&&!sessionToken))return;
     if(!game.options.some(x=>x.name===action&&x.available))return;
-    const next=[...history,action];
+    const next=[...history,action].slice(-192);
     const ticket=++runId.current;
     setBusy(true);setFailure('');
     try{
-      const result=await apiPost<Play>('/play',{
-        ...config,moves:next,
-      });
-      if(!result.ok||
-         result.played_moves.join('|')!==next.join('|')||
-         result.current.world_id!==id)
-        throw new Error('World action receipt diverged from source');
+      let current:GameState;
+      let surroundings:Tile[];
+      let signed:string|null=null;
+      if(sessionToken){
+        const result=await apiPost<SignedAdvance>('/checkpoint/advance',{
+          ...config,token:sessionToken,moves:[action],
+        });
+        if(!result.ok||!result.new_checkpoint||
+           result.current.world_id!==id||
+           result.cumulative_actions!==game.player.turn+1)
+          throw new Error('Signed world continuation failed source verification.');
+        current=result.current;surroundings=result.surroundings;
+        signed=result.new_checkpoint;
+      }else{
+        const result=await apiPost<Play>('/play',{
+          ...config,moves:next,
+        });
+        if(!result.ok||result.played_moves.join('|')!==next.join('|')||
+           result.current.world_id!==id)
+          throw new Error('World action receipt diverged from source');
+        current=result.current;surroundings=result.surroundings;
+      }
       if(ticket===runId.current){
-        setHistory(next);setGame(result.current);
-        setTerrain(result.surroundings);
-        if(result.current.has_completed_ending){
-          setNotice(result.current.postgame_active
+        setHistory(next);setGame(current);
+        setTerrain(surroundings);
+        if(signed){
+          setPreviousTokens(v=>[...v,sessionToken as string].slice(-32));
+          setSessionToken(signed);
+        }
+        if(current.has_completed_ending){
+          setNotice(current.postgame_active
             ? 'Story ending reached. Your choices persist, and this world remains playable.'
             : 'Campaign completed. Restart to experience a different outcome.');
         }else setNotice('');
