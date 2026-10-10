@@ -42,3 +42,13 @@ def test_distance_field_routes_around_hard_walls():
         (0,1,2),(-1,-1,3),(6,5,4))
     with pytest.raises(GeometryError):
         distance_field(grid,(0,1))
+
+def test_astar_is_shortest_deterministic_and_refuses_wall_endpoints():
+    grid=("S..","##.","..G")
+    route=astar_path(grid,(0,0),(2,2))
+    assert route[0]==(0,0) and route[-1]==(2,2)
+    assert len(route)==distance_field(grid,(0,0))[2][2]+1
+    assert route==astar_path(grid,(0,0),(2,2))
+    assert astar_path(("S#G",),(0,0),(2,0))==()
+    with pytest.raises(GeometryError):
+        astar_path(grid,(1,1),(2,2))
