@@ -104,7 +104,8 @@ def validate_campaign(campaign:Campaign)->Campaign:
     return campaign
 
 def design_campaign(stages:int,*,seed:int=0,
-                    mode:str="branching",intensity:str="balanced")->Campaign:
+                    mode:str="branching",intensity:str="balanced",
+                    stage_difficulty:tuple[int,...]|None=None)->Campaign:
     if type(stages) is not int or not 1<=stages<=MAX_STAGES:
         raise ValueError("original campaign requires one to eight actual stages")
     if type(seed) is not int or not 0<=seed<2**32:
@@ -112,6 +113,12 @@ def design_campaign(stages:int,*,seed:int=0,
     if mode not in ("linear","branching") or intensity not in (
         "gentle","balanced","challenging","spicy"):
         raise ValueError("original branching style or challenge profile unrecognized")
+    if stage_difficulty is not None:
+        if (not isinstance(stage_difficulty,tuple) or
+                len(stage_difficulty)!=stages or
+                any(type(score) is not int or not 0<=score<=100
+                    for score in stage_difficulty)):
+            raise ValueError("campaign path difficulty must be measured for each real chapter")
     chapters=[]
     for n in range(stages):
         if mode=="linear" or stages<3:
@@ -129,7 +136,20 @@ def design_campaign(stages:int,*,seed:int=0,
                     "mastery" if mode=="branching" and stages>=3 else "finale")
         else:
             ending=None
-        names=("explore next chapter","take the riskier shortcut")[:len(targets)]
+        if len(targets)==2 and stage_difficulty is not None:
+            pair=sorted(targets,key=lambda target:
+                        (stage_difficulty[target],target))
+            if intensity in ("challenging","spicy"):
+                pair.reverse()
+            targets=tuple(pair)
+            names=tuple(
+                ("higher tension" if stage_difficulty[target]>=50 else
+                 "lower tension")+
+                f" route (measured {stage_difficulty[target]}/100)"
+                for target in targets
+            )
+        else:
+            names=("explore next chapter","take optional chapter shortcut")[:len(targets)]
         role=("ending" if ending else
               "fork" if len(targets)>1 else "connector")
         chapters.append(Chapter(n,targets,ending,role,names))
