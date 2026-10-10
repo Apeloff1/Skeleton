@@ -86,6 +86,7 @@ jobs:
             tests/test_ai_dragon_native_production.py \
             tests/test_ai_dragon_native_desktop.py \
             tests/test_ai_dragon_native_artforge.py \
+            tests/test_ai_dragon_native_evolution.py \
             tests/test_ai_webcrawler_dragon_native_projects.py \
             tests/test_ai_webcrawler_dragon_native_compile.py \
             tests/test_ai_webcrawler_dragon_native_cycles.py \
@@ -127,6 +128,35 @@ jobs:
           assert audit["archives_verified"] == 3
           assert all(item["binary_sha256"] for item in result["artifacts"])
           print("ORIGINAL_NATIVE_ART_ROM_BUILDS_PASS", audit["request_id"])
+          PY
+      - name: Prove multi-game evolution produces distinct verified native cartridges
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from skeleton.ai.webcrawler.dragon_native_production import ProductionRequest, PortableGameDesign
+          from skeleton.ai.webcrawler.dragon_native_evolution import (
+              EvolutionSeriesRequest, build_evolution_series, verify_evolution_series,
+          )
+          specification = EvolutionSeriesRequest(
+              base=ProductionRequest(
+                  title="Original Evolving Crystal Expedition",
+                  style="arcade_score_attack", targets=("game_boy", "nes"),
+                  seed=1977, original_work_attested=True,
+                  portable_design=PortableGameDesign(
+                      hero="robot", quest_theme="crystals", palette="dmg_green",
+                      stages=4, candidates=6, difficulty=3,
+                  ),
+              ),
+              editions=3,
+          )
+          root = Path("/tmp/dragon-evolution-series")
+          release = build_evolution_series(specification, root, authorized=True)
+          assert release["status"] == "published"
+          audit = verify_evolution_series(root, release["index"])
+          assert audit["source_projects_verified"] == 6
+          assert audit["editions_verified"] == 3
+          print("DRAGON_NATIVE_GAME_EVOLUTION_VERIFIED",audit["index_sha256"])
           PY
       - name: Build original Game Boy ROM
         run: |
