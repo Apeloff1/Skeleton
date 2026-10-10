@@ -24,6 +24,26 @@ def test_script_plays_cues_and_gates_hit_frame():
     assert "DANGER_RAMP" in src or "lethal" in src
 
 
+def test_impact_cue_waits_for_contact_and_only_fires_once():
+    script = combat_vfx_script()
+    assert "_pending_hit_frame = cue_hit_frame" in script
+    assert "_playing = cue_hit_frame < 0" in script
+    assert "if _playing:\n        _emit_particles()" in script
+    assert "if _pending_hit_frame >= 0 and frame == _pending_hit_frame:" in script
+    assert "_pending_hit_frame = -1" in script
+    # Readability telegraphs are shown immediately instead of deferred to impact.
+    assert "play_cue(chosen, lead, 16 * slots, 0.0, tier, -1)" in script
+
+
+def test_shape_emitter_traverses_nested_particles_in_godot_scene():
+    script = combat_vfx_script()
+    scene = combat_vfx_scene("modern")
+    assert "for emitter in child.get_children():" in script
+    assert "if emitter is GPUParticles2D:" in script
+    assert "emitter.restart()" in script
+    assert 'parent="CombatVfx/Cone"' in scene
+
+
 def test_scene_has_combat_vfx_and_shape_nodes():
     text = combat_vfx_scene("modern")
     assert 'node name="CombatVfx"' in text
