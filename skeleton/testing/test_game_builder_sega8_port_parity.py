@@ -278,6 +278,12 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     assert receipt["real_z80_startup_checked_per_platform"] is True
     assert receipt["original_on_cartridge_demo_equivalent_across_platforms"] is True
     assert receipt["original_stage_hardware_color_parity_verified"] is True
+    assert receipt["extended_eight_worlds_gameplay_parity_verified"] is True
+    assert receipt["extended_eight_worlds_autonomous_replay_verified_on_both_platforms"] is True
+    assert receipt["extended_eight_worlds_native_controller_actions_verified_per_platform"] == 1100
+    assert receipt["extended_eight_worlds_original_world_digest"] == "8"*64
+    assert receipt["extended_eight_worlds_winning_replay_digest"] == "7"*64
+    assert receipt["extended_eight_worlds_native_z80_semantic_trace_sha256"] == "6"*64
     assert receipt["original_stage_color_accents_verified_per_console"] == 257
     assert receipt["native_attract_demo_entry_and_cancel_verified_on_both_platforms"] is True
     assert receipt["native_autonomous_full_game_replayed_on_both_platforms"] is True
@@ -310,6 +316,23 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     ("manifest", "game_gear_original_stage_rgb444_accents", [[-1,20]]),
     ("manifest", "master_system_original_stage_rgb222_accents", [[100,2]]),
     ("native_route", "original_hardware_stage_color_accents_verified", False),
+    ("ext_source", "original_campaign_profile", "commercial_remake"),
+    ("ext_source", "world_digest", "9"*64),
+    ("ext_source", "winning_replay_digest", "0"*64),
+    ("ext_source", "rights_evidence_sha256", "1"*64),
+    ("ext_source", "distribution_licensed", True),
+    ("ext_host", "original_levels_verified", 7),
+    ("ext_host", "original_demo_controller_actions_verified", 10),
+    ("ext_host", "original_native_solution_attract_mode_host_verified", False),
+    ("ext_host", "rights_independently_verified", True),
+    ("ext_boot", "hardware_boot_smoke_verified", False),
+    ("ext_boot", "rom_sha256", "0"*64),
+    ("ext_guest", "original_levels_replayed", 7),
+    ("ext_guest", "controller_actions_replayed", 200),
+    ("ext_guest", "original_companion_rank_and_reward_verified", False),
+    ("ext_guest", "native_attract_demo_full_solution_verified_on_guest_z80", False),
+    ("ext_guest", "semantic_controller_screen_trace_sha256", "0"*64),
+    ("ext_guest", "physical_hardware_verified", True),
     ("native_route", "original_hardware_stage_accents_verified_per_move", 1),
     ("manifest", "original_demo_solution_sha256", "0"*64),
     ("manifest", "original_demo_playback_steps", 42),
