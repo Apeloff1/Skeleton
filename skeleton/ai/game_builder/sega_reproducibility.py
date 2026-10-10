@@ -242,8 +242,12 @@ def verify_rebuilt_sega_cartridge(
     # All 32 KiB must agree, not only the weak additive Sega header checksum.
     first_bytes = _read_bounded(first, max_bytes=32768)
     rebuilt_bytes = _read_bounded(rebuilt, max_bytes=32768)
-    _require(first_bytes == rebuilt_bytes,
-             "original/rebuilt Sega machine code differs despite matching header metadata")
+    _require(
+        first_bytes == rebuilt_bytes
+        and sha256(first_bytes).hexdigest() == first_verified["sha256"]
+        and sha256(rebuilt_bytes).hexdigest() == rebuilt_verified["sha256"],
+        "native ROM bytes changed between structural intake and reproducibility comparison",
+    )
     core = {
         "schema": "skeleton.game_builder.sega_reproducibility.v1",
         "target": target,
