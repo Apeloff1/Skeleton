@@ -145,7 +145,7 @@ No enterprise grade, completed volume, release permission or legal certainty.
 
 The full Dragon/reviewed-knowledge/pyramid run passes 1064 tests and 11 subtests,
 with 12 skips. The focused backend runtime, projection, Academy and canonical
-storage/governance/regeneration run passes 58 tests. Architecture, construction,
+storage/governance/regeneration run passes 59 tests. Architecture, construction,
 capability interfaces, superiority schema, state topology and global resource
 contract checks pass. This supersedes neither the six reproduced baseline chat
 failures nor the stale implementation-notes gate. Provider bootstrap and hosted

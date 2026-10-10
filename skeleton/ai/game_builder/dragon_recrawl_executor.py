@@ -135,9 +135,14 @@ def run_admitted_recrawl(
         if delay > 5.0:
             return None  # External scheduler must respect longer crawl delays.
         sleep(delay)
+        # Revocation after robots is an ordinary stopped acquisition, not a
+        # fresh admission. The finalizer still releases the existing grant.
+        current_consent = consent_provider()
+        if current_consent is not True:
+            return None
         if not dispatcher.authorize_chunk(
             ticket, sample_provider(), now=int(clock()), authorized=True,
-            trusted_worker=True, consent=consent_provider(),
+            trusted_worker=True, consent=current_consent,
         ):
             return None
         result = engine.step(now=max(float(clock()), float(now) + delay))
