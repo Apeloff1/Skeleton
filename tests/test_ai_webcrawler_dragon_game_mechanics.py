@@ -435,3 +435,13 @@ def test_session_history_budget_fail_closed_after_first_row(monkeypatch):
     with pytest.raises(ValueError, match="history memory"):
         store.sessions("alice", authorized=True)
 
+
+def test_partial_confirmation_keeps_profile_under_review():
+    store = setup()
+    confirmed = observation(preference=PreferenceSignal.ENJOYED, confirmed=True)
+    unconfirmed = observation(timestamp=2000)
+    store.record(session(store, observations=(confirmed, unconfirmed)), authorized=True)
+    profile = store.distill("alice", authorized=True)
+    assert profile.review_required
+    assert not profile.insights[0].user_confirmed
+
