@@ -663,4 +663,22 @@ def route_overrun_ppm(problem: RouteProblem, proof: RouteProof) -> int:
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm"]
+def verify_route_proof(
+    problem: RouteProblem, proof: RouteProof, *, hazard_cost: int = 8,
+    edge_penalties: Mapping[Edge, int] | None = None,
+) -> bool:
+    """Recompute every material field, including cost and ordered objectives."""
+    if not isinstance(proof, RouteProof) or proof.problem_digest != problem.digest:
+        raise MultipathError("route proof refers to another level")
+    replay = evaluate_route(
+        problem, proof.actions, allow_hazards=proof.hazard_visits > 0,
+        hazard_cost=hazard_cost, edge_penalties=edge_penalties,
+        solver=proof.solver, expanded_states=proof.expanded_states,
+    )
+    if replay != proof:
+        raise MultipathError("route proof does not match deterministic replay")
+    return True
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof"]
