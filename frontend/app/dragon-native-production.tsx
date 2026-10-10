@@ -756,6 +756,7 @@ const stylesUi = StyleSheet.create({
   counterButton: { backgroundColor: '#326f56', borderRadius: 10, minWidth: 42,
     padding: 10, alignItems: 'center' },
   platformTitle: { fontWeight: '700', color: '#e4f7ec', fontSize: 15 },
+  section: { padding: 14, borderRadius: 12, gap: 8, backgroundColor: '#162a36' },
   consent: { padding: 14, borderRadius: 12, backgroundColor: '#1d3540' },
   action: { backgroundColor: '#326f56', borderRadius: 12, alignItems: 'center', padding: 15 },
   disabled: { opacity: 0.45 },
