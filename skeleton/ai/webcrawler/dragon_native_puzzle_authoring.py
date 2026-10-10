@@ -139,8 +139,29 @@ def starter_authored_levels(stages:int=1)->dict:
     from .dragon_native_puzzle import transformed_level
     if type(stages) is not int or not 1<=stages<=MAX_LEVELS:
         raise ValueError("invalid original puzzle starter level count")
-    generated=tuple(transformed_level(i,1977,difficulty=4) for i in range(stages))
-    return authored_document(generated)
+    selected=[]
+    used=set()
+    for index in range(stages):
+        level=None
+        for attempt in range(20):
+            seed=(1977+index*0x9E3779B1+attempt)&0xffffffff
+            candidate=transformed_level(
+                index,seed,difficulty=5,procedural=attempt>=6,
+            )
+            identity=level_digest(candidate)
+            if identity not in used:
+                try:
+                    from .dragon_native_puzzle import solve_grid
+                    solve_grid(candidate)
+                except ValueError:
+                    continue
+                level=candidate
+                used.add(identity)
+                break
+        if level is None:
+            raise ValueError("could not create distinct solvable starter game stages")
+        selected.append(level)
+    return authored_document(tuple(selected))
 
 
 def preview_authored_levels(levels:tuple[tuple[str,...],...])->dict:
