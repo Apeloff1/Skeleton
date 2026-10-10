@@ -67,3 +67,13 @@ def test_swept_aabb_reports_exact_fraction_for_contact():
     assert swept_aabb_hit((0,0,2,2),(1,1,2,2),3,3)==Fraction(0)
     with pytest.raises(GeometryError):
         swept_aabb_hit((0,0,2,2),(4,0,2,2),4096,0)
+
+def test_sprite_atlas_packing_is_deterministic_and_nonoverlapping():
+    sizes=((8,8),(8,16),(16,8),(4,4))
+    placed=shelf_pack_rectangles(sizes,24)
+    assert placed==((0,0,8,8),(8,0,8,16),(0,16,16,8),(16,16,4,4))
+    assert all(not rect_intersects(a,b) for i,a in enumerate(placed) for b in placed[i+1:])
+    with pytest.raises(GeometryError):
+        shelf_pack_rectangles(((32,8),),16)
+    with pytest.raises(GeometryError):
+        shelf_pack_rectangles(((8,512),)*8,8)
