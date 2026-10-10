@@ -1,0 +1,114 @@
+# Cross-era Native Homebrew Artifact Validation
+
+**Goal:** Real, content-addressed game artifacts, not "HTML game" surrogates.
+**Safety:** File layout and checksum validation does not prove a game boots,
+does not prove originality, and does not authorize the use of commercial IP.
+
+## Structural desktop executables
+
+Module: `skeleton/ai/game_builder/native_binary_structure.py`
+
+The previous native-byte gate was deliberately a weak format sanity check.
+A file beginning with `MZ`, `ELF` or Mach-O magic could pass even when no
+operating-system image was actually present.
+
+A new independent structural parser inspects real file-descriptor-backed
+images with bounds checked before each header or region read. The parser
+examines file size, program/section table dimensions, expected architecture,
+mapped code segments, execution permissions and the entrypoint relationship
+to the on-disk image. It then re-hashes the complete image in small bounded
+chunks **from the same verified file descriptor**. No symlink, hardlink,
+directory, oversized or wrong-target native executable is accepted.
+
+| Desktop output | Format | Strict checks |
+| --- | --- | --- |
+| Windows | PE32/PE32+ PE/COFF | DOS offset, PE signature, COFF machine, executable-not-DLL, bounded optional/section headers, file alignment, raw section bounds/overlap, executable entrypoint in mapped code |
+| Linux | ELF32/ELF64 | Class, endianness, executable/PIE type, CPU, bounded program/section tables, loadable segment file/memory consistency, file-backed entrypoint in executable LOAD |
+| macOS | thin 64-bit Mach-O | Executable CPU type, command count/size, segment bounds, 64-bit section table boundaries, LC_MAIN or native thread entry, executable segment/entry offset |
+
+**Intentionally unsupported:** PE resource/data-directory semantic verification,
+ELF extended program-header counts, 32-bit/FAT universal Mach-O files,
+platform code signatures, notarization, ASLR deployment policy, dependency
+runtime resolution and dynamic loader compatibility. Those need separate
+dedicated assessments before hardware or publisher acceptance.
+
+These checks are conservative; an OS can accept other uncommon variants.
+Never "fix" validation by changing the output extension or forging a magic
+header. Resolve the compiler, binary type and runtime compatibility instead.
+
+`run_structurally_verified_native_release_gate()` chains:
+actual native file-byte receipt, fully parsed native executable structure
+and external, administrator-signed/pinned independent reviewer policy.
+All three must describe the exact signed game and output bytes.
+
+Even when a structurally well-formed PE, ELF or Mach-O passes:
+`executable_boot_verified=false`,
+`binary_executed_successfully=false`,
+`legal_noninfringement_certified=false`, and
+`release_authorized=false`.
+
+The test fixtures emulate headers and segments. They are **NOT working games**
+and must not be used to claim native runtime acceptance.
+
+References:
+- Microsoft PE/COFF: https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
+- Linux ELF manual: https://man7.org/linux/man-pages/man5/elf.5.html
+- Apple Darwin Mach-O header reference:
+  https://github.com/apple/darwin-xnu/blob/main/EXTERNAL_HEADERS/mach-o/loader.h
+
+## Actual retro ROM and tape formats
+
+Module: `skeleton/ai/game_builder/native_retro_artifact.py`
+
+Six hardware targets now have a local cartridge/tape evidence intake. Existing
+native source exporters remain distinct; no commercial game binaries or
+device firmware are downloaded or bundled.
+
+| Era / platform | Verified format metadata | Not automatically verified |
+| --- | --- | --- |
+| Nintendo Game Boy DMG | Bank-aligned header ROM length, mapper code, header checksum, reset entry | Boot-logo redistribution rights, real LCD/input behavior |
+| Game Boy Color | Color mode flag and DMG/CGB exclusivity, header checksum, ROM size | Color VRAM attributes/CPU timing or hardware |
+| NES / Famicom | Strict iNES1 NROM mapper zero, PRG/CHR bank sizes, no trainer, reset vector into CPU ROM | Authentic 6502 gameplay, PPU synchronization |
+| Sega Master System | Existing Sega 32 KiB TMR SEGA checksum/header, reset and interrupt vector checks | All BIOS/hardware revisions and actual sound/input |
+| MSX1 | Existing 16 KiB AB page-1 cartridge validator, INIT and BIOS-call metadata | Z80 full instruction validity and all BIOS variants |
+| ZX Spectrum 48K | Existing two-block TAP checksum, length, load-address and Z80 entry checks | Firmware boot, keyboard mapping, full tape playthrough |
+
+Every inspected output must match an explicit expected **SHA-256**. A guessed
+file type, corrupt ROM, modified checksum, altered target or symlinked path
+fails closed. Passing metadata is not equivalent to verified game execution.
+
+References:
+- Pan Docs: https://gbdev.io/pandocs/The_Cartridge_Header.html
+- iNES header format: https://www.nesdev.org/wiki/INES
+- Existing project-created SMS/MSX/Spectrum format packers and native CI
+  remain the source of their supported exact hardware-specific constraints.
+
+### Rights and anti-plagiarism remain independent
+
+Programming patterns, game rules and ideas do not by themselves determine
+copyright infringement. High-level visual identity, story expression,
+characters, audio, protectable maps, UI and third-party licenses still
+require the separate originality/rightsholder checks.
+
+A legitimate homebrew ROM may require boot-screen trademarks or proprietary
+SDK approval for certain distribution channels. A cartridge file that has
+a correct checksum cannot grant a hardware maker license.
+
+Unresolved: direct signed evidence linking every *retro* cartridge to its
+reviewed source, real emulator/hardware verified gameplay replay, region-aware
+packaging, toolchain provenance and publisher approval. These remain separate
+milestones, not fictional green status fields.
+
+## CI and adversarial acceptance
+
+`.github/workflows/game-hardware-archive.yml` now runs:
+- `test_game_builder_native_binary_structure.py`: PE/ELF/Mach-O
+  boundary/range mutations, valid synthetic layouts, digest and link attacks.
+- `test_game_builder_strict_release_pipeline.py`: full strict desktop
+  image plus independently pinned reviewer chain.
+- `test_game_builder_native_retro_artifact.py`: real six-era-format
+  generated bytes, copy/substitution resistance, mapper, checksum and
+  loader-header mutation tests.
+
+Do not merge until exact-head CI is green, and do not interpret focused
+format tests as closure of repository-wide unrelated failing gates.
