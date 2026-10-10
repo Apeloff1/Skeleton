@@ -20,6 +20,11 @@ import {
   parseNativeBoard, stepNativePreview, visibleNativeBoard,
   type EditorPreviewState, type PuzzleMove,
 } from '../product/dragonPuzzlePreview';
+import {
+  type PuzzleHistory, initializePuzzleHistory, paintOriginalCell,
+  undoPuzzleEdit, redoPuzzleEdit, canUndoPuzzle, canRedoPuzzle,
+  type DrawTile,
+} from '../product/dragonPuzzleHistory';
 
 const API = (API_BASE || '').replace(/\/$/, '');
 const ENDPOINT = API + '/api/dragon-academy/native/production/puzzle';
@@ -74,6 +79,7 @@ export default function DragonOriginalPuzzleEditor({
   enabled, stages, onApprovedLevels,
 }: Props) {
   const [boards, setBoards] = React.useState<string[][]>([]);
+  const [editHistory, setEditHistory] = React.useState<PuzzleHistory | null>(null);
   const [current, setCurrent] = React.useState(0);
   const [tool, setTool] = React.useState<string>('#');
   const [busy, setBusy] = React.useState(false);
@@ -98,6 +104,7 @@ export default function DragonOriginalPuzzleEditor({
     setDemoCursor(-1);
     setCurrent(0);
     setBoards([]);
+    setEditHistory(null);
     setStatus('');
     setBusy(true);
     void (async () => {
@@ -117,14 +124,18 @@ export default function DragonOriginalPuzzleEditor({
           throw new Error('Original puzzle starter grid did not meet safety bounds.');
         }
         if (!cancelled && fetchEpoch.current === generation) {
-          setBoards((result.levels as string[][]).map(board => [...board]));
+          const first=(result.levels as string[][]).map(board => [...board]);
+          setBoards(first);
+          setEditHistory(initializePuzzleHistory(first));
         }
       } catch {
         if (!cancelled && fetchEpoch.current === generation) {
           // Useful local original starter for offline editing. This fallback
           // is NOT treated as approved or certified and cannot be exported
           // without a separate backend validation.
-          setBoards(Array.from({ length: stages }, () => newBoard()));
+          const first=Array.from({ length: stages }, () => newBoard());
+          setBoards(first);
+          setEditHistory(initializePuzzleHistory(first));
           setStatus('Could not load distinct starter stages. Edit offline and validate before export.');
         }
       } finally {
@@ -138,24 +149,33 @@ export default function DragonOriginalPuzzleEditor({
 
   const applyTool = (x: number, y: number) => {
     if (busy || validating || play || !boards[current]) return;
-    const next = boards.map(board => [...board]);
-    const selected = next[current];
-    if (!selected[y] || x < 0 || x >= WIDTH) return;
-    const before = selected[y][x];
-    if (tool === '@' && before !== '@') {
-      // Exactly one avatar on each grid: remove prior hero first.
-      for (let row = 0; row < HEIGHT; row++) {
-        selected[row] = selected[row].replace('@', '.');
-      }
+    if (!editHistory) return;
+    try {
+      const update=paintOriginalCell(editHistory,current,x,y,tool as DrawTile);
+      if (update===editHistory) return;
+      setEditHistory(update);
+      setBoards(update.current.boards.map(board => [...board]));
+    } catch {
+      setStatus('Native game board edit exceeds canvas bounds.');
+      return;
     }
-    const copy = selected[y].split('');
-    copy[x] = before === tool && tool !== '@' ? '.' : tool;
-    selected[y] = copy.join('');
-    setBoards(next);
     setValidated(null);
     setPlay(null);
     setDemoCursor(-1);
     setStatus('');
+    onApprovedLevels(null);
+  };
+
+  const rewindBoard = (redo: boolean) => {
+    if (!editHistory || busy || validating || play) return;
+    const updated=redo?redoPuzzleEdit(editHistory):undoPuzzleEdit(editHistory);
+    if (updated===editHistory) return;
+    setEditHistory(updated);
+    setBoards(updated.current.boards.map(board => [...board]));
+    setCurrent(updated.current.stage);
+    setValidated(null);
+    setDemoCursor(-1);
+    setStatus('Board paint history changed. Validate the campaign before native export.');
     onApprovedLevels(null);
   };
 
@@ -236,6 +256,7 @@ export default function DragonOriginalPuzzleEditor({
       }
       const rows = (parsed.levels as string[][]).map(grid => [...grid]);
       setBoards(rows);
+      setEditHistory(initializePuzzleHistory(rows));
       setPlay(null);
       setDemoCursor(-1);
       setValidated(null);
@@ -384,6 +405,27 @@ export default function DragonOriginalPuzzleEditor({
           </TouchableOpacity>
         ))}
       </ScrollView>
+      <View style={styles.fileActions}>
+        <TouchableOpacity accessibilityRole="button"
+          accessibilityLabel="Undo original game board paint"
+          disabled={!editHistory || !canUndoPuzzle(editHistory) || busy || validating || !!play}
+          onPress={() => rewindBoard(false)}
+          style={[styles.fileButton, (!editHistory || !canUndoPuzzle(editHistory) ||
+            busy || validating || !!play) && styles.disabled]}>
+          <Text style={styles.actionText}>↶ Undo painting</Text>
+        </TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button"
+          accessibilityLabel="Redo original game board paint"
+          disabled={!editHistory || !canRedoPuzzle(editHistory) || busy || validating || !!play}
+          onPress={() => rewindBoard(true)}
+          style={[styles.fileButton, (!editHistory || !canRedoPuzzle(editHistory) ||
+            busy || validating || !!play) && styles.disabled]}>
+          <Text style={styles.actionText}>↷ Redo painting</Text>
+        </TouchableOpacity>
+        {editHistory && <Text style={styles.help}>
+          {editHistory.previous.length} undo steps · {editHistory.next.length} redo steps
+        </Text>}
+      </View>
       {busy && <ActivityIndicator color="#8fd2b2" />}
       <View style={styles.board}>
         {active.map((line, y) => (
