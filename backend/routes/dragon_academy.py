@@ -22,6 +22,8 @@ from pydantic import BaseModel, Field
 
 from routes.gameforge_auth import get_current_user
 from skeleton.ai.game_builder.dragon_review_store import DragonReviewStore
+from skeleton.ai.game_builder.reviewed_knowledge import ReviewedKnowledgeStore, KnowledgeError
+from skeleton.ai.game_builder.dragon_wisdom_pyramid import DragonWisdomPyramid
 from skeleton.ai.webcrawler.dragon_practice_lab import DragonPracticeLab
 from skeleton.ai.webcrawler.dragon_practice_cycles import DragonPracticeCycles
 from skeleton.ai.webcrawler.dragon_session_projection import DragonSessionProjection
@@ -126,6 +128,49 @@ def academy_status(owner: str = Depends(_principal)) -> dict:
 def academy_wisdom(owner: str = Depends(_principal)) -> dict:
     with _lab() as (lab,_):
         return {"ok": True, "snapshot": _wisdom_snapshot(lab.db, owner)}
+
+@contextmanager
+def _wisdom_library() -> Iterator[ReviewedKnowledgeStore]:
+    # The reviewed source ledger is separately configured and authoritative.
+    # Never silently create an empty substitute knowledgebase on a GET request.
+    raw = os.environ.get("SKL_DRAGON_KNOWLEDGE_DB_PATH", "").strip()
+    if not raw:
+        raise HTTPException(status_code=503, detail="Dragon knowledge library not configured")
+    path = Path(raw).expanduser()
+    if not path.is_absolute() or not path.is_file():
+        raise HTTPException(status_code=503, detail="Dragon knowledge library unavailable")
+    try:
+        with ReviewedKnowledgeStore(path) as library:
+            yield library
+    except (sqlite3.DatabaseError, KnowledgeError, ValueError, TypeError):
+        raise HTTPException(status_code=409, detail="Dragon knowledge verification unavailable") from None
+
+
+@router.get("/knowledge/hoag")
+def knowledge_hoag(
+    response: Response, owner: str = Depends(_principal),
+) -> dict:
+    # Render only currently valid, independently reviewed and human-approved
+    # advisory claims. No source text or raw transcript is returned.
+    response.headers["Cache-Control"] = "private, no-store"
+    with _wisdom_library() as library:
+        return {"ok": True, **DragonWisdomPyramid(library).hoag_view(
+            owner, now=int(time.time()), authorized=True,
+        )}
+
+
+@router.get("/knowledge/recrawls")
+def knowledge_recrawls(
+    response: Response, owner: str = Depends(_principal),
+) -> dict:
+    # Intents only. Browser has no research dispatch, approval or mint routes.
+    response.headers["Cache-Control"] = "private, no-store"
+    with _wisdom_library() as library:
+        orders = DragonWisdomPyramid(library).recrawl_queue(
+            owner, now=int(time.time()), authorized=True, limit=32,
+        )
+        return {"ok": True, "orders": orders, "execution_authorized": False}
+
 
 @router.get("/crawler/feed")
 def crawler_feed(
