@@ -53,6 +53,8 @@ def parse_design(data:object)->GameDesign:
     hero=_text("hero",r"[a-z_]{2,32}",32)
     theme=_text("quest_theme",r"[a-z_]{2,32}",32)
     notes=_text("project_notes",r"[A-Za-z0-9 .,!?_:;'()/+-]{0,200}",200)
+    if re.search(r"(?:^|;)\s*(?:rm|curl|wget|bash|sh|powershell|cmd|python|node)(?:\s|$)", notes, re.IGNORECASE):
+        raise ValueError("project notes contain command-shaped instructions")
     for k,low,high in (("stages",1,8),("candidates",1,24),
                        ("seed",0,2**32-1),("difficulty",1,10)):
         val=data[k]
