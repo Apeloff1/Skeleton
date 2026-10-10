@@ -510,10 +510,9 @@ def render_native_project(*,title:str,target_id:str,style:str,
         isinstance(m,Mechanic) for m in mechanics):
         raise ValueError("invalid mechanic inventory")
     if design is not None:
-        from .dragon_game_design import GameDesign
-        if not isinstance(design,GameDesign) or (
-            design.target!=target_id or design.genre!=style or design.title!=title
-        ):
+        from .dragon_game_design import verify_design
+        verify_design(design)
+        if design.target!=target_id or design.genre!=style or design.title!=title:
             raise ValueError("game design must match title, target and genre")
     # Research titles never become executable source or build script literals.
     clean=" ".join(re.findall("[A-Za-z0-9]+",title)[:8])[:42] or "Dragon Native"
