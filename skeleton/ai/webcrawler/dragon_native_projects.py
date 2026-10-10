@@ -767,7 +767,8 @@ def render_native_project(*,title:str,target_id:str,style:str,
                   else "game_boy_scrolling_platformer" if target_id=="game_boy" and style=="side_scrolling_platformer"
                   else "original_collectible_chase"
               ),"campaign_stages": (
-                  (design.stages if design is not None else 4)
+                  (1 if style=="world_route_adventure" else
+                   design.stages if design is not None else 4)
                   if target_id in ("pc_linux","pc_windows","pc_macos","steam_deck")
                   else 1
               )}
