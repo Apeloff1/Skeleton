@@ -430,9 +430,14 @@ def render_playable_world(
     )
 
 
-def write_playable_html(bundle: PlayableHTML, path: str | Path, *, authorized: bool) -> Path:
-    if not authorized:
+def write_playable_html(
+    bundle: PlayableHTML, path: str | Path, *,
+    authorized: bool, overwrite: bool = True,
+) -> Path:
+    if authorized is not True:
         raise PermissionError("file export requires authorization")
+    if type(overwrite) is not bool:
+        raise PlayableExportError("export overwrite policy must be boolean")
     if not isinstance(bundle, PlayableHTML):
         raise PlayableExportError("typed PlayableHTML required")
     target = Path(path)
@@ -454,7 +459,13 @@ def write_playable_html(bundle: PlayableHTML, path: str | Path, *, authorized: b
             stream.write(bundle.html.encode("utf-8"))
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, target)
+        if overwrite:
+            os.replace(temporary, target)
+        else:
+            # Atomic no-clobber publish; a second process cannot replace an
+            # existing game between a path precheck and final publication.
+            os.link(temporary, target)
+            os.unlink(temporary)
         if os.name == "posix":
             dirfd = os.open(str(target.parent), os.O_RDONLY)
             try:
