@@ -7,6 +7,7 @@ on:
       - 'scripts/game_builder/native_nes_ci.py'
       - 'scripts/game_builder/nes_reproducibility_ci.py'
       - 'scripts/game_builder/nes_6502_boot.py'
+      - 'scripts/game_builder/nes_6502_controller.py'
       - 'skeleton/testing/test_game_builder_nes_6502_boot.py'
       - 'skeleton/testing/test_game_builder_nes_reproducibility.py'
       - '.github/workflows/game-builder-native-nes.yml'
@@ -36,6 +37,7 @@ jobs:
             /scripts/game_builder/native_nes_ci.py
             /scripts/game_builder/nes_reproducibility_ci.py
             /scripts/game_builder/nes_6502_boot.py
+            /scripts/game_builder/nes_6502_controller.py
             /skeleton/testing/test_game_builder_nes_6502_boot.py
             /scripts/game_builder/sega_reproducibility_ci.py
             /skeleton/testing/test_game_builder_nes_reproducibility.py
@@ -109,7 +111,24 @@ jobs:
           assert boot["cycle_accurate_ppu_apu_verified"] is False
           assert boot["full_gameplay_playthrough_verified"] is False
           assert boot["publication_authorized"] is False
-          print("Compiled genuine native NES cartridge", result["sha256"])
+          PY
+          SOURCE_SHA="$(python -c 'import json; print(json.load(open("nes-source-evidence.json",encoding="utf-8"))["source_digest"])')"
+          python scripts/game_builder/nes_6502_controller.py \
+            --rom nes-world-src/build/skeleton-original.nes \
+            --source-dir nes-world-src \
+            --rom-sha256 "$FIRST_ROM_SHA" \
+            --source-sha256 "$SOURCE_SHA" \
+            --receipt-out nes-6502-original-first-move.json
+          python - <<'PY'
+          import json
+          move=json.load(open("nes-6502-original-first-move.json",encoding="utf-8"))
+          assert move["original_6502_input_executed"] is True
+          assert move["original_safe_first_move_matched"] is True
+          assert move["native_input_port_reads"] >= 8
+          assert move["native_sprite_dma_transfers"] >= 2
+          assert move["full_controller_route_replayed"] is False
+          assert move["cycle_accurate_ppu_apu_verified"] is False
+          assert move["legal_distribution_authorized"] is False          print("Compiled genuine native NES cartridge", result["sha256"])
           PY
       - name: Save ROM with provenance and reproducible build source
         uses: actions/upload-artifact@v4
@@ -123,5 +142,6 @@ jobs:
             nes-second-source-evidence.json
             nes-independent-rebuild-proof.json
             nes-6502-observed-boot.json
+            nes-6502-original-first-move.json
           if-no-files-found: error
           retention-days: 7
