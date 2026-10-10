@@ -598,3 +598,23 @@ def test_level_dossier_separates_solvability_from_human_enjoyment():
     assert not dossier["human_enjoyment_verified"]
     assert not dossier["frustration_calibrated_with_players"]
 
+
+def test_level_evolution_replays_every_authorized_stage_without_self_promotion():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    goal = cycle_rank(p) + 1
+    result = evolve_challenge_level(
+        p, min_loops=goal, add_hazards=1, max_changes=3, authorized=True,
+    )
+    assert result == evolve_challenge_level(
+        p, min_loops=goal, add_hazards=1, max_changes=3, authorized=True,
+    )
+    assert len(result.edits) == 2
+    assert cycle_rank(result.result) >= goal
+    assert len(result.result.hazards) == len(p.hazards) + 1
+    assert result.dossier["structural_multiple_paths_verified"]
+    assert not result.dossier["human_enjoyment_verified"]
+    assert result.status == "design_validated_player_qualification_pending"
+    assert verify_route_proof(result.result, solve_route(result.result))
+    with pytest.raises(PermissionError):
+        evolve_challenge_level(p, min_loops=goal, authorized=False)
+
