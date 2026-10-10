@@ -35,7 +35,9 @@ int main(void) {
     unsigned int demo_index;
 #endif
     if (setjmp(host_boot_return)==0) skeleton_sega_native_entry();
-    if (!host_display_enabled || host_palette_writes!=8) abort();
+    /* Eight original boot palette writes + two stage-zero CRAM accent
+     * writes; real game stages may add further authenticated palette I/O. */
+    if (!host_display_enabled || host_palette_writes!=10) abort();
     emit_state();
 #ifdef SKELETON_NATIVE_DEMO_REPLAY
     /* Read the physically emitted on-cartridge solution tables. No Python
