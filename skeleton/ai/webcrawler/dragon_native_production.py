@@ -28,6 +28,83 @@ from .dragon_native_targets import CATALOG, STYLES, target_catalog
 SCHEMA = "skeleton.ai.dragon.native_production.v1"
 RELEASE_SCHEMA = "skeleton.ai.dragon.native_source_release.v1"
 INDEX_SCHEMA = "skeleton.ai.dragon.native_production_index.v1"
+
+
+@dataclass(frozen=True)
+class PortableGameDesign:
+    """User-chosen original gameplay parameters independent of target hardware."""
+    palette: str = "vga_dusk"
+    hero: str = "hatchling"
+    quest_theme: str = "ancient_ruins"
+    difficulty: int = 4
+    stages: int = 4
+    candidates: int = 8
+    project_notes: str = "Original native homebrew; platform-scaled design"
+
+    def validate(self) -> None:
+        from .dragon_game_design import PALETTES, HEROES, THEMES
+        if self.palette not in PALETTES or self.hero not in HEROES or self.quest_theme not in THEMES:
+            raise ValueError("portable palette, hero or theme is not supported")
+        for name, lower, upper in (("difficulty", 1, 10),
+                                   ("stages", 1, 8), ("candidates", 1, 24)):
+            number = getattr(self, name)
+            if type(number) is not int or not lower <= number <= upper:
+                raise ValueError("invalid portable game design control: " + name)
+        if (not isinstance(self.project_notes, str) or
+                len(self.project_notes) > 200 or
+                not re.fullmatch(r"[A-Za-z0-9 .,!?_:;'()/+\-]*", self.project_notes)):
+            raise ValueError("untrusted portable design notes")
+
+
+def _adapt_portable_design(request: "ProductionRequest", target_id: str):
+    """Compile user intent into a canonical typed GameDesign per platform.
+
+    Cartridge templates are presently fixed collectible games. Their style,
+    mechanics, difficulty, hero and theme are *not* fully parametric; a
+    translation report discloses that fact rather than pretending equivalence.
+    """
+    from .dragon_game_design import parse_design
+    profile = request.portable_design
+    if profile is None:
+        return None, None
+    profile.validate()
+    desktop = target_id in ("pc_linux", "pc_windows", "pc_macos", "steam_deck")
+    palette = profile.palette if desktop or profile.palette in (
+        "dmg_green", "handheld", "vga_dusk"
+    ) else "handheld"
+    values = {
+        "schema": "skeleton.ai.dragon.game_design.v1",
+        "title": request.title, "target": target_id, "genre": request.style,
+        "palette": palette,
+        "stages": profile.stages if desktop else 1,
+        "candidates": profile.candidates if desktop else 1,
+        "seed": request.seed, "difficulty": profile.difficulty,
+        "hero": profile.hero, "quest_theme": profile.quest_theme,
+        "project_notes": profile.project_notes,
+    }
+    actual = parse_design(values)
+    adjustments = []
+    if not desktop and profile.stages != 1:
+        adjustments.append("multi_stage_campaign_reduced_to_one_stage")
+    if not desktop and profile.candidates != 1:
+        adjustments.append("search_budget_reduced_to_one_candidate")
+    if palette != profile.palette:
+        adjustments.append("palette_adapted_to_cartridge_safe_class")
+    if not desktop:
+        adjustments.append("hero_theme_and_difficulty_not_runtime_applied_by_cartridge_emitter")
+    return actual, {
+        "schema": "skeleton.ai.dragon.portable_game_port.v1",
+        "portable_profile": asdict(profile),
+        "portable_profile_digest": digest(asdict(profile)),
+        "target": target_id,
+        "target_design_digest": actual.digest,
+        "target_palette": actual.palette,
+        "target_stages": actual.stages,
+        "target_candidates": actual.candidates,
+        "port_adjustments": adjustments,
+        "claims": "platform-specific native source; no equivalent-port or gameplay certification",
+    }
+
 RIGHTS_BASES = frozenset({"original_homebrew", "verified_public_domain", "documented_license"})
 COMPILABLE = frozenset({"game_boy", "game_boy_color", "nes"})
 MAX_TARGETS = 16
@@ -60,6 +137,7 @@ class ProductionRequest:
     compile_roms: bool = False
     require_compiled: bool = False
     max_portfolio_bytes: int = MAX_PORTFOLIO_BYTES
+    portable_design: PortableGameDesign | None = None
 
     def validate(self) -> None:
         if not isinstance(self.title, str) or not 2 <= len(self.title.strip()) <= 80:
@@ -91,6 +169,12 @@ class ProductionRequest:
             raise ValueError("required native build needs compile_roms")
         if type(self.max_portfolio_bytes) is not int or not 1_024 <= self.max_portfolio_bytes <= MAX_PORTFOLIO_BYTES:
             raise ValueError("invalid bounded portfolio budget")
+        if self.portable_design is not None:
+            if not isinstance(self.portable_design, PortableGameDesign):
+                raise ValueError("typed portable design required")
+            self.portable_design.validate()
+            if not re.fullmatch(r"[A-Za-z][A-Za-z0-9 ._'!\-]{2,79}", self.title):
+                raise ValueError("portable game designs need a bounded native-compatible title")
 
     @property
     def request_id(self) -> str:
@@ -101,6 +185,7 @@ class ProductionRequest:
             "rights_basis": self.rights_basis, "rights_reference": self.rights_reference,
             "attested": True, "compile_roms": self.compile_roms,
             "require_compiled": self.require_compiled,
+            "portable_design": asdict(self.portable_design) if self.portable_design else None,
         })
 
 
@@ -131,6 +216,7 @@ class ArtifactReceipt:
     hardware_budget_state: str
     evidence: str
     compiler_state: str
+    port_profile_digest: str | None = None
 
 
 @dataclass(frozen=True)
@@ -269,6 +355,7 @@ def validate_native_source(project: NativeProject) -> dict[str, str]:
 
 def _render(request: ProductionRequest, target_id: str) -> NativeProject:
     identity = digest([request.request_id, target_id, request.style, request.seed])
+    adapted_design, _ = _adapt_portable_design(request, target_id)
     return render_native_project(
         title=request.title,
         target_id=target_id,
@@ -276,6 +363,7 @@ def _render(request: ProductionRequest, target_id: str) -> NativeProject:
         candidate_id=identity,
         mechanics=(Mechanic.MOVEMENT, Mechanic.EXPLORATION),
         authorized=True,
+        design=adapted_design,
     )
 
 
@@ -316,6 +404,16 @@ def make_source_release(
     if project.target_id not in request.targets or project.style != request.style:
         raise ValueError("native project does not match approved production request")
     hashes = validate_native_source(project)
+    adapted_design, port_plan = _adapt_portable_design(request, project.target_id)
+    if port_plan is not None:
+        if adapted_design is None:
+            raise ValueError("missing typed target design")
+        if "dragon-game-design.json" in project.files:
+            documented_design = json.loads(project.files["dragon-game-design.json"])
+            if documented_design.get("digest") != adapted_design.digest:
+                raise ValueError("native project design does not match portable plan")
+        elif project.target_id in ("pc_linux", "pc_windows", "pc_macos", "steam_deck"):
+            raise ValueError("desktop native generator discarded the approved game design")
     if binary is not None:
         if not request.compile_roms or project.target_id not in COMPILABLE or compiler_state != "compiled_native":
             raise ValueError("binary may be admitted only from verified compiler")
@@ -337,6 +435,8 @@ def make_source_release(
         "source_files": hashes,
         "source_count": len(hashes),
         "source_bytes": source_total,
+        "port_plan": port_plan,
+        "port_profile_digest": port_plan["portable_profile_digest"] if port_plan else None,
         "gameplay_mode": json.loads(project.files["dragon-native-manifest.json"])["runtime_gameplay_mode"],
         "campaign_stages": json.loads(project.files["dragon-native-manifest.json"])["campaign_stages"],
         "hardware_budget_state": "source_budget_checked_only",
@@ -372,6 +472,7 @@ def make_source_release(
         campaign_stages=receipt["campaign_stages"],
         hardware_budget_state=receipt["hardware_budget_state"],
         evidence=evidence, compiler_state=compiler_state,
+        port_profile_digest=receipt["port_profile_digest"],
     )
 
 
@@ -435,6 +536,46 @@ def verify_source_release(payload: bytes) -> dict:
             supported_mechanics=(), deferred_mechanics=(),
         )
         validate_native_source(reconstructed)
+        port_plan = receipt.get("port_plan")
+        if port_plan is not None:
+            if not isinstance(port_plan, dict):
+                raise ValueError("portable port plan must be structured")
+            try:
+                profile = PortableGameDesign(**port_plan["portable_profile"])
+                profile.validate()
+                reconstruction = ProductionRequest(
+                    title=native.get("title", "Original port"),
+                    style=receipt["style"], targets=(receipt["target"],),
+                    original_work_attested=True,
+                    seed=port_plan["portable_profile"].get("seed", 1),
+                    portable_design=profile,
+                )
+                # The original production title/seed are identity-bound only
+                # through the output metadata when a per-target design is used.
+                from .dragon_game_design import parse_design
+                if "dragon-game-design.json" in recovered_sources:
+                    embedded = json.loads(recovered_sources["dragon-game-design.json"])
+                    parsed = parse_design({k: embedded[k] for k in (
+                        "schema", "title", "target", "genre", "palette",
+                        "stages", "candidates", "seed", "difficulty", "hero",
+                        "quest_theme", "project_notes"
+                    )})
+                    if parsed.digest != embedded["digest"] or parsed.digest != port_plan["target_design_digest"]:
+                        raise ValueError("portable embedded design disagrees with release")
+                if port_plan.get("portable_profile_digest") != digest(asdict(profile)):
+                    raise ValueError("portable profile digest invalid")
+                if port_plan.get("target") != receipt["target"]:
+                    raise ValueError("ported target disagrees with verified release")
+                if port_plan.get("claims") != (
+                    "platform-specific native source; no equivalent-port or gameplay certification"
+                ):
+                    raise ValueError("unsafe port certification claim")
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ValueError("portable game port evidence cannot be replayed") from exc
+            if receipt.get("port_profile_digest") != port_plan["portable_profile_digest"]:
+                raise ValueError("portable profile receipt mismatch")
+        elif receipt.get("port_profile_digest") is not None:
+            raise ValueError("portable profile claimed without translated evidence")
         if receipt.get("target") not in CATALOG or receipt.get("style") not in STYLES:
             raise ValueError("unknown packaged target/style")
         binary_name = receipt.get("binary_member")
@@ -549,7 +690,7 @@ def _assert_index_consistency(index: dict, verified: list[tuple[dict, dict, int]
         for field in (
             "target", "source_fingerprint", "source_count", "source_bytes",
             "binary_sha256", "gameplay_mode", "campaign_stages",
-            "hardware_budget_state", "evidence", "compiler_state",
+            "hardware_budget_state", "evidence", "compiler_state", "port_profile_digest",
         ):
             if entry.get(field) != receipt.get(field):
                 raise ValueError("portfolio entry and verified release disagree on " + field)
@@ -791,7 +932,8 @@ def verify_published_production(destination: Path, index_name: str) -> dict:
                 receipt["gameplay_mode"] != item["gameplay_mode"] or
                 receipt["campaign_stages"] != item["campaign_stages"] or
                 receipt["hardware_budget_state"] != item["hardware_budget_state"] or
-                receipt["binary_sha256"] != item["binary_sha256"]):
+                receipt["binary_sha256"] != item["binary_sha256"] or
+                receipt["port_profile_digest"] != item.get("port_profile_digest")):
             raise ValueError("portfolio index and archive receipts disagree")
         targets.add(target)
         hashes.append(item["archive_sha256"])
