@@ -171,3 +171,80 @@ def test_release_bytes_cannot_claim_strong_executable_structure_validation(tmp_p
         replace(result,exhaustive_payload_inventory_verified=False)
     with pytest.raises(NativeIntakeError):
         replace(result,byte_verified_files=("compiled_binary",))
+
+
+
+def test_large_native_binary_hashed_in_fixed_memory_budget(tmp_path,monkeypatch):
+    from skeleton.ai.game_builder.native_release_intake import _fingerprint_binary
+    from hashlib import sha256
+    payload = b"MZ" + b"original homebrew machine code"*320000
+    path=tmp_path/"native-game.exe"
+    path.write_bytes(payload)
+    native_reads=[]
+    original_read=os.read
+
+    def budget_read(fd,maximum):
+        native_reads.append(maximum)
+        return original_read(fd,maximum)
+
+    monkeypatch.setattr(os,"read",budget_read)
+    digest,length,header=_fingerprint_binary(path)
+    assert digest == sha256(payload).hexdigest()
+    assert length == len(payload)
+    assert header.startswith(b"MZ")
+    assert len(header) <= 64
+    assert len(native_reads)>3
+    assert max(native_reads) <= 256*1024
+
+
+def test_large_sparse_executable_file_refused_before_loading_into_memory(tmp_path):
+    from skeleton.ai.game_builder.native_release_intake import _fingerprint_binary, _MAX_BINARY
+    path=tmp_path/"oversize.exe"
+    with path.open("wb") as out:
+        out.truncate(_MAX_BINARY + 1)
+    with pytest.raises(NativeIntakeError,match="bounded"):
+        _fingerprint_binary(path)
+
+
+def test_binary_streamed_inode_changed_during_hash_is_rejected(tmp_path,monkeypatch):
+    from skeleton.ai.game_builder.native_release_intake import _fingerprint_binary
+    path=tmp_path/"old-game.exe"
+    path.write_bytes(b"MZ"+b"x"*(1024*1024))
+    initial_read=os.read
+    changed=[False]
+
+    def race(fd,length):
+        data=initial_read(fd,length)
+        if not changed[0]:
+            changed[0]=True
+            old=path.stat()
+            os.utime(path,ns=(old.st_atime_ns,old.st_mtime_ns+5_000_000_000))
+        return data
+
+    monkeypatch.setattr(os,"read",race)
+    with pytest.raises(NativeIntakeError,match="changed while hashing"):
+        _fingerprint_binary(path)
+    assert changed[0]
+
+
+@pytest.mark.parametrize("file_kind",["linked","symlink","fifo","directory"])
+def test_unusual_native_binary_inode_rejected_by_streamed_file_reader(tmp_path,file_kind):
+    from skeleton.ai.game_builder.native_release_intake import _fingerprint_binary
+    path=tmp_path/"executable.exe"
+    data=b"MZ"+b"x"*1024
+    if file_kind=="fifo" and not hasattr(os,"mkfifo"):
+        pytest.skip("mkfifo unavailable")
+    if file_kind=="directory":
+        path.mkdir()
+    elif file_kind=="fifo":
+        os.mkfifo(path)
+    elif file_kind=="linked":
+        original=tmp_path/"original.exe"
+        original.write_bytes(data)
+        os.link(original,path)
+    else:
+        target=tmp_path/"target.exe"
+        target.write_bytes(data)
+        path.symlink_to(target)
+    with pytest.raises(NativeIntakeError):
+        _fingerprint_binary(path)
