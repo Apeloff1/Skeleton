@@ -15,7 +15,6 @@ remain independent gates. No ROMs, BIOS, SDKs or firmware are downloaded.
 from __future__ import annotations
 
 import argparse
-from hashlib import sha256
 import json
 from pathlib import Path
 from typing import Any
@@ -25,9 +24,8 @@ from .evolution_practice import practice_evolution_games
 from .evolution_native_sources import compile_evolution_native_sources, export_evolution_native_sources
 from .playable_world import GameBuildIntent, generate_playable_world
 from .port_planner import HomebrewSource
+from .rights_evidence import read_rights_evidence
 from .platform_registry import default_registry
-
-_MAX_RIGHTS_BYTES = 8 * 1024 * 1024
 
 
 def build_native_evolution(
@@ -46,18 +44,10 @@ def build_native_evolution(
     registry = default_registry()
     if basis not in registry.profiles or destination not in registry.profiles:
         raise ValueError("both historical systems must belong to validated catalogue")
-    evidence_path = Path(rights_evidence)
-    if evidence_path.is_symlink() or not evidence_path.is_file():
-        raise ValueError("authorship evidence must be a local ordinary file")
-    if not 0 < evidence_path.stat().st_size <= _MAX_RIGHTS_BYTES:
-        raise ValueError("authorship evidence missing or too large")
-    hasher = sha256()
-    with evidence_path.open("rb") as stream:
-        while blob := stream.read(1024 * 1024):
-            hasher.update(blob)
+    evidence = read_rights_evidence(rights_evidence).document_sha256
     source = HomebrewSource(
         project_id=project_id, platform_id=basis,
-        rights_basis="project_owned", evidence_sha256=hasher.hexdigest(),
+        rights_basis="project_owned", evidence_sha256=evidence,
         creative_identity=creative_identity,
     )
     world = generate_playable_world(GameBuildIntent(
