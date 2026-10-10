@@ -1128,6 +1128,36 @@ def native_world_codex_access_proof(
             detail="Original optional game-world gate is not implemented") from None
 
 
+class NativeCodexTileRequest(NativeCodexWorldRequest):
+    target:str=Field(default="game_boy",
+        pattern=r"^[a-z0-9_]{2,48}$")
+
+
+@router.post("/native/production/worlds/codex/tiles")
+def native_world_codex_tiles(
+    body:NativeCodexTileRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from dataclasses import asdict
+    from skeleton.ai.webcrawler.dragon_world_codex import unrank
+    from skeleton.ai.webcrawler.dragon_codex_tiles import (
+        tile_pack,verify_tile_pack,
+    )
+    try:
+        source=unrank(body.index)
+        art=tile_pack(source,body.target)
+        verified=verify_tile_pack(source,art)
+        return {
+            "ok":True,"source":asdict(art),
+            "independent_format_verification":verified,
+            "visual_claim":"actual original 8x8 tile pixels and native "
+                "GB/NES/SNES bitplanes where supported; not a compiled ROM",
+        }
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original source world or native graphics format unsupported") from None
+
+
 class NativeGenomicWorldRequest(BaseModel):
     """Arbitrary-precision design address is a DECIMAL STRING, never a float."""
     model_config=ConfigDict(extra="forbid")
