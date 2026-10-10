@@ -13,8 +13,18 @@ import {
   walkPreview,
   runAppForge,
   engineRun,
+  sendAppCockpit,
   type SealHeaders,
 } from './client';
+import {
+  asCommandEnvelope,
+  explainCommandResult,
+  extractSnapshot,
+  formatSnapshotChanges,
+  snapshotDiff,
+  type HistoryEntry,
+} from './cockpitSummary';
+import { BASE_CATALOG, mergeCatalog, parseCommand } from './commands';
 import { operatorErrorFromException, type OperatorError } from './errors';
 import type {
   Beat,
@@ -27,6 +37,7 @@ import type {
   PlaytestMode,
   RepairMode,
   WalkPreview,
+  CockpitSnapshot,
 } from './types';
 import type { RunPayload, RunRequest } from '../skeletonForge/types';
 
@@ -366,4 +377,151 @@ export function useOperatorWalk() {
 
   React.useEffect(() => () => ctrlRef.current?.abort(), []);
   return { preview, loading, error, run };
+}
+
+export function useOperatorCockpit(eraIds?: string[], maxHistory = 40) {
+  const [snapshot, setSnapshot] = React.useState<CockpitSnapshot | null>(null);
+  const [entries, setEntries] = React.useState<HistoryEntry[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const seq = React.useRef(0);
+  const ctrlRef = React.useRef<AbortController | null>(null);
+  const snapRef = React.useRef<CockpitSnapshot | null>(null);
+  React.useEffect(() => {
+    snapRef.current = snapshot;
+  }, [snapshot]);
+
+  const catalog = React.useMemo(
+    () => (eraIds?.length ? mergeCatalog(BASE_CATALOG, { eras: eraIds }) : BASE_CATALOG),
+    [eraIds],
+  );
+
+  const pushEntry = React.useCallback(
+    (entry: HistoryEntry) => {
+      setEntries((log) => [entry, ...log].slice(0, maxHistory));
+    },
+    [maxHistory],
+  );
+
+  const fetchSnapshot = React.useCallback(async (signal: AbortSignal): Promise<CockpitSnapshot | null> => {
+    const r = await sendAppCockpit('SNAPSHOT', { signal });
+    if (signal.aborted) return null;
+    if (r.ok && r.data) {
+      const snap = extractSnapshot(r.data);
+      if (snap) {
+        setSnapshot(snap);
+        setError(null);
+        return snap;
+      }
+      setError('SNAPSHOT returned an unexpected shape.');
+      return null;
+    }
+    const op = operatorErrorFromApi(r, { sealed: false });
+    setError(errMessage(op) ?? `HTTP ${r.status}`);
+    return null;
+  }, []);
+
+  const refresh = React.useCallback(async () => {
+    ctrlRef.current?.abort();
+    const ctrl = new AbortController();
+    ctrlRef.current = ctrl;
+    setLoading(true);
+    try {
+      await fetchSnapshot(ctrl.signal);
+    } catch (e) {
+      if (ctrl.signal.aborted) return;
+      setError(errMessage(operatorErrorFromException(e)));
+    } finally {
+      if (!ctrl.signal.aborted) setLoading(false);
+    }
+  }, [fetchSnapshot]);
+
+  const submit = React.useCallback(
+    async (raw: string) => {
+      const parsed = parseCommand(raw, catalog);
+      if (!parsed.sendable || !parsed.canonical) {
+        const msg = parsed.diagnostics.find((d) => d.severity === 'error')?.message ?? 'Command is not sendable.';
+        setError(msg);
+        return null;
+      }
+      ctrlRef.current?.abort();
+      const ctrl = new AbortController();
+      ctrlRef.current = ctrl;
+      const id = ++seq.current;
+      const before = snapRef.current;
+      setBusy(true);
+      setError(null);
+      try {
+        const r = await sendAppCockpit(parsed.canonical, { signal: ctrl.signal });
+        if (ctrl.signal.aborted) return null;
+        if (!(r.ok && r.data)) {
+          const op = operatorErrorFromApi(r, { sealed: false });
+          const summary = errMessage(op) ?? `HTTP ${r.status}`;
+          const entry: HistoryEntry = {
+            id,
+            command: parsed.canonical,
+            ok: false,
+            summary,
+            changes: [],
+            at: Date.now(),
+          };
+          pushEntry(entry);
+          setError(summary);
+          setBusy(false);
+          return entry;
+        }
+        const envelope = asCommandEnvelope(r.data, parsed.spec?.verb ?? '');
+        let after = extractSnapshot(r.data);
+        const inspect = parsed.spec?.id === 'snapshot' || parsed.spec?.id === 'status';
+        if (!after && !inspect) {
+          after = await fetchSnapshot(ctrl.signal);
+        } else if (after) {
+          setSnapshot(after);
+        }
+        if (ctrl.signal.aborted) return null;
+        const changes = formatSnapshotChanges(snapshotDiff(before, after ?? snapRef.current));
+        const summary = explainCommandResult(envelope, parsed.spec, parsed.canonical);
+        const entry: HistoryEntry = {
+          id,
+          command: parsed.canonical,
+          ok: true,
+          summary,
+          changes,
+          at: Date.now(),
+        };
+        pushEntry(entry);
+        setBusy(false);
+        return entry;
+      } catch (e) {
+        if (ctrl.signal.aborted) return null;
+        const op = operatorErrorFromException(e);
+        const summary = errMessage(op) ?? 'unexpected error';
+        const entry: HistoryEntry = {
+          id,
+          command: parsed.canonical,
+          ok: false,
+          summary,
+          changes: [],
+          at: Date.now(),
+        };
+        pushEntry(entry);
+        setError(summary);
+        setBusy(false);
+        return entry;
+      }
+    },
+    [catalog, fetchSnapshot, pushEntry],
+  );
+
+  const clear = React.useCallback(() => setEntries([]), []);
+
+  React.useEffect(() => {
+    void refresh();
+    return () => ctrlRef.current?.abort();
+    // Load once on mount; era catalogue changes do not auto-refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return { snapshot, entries, loading, busy, error, refresh, submit, clear };
 }

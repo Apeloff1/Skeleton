@@ -1,10 +1,10 @@
 /**
  * Live forge-operator screen: wires catalog, compose, app/engine run, plan,
- * walk, report and recovery into OperatorView.
+ * walk, cockpit, report and recovery into OperatorView.
  */
 import React from 'react';
 import type { MaterialiseTarget, PlaytestMode, RepairMode } from '../types';
-import { useOperatorCatalog, useOperatorCompose, useOperatorPlan, useOperatorRun, useOperatorWalk, useNow } from '../hooks';
+import { useOperatorCatalog, useOperatorCockpit, useOperatorCompose, useOperatorPlan, useOperatorRun, useOperatorWalk, useNow } from '../hooks';
 import { type OperatorTab } from '../operatorTabs';
 import OperatorView from './OperatorView';
 
@@ -28,6 +28,8 @@ export default function OperatorScreen({ initialTab = null }: OperatorScreenProp
   const run = useOperatorRun();
   const plan = useOperatorPlan();
   const walk = useOperatorWalk();
+  const eraIds = React.useMemo(() => catalog.eras.map((e) => e.id), [catalog.eras]);
+  const cockpit = useOperatorCockpit(eraIds);
   const now = useNow(run.phase === 'running');
 
   React.useEffect(() => {
@@ -133,6 +135,17 @@ export default function OperatorScreen({ initialTab = null }: OperatorScreenProp
           if (pinned) setEra(pinned);
           setTab('compose');
         },
+      }}
+      cockpit={{
+        snapshot: cockpit.snapshot,
+        entries: cockpit.entries,
+        loading: cockpit.loading,
+        busy: cockpit.busy,
+        error: cockpit.error,
+        eraIds,
+        onRefresh: () => void cockpit.refresh(),
+        onSubmit: (cmd) => void cockpit.submit(cmd),
+        onClearHistory: cockpit.clear,
       }}
       report={{
         payload: run.enginePayload,

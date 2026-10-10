@@ -13,6 +13,7 @@ import {
   type OperatorTab,
 } from '../operatorTabs';
 import BeatsPanel, { type BeatsPanelProps } from './BeatsPanel';
+import CockpitPanel, { type CockpitPanelProps } from './CockpitPanel';
 import ComposeRunPanel, { type ComposeRunPanelProps } from './ComposeRunPanel';
 import ErasPanel, { type ErasPanelProps } from './ErasPanel';
 import PlansPanel, { type PlansPanelProps } from './PlansPanel';
@@ -28,6 +29,7 @@ export interface OperatorViewProps {
   walk: WalkPanelProps;
   eras: ErasPanelProps;
   beats: BeatsPanelProps;
+  cockpit: CockpitPanelProps;
   report: RunReportPanelProps;
   recovery: RecoveryPanelProps;
   notice?: string | null;
@@ -80,6 +82,7 @@ export default function OperatorView(props: OperatorViewProps) {
         {tab === 'walk' ? <WalkPanel {...props.walk} /> : null}
         {tab === 'eras' ? <ErasPanel {...props.eras} /> : null}
         {tab === 'beats' ? <BeatsPanel {...props.beats} /> : null}
+        {tab === 'cockpit' ? <CockpitPanel {...props.cockpit} /> : null}
         {tab === 'report' ? <RunReportPanel {...props.report} /> : null}
         {tab === 'recovery' ? <RecoveryPanel {...props.recovery} /> : null}
       </ScrollView>

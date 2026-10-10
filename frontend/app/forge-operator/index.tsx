@@ -1,6 +1,6 @@
 /**
  * /forge-operator — Pack F forge operator hub.
- * Deep link a tab with ?tab=compose|plans|walk|eras|beats|report|recovery.
+ * Deep link a tab with ?tab=compose|plans|walk|eras|beats|cockpit|report|recovery.
  */
 import React from 'react';
 import { SafeAreaView, StyleSheet } from 'react-native';

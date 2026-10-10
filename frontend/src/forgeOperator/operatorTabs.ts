@@ -2,7 +2,7 @@
  * Forge-operator tab ids + deep-link parsing (?tab=compose|plans|…).
  * Mirrors skeletonForge/cockpitScreen tab helpers without coupling to that UI.
  */
-export const OPERATOR_TABS = ['compose', 'plans', 'walk', 'eras', 'beats', 'report', 'recovery'] as const;
+export const OPERATOR_TABS = ['compose', 'plans', 'walk', 'eras', 'beats', 'cockpit', 'report', 'recovery'] as const;
 export type OperatorTab = (typeof OPERATOR_TABS)[number];
 
 export const OPERATOR_TAB_LABELS: Record<OperatorTab, string> = {
@@ -11,6 +11,7 @@ export const OPERATOR_TAB_LABELS: Record<OperatorTab, string> = {
   walk: 'Walk',
   eras: 'Eras',
   beats: 'Beats',
+  cockpit: 'Cockpit',
   report: 'Run report',
   recovery: 'Recovery',
 };
@@ -21,6 +22,7 @@ export const OPERATOR_TAB_HINTS: Record<OperatorTab, string> = {
   walk: 'POST /api/skeleton/walk — extraction walkthrough preview',
   eras: 'GET /api/skeleton/eras — dialect pack catalogue',
   beats: 'GET /api/skeleton/beats — questionnaire beats',
+  cockpit: 'POST /api/skeleton/cockpit — live snapshot and command history',
   report: 'Seal · playtest · repair status from the last engine/app run',
   recovery: 'Cancel in-flight work, clear seal, and reset operator state',
 };
