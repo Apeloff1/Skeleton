@@ -203,9 +203,14 @@ class GameMechanicsMemory:
                 (owner,),
             ).fetchone()[0]
             existing = self.db.execute(
-                "SELECT 1 FROM dragon_game_sessions WHERE owner=? AND session_id=?",
+                "SELECT game_label, duration_ms, observations_json "
+                "FROM dragon_game_sessions WHERE owner=? AND session_id=?",
                 (owner, session.session_id),
             ).fetchone()
+            if existing is not None and existing != (
+                session.game_label, session.duration_ms, payload
+            ):
+                raise ValueError("existing observation evidence drift detected")
             if not existing and count >= self.policy.max_sessions_per_owner:
                 raise ValueError("session capacity exceeded")
             self.db.execute("""
