@@ -220,6 +220,34 @@ class Sega8BitSourceProject:
     emulator_playthrough_verified: bool = False
     physical_hardware_verified: bool = False
 
+    def __post_init__(self) -> None:
+        if self.target_platform_id not in _TARGETS:
+            raise Sega8BitNativeError("unrecognized original Z80 target")
+        if (self.cartridge_compiled is not False
+                or self.emulator_playthrough_verified is not False
+                or self.physical_hardware_verified is not False):
+            raise Sega8BitNativeError("native source cannot self-certify real machine execution")
+        digest = sha256((
+            self.game_c + "\\0" + self.makefile + "\\0" + self.manifest_json
+        ).encode("utf-8")).hexdigest()
+        if digest != self.content_digest:
+            raise Sega8BitNativeError("native source bytes changed after generation")
+        try:
+            manifest = json.loads(self.manifest_json)
+        except (ValueError, TypeError) as exc:
+            raise Sega8BitNativeError("invalid original game manifest") from exc
+        if (not isinstance(manifest, dict)
+                or manifest.get("schema") != "skeleton.game_builder.native_sega8_source.v1"
+                or manifest.get("platform") != self.target_platform_id
+                or not isinstance(manifest.get("world_digest"), str)):
+            raise Sega8BitNativeError("native game manifest identity mismatch")
+        if any(manifest.get(flag) is not False for flag in (
+            "binary_compiled", "emulator_playthrough_verified",
+            "physical_hardware_verified", "distribution_licensed",
+            "release_approved", "third_party_game_or_firmware_redistributed",
+        )):
+            raise Sega8BitNativeError("unreviewed cartridge cannot claim release or execution")
+
 
 def _tiles() -> str:
     """Original 2-bit graphics -> genuine four-plane SMS VDP tile bytes."""
