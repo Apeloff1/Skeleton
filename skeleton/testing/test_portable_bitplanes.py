@@ -36,3 +36,11 @@ def test_decode_nes_2bpp_roundtrip_and_cross_console_order():
     with pytest.raises(PortableCodecError):
         decode_nes_2bpp(bytearray(16))
 
+
+def test_encode_snes_4bpp_high_planes_in_second_bank():
+    row = (1, 2, 4, 8, 15, 0, 0, 0)
+    expected = bytes([0x88,0x48]*8+[0x28,0x18]*8)
+    assert encode_snes_4bpp((row,)*8) == expected
+    with pytest.raises(PortableCodecError):
+        encode_snes_4bpp(((16,)*8,)*8)
+
