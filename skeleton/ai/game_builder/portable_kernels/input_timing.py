@@ -55,3 +55,22 @@ def deadzone_axis(value: int, *, threshold: int=4096) -> int:
     normalized=min(32767,(magnitude-dead)*32767//(32767-dead))
     return normalized if sample>0 else -normalized
 
+
+def digital_hysteresis(samples: object, *, press: int=20000,
+                       release: int=14000) -> tuple[bool,...]:
+    """Schmitt-trigger analog button conversion without threshold chatter."""
+    on=_int(press,"press threshold",1,32767)
+    off=_int(release,"release threshold",0,on-1)
+    if (not isinstance(samples,(tuple,list)) or not 1<=len(samples)<=4096
+            or any(type(x) is not int or not 0<=x<=32767 for x in samples)):
+        raise InputTimingError("bounded unsigned trigger samples required")
+    pressed=False
+    result=[]
+    for sample in samples:
+        if pressed and sample<=off:
+            pressed=False
+        elif not pressed and sample>=on:
+            pressed=True
+        result.append(pressed)
+    return tuple(result)
+
