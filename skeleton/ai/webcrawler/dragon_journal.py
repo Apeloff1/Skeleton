@@ -72,9 +72,15 @@ class DragonEventJournal:
             raise ValueError("event time must be finite")
         # SQLite REAL round trips integers as floats. Hash persisted semantics.
         at = float(at)
-        data = dict(payload or {})
-        encoded = _canonical(data)
-        if len(encoded.encode("utf-8")) > 32768:
+        if payload is not None and not isinstance(payload, Mapping):
+            raise ValueError("journal payload must be a JSON object")
+        try:
+            data = dict(payload) if payload is not None else {}
+            encoded = _canonical(data)
+            size = len(encoded.encode("utf-8", errors="strict"))
+        except (TypeError, ValueError, UnicodeError, OverflowError, RecursionError) as exc:
+            raise ValueError("journal payload must be canonical finite JSON") from exc
+        if size > 32768:
             raise ValueError("event payload exceeds limit")
         with self.db:
             row = self.db.execute(
