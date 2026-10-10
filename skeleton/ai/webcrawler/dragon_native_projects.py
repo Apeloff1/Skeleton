@@ -490,7 +490,9 @@ def render_native_project(*,title:str,target_id:str,style:str,
                           candidate_id:str,mechanics:tuple[Mechanic,...],
                           authorized:bool,design=None,
                           procedural_puzzles:bool=False,
-                          authored_puzzles:tuple[tuple[str,...],...]|None=None)->NativeProject:
+                          authored_puzzles:tuple[tuple[str,...],...]|None=None,
+                          campaign_mode:str="branching",
+                          challenge_profile:str="balanced")->NativeProject:
     if not authorized:raise PermissionError("native game build requires authorization")
     if type(procedural_puzzles) is not bool:
         raise ValueError("procedural puzzle control must be strict boolean")
@@ -573,7 +575,9 @@ def render_native_project(*,title:str,target_id:str,style:str,
                 authored_levels=authored_puzzles,
                 hero=design.hero if design is not None else "hatchling",
                 theme=design.quest_theme if design is not None else "ancient_ruins",
-                palette=design.palette if design is not None else "dmg_green")
+                palette=design.palette if design is not None else "dmg_green",
+                campaign_mode=campaign_mode,
+                challenge_profile=challenge_profile)
             if design is not None:
                 from .dragon_game_design import design_manifest
                 files["dragon-game-design.json"]=json.dumps(
