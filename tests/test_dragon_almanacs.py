@@ -222,6 +222,29 @@ def test_forged_pack_statement_and_citation_fail_even_with_rehashed_payload(libr
         with pytest.raises(ValueError): retrieve_weight_pack(forged, library, "owner", "jump", authorized=True)
 
 
+@pytest.mark.parametrize("tamper", ["inflate", "suppress", "rights", "duplicate"])
+def test_rehashed_weight_pack_cannot_change_rank_or_claim_authority(library, tamper):
+    library.import_document(document(), expected_parent_digest=None, authorized=True)
+    pack = build_weight_pack(library, "owner", authorized=True)
+    raw = zlib.decompress(pack.payload)
+    if tamper == "duplicate":
+        raw = raw.replace(b'"schema":', b'"schema":"forged","schema":', 1)
+    else:
+        body = json.loads(raw)
+        if tamper == "inflate":
+            body["postings"]["jump"][0][1] = 255
+        elif tamper == "suppress":
+            body["postings"]["jump"] = []
+        else:
+            body["training_authorized"] = True
+        raw = canonical_json(body).encode("utf-8")
+    payload = zlib.compress(raw)
+    forged = replace(pack, payload=payload, raw_bytes=len(raw),
+                     payload_digest=sha256(payload).hexdigest())
+    with pytest.raises(ValueError):
+        retrieve_weight_pack(forged, library, "owner", "jump", authorized=True)
+
+
 def test_original_experiment_is_reproducible_and_holdout_disjoint():
     result = run_original_experiment(samples=40)
     assert result == run_original_experiment(samples=40)
