@@ -308,11 +308,19 @@ def verify_evolution_series(destination:Path,index_name:str)->dict:
                     (previous["index_sha256"] if previous else None)):
             raise ValueError("evolution edition failed replay or predecessor linkage")
         if previous is not None:
-            earlier=json.loads((root/previous["directory"]/previous["index"]).read_text())
-            latter=json.loads((location/index).read_text())
-            a={x["target"]:x for x in earlier["entries"]}
-            b={x["target"]:x for x in latter["entries"]}
-            changes=sum(a[t]["archive_sha256"]!=b[t]["archive_sha256"] for t in a)
+            earlier_bytes=(root/previous["directory"]/previous["index"]).read_bytes()
+            later_bytes=(location/index).read_bytes()
+            if (_hash(earlier_bytes)!=previous["index_sha256"] or
+                    _hash(later_bytes)!=entry["index_sha256"]):
+                raise ValueError("series production receipt changed after verification")
+            earlier=json.loads(earlier_bytes)
+            latter=json.loads(later_bytes)
+            old={x["target"]:x for x in earlier["entries"]}
+            new={x["target"]:x for x in latter["entries"]}
+            changes=sum(
+                old[target]["archive_sha256"]!=new[target]["archive_sha256"]
+                for target in old
+            )
             if changes==0 or entry.get("source_changes_from_previous")!=changes:
                 raise ValueError("evolution index falsely claims changed native games")
         else:
