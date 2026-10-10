@@ -518,9 +518,10 @@ class CrawlEngine:
             item.url,
         ) if successful else None
         novel = bool(doc and not self.store.has_content(doc.content_hash))
-        if not hasattr(self.fetcher,"fetch_once"):
-            self.budget.charge_response(len(body), accepted=novel)
-        elif novel:
+        # Redirect/robots transport charges each actual HTTP hop in
+        # fetch_with_policy. Counting the fallback fetcher again here would
+        # double-charge the same page and exhaust budgets prematurely.
+        if novel:
             self.budget.documents += 1
         if not doc:
             return None
