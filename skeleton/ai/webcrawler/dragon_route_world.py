@@ -441,6 +441,81 @@ def replay(world:World,route:tuple[str,...],traveller:Traveller=Traveller(),*,
         footprint,secret,unlockable,environmental,True,True,digest,
     )
 
+def experience(world:World,traveller:Traveller=Traveller(), *,
+               path:tuple[str,...]=())->dict:
+    """Continue a genuinely playable original journey without requiring goal.
+
+    A player can travel down a deadend, pick up a clue, turn around, take
+    optional detours, wait for a train, or find an unlockable passage.
+    Any undiscovered secret route is omitted from the choice menu rather
+    than revealing its destination. Options are replayed on every request;
+    the client never gets to mint cash, abilities or location.
+    """
+    validate_world(world);validate_traveller(traveller)
+    if not isinstance(path,tuple) or len(path)>MAX_HOPS or any(
+            type(item) is not str or not VALID_ID.fullmatch(item)
+            for item in path):
+        raise ValueError("world free-roam history exceeds bounded game actions")
+    idx=_node_index(world)
+    edges={item.id:item for item in world.connections}
+    state=_begin(world,traveller)
+    for action in path:
+        if action not in edges:
+            raise ValueError("free-roam journey includes nonexistent travel edge")
+        after=_apply(world,traveller,state,edges[action],idx,())
+        if after is None:
+            raise ValueError("free-roam journey changed a locked, unsafe or unpaid route")
+        state=after
+    choices=[]
+    if state.place!=world.goal:
+        for edge in world.connections:
+            if edge.origin!=state.place:continue
+            # A secret passage unknown to this player does not leak its
+            # identity or destination through API option counts.
+            if edge.secret_token and edge.secret_token not in state.tokens:
+                continue
+            allowed=_apply(world,traveller,state,edge,idx,())
+            reason="open"
+            if allowed is None:
+                if edge.weather_any and not set(world.environment).intersection(edge.weather_any):
+                    reason="weather_restricted"
+                elif edge.weather_none and set(world.environment).intersection(edge.weather_none):
+                    reason="weather_restricted"
+                elif state.money<edge.price:reason="fare_required"
+                elif state.energy<edge.fatigue:reason="stamina_required"
+                elif state.elapsed+_depart(edge,state.clock)+edge.minutes>world.max_minutes:
+                    reason="travel_time_exhausted"
+                else:reason="progress_or_equipment_locked"
+            choices.append({
+                "edge":edge.id,"to":edge.destination,
+                "mode":edge.mode,"family":MODES[edge.mode],
+                "shape":list(edge.shapes),
+                "time_minutes":edge.minutes,
+                "waiting_minutes":_depart(edge,state.clock),
+                "price":edge.price,"fatigue":edge.fatigue,
+                "danger":edge.danger,"scenic":edge.spectacle,
+                "access":reason,"available":allowed is not None,
+            })
+    return {
+        "schema":SCHEMA,
+        "world_position":state.place,
+        "goal":world.goal,
+        "completed":state.place==world.goal,
+        "visited_places":list(state.traversed_places),
+        "played_edges":list(path),
+        "known_tokens":sorted(state.tokens),
+        "remaining_cash":state.money,
+        "remaining_energy":state.energy,
+        "elapsed_minutes":state.elapsed,
+        "waiting_minutes":state.waiting_minutes,
+        "clock_minute":state.clock%1440,
+        "risk":state.danger,
+        "scenic":state.spectacle,
+        "options":choices,
+        "scope":"original game-world traversal only; no real-world routing or licensed title content",
+    }
+
+
 def portfolio(world:World,traveller:Traveller=Traveller(),*,
               max_routes:int=12,expansion_cap:int=5000,
               include_circuitous:bool=True)->RouteSearch:
