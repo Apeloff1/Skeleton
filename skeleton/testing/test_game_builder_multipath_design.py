@@ -288,3 +288,14 @@ def test_branch_choices_count_real_player_decisions():
     with pytest.raises(MultipathError):
         route_branch_choices(RouteProblem.from_rows(HAZARD_LEVEL), solved)
 
+
+def test_hazard_awareness_map_excludes_hazard_tile_and_respects_radius():
+    p = RouteProblem.from_rows(HAZARD_LEVEL)
+    sensed = hazard_proximity(p, radius=1)
+    assert (3, 1) not in sensed
+    assert sensed[(2, 1)] == 1
+    assert sensed[(3, 2)] == 1
+    assert sensed[(1, 1)] == 0
+    with pytest.raises(MultipathError):
+        hazard_proximity(p, radius=0)
+
