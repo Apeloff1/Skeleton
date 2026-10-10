@@ -155,6 +155,7 @@ function NativeSourceEditor() {
   const [difficulty, setDifficulty] = React.useState(4);
   const [stageCount, setStageCount] = React.useState(4);
   const [searchBudget, setSearchBudget] = React.useState(8);
+  const [proceduralLevels, setProceduralLevels] = React.useState(false);
   const [targets, setTargets] = React.useState<string[]>(['game_boy']);
   const [attested, setAttested] = React.useState(false);
   const [approved, setApproved] = React.useState(false);
@@ -284,12 +285,13 @@ function NativeSourceEditor() {
       palette, hero, quest_theme: questTheme, difficulty,
       stages: stageCount, candidates: searchBudget,
       project_notes: 'Original native homebrew; platform-scaled design',
+      procedural_levels: style === 'fixed_screen_puzzle' && proceduralLevels,
     },
   });
 
   React.useEffect(() => { setPreview(null); }, [
     title, style, targets, palette, hero, questTheme,
-    difficulty, stageCount, searchBudget, attested,
+    difficulty, stageCount, searchBudget, proceduralLevels, attested,
   ]);
 
   const previewTargets = async () => {
@@ -536,6 +538,22 @@ function NativeSourceEditor() {
             </TouchableOpacity>
           </View>
         ))}
+        {style === 'fixed_screen_puzzle' && !usesCartridgeTargets && (
+          <TouchableOpacity accessibilityRole="checkbox"
+            accessibilityState={{ checked: proceduralLevels }}
+            disabled={busy} style={stylesUi.consent}
+            onPress={() => {
+              setProceduralLevels(current => !current);
+              setSuccess('');
+            }}>
+            <Text style={stylesUi.copy}>
+              {proceduralLevels ? '☑ ' : '☐ '}
+              Build novel solver-proven puzzle routes. Each stage adds bounded
+              original obstacles and accepts only layouts proven solvable.
+              This may increase source generation time.
+            </Text>
+          </TouchableOpacity>
+        )}
         {usesCartridgeTargets && (
           <Text style={stylesUi.warning}>
             Cartridge adaptation: one stage and one candidate per original
