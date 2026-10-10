@@ -76,6 +76,7 @@ def test_evolution_requires_explicit_authority_and_emits_replay_bound_design(tmp
     b"",
     b'{"rows":[]}',
     b'{"rows":[],"authority":"approved"}',
+    b'{"rows":[],"rows":[]}',
     b'{"rows":NaN}',
     b"\xff\xfe",
     b"X" * 16_385,
