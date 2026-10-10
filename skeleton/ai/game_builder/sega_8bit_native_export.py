@@ -630,6 +630,30 @@ def compile_native_sega_8bit(
             )
             + "\n};"
         )
+    # Ship an independently solved demonstration with each original cartridge.
+    # Direction bytes are a compact native walkthrough, not extracted inputs
+    # from any commercial game. The normal native advance() function executes
+    # every move, maintaining all original collision/reward/animation rules.
+    _original_actions = {"up": 0, "down": 1, "left": 2, "right": 3}
+    demo_arrays = []
+    demo_steps_total = 0
+    for level in world.levels:
+        moves = tuple(level.safe_solution)
+        if not moves or len(moves) > 20000:
+            raise Sega8BitNativeError("original demonstration route exceeds native input budget")
+        demo_steps_total += len(moves)
+        demo_arrays.append(
+            f"static const unsigned char demo_{level.index}[] = {{\n"
+            + "\n".join(
+                "    " + ", ".join(str(_original_actions[x]) for x in moves[i:i+32]) + ","
+                for i in range(0, len(moves), 32)
+            )
+            + "\n};"
+        )
+    if demo_steps_total > 20000 or demo_steps_total != sum(
+        len(stage.safe_solution) for stage in world.levels
+    ):
+        raise Sega8BitNativeError("original demonstration exceeds verified playback capacity")
     themes = {
         "forest": ((0x000, 0x2A4, 0x5A8, 0xFFF),
                    (0, 13, 29, 63)),
@@ -660,6 +684,9 @@ def compile_native_sega_8bit(
         "__DEFAULT_REDUCED_MOTION__":str(int(reduced_motion)),
         "__DEFAULT_AUDIO_ENABLED__":str(int(audio_enabled)),
         "__TILES__":_tiles(),"__MAPS__":"\n\n".join(maps),
+        "__DEMO_ROUTES__":"\n\n".join(demo_arrays),
+        "__DEMO_POINTERS__":", ".join(f"demo_{x.index}" for x in world.levels),
+        "__DEMO_LENGTHS__":", ".join(str(len(x.safe_solution)) for x in world.levels),
         "__POINTERS__":", ".join(f"stage_{level.index}" for level in world.levels),
         "__START_X__":", ".join(str(l.start[0]) for l in world.levels),
         "__START_Y__":", ".join(str(l.start[1]) for l in world.levels),
@@ -694,6 +721,13 @@ def compile_native_sega_8bit(
         "default_reduced_motion":reduced_motion,
         "native_joypad_pause_controls":True,
         "native_sound_toggle_controls":True,
+        "original_native_solution_attract_mode":True,
+        "original_demo_chord_frames":25,
+        "original_demo_direction_encoding":"0=up,1=down,2=left,3=right",
+        "original_demo_playback_steps":demo_steps_total,
+        "original_demo_uses_identical_game_rules":True,
+        "original_demo_autostart":False,
+        "original_demo_external_content":False,
         "original_companion_pose_count":5,
         "original_hero_pose_count":2,
         "companion_bond_ranks":8,
