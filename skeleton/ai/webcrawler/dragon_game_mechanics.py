@@ -169,7 +169,9 @@ class GameMechanicsMemory:
                     or not 0 <= obs.confidence <= 1
                     or not isfinite(obs.confidence)):
                 raise ValueError("invalid observation confidence")
-            if obs.preference is not PreferenceSignal.UNKNOWN and not obs.user_confirmed:
+            if type(obs.user_confirmed) is not bool:
+                raise ValueError("observation confirmation must be boolean")
+            if obs.preference is not PreferenceSignal.UNKNOWN and obs.user_confirmed is not True:
                 raise PermissionError("taste signals require explicit user confirmation")
             rows.append([
                 obs.timestamp_ms, obs.mechanic.value, obs.description,
