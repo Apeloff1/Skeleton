@@ -246,6 +246,10 @@ def boot_rom(
             f"PSG writes={machine.psg_writes}, status reads={machine.vdp_read_status}; "
             f"PC samples={sample_pc}; reset vector={binary[:16].hex()}; "
             f"final_pc={cpu.pc:#06x} sp={cpu.sp:#06x} halted={cpu.halted}; "
+            f"final_bc={cpu.bc:#06x} final_hl={cpu.hl:#06x} "
+            f"final_de={cpu.de:#06x} final_a={cpu.a:#04x}; "
+            f"trap_code={binary[max(0, cpu.pc-16):cpu.pc+24].hex()}; "
+            f"boot_code={binary[0x1190:0x11b0].hex()}; "
             f"VBlank events={machine.interrupts_issued}"
         )
     return {
