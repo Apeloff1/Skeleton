@@ -374,7 +374,8 @@ def native_world_route_source_bundle(
             for name in sorted(files):
                 if name not in (
                     "src/main.c","include/dragon_route_world.h",
-                    "dragon-original-route-proof.json","Makefile","README.md",
+                    "dragon-original-route-proof.json","Makefile","CMakeLists.txt",
+                    "README.md",
                 ):
                     raise ValueError("unexpected source code path")
                 item=ZipInfo(name,date_time=(1980,1,1,0,0,0))
