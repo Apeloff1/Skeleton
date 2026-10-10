@@ -567,3 +567,13 @@ def test_hazard_relocation_preserves_count_and_safe_proof():
     assert moved.safe_proof.hazard_visits == 0
     assert verify_route_proof(moved.after, moved.safe_proof)
 
+
+def test_spawn_relocation_requires_new_full_reachable_solution():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    moved = relocate_start(p, (1, 2), authorized=True)
+    assert moved.after.start == (1, 2)
+    assert moved.safe_proof.positions[0] == (1, 2)
+    assert verify_route_proof(moved.after, moved.safe_proof)
+    with pytest.raises(MultipathError):
+        relocate_start(p, p.collectibles[0], authorized=True)
+
