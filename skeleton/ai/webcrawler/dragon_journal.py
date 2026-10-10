@@ -113,25 +113,37 @@ class DragonEventJournal:
 
     def verify(self, session_id: str) -> bool:
         previous = "0" * 64
-        rows = self.db.execute(
+        # Stream rows from SQLite: journal verification must not materialize
+        # the entire history in memory for long-lived companion sessions.
+        cursor = self.db.execute(
             "SELECT sequence,event_id,kind,url,at,payload,previous_digest,digest "
             "FROM dragon_companion_events WHERE session_id=? ORDER BY sequence",
-            (session_id,)).fetchall()
-        for index, r in enumerate(rows, 1):
-            seq, event_id, kind, url, at, payload, parent, digest = r
-            if seq != index or parent != previous or event_id != digest:
+            (session_id,))
+        for index, r in enumerate(cursor, 1):
+            try:
+                seq, event_id, kind, url, at, payload, parent, digest = r
+                if (seq != index or parent != previous or event_id != digest
+                        or kind not in ALLOWED or not math.isfinite(at)):
+                    return False
+                _validate_source_url(url)
+                parsed_payload = json.loads(payload)
+                if (not isinstance(parsed_payload, dict)
+                        or _canonical(parsed_payload) != payload):
+                    return False
+                base = {"session_id": session_id, "sequence": seq, "kind": kind,
+                        "url": url, "at": at, "payload": parsed_payload,
+                        "previous_digest": parent}
+                computed = hashlib.sha256(_canonical(base).encode("utf-8")).hexdigest()
+                if computed != digest:
+                    # Historical integer timestamp writers encoded timestamp
+                    # as int before SQLite REAL round-trip. Preserve exact
+                    # evidence without broadening any other chain field.
+                    if not float(at).is_integer():
+                        return False
+                    base["at"] = int(at)
+                    if hashlib.sha256(_canonical(base).encode("utf-8")).hexdigest() != digest:
+                        return False
+                previous = digest
+            except (ValueError, TypeError, UnicodeError, OverflowError, RecursionError):
                 return False
-            base = {"session_id": session_id, "sequence": seq, "kind": kind,
-                    "url": url, "at": at, "payload": json.loads(payload),
-                    "previous_digest": parent}
-            if hashlib.sha256(_canonical(base).encode("utf-8")).hexdigest() != digest:
-                # Older writers hashed integer timestamps before SQLite REAL
-                # coercion. Accept only the exact historical digest, without
-                # rewriting evidence or relaxing any chain/custody check.
-                if not float(at).is_integer():
-                    return False
-                base["at"] = int(at)
-                if hashlib.sha256(_canonical(base).encode("utf-8")).hexdigest() != digest:
-                    return False
-            previous = digest
         return True
