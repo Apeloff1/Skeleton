@@ -59,6 +59,7 @@ def test_full_portfolio_really_exports_all_supported_native_machine_sources(tmp_
         "sinclair_zx_spectrum":"game.asm",
         "msx1":"game.asm",
         "sega_master_system":"game.asm",
+        "sega_game_gear":"game.c",
     }
     assert set(mapping).issubset(_NATIVE)
     assert {p.name for p in (root/"targets").iterdir()}==set(_NATIVE)
