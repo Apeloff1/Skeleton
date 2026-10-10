@@ -128,7 +128,7 @@ def test_locked_console_targets_fail_instead_of_pretending(tmp_path):
     with pytest.raises(PermissionError):
         make("xbox_series")
     with pytest.raises(ValueError):
-        make("wii_u")
+        make("rca_studio_ii")
     with pytest.raises(PermissionError):
         render_native_project(title="Good Game",target_id="game_boy",
             style="racing",candidate_id=CANDIDATE,

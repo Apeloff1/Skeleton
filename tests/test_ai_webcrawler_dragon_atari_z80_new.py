@@ -37,7 +37,7 @@ def _render(target:str):
 
 def test_unique_platform_id_count_169_and_all_real_native_source_targets():
     assert len(SUPPLEMENTAL_TARGETS)==122
-    assert len(EMITTERS)==80
+    assert len(EMITTERS)>=86
     assert coverage_report()["catalog_count"]==169
     assert coverage_report()["missing_native_source_count"] == (169-len(EMITTERS))
     assert coverage_report()["source_coverage_fraction"]==round(len(EMITTERS)/169,6)

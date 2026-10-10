@@ -735,3 +735,77 @@ retro game compiler checks. One external Copilot security-automation
 failure arose from HTTP 402 monthly quota exhaustion, not a detected
 Dragon vulnerability. This new code still requires independent
 latest-head CI before any verification sign-off.
+
+
+## October 10, 2026 — Vectrex 6809 vector CRT and Atari 7800 MARIA
+
+This batch increases **the curated source-capable coverage to 86 of 169
+distinct targets (50.9%)**, leaving **83 source adapters** unimplemented.
+These numbers describe deterministic source generators only. The newly
+created Vectrex ROM, Atari A78 ROM, emulator playtest, device test and
+distribution-signature stages remain unverified.
+
+### Vectrex: truly vector-based, not a raster-emulated port
+
+New native Vector Quest source is built for CMOC/VectreC using the
+Vectrex Motorola 6809 BIOS library. It calls wait_recal once each frame
+before any analog-vector drawing, resets the beam origin, chooses scale
+and CRT brightness, and draws the dragon, crystal and pursuer as four
+original line segments. Digital joystick input controls motion; the
+button restarts; pickups increase score and difficulty and can restore
+health. A chasing enemy inflicts bounded damage with invulnerability,
+lives are rendered as original vectors, and two different chirps are
+written to the AY-3-8912 sound registers. It emits C and a Vectrex-aware
+CMOC Makefile targeting a real .bin cartridge via a separately installed
+cross-compiler and the exact target BIOS wrapper. No raster-to-vector
+screenshot, game ROM, firmware, third-party game art or fake binary is
+included. The analog beam and input timings require Vectrex emulator
+replay and physical verification.
+
+### Atari 7800: MARIA sprite hardware, not 2600 TIA aliases
+
+The new Atari 7800 producer emits an original 7800basic 160A project
+for the MARIA hardware (different from the older Atari 2600 source).
+It has three animated-capable original objects: a dragon, crystal
+and pursuer. The main loop clears and draws MARIA sprites, reads
+the actual two-button joystick, checks 8×16 software sprite collision,
+gathers points, advances levels, chases the player, tracks health,
+implements temporary invulnerability and supports a retry path.
+
+To avoid dependencies on third-party artwork and avoid falsely claiming
+the 7800 compiler produces assets from nothing, the generator bundles
+a standalone Python **standard-library-only indexed PNG writer**.
+It builds three original four-color 8×16 sprite files for the 7800basic
+incgraphic pipeline; unit tests verify the PNG header, dimensions,
+decompressed scanline contents, deterministic hashes and CRC32 for every
+chunk. Compilation uses a separately installed 7800basic toolchain,
+with output intent a genuine Atari .a78 file. We do not redistribute
+7800basic itself, and a compiled A78 still requires MARIA display,
+joystick, audio and frame-timing tests before claiming playability.
+
+### Separate validation levels and licensing
+
+The dedicated tests verify hardware-specific source contracts and
+determinism; reject source generation for unsupported genres or invalid
+seeds; render and inspect original PNG images using the host Python
+interpreter; and conditionally compile the native games only if the
+proper external toolchain is actually installed. Any skipped hardware
+compiler job is *not* a passed ROM build. No claim is made that user
+firmware, game copies, ROM keys or a vendor commercial SDK are present.
+
+Reference docs for the relevant open toolchains:
+
+- VectreC CMOC library and BIOS ABI: https://github.com/rogerboesch/vectreC
+- Atari 7800basic compiler: https://github.com/7800-devtools/7800basic
+- 7800basic native MARIA sprite and collision syntax:
+  https://www.randomterrain.com/7800basic.html
+
+### Release acceptance gates
+
+Both new platforms must complete actual cross compilation with
+documented versions, show original visuals and correct controller
+behavior in appropriate emulators, prove repeatable progression and
+audio output on representative hardware, and independently pass
+license/provenance review before binary release. The machine-readable
+readiness registry remains source-only until receipts for those stages
+are independently validated.

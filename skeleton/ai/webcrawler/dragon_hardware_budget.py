@@ -56,6 +56,8 @@ LIMITS={
     "xbox_original":("Microsoft","x86",67108864,16777216,67108864,65536,1024,1024,1048576),
     # Developer-facing source budgets, not physical linker map verification.
     "nintendo_64":("Nintendo","VR4300",4194304,262144,4194304,65536,128,128,8192),
+    "vectrex":("GCE","Motorola 6809",1024,1024,1024,8192,48,48,256),
+    "atari_7800":("Atari","6502C/MARIA",4096,4096,4096,32768,30,12,512),
     "commodore_vic20":("Commodore","MOS 6502",5120,1024,5120,16384,2,2,384),
     "commodore_pet":("Commodore","MOS 6502",32768,1024,32768,16384,1,1,1024),
     "commodore_plus4":("Commodore","MOS 7501",65536,4096,65536,16384,1,1,1024),

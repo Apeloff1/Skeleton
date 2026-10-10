@@ -90,6 +90,10 @@ SOURCE_RENDERERS.update({
     "wii_u":"PowerPC wut OSScreen TV+DRC with native VPAD GamePad input",
     "nintendo_switch":"ARM64 libnx handheld/docked console and Npad",
 })
+SOURCE_RENDERERS.update({
+    "vectrex":"Motorola 6809 real analog beam vector BIOS",
+    "atari_7800":"Atari 7800 6502C MARIA DMA 160A sprites",
+})
 assert set(SOURCE_RENDERERS)==EMITTERS
 
 @dataclass(frozen=True)

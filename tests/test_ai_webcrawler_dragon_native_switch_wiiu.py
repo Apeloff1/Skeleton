@@ -144,9 +144,9 @@ def test_bounded_seed_and_style_contracts():
                 mechanics=(Mechanic.MOVEMENT,),authorized=True)
     report=coverage_report()
     assert report["catalog_count"]==169
-    assert report["native_source_count"]==84
-    assert report["missing_native_source_count"]==85
-    assert len(report["source_ids"])==84
+    assert report["native_source_count"]==len(EMITTERS)
+    assert report["missing_native_source_count"]==169-len(EMITTERS)
+    assert len(report["source_ids"])==len(EMITTERS)
 
 @pytest.mark.parametrize("target",TARGETS)
 def test_real_portable_c_gameplay_compilation_and_four_chapter_replay(tmp_path,target):
