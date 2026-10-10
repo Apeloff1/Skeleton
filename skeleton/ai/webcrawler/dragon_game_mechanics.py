@@ -154,9 +154,13 @@ class GameMechanicsMemory:
                 or any(not isinstance(obs, GameObservation) for obs in session.observations)):
             raise ValueError("invalid observation collection")
         rows = []
+        previous_timestamp = -1
         for obs in session.observations:
-            if not isinstance(obs.timestamp_ms, int) or not 0 <= obs.timestamp_ms <= session.duration_ms:
+            if type(obs.timestamp_ms) is not int or not 0 <= obs.timestamp_ms <= session.duration_ms:
                 raise ValueError("observation outside recording")
+            if obs.timestamp_ms < previous_timestamp:
+                raise ValueError("observation timestamps must be in recording order")
+            previous_timestamp = obs.timestamp_ms
             if not isinstance(obs.mechanic, Mechanic) or not isinstance(obs.preference, PreferenceSignal):
                 raise ValueError("unknown game mechanic or preference")
             if not isinstance(obs.description, str) or not 1 <= len(obs.description) <= self.policy.max_note_chars:
