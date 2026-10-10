@@ -119,6 +119,24 @@ class GameTasteProfile:
     review_required: bool
     fingerprint: str
 
+    def __post_init__(self) -> None:
+        if (not isinstance(self.owner, str) or not 1 <= len(self.owner) <= 128
+                or self.owner != self.owner.strip() or not self.owner.isprintable()):
+            raise ValueError("taste profile owner invalid")
+        if (not isinstance(self.insights, tuple)
+                or any(not isinstance(item, MechanicInsight) for item in self.insights)
+                or len({item.mechanic for item in self.insights}) != len(self.insights)):
+            raise ValueError("taste profile mechanics are invalid or duplicated")
+        if (not isinstance(self.design_directives, tuple)
+                or len(self.design_directives) > len(Mechanic)
+                or any(not isinstance(item, str) or not item.isprintable()
+                       for item in self.design_directives)):
+            raise ValueError("taste profile directive evidence invalid")
+        if (type(self.review_required) is not bool
+                or not isinstance(self.fingerprint, str)
+                or re.fullmatch(r"[0-9a-f]{64}", self.fingerprint) is None):
+            raise ValueError("taste profile review receipt invalid")
+
 
 class GameMechanicsMemory:
     def __init__(self, db: sqlite3.Connection,
