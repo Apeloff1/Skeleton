@@ -86,3 +86,9 @@ def decode_sms_4bpp(data: bytes) -> tuple[tuple[int, ...], ...]:
                            for plane in range(4))
                        for x in range(8)) for y in range(8))
 
+
+def encode_genesis_4bpp(tile: Sequence[Sequence[int]]) -> bytes:
+    """Mega Drive/Genesis packed 4bpp, high nibble for left pixel."""
+    rows = _pixels(tile, 15)
+    return bytes((row[x] << 4) | row[x+1] for row in rows for x in range(0,8,2))
+
