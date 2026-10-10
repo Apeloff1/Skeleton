@@ -135,6 +135,14 @@ def _final_digest(cert:dict)->str:
 def build_maze(request:MazeRequest=MazeRequest())->MazeCreation:
     _bounded(request)
     rng=random.Random(request.seed)
+    # Challenge is an actual graph-construction choice, not merely a label.
+    # Gentle introduces more interchanges/early shortcuts; higher challenge
+    # makes the trusted main passage longer and detours more deceptive.
+    braid_density=max(0,min(100,request.detour_density+
+        {"gentle":25,"balanced":0,"challenging":-20,"spicy":-35}[request.challenge]))
+    corridor_minutes={
+        "gentle":3,"balanced":4,"challenging":6,"spicy":8
+    }[request.challenge]
     backbone=_main_spine(request.width,request.height)
     base_ids=tuple(_place(*xy) for xy in backbone)
     indexed={xy:number for number,xy in enumerate(backbone)}
@@ -184,9 +192,9 @@ def build_maze(request:MazeRequest=MazeRequest())->MazeCreation:
         return edge.id
     for before,after in zip(backbone,backbone[1:]):
         origin,destination=_place(*before),_place(*after)
-        forward=add("spine",origin,destination,"walk",4,
+        forward=add("spine",origin,destination,"walk",corridor_minutes,
                     shapes=("critical","spine","guided"))
-        reverse=add("reverse",destination,origin,"walk",4,
+        reverse=add("reverse",destination,origin,"walk",corridor_minutes,
                     shapes=("doubleback","backtrack","safe_return","recovery"))
         main.append(forward)
         back.append(reverse)
@@ -213,7 +221,7 @@ def build_maze(request:MazeRequest=MazeRequest())->MazeCreation:
     braid=[]
     used={(e.origin,e.destination) for e in edges}
     for index in range(len(base_ids)-4):
-        if rng.randrange(100)>=request.detour_density:
+        if rng.randrange(100)>=braid_density:
             continue
         jump=2+rng.randrange(3)
         to=index+jump
