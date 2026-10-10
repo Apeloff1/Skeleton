@@ -26,6 +26,17 @@ type PlatformCapability = {
   toolchain: string;
 };
 
+type NativePlan = {
+  status: 'source_ready' | 'blocked';
+  can_export_sources: boolean;
+  evidence: string;
+  targets: Array<{
+    target: string; state: string; reason: string;
+    target_palette: string | null; target_stages: number | null;
+    target_candidates: number | null; adaptations: string[];
+  }>;
+};
+
 type CapabilityPayload = {
   ok: boolean;
   targets: PlatformCapability[];
@@ -121,6 +132,7 @@ function NativeSourceEditor() {
   const [busy, setBusy] = React.useState(false);
   const [failure, setFailure] = React.useState('');
   const [success, setSuccess] = React.useState('');
+  const [preview, setPreview] = React.useState<NativePlan | null>(null);
   const active = React.useRef<AbortController | null>(null);
   const isEditor = role === 'editor' || role === 'admin';
 
@@ -195,6 +207,53 @@ function NativeSourceEditor() {
   const usesDesktopTargets = targets.some(id =>
     ['pc_linux', 'pc_windows', 'pc_macos', 'steam_deck'].includes(id));
 
+  const sourcePayload = (forGeneration: boolean) => ({
+    title: title.trim(), style, targets, seed: 1,
+    original_work_attested: attested, approved: forGeneration && approved,
+    rights_basis: 'original_homebrew', rights_reference: '',
+    portable_design: {
+      palette, hero, quest_theme: questTheme, difficulty,
+      stages: stageCount, candidates: searchBudget,
+      project_notes: 'Original native homebrew; platform-scaled design',
+    },
+  });
+
+  React.useEffect(() => { setPreview(null); }, [
+    title, style, targets, palette, hero, questTheme,
+    difficulty, stageCount, searchBudget, attested,
+  ]);
+
+  const previewTargets = async () => {
+    if (busy || !isEditor || !attested || !title.trim() ||
+        !/^[A-Za-z][A-Za-z0-9 ._'!-]{2,79}$/.test(title.trim()) ||
+        !targets.length || targets.length > MAX_TARGETS) return;
+    setBusy(true);
+    setFailure('');
+    setPreview(null);
+    try {
+      if (!getAuthToken()) {
+        throw new Error('An authenticated editor session is required.');
+      }
+      const response = await fetch(ENDPOINT + '/preview', {
+        method: 'POST', cache: 'no-store',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(sourcePayload(false)),
+      });
+      if (!response.ok) throw new Error('Native feasibility preview was rejected.');
+      const report = await response.json() as NativePlan;
+      if (!report || !Array.isArray(report.targets) ||
+          report.targets.length !== targets.length ||
+          !['source_ready', 'blocked'].includes(report.status)) {
+        throw new Error('Invalid native feasibility report.');
+      }
+      setPreview(report);
+    } catch {
+      setFailure('Preview unavailable. No source or ROM was generated.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const generate = async () => {
     if (busy || !isEditor || !attested || !approved || !title.trim() ||
         !/^[A-Za-z][A-Za-z0-9 ._'!-]{2,79}$/.test(title.trim()) || targets.length < 1 ||
@@ -214,16 +273,7 @@ function NativeSourceEditor() {
         headers: authHeaders({ 'Content-Type': 'application/json' }),
         signal: controller.signal,
         cache: 'no-store',
-        body: JSON.stringify({
-          title: title.trim(), style, targets, seed: 1,
-          original_work_attested: true, approved: true,
-          rights_basis: 'original_homebrew', rights_reference: '',
-          portable_design: {
-            palette, hero, quest_theme: questTheme, difficulty,
-            stages: stageCount, candidates: searchBudget,
-            project_notes: 'Original native homebrew; platform-scaled design',
-          },
-        }),
+        body: JSON.stringify(sourcePayload(true)),
       });
       if (!response.ok) {
         throw new Error(response.status === 401 || response.status === 403
@@ -411,6 +461,49 @@ function NativeSourceEditor() {
             {approved ? '☑ ' : '☐ '}I authorize generation of these native source artifacts.
           </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity accessibilityRole="button"
+          testID="dragon-native-preview"
+          disabled={busy || loading || !isEditor || !attested ||
+            targets.length < 1 || !title.trim()}
+          style={[stylesUi.counterButton, { padding: 13 },
+            (busy || !isEditor || !attested || loading) && stylesUi.disabled]}
+          onPress={previewTargets}>
+          <Text style={stylesUi.actionText}>Preview hardware adaptations (no build)</Text>
+        </TouchableOpacity>
+        {preview && (
+          <View style={stylesUi.preview}>
+            <Text style={stylesUi.label}>Source-only readiness</Text>
+            <Text style={preview.can_export_sources ? stylesUi.ok : stylesUi.warning}>
+              {preview.can_export_sources ? 'All selected source emitters available' : 'At least one target is blocked'}
+            </Text>
+            {preview.targets.map(item => (
+              <View key={item.target} style={stylesUi.platform}>
+                <Text style={stylesUi.platformTitle}>
+                  {item.target.replace(/_/g, ' ')} · {item.state.replace(/_/g, ' ')}
+                </Text>
+                <Text style={stylesUi.hint}>{item.reason}</Text>
+                {item.target_palette && (
+                  <Text style={stylesUi.hint}>
+                    Actual palette: {formatStyle(item.target_palette)}
+                    {' · '}stages: {item.target_stages}
+                    {' · '}candidates: {item.target_candidates}
+                  </Text>
+                )}
+                {item.adaptations.map(adaptation => (
+                  <Text key={adaptation} style={stylesUi.warning}>
+                    Adaptation: {formatStyle(adaptation)}
+                  </Text>
+                ))}
+              </View>
+            ))}
+            <Text style={stylesUi.hint}>
+              Preview estimates source feasibility only. It does not create,
+              compile, execute or legally approve a game.
+            </Text>
+          </View>
+        )}
+
         <TouchableOpacity accessibilityRole="button" testID="dragon-native-export"
           disabled={busy || loading || !isEditor || !attested || !approved ||
             targets.length < 1 || !title.trim()}
@@ -451,6 +544,8 @@ const stylesUi = StyleSheet.create({
   input: { borderWidth: 1, borderColor: '#45675b', borderRadius: 10,
     padding: 12, color: '#f7fffc', backgroundColor: '#182833' },
   platform: { backgroundColor: '#192a34', borderRadius: 12, padding: 12, gap: 5 },
+  preview: { backgroundColor: '#142834', borderWidth: 1, borderColor: '#345660',
+    borderRadius: 14, padding: 14, gap: 10 },
   counter: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
   counterButton: { backgroundColor: '#326f56', borderRadius: 10, minWidth: 42,
     padding: 10, alignItems: 'center' },
