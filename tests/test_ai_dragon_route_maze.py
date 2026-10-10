@@ -6,7 +6,7 @@ import json
 import pytest
 
 from skeleton.ai.webcrawler.dragon_route_maze import (
-    SCHEMA,WEATHERS,MazeRequest,build_maze,verify_maze,_main_spine,
+    SCHEMA,WEATHERS,MazeRequest,build_maze,verify_maze,recover_maze,_main_spine,
 )
 from skeleton.ai.webcrawler.dragon_route_world import (
     replay,experience,validate_world,
@@ -162,3 +162,54 @@ def test_maze_rich_variants_are_structural_routes_not_unverified_game_titles():
 def test_all_original_game_maze_inputs_are_strictly_bounded(kwargs):
     with pytest.raises(ValueError):
         build_maze(MazeRequest(**kwargs))
+
+
+
+def test_actual_current_maze_world_state_has_proven_safe_escape_after_doubleback():
+    built=build_maze(MazeRequest(seed=1977,width=6,height=6))
+    witness=built.certificate.doubleback_witnesses[0]
+    entering=next(index for index,action in enumerate(witness)
+                  if action.startswith("branch_"))
+    partial=witness[:entering+1]
+    proof=recover_maze(built,partial)
+    assert proof["reachable_now"]
+    assert not proof["reset_required"]
+    assert proof["next_move"]
+    assert proof["remaining_actions"]==len(proof["recovery_suffix"])
+    completed=replay(
+        built.world,partial+tuple(proof["recovery_suffix"]),
+        built.traveller,
+    )
+    assert completed.success
+    assert "current position" in proof["proof"]
+
+
+def test_exhausted_80_move_original_world_requires_true_reset_not_fake_shortcut():
+    built=build_maze(MazeRequest(seed=1977,width=4,height=4))
+    spine=built.certificate.backbone[0]
+    returning=next(x.id for x in built.world.connections
+                   if x.origin==built.world.connections[0].destination
+                   and x.destination==built.world.start
+                   and "recovery" in x.shapes)
+    history=(spine,returning)*40
+    report=recover_maze(built,history)
+    assert not report["reachable_now"]
+    assert report["reset_required"]
+    assert report["next_move"] is None
+    assert report["recovery_suffix"]==[]
+    assert "restart" in report["proof"]
+
+
+def test_original_safe_maze_escape_honors_every_climate_and_rejects_illegal_input():
+    for weather in WEATHERS:
+        built=build_maze(MazeRequest(seed=313,width=5,height=4,weather=weather))
+        for target in built.certificate.doubleback_witnesses[:2]:
+            entering=next(i for i,name in enumerate(target)
+                          if name.startswith("branch_"))
+            history=target[:entering+1]
+            result=recover_maze(built,history)
+            assert result["reachable_now"]
+            assert replay(built.world,history+tuple(result["recovery_suffix"]),
+                          built.traveller).success
+        with pytest.raises(ValueError):
+            recover_maze(built,("fake_level_jump",))
