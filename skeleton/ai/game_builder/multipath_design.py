@@ -1255,4 +1255,33 @@ def carve_for_diversity(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget", "pareto_hazard_routes", "enumerate_shortest_routes", "route_progress_trace", "make_level_edit", "carve_alternative_corridor", "seal_safe_corridor", "relocate_collectible", "relocate_exit", "add_solvable_hazard", "remove_hazard", "relocate_hazard", "relocate_start", "carve_for_diversity"]
+def evaluate_level_challenge(
+    problem: RouteProblem, *, portfolio_size: int = 4,
+) -> dict[str, object]:
+    """Report provable geometry difficulty separately from player enjoyment."""
+    if type(portfolio_size) is not int or not 1 <= portfolio_size <= 8:
+        raise MultipathError("invalid level evaluation portfolio")
+    safe = solve_route(problem)
+    portfolio = route_portfolio(problem, max_routes=portfolio_size)
+    novelty = portfolio_diversity_ppm(portfolio)
+    loops = cycle_rank(problem)
+    return {
+        "schema": "skeleton.game_builder.challenge_dossier.v1",
+        "world_digest": problem.digest,
+        "safe_solution_digest": safe.digest,
+        "safe_solution_steps": safe.steps,
+        "independent_topological_loops": loops,
+        "unique_valid_route_count": len(portfolio),
+        "corridor_diversity_ppm": novelty,
+        "structural_multiple_paths_verified": loops > 0 and len(portfolio) >= 2 and novelty > 0,
+        "navigation_decision_histogram": degree_histogram(problem),
+        "dead_end_cells": [list(x) for x in dead_end_cells(problem)],
+        "hazards": len(problem.hazards),
+        "safe_route_exposure": route_exposure_score(problem, safe),
+        "human_enjoyment_verified": False,
+        "frustration_calibrated_with_players": False,
+    }
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget", "pareto_hazard_routes", "enumerate_shortest_routes", "route_progress_trace", "make_level_edit", "carve_alternative_corridor", "seal_safe_corridor", "relocate_collectible", "relocate_exit", "add_solvable_hazard", "remove_hazard", "relocate_hazard", "relocate_start", "carve_for_diversity", "evaluate_level_challenge"]
