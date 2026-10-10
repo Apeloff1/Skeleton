@@ -201,3 +201,16 @@ def test_regions_find_unreachable_pockets_and_cover_grid():
     with pytest.raises(MultipathError):
         solve_route(p)
 
+
+def test_objective_reachability_identifies_missing_collectibles():
+    rows = list(OPEN_LEVEL)
+    rows[4] = "#########"
+    rows[1] = "#S.....G#"
+    rows[5] = "#..C....#"
+    report = objective_reachability(RouteProblem.from_rows(rows))
+    assert report["exit_reachable"] is True
+    assert report["all_collectibles_reachable"] is False
+    assert report["missing_collectibles"] == ((3, 5),)
+    good = objective_reachability(RouteProblem.from_rows(OPEN_LEVEL))
+    assert good["all_collectibles_reachable"] and good["exit_reachable"]
+
