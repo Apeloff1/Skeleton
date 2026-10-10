@@ -329,6 +329,8 @@ def emit_route_game(world:World,traveller:Traveller,*,authorized:bool)->dict[str
         "static const DragonProof dragon_probes[DRAGON_PROBE_COUNT]={\n"+
         "\n".join(proof_data)+"\n};\n#endif\n"
     )
+    from .dragon_route_world_assurance import demand_viable_world
+    quality=demand_viable_world(world,traveller)
     analysis=structural_report(world)
     manifest={
         "schema":SCHEMA,
@@ -344,6 +346,7 @@ def emit_route_game(world:World,traveller:Traveller,*,authorized:bool)->dict[str
         },
         "token_registry":token_list,
         "abstract_graph_audit":analysis,
+        "full_route_world_assurance":quality,
         "probes":probes,
         "original_work_attested":world.original_work_attested,
         "rights_claim":"originality attested; not independent copyright/patent/trademark clearance",
