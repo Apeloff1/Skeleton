@@ -675,3 +675,87 @@ def test_forged_cartridge_port_downgrade_detected_without_modifying_source():
 def test_portable_request_never_accepts_untyped_arbitrary_profile():
     with pytest.raises(ValueError, match="typed portable"):
         request(portable_design={"stage": 200}).validate()
+
+
+
+def test_verified_native_release_comparison_guides_real_revision_review(tmp_path):
+    from skeleton.ai.webcrawler.dragon_native_production import (
+        PortableGameDesign, compare_verified_portfolios,
+    )
+    first = request(
+        targets=("game_boy", "pc_linux"),
+        portable_design=PortableGameDesign(hero="hatchling", stages=4),
+    )
+    second = request(
+        targets=("game_boy", "pc_linux"),
+        portable_design=PortableGameDesign(hero="robot", stages=6),
+    )
+    previous = tmp_path / "previous"
+    current = tmp_path / "current"
+    a = publish_production(first, previous, authorized=True)
+    b = publish_production(second, current, authorized=True)
+    result = compare_verified_portfolios(previous, a["index"], current, b["index"])
+    assert result["previous_request_id"] == first.request_id
+    assert result["current_request_id"] == second.request_id
+    assert result["changes"] >= 1
+    assert result["previous_verified"] == result["current_verified"] == 2
+    assert any("portable_game_design_changed" in x["causes_to_review"]
+               for x in result["targets"])
+    assert all(x["requires_new_compile_review"] for x in result["targets"]
+               if x["state"] == "source_changed")
+    assert "no automatic" in result["claim_boundary"]
+
+    replay = compare_verified_portfolios(current, b["index"], current, b["index"])
+    assert replay["changes"] == 0
+    assert replay["unchanged"] == 2
+    assert all(x["state"] == "identical" for x in replay["targets"])
+
+
+def test_release_comparison_refuses_tampered_source_before_claiming_differences(tmp_path):
+    from skeleton.ai.webcrawler.dragon_native_production import compare_verified_portfolios
+    before = tmp_path / "before"
+    after = tmp_path / "after"
+    first = publish_production(request(), before, authorized=True)
+    second = publish_production(request(seed=2), after, authorized=True)
+    name = second["artifacts"][0]["archive_name"]
+    (after / name).write_bytes(b"not a valid homebrew artifact")
+    with pytest.raises(ValueError, match="changed"):
+        compare_verified_portfolios(before, first["index"], after, second["index"])
+
+
+def test_read_only_preflight_preview_exposes_actual_console_feature_downgrades():
+    from skeleton.ai.webcrawler.dragon_native_production import (
+        PortableGameDesign, preview_native_portfolio,
+    )
+    spec = request(
+        targets=("game_boy", "ps5", "pc_linux"),
+        portable_design=PortableGameDesign(stages=7, candidates=11,
+                                           palette="modern_neon"),
+    )
+    report = preview_native_portfolio(spec)
+    assert not report["can_export_sources"]
+    assert report["status"] == "blocked"
+    assert report["evidence"] == "none"
+    targets = {item["target"]: item for item in report["targets"]}
+    assert targets["ps5"]["state"] == "blocked"
+    assert targets["ps5"]["target_design_digest"] is None
+    assert targets["game_boy"]["state"] == "source_ready"
+    assert targets["game_boy"]["target_stages"] == 1
+    assert targets["game_boy"]["target_candidates"] == 1
+    assert targets["game_boy"]["target_palette"] == "handheld"
+    assert "palette_adapted_to_cartridge_safe_class" in targets["game_boy"]["adaptations"]
+    assert targets["pc_linux"]["target_stages"] == 7
+    assert targets["pc_linux"]["target_candidates"] == 11
+
+
+def test_source_preview_never_builds_native_source_or_mints_completion(monkeypatch):
+    from skeleton.ai.webcrawler import dragon_native_production as production
+    def forbidden(**kwargs):
+        raise AssertionError("preflight must not invoke native game emitters")
+    monkeypatch.setattr(production, "render_native_project", forbidden)
+    report = production.preview_native_portfolio(
+        request(targets=("nes", "game_boy")),
+    )
+    assert report["can_export_sources"]
+    assert report["evidence"] == "none"
+    assert len(report["targets"]) == 2
