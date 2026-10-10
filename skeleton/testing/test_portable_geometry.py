@@ -35,3 +35,10 @@ def test_flood_fill_excludes_isolated_rooms_and_orders_coordinates():
     assert flood_fill(grid,(3,1))==((3,1),(3,2))
     with pytest.raises(GeometryError):
         flood_fill(grid,(2,1))
+
+def test_distance_field_routes_around_hard_walls():
+    grid=("S..","##.","..G")
+    assert distance_field(grid,(0,0))==(
+        (0,1,2),(-1,-1,3),(6,5,4))
+    with pytest.raises(GeometryError):
+        distance_field(grid,(0,1))
