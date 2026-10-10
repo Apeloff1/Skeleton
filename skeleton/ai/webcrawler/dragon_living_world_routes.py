@@ -58,6 +58,7 @@ class IndexedRoute:
     world_id:int
     variant:int
     slot:int
+    sample_budget:int
     objective:str
     world_fingerprint:str
     actions:tuple[str,...]
@@ -160,7 +161,7 @@ def materialize_route(world:LivingWorld,slot:int,*,steps:int|None=None)->Indexed
     continued=describe(world,state,include_options=False)["playable"]
     return IndexedRoute(
         schema=SCHEMA,world_id=world.world_id,variant=world.variant,
-        slot=slot,objective=POLICIES[slot],
+        slot=slot,sample_budget=steps,objective=POLICIES[slot],
         world_fingerprint=world.world_fingerprint,
         actions=tuple(actions),endpoints=tuple(coords),
         chapters_seen=state.chapter,
@@ -187,9 +188,7 @@ def verify_route(world:LivingWorld,route:IndexedRoute)->dict:
         route.world_id!=world.world_id or route.variant!=world.variant
     ):
         raise ValueError("original route variant evidence belongs to another game world")
-    expected=materialize_route(world,route.slot,
-                               steps=(12+route.slot if len(route.actions)!=12+route.slot
-                                      and route.completed_world else len(route.actions)))
+    expected=materialize_route(world,route.slot,steps=route.sample_budget)
     # Exact recomputation catches mutated actions/outcomes/coordinates,
     # including fake claiming an ending for an endless playable game.
     if expected!=route or replay(world,route.actions).history_digest!=route.ending_replay_digest:
