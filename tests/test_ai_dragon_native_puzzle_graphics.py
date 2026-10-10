@@ -131,3 +131,52 @@ def test_native_game_screenshots_are_real_gameplay_frames_with_bmp_structure(tmp
         assert struct.unpack_from("<I",raw,22)[0]==480
         assert len(raw)<3_000_000
     assert images[0].read_bytes()!=images[2].read_bytes()
+
+
+
+def test_original_creator_changes_genuine_graphical_native_avatar_and_biome_tiles():
+    from skeleton.ai.webcrawler.dragon_native_puzzle_graphics import pixel_header
+    modern=pixel_header(hero="astronaut",theme="space",
+                        palette="modern_neon",seed=37)
+    original=pixel_header(hero="hatchling",theme="ancient_ruins",
+                          palette="dmg_green",seed=37)
+    assert modern!=original
+    assert modern.count("static const uint8_t")==4
+    assert len(modern)<5000
+    request=ProductionRequest(
+        title="Original Galaxy Native Puzzles",
+        style="fixed_screen_puzzle",targets=("pc_linux",),
+        seed=37,original_work_attested=True,
+        portable_design=PortableGameDesign(
+            hero="astronaut",quest_theme="space",palette="modern_neon",
+            stages=2,
+        ),
+    )
+    project=_render(request,"pc_linux")
+    assert project.files["include/dragon_puzzle_pixels.h"]==modern
+    source,_=make_source_release(project,request)
+    receipt,files=_puzzle_proof(source)
+    assert receipt["style"]=="fixed_screen_puzzle"
+    assert files["include/dragon_puzzle_pixels.h"]==modern
+
+
+def test_native_visual_replay_detects_a_replaced_hero_tile_even_in_valid_source_release():
+    from dataclasses import replace
+    from skeleton.ai.webcrawler.dragon_native_projects import digest
+    from skeleton.ai.webcrawler.dragon_native_puzzle_graphics import pixel_header
+    game=ProductionRequest(
+        title="Original Actor Runtime",
+        style="fixed_screen_puzzle",targets=("pc_linux",),seed=41,
+        original_work_attested=True,
+        portable_design=PortableGameDesign(
+            hero="robot",quest_theme="volcano",stages=1,
+        ),
+    )
+    expected=_render(game,"pc_linux")
+    fake=dict(expected.files)
+    fake["include/dragon_puzzle_pixels.h"]=pixel_header(
+        hero="hatchling",theme="forest",palette="dmg_green",seed=41)
+    manipulated=replace(expected,files=fake,digest=digest(fake))
+    source,_=make_source_release(manipulated,game)
+    with pytest.raises(ValueError,match="native runnable source"):
+        _puzzle_proof(source)
