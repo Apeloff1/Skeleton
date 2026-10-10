@@ -79,6 +79,7 @@ class TraceabilitySpineTests(unittest.TestCase):
             "machine/protocol_registry.json",
             "machine/maturity_registry.json",
             "machine/master_traceability.json",
+            "machine/ai_file_tree.json",
             "scripts/check_nfr_registry.py",
             "scripts/check_master_traceability.py",
             "skeleton/contracts/operation.py",
