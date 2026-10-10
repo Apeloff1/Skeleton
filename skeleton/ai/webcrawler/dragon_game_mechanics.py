@@ -90,6 +90,26 @@ class MechanicInsight:
     examples: tuple[str, ...]
     user_confirmed: bool
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.mechanic, Mechanic):
+            raise ValueError("mechanic insight identity invalid")
+        if (type(self.observation_count) is not int or self.observation_count < 1
+                or type(self.supporting_sessions) is not int
+                or not 1 <= self.supporting_sessions <= self.observation_count):
+            raise ValueError("mechanic insight support counts invalid")
+        if (type(self.preference_score) not in (int, float)
+                or not -1 <= self.preference_score <= 1
+                or not isfinite(self.preference_score)
+                or type(self.confidence) not in (int, float)
+                or not 0 <= self.confidence <= 1
+                or not isfinite(self.confidence)):
+            raise ValueError("mechanic insight numerical evidence invalid")
+        if (not isinstance(self.examples, tuple) or len(self.examples) > 5
+                or any(not isinstance(note, str) or not note or not note.isprintable()
+                       for note in self.examples)
+                or type(self.user_confirmed) is not bool):
+            raise ValueError("mechanic insight review state invalid")
+
 
 @dataclass(frozen=True)
 class GameTasteProfile:
