@@ -121,3 +121,47 @@ def test_read_only_authoring_preview_performs_actual_exact_solver_pass():
     assert [x["crates"] for x in preview["stages"]]==[1,2]
     assert all(x["solver_states"]>0 for x in preview["stages"])
     assert "not compiled" in preview["scope"]
+
+
+
+def test_author_replay_rejects_modified_generated_c_game_even_with_matching_zip_hash():
+    from skeleton.ai.webcrawler.dragon_native_puzzle_authoring import validate_authored_levels
+    from skeleton.ai.webcrawler.dragon_native_desktop import _puzzle_proof
+    from skeleton.ai.webcrawler.dragon_native_production import (
+        make_source_release,ProductionRequest,PortableGameDesign,_render,
+    )
+    from skeleton.ai.webcrawler.dragon_native_projects import NativeProject,digest
+    from dataclasses import replace
+
+    levels=(BASE_LEVELS[0],)
+    approved=authored_request(levels)
+    native=_render(approved,"pc_linux")
+    original=dict(native.files)
+    assert "if(!perform(trace[i]))return 4;" in original["src/main.c"]
+    original["src/main.c"]=original["src/main.c"].replace(
+        "if(!perform(trace[i]))return 4;",
+        "if(!perform(trace[i]))return 0;",
+        1,
+    )
+    # Recreate the same source-only cryptographic envelope with altered
+    # generated game behavior; independent emitter replay must still reject.
+    tampered=replace(native,files=original,digest=digest(original))
+    payload,_=make_source_release(tampered,approved)
+    with pytest.raises(ValueError,match="native runnable source"):
+        _puzzle_proof(payload)
+
+
+def test_author_replay_rejects_puzzle_layout_inconsistent_with_generated_header():
+    from dataclasses import replace
+    from skeleton.ai.webcrawler.dragon_native_projects import digest
+    from skeleton.ai.webcrawler.dragon_native_desktop import _puzzle_proof
+    game=authored_request((BASE_LEVELS[0],))
+    native=_render(game,"pc_linux")
+    files=dict(native.files)
+    files["include/dragon_puzzle.h"]=files["include/dragon_puzzle.h"].replace(
+        "#define LEVEL_COUNT 1","#define LEVEL_COUNT 2",1,
+    )
+    modified=replace(native,files=files,digest=digest(files))
+    release,_=make_source_release(modified,game)
+    with pytest.raises(ValueError,match="native runnable source"):
+        _puzzle_proof(release)
