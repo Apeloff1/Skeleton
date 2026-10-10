@@ -150,7 +150,7 @@ def _assert_state(world: PlayableWorld, state: PlayState) -> None:
 
 
 def initial_state(world: PlayableWorld, *, authorized: bool) -> PlayState:
-    if not authorized:
+    if authorized is not True:
         raise PermissionError("game session creation requires authorization")
     if not isinstance(world, PlayableWorld):
         raise GameplayError("PlayableWorld required")
@@ -165,10 +165,10 @@ def advance(
     world: PlayableWorld, state: PlayState, action: str, *,
     authorized: bool,
 ) -> PlayState:
-    if not authorized:
+    if authorized is not True:
         raise PermissionError("game action requires authorization")
     _assert_state(world, state)
-    if action not in _MOVES or not isinstance(action, str):
+    if not isinstance(action, str) or action not in _MOVES:
         raise GameplayError("unsupported player action")
     if state.status != "playing":
         raise GameplayError("terminal session cannot accept more actions")
@@ -216,7 +216,7 @@ def play_actions(
     world: PlayableWorld, actions: Sequence[str], *,
     authorized: bool,
 ) -> GameReplay:
-    if not authorized:
+    if authorized is not True:
         raise PermissionError("game replay execution requires authorization")
     if not isinstance(actions, (tuple, list)) or len(actions) > MAX_REPLAY_ACTIONS:
         raise GameplayError("invalid or oversized replay action sequence")
@@ -239,7 +239,7 @@ def verify_replay(
     world: PlayableWorld, replay: GameReplay, *,
     authorized: bool,
 ) -> None:
-    if not authorized:
+    if authorized is not True:
         raise PermissionError("gameplay replay validation requires authorization")
     if not isinstance(world, PlayableWorld) or not isinstance(replay, GameReplay):
         raise GameplayError("typed world and replay required")
@@ -266,7 +266,7 @@ def verify_replay(
 
 def demonstrate_solvable(world: PlayableWorld, *, authorized: bool) -> GameReplay:
     """Execute each level's hazard-free proof with the real transition engine."""
-    if not authorized:
+    if authorized is not True:
         raise PermissionError("game solvability execution requires authorization")
     if not isinstance(world, PlayableWorld):
         raise GameplayError("PlayableWorld required")
