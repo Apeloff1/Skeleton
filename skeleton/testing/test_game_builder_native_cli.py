@@ -27,6 +27,29 @@ from skeleton.ai.game_builder.native_game_cli import build_game
     ("linux_desktop", {"game.c", "CMakeLists.txt", "manifest.json"}),
     ("macos_modern", {"game.c", "CMakeLists.txt", "manifest.json"}),
 ])
+def test_native_game_rejects_symlink_rights_source_before_any_binary_or_directory(tmp_path):
+    from skeleton.ai.game_builder.native_game_cli import build_game
+
+    original = tmp_path / "evidence.txt"
+    original.write_bytes(b"New authored original play mechanics.")
+    alias = tmp_path / "evidence-alias.txt"
+    try:
+        alias.symlink_to(original)
+    except OSError:
+        pytest.skip("symlink unavailable")
+    result_folder = tmp_path / "never-created"
+    with pytest.raises(ValueError, match="bounded local regular file"):
+        build_game(
+            target="windows_modern", basis="bandai_wonderswan",
+            project_id="owned-homebrew", title="Own Game", seed=19,
+            width=17, height=15, levels=3,
+            collectibles=3, hazards=4, health=4,
+            rights_evidence=alias, creative_identity=("own art", "own gameplay"),
+            output=result_folder, authorized=True,
+        )
+    assert not result_folder.exists()
+
+
 def test_native_game_cli_produces_real_source_for_target_without_shell(tmp_path, target, files):
     receipt = tmp_path / "my-original-authorship.txt"
     receipt.write_text("Original game authored by the current user. No inherited ROMs.", encoding="utf-8")
