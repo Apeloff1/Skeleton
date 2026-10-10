@@ -288,4 +288,14 @@ def route_revisits(proof: RouteProof) -> int:
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits"]
+def route_turns(proof: RouteProof) -> int:
+    """Count directional changes, a device-independent navigation signal."""
+    if not isinstance(proof, RouteProof):
+        raise MultipathError("typed RouteProof required")
+    if not proof.actions:
+        return 0
+    return sum(a != b for a, b in zip(proof.actions, proof.actions[1:]))
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns"]
