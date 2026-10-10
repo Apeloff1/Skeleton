@@ -85,7 +85,7 @@ export default function DesignReviewRoute() {
   };
   if(!gameId)return <SafeAreaView style={s.safe}><View style={s.panel}>
     <Text style={s.heading}>Select a real game</Text>
-    <Text style={s.copy}>Design review needs a valid game context. It cannot guess a demo or another user's project.</Text>
+    <Text style={s.copy}>Design review needs a valid game context. It cannot guess a demo or another user project.</Text>
     <TouchableOpacity style={s.primary} accessibilityRole="button" onPress={()=>reopen('/my-builds')}>
       <Text style={s.primaryText}>Choose a build →</Text>
     </TouchableOpacity>

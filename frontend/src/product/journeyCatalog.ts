@@ -99,7 +99,7 @@ export const PRODUCT_JOURNEYS: readonly ProductJourney[] = [
       { id: 'workbench', title: 'Open World Workbench', description: 'Inspect world evidence and forge missing artifacts.', href: '/world-workbench', requiresBuild: true },
       { id: 'world', title: 'Create a world', description: 'Define regions, ecology and world rules from the game.', href: '/worldforge', acceptsBuild: true },
       { id: 'scene', title: 'Compose a scene', description: 'Build a scene for this game.', href: '/compose-scene', requiresBuild: true },
-      { id: 'assets', title: 'Build assets', description: 'Generate art grounded in this game's knowledge.', href: '/asset-genesis', requiresBuild: true },
+      { id: 'assets', title: 'Build assets', description: 'Generate art grounded in this game knowledge.', href: '/asset-genesis', requiresBuild: true },
       { id: 'mechanics', title: 'Engineer mechanics', description: 'Mount and inspect game systems.', href: '/systems-forge', requiresBuild: true },
       { id: 'review', title: 'Review your design', description: 'Compile an evidence-guided design brief.', href: '/design-review', requiresBuild: true },
       { id: 'studio', title: 'Integrate the project', description: 'Continue with the integrated game build.', href: '/studio', acceptsBuild: true },
