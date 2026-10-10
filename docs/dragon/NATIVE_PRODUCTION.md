@@ -315,6 +315,74 @@ color-index data, not exact DMG or NES calibrated display colors.
 Previews are cancellable if user controls change, and no placeholder
 sprite is falsely shown when the preview endpoint is unavailable.
 
+### Playable user-authored campaigns and verified live gameplay physics
+
+**New native gameplay capabilities** extend the existing original C99
+Sokoban editor beyond source prototypes.
+
+- In-game H now computes the shortest **current-position** path through a
+  bounded C99 BFS of player/crate states, rather than incorrectly returning
+  only the starter move. It handles crate pushes, already completed stages,
+  legitimate deviations and failed bounded searches. The compiled binary
+  provides \`--hint-selftest\` for every actual generated level.
+- \`--simulate LEVEL COMMANDS\` replays up to 400 \`wasdur\` moves with
+  genuine native crate collision, undo and reset. It reports the full player,
+  crate, move and push state and a deterministic FNV state digest.
+- A separate Python physics interpreter independently reproduces those
+  transitions. The native Linux release builder executes **four distinct
+  movement traces per level**, compares every field and refuses to package
+  a mismatched executable. The source-hash audit additionally regenerates
+  the canonical C game and header from the original level specification.
+- **Opt-in procedural stages** add bounded walls and routes to hand-authored
+  original seeds. Every admitted changed map must pass the authoritative
+  exact shortest-path solver. Unsupported or unsolvable variants fall
+  back to clearly labeled original solutions; legacy geometry is preserved
+  by default.
+- **Direct original puzzle authoring** supports real 12×10 boards with
+  wall \`#\`, floor \`.\`, avatar \`@\`, crate \`$\`, and goal \`o\`. The app
+  has a touch-friendly multi-stage grid editor, paint tools and a separate
+  Validate action. Up to eight distinct stages are checked by bounded BFS
+  before their exact rows can become a compiled native game.
+- Authored game boards enter both the canonical request digest and
+  source-only ZIP. The standalone Linux builder accepts the same boards
+  via a strict, versioned JSON file and executes their native gameplay
+  tests. No HTTP route accepts executable C/source code or compiles on
+  behalf of an untrusted visitor.
+
+Author a puzzle in the creator screen under **fixed screen puzzle → Author
+my own boards**, or generate a canonical starter:
+
+\`\`\`sh
+# Prepare original level pack JSON using the strict Python API.
+python - <<'PY'
+import json
+from pathlib import Path
+from skeleton.ai.webcrawler.dragon_native_puzzle_authoring import starter_authored_levels
+Path("original-levels.json").write_text(json.dumps(starter_authored_levels(2), indent=2))
+PY
+
+# Build an actual standalone original C99 Linux game from that map content.
+python -m skeleton.ai.webcrawler.dragon_native_desktop build \
+  --title "Original Authored Puzzle Quest" \
+  --authored-levels ./original-levels.json \
+  --difficulty 5 --attest-original-rights \
+  --authorize-local-build --out ./built-original-game
+
+# Or generate new BFS-vetted level routes:
+python -m skeleton.ai.webcrawler.dragon_native_desktop build \
+  --title "Original Labyrinth" --stages 4 --difficulty 8 \
+  --procedural-levels --attest-original-rights \
+  --authorize-local-build --out ./original-labyrinth
+\`\`\`
+
+The level-pack JSON has exact structural fields, no scripts, no hidden
+assets or external URLs, small file bounds, duplicate-level rejection,
+source fingerprints and no automatic legal clearance. All C compilations
+are restricted to the local operator build boundary, not Expo or the
+research crawler. Real gameplay verification covers the original Sokoban
+rules, not every game mechanic available in the broader multi-genre
+factory.
+
 ### Release verification and index integrity
 
 A release index is **not trusted merely because its archive hashes match**.
