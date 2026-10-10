@@ -27,6 +27,17 @@ from .character_motor import (
     CharacterMotorSettings,
     KinematicCharacterMotor,
 )
+from .vehicle import (
+    MAX_VEHICLE_WHEELS,
+    RaycastVehicle,
+    VehicleControl,
+    VehicleSettings,
+    VehicleState,
+    VehicleUpdateResult,
+    WheelContact,
+    WheelSettings,
+    step_vehicles,
+)
 from .calculations import (
     PhysicsAggregate,
     aggregate_physics,
@@ -324,4 +335,13 @@ __all__ = [
     "get_default_broadphase_accelerator",
     "close_default_broadphase_accelerator",
     "world_inertia",
+    "MAX_VEHICLE_WHEELS",
+    "RaycastVehicle",
+    "VehicleControl",
+    "VehicleSettings",
+    "VehicleState",
+    "VehicleUpdateResult",
+    "WheelContact",
+    "WheelSettings",
+    "step_vehicles",
 ]
