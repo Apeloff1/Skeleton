@@ -188,6 +188,12 @@
       "owner_plane": "observability",
       "authority": "conditional-authoritative",
       "status": "local-observations-only"
+    },
+    {
+      "domain_id": "dragon-conversation-micro-projection",
+      "owner_plane": "retrieval",
+      "authority": "derived",
+      "status": "canonical-lifecycle-hooks-implemented-consent-runtime-binding-required"
     }
   ]
 }

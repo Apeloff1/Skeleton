@@ -4,6 +4,22 @@ on:
     branches: [main]
     paths:
       - "skeleton/ai/webcrawler/dragon_*.py"
+      - "skeleton/ai/game_builder/**"
+      - "backend/routes/dragon_academy.py"
+      - "backend/tests/test_dragon_academy_routes.py"
+      - "backend/tests/test_dragon_delivery_routes.py"
+      - "backend/core/dragon_*.py"
+      - "backend/core/conversations.py"
+      - "backend/server.py"
+      - "scripts/check_provider_bootstrap.py"
+      - "backend/routes/ai.py"
+      - "backend/tests/test_dragon_runtime_bridge.py"
+      - "backend/tests/test_dragon_conversation_binding.py"
+      - "tests/test_dragon_*.py"
+      - "tests/test_game_niche_research.py"
+      - "frontend/features/Jeeves/companion/**"
+      - "frontend/scripts/test-dragon-wisdom.cjs"
+      - "frontend/scripts/test-dragon-delivery.cjs"
       - "tests/test_ai*dragon*.py"
       - "frontend/src/components/Dragon*.tsx"
       - "frontend/src/components/dragon*.ts"
@@ -16,6 +32,22 @@ on:
     branches: [main]
     paths:
       - "skeleton/ai/webcrawler/dragon_*.py"
+      - "skeleton/ai/game_builder/**"
+      - "backend/routes/dragon_academy.py"
+      - "backend/tests/test_dragon_academy_routes.py"
+      - "backend/tests/test_dragon_delivery_routes.py"
+      - "backend/core/dragon_*.py"
+      - "backend/core/conversations.py"
+      - "backend/server.py"
+      - "scripts/check_provider_bootstrap.py"
+      - "backend/routes/ai.py"
+      - "backend/tests/test_dragon_runtime_bridge.py"
+      - "backend/tests/test_dragon_conversation_binding.py"
+      - "tests/test_dragon_*.py"
+      - "tests/test_game_niche_research.py"
+      - "frontend/features/Jeeves/companion/**"
+      - "frontend/scripts/test-dragon-wisdom.cjs"
+      - "frontend/scripts/test-dragon-delivery.cjs"
       - "tests/test_ai*dragon*.py"
       - "frontend/src/components/Dragon*.tsx"
       - "frontend/src/components/dragon*.ts"
@@ -41,7 +73,7 @@ jobs:
       - name: Install focused test runtime
         run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
       - name: Compile Dragon modules
-        run: python -m compileall -q skeleton/ai/webcrawler
+        run: python -m compileall -q skeleton/ai/webcrawler skeleton/ai/game_builder backend/routes/dragon_academy.py
       - name: Run Dragon regression suite
         env:
           PYTHONPATH: "."
@@ -55,6 +87,42 @@ jobs:
           fi
           printf 'Running %s Dragon test modules\n' "${#tests[@]}"
           python -m pytest -q --noconftest "${tests[@]}"
+      - name: Dragon wisdom and canonical owner integration
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          set -euo pipefail
+          # Legacy forge tests bootstrap package modules into sys.modules.
+          # Process isolation keeps class identities canonical for each suite.
+          for test in \
+            tests/test_ai_game_builder_runtime.py \
+            tests/test_ai_game_builder_overengineering_runtime.py \
+            tests/test_ai_game_builder_governance.py \
+            tests/test_game_builder_knowledge_rights_bridge.py \
+            tests/test_game_builder_reviewed_knowledge.py \
+            tests/test_game_research_foundation.py \
+            tests/test_game_niche_research.py \
+            tests/test_dragon_almanacs.py \
+            tests/test_dragon_delivery.py \
+            tests/test_dragon_wisdom_pyramid.py \
+            tests/test_dragon_wisdom_refresh_bridge.py \
+            tests/test_dragon_recrawl_dispatch.py \
+            tests/test_dragon_wisdom_authority.py \
+            tests/test_dragon_wisdom_operational.py \
+            tests/test_dragon_wisdom_integration.py \
+            tests/test_dragon_visual_play_integration.py \
+            tests/test_dragon_evidence_timestamp_compatibility.py; do
+            python -m pytest -q --noconftest "$test"
+          done
+      - name: Authenticated Dragon companion snapshots
+        run: |
+          python -m pip install --disable-pip-version-check "fastapi==0.142.2" "httpx==0.28.1" "bcrypt>=4,<6" "PyJWT>=2,<3" "email-validator>=2,<3"
+          PYTHONPATH=.:backend PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest backend/tests/test_dragon_academy_routes.py backend/tests/test_dragon_delivery_routes.py
+      - name: Canonical Dragon resource and conversation lifecycle
+        run: |
+          python -m pip install --disable-pip-version-check "pymongo>=4,<5" "motor>=3,<4" "pytest-asyncio>=0.24,<2" "python-dotenv>=1,<2" "pydantic-settings>=2,<3"
+          PYTHONPATH=.:backend PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest -p pytest_asyncio.plugin backend/tests/test_dragon_runtime_bridge.py backend/tests/test_dragon_conversation_binding.py backend/tests/test_conversation_storage_admission.py backend/tests/test_conversation_regeneration.py backend/tests/test_conversation_governance.py
   frontend:
     name: Dragon Frontend
     runs-on: ubuntu-latest
@@ -75,5 +143,9 @@ jobs:
         run: yarn test:dragon-companion
       - name: Cross-language canonical wire parity
         run: yarn test:dragon-wire
+      - name: Final Dragon wisdom display
+        run: yarn test:dragon-wisdom
+      - name: Dragon knowledge-to-native delivery
+        run: node scripts/test-dragon-delivery.cjs
       - name: TypeScript compile
         run: yarn typecheck

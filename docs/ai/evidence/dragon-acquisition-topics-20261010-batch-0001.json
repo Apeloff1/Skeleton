@@ -1,0 +1,884 @@
+{
+  "schema": "skeleton.dragon.acquisition_topic_triage.v1",
+  "batch_path": "docs/ai/evidence/dragon-acquisition-20261010-batch-0001.json",
+  "independent_support_added": 0,
+  "canonical_admission": false,
+  "topics": [
+    {
+      "topic_path": [
+        "**Design**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0017fcb9b1445e4f0a6949fb81b3fe01159175a23ca300ff1350938c2b2a0974",
+          "url": "https://medium.com/@lucaoropallo/26-nudges-to-use-in-videogames-to-manipulate-the-player-242de739e59b",
+          "representation_sha256": "3429db120059e418abe0d154928f7486e1e1d8ffd448318217af03f4e3678515",
+          "kind": "availability_and_identity_metadata_only"
+        },
+        {
+          "source_id": "source-019f4f84fc06cd14235d76b9fd7fcd5d7c9e42eab1d73455c750411ccc35f457",
+          "url": "https://www.youtube.com/watch?v=3pHqSJwPFWQ",
+          "representation_sha256": "b950da5b6ec20d7523bb3c00d1c874db12e8668aed1771f67b735f589aeb12a4",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-019f4f84fc06cd14235d76b9fd7fcd5d7c9e42eab1d73455c750411ccc35f457",
+          "finding": "retrieval_failed",
+          "scope": "This tool request only; does not establish global unavailability or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "Haxe"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-001ee27d0ace784cc909ff7a32f86240a8961271579a751470b1f5f4de7c672e",
+          "url": "https://github.com/haxenme/nme",
+          "representation_sha256": "b9ba5b38f5564632243e7c7ac8506884f57c12cad771eb50134f8f342281d7eb",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Engines**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0029a303f9d89cbf714d2db7905597cdc0e3ab1c9902a6b9ec618abe595c7be0",
+          "url": "https://docs.google.com/spreadsheets/d/1z1RV6w4HjPODFcao34h72Vw-9KxtQ9rv0ZM7folTUMU",
+          "representation_sha256": "c3630640dfd0e2124b39026385107f012b8076b6cf1632b25302c6f26b1c28bc",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-0029a303f9d89cbf714d2db7905597cdc0e3ab1c9902a6b9ec618abe595c7be0",
+          "finding": "retrieval_failed",
+          "scope": "This tool request only; does not establish global unavailability or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Marketing**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-00328f55511a334ffff5415354fdf44a09acf33cfd6d0548c382db3ad7950f82",
+          "url": "https://www.youtube.com/watch?v=9fiiypUevq4",
+          "representation_sha256": "8eae6782ed7c0ae88954559120f5ae1b2aadbbdf30bf057ca163d4382084a64d",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-00328f55511a334ffff5415354fdf44a09acf33cfd6d0548c382db3ad7950f82",
+          "finding": "retrieval_failed",
+          "scope": "This tool request only; does not establish global unavailability or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Learning",
+        "Game Development"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-006c2c3213ab176ad6de6e21c7121926e7821ba8e05a187bc55130429cb2f5ff",
+          "url": "https://github.com/ellisonleao/magictools",
+          "representation_sha256": "2b270004eb2179a081145c68e2ba5d20d75a1ed73a3ab122426d729f15b7b0a3",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Resources**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-006c2c3213ab176ad6de6e21c7121926e7821ba8e05a187bc55130429cb2f5ff",
+          "url": "https://github.com/ellisonleao/magictools",
+          "representation_sha256": "2b270004eb2179a081145c68e2ba5d20d75a1ed73a3ab122426d729f15b7b0a3",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Code**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0074914175ab91ee26e7bd0bbc0f0124ea73fc0bc4d6ccba0d49783ad1da9ff6",
+          "url": "https://www.gamasutra.com/blogs/DannyWeinbaum/20171201/310813/Foliage_Optimization_in_Unity.php",
+          "representation_sha256": "d0e346868e8463e3c1d8aafd2a58ee1b9fbf6a49f588a15f0e7850ed2fc740e7",
+          "kind": "availability_and_identity_metadata_only"
+        },
+        {
+          "source_id": "source-00b1036cc35c16061907bedf5d4547dfc248f58618ad92a222ba71aa8de20172",
+          "url": "https://github.com/rigtorp/awesome-modern-cpp",
+          "representation_sha256": "95148536d71dfc2420cce679551f036fb59a096068c2e4f52201f09ba43790d5",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-0074914175ab91ee26e7bd0bbc0f0124ea73fc0bc4d6ccba0d49783ad1da9ff6",
+          "finding": "redirect_to_non_target_index",
+          "scope": "This tool request only; does not establish global unavailability or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Browser-Based",
+        "Arcade"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0079e443fa868be2843932b6da4f8245369ef9c001101dd6ecbefd491ad94620",
+          "url": "https://github.com/AdamAtomic/Mode",
+          "representation_sha256": "c45b0cfd1a83b947263ac77efb69d435984a48f6c533b9126749218e4bac1932",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Legend"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-008a93bad2920ed48b253f9e1aa82cbec2330e6a93a540ca9e851f23e747a035",
+          "url": "https://en.wikipedia.org/wiki/ISC_license",
+          "representation_sha256": "4eff7725c38799c05cdefdd676330e6233f26d91aece7b7310c498cf9c8a5444",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Art**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-008ea52b239c6161337eaeb7acc765dd381208d0e821b886d5740ab326a44e78",
+          "url": "https://www.gamedev.net/articles/visual-arts/color-palettes-r4964/",
+          "representation_sha256": "f0459636bb065550b961855662237a1dec65c8f8f01bb0daa19feea9f0dafd80",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "C++"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-00a58dcc48a9de1df6833748f055a301fa19f236d3c87263bda18df0d76f041c",
+          "url": "https://github.com/alecthomas/entityx",
+          "representation_sha256": "b4a47e48aeaf0ec49dd8c94ae6e68060a7c484d023ebc991ccdb4999a6aee1f4",
+          "kind": "availability_and_identity_metadata_only"
+        },
+        {
+          "source_id": "source-00b5ed13c777c2a9900736fdc4271d7d81069664bf667b11c390622c3addf170",
+          "url": "https://github.com/boostorg",
+          "representation_sha256": "89b5ecf36a06ce5b11709fed37a431bf6c275be3ed8540312c356a5ceb562251",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-00b5ed13c777c2a9900736fdc4271d7d81069664bf667b11c390622c3addf170",
+          "finding": "retrieval_failed",
+          "scope": "This tool request only; does not establish global unavailability or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Specialty Topics",
+        "Shaders"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-00a9aac46fadea57c3609607787809097e5677413a539c050fe7679a32c387c6",
+          "url": "https://mattdesl.svbtle.com/drawing-lines-is-hard",
+          "representation_sha256": "b07ff2fdaf5d63b0f964fb998e3ff453a683a0fc48053fbcee54c4a7aafde0f3",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Table of Contents",
+        "Engines and Frameworks"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-00e8e04beac665c46defdefe1a705b433d24e848d9499e7739587c303bd7ac5e",
+          "url": "https://github.com/GearChicken/MINX",
+          "representation_sha256": "8c71dececb300dd8d706e39bf6be5eb2be31a5ab22fd030e820346ff112aa6e9",
+          "kind": "availability_and_identity_metadata_only"
+        },
+        {
+          "source_id": "source-01a84d154f8be78ef9acdf86777b50bdbe8502d35f2b19d9179e14e76fc44e01",
+          "url": "https://github.com/CRYTEK-CRYENGINE/CRYENGINE",
+          "representation_sha256": "3b4de7492b0ccb7ffed7562246cd0ac0a1d86cb6a55f8ded0f1139529e5a48ef",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-01a84d154f8be78ef9acdf86777b50bdbe8502d35f2b19d9179e14e76fc44e01",
+          "finding": "retrieval_failed",
+          "scope": "This tool request only; does not establish global unavailability or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Browser-Based",
+        "Puzzle"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-00ec5e22ea9244a25cbeaa5c3f8810f7552dbdc537035b0a3cda8cdd4bedf511",
+          "url": "http://antila.github.io/ludum-dare-28/",
+          "representation_sha256": "3626ad58c82dfd153bb2faaf915f4745ac57f5866c2959143ef18caa338a6d33",
+          "kind": "availability_and_identity_metadata_only"
+        },
+        {
+          "source_id": "source-0144148609dd1551842cb2ccb7edd85d499eb44f170b4aa4f568b53ab91af55b",
+          "url": "https://github.com/dart-lang/pop-pop-win",
+          "representation_sha256": "0af181e7319b1f592a58786f77832e81acadb67158ff879316125cfdb3103bc4",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-00ec5e22ea9244a25cbeaa5c3f8810f7552dbdc537035b0a3cda8cdd4bedf511",
+          "finding": "retrieval_failed",
+          "scope": "This tool request only; does not establish global unavailability or rights expiry."
+        },
+        {
+          "source_id": "source-0144148609dd1551842cb2ccb7edd85d499eb44f170b4aa4f568b53ab91af55b",
+          "finding": "repository_move_unresolved",
+          "scope": "This tool request only; does not establish global unavailability or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Design",
+        "UI/UX"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0107c480ea6702f56b45247cb2920ca6cb99c8b97bb0dea22fea4ab1821f4b75",
+          "url": "https://www.notion.so/onewithmachines/WE-CAN-FIX-IT-IN-UI-9f588869324a45e2b2d0595546ce77d1",
+          "representation_sha256": "511cc27777d6a5e08d72b0dbc75b8c3dccd27ff1613c5f4e0f544ebf25eb9fbf",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-0107c480ea6702f56b45247cb2920ca6cb99c8b97bb0dea22fea4ab1821f4b75",
+          "finding": "retrieval_failed",
+          "scope": "This tool request only; does not establish global unavailability or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Art",
+        "2D/Illustration"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0122c9dc8a5c0bb5ce34ed12d037399d8e298d86fabaaf6557067002af5b4a95",
+          "url": "https://www.youtube.com/playlist?list=PLR2KBLDDnZz3Ec8LZ66IDS--P9g3TdwOM",
+          "representation_sha256": "59ce8ac90c3705962b2057f6a36958307803f63ec0b3a37501f754beeec64aae",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-0122c9dc8a5c0bb5ce34ed12d037399d8e298d86fabaaf6557067002af5b4a95",
+          "finding": "metadata_shell_only",
+          "scope": "This tool request only; does not establish global unavailability or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Programming"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0127359362628c5a5942c75f37a97343f94447e5065fe21f6c8097d7c65174fe",
+          "url": "https://laroldsretrogameyard.com/category/tutorials/gba/",
+          "representation_sha256": "ed6e40c0848cc6e3c9336c0b02f28e3db0490b322f6c66ac591c7f66795a4db5",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "JavaScript"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-012aa7329a7637ac4965763a1d62e8694fcd6a1791985d56ca1d6852a66fe8ae",
+          "url": "https://createjs.com/",
+          "representation_sha256": "300acc54905ea574387bf2863af49e0dcf7bd72d9ca671a62703a9f71442ffe6",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-012aa7329a7637ac4965763a1d62e8694fcd6a1791985d56ca1d6852a66fe8ae",
+          "finding": "metadata_shell_only",
+          "scope": "This tool request only; does not establish global unavailability or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Tools / Software",
+        "Audio Tools"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0130112309cb396effa79fe576ccced152fecd39c84e61da612af55735ddd1a2",
+          "url": "https://lmms.io/",
+          "representation_sha256": "182664b8f01b6d700e3561af5455181dee99d838ab57b5539270c8d9c7d9919e",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-0130112309cb396effa79fe576ccced152fecd39c84e61da612af55735ddd1a2",
+          "finding": "retrieval_failed",
+          "scope": "This tool request only; does not establish global unavailability or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Table of Contents",
+        "Music and Audio Editors"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0130112309cb396effa79fe576ccced152fecd39c84e61da612af55735ddd1a2",
+          "url": "https://lmms.io/",
+          "representation_sha256": "182664b8f01b6d700e3561af5455181dee99d838ab57b5539270c8d9c7d9919e",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-0130112309cb396effa79fe576ccced152fecd39c84e61da612af55735ddd1a2",
+          "finding": "retrieval_failed",
+          "scope": "This tool request only; does not establish global unavailability or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Specialty Topics",
+        "Scripting"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-01379ab1763314b1070cb078affd53ff68780cadd56b4907f646a9190bf752e4",
+          "url": "https://caiorss.github.io/C-Cpp-Notes/embedded_scripting_languages.html",
+          "representation_sha256": "bafa715e075060833cb8cada881141a0133d2ed17e641adff2463aaa11546faf",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Plugins and scripts",
+        "Godot 3"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0145144fb7eace30e06d603d412e11ff51cedd6744c26d316c6151296b51bd8e",
+          "url": "https://github.com/vnen/godot-tiled-importer",
+          "representation_sha256": "fd6a0685e98f26424a53d30d227626d10a81ca50a4157c9f1e2c556c1624424c",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Browser-Based",
+        "Sandbox"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0145dbcbf75cb72b2fd7ef3537a3154ea91221bbad9787e0e06bc876a199c7e1",
+          "url": "https://github.com/B-Train04/Project-Cube",
+          "representation_sha256": "495df954ad068fa402522dd5563cbf4320de79dd62a8f172de6a7eb913b79f04",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-0145dbcbf75cb72b2fd7ef3537a3154ea91221bbad9787e0e06bc876a199c7e1",
+          "finding": "retrieval_failed",
+          "scope": "This tool request only; does not establish global unavailability or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "Rust"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-01515317a41bda91a7a84499628ffe70bf7ef8f0337c27160cb66358d7679062",
+          "url": "https://github.com/linebender/druid",
+          "representation_sha256": "7b4631ce9acde6ffe211bdf05d6d15ae83afd83517f3b2607fa32d85813c7d89",
+          "kind": "availability_and_identity_metadata_only"
+        },
+        {
+          "source_id": "source-0196320b1c68cf2f18c234cccd488d776bd6edd4529e008484163e0e874cd522",
+          "url": "https://github.com/dimforge/rapier",
+          "representation_sha256": "a0458200d6cbf1a9fc955a5a2ed43389f5d13a23434c6903fdf45390fa77286e",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Talks [![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://github.com/sindres",
+        "GDC Talks"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0161312c1a44ecea2fff19f7b30abfaa02cee63aa1804469d7801c2021e3cc64",
+          "url": "http://www.gdcvault.com/play/1018048/):",
+          "representation_sha256": "1336a0a06ffa597ff27941b7e59b26d8731ea4067ccd0ed2b614072f68927319",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-0161312c1a44ecea2fff19f7b30abfaa02cee63aa1804469d7801c2021e3cc64",
+          "finding": "retrieval_failed",
+          "scope": "This tool request only; does not establish global unavailability or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Unity**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0179bc5a7f4018ea7e6d4c882f29760f5e527e41d23aeac7f7a65925de6a679d",
+          "url": "https://youtu.be/84A1FcQt9v4",
+          "representation_sha256": "90ccb4e9cd0316f7d9088d9da3f7746e75f12959037ade24a6c57d1bae8bdd73",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-0179bc5a7f4018ea7e6d4c882f29760f5e527e41d23aeac7f7a65925de6a679d",
+          "finding": "retrieval_failed",
+          "scope": "This tool request only; does not establish global unavailability or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Native",
+        "Platform"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0181ab472b9130feb578f57a7a506342625fe6a681a4c1be28906ea8dae25f68",
+          "url": "https://github.com/riksweeney/edgar",
+          "representation_sha256": "07de293b2a8708cab98d80b6da1e3c397cccc72d877d5ed4ad99f91a9c0b2144",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Modules",
+        "Godot 4"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0196320b1c68cf2f18c234cccd488d776bd6edd4529e008484163e0e874cd522",
+          "url": "https://github.com/dimforge/rapier",
+          "representation_sha256": "a0458200d6cbf1a9fc955a5a2ed43389f5d13a23434c6903fdf45390fa77286e",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Plugins and scripts",
+        "Godot 4"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID assigned only by existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-01a3a21cbe7c5d582b68c9e2db7e35781cc3b9302563dbd806a65b67f565473c",
+          "url": "https://github.com/googleforgames/agones",
+          "representation_sha256": "7c79324c867ceded67834137dec7089e4975b90a7c049986c75d6aa5cfb2a3ca",
+          "kind": "availability_and_identity_metadata_only"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-01a3a21cbe7c5d582b68c9e2db7e35781cc3b9302563dbd806a65b67f565473c",
+          "finding": "repository_move_unresolved",
+          "scope": "This tool request only; does not establish global unavailability or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    }
+  ],
+  "license_observation": {
+    "url": "https://github.com/haxenme/nme/blob/master/LICENSE",
+    "git_blob_sha": "9256e44ca9594c9e5f8890ebe1caac08b48e059b",
+    "content_sha256": "768b29c7c27ea17fea263fafd8a6064d3ef058a349b708c577f428cc859c6029",
+    "checked_at": "2026-10-10T17:19:52.014Z",
+    "source_id": "source-001ee27d0ace784cc909ff7a32f86240a8961271579a751470b1f5f4de7c672e",
+    "statement": "The retrieved LICENSE identifies MIT and names nmehost in its 2013 copyright notice.",
+    "scope": "License-file metadata only; covered-file inventory, third-party assets, patent issues and dataset authorization not determined.",
+    "review_state": "unreviewed",
+    "training_authorized": false
+  },
+  "entity_candidates": [
+    {
+      "provider": "github_repository_metadata",
+      "provider_id": "341715",
+      "kind": "game",
+      "title": "Mode",
+      "url": "https://github.com/AdamAtomic/Mode",
+      "source_id": "source-0079e443fa868be2843932b6da4f8245369ef9c001101dd6ecbefd491ad94620",
+      "representation_sha256": "c45b0cfd1a83b947263ac77efb69d435984a48f6c533b9126749218e4bac1932",
+      "identity_verified_across_providers": false,
+      "edition": null,
+      "admission": "unreviewed_metadata_candidate"
+    },
+    {
+      "provider": "github_repository_metadata",
+      "provider_id": "37363489",
+      "kind": "game",
+      "title": "edgar",
+      "url": "https://github.com/riksweeney/edgar",
+      "source_id": "source-0181ab472b9130feb578f57a7a506342625fe6a681a4c1be28906ea8dae25f68",
+      "representation_sha256": "07de293b2a8708cab98d80b6da1e3c397cccc72d877d5ed4ad99f91a9c0b2144",
+      "identity_verified_across_providers": false,
+      "edition": null,
+      "admission": "unreviewed_metadata_candidate"
+    }
+  ]
+}

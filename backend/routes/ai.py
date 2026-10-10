@@ -23,6 +23,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from core.chat_turn_lifecycle import ChatTurnLifecycle
 from core.chat_turns import chat_turn_authority
 from core.conversations import ConversationStorageUnavailable, conversation_authority
+from core.dragon_runtime_bridge import dragon_foreground, dragon_context_budget
 from core.engine_client import (
     EngineClient,
     EngineClientError,
@@ -40,7 +41,7 @@ from skeleton.contracts.context import (
     ContextTrust,
 )
 from skeleton.contracts.conversation import ConversationAuthorType, ConversationMessage
-from skeleton.context.compiler import ContextCompiler
+from skeleton.context.compiler import ContextCompiler, ContextCompilationError
 from skeleton.context.instruction_policy import InstructionPolicy
 from skeleton.context.sources import artifact_segment, conversation_message_segment
 from skeleton.ai.assistant.live_evidence import bind_provider_receipt_set
@@ -497,6 +498,7 @@ def _compile_chat_context(
     operation_id: str,
     execution_id: str,
     request_context: str | None,
+    dragon_segments: tuple = (),
 ) -> ContextEnvelope:
     """Compile the one authoritative immutable context snapshot for a chat turn."""
 
@@ -538,6 +540,7 @@ def _compile_chat_context(
         if message.message_id not in abandoned_user_ids
         and message.message_id not in terminal_marker_ids
     )
+    segments.extend(dragon_segments)
     if request_context:
         segments.append(
             artifact_segment(
@@ -559,7 +562,7 @@ def _compile_chat_context(
         turn_id=user_message.message_id,
         tenant_id=tenant_id,
         purpose=purpose,
-        budget=CHAT_CONTEXT_BUDGET,
+        budget=dragon_context_budget(CHAT_CONTEXT_BUDGET),
         segments=segments,
         tools_enabled=False,
         compiled_at=user_message.created_at,
@@ -1047,7 +1050,7 @@ async def ai_assist(request: AIAssistRequest) -> AIAssistResponse:
     )
 
 
-@router.post("/chat")
+@router.post("/chat", dependencies=[Depends(dragon_foreground)])
 async def ai_chat(
     request: AIChatRequest,
     user=Depends(require_role("viewer")),
@@ -1216,15 +1219,21 @@ async def ai_chat(
         transcript,
         before_sequence=user_message.sequence,
     )
-    context_envelope = _compile_chat_context(
-        thread=thread,
-        transcript=transcript,
-        user_message=user_message,
-        tenant_id=tenant_id,
-        operation_id=operation_id,
-        execution_id=execution_id,
-        request_context=request.context,
-    )
+    dragon_context_reader = getattr(conversation_authority, "dragon_context_segments", None)
+    dragon_segments = () if dragon_context_reader is None else await dragon_context_reader(thread, request.message)
+    try:
+        context_envelope = _compile_chat_context(
+            thread=thread,
+            transcript=transcript,
+            user_message=user_message,
+            tenant_id=tenant_id,
+            operation_id=operation_id,
+            execution_id=execution_id,
+            request_context=request.context,
+            dragon_segments=dragon_segments,
+        )
+    except ContextCompilationError:
+        raise HTTPException(status_code=503, detail="Request exceeds current hardware context budget") from None
     try:
         chat_turn = await chat_turn_lifecycle.advance(
             chat_turn,

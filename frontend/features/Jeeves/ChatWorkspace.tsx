@@ -263,7 +263,7 @@ export default function ChatWorkspace() {
         {snapshot.saveState === 'error' ? <Button icon="refresh-outline" label="Save again" onPress={controller.retrySave} /> : <TouchableOpacity accessibilityLabel="Dismiss notice" onPress={controller.dismissNotice}><Ionicons name="close" size={20} color={C.text} /></TouchableOpacity>}
       </View>}
       <View style={[s.companionDock, width < 760 && s.companionDockCompact]}>
-        <DragonCompanionPanel draft={conversation.draft} lastUserText={[...conversation.messages].reverse().find(message => message.role === 'user')?.text} academy={dragonAcademy.view} telemetry={dragonAcademy.telemetry} />
+        <DragonCompanionPanel draft={conversation.draft} lastUserText={[...conversation.messages].reverse().find(message => message.role === 'user')?.text} academy={dragonAcademy.view} telemetry={dragonAcademy.telemetry} waitingRequestId={snapshot.busyId} />
       </View>
       <DragonDemoPlayer demo={dragonAcademy.demo} onClose={dragonAcademy.closeDemo} />
       {!!dragonAcademy.error && <Text accessibilityRole="alert" style={s.small}>{dragonAcademy.error}</Text>}

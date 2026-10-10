@@ -43,7 +43,9 @@ def test_robots_is_fail_closed_and_disallow_is_never_fetched():
     e = CrawlEngine(f, policy=CrawlPolicy(min_host_delay_seconds=0))
     assert e.enqueue("https://example.com/")
     assert e.step(now=1) is None
-    assert f.calls == []
+    # Fail closed still makes a bounded robots request; protected page content
+    # must never be fetched until the destination's robots policy is known.
+    assert f.calls == ["https://example.com/robots.txt"]
 
     e = engine({"https://example.com/private": (200, "text/plain", "secret")})
     assert e.enqueue("https://example.com/private")
@@ -123,6 +125,9 @@ def test_retry_is_bounded_and_backed_off():
     assert e.step(now=5) is None
     assert e.step(now=6) is None
     assert len(f.calls) == 3
+    # A failed network operation still consumes the global crawl budget;
+    # otherwise a repeatedly failing legacy fetcher can evade request caps.
+    assert e.budget.requests == 3
 
 
 def test_robots_bootstrap_is_self_directed_and_budgeted():

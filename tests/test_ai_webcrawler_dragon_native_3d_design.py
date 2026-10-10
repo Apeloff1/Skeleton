@@ -40,7 +40,7 @@ def test_user_editable_design_changes_stages_palette_and_candidate_budget(tmp_pa
     ("stages",0),("stages",True),("stages",10),("candidates",100),
     ("seed",-1),("seed",2**32),("title","; touch /tmp/hack"),
     ("genre","unrealistic_genre"),("palette","../../../"),("hero","nobody"),
-    ("quest_theme","evil<script>"),("project_notes","; rm -rf /"),
+    ("quest_theme","evil<script>"),("project_notes","evil<script>"),
 ])
 def test_invalid_design_is_not_rendered_as_executable_source(field,bad):
     fields=starter_design()
@@ -70,7 +70,7 @@ def test_native_3d_source_has_dda_projection_depth_enemy_and_controller():
     assert "DRAGON_RAYCAST_SMOKE" in source
     assert "distanceX<distanceY" in source
     assert "float depth=" in source
-    assert "depths[col]" in source
+    assert "depths[c]=depth" in source
     assert "ty<depths[col/2]" in source
     assert "SDL_GameControllerGetButton" in source
     assert "SDL_SCANCODE_RIGHT" in source
@@ -107,3 +107,14 @@ def test_real_3d_sdl_binary_build_and_headless_depth_scan(tmp_path,genre):
         timeout=20,capture_output=True,text=True)
     assert run.returncode==0,(run.stdout,run.stderr)
     assert "DRAGON_RAYCAST_SMOKE PASS" in run.stdout
+
+
+def test_project_notes_are_inert_manifest_data(tmp_path):
+    config=starter_design(title="Original game")
+    config["project_notes"]="; rm -rf /"
+    design=parse_design(config)
+    emit_demo("pc_linux",tmp_path/"game",design=design)
+    recorded=json.loads((tmp_path/"game/dragon-game-design.json").read_text())
+    assert recorded["project_notes"]==config["project_notes"]
+    assert config["project_notes"] not in (tmp_path/"game/src/main.c").read_text()
+    assert config["project_notes"] not in (tmp_path/"game/CMakeLists.txt").read_text()

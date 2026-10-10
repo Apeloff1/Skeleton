@@ -227,7 +227,7 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 200, response.text
     command = captured["command"]
     execution_id = command.execution_request.execution_id
     assert captured["append"]["expected_thread_version"] == 1
@@ -331,7 +331,7 @@ def test_chat_retry_replays_existing_assistant_without_provider_call(
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 200, response.text
     body = response.json()
     assert body["replayed"] is True
     assert body["response"] == "canonical answer"
@@ -448,7 +448,7 @@ def test_provider_failure_keeps_user_message_canonical_for_retry(
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 200, response.text
     body = response.json()
     assert body["success"] is False
     assert body["user_message"]["message_id"] == user_message.message_id
@@ -516,7 +516,7 @@ def test_successful_chat_retry_reuses_committed_assistant_without_provider(
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 200, response.text
     body = response.json()
     assert body["replayed"] is True
     assert body["response"] == "existing answer"
@@ -652,7 +652,7 @@ def test_chat_compiles_immutable_context_and_keeps_ephemeral_context_untrusted(
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 200, response.text
     envelope = captured["envelope"]
     assert envelope.context_id == response.json()["context"]["context_id"]
     assert envelope.context_digest == response.json()["context"]["context_digest"]

@@ -108,13 +108,21 @@ def test_current_workflows_bind_migration_rehearsal_to_recovery_and_release() ->
     assert all(len(row["digest"]) == 64 for row in receipt.values())
 
 
-def test_current_masterplan_is_pending_exact_head_qualification() -> None:
+def test_current_masterplan_has_consistent_exact_head_qualification() -> None:
+    # The independent verifier accepts either an open qualification gap or
+    # a signed VOL-005 after the qualification evidence was added. Do not
+    # freeze the original pre-signoff state into this regression assertion.
     binding = _verify_masterplan(ROOT)
 
     assert binding["key"] == "VOL-005"
-    assert binding["completion_checkbox"] is False
-    assert binding["completion_checkbox_mark"] == "[ ]"
-    assert binding["gaps"] == [QUALIFICATION_GAP]
+    if binding["gaps"]:
+        assert binding["gaps"] == [QUALIFICATION_GAP]
+        assert binding["completion_checkbox"] is False
+        assert binding["completion_checkbox_mark"] == "[ ]"
+    else:
+        assert binding["completion_checkbox"] is True
+        assert binding["completion_checkbox_mark"] == "[x]"
+        assert binding["implementation_status"] in {"implemented", "hardened", "verified"}
     assert len(binding["binding_digest"]) == 64
 
 

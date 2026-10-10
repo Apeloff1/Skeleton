@@ -2,6 +2,7 @@ import tempfile
 from skeleton.ai.webcrawler.leases import SqliteLeaseStore
 from skeleton.ai.webcrawler.traps import TrapGuard
 from skeleton.ai.webcrawler.storage import SqliteCrawlStore
+from skeleton.ai.webcrawler.migrations import SCHEMA_VERSION
 
 def test_lease_excludes_second_worker_until_expiry():
     with tempfile.TemporaryDirectory() as d:
@@ -31,6 +32,6 @@ def test_trap_guard_rejects_common_infinite_spaces():
 def test_store_records_latest_schema_version():
     with tempfile.TemporaryDirectory() as d:
         s=SqliteCrawlStore(d+"/c.db")
-        assert s.db.execute("SELECT version FROM schema_version").fetchone()[0] == 2
+        assert s.db.execute("SELECT version FROM schema_version").fetchone()[0] == SCHEMA_VERSION
         assert s.db.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_documents_fetched_at'").fetchone()
         s.close()

@@ -98,3 +98,51 @@ def test_unrelated_sources_cannot_be_compared():
             store.read("alice", first.snapshot_id, authorized=True),
             store.read("alice", second.snapshot_id, authorized=True),
         )
+
+def test_snapshot_identity_survives_integer_vs_sqlite_float_epoch_round_trip():
+    store = archive()
+    integer = capture(store, b"timestamp normalization", observed=100)
+    same = capture(store, b"timestamp normalization", observed=100.0)
+    assert integer.snapshot_id == same.snapshot_id
+    assert store.read("alice", integer.snapshot_id, authorized=True)[1] == b"timestamp normalization"
+    assert len(store.timeline("alice", URL, authorized=True)) == 1
+    different = capture(store, b"timestamp normalization", observed=100.5)
+    assert different.snapshot_id != integer.snapshot_id
+    assert store.read("alice", different.snapshot_id, authorized=True)[0].observed_at == 100.5
+
+
+def test_archive_rejects_non_finite_snapshot_identity_clock():
+    store = archive()
+    for bad in (float("nan"), float("inf"), -float("inf")):
+        with pytest.raises(ValueError, match="clock"):
+            store.capture("alice", source_url=URL, body=b"evidence",
+                          observed_at=bad, now=100.0,
+                          license_note="Authorized excerpt", authorized=True)
+
+
+def test_legacy_integer_timestamp_archive_can_still_be_verified():
+    import hashlib
+    import json
+    store = archive()
+    body = b"historical source evidence"
+    digest = hashlib.sha256(body).hexdigest()
+    from skeleton.ai.webcrawler.dragon_video_history import canonical_video_url
+    canonical_url = canonical_video_url(URL)
+    legacy_raw = json.dumps([canonical_url, 100, digest],
+                            separators=(",", ":"), ensure_ascii=True, allow_nan=False)
+    legacy_id = hashlib.sha256(legacy_raw.encode()).hexdigest()
+    store.db.execute(
+        """INSERT INTO archivex_snapshots
+        (owner,snapshot_id,source_url,observed_at,content_digest,
+         content_length,media_type,license_note,body) VALUES(?,?,?,?,?,?,?,?,?)""",
+        ("alice", legacy_id, canonical_url, 100.0, digest, len(body),
+         "text/plain", "Authorized historical excerpt", body),
+    )
+    store.db.commit()
+    assert store.read("alice", legacy_id, authorized=True)[1] == body
+    store.db.execute(
+        "UPDATE archivex_snapshots SET content_digest=? WHERE owner=? AND snapshot_id=?",
+        ("0"*64, "alice", legacy_id),
+    )
+    with pytest.raises(ValueError, match="integrity"):
+        store.read("alice", legacy_id, authorized=True)

@@ -62,7 +62,7 @@ def test_gb_is_sm83_code_and_rom_pipeline_not_a_browser_game():
     asm=p.files["src/main.asm"]
     assert 'SECTION "Entry", ROM0[$100]' in asm
     assert 'ldh [rLCDC]' in asm
-    assert 'ld [OAM+6]' in asm
+    assert 'ld [DRAGON_OAM+6]' in asm
     assert "ldh [rJOYP]" in asm
     assert "rgbasm" in p.files["Makefile"].lower()
     assert "rgblink" in p.files["Makefile"].lower()

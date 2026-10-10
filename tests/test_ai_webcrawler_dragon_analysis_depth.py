@@ -56,9 +56,10 @@ def trials(randomized=True, treated_success=True):
     ) for i in range(40))
 
 
-def test_randomized_trials_support_causal_interpretation():
+def test_randomization_claim_without_verified_protocol_cannot_be_causal():
     report = analyze_mechanic_trials(trials(), authorized=True)
-    assert report.causal_claim_permitted
+    assert not report.causal_claim_permitted
+    assert any("verified experimental protocol" in warning for warning in report.warnings)
     assert report.observed_difference == 1
     assert report.difference_interval[0] > 0
 

@@ -5,7 +5,7 @@ GB/NES native ROM assembly, DOS VGA, and SDL desktop. A source bundle is NOT
 a compiled ROM. No untrusted game code runs inside this web service.
 """
 from __future__ import annotations
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from hashlib import sha256
 from io import BytesIO
 import json
@@ -69,14 +69,50 @@ class DragonNativePracticeLab:
         db.commit()
 
     def generate(self, owner:str, *, target_id:str,style:str,
-                 now:float,authorized:bool,consent:bool)->NativeAttempt:
+                 now:float,authorized:bool,consent:bool, design=None, source_context:dict|None=None,
+                 request_id:str|None=None)->NativeAttempt:
         _owner(owner)
         _time(now)
         if not authorized or not consent:
             raise PermissionError("native practice requires live authorization and opt-in")
         demand_target(target_id)
+        if design is not None:
+            from .dragon_game_design import FIELDS, parse_design, GameDesign
+            if not isinstance(design, GameDesign) or parse_design({k:getattr(design,k) for k in FIELDS}) != design or design.target != target_id or design.genre != style:
+                raise ValueError("canonical design must match native request")
+        stable_attempt = None
+        if source_context is not None:
+            from skeleton.ai.game_builder.contracts import canonical_digest
+            from copy import deepcopy
+            source_context = deepcopy(source_context)
+            if (design is None or not isinstance(source_context, dict)
+                    or source_context.get("schema") != "skeleton.dragon.delivery_brief.v1"
+                    or source_context.get("owner") != owner
+                    or source_context.get("design_digest") != design.digest
+                    or source_context.get("ready_for_source_generation") is not True
+                    or source_context.get("blockers") != []
+                    or source_context.get("release_authorized") is not False
+                    or source_context.get("training_authorized") is not False
+                    or type(source_context.get("expires_at")) is not int
+                    or not source_context["prepared_at"] <= now < source_context["expires_at"]
+                    or canonical_digest({k:v for k,v in source_context.items() if k != "plan_digest"}) != source_context.get("plan_digest")
+                    or len(json.dumps(source_context).encode()) > 64000):
+                raise ValueError("current owner-bound delivery brief required")
+            import re
+            if not isinstance(request_id,str) or not re.fullmatch(r"[A-Za-z0-9_-]{16,80}",request_id):
+                raise ValueError("bounded delivery idempotency key required")
+            stable_attempt = digest([owner, "delivery", request_id])
+        elif request_id is not None:
+            raise ValueError("delivery key requires reviewed source context")
         self.db.execute("BEGIN IMMEDIATE")
         with self.db:
+            if stable_attempt:
+                existing = self.db.execute("SELECT lesson_id,target_id,style,state,source_digest,created_at,review_digest,variant,project_json FROM dragon_native_game_attempts WHERE owner=? AND attempt_id=?", (owner,stable_attempt)).fetchone()
+                if existing:
+                    stored = json.loads(existing[8])
+                    if digest(stored["files"]) != existing[4] or json.loads(stored["files"].get("dragon-knowledge-brief.json", "null")) != source_context:
+                        raise ValueError("delivery retry differs from committed request")
+                    return NativeAttempt(stable_attempt,existing[0],owner,existing[1],existing[2],existing[3],existing[4],existing[5],bool(existing[6]),existing[7])
             day=int(now//86400)*86400
             native=self.db.execute("""SELECT COUNT(*) FROM dragon_native_game_attempts
                 WHERE owner=? AND created_at>=? AND created_at<?""",
@@ -89,7 +125,10 @@ class DragonNativePracticeLab:
             lessons=self.db.execute("""SELECT lesson_id,title,mechanics_json
                 FROM dragon_practice_lessons WHERE owner=? AND consent=1
                 ORDER BY created_at,lesson_id""",(owner,)).fetchall()
-            if not lessons:raise PermissionError("no consented and verified lessons")
+            if source_context is not None:
+                required_mechanics = {c["mechanic"] for c in source_context["citations"]}
+                lessons = [row for row in lessons if required_mechanics.intersection(json.loads(row[2]))]
+            if not lessons:raise PermissionError("no consented and verified lessons matching the design evidence")
             choices=[]
             for lesson_id,title,mechanics_json in lessons:
                 count=self.db.execute("""SELECT COUNT(*) FROM dragon_native_game_attempts
@@ -102,15 +141,24 @@ class DragonNativePracticeLab:
             variant,lesson_id,title,mechanics_json=choices[0]
             canonical=digest([owner,lesson_id,target_id,style,variant])
             project=render_native_project(
-                title=title,target_id=target_id,style=style,candidate_id=canonical,
+                title=design.title if design is not None else title,target_id=target_id,style=style,candidate_id=canonical,
                 mechanics=tuple(Mechanic(x) for x in json.loads(mechanics_json)),
-                authorized=True,
+                authorized=True, design=design,
             )
+            if source_context is not None:
+                files = dict(project.files)
+                files["dragon-knowledge-brief.json"] = json.dumps(source_context,sort_keys=True,indent=2)+"\n"
+                files["dragon-game-design.json"] = json.dumps(source_context["design"],sort_keys=True,indent=2)+"\n"
+                files["README.md"] += "\n## Reviewed design guidance\nSee dragon-knowledge-brief.json for source revisions, independent review and approval references. These guide the design; they do not certify generated code or grant distribution rights.\n"
+                fingerprint = digest(files)
+                project = replace(project, files=files, digest=fingerprint, project_id=digest([project.project_id,fingerprint]))
             project_json=json.dumps(asdict(project),sort_keys=True,
                                      separators=(",",":"),ensure_ascii=True)
+            if len(project_json.encode("utf-8")) > self.parent.policy.max_artifact_bytes:
+                raise ValueError("native practice artifact exceeds bounded policy")
             if len(project_json.encode())>250000:
                 raise ValueError("native source payload exceeds budget")
-            attempt_id=digest([owner,lesson_id,project.project_id])
+            attempt_id=stable_attempt or digest([owner,lesson_id,project.project_id])
             self.db.execute("""INSERT INTO dragon_native_game_attempts(
                 owner,attempt_id,lesson_id,target_id,style,state,source_digest,
                 project_json,created_at,variant)VALUES(?,?,?,?,?,?,?,?,?,?)""",

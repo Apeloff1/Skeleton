@@ -99,10 +99,10 @@ def enrich_gb_asm(source:str) -> str:
     if not isinstance(source,str):raise ValueError("GB source required")
     source,n=re.subn(r"(?s)Tiles:\n.*?\nTilesEnd:",gb_assembly(),source)
     if n!=1:raise ValueError("GB tile section missing")
-    # Blinking sprite indexes alternate idle/blink, under VBlank OAM refresh.
+    # Blinking sprite indexes alternate idle/blink, under VBlank DRAGON_OAM refresh.
     before="""    xor a
-    ld [OAM+2], a
-    ld [OAM+3], a"""
+    ld [DRAGON_OAM+2], a
+    ld [DRAGON_OAM+3], a"""
     after="""    ld hl, AnimFrame
     inc [hl]
     ld a, [hl]
@@ -113,9 +113,9 @@ def enrich_gb_asm(source:str) -> str:
 .idle:
     xor a
 .paint:
-    ld [OAM+2], a
+    ld [DRAGON_OAM+2], a
     xor a
-    ld [OAM+3], a"""
+    ld [DRAGON_OAM+3], a"""
     if before not in source:raise ValueError("GB sprite update anchor unavailable")
     source=source.replace(before,after)
     if "PlayerY: ds 1" not in source:raise ValueError("GB WRAM declaration missing")
@@ -125,10 +125,10 @@ def enrich_gb_asm(source:str) -> str:
     source=source.replace("    ld a, 48\n    ld [PlayerX], a",
                           "    xor a\n    ld [AnimFrame], a\n    ld a, 48\n    ld [PlayerX], a")
     # Star tile moved to index 4.
-    if "    ld a, 1\n    ld [OAM+6], a" not in source:
+    if "    ld a, 1\n    ld [DRAGON_OAM+6], a" not in source:
         raise ValueError("GB collectible sprite declaration missing")
-    return source.replace("    ld a, 1\n    ld [OAM+6], a",
-                          "    ld a, 4\n    ld [OAM+6], a")
+    return source.replace("    ld a, 1\n    ld [DRAGON_OAM+6], a",
+                          "    ld a, 4\n    ld [DRAGON_OAM+6], a")
 
 def enrich_nes_asm(source:str) -> str:
     if not isinstance(source,str):raise ValueError("NES source required")

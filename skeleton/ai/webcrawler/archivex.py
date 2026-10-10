@@ -77,8 +77,26 @@ class ArchiveX:
 
     @staticmethod
     def _identity(source_url: str, observed_at: float, digest: str) -> str:
+        # SQLite REAL round-trips integer epoch seconds as floating-point.
+        # Keep snapshot IDs invariant between initial capture and DB reads,
+        # without weakening byte/digest/identity verification.
+        if not isinstance(observed_at, (int, float)) or isinstance(observed_at, bool) or not isfinite(observed_at):
+            raise ValueError("invalid archival observation timestamp")
+        normalized_at = float(observed_at)
         canonical = json.dumps(
-            [source_url, observed_at, digest],
+            [source_url, normalized_at, digest],
+            separators=(",", ":"), ensure_ascii=True, allow_nan=False,
+        )
+        return sha256(canonical.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _legacy_integer_identity(source_url: str, observed_at: float, digest: str) -> str | None:
+        # Older snapshots accepted integer timestamps but SQLite persisted
+        # them as REAL. Match only that historically exact encoding.
+        if not isfinite(observed_at) or not float(observed_at).is_integer():
+            return None
+        canonical = json.dumps(
+            [source_url, int(observed_at), digest],
             separators=(",", ":"), ensure_ascii=True, allow_nan=False,
         )
         return sha256(canonical.encode("utf-8")).hexdigest()
@@ -135,8 +153,12 @@ class ArchiveX:
         if row is None:
             return None
         source, observed, digest, length, media, license_note, body = row
+        identities = {self._identity(source, observed, digest)}
+        legacy = self._legacy_integer_identity(source, observed, digest)
+        if legacy is not None:
+            identities.add(legacy)
         if (len(body) != length or sha256(body).hexdigest() != digest or
-                self._identity(source, observed, digest) != snapshot_id):
+                snapshot_id not in identities):
             raise ValueError("archive integrity violation")
         return ArchiveXSnapshot(owner, snapshot_id, source, observed,
                                 digest, length, media, license_note), body

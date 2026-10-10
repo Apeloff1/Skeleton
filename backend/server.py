@@ -2245,6 +2245,9 @@ _runtime_lifecycle = RuntimeServiceLifecycle("backend")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from core.dragon_runtime_bridge import mount_configured_dragon_runtime
+    from core.conversations import conversation_authority
+    mount_configured_dragon_runtime(app, conversation_authority)
     if _runtime_lifecycle.phase in (ServicePhase.STOPPED, ServicePhase.FAILED):
         _runtime_lifecycle.restart(reason="backend-lifespan-restart")
     elif _runtime_lifecycle.phase is not ServicePhase.STARTING:

@@ -898,6 +898,112 @@
         "skeleton/testing/test_reference_provenance.py",
         "docs/architecture/REFERENCE_PROVENANCE.md"
       ]
+    },
+    {
+      "id": "dragon-conversation-micro-projection",
+      "owner_plane": "retrieval",
+      "physical_store": "backend-data-volume",
+      "logical_location": "Existing Dragon SQLite connection / dragon_conversation_micro_logs and dragon_conversation_micro_terms and short-lived dragon_conversation_micro_fences",
+      "authority": "derived",
+      "source_of_truth": false,
+      "status": "canonical-lifecycle-hooks-implemented-consent-runtime-binding-required",
+      "data_classes": [
+        "confidential"
+      ],
+      "transaction_scope": "SQLite transactional checkpoint identity and postings; writer lock precedes capacity checks",
+      "consistency": "Ten committed canonical message references plus caller-bound topic facets; authorized tenant/owner/thread/active-branch lookup; expiry and digest checks; never transcript or training authority",
+      "retention": "Explicit fresh canonical retention policy; separate training consent; expiry and governed-delete hook; 300-second negative-only deletion fence for bounded in-flight callbacks",
+      "backup_restore": "Discard/rebuild only from currently authorized canonical conversation windows; on-disk reopen regression verifies projection restart; projection loss does not alter canonical messages",
+      "migration": "Additive create-if-absent projection tables; disable adapter and delete/rebuild derived tables on rollback",
+      "derived_from": [
+        "conversation-thread-state",
+        "conversation-message-state"
+      ],
+      "rebuildable": true,
+      "evidence": [
+        "skeleton/ai/webcrawler/dragon_conversation_micro_logs.py",
+        "tests/test_ai_dragon_resource_cognition.py",
+        "docs/ai/dragon-resource-cognition-2026-10-10.md",
+        "backend/core/dragon_conversation_binding.py",
+        "backend/core/conversations.py",
+        "backend/tests/test_dragon_conversation_binding.py"
+      ]
+    },
+    {
+      "physical_store": "backend-data-volume",
+      "data_classes": [
+        "confidential"
+      ],
+      "status": "implemented-local-configured-deployment-required",
+      "id": "dragon-reviewed-knowledge-state",
+      "owner_plane": "retrieval",
+      "logical_location": "SKL_DRAGON_KNOWLEDGE_DB_PATH / existing game_builder_knowledge, dragon_wisdom_pyramid and derived dragon_almanac_* tables",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "transaction_scope": "SQLite source revision and Wiki approval transactions; delivery holds a writer reservation through native artifact commit, then records a separately recoverable Almanakk source-synthesis projection",
+      "consistency": "current owner-scoped source history and independently signed review/approval references; brief generation has no mint authority",
+      "retention": "governed owner erasure and source revocation; derived brief invalidates on root/review/expiry changes",
+      "backup_restore": "restore reviewed source and approval chains with separate custody anchors; fail closed on corruption or rollback; missing project-synthesis findings rebuild idempotently from owner-scoped native artifacts without regenerating source",
+      "migration": "existing canonical tables; this delivery increment adds no table and does not rewrite historical source or approval rows",
+      "derived_from": [],
+      "rebuildable": false,
+      "evidence": [
+        "skeleton/ai/game_builder/reviewed_knowledge.py",
+        "skeleton/ai/game_builder/dragon_wisdom_pyramid.py",
+        "skeleton/ai/game_builder/dragon_delivery.py",
+        "tests/test_dragon_delivery.py"
+      ]
+    },
+    {
+      "physical_store": "backend-data-volume",
+      "data_classes": [
+        "confidential"
+      ],
+      "status": "implemented-local-configured-deployment-required",
+      "id": "dragon-native-practice-artifacts",
+      "owner_plane": "artifact-files",
+      "logical_location": "SKL_DRAGON_PRACTICE_DB_PATH / existing dragon_native_game_attempts.project_json and source_digest",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "transaction_scope": "one owner-scoped SQLite attempt and complete generated source bundle per commit",
+      "consistency": "source digest covers native code, canonical design and cited brief; request-derived attempt identity makes delivery retry idempotent",
+      "retention": "existing native practice owner lifecycle; archived historical citations do not remain current approval authority",
+      "backup_restore": "preserve native attempt rows and source bundles; archive digest and owner isolation validated after reopen",
+      "migration": "optional design and brief files inside existing project_json; old source bundles remain readable with unchanged schema",
+      "derived_from": [],
+      "rebuildable": false,
+      "evidence": [
+        "skeleton/ai/webcrawler/dragon_native_practice.py",
+        "backend/routes/dragon_academy.py",
+        "tests/test_dragon_delivery.py",
+        "backend/tests/test_dragon_delivery_routes.py"
+      ]
+    },
+    {
+      "physical_store": "backend-data-volume",
+      "data_classes": [
+        "confidential"
+      ],
+      "status": "implemented-local-configured-deployment-required",
+      "id": "dragon-delivery-brief-projection",
+      "owner_plane": "application-api",
+      "logical_location": "ephemeral HTTP brief and historical dragon-knowledge-brief.json inside canonical native artifacts",
+      "authority": "derived",
+      "source_of_truth": false,
+      "transaction_scope": "current knowledge snapshot per brief; no separate mutable plan database",
+      "consistency": "brief expires within five minutes; current evidence reconstructed at generation; browser never supplies authoritative citations",
+      "retention": "ephemeral in UI; archived brief follows artifact retention and is explicitly historical",
+      "backup_restore": "recompute active briefs from current knowledge; historical project files retain exact old evidence identity",
+      "migration": "additive versioned response and optional artifact file; rollback hides workbench and preserves readable older artifacts",
+      "derived_from": [
+        "dragon-reviewed-knowledge-state"
+      ],
+      "rebuildable": true,
+      "evidence": [
+        "skeleton/ai/game_builder/dragon_delivery.py",
+        "frontend/features/Jeeves/companion/dragonDelivery.ts",
+        "tests/test_dragon_delivery.py"
+      ]
     }
   ],
   "state_flows": [
@@ -1068,6 +1174,14 @@
       "mode": "fail-closed lifecycle registration",
       "rule": "GovernedMemoryWriter commits canonical memory then reconciles tenant-bound lifecycle metadata; if governance persistence fails the committed memory is tombstoned fail-closed and a canonical delete projection intent is emitted",
       "failure": "active ungoverned memory is forbidden; governance registration failure forces canonical memory tombstone and surfaces a typed writeback error"
+    },
+    {
+      "id": "canonical-commit-to-dragon-micro-projection",
+      "from": "conversation-message-state",
+      "to": "dragon-conversation-micro-projection",
+      "mode": "consented-derived-ten-step-checkpoint",
+      "rule": "After canonical commit, bounded reference-only windows may produce derived topic checkpoints under current tenant/owner/thread retention policy; inference keeps them untrusted and governed deletion clears/fences them before acknowledgement",
+      "failure": "Unavailable, expired or revoked consent, branch gaps, callback failure and projection corruption never grant context/training authority or roll back the canonical message; bounded reauthorization repairs retained windows"
     }
   ],
   "recovery_order": [

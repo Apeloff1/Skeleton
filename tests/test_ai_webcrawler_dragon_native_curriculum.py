@@ -30,6 +30,7 @@ def structural_gb_fixture():
     for b in rom[0x134:0x14D]:
         checksum=(checksum-b-1)&0xff
     rom[0x14D]=checksum
+    rom[0x14E:0x150] = (sum(rom) & 0xFFFF).to_bytes(2, "big")
     return bytes(rom)
 
 def test_new_dragon_earns_no_console_mastery_from_source_count_alone():
@@ -66,7 +67,8 @@ def test_only_signed_rom_bytes_unlock_next_hardware_platform():
     after=course.evaluate("alice",authorized=True)
     assert after.curriculum_level==2
     assert after.structural_build_targets==("game_boy",)
-    assert after.next_recommendation.genre=="side_scrolling_platformer"
+    assert after.next_recommendation.target=="nes"
+    assert ("game_boy", "side_scrolling_platformer") in {(x.target, x.genre) for x in after.unlocked}
     assert "nes" in {r.target for r in after.unlocked}
     assert "game_boy_color" in {r.target for r in after.unlocked}
     assert parent.progress("alice",authorized=True).xp==30

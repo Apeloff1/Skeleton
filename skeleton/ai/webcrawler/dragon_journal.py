@@ -50,8 +50,10 @@ class DragonEventJournal:
             raise ValueError("invalid session or event kind")
         if not url.startswith(("https://", "http://")) or len(url) > 4096:
             raise ValueError("invalid event URL")
-        if not math.isfinite(at):
+        if isinstance(at, bool) or not isinstance(at, (int, float)) or not math.isfinite(at) or at < 0:
             raise ValueError("event time must be finite")
+        # SQLite REAL round trips integers as floats. Hash persisted semantics.
+        at = float(at)
         data = dict(payload or {})
         encoded = _canonical(data)
         if len(encoded.encode("utf-8")) > 32768:
@@ -99,6 +101,13 @@ class DragonEventJournal:
                     "url": url, "at": at, "payload": json.loads(payload),
                     "previous_digest": parent}
             if hashlib.sha256(_canonical(base).encode("utf-8")).hexdigest() != digest:
-                return False
+                # Older writers hashed integer timestamps before SQLite REAL
+                # coercion. Accept only the exact historical digest, without
+                # rewriting evidence or relaxing any chain/custody check.
+                if not float(at).is_integer():
+                    return False
+                base["at"] = int(at)
+                if hashlib.sha256(_canonical(base).encode("utf-8")).hexdigest() != digest:
+                    return False
             previous = digest
         return True

@@ -38,8 +38,8 @@ DEF rJOYP EQU $FF00
 DEF rLCDC EQU $FF40
 DEF rLY EQU $FF44
 DEF rOBP0 EQU $FF48
-DEF OAM EQU $FE00
-DEF VRAM EQU $8000
+DEF DRAGON_OAM EQU $FE00
+DEF DRAGON_VRAM EQU $8000
 DEF GOAL_X EQU {x}
 DEF GOAL_Y EQU {y}
 SECTION "Entry", ROM0[$100]
@@ -55,13 +55,13 @@ Start:
     jr c, .waitLCD
     xor a
     ldh [rLCDC], a
-    ld hl, OAM
+    ld hl, DRAGON_OAM
     ld b, 160
 .clear:
     ld [hli], a
     dec b
     jr nz, .clear
-    ld hl, VRAM
+    ld hl, DRAGON_VRAM
     ld de, Tiles
     ld b, TilesEnd-Tiles
 .tiles:
@@ -136,28 +136,28 @@ Input:
     ret
 Sprites:
     ld a,[PlayerY]
-    ld [OAM],a
+    ld [DRAGON_OAM],a
     ld a,[PlayerX]
-    ld [OAM+1],a
+    ld [DRAGON_OAM+1],a
     xor a
-    ld [OAM+2],a
-    ld [OAM+3],a
+    ld [DRAGON_OAM+2], a
+    ld [DRAGON_OAM+3], a
     ld a,GOAL_Y
-    ld [OAM+4],a
+    ld [DRAGON_OAM+4],a
     ld a,GOAL_X
-    ld [OAM+5],a
-    ld a,1
-    ld [OAM+6],a
+    ld [DRAGON_OAM+5],a
+    ld a, 1
+    ld [DRAGON_OAM+6], a
     xor a
-    ld [OAM+7],a
+    ld [DRAGON_OAM+7],a
     ld a,[PlayerX]
     cp GOAL_X
     jr nz,.notWin
     ld a,[PlayerY]
     cp GOAL_Y
     jr nz,.notWin
-    ld a,$1B
-    ldh [rOBP0],a
+    ld a, $1B
+    ldh [rOBP0], a
 .notWin:
     ret
 Tiles:

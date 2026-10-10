@@ -268,3 +268,303 @@ def test_adaptive_practice_subscriptions_preserve_opt_in_and_finite_ticks(
     assert len(created)==1
     assert created[0].target_id=="game_boy"
     assert route.academy_status(owner=owner)["native_attempts"]
+
+
+def test_authenticated_companion_reads_only_signed_current_owner_review(tmp_path, monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from skeleton.ai.game_builder.dragon_review_store import DragonReviewStore
+    from skeleton.ai.game_builder.dragon_wisdom import SquareReview, SQUARES
+    monkeypatch.setenv("SKL_DRAGON_PRACTICE_DB_PATH", str(tmp_path/"reviews.sqlite"))
+    monkeypatch.setenv("SKL_DRAGON_REVIEW_SIGNING_KEY_HEX", (b"s"*32).hex())
+    monkeypatch.setattr(route.time, "time", lambda: 21)
+    squares=tuple({"id": key,"label":label,"score":70,"industry_score":None,
+        "industry_delta":None,"status":"improve","comparison_state":"unknown",
+        "axes":list(axes)} for key,label,axes in SQUARES)
+    review=SquareReview("a"*64,"b"*64,"c"*64,"d"*64,"e"*64,None,100,100,
+        squares,(),(),(),"f"*64,True,20,40)
+    with sqlite3.connect(tmp_path/"reviews.sqlite") as db:
+        DragonReviewStore(db,signing_key=b"s"*32).publish(identity(),review,
+            now=20,expires_at=40,trusted_worker=True)
+    app=FastAPI();app.include_router(route.router)
+    app.dependency_overrides[route.get_current_user]=lambda: {
+        "email":"alice@example.test","tenant_id":"tenant-a","role":"viewer"}
+    with TestClient(app) as client:
+        response=client.get("/api/dragon-academy/status")
+        assert response.status_code==200
+        assert response.json()["wisdom_review"]["review"]==review.to_payload()
+        assert client.get("/api/dragon-academy/wisdom").json()["snapshot"]==response.json()["wisdom_review"]
+        assert client.post("/api/dragon-academy/wisdom",json={"review":{}}).status_code==405
+        assert client.post("/api/dragon-academy/status",json={"wisdom_review":{}}).status_code==405
+        app.dependency_overrides[route.get_current_user]=lambda: {
+            "email":"bob@example.test","tenant_id":"tenant-a","role":"viewer"}
+        assert client.get("/api/dragon-academy/status").json()["wisdom_review"] is None
+        app.dependency_overrides[route.get_current_user]=lambda: {
+            "email":"alice@example.test","tenant_id":"tenant-a","role":"viewer"}
+        monkeypatch.setattr(route.time,"time",lambda:40)
+        assert client.get("/api/dragon-academy/status").json()["wisdom_review"] is None
+        monkeypatch.setattr(route.time,"time",lambda:21)
+        monkeypatch.setenv("SKL_DRAGON_REVIEW_SIGNING_KEY_HEX", (b"x"*32).hex())
+        assert client.get("/api/dragon-academy/status").status_code==409
+        app.dependency_overrides[route.get_current_user]=lambda: None
+        assert client.get("/api/dragon-academy/status").status_code==401
+
+
+
+
+def test_authenticated_hoag_and_recrawl_read_only_routes(tmp_path, monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from skeleton.ai.game_builder.reviewed_knowledge import (
+        ReviewedDocument, ReviewedKnowledgeStore, ReviewedNote,
+    )
+    from skeleton.ai.game_builder.dragon_wisdom_pyramid import DragonWisdomPyramid
+
+    db_path = tmp_path / "knowledge.sqlite"
+    monkeypatch.delenv("SKL_DRAGON_KNOWLEDGE_DB_PATH", raising=False)
+    app = FastAPI()
+    app.include_router(route.router)
+    app.dependency_overrides[route.get_current_user] = lambda: {
+        "email": "alice@example.test", "tenant_id": "tenant-a", "role": "viewer",
+    }
+    with TestClient(app) as client:
+        assert client.get("/api/dragon-academy/knowledge/hoag").status_code == 503
+        assert client.get("/api/dragon-academy/knowledge/recrawls").status_code == 503
+
+    owner = identity()
+    now = 1_791_638_400
+    with ReviewedKnowledgeStore(db_path) as library:
+        wiki = DragonWisdomPyramid(library)
+        revisions = {}
+        for label in ("a", "b"):
+            source_id = "source-" + label
+            text = "Jump timing should be predictable."
+            document = ReviewedDocument(
+                owner=owner, source_id=source_id,
+                source_url="https://example.org/" + source_id,
+                title="Original game design study", text=text,
+                observed_at="2026-10-10T12:00:00Z",
+                license_id="design-reference-license",
+                allowed_scopes=("design_reference",),
+                reviewer_id="research-reviewer-" + label,
+                approved=True,
+                notes=(ReviewedNote(
+                    note_id="note-" + label, mechanic="platforming",
+                    statement=text, start=0, end=len(text),
+                    stance="supports", confidence_ppm=880_000,
+                    dependence_group="publisher-" + label,
+                    tags=("jump",),
+                ),),
+            )
+            revisions[label] = library.import_document(
+                document, expected_parent_digest=None, authorized=True,
+            )
+        brief = library.build_brief(
+            owner, "jump", authorized=True, min_independent_groups=2,
+        )
+        decision = wiki.wiki_review(
+            owner, brief, mechanic="platforming", disposition="accepted",
+            independent_reviewer_id="independent-wiki-reviewer",
+            review_evidence_digest="a" * 64, now=now, expires_at=now + 3600,
+            authorized=True, trusted_worker=True,
+        )
+        wiki.promote(
+            owner, decision["digest"], now=now + 1,
+            authorized=True, trusted_worker=True, human_approved=True,
+        )
+    monkeypatch.setenv("SKL_DRAGON_KNOWLEDGE_DB_PATH", str(db_path))
+    monkeypatch.setattr(route.time, "time", lambda: now + 5)
+    with TestClient(app) as client:
+        result = client.get("/api/dragon-academy/knowledge/hoag")
+        assert result.status_code == 200
+        assert result.headers["cache-control"] == "private, no-store"
+        assert result.json()["items"][0]["mechanic"] == "platforming"
+        assert result.json()["items"][0]["training_authorized"] is False
+        assert "Jump timing" not in result.text
+        assert client.post("/api/dragon-academy/knowledge/hoag", json={}).status_code == 405
+        assert client.post("/api/dragon-academy/knowledge/recrawls", json={}).status_code == 405
+        app.dependency_overrides[route.get_current_user] = lambda: {
+            "email": "bob@example.test", "tenant_id": "tenant-a", "role": "viewer",
+        }
+        assert client.get("/api/dragon-academy/knowledge/hoag").json()["items"] == []
+        app.dependency_overrides[route.get_current_user] = lambda: None
+        assert client.get("/api/dragon-academy/knowledge/hoag").status_code == 401
+        app.dependency_overrides[route.get_current_user] = lambda: {
+            "email": "alice@example.test", "tenant_id": "tenant-a", "role": "viewer",
+        }
+        with ReviewedKnowledgeStore(db_path) as library:
+            DragonWisdomPyramid(library).recrawl(
+                owner, "source-a", reason="changed_source",
+                expected_revision=revisions["a"].revision_digest,
+                now=now + 6, authorized=True, trusted_worker=True,
+            )
+        monkeypatch.setattr(route.time, "time", lambda: now + 7)
+        result = client.get("/api/dragon-academy/knowledge/recrawls")
+        assert result.status_code == 200
+        assert result.json()["orders"][0]["source_id"] == "source-a"
+        assert result.json()["orders"][0]["execution_authorized"] is False
+        assert client.get("/api/dragon-academy/knowledge/hoag").json()["items"] == []
+
+def test_guarded_pulse_requires_configured_shared_runtime():
+    from starlette.requests import Request
+    from fastapi import FastAPI
+    app=FastAPI()
+    request=Request({'type':'http','app':app})
+    with pytest.raises(HTTPException) as exc:
+        route.pulse_practice(request,owner=identity())
+    assert exc.value.status_code==503
+
+
+def test_guarded_pulse_runs_native_subscription_and_defers_under_heat(tmp_path,monkeypatch):
+    from starlette.requests import Request
+    from fastapi import FastAPI
+    from dataclasses import replace
+    from skeleton.ai.webcrawler.dragon_chunk_executor import DragonChunkExecutor
+    from skeleton.ai.webcrawler.dragon_resource_session import DragonResourceSession, HardwareSample
+    from skeleton.ai.game_builder.resource_governor import ResourceGovernor, ResourceEnvelope
+    from skeleton.kernel.global_resource_scheduler import GlobalResourceScheduler, GlobalResourcePolicy, ResourceVector, PlanePolicy
+    app=FastAPI();owner=identity()
+    scheduler=GlobalResourceScheduler(GlobalResourcePolicy(ResourceVector(cpu_millis=4000,memory_mb=256,io_tokens=10),
+        (PlanePolicy('interactive',2,ResourceVector(),1.),PlanePolicy('background',1,ResourceVector(),1.))))
+    hardware=HardwareSample(256*1024**2,4,.1,.9,True,False,10)
+    executor=DragonChunkExecutor(DragonResourceSession(global_resources=scheduler,tenant=owner),
+        ResourceGovernor(ResourceEnvelope(100,10,1000000,3,1,1,10)),lambda:hardware,clock=lambda:10)
+    app.state.dragon_practice_executor_factory=lambda authenticated_owner: executor
+    request=Request({'type':'http','app':app})
+    path=tmp_path/'pulse.sqlite';monkeypatch.setenv('SKL_DRAGON_PRACTICE_DB_PATH',str(path))
+    with route._lab() as (lab,cycles):
+        lab.offer(approved(owner),authorized=True,now=10)
+        cycles.enable(owner,authorized=True,human_approved=True,now=10,expires_at=3010,
+            demos_per_tick=2,max_ticks=2,generation_mode='native')
+    executor.hardware=lambda:replace(hardware,thermal_limited=True)
+    deferred=route.pulse_practice(request,owner=owner)
+    assert deferred['resource_execution']['reason']=='thermal_or_pressure'
+    assert deferred['subscription']['remaining_ticks']==2 and not deferred['created']
+    executor.hardware=lambda:hardware
+    result=route.pulse_practice(request,owner=owner)
+    assert len(result['created'])==2 and result['resource_execution']['done']
+    assert result['subscription']['remaining_ticks']==1
+    assert scheduler.usage('background').empty
+    with pytest.raises(HTTPException) as exc:
+        route.pulse_practice(request,owner=identity('other@example.test'))
+    assert exc.value.status_code==503
+
+
+
+
+def test_signed_custody_and_memory_route_fail_closed_on_rollback(tmp_path, monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from skeleton.ai.game_builder.reviewed_knowledge import (
+        ReviewedDocument, ReviewedKnowledgeStore, ReviewedNote,
+    )
+    from skeleton.ai.game_builder.dragon_wisdom_authority import DragonWisdomAuthority
+    from skeleton.ai.game_builder.dragon_wisdom_memory import DragonWisdomMemory
+    from skeleton.ai.game_builder.dragon_wisdom_pyramid import DragonWisdomPyramid
+    from skeleton.ai.game_builder.dragon_wisdom_custody import DragonCustodyAnchor
+
+    owner = identity()
+    now = 1791644400
+    db_path = tmp_path / "source-evidence.sqlite"
+    anchor_dir = tmp_path / "external-anchors"
+    anchor_dir.mkdir()
+    monkeypatch.setenv("SKL_DRAGON_KNOWLEDGE_DB_PATH", str(db_path))
+    monkeypatch.setenv("SKL_DRAGON_WISDOM_CUSTODY_REQUIRED", "1")
+    monkeypatch.setenv("SKL_DRAGON_WISDOM_ANCHOR_DIR", str(anchor_dir))
+    monkeypatch.setenv("SKL_DRAGON_WISDOM_ANCHOR_KEY_HEX", "cd"*32)
+    monkeypatch.setattr(route.time, "time", lambda: now+3)
+
+    with ReviewedKnowledgeStore(db_path) as library:
+        pyramid = DragonWisdomPyramid(library)
+        for suffix in ("a", "b"):
+            text = "Original input delay measurements and game design."
+            library.import_document(ReviewedDocument(
+                owner=owner, source_id="source-"+suffix,
+                source_url="https://example.org/"+suffix,
+                title="Original mechanics study", text=text,
+                observed_at="2026-10-10T12:00:00Z",
+                license_id="approved-design-reference",
+                allowed_scopes=("design_reference",),
+                reviewer_id="source-reviewer-"+suffix, approved=True,
+                notes=(ReviewedNote(
+                    note_id="note-"+suffix, mechanic="platforming",
+                    statement="Input timing has measurable constraints.",
+                    start=0, end=len("Original input delay"),
+                    stance="supports", confidence_ppm=900000,
+                    dependence_group="publisher-"+suffix,
+                    tags=("delay", "input"),
+                ),),
+            ), expected_parent_digest=None, authorized=True)
+        brief = library.build_brief(
+            owner, "input", authorized=True, min_independent_groups=2,
+        )
+        auth = DragonWisdomAuthority(
+            pyramid, wiki_signing_key=b"r"*32,
+            approval_signing_key=b"a"*32, issuer="studio-identity",
+        )
+        wiki_grant = auth.issue_grant(
+            owner, "wiki-reviewer", "neutral-lab", "wiki_reviewer",
+            brief.to_payload()["brief_digest"], now=now, expires_at=now+60,
+            identity_verified=True, authorized=True,
+        )
+        review = auth.review(
+            owner, brief, mechanic="platforming", disposition="accepted",
+            review_evidence_digest="e"*64, grant=wiki_grant,
+            now=now, expires_at=now+3600,
+            authorized=True, trusted_worker=True,
+        )
+        approve_grant = auth.issue_grant(
+            owner, "human-approver", "governance", "memory_approver",
+            review["digest"], now=now, expires_at=now+60,
+            identity_verified=True, authorized=True,
+        )
+        auth.approve(
+            owner, review["digest"], grant=approve_grant,
+            now=now+1, authorized=True, trusted_worker=True,
+        )
+        DragonWisdomMemory(pyramid).reconcile(
+            owner, now=now+2, authorized=True, trusted_worker=True,
+        )
+
+    app = FastAPI()
+    app.include_router(route.router)
+    app.dependency_overrides[route.get_current_user] = lambda: {
+        "email": "alice@example.test", "tenant_id": "tenant-a", "role": "viewer",
+    }
+    with TestClient(app) as client:
+        # Even correctly signed approvals cannot be served without a separate
+        # externally anchored journal head when strict custody is configured.
+        assert client.get("/api/dragon-academy/knowledge/hoag").status_code == 409
+        assert client.get("/api/dragon-academy/knowledge/memory").status_code == 409
+        with ReviewedKnowledgeStore(db_path) as library:
+            pyramid = DragonWisdomPyramid(library)
+            DragonCustodyAnchor(anchor_dir, signing_key=bytes.fromhex("cd"*32)).checkpoint(
+                pyramid, owner, now=now+2, authorized=True,
+                trusted_worker=True, allow_initial_bootstrap=True,
+            )
+        response = client.get("/api/dragon-academy/knowledge/memory")
+        assert response.status_code == 200
+        assert response.headers["cache-control"] == "private, no-store"
+        assert len(response.json()["items"]) == 1
+        assert response.json()["items"][0]["training_authorized"] is False
+        assert client.get("/api/dragon-academy/knowledge/memory?mechanic=other").json()["items"] == []
+        assert client.post("/api/dragon-academy/knowledge/memory", json={}).status_code == 405
+        app.dependency_overrides[route.get_current_user] = lambda: {
+            "email": "bob@example.test", "tenant_id": "tenant-a", "role": "viewer",
+        }
+        assert client.get("/api/dragon-academy/knowledge/memory").status_code == 409
+        app.dependency_overrides[route.get_current_user] = lambda: {
+            "email": "alice@example.test", "tenant_id": "tenant-a", "role": "viewer",
+        }
+        with ReviewedKnowledgeStore(db_path) as library:
+            pyramid = DragonWisdomPyramid(library)
+            pyramid.revoke(owner, review["digest"], reason="rights_change",
+                           now=now+3, authorized=True, trusted_worker=True)
+        assert client.get("/api/dragon-academy/knowledge/memory").status_code == 409
+        with ReviewedKnowledgeStore(db_path) as library:
+            pyramid = DragonWisdomPyramid(library)
+            DragonCustodyAnchor(anchor_dir, signing_key=bytes.fromhex("cd"*32)).checkpoint(
+                pyramid, owner, now=now+4, authorized=True,
+                trusted_worker=True,
+            )
+        assert client.get("/api/dragon-academy/knowledge/memory").json()["items"] == []

@@ -19,7 +19,7 @@ def setup():
     root=LayerReceipt(AnalysisLayer.SOURCE_INTEGRITY,(),"c"*64,2,True,False)
     dispatch=LayerDispatch(AnalysisLayer.TEMPORAL_SEGMENTATION,
         ("c"*64,),"temporal","v1")
-    frames=(FeatureFrame(0,"f0",(0.,)),FeatureFrame(100,"f1",(1.,)))
+    frames=(FeatureFrame(timestamp_ms=0,features=(0.,),source_frame_id="f0"),FeatureFrame(timestamp_ms=100,features=(1.,),source_frame_id="f1"))
     return q,ledger,c,j,root,dispatch,frames
 
 

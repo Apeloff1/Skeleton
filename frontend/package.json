@@ -29,7 +29,8 @@
     "test:build-lifecycle": "node --test scripts/test-build-job-lifecycle.mjs",
     "test:knowledge-experience": "node --test scripts/test-knowledge-experience.mjs",
     "test:world-workbench": "node --test scripts/test-world-workbench.mjs",
-    "test:design-review": "node --test scripts/test-design-review.mjs"
+    "test:design-review": "node --test scripts/test-design-review.mjs",
+    "test:dragon-wisdom": "node scripts/test-dragon-wisdom.cjs"
   },
   "engines": {
     "node": ">=24"

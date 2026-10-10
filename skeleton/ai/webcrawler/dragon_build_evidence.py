@@ -16,7 +16,7 @@ from .dragon_native_practice import DragonNativePracticeLab
 from .dragon_native_compile import _verify
 from .dragon_practice_lab import _owner,_time
 
-ROM_EXTENSIONS={"game_boy":"gb","game_boy_color":"gbc","nes":"nes"}
+ROM_EXTENSIONS={"game_boy":"gb","game_boy_color":"gbc","nes":"nes","commodore_64":"prg"}
 MAX_ROM_BYTES=2_000_000
 
 @dataclass(frozen=True)
@@ -93,7 +93,7 @@ class DragonBuildEvidence:
         _owner(owner);_time(now)
         if not authorized or not trusted_worker:
             raise PermissionError("native ROM attestations require a trusted compiler worker")
-        if not isinstance(rom,bytes) or not 32768<=len(rom)<=MAX_ROM_BYTES:
+        if not isinstance(rom,bytes) or not 32<=len(rom)<=MAX_ROM_BYTES:
             raise ValueError("native ROM payload size invalid")
         if toolchain not in ("RGBDS","cc65"):
             raise ValueError("unrecognized trusted native compiler")
@@ -103,8 +103,10 @@ class DragonBuildEvidence:
         if project.get("digest")!=source_digest:
             raise ValueError("native build source custody mismatch")
         expected_toolchain="RGBDS" if target_id in ("game_boy","game_boy_color") else "cc65"
-        if target_id not in ROM_EXTENSIONS or toolchain!=expected_toolchain:
+        if target_id not in ROM_EXTENSIONS:
             raise ValueError("native target is not supported for ROM verification")
+        if toolchain!=expected_toolchain:
+            raise ValueError("trusted native compiler does not match target")
         if not _verify(target_id,rom):
             raise ValueError("ROM header, size or checksum invalid")
         # Explicitly preserve the issuer's source digest, not caller-provided
@@ -121,7 +123,9 @@ class DragonBuildEvidence:
             "source_digest":source_digest,"binary_sha256":binary_sha,
             "bytes_written":len(rom),"toolchain":toolchain,"event_time":now,
             "chain_index":len(history)+1,"previous_digest":previous,
-            "claim":"rom_header_and_content_verified_not_gameplay_verified",
+            "claim":("native_program_header_and_content_verified_not_gameplay_verified"
+                     if target_id == "commodore_64" else
+                     "rom_header_and_content_verified_not_gameplay_verified"),
         }
         receipt_digest=sha256(self._canon(evidence)).hexdigest()
         signature=self._signature(evidence)

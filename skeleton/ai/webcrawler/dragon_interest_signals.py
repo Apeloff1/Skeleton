@@ -82,6 +82,8 @@ _WEIGHTS = {
 def normalize_tag(tag: str) -> str:
     if not isinstance(tag, str):
         raise ValueError("topic must be text")
+    if any(ord(char) < 32 or ord(char) == 127 for char in tag):
+        raise ValueError("invalid topic control character")
     value = " ".join(tag.casefold().split())
     if not _TAG.fullmatch(value):
         raise ValueError("invalid topic")
