@@ -1217,4 +1217,42 @@ def relocate_start(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget", "pareto_hazard_routes", "enumerate_shortest_routes", "route_progress_trace", "make_level_edit", "carve_alternative_corridor", "seal_safe_corridor", "relocate_collectible", "relocate_exit", "add_solvable_hazard", "remove_hazard", "relocate_hazard", "relocate_start"]
+def carve_for_diversity(
+    problem: RouteProblem, *, authorized: bool,
+    max_candidates: int = 32,
+) -> MapEditReceipt:
+    """Find a one-wall structural improvement, scored by actual route portfolio."""
+    if authorized is not True:
+        raise PermissionError("route-generation change requires designer authorization")
+    if (not isinstance(problem, RouteProblem) or type(max_candidates) is not int
+            or not 1 <= max_candidates <= 96):
+        raise MultipathError("invalid structural route-evolution search budget")
+    before_loops = cycle_rank(problem)
+    options: list[tuple[int, int, int, MapEditReceipt]] = []
+    tried = 0
+    for y in range(1, problem.height-1):
+        for x in range(1, problem.width-1):
+            if problem.tile((x, y)) != "#":
+                continue
+            if tried >= max_candidates:
+                break
+            tried += 1
+            try:
+                candidate = carve_alternative_corridor(problem, (x, y), authorized=True)
+                portfolio = route_portfolio(candidate.after, max_routes=3)
+            except MultipathError:
+                continue
+            novelty = portfolio_diversity_ppm(portfolio)
+            if len(portfolio) < 2 or novelty == 0:
+                continue
+            gained = cycle_rank(candidate.after) - before_loops
+            options.append((novelty, gained, -tried, candidate))
+        if tried >= max_candidates:
+            break
+    if not options:
+        raise MultipathError("no structural alternative exists inside search budget")
+    return max(options, key=lambda item: item[:3])[3]
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget", "pareto_hazard_routes", "enumerate_shortest_routes", "route_progress_trace", "make_level_edit", "carve_alternative_corridor", "seal_safe_corridor", "relocate_collectible", "relocate_exit", "add_solvable_hazard", "remove_hazard", "relocate_hazard", "relocate_start", "carve_for_diversity"]
