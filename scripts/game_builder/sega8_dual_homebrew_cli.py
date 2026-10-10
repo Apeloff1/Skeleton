@@ -128,8 +128,15 @@ def export_dual_original(
             shared = observed
         elif shared != observed:
             raise Sega8DualPortError("original world, rights, solution or palette diverged across consoles")
-        if manifest.get("platform") != target:
-            raise Sega8DualPortError("native cartridge destination identity mismatch")
+        if (
+            manifest.get("platform") != target
+            or manifest.get("source_platform") != target
+            or source.get("native_source_authoring_platform") != target
+            or source.get("third_party_console_origin_claimed") is not False
+        ):
+            raise Sega8DualPortError(
+                "native original game must not claim a third-party console as its source"
+            )
         digest = _source_fingerprint(path)
         if digest != source["source_content_digest"]:
             raise Sega8DualPortError("native project source changed during dual-port build")
