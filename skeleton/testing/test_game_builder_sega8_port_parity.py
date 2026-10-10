@@ -71,6 +71,9 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
                 "all_level_completion_verified": True,
                 "original_score_and_screen_state_verified": True,
                 "original_companion_rank_progression_verified": True,
+                "original_native_solution_attract_mode_host_verified": True,
+                "original_demo_controller_actions_verified": 256,
+                "original_demo_screen_trace_sha256": "7"*64,
                 "source_content_digest": str(index) * 64,
                 "world_digest": WORLD, "original_controller_actions_verified": 256,
                 "original_levels_verified": 3,
@@ -108,6 +111,9 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
             "original_source_game_verified_on_instruction_level_cpu": True,
             "original_companion_rank_and_reward_verified": True,
             "actual_victory_palette_verified": True,
+            "native_attract_demo_chord_started_from_victory": True,
+            "native_attract_demo_performed_first_original_move": True,
+            "native_attract_demo_user_cancel_restored_game": True,
             "original_levels_replayed": 3,
             "controller_actions_replayed": 256,
             "hardware_screen_states_verified": 257,
@@ -178,6 +184,9 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     assert receipt["gameplay_parity_verified"] is True
     assert receipt["independent_native_rom_formats_verified"] is True
     assert receipt["real_z80_startup_checked_per_platform"] is True
+    assert receipt["original_on_cartridge_demo_equivalent_across_platforms"] is True
+    assert receipt["native_attract_demo_entry_and_cancel_verified_on_both_platforms"] is True
+    assert receipt["original_demo_controller_actions_verified_per_platform"] == 256
     assert receipt["native_cartridge_rebuild_byte_equality_checked_per_platform"] is True
     assert set(receipt["native_rebuild_provenance_sha256_by_platform"]) == set(EXTS)
     assert all(len(value)==64 for value in receipt["native_rebuild_provenance_sha256_by_platform"].values())
@@ -202,6 +211,12 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     ("manifest", "project_id", "unreviewed-work"),
     ("host", "original_controller_actions_verified", 257),
     ("host", "original_score_and_screen_state_verified", False),
+    ("host", "original_native_solution_attract_mode_host_verified", False),
+    ("host", "original_demo_controller_actions_verified", 0),
+    ("host", "original_demo_screen_trace_sha256", "0"*64),
+    ("native_route", "native_attract_demo_chord_started_from_victory", False),
+    ("native_route", "native_attract_demo_performed_first_original_move", False),
+    ("native_route", "native_attract_demo_user_cancel_restored_game", False),
     ("host", "full_console_emulator_playthrough_verified", True),
     ("boot", "hardware_boot_smoke_verified", False),
     ("boot", "physical_hardware_verified", True),
