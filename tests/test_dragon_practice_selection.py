@@ -119,3 +119,36 @@ def test_practice_attempt_rejects_foreign_world_and_manipulated_ledger():
         verified_practice_run(left.game_id, forged, authorized=True)
     with pytest.raises(PracticeSelectionError):
         verified_practice_run(left.game_id, object(), authorized=True)
+
+
+def test_portfolio_receipt_binds_exact_100_verified_game_worlds():
+    receipt = practice_portfolio_receipt(authorized=True)
+    assert receipt["schema"] == "skeleton.dragon.practice_portfolio.v1"
+    assert receipt["game_count"] == len(receipt["games"]) == 100
+    assert len({x["world_digest"] for x in receipt["games"]}) == 100
+    assert receipt["digest"] == canonical_digest(
+        {k: v for k, v in receipt.items() if k != "digest"}
+    )
+    assert receipt == practice_portfolio_receipt(authorized=True)
+    assert receipt["native_binary_build_verified"] is False
+    assert receipt["originality_independently_cleared"] is False
+    assert receipt["release_authorized"] is False
+
+
+def test_game_comparison_reports_factual_delta_not_quality_judgment():
+    a = load_practice_game("dragon-practice-001", authorized=True)
+    b = load_practice_game("dragon-practice-002", authorized=True)
+    evidence = compare_practice_challenges(a.game_id, b.game_id, authorized=True)
+    assert evidence["first_world_digest"] == a.world.digest
+    assert evidence["second_world_digest"] == b.world.digest
+    assert evidence["route_step_difference"] == (
+        len(b.proof.action_receipts) - len(a.proof.action_receipts)
+    )
+    assert evidence["hazard_difference"] == (
+        len(b.world.levels[0].hazards) - len(a.world.levels[0].hazards)
+    )
+    assert evidence["quality_comparison_authorized"] is False
+    with pytest.raises(PracticeSelectionError):
+        compare_practice_challenges(a.game_id, a.game_id, authorized=True)
+    with pytest.raises(PermissionError):
+        compare_practice_challenges(a.game_id, b.game_id, authorized=1)
