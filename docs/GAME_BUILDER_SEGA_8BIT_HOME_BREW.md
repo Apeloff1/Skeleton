@@ -181,3 +181,43 @@ generation that requires rechecking and re-signing release evidence, rather
 than silently reusing a previous build certificate. No sample artwork or
 platform-exclusive commercial textures are copied.
 
+## Real SDCC toolchain revision, source and authorship evidence
+
+The original Sega Master System/Game Gear CI uses a pinned public Git
+revision of devkitSMS (`533ae572c897cf44f1da865013ebf690134301a3`).
+This is an **exact 40-character Git SHA-1 commit ID**. It must not be
+misidentified as a SHA-256 content digest, which is 64 hexadecimal
+characters. The `native_sega_8bit_ci.verify` adapter accepts full Git
+revision IDs of either 40 or 64 hex digits, refuses branch/tag names,
+partial revisions and malformed hashes, and labels the revision algorithm
+in the resulting receipt. A commit ID is not proof of signed toolchain
+provenance: `toolchain_source_authenticated` remains false.
+
+Original source authorship and the native ROM are **different evidence
+objects**. The dedicated workflow now records the authored game's source
+digest and the author's declaration-file digest at generation time, before
+compiling with SDCC. The later verification step reopens the real game C,
+Makefile and manifest using no-follow directory file descriptors, rejects
+unreviewed extra root files, allows only the separate legitimate `build`
+directory and validates the exact prebuild source and author declaration
+hashes. Both checks are recorded distinctly; matching developer-provided
+hashes does **not** establish independent legal clearance, compiler
+authenticity or a license to reuse third-party commercial material.
+
+The ROM file also uses no-follow, bounded, inode-checked opening. Symlinked
+ancestor paths, hardlinked ROM bytes, named pipes and oversized sparse
+cartridges fail closed rather than falling back to unsafe `Path.read_bytes`
+after an earlier symlink check.
+
+The workflow separately checks that a clean second SDCC build produces the
+same SHA-256 ROM as the first build and uploads **receipts rather than public
+ROM binaries**. Deterministic output is valuable regression evidence but
+does not prove emulator boot, game playability, developer-kit license
+compatibility, or publisher distribution rights. Those require distinct
+trusted provenance and authorized operating-system/hardware evaluation.
+
+Regression coverage includes 40-character real Git revision IDs,
+64-character Git SHA-256 IDs, malformed or abbreviated IDs, changed source
+after generation, substituted authorship records, unreviewed extra files,
+allowed build intermediates, linked/sparse cartridge files and forged
+release booleans.
