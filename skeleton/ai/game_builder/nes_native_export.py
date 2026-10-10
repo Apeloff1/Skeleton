@@ -532,6 +532,18 @@ def compile_native_nes(
             raise NativeNESError("template marker collision")
         result = result.replace(marker, value)
     asm = result + "\n"
+    # Preserve an original safe move from the exact generated world for
+    # verifying the real 6502 guest responds to physical controller bits.
+    first_move = world.levels[0].safe_solution[0]
+    first_spawn = world.levels[0].start
+    move_delta={"up":(0,-1),"down":(0,1),"left":(-1,0),"right":(1,0)}
+    if first_move not in move_delta:
+        raise NativeNESError("original NES reference route contains unknown action")
+    dx,dy=move_delta[first_move]
+    first_target=(first_spawn[0]+dx,first_spawn[1]+dy)
+    if not (0<=first_target[0]<world.intent.width
+            and 0<=first_target[1]<world.intent.height):
+        raise NativeNESError("original NES first controller action exits world envelope")
     manifest = {
         "schema": "skeleton.game_builder.native_nes_source.v1",
         "project_id": source.project_id,
@@ -547,6 +559,9 @@ def compile_native_nes(
         "width": world.intent.width,
         "height": world.intent.height,
         "reference_safe_moves": sum(len(level.safe_solution) for level in world.levels),
+        "original_first_controller_action": first_move,
+        "original_first_player_spawn": list(first_spawn),
+        "original_first_controller_target": list(first_target),
         "cartridge_built": False,
         "emulator_verified": False,
         "hardware_verified": False,
