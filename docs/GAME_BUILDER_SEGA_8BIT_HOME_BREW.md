@@ -444,3 +444,48 @@ audio I/O writes. The branch must NOT be marked hardware-playable until
 the startup trace, selected CPU core, real ROM mapper and device callbacks
 produce validated hardware-facing results in exact-head CI. Successful
 source-host gameplay tests do not substitute for real ROM CPU execution.
+
+## Complete native Z80 winning-route execution
+
+The original homebrew pipeline now has an **input-driven native game replay**
+that loads the real SDCC-generated 32 KiB Sega cartridge into an independent
+Z80 instruction interpreter and observes only the guest console's video
+memory, hardware palette and controller operations. It does not copy Python
+gameplay rules into the emulator or override guest RAM with expected values.
+
+For each independently generated safe move the runner presses the actual
+console joypad bit, gives the native cartridge time to handle interrupt
+driven input and drain its bounded VDP queue, then releases the button.
+The original hardware name table is inspected for **exactly one hero tile**,
+stage, coordinates, health, collectibles, four-digit score and cosmetic
+companion rank. If any guest observation differs from the source-game
+reference, including after the controller is released, acceptance fails.
+
+At the final authored exit the guest must actually change the original
+hardware palette to the victory color in its console-specific color
+RAM: RGB222 on Master System and RGB444 on Game Gear. Test receipts bind
+every action, screen state, original project digest, source digest and
+compiled ROM SHA-256. A source-only replay or a structural ROM checksum
+cannot satisfy this acceptance gate.
+
+After building an original ROM and its independent source route:
+
+```bash
+python -m scripts.game_builder.sega8_real_z80_gameplay \
+  --rom ./homebrew-gg/build/skeleton-original.gg \
+  --source-dir ./homebrew-gg \
+  --route ./original-winning-route.json \
+  --target sega_game_gear \
+  --receipt-out ./game-gear-real-z80-gameplay.json
+```
+
+The CI matrix builds both consoles separately and checks that their
+original rules and route outcomes agree while the cartridge bytes remain
+distinct. The cross-port gate requires both machine-code replay receipts
+before reporting full native Z80 gameplay parity.
+
+This is instruction-level execution with a deliberately bounded device
+model and synthetic video interrupts. It is **not** a cycle-accurate
+full-consumer emulator, physical-console acceptance, or legal permission
+to redistribute ROMs, outside artwork or proprietary firmware. The
+latter statuses remain explicitly false even after a successful replay.
