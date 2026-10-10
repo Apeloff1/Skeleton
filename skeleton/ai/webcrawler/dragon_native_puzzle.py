@@ -328,13 +328,17 @@ def emit_native_puzzle(*,seed:int,stages:int=4,difficulty:int=4,
     campaign=design_campaign(
         stages,seed=seed,mode=campaign_mode,intensity=challenge_profile,
     )
-    layouts=[];solutions=[];proofs=[]
+    from .dragon_native_multipath import analyse_routes,route_report
+    layouts=[];solutions=[];proofs=[];alternatives=[]
     for index in range(stages):
         grid=(original_pack.levels[index].rows if original_pack is not None
               else transformed_level(index,seed,difficulty,procedural=procedural))
         path,states=solve_grid(grid)
         start,boxes,goals,walls=_parse(grid)
         layouts.append(grid);solutions.append(path)
+        alternatives.append(route_report(analyse_routes(
+            grid,max_routes=4,expansion_cap=4000,
+        )))
         proofs.append(LevelProof(index,path,len(path),states,len(boxes),
              sha256("\n".join(grid).encode()).hexdigest(),
              sha256(path.encode()).hexdigest()))
@@ -390,6 +394,8 @@ clean:
       "authored_level_rows":[list(level.rows) for level in original_pack.levels]
                              if original_pack is not None else None,
       "level_proofs":[asdict(p) for p in proofs],
+      "route_analysis":[{"stage":index,**record}
+                        for index,record in enumerate(alternatives)],
       "native_runtime_test_required":True,
       "proof_scope":"optimal abstract grid moves, not C executable verification",
     }
