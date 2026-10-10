@@ -277,3 +277,14 @@ def test_exact_tile_distances_match_single_corridor_ground_truth():
     assert distances[p.collectibles[0]] == 2
     assert len(distances) == 7
 
+
+def test_branch_choices_count_real_player_decisions():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    solved = solve_route(p)
+    choices = route_branch_choices(p, solved)
+    assert len(choices) == solved.steps
+    assert choices[0] == 2
+    assert max(choices) >= 3
+    with pytest.raises(MultipathError):
+        route_branch_choices(RouteProblem.from_rows(HAZARD_LEVEL), solved)
+
