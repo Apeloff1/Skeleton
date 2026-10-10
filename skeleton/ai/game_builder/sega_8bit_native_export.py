@@ -62,6 +62,44 @@ static unsigned char board[MAP_SIZE];
 static unsigned char level_index, hero_x, hero_y, health, gems_left;
 static unsigned char won, lost, move_cooldown;
 static unsigned int score;
+#define VRAM_QUEUE_CAPACITY 16
+#define VRAM_WRITES_PER_FRAME 3
+static unsigned char pending_x[VRAM_QUEUE_CAPACITY], pending_y[VRAM_QUEUE_CAPACITY];
+static unsigned char pending_tile[VRAM_QUEUE_CAPACITY], pending_count;
+
+/* Coalesce matching coordinates; a full queue fails closed rather than
+ * silently losing screen updates. The logic does not change the game world. */
+static void queue_tile(unsigned char x, unsigned char y, unsigned char tile) {
+    unsigned char i;
+    for (i=0; i<pending_count; ++i) {
+        if (pending_x[i]==x && pending_y[i]==y) {
+            pending_tile[i]=tile;
+            return;
+        }
+    }
+    if (pending_count==VRAM_QUEUE_CAPACITY) {
+        lost=1;
+        return;
+    }
+    pending_x[pending_count]=x;
+    pending_y[pending_count]=y;
+    pending_tile[pending_count]=tile;
+    ++pending_count;
+}
+static void flush_pending(void) {
+    unsigned char count, i, remaining;
+    count=pending_count<VRAM_WRITES_PER_FRAME ?
+        pending_count : VRAM_WRITES_PER_FRAME;
+    for (i=0; i<count; ++i)
+        SMS_setTileatXY(pending_x[i],pending_y[i],pending_tile[i]);
+    remaining=pending_count-count;
+    for (i=0; i<remaining; ++i) {
+        pending_x[i]=pending_x[i+count];
+        pending_y[i]=pending_y[i+count];
+        pending_tile[i]=pending_tile[i+count];
+    }
+    pending_count=remaining;
+}
 
 /* All tile writes happen with the display off or immediately after VBlank. */
 static void write_cell(unsigned char x, unsigned char y) {
@@ -81,6 +119,23 @@ static void draw_hud(void) {
     SMS_setTileatXY(LEFT+15, HUD_Y, DIGIT_BASE+((score/10)%10));
     SMS_setTileatXY(LEFT+16, HUD_Y, DIGIT_BASE+(score%10));
 }
+static void queue_hud(unsigned char tile) {
+    if (tile==GEM) {
+        queue_tile(LEFT+1,HUD_Y,DIGIT_BASE+(gems_left/10));
+        queue_tile(LEFT+2,HUD_Y,DIGIT_BASE+(gems_left%10));
+    } else if (tile==HAZARD) {
+        queue_tile(LEFT+5,HUD_Y,DIGIT_BASE+(health/10));
+        queue_tile(LEFT+6,HUD_Y,DIGIT_BASE+(health%10));
+    } else if (tile==EXIT) {
+        queue_tile(LEFT+9,HUD_Y,DIGIT_BASE+((level_index+1)/10));
+        queue_tile(LEFT+10,HUD_Y,DIGIT_BASE+((level_index+1)%10));
+    }
+    if (tile==GEM) {
+        queue_tile(LEFT+14,HUD_Y,DIGIT_BASE+((score/100)%10));
+        queue_tile(LEFT+15,HUD_Y,DIGIT_BASE+((score/10)%10));
+        queue_tile(LEFT+16,HUD_Y,DIGIT_BASE+(score%10));
+    }
+}
 static void draw_hero(void) {
     SMS_setTileatXY(LEFT+hero_x, TOP+hero_y, HERO);
 }
@@ -88,6 +143,7 @@ static void load_level(void) {
     unsigned int i;
     unsigned char x, y;
     SMS_displayOff();
+    pending_count=0; /* old-stage writes cannot leak into the new level */
     gems_left = GEMS_PER_LEVEL;
     hero_x = authored_spawn_x[level_index];
     hero_y = authored_spawn_y[level_index];
@@ -117,7 +173,7 @@ static void advance(int dx, int dy) {
     tile=board[position];
     if (tile==WALL || (tile==EXIT && gems_left!=0)) return;
 
-    write_cell(hero_x, hero_y);
+    queue_tile(LEFT+hero_x,TOP+hero_y,board[(unsigned int)hero_y*WIDTH+hero_x]);
     hero_x=(unsigned char)nx;
     hero_y=(unsigned char)ny;
     if (tile==GEM) {
@@ -136,8 +192,8 @@ static void advance(int dx, int dy) {
             return;
         }
     }
-    draw_hero();
-    draw_hud();
+    queue_tile(LEFT+hero_x,TOP+hero_y,HERO);
+    queue_hud(tile);
 }
 void main(void) {
     unsigned int keys;
@@ -161,7 +217,8 @@ void main(void) {
     load_level();
     for (;;) {
         SMS_waitForVBlank();
-        if (won || lost) continue;
+        flush_pending();
+        if (won || lost || pending_count) continue;
         if (move_cooldown) { --move_cooldown; continue; }
         keys=SMS_getKeysStatus();
         if (keys & PORT_A_KEY_UP) {
@@ -186,6 +243,7 @@ _MAKE = """# Toolchain must be provided legally by the builder; nothing is vendo
 SDCC ?= sdcc
 MAKESMS ?= makesms
 SMSLIB_DIR ?= .
+SMSLIB_INC ?= $(SMSLIB_DIR)/src
 CRT0_SMS ?= crt0_sms.rel
 LIBRARY := __LIBRARY__
 TARGET_FLAG := __FLAG__
@@ -194,7 +252,7 @@ ROM := skeleton-original.__EXT__
 all: build/$(ROM)
 build/game.rel: game.c
 \tmkdir -p build
-\t$(SDCC) -c -mz80 $(TARGET_FLAG) -I$(SMSLIB_DIR) -o $@ $<
+\t$(SDCC) -c -mz80 $(TARGET_FLAG) -I$(SMSLIB_INC) -o $@ $<
 build/game.ihx: build/game.rel
 \t$(SDCC) -o $@ -mz80 --no-std-crt0 --data-loc 0xC000 $(CRT0_SMS) $< $(SMSLIB_DIR)/$(LIBRARY)
 build/$(ROM): build/game.ihx
