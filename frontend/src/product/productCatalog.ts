@@ -39,6 +39,7 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
       { id: 'route-world', title: 'Multi-path world explorer', description: 'Play and build original worlds with public transport, weather, secrets, long detours, free roaming, magical and space routes.', operation: 'dragon.routes.world', href: '/dragon-route-world' },
       { id: 'maze-forge', title: 'Constructive maze builder', description: 'Create genuinely finishable original mazes with scenic circuits, doublebacks, dead-end discoveries, climate-safe paths and native C99 source evidence.', operation: 'dragon.routes.maze', href: '/dragon-maze-world' },
       { id: 'route-atlas', title: 'World-scale route atlas', description: 'Play 12 independently certified maze regions with hundreds of rooms, alternate portal routes and full-world scenic expeditions.', operation: 'dragon.routes.atlas', href: '/dragon-route-atlas' },
+      { id: 'living-worlds', title: 'Living worlds and postgame', description: 'Build never-ending sandbox and survival worlds, changing labyrinths, multiple realms, consequence-driven endings and persistent postgame exploration.', operation: 'dragon.worlds.living', href: '/dragon-living-world' },
     ],
   },
   {
@@ -53,6 +54,7 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
       { id: 'world-routes', title: 'Author route networks', description: 'Compare original multimodal journey graphs, gates, hidden paths, detours, alternate goals and challenge routes.', operation: 'world.routes.author', href: '/dragon-route-world' },
       { id: 'world-mazes', title: 'Design guaranteed mazes', description: 'Play and export certified worlds with every-room recovery, secret detours, scenic routes and optional maze difficulty.', operation: 'world.mazes.guaranteed', href: '/dragon-maze-world' },
       { id: 'world-route-atlas', title: 'Compose regional worlds', description: 'Connect up to 576 independently certified rooms across 12 playable regions with optional shortcuts and scenic full-world paths.', operation: 'world.regions.atlas', href: '/dragon-route-atlas' },
+      { id: 'world-lifecycle', title: 'Create living and endless worlds', description: 'Change victory rules, world eras, faction consequences, ecology, moving mazes and post-ending open exploration across 32 active original gameplay profiles.', operation: 'world.lifecycle.author', href: '/dragon-living-world' },
       { id: 'systems', title: 'Author systems', description: 'Compose quests, economy, crafting, NPCs and progression.', operation: 'world.systems.compose' },
       { id: 'assets', title: 'Forge assets', description: 'Generate and organize reusable world assets.', operation: 'asset.forge' },
     ],
