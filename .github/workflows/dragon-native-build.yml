@@ -11,6 +11,7 @@ on:
       - 'skeleton/ai/webcrawler/dragon_native_raycaster.py'
       - 'skeleton/ai/webcrawler/dragon_native_3d_era.py'
       - 'skeleton/ai/webcrawler/dragon_native_puzzle.py'
+      - 'skeleton/ai/webcrawler/dragon_native_artforge.py'
       - 'skeleton/ai/webcrawler/dragon_hw_graphics.py'
       - 'skeleton/ai/webcrawler/dragon_hardware_budget.py'
       - 'skeleton/ai/webcrawler/dragon_game_fitness.py'
@@ -84,6 +85,7 @@ jobs:
           python -m pytest -q \
             tests/test_ai_dragon_native_production.py \
             tests/test_ai_dragon_native_desktop.py \
+            tests/test_ai_dragon_native_artforge.py \
             tests/test_ai_webcrawler_dragon_native_projects.py \
             tests/test_ai_webcrawler_dragon_native_compile.py \
             tests/test_ai_webcrawler_dragon_native_cycles.py \
@@ -104,6 +106,28 @@ jobs:
             tests/test_ai_webcrawler_dragon_native_c64.py \
             tests/test_ai_webcrawler_dragon_native_gbc.py \
             tests/test_ai_webcrawler_dragon_native_platformer.py
+      - name: Compile original art-directed handheld and NES ROMs
+        run: |
+          set -euo pipefail
+          python -m skeleton.ai.webcrawler.dragon_native_production build \
+            --title "Original Sprite and World Campaign" \
+            --style arcade_score_attack \
+            --targets game_boy,game_boy_color,nes \
+            --attest-original-rights --compile-roms --require-compiled \
+            --out /tmp/dragon-original-art-roms \
+            > /tmp/dragon-original-art-build.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from skeleton.ai.webcrawler.dragon_native_production import verify_published_production
+          result = json.loads(Path("/tmp/dragon-original-art-build.json").read_text())
+          assert result["status"] == "published"
+          audit = verify_published_production(
+              Path("/tmp/dragon-original-art-roms"), result["index"])
+          assert audit["archives_verified"] == 3
+          assert all(item["binary_sha256"] for item in result["artifacts"])
+          print("ORIGINAL_NATIVE_ART_ROM_BUILDS_PASS", audit["request_id"])
+          PY
       - name: Build original Game Boy ROM
         run: |
           python -m skeleton.ai.webcrawler.dragon_native_cli \
