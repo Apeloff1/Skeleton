@@ -87,6 +87,8 @@ def test_atari_5200_statically_linked_real_analog_controller_and_antic_console()
         "JOY_LEFT_MASK", "JOY_RIGHT_MASK", "JOY_UP_MASK",
         "JOY_DOWN_MASK", "JOY_BTN_1_MASK",
         "waitvsync()", "OS.color0", "OS.color1", "OS.color2",
+        "GTIA_WRITE.colpf0", "GTIA_WRITE.colpf1", "GTIA_WRITE.colpf2",
+        "#ifdef OS", "dragon_palette(",
         "gotoxy(px,py)", "life--", "score++", "level=1+score/4",
     ):
         assert required in c

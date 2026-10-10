@@ -25,6 +25,18 @@ extern const void joy_static_stddrv[];
 static unsigned int prng=__SEED__;
 static unsigned char px=3,py=5,gx=13,gy=9,fx=17,fy=18;
 static unsigned char life=5,level=1,score=0,guard=0,step=0;
+/* cc65 2.19 atari5200.h provides GTIA_WRITE but not OS.
+   Newer revisions expose OS shadow colors.  Preserve the ability to build
+   against either SDK, with the real Atari GTIA hardware-register fallback. */
+static void dragon_palette(unsigned char palette){
+#ifdef OS
+ OS.color0=0x24;OS.color1=palette;OS.color2=0xA8;
+#else
+ GTIA_WRITE.colpf0=0x24;
+ GTIA_WRITE.colpf1=palette;
+ GTIA_WRITE.colpf2=0xA8;
+#endif
+}
 static unsigned int rnd(void){
  prng^=prng<<7;prng^=prng>>9;prng^=prng<<8;
  return prng;
@@ -32,7 +44,7 @@ static unsigned int rnd(void){
 static void restart(void){
  prng=__SEED__;px=3;py=5;gx=13;gy=9;fx=17;fy=18;
  life=5;level=1;score=0;guard=0;step=0;
- OS.color0=0x24;OS.color1=0x86;OS.color2=0xA8;
+ dragon_palette(0x86);
 }
 static void draw(void){
  clrscr();
@@ -58,7 +70,7 @@ static void move(unsigned char key){
   score++;level=1+score/4;
   gx=1+(unsigned char)(rnd()%18);
   gy=3+(unsigned char)(rnd()%17);
-  OS.color1=(unsigned char)(0x48+(score&7)*2);
+  dragon_palette((unsigned char)(0x48+(score&7)*2));
   if(score%5==0&&life<5)life++;
  }
  step++;
