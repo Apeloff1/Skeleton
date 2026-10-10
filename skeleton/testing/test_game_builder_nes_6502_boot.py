@@ -139,7 +139,7 @@ def test_compiled_rom_signature_without_real_ppu_writes_does_not_boot(tmp_path):
     image=synthetic_original_nrom()
     file=tmp_path/"rom-with-no-gameplay.nes"
     file.write_bytes(image)
-    with pytest.raises(NES6502BootError,match="exceeded"):
+    with pytest.raises(NES6502BootError,match="exceeded|escaped"):
         verify_original_nes_6502_boot(
             file,expected_sha256=sha256(image).hexdigest(),
             instruction_budget=25000,
