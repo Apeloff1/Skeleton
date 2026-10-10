@@ -103,8 +103,13 @@ class SessionTask:
     provider_tokens: int = 0
 
     def request(self) -> ResourceRequest:
-        if self.lane not in PRIORITIES or not isinstance(self.checkpointable, bool):
-            raise ValueError("unsupported workload lane")
+        if (not isinstance(self.task_id, str) or not 1 <= len(self.task_id) <= 128
+                or any(ord(ch) < 32 or ord(ch) == 127 for ch in self.task_id)
+                or not isinstance(self.lane, str) or self.lane not in PRIORITIES
+                or type(self.checkpointable) is not bool):
+            raise ValueError("invalid task identity or workload lane")
+        _integer(self.memory_bytes, 1, 2**50, "task memory")
+        _integer(self.cpu_units, 1, 1024, "task CPU")
         for name in ("gpu_millis", "io_tokens", "provider_tokens"):
             _integer(getattr(self, name), 0, 10**12, name)
         return ResourceRequest(self.task_id, self.cpu_units, self.memory_bytes,
