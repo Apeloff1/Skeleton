@@ -244,3 +244,16 @@ def test_tarjan_identifies_real_single_corridor_chokepoints():
     assert (1, 1) not in articulation_cells(p)
     assert (7, 1) not in articulation_cells(p)
 
+
+def test_bridges_enumerate_each_critical_corridor_edge_once():
+    line = RouteProblem.from_rows((
+        "#########", "#S.C...G#", "#########", "#########",
+        "#########", "#########", "#########", "#########", "#########",
+    ))
+    bridges = bridge_corridors(line)
+    assert len(bridges) == 6
+    assert set(bridges) == {
+        ((x, 1), (x + 1, 1)) for x in range(1, 7)
+    }
+    assert len(bridge_corridors(RouteProblem.from_rows(OPEN_LEVEL))) < 6
+
