@@ -508,4 +508,12 @@ def bridge_corridors(problem: RouteProblem) -> tuple[Edge, ...]:
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors"]
+def cycle_rank(problem: RouteProblem) -> int:
+    """Compute E - V + C, the topological number of independent loops."""
+    cells = walkable_cells(problem)
+    edges = sum(len(problem.neighbors(p, allow_hazards=False)) for p in cells) // 2
+    return edges - len(cells) + len(connected_regions(problem))
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank"]
