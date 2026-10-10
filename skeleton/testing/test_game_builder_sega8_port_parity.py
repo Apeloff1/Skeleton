@@ -41,6 +41,12 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
                 "reference_safe_replay_digest": REPLAY,
                 "source_rights_evidence_sha256": RIGHTS,
                 "original_color_theme": "space",
+                "original_native_solution_attract_mode": True,
+                "original_demo_playback_steps": 256,
+                "original_demo_solution_sha256": "9"*64,
+                "original_demo_uses_identical_game_rules": True,
+                "original_demo_autostart": False,
+                "original_demo_external_content": False,
                 "levels": 3, "width": 17, "height": 15,
                 "binary_compiled": False, "emulator_playthrough_verified": False,
                 "physical_hardware_verified": False, "release_approved": False,
@@ -187,6 +193,7 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     assert receipt["original_on_cartridge_demo_equivalent_across_platforms"] is True
     assert receipt["native_attract_demo_entry_and_cancel_verified_on_both_platforms"] is True
     assert receipt["original_demo_controller_actions_verified_per_platform"] == 256
+    assert receipt["original_demo_solution_sha256"] == "9"*64
     assert receipt["native_cartridge_rebuild_byte_equality_checked_per_platform"] is True
     assert set(receipt["native_rebuild_provenance_sha256_by_platform"]) == set(EXTS)
     assert all(len(value)==64 for value in receipt["native_rebuild_provenance_sha256_by_platform"].values())
@@ -208,6 +215,10 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     ("manifest", "reference_safe_replay_digest", "e" * 64),
     ("manifest", "source_rights_evidence_sha256", "f" * 64),
     ("manifest", "original_color_theme", "desert"),
+    ("manifest", "original_demo_solution_sha256", "0"*64),
+    ("manifest", "original_demo_playback_steps", 42),
+    ("manifest", "original_demo_autostart", True),
+    ("manifest", "original_demo_external_content", True),
     ("manifest", "project_id", "unreviewed-work"),
     ("host", "original_controller_actions_verified", 257),
     ("host", "original_score_and_screen_state_verified", False),
