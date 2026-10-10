@@ -56,3 +56,11 @@ def test_rgb332_roundtrip_and_component_range():
     with pytest.raises(PaletteError):
         decode_rgb332(True)
 
+
+def test_palette_nearest_is_weighted_and_first_tie_wins():
+    assert nearest_palette_index((3,4,5), ((0,0,0),(255,255,255)))==0
+    assert nearest_palette_index((255,250,255), ((0,0,0),(255,255,255)))==1
+    assert nearest_palette_index((20,20,20), ((20,20,20),(20,20,20)))==0
+    with pytest.raises(PaletteError):
+        nearest_palette_index((0,0,0), ())
+
