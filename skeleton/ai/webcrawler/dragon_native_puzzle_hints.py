@@ -25,12 +25,12 @@ NEW_HINT = """   if(key=='h'||key=='H'){
 
 SOLVER = r'''
 /* Native C99 live Sokoban shortest-path search.
-   Open-addressing hash table holds at most 50k unique states. Every state
+   Open-addressing hash table supports the generator's 120k-state proof budget. Every state
    encodes the ACTUAL player and 1..3 crates on the generated 120-cell map.
    Hash collisions are checked by exact state equality before deduplication.
    Returned move is first move of a shortest BFS path; no remote AI call. */
-#define HINT_NODES 50000
-#define HINT_BUCKETS 131071
+#define HINT_NODES 120001
+#define HINT_BUCKETS 262147
 typedef struct {
  unsigned char player, crates[3];
  int parent;
