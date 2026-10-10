@@ -1,8 +1,8 @@
 # Offline Foundations v1 — Synthetic training dataset
 
-**Dataset:** \`skeleton-offline-foundations\` • **Version:** \`1.0.0\`  
+**Dataset:** \`skeleton-offline-foundations\` • **Version:** \`1.0.0\`
 **Scope:** Standalone Skeleton AI language/data processing, game-engine rule
-reasoning, and offline-policy instruction following.  
+reasoning, and offline-policy instruction following.
 **Acquisition:** No network or third-party corpus. All records are synthetic
 examples generated from explicit deterministic rules. These are not private
 user conversations, scraped tutorials, licensed game assets, or real-world
