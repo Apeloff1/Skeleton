@@ -278,3 +278,49 @@ def test_original_authorship_evidence_refuses_unsafe_filesystem_sources(tmp_path
     with pytest.raises(ValueError,match="original author evidence"):
         emit("sega_master_system",tmp_path/"not-created",chosen)
     assert not (tmp_path/"not-created").exists()
+
+
+
+@pytest.mark.parametrize("target", ("sega_master_system","sega_game_gear"))
+def test_real_extended_eight_stage_native_campaign_source_is_solvable_and_distinct(
+    tmp_path,target,
+):
+    evidence=tmp_path/"independent-original-author.txt"
+    evidence.write_text(
+        "Original eight-chapter game, original graphics and native controls.",
+        encoding="utf-8",
+    )
+    standard=emit(target,tmp_path/"standard",evidence)
+    extended=emit(target,tmp_path/"extended",evidence,profile="full_campaign")
+    manifest=json.loads((tmp_path/"extended"/"manifest.json").read_text())
+    assert standard["original_campaign_profile"]=="standard"
+    assert extended["original_campaign_profile"]=="full_campaign"
+    assert extended["source_content_digest"] != standard["source_content_digest"]
+    assert extended["world_digest"] != standard["world_digest"]
+    assert manifest["levels"]==8
+    assert manifest["companion_bond_ranks"]==8
+    assert manifest["original_native_solution_attract_mode"] is True
+    assert manifest["original_demo_playback_steps"]>standard["source_content_digest"].count("!")
+    assert manifest["original_demo_compressed_rom_bytes"] >= (
+        manifest["original_demo_playback_steps"] + 3
+    ) // 4
+    assert manifest["native_per_stage_hardware_bg_palette_accents"] is True
+    assert len(manifest["master_system_original_stage_rgb222_accents"])==8
+    assert len(manifest["game_gear_original_stage_rgb444_accents"])==8
+    assert manifest["distribution_licensed"] is False
+    assert manifest["release_approved"] is False
+    code=(tmp_path/"extended"/"game.c").read_text(encoding="utf-8")
+    assert code.count("static const unsigned char stage_")==8
+    assert code.count("static const unsigned char demo_")==8
+    assert "original_stage_accent_1[level_index]" in code
+    assert "--" not in extended["source_content_digest"]
+
+
+@pytest.mark.parametrize("invalid",(None,True,False,12,{},[],"", "third_party_game", "full_campaign " ))
+def test_extended_native_source_profile_fails_closed_before_file_generation(tmp_path,invalid):
+    evidence=tmp_path/"authorship.txt"
+    evidence.write_text("Independent original digital game.",encoding="utf-8")
+    output=tmp_path/"not-a-game"
+    with pytest.raises(ValueError,match="profile"):
+        emit("sega_master_system",output,evidence,profile=invalid)
+    assert not output.exists()
