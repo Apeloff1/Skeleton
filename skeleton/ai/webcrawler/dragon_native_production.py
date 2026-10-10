@@ -521,6 +521,63 @@ def build_source_bundle(
     return result, asdict(index)
 
 
+
+def _assert_index_consistency(index: dict, verified: list[tuple[dict, dict, int]]) -> None:
+    """Independently reconstruct top-level claims from each verified archive.
+
+    `verified` holds (index entry, nested release receipt, exact ZIP bytes).
+    Receipt presence or a self-declared index label never supplies evidence.
+    """
+    if not isinstance(index, dict) or not verified:
+        raise ValueError("missing verified production evidence")
+    if index.get("schema") != INDEX_SCHEMA or index.get("target_count") != len(verified):
+        raise ValueError("production index identity or count invalid")
+    if not HEX.fullmatch(str(index.get("request_id", ""))):
+        raise ValueError("invalid production request identity")
+    actual_modes: set[str] = set()
+    any_binary = False
+    actual_targets: set[str] = set()
+    for entry, receipt, archive_size in verified:
+        if not isinstance(entry, dict) or not isinstance(receipt, dict):
+            raise ValueError("invalid portfolio record")
+        target = receipt.get("target")
+        if target in actual_targets:
+            raise ValueError("duplicate native target in production portfolio")
+        actual_targets.add(target)
+        if receipt.get("request_id") != index["request_id"] or receipt.get("style") != index.get("style"):
+            raise ValueError("portfolio request, style, and release disagree")
+        for field in (
+            "target", "source_fingerprint", "source_count", "source_bytes",
+            "binary_sha256", "gameplay_mode", "campaign_stages",
+            "hardware_budget_state", "evidence", "compiler_state",
+        ):
+            if entry.get(field) != receipt.get(field):
+                raise ValueError("portfolio entry and verified release disagree on " + field)
+        if entry.get("archive_bytes") != archive_size:
+            raise ValueError("portfolio archive length changed")
+        if not isinstance(receipt.get("gameplay_mode"), str):
+            raise ValueError("native gameplay mode missing")
+        actual_modes.add(receipt["gameplay_mode"])
+        any_binary = any_binary or receipt.get("binary_sha256") is not None
+    if index.get("declared_gameplay_modes") != sorted(actual_modes):
+        raise ValueError("portfolio gameplay-mode claims diverge from source")
+    expected_fidelity = (
+        "different_implemented_modes_not_an_equivalent_port" if len(actual_modes) > 1
+        else "matching_declared_modes_not_verified_equivalent"
+    )
+    if index.get("cross_target_fidelity") != expected_fidelity:
+        raise ValueError("portfolio falsely claims cross-target gameplay parity")
+    expected_evidence = "source_and_rom_structure_only" if any_binary else "source_only"
+    if index.get("production_evidence") != expected_evidence:
+        raise ValueError("portfolio falsely claims a release evidence level")
+    if index.get("legal_claim") != (
+        "attested original/authorized material; external legal verification not asserted"
+    ):
+        raise ValueError("portfolio legal claim was modified")
+
+
+
+
 def verify_source_bundle(bundle: bytes) -> dict:
     """Offline nested bundle verifier with bounded members and replayed digests."""
     if not isinstance(bundle, bytes) or not 50 <= len(bundle) <= 3_000_000:
@@ -548,6 +605,7 @@ def verify_source_bundle(bundle: bytes) -> dict:
             raise ValueError("invalid source index identity")
         expected = {"production-index.json"}
         seen: set[str] = set()
+        independently_verified: list[tuple[dict, dict, int]] = []
         for row in rows:
             name = row.get("archive_name")
             if not isinstance(name, str) or not re.fullmatch(
@@ -570,8 +628,10 @@ def verify_source_bundle(bundle: bytes) -> dict:
                     row.get("binary_sha256") is not None):
                 raise ValueError("nested release evidence mismatch")
             seen.add(target)
+            independently_verified.append((row, receipt, len(payload)))
         if expected != set(names):
             raise ValueError("unrecognized nested bundle contents")
+        _assert_index_consistency(index, independently_verified)
         return {"schema": INDEX_SCHEMA, "status": "verified_source_bundle",
                 "request_id": index["request_id"], "target_count": len(rows),
                 "scope": "source only; no binaries, gameplay or distribution clearance"}
@@ -710,6 +770,7 @@ def verify_published_production(destination: Path, index_name: str) -> dict:
         raise ValueError("portfolio index invalid")
     hashes: list[str] = []
     targets: set[str] = set()
+    independently_verified: list[tuple[dict, dict, int]] = []
     for item in entries:
         name = _path(item["archive_name"])
         if not re.fullmatch(r"dragon-[a-z0-9_]+-[a-f0-9]{20}\.zip", name):
@@ -732,6 +793,10 @@ def verify_published_production(destination: Path, index_name: str) -> dict:
             raise ValueError("portfolio index and archive receipts disagree")
         targets.add(target)
         hashes.append(item["archive_sha256"])
+        independently_verified.append((item, receipt, len(payload)))
+    _assert_index_consistency(index, independently_verified)
+    if index_name != "dragon-production-" + index["request_id"][:20] + ".json":
+        raise ValueError("portfolio index name diverges from approved request")
     return {"schema": INDEX_SCHEMA, "status": "verified",
             "request_id": index["request_id"],
             "archives_verified": len(entries),
