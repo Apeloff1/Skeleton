@@ -35,6 +35,7 @@ from .atari8_native_export import Atari8BitNativeError, Atari8BitSourceProject, 
 from .apple2_native_export import Apple2NativeError, Apple2SourceProject, compile_native_apple2, export_native_apple2
 from .spectrum_native_export import SpectrumNativeError, SpectrumSourceProject, compile_native_spectrum, export_native_spectrum
 from .msx1_native_export import MSX1NativeError, MSX1SourceProject, compile_native_msx1, export_native_msx1
+from .sega_8bit_native_export import Sega8BitNativeError, Sega8BitSourceProject, compile_native_sega_8bit, export_native_sega_8bit
 from .port_planner import HomebrewSource
 
 _DESKTOP = frozenset({"windows_modern", "linux_desktop", "macos_modern"})
@@ -52,7 +53,7 @@ class EvolutionNativeStage:
     source_kind: str | None
     source_digest: str | None
     status: str
-    project: NativeDesktopSourceProject | GameBoySourceProject | NativeNESSourceProject | NativeC64SourceProject | NativeDOSSourceProject | Atari8BitSourceProject | GameBoyColorSourceProject | Apple2SourceProject | SpectrumSourceProject | MSX1SourceProject | None
+    project: NativeDesktopSourceProject | GameBoySourceProject | NativeNESSourceProject | NativeC64SourceProject | NativeDOSSourceProject | Atari8BitSourceProject | GameBoyColorSourceProject | Apple2SourceProject | SpectrumSourceProject | MSX1SourceProject | Sega8BitSourceProject | None
 
     def __post_init__(self):
         if self.status not in _STATUSES:
@@ -138,7 +139,7 @@ def compile_evolution_native_sources(
         if stage.native_binary_built or stage.target_adapter_state != "concept_prototype_not_native":
             raise GameEvolutionError("upstream practice has forged hardware build assertion")
         target = stage.intended_platform_id
-        project: NativeDesktopSourceProject | GameBoySourceProject | NativeNESSourceProject | NativeC64SourceProject | NativeDOSSourceProject | Atari8BitSourceProject | GameBoyColorSourceProject | Apple2SourceProject | SpectrumSourceProject | MSX1SourceProject | None = None
+        project: NativeDesktopSourceProject | GameBoySourceProject | NativeNESSourceProject | NativeC64SourceProject | NativeDOSSourceProject | Atari8BitSourceProject | GameBoyColorSourceProject | Apple2SourceProject | SpectrumSourceProject | MSX1SourceProject | Sega8BitSourceProject | None = None
         status = "design_only"
         if target in _DESKTOP:
             try:
@@ -179,6 +180,13 @@ def compile_evolution_native_sources(
             except NativeDOSError as exc:
                 if "budget exceeded" not in str(exc):
                     raise GameEvolutionError("DOS real-mode compiler refused practice stage") from exc
+                status = "budget_incompatible"
+        elif target in ("sega_master_system","sega_game_gear"):
+            try:
+                project = compile_native_sega_8bit(stage.game_world,source,target,authorized=True)
+            except Sega8BitNativeError as exc:
+                if "screen tile budget" not in str(exc):
+                    raise GameEvolutionError("Sega 8-bit compiler refused original stage") from exc
                 status = "budget_incompatible"
         elif target == "msx1":
             try:
@@ -260,6 +268,8 @@ def export_evolution_native_sources(
             export_native_c64(stage.project, folder, authorized=True)
         elif isinstance(stage.project, NativeDOSSourceProject):
             export_native_dos(stage.project, folder, authorized=True)
+        elif isinstance(stage.project, Sega8BitSourceProject):
+            export_native_sega_8bit(stage.project, folder, authorized=True)
         elif isinstance(stage.project, MSX1SourceProject):
             export_native_msx1(stage.project, folder, authorized=True)
         elif isinstance(stage.project, SpectrumSourceProject):
