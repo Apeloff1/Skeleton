@@ -104,7 +104,7 @@ def test_nes_binaries_reject_checksum_preserving_code_swaps(tmp_path,where):
 
 @pytest.mark.parametrize("byte,value",(
     (0,0), (4,3), (5,2), (6,0x10), (7,8),
-    (16+0x7FFA,0), (16+0x7FFC,0), (16+0x7FFE,0),
+    (16+0x7FFB,0), (16+0x7FFD,0), (16+0x7FFF,0),
     (16+0x7FFC,0xFF),
 ))
 def test_native_nes_refuses_invalid_mapper_header_and_interrupt_vector(
