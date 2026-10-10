@@ -643,4 +643,24 @@ def route_chokepoint_ppm(problem: RouteProblem, proof: RouteProof) -> int:
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm"]
+def route_overrun_ppm(problem: RouteProblem, proof: RouteProof) -> int:
+    """Relative extra traversal against the same hazard accessibility policy."""
+    if proof.problem_digest != problem.digest:
+        raise MultipathError("route optimization needs same source world")
+    verified = evaluate_route(
+        problem, proof.actions, allow_hazards=proof.hazard_visits > 0,
+    )
+    if verified.positions != proof.positions:
+        raise MultipathError("route replay geometry differs")
+    if proof.hazard_visits:
+        minimum = solve_route(problem, algorithm="dijkstra",
+                              allow_hazards=True, hazard_cost=0).steps
+    else:
+        minimum = solve_route(problem).steps
+    if proof.steps < minimum:
+        raise MultipathError("route shorter than claimed optimal safe baseline")
+    return (proof.steps - minimum) * 1_000_000 // max(1, minimum)
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm"]
