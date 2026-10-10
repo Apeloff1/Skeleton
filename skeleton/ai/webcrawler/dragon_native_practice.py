@@ -108,6 +108,8 @@ class DragonNativePracticeLab:
             )
             project_json=json.dumps(asdict(project),sort_keys=True,
                                      separators=(",",":"),ensure_ascii=True)
+            if len(project_json.encode("utf-8")) > self.parent.policy.max_artifact_bytes:
+                raise ValueError("native practice artifact exceeds bounded policy")
             if len(project_json.encode())>250000:
                 raise ValueError("native source payload exceeds budget")
             attempt_id=digest([owner,lesson_id,project.project_id])

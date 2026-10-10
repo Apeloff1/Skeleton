@@ -233,3 +233,20 @@ class DragonResourceSession:
                 del self._grants[task_id]
             del self._active[task_id]
             self._yielding.discard(task_id)
+
+    @property
+    def tenant(self) -> str:
+        return self._tenant
+
+    def yield_requested(self, task_id: str) -> bool:
+        """Executing chunks recheck both local and cross-plane preemption."""
+        with self._lock:
+            if task_id not in self._active:
+                raise ValueError("unknown active task")
+            if task_id in self._yielding:
+                return True
+            if task_id in self._grants:
+                grant_id = self._grants[task_id]
+                return any(g.grant_id == grant_id and g.state == "revoking"
+                           for g in self._global.active_grants())
+            return False

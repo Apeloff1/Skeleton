@@ -15,13 +15,19 @@
   "integration_surfaces": [
     "skeleton/ai/agents/core/scheduler.py",
     "skeleton/automation/agents/scheduler.py",
-    "skeleton/ai/webcrawler/dragon_resource_session.py"
+    "skeleton/ai/webcrawler/dragon_resource_session.py",
+    "skeleton/ai/webcrawler/dragon_chunk_executor.py",
+    "skeleton/ai/webcrawler/dragon_practice_cycles.py",
+    "backend/routes/dragon_academy.py"
   ],
   "acceptance_tests": [
     "skeleton/testing/test_global_resource_scheduler.py",
     "skeleton/testing/test_global_resource_swarm_integration.py",
     "tests/test_scheduler.py",
-    "tests/test_ai_dragon_resource_cognition.py"
+    "tests/test_ai_dragon_resource_cognition.py",
+    "tests/test_ai_dragon_chunk_executor.py",
+    "tests/test_ai_dragon_guarded_practice.py",
+    "backend/tests/test_dragon_academy_routes.py"
   ],
   "invariants": [
     "all planes share one physical capacity ledger",

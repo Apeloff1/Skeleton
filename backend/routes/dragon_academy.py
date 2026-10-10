@@ -17,7 +17,7 @@ import sqlite3
 import time
 from typing import Iterator
 
-from fastapi import APIRouter, Depends, HTTPException, Path as URLPath, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Path as URLPath, Query, Response, Request
 from pydantic import BaseModel, Field
 
 from routes.gameforge_auth import get_current_user
@@ -294,6 +294,27 @@ def run_practice(body: RunPracticeRequest, owner: str = Depends(_principal)) -> 
         result=_snapshot(lab,cycles,owner)
         result["created"]=[asdict(a) for a in attempts]
         return result
+
+@router.post("/practice/pulse")
+def pulse_practice(request: Request, owner: str = Depends(_principal)) -> dict:
+    """One consented scheduled slice; only the shared runtime can admit work."""
+    from skeleton.ai.webcrawler.dragon_chunk_executor import DragonChunkExecutor
+    factory = getattr(request.app.state, "dragon_practice_executor_factory", None)
+    if not callable(factory):
+        raise HTTPException(status_code=503, detail="Dragon resource runtime not configured")
+    executor = factory(owner)
+    if not isinstance(executor, DragonChunkExecutor) or executor.session.tenant != owner:
+        raise HTTPException(status_code=503, detail="Dragon owner resource runtime unavailable")
+    with _lab() as (lab, cycles):
+        attempts, run = cycles.pulse_guarded(owner, authorized=True, executor=executor)
+        result = _snapshot(lab, cycles, owner)
+        result["created"] = [asdict(a) for a in attempts]
+        result["resource_execution"] = asdict(run) if run is not None else {
+            "completed_chunks": 0, "done": False, "reason": "subscription_not_due",
+            "checkpoints": [], "effort": "defer",
+        }
+        return result
+
 
 @router.post("/practice/subscribe")
 def subscribe_practice(body: SubscribeRequest, owner: str = Depends(_principal)) -> dict:

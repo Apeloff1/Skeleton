@@ -311,6 +311,7 @@ def test_authenticated_companion_reads_only_signed_current_owner_review(tmp_path
 
 
 
+
 def test_authenticated_hoag_and_recrawl_read_only_routes(tmp_path, monkeypatch):
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
@@ -403,3 +404,48 @@ def test_authenticated_hoag_and_recrawl_read_only_routes(tmp_path, monkeypatch):
         assert result.json()["orders"][0]["source_id"] == "source-a"
         assert result.json()["orders"][0]["execution_authorized"] is False
         assert client.get("/api/dragon-academy/knowledge/hoag").json()["items"] == []
+
+def test_guarded_pulse_requires_configured_shared_runtime():
+    from starlette.requests import Request
+    from fastapi import FastAPI
+    app=FastAPI()
+    request=Request({'type':'http','app':app})
+    with pytest.raises(HTTPException) as exc:
+        route.pulse_practice(request,owner=identity())
+    assert exc.value.status_code==503
+
+
+def test_guarded_pulse_runs_native_subscription_and_defers_under_heat(tmp_path,monkeypatch):
+    from starlette.requests import Request
+    from fastapi import FastAPI
+    from dataclasses import replace
+    from skeleton.ai.webcrawler.dragon_chunk_executor import DragonChunkExecutor
+    from skeleton.ai.webcrawler.dragon_resource_session import DragonResourceSession, HardwareSample
+    from skeleton.ai.game_builder.resource_governor import ResourceGovernor, ResourceEnvelope
+    from skeleton.kernel.global_resource_scheduler import GlobalResourceScheduler, GlobalResourcePolicy, ResourceVector, PlanePolicy
+    app=FastAPI();owner=identity()
+    scheduler=GlobalResourceScheduler(GlobalResourcePolicy(ResourceVector(cpu_millis=4000,memory_mb=256,io_tokens=10),
+        (PlanePolicy('interactive',2,ResourceVector(),1.),PlanePolicy('background',1,ResourceVector(),1.))))
+    hardware=HardwareSample(256*1024**2,4,.1,.9,True,False,10)
+    executor=DragonChunkExecutor(DragonResourceSession(global_resources=scheduler,tenant=owner),
+        ResourceGovernor(ResourceEnvelope(100,10,1000000,3,1,1,10)),lambda:hardware,clock=lambda:10)
+    app.state.dragon_practice_executor_factory=lambda authenticated_owner: executor
+    request=Request({'type':'http','app':app})
+    path=tmp_path/'pulse.sqlite';monkeypatch.setenv('SKL_DRAGON_PRACTICE_DB_PATH',str(path))
+    with route._lab() as (lab,cycles):
+        lab.offer(approved(owner),authorized=True,now=10)
+        cycles.enable(owner,authorized=True,human_approved=True,now=10,expires_at=3010,
+            demos_per_tick=2,max_ticks=2,generation_mode='native')
+    executor.hardware=lambda:replace(hardware,thermal_limited=True)
+    deferred=route.pulse_practice(request,owner=owner)
+    assert deferred['resource_execution']['reason']=='thermal_or_pressure'
+    assert deferred['subscription']['remaining_ticks']==2 and not deferred['created']
+    executor.hardware=lambda:hardware
+    result=route.pulse_practice(request,owner=owner)
+    assert len(result['created'])==2 and result['resource_execution']['done']
+    assert result['subscription']['remaining_ticks']==1
+    assert scheduler.usage('background').empty
+    with pytest.raises(HTTPException) as exc:
+        route.pulse_practice(request,owner=identity('other@example.test'))
+    assert exc.value.status_code==503
+

@@ -127,3 +127,74 @@ L13 remains open for authenticated end-to-end crawl/review/promotion acceptance.
 Validation: `python -m pytest tests/test_game_builder_reviewed_knowledge.py -q`
 passed 31 tests and 11 subtests. Sign-off: Codex, 2026-10-10, limited to this
 local planning implementation and its focused validation; no volume closure.
+
+## Live telemetry and synchronous chunk execution increment
+
+The canonical HardwareProbe now marks live memory measurements explicitly.
+Linux MemAvailable (clamped by a finite root cgroup v2 limit), Windows
+GlobalMemoryStatusEx and macOS free-page readings qualify; assumed fallback
+memory does not. Windows power status distinguishes a missing battery from
+unknown telemetry. Unknown battery readings conservatively block acquisition.
+Nested cgroup limits, device qualification and macOS battery telemetry remain
+open; this is not an application-wide hardware certification.
+
+DragonLiveHardware adapts this existing owner. DragonChunkExecutor requires an
+injected shared global scheduler, explicit authority and consent, and fresh
+hardware admission before each synchronous chunk. It checks declared cumulative
+token, tool, artifact and retry limits before callbacks; rejects observed usage
+above the declaration; and releases grants only after a callback returns or
+raises. Foreground arrival is reference-counted, and cooperative checkpoints
+also observe canonical global revocation. There are no detached worker threads
+or automatic retries. Native/provider calls must enforce their own timeouts.
+The injected governor must be exclusive to this executor or externally serialized;
+its existing accounting object is not a cross-process resource ledger.
+
+This is an execution adapter with real callback acceptance tests, not yet a
+production conversation/scheduler hook. No new provider transport, database,
+authority owner or retention policy is introduced. Rollback removes these
+optional adapters; existing canonical stores remain intact. Admission failure
+performs no callback and consumes no declared usage. A callback that exceeds
+its own declaration is rejected after observation; the runtime cannot undo work
+already performed by defective trusted code.
+
+## Guarded practice integration
+
+The canonical practice controller exposes pulse_guarded for trusted schedulers.
+It binds an injected executor to the authenticated opaque owner, admits one
+finite tick through the shared ledger, and rechecks telemetry, foreground yield,
+expiry and subscription revision between every artifact. Consent remains in
+canonical practice subscriptions and separately approved lessons. A new revision
+counter distinguishes deliberate stop/replacement from automatic exhaustion of
+the final tick. Existing rows migrate with revision zero without deleting data.
+
+The Academy POST /api/dragon-academy/practice/pulse endpoint uses that controller.
+Its executor factory comes only from trusted application state:
+dragon_practice_executor_factory(owner). Missing or mismatched configuration
+returns 503. The factory must return the owner's serialized executor using the
+application's shared global scheduler and retained cumulative governor. It must
+not create an independent capacity ledger or reset budgets on every request.
+No request parameter can set the owner, capacity, consent or runtime factory.
+The existing explicit generation endpoints remain compatibility paths; they
+are not covered by an application-wide resource guarantee in this increment.
+No production bootstrap currently installs this factory automatically.
+
+Deferral consumes no tick. Once a tick starts, partial completion consumes its
+reserved tick and cooldown: restoring it could duplicate committed artifacts.
+Each completed attempt is conservatively charged its maximum artifact policy
+rather than claiming an exact disk-write measurement. Native project metadata
+and sources are now checked against that same byte bound before commit. SQLite
+and source generation remain synchronous and bounded by existing quotas; this
+path does not compile native projects, invoke models or install a timer.
+Checkpoint references point to existing practice records, not a separate store.
+
+L00–L03 preserve practice, auth and resource owners. L04–L07 cover admission,
+transactional tick reservation, shared grants and checkpoint revocation. L08–L09
+expose defer reasons and bounded accounting. L10 tests real HTML/native source
+creation, initial heat/budget/foreground/missing-ledger deferral, interruption
+between artifacts, final-tick revocation and oversize rollback. L11 preserves
+existing rows during additive migration; L12 rollback removes the consumer and
+leaves practice records readable. L13 remains pending production factory wiring,
+all-generation-path adoption and consumer hardware qualification.
+
+Sign-off: Codex, 2026-10-10, implementation and local acceptance scope only.
+No complete volume or all-engine capability claim is made.

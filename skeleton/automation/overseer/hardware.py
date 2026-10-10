@@ -87,6 +87,7 @@ class HardwareState:
     battery_charging: Optional[bool]
     io_wait: float            # 0..1
     read_at: float = field(default_factory=time.time)
+    memory_sample_verified: bool = False
 
     def thermal_max(self) -> float:
         return max(self.temps_celsius) if self.temps_celsius else 0.0
@@ -100,6 +101,7 @@ class HardwareState:
             "battery_level": self.battery_level,
             "battery_charging": self.battery_charging,
             "io_wait": round(self.io_wait, 3),
+            "memory_sample_verified": self.memory_sample_verified,
         }
 
 
@@ -189,6 +191,7 @@ class HardwareProbe:
             battery_level=batt_level,
             battery_charging=batt_charging,
             io_wait=io_wait,
+            memory_sample_verified=getattr(self, "_memory_verified", False),
         )
         self._prev_state = state
         return state
@@ -244,6 +247,7 @@ class HardwareProbe:
         return 4096  # conservative default
 
     def _memory_state(self) -> Tuple[int, int, float, float]:
+        self._memory_verified = False
         total = self._memory_total_mb()
         try:
             if self._sys == "linux":
@@ -251,16 +255,73 @@ class HardwareProbe:
                 for line in Path("/proc/meminfo").read_text().splitlines():
                     k, rest = line.split(":", 1)
                     info[k] = int(rest.split()[0]) // 1024
-                avail = info.get("MemAvailable", info.get("MemFree", total // 2))
+                if "MemAvailable" not in info or "MemTotal" not in info:
+                    raise ValueError("live memory fields unavailable")
+                total = info["MemTotal"]
+                avail = info["MemAvailable"]
+                if not 0 <= avail <= total or total <= 0:
+                    raise ValueError("invalid live memory counters")
                 used = total - avail
                 swap_total = info.get("SwapTotal", 0)
                 swap_free = info.get("SwapFree", 0)
                 swap_p = (swap_total - swap_free) / swap_total if swap_total else 0.0
+                # Cgroup-v2 limits can be far below physical host RAM.
+                base = Path("/sys/fs/cgroup")
+                if (base / "memory.max").exists():
+                    raw = (base / "memory.max").read_text().strip()
+                    if raw != "max":
+                        limit = int(raw)
+                        current = int((base / "memory.current").read_text().strip())
+                        if limit <= 0 or current < 0:
+                            raise ValueError("invalid cgroup counters")
+                        avail = min(avail, max(0, limit - current) // (1024 * 1024))
+                        total = min(total, max(1, limit // (1024 * 1024)))
+                        used = max(0, total - avail)
+                self._memory_verified = True
                 return used, avail, used / max(1, total), swap_p
+            if self._sys == "windows":
+                total, avail = self._windows_memory_mb()
+                self._memory_verified = True
+                return total - avail, avail, (total - avail) / max(1, total), 0.0
+            if self._sys == "darwin":
+                import re
+                import subprocess
+                total = int(subprocess.check_output(["sysctl", "-n", "hw.memsize"], timeout=2).strip()) // (1024 * 1024)
+                raw = subprocess.check_output(["vm_stat"], timeout=2).decode("ascii")
+                header = re.search(r"page size of (\d+) bytes", raw)
+                counts = dict((name, int(value)) for name, value in
+                    re.findall(r"^(Pages [^:]+):\s*(\d+)\.", raw, re.M))
+                if header is None or "Pages free" not in counts or total <= 0:
+                    raise ValueError("macOS live memory counters unavailable")
+                # Conservative available estimate: free pages only; do not
+                # assume every cache or compressed page is reclaimable.
+                avail = counts["Pages free"] * int(header.group(1)) // (1024 * 1024)
+                if not 0 <= avail <= total:
+                    raise ValueError("invalid macOS memory counters")
+                self._memory_verified = True
+                return total - avail, avail, (total - avail) / total, 0.0
         except Exception:
             pass
         used = total // 2
         return used, total - used, 0.5, 0.0
+
+    @staticmethod
+    def _windows_memory_mb() -> Tuple[int, int]:
+        import ctypes
+        from ctypes import wintypes
+        class MemoryStatus(ctypes.Structure):
+            _fields_ = [("length", wintypes.DWORD), ("load", wintypes.DWORD)] + [
+                (name, ctypes.c_ulonglong) for name in
+                ("total_physical", "available_physical", "total_page", "available_page",
+                 "total_virtual", "available_virtual", "available_extended")]
+        status = MemoryStatus()
+        status.length = ctypes.sizeof(status)
+        call = ctypes.windll.kernel32.GlobalMemoryStatusEx
+        call.argtypes = [ctypes.POINTER(MemoryStatus)]
+        call.restype = wintypes.BOOL
+        if not call(ctypes.byref(status)) or not 0 <= status.available_physical <= status.total_physical or not status.total_physical:
+            raise OSError("Windows live memory counters unavailable")
+        return status.total_physical // (1024 * 1024), status.available_physical // (1024 * 1024)
 
     def _cpu_load(self) -> Tuple[float, List[float], float]:
         try:
@@ -300,13 +361,36 @@ class HardwareProbe:
                 continue
         return temps
 
+    @staticmethod
+    def _windows_power_status():
+        import ctypes
+        class PowerStatus(ctypes.Structure):
+            _fields_ = [("ac", ctypes.c_ubyte), ("flags", ctypes.c_ubyte),
+                        ("percent", ctypes.c_ubyte), ("reserved", ctypes.c_ubyte),
+                        ("lifetime", ctypes.c_uint32), ("full_lifetime", ctypes.c_uint32)]
+        status = PowerStatus()
+        if not ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(status)):
+            raise OSError("Windows power telemetry unavailable")
+        return status.ac, status.flags, status.percent
+
     def _battery_present(self) -> bool:
+        if self._sys == "windows":
+            try:
+                _, flags, _ = self._windows_power_status()
+                return flags != 128  # Unknown is conservatively battery-capable.
+            except Exception:
+                return True
         return Path("/sys/class/power_supply").exists() and any(
             "BAT" in p.name for p in Path("/sys/class/power_supply").glob("*")
         ) if self._sys == "linux" else self._sys == "darwin"
 
     def _battery_state(self) -> Tuple[Optional[float], Optional[bool]]:
         try:
+            if self._sys == "windows":
+                ac, flags, percent = self._windows_power_status()
+                if flags == 128:
+                    return None, True
+                return (percent / 100.0 if 0 <= percent <= 100 else None), (ac == 1 if ac in (0, 1) else None)
             if self._sys == "linux":
                 for bat in Path("/sys/class/power_supply").glob("BAT*"):
                     cap = (bat / "capacity")
