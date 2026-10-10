@@ -165,6 +165,16 @@ class SignedAuthorityTests(TestCase):
                 )
 
 
+    def test_signed_review_grant_cannot_be_replayed_on_same_brief(self):
+        target = self.brief.to_payload()["brief_digest"]
+        grant = self.grant("wiki_reviewer", target)
+        initial = self.review(grant)
+        self.assertEqual(initial["reviewer"], "independent-human")
+        with self.assertRaisesRegex(ValueError, "already consumed"):
+            self.review(grant)
+
+
+
 if __name__ == "__main__":
     import unittest
     unittest.main()
