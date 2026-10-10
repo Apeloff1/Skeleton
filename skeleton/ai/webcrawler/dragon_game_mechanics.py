@@ -300,8 +300,12 @@ class GameMechanicsMemory:
                 limit: int = 100) -> GameTasteProfile:
         sessions = self.sessions(owner, authorized=authorized, limit=limit)
         groups: dict[Mechanic, list[tuple[GameObservation, str]]] = {}
+        observed = 0
         for session in sessions:
             for observation in session.observations:
+                observed += 1
+                if observed > MAX_DISTILL_OBSERVATIONS:
+                    raise ValueError("distillation observation resource budget exceeded")
                 if observation.confidence >= self.policy.min_confidence:
                     groups.setdefault(observation.mechanic, []).append(
                         (observation, session.session_id)
