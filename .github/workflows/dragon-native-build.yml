@@ -6,6 +6,15 @@ on:
       - 'skeleton/ai/webcrawler/dragon_native_*.py'
       - 'skeleton/ai/webcrawler/dragon_living_world*.py'
       - 'skeleton/ai/webcrawler/dragon_world_genome.py'
+      - 'skeleton/ai/webcrawler/dragon_world_codex.py'
+      - 'skeleton/ai/webcrawler/dragon_world_codex_runtime.py'
+      - 'skeleton/ai/webcrawler/dragon_world_story_grammar.py'
+      - 'skeleton/ai/webcrawler/dragon_codex_*.py'
+      - 'tests/test_ai_dragon_world_codex.py'
+      - 'tests/test_ai_dragon_world_story_grammar.py'
+      - 'tests/test_ai_dragon_codex_desktop.py'
+      - 'backend/tests/test_dragon_world_codex_routes.py'
+      - 'frontend/app/dragon-world-codex.tsx'
       - 'skeleton/ai/webcrawler/dragon_genomic_world.py'
       - 'skeleton/ai/webcrawler/dragon_genomic_paths.py'
       - 'tests/test_ai_dragon_world_genome.py'
@@ -505,6 +514,73 @@ jobs:
         with:
           name: dragon-original-gameplay-sdl-frames
           path: /tmp/original-game-media/dragon-original-game-frames-*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  codex-128-axis-original-worlds-and-native-desktop:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require bounded original Codex/genre/platform source syntax
+        run: |
+          set -euo pipefail
+          python -m compileall -q \
+            skeleton/ai/webcrawler/dragon_world_codex.py \
+            skeleton/ai/webcrawler/dragon_world_codex_runtime.py \
+            skeleton/ai/webcrawler/dragon_world_story_grammar.py \
+            skeleton/ai/webcrawler/dragon_codex_platforms.py \
+            skeleton/ai/webcrawler/dragon_codex_desktop.py
+      - name: Install real deterministic game runtime tests
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Prove 1024-bit exact world identities, all delayed gates, stories and native builds
+        run: |
+          set -euo pipefail
+          python -m pytest -q \
+            tests/test_ai_dragon_world_codex.py \
+            tests/test_ai_dragon_world_story_grammar.py \
+            tests/test_ai_dragon_codex_desktop.py
+      - name: Compile a genuinely interactive Linux C99 original game and replay all temporal gates
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/dragon-codex-original
+          python - <<'PY'
+          from pathlib import Path
+          from skeleton.ai.webcrawler.dragon_world_codex import edit
+          from skeleton.ai.webcrawler.dragon_codex_desktop import emit_codex_c99
+          root=Path("/tmp/dragon-codex-original")
+          world=edit("0",{"elevation_tectonics":255,
+                          "plate_migration":255,
+                          "choice_permanence":128})
+          source=emit_codex_c99(world)
+          (root/"dragon_codex_game.c").write_text(
+              source.source,encoding="utf-8")
+          PY
+          cc -std=c99 -O2 -Wall -Wextra -Werror \
+            /tmp/dragon-codex-original/dragon_codex_game.c \
+            -o /tmp/dragon-codex-original/dragon_codex_game
+          /tmp/dragon-codex-original/dragon_codex_game --selftest \
+            | tee /tmp/dragon-codex-original/selftest.txt
+          grep -q "DRAGON_CODEX_SELFTEST_PASS 16" \
+            /tmp/dragon-codex-original/selftest.txt
+          printf "status\nstudy 0\nstudy 1\nwait\nmap\nquit\n" |
+            /tmp/dragon-codex-original/dragon_codex_game \
+            > /tmp/dragon-codex-original/interactive-session.txt
+          grep -q "No mandatory ending" \
+            /tmp/dragon-codex-original/interactive-session.txt
+      - name: Publish original source and actual compiled selftest evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-codex-native-c99-source-and-playback
+          path: |
+            /tmp/dragon-codex-original/dragon_codex_game.c
+            /tmp/dragon-codex-original/selftest.txt
+            /tmp/dragon-codex-original/interactive-session.txt
           if-no-files-found: error
           retention-days: 7
 
