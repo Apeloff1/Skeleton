@@ -679,3 +679,54 @@ A future Windows/game-console enhanced port may recreate these
 original motifs with smooth animation and richer pixel effects,
 but the original ColecoVision ROM stays within native memory,
 graphics and rights constraints.
+
+## Vectrex — original 6809 CRT vector dragon adventure
+
+The abandoned **Vectrex** (1982) joins the list of independently
+implemented target hardware, not as a console ROM extension of the
+raster-based platforms but through a new **Motorola 6809** game compiler.
+
+`vectrex_native_export.py` translates a provably solvable original
+`PlayableWorld` into self-contained 6809 assembly and authentic
+Vectrex cartridge header, with its source-specific music/title pointers,
+legal original game strings and independently authored multi-stage
+maze data. `vectrex_rom.py` verifies the physical binary header,
+6809 BIOS JSR opcodes and distinct cartridge signature. It does not
+reproduce the commercial Vectrex BIOS, overlays, or a proprietary game.
+
+Vectrex has **no bitmap pixels, sprites, VRAM tilemaps, programmable
+color table or conventional sound effects through a PSG port like the
+ColecoVision**. The new game instead draws directly with vector-beam
+operations: BIOS Wait_Recal at $F192 to recalibrate every frame,
+Intensity_a at $F2AB, Moveto_d_7F at $F2FC, Draw_Line_d at $F3DF and
+Reset0Ref at $F354. The tiny original winged-dragon silhouette is
+composed of original CRT line segments and nearby walls, crystals,
+hazards and exit portals are separately drawn from original maps as
+local-vector motifs, making the actual scene responsive to the game
+world instead of being a canned static console demo.
+
+Joystick input comes from the genuine Vectrex Joy_Digital BIOS routine
+at $F1F8 and native joystick-axis state RAM at $C81B/$C81C.
+The game samples both axes, applies deterministic grid bounds and
+collision, collects crystals, scores +10 per crystal and +100 per
+stage exit, deducts health at hazards, advances multiple stages,
+and preserves separate terminal win/loss state. Mutations live
+strictly inside the console's **1KiB of physical shared RAM** at
+$C800–$CBFF. Vectrex-owned BIOS variables stay in $C800–$C8FF,
+source-derived map bytes occupy $C900–$C9FF, original gameplay state
+is at $CB00, and the cartridge uses a bounded stack at $CBF0.
+Attempts to export larger raster-era worlds fail rather than silently
+claiming nonexistent RAM or dropping stage content.
+
+The `Game Builder Native Vectrex Motorola 6809` GitHub workflow
+builds the genuine game with a SHA-pinned `lwasm` toolchain,
+verifies authentic 6809 machine-code and vector-BIOS call signatures,
+runs source/rights/memory-budget regressions and uploads the resulting
+Vectrex-compatible cartridge binary.
+
+As with all newly introduced platform outputs, source implementation
+is separate from **successful linker build**, **full emulator gameplay
+playthrough**, **physical Vectrex qualification**, **legal distribution
+rights** and **consumer release**. The platform becomes the **16th
+authentic native-source implementation** out of 524 historical
+candidate systems; no unverified hardware acceptance is counted.
