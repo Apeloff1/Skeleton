@@ -133,3 +133,20 @@ def test_original_temporal_solver_rejects_unreachable_realm_without_portal():
     assert world.realms>=3
     with pytest.raises(ValueError):
         solve(world,(1,1,1))
+
+
+
+def test_changing_maze_replay_rejects_tampered_path_costs_and_truncated_search_receipts():
+    world=create_world(world_id=1717,variant=7,style="mutable_labyrinth")
+    proof=solve(world,(0,2,1),method="astar",budget=2600,horizon=26)
+    assert proof.reachable_in_bound
+    assert verify_proof(world,proof)["verified"]
+    for forged in (
+        replace(proof,actual_turns=proof.actual_turns+1),
+        replace(proof,search_budget=100),
+        replace(proof,replay_digest="0"*64),
+        replace(proof,steps=proof.steps+("wait",)),
+        replace(proof,ending_is_required=True),
+    ):
+        with pytest.raises(ValueError):
+            verify_proof(world,forged)
