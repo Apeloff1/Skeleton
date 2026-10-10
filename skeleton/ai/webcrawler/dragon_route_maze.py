@@ -161,7 +161,7 @@ def build_maze(request:MazeRequest=MazeRequest())->MazeCreation:
     for row,col in all_cells:
         side_room=(row,col) not in indexed
         clue=clue_at.get((row,col))
-         scenery=(35+rng.randrange(66) if side_room else rng.randrange(36))
+        scenery=(35+rng.randrange(66) if side_room else rng.randrange(36))
         biome=BIOMES[(row+col+request.seed)%len(BIOMES)]
         places.append(Place(
             _place(row,col),region="maze",biome=biome,
