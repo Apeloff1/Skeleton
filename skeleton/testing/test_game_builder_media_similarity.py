@@ -10,6 +10,7 @@ import wave
 import pytest
 
 from skeleton.ai.game_builder.media_similarity import (
+    MediaFingerprint, MediaMatchEvidence,
     MediaScreenError, compare_media, fingerprint_image, fingerprint_wav,
 )
 from skeleton.ai.game_builder.plagiarism_guard import (
@@ -108,6 +109,35 @@ def test_antiphase_stereo_is_not_misclassified_as_silence():
     antiphase = fingerprint_wav("phase-opposed", out.getvalue())
     assert max(antiphase.feature) == pytest.approx(1.0)
     assert len(antiphase.feature) == 128
+
+
+@pytest.mark.parametrize("mutation", [
+    {"release_safe": True},
+    {"raw_bytes_evaluated": False},
+    {"content_sha256": "not-a-digest"},
+    {"feature": -1},
+    {"feature": 1 << 64},
+    {"length_or_pixels": 0},
+    {"media_id": "bad\\nidentity"},
+])
+def test_media_fingerprints_cannot_claim_unscreened_or_release_cleared(mutation):
+    source = fingerprint_image("own-artwork", synthetic_png())
+    with pytest.raises(MediaScreenError):
+        replace(source, **mutation)
+
+
+@pytest.mark.parametrize("mutation", [
+    {"release_safe": True},
+    {"raw_bytes_evaluated": False},
+    {"feature": (float("nan"),) * 128},
+    {"feature": (2.0,) * 128},
+    {"feature": (0.1,) * 127},
+    {"length_or_pixels": 3_000_001},
+])
+def test_wav_fingerprints_require_valid_bounded_numeric_signals(mutation):
+    source = fingerprint_wav("own-audio", synthetic_wav())
+    with pytest.raises(MediaScreenError):
+        replace(source, **mutation)
 
 
 def test_image_and_audio_findings_are_separate_and_cannot_auto_clear():
