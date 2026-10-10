@@ -23,6 +23,7 @@ _NATIVE_SOURCE_ADAPTERS = {
     "sinclair_zx_spectrum": "z80asm_spectrum_ula_keyboard_rom_tap_source",
     "msx1": "z80asm_msx1_bios_vdp_16kb_rom_source",
     "colecovision": "z80asm_coleco_os7_32kb_tms9918_native_rom_source",
+    "vectrex": "lwasm_6809_crt_beam_vector_game_source",
     "sega_master_system": "z80asm_sms_mode4_4bpp_32kb_cartridge_source",
     "sega_game_gear": "sdcc_devkitsms_gg_rgb444_handheld_source",
 }
