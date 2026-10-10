@@ -135,11 +135,28 @@ class ColecoMachine:
         state=self.ram_state()
         return TMS_NAME+33+32*state["y"]+state["x"]
 
+    def assert_authored_art(self,manifest:dict[str,Any])->dict[str,str]:
+        # The guest must have *actually uploaded* independently authored
+        # 8x8 bitmap motifs and palette rows into physical VDP memory.
+        # Merely declaring art in a source manifest cannot pass this check.
+        pixel_bytes=b"".join(bytes(self.vram[0x400+i*64:0x408+i*64]) for i in range(6))
+        color_bytes=bytes(self.vram[0x2010:0x2016])
+        pixels=sha256(pixel_bytes).hexdigest()
+        colors=sha256(color_bytes).hexdigest()
+        if manifest.get("original_8x8_tile_count")!=6 or manifest.get("distinct_background_color_groups")!=6:
+            raise ColecoCPUError("game source did not declare independently authored six-tile palette")
+        if pixels!=manifest.get("original_tile_sha256") or colors!=manifest.get("original_palette_sha256"):
+            raise ColecoCPUError("actual TMS9918A VRAM art or color bytes diverged from original source")
+        if len(set(color_bytes))!=6:
+            raise ColecoCPUError("authored Coleco art color palettes collapsed to identical hardware rows")
+        return {"guest_vram_original_art_sha256":pixels,
+                "guest_vram_original_palette_sha256":colors}
+
     def assert_screen(self)->None:
         if self.vdp_registers[1]!=0xE0:
             raise ColecoCPUError("actual Z80 did not rearm genuine TMS9918 vertical-NMI mode")
         addr=self.hero_address()
-        if addr<TMS_NAME or addr>=TMS_NAME+768 or self.vram[addr]!=ord("@"):
+        if addr<TMS_NAME or addr>=TMS_NAME+768 or self.vram[addr]!=0xA8:
             raise ColecoCPUError("real Coleco VRAM lacks the original hero at guest RAM position")
         if not self.pad_selected:
             raise ColecoCPUError("guest ROM never selected original controller mode")
@@ -208,8 +225,8 @@ def play(rom_path:Path,route_path:Path,manifest_path:Path,source_binary_path:Pat
     rom=rom_path.read_bytes()
     assembled=source_binary_path.read_bytes()
     proof=verify_col(rom,source=assembled)
-    route=_reference(json.loads(route_path.read_text(encoding="utf-8")),
-                     json.loads(manifest_path.read_text(encoding="utf-8")))
+    manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
+    route=_reference(json.loads(route_path.read_text(encoding="utf-8")),manifest)
     from z80_python import Z80CPU
     machine=ColecoMachine(rom)
     cpu=Z80CPU(machine.read,machine.write,read_port=machine.read_port,
@@ -219,6 +236,7 @@ def play(rom_path:Path,route_path:Path,manifest_path:Path,source_binary_path:Pat
     if machine.bios_calls!={"MODE_1":1,"LOAD_ASCII":1}:
         raise ColecoCPUError("native program did not call the exact audited Coleco OS7 entry points")
     machine.assert_screen()
+    art_receipt=machine.assert_authored_art(manifest)
     if machine.ram_state()!=route["initial"]:
         raise ColecoCPUError("actual Coleco Z80 boot RAM differs from safe original-world reference")
     for i,step in enumerate(route["steps"]):
@@ -258,6 +276,8 @@ def play(rom_path:Path,route_path:Path,manifest_path:Path,source_binary_path:Pat
         "original_tms9918_vram_name_writes":machine.video_writes,
         "real_z80_nmi_acknowledgements":machine.vblank_acks,
         "sn76489_write_count":machine.psg_writes,
+        **art_receipt,
+        "actual_original_8x8_video_art_verified":True,
         "coleco_bios_stub_calls":machine.bios_calls,
         "actual_coleco_z80_cpu_gameplay_verified":True,
         "proprietary_coleco_bios_redistributed":False,
