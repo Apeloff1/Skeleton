@@ -9,10 +9,13 @@ on:
       - 'skeleton/ai/webcrawler/dragon_world_codex.py'
       - 'skeleton/ai/webcrawler/dragon_world_codex_runtime.py'
       - 'skeleton/ai/webcrawler/dragon_codex_access_matrix.py'
+      - 'skeleton/ai/webcrawler/dragon_codex_tiles.py'
       - 'skeleton/ai/webcrawler/dragon_world_story_grammar.py'
       - 'skeleton/ai/webcrawler/dragon_codex_*.py'
       - 'tests/test_ai_dragon_world_codex.py'
       - 'tests/test_ai_dragon_codex_access_matrix.py'
+      - 'tests/test_ai_dragon_codex_tiles.py'
+      - 'backend/tests/test_dragon_codex_tiles_routes.py'
       - 'tests/test_ai_dragon_world_story_grammar.py'
       - 'tests/test_ai_dragon_codex_desktop.py'
       - 'backend/tests/test_dragon_world_codex_routes.py'
@@ -538,6 +541,7 @@ jobs:
             skeleton/ai/webcrawler/dragon_world_story_grammar.py \
             skeleton/ai/webcrawler/dragon_codex_platforms.py \
             skeleton/ai/webcrawler/dragon_codex_access_matrix.py \
+            skeleton/ai/webcrawler/dragon_codex_tiles.py \
             skeleton/ai/webcrawler/dragon_codex_desktop.py
       - name: Install real deterministic game runtime tests
         run: python -m pip install --disable-pip-version-check pytest
@@ -547,6 +551,7 @@ jobs:
           python -m pytest -q \
             tests/test_ai_dragon_world_codex.py \
             tests/test_ai_dragon_codex_access_matrix.py \
+            tests/test_ai_dragon_codex_tiles.py \
             tests/test_ai_dragon_world_story_grammar.py \
             tests/test_ai_dragon_codex_desktop.py
       - name: Compile a genuinely interactive Linux C99 original game and replay all temporal gates
