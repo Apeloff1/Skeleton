@@ -344,7 +344,8 @@ clean:
        " and runner confirm it.\n"
     )
     from .dragon_native_puzzle_hints import enable_live_hints
-    runtime=enable_live_hints(C_SOURCE)
+    from .dragon_native_puzzle_trace import enable_native_trace
+    runtime=enable_native_trace(enable_live_hints(C_SOURCE))
     return {"src/main.c":runtime,"include/dragon_puzzle.h":header,
             "CMakeLists.txt":cmake,"Makefile":make,
             "dragon-puzzle-proof.json":json.dumps(info,sort_keys=True,indent=2)+"\n",
