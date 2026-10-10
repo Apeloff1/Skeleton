@@ -350,3 +350,16 @@ def test_tampered_stored_metadata_is_rejected():
     with pytest.raises(ValueError, match="metadata invalid"):
         store.sessions("alice", authorized=True)
 
+
+def test_stored_observation_bool_confidence_and_timestamp_are_rejected():
+    import json
+    store = setup()
+    store.record(session(store), authorized=True)
+    for index, value in ((0, True), (3, True), (5, 1)):
+        body = [[1000, "combat", "Timing-based interaction", 0.9, "unknown", False]]
+        body[0][index] = value
+        store.db.execute("UPDATE dragon_game_sessions SET observations_json=? WHERE owner=?",
+                         (json.dumps(body), "alice"))
+        with pytest.raises(ValueError, match="cell validation failed"):
+            store.sessions("alice", authorized=True)
+
