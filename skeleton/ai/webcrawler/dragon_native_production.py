@@ -757,9 +757,9 @@ def verify_published_production(destination: Path, index_name: str) -> dict:
     index_path = root / index_name
     if index_path.is_symlink():
         raise ValueError("index may not be a symlink")
-    data = index_path.read_bytes()
-    if len(data) > 128_000:
+    if index_path.stat().st_size > 128_000:
         raise ValueError("portfolio index over budget")
+    data = index_path.read_bytes()
     index = json.loads(data)
     entries = index.get("entries")
     if (index.get("schema") != INDEX_SCHEMA or
@@ -778,6 +778,8 @@ def verify_published_production(destination: Path, index_name: str) -> dict:
         artifact = root / name
         if artifact.is_symlink() or not artifact.is_file():
             raise ValueError("missing or unsafe portfolio archive")
+        if artifact.stat().st_size > MAX_ARCHIVE_BYTES:
+            raise ValueError("portfolio archive exceeds verification budget")
         payload = artifact.read_bytes()
         if _hash(payload) != item["archive_sha256"] or len(payload) != item["archive_bytes"]:
             raise ValueError("portfolio archive changed after publishing")
