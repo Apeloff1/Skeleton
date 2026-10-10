@@ -6,6 +6,7 @@ import pytest
 
 from skeleton.ai.game_builder.multipath_design import (
     MultipathError, RouteProblem, evaluate_route, solve_route,
+    verify_map_edit_receipt, apply_edit_to_playable_world,
 )
 
 OPEN_LEVEL = (
@@ -618,3 +619,49 @@ def test_level_evolution_replays_every_authorized_stage_without_self_promotion()
     with pytest.raises(PermissionError):
         evolve_challenge_level(p, min_loops=goal, authorized=False)
 
+
+
+
+def test_map_edit_custody_rejects_unlisted_hidden_tile_mutations():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    changed = make_level_edit(p, {(2, 3): "."}, operation="open_passage", authorized=True)
+    assert verify_map_edit_receipt(p, changed)
+    with pytest.raises(MultipathError, match="omits or misstates"):
+        verify_map_edit_receipt(p, replace(changed, changes=()))
+    with pytest.raises(MultipathError, match="source authority"):
+        verify_map_edit_receipt(RouteProblem.from_rows(HAZARD_LEVEL), changed)
+    with pytest.raises(MultipathError, match="integer pairs"):
+        make_level_edit(p, {"malformed": "."}, operation="open_passage", authorized=True)
+
+
+def test_route_editor_builds_actual_game_world_and_replays_win():
+    from skeleton.ai.game_builder.playable_world import (
+        GameBuildIntent, generate_playable_world,
+    )
+    from skeleton.ai.game_builder.playable_simulation import demonstrate_solvable
+    intent = GameBuildIntent(
+        project_id="authored-arcade", title="Original Path Puzzle",
+        subtitle="Alternate playable outcomes",
+        seed=67, width=9, height=9, levels=1,
+        collectibles_per_level=1, hazards_per_level=0,
+    )
+    world = generate_playable_world(intent, authorized=True)
+    old_level = world.levels[0]
+    original = RouteProblem.from_rows(old_level.rows)
+    empty_floor = next(
+        point for point in walkable_cells(original)
+        if original.tile(point) == "." and point != old_level.start
+    )
+    edit = relocate_collectible(
+        original, original.collectibles[0], empty_floor, authorized=True,
+    )
+    updated = apply_edit_to_playable_world(world, 0, edit, authorized=True)
+    assert updated.digest != world.digest
+    assert updated.levels[0].collectibles == (empty_floor,)
+    assert updated.levels[0].digest != old_level.digest
+    assert demonstrate_solvable(updated, authorized=True).final_state.status == "won"
+    assert world.levels[0].rows == old_level.rows
+    with pytest.raises(PermissionError):
+        apply_edit_to_playable_world(world, 0, edit, authorized=False)
+    with pytest.raises(MultipathError):
+        apply_edit_to_playable_world(world, 1, edit, authorized=True)
