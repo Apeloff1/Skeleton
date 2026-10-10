@@ -392,6 +392,31 @@ class GameMechanicsMemory:
             not insights or any(not x.user_confirmed for x in insights) or conflicting, fingerprint,
         )
 
+    def public_taste_snapshot(self, owner: str, *, authorized: bool,
+                              limit: int = 100) -> dict:
+        """Expose bounded design signals without exporting owner observation text."""
+        profile = self.distill(owner, authorized=authorized, limit=limit)
+        return {
+            "schema": "skeleton.dragon.game_taste_advisory.v1",
+            "owner_digest": sha256(owner.encode("utf-8")).hexdigest(),
+            "profile_fingerprint": profile.fingerprint,
+            "review_required": profile.review_required,
+            "advisory_only": True,
+            "training_authorized": False,
+            "memory_promotion_authorized": False,
+            "signals": [
+                {
+                    "mechanic": insight.mechanic.value,
+                    "observation_count": insight.observation_count,
+                    "supporting_sessions": insight.supporting_sessions,
+                    "preference_score": insight.preference_score,
+                    "confidence": insight.confidence,
+                    "fully_user_confirmed": insight.user_confirmed,
+                }
+                for insight in profile.insights
+            ],
+        }
+
     def history_receipt(self, owner: str, *, authorized: bool, limit: int = 100) -> dict:
         """Produce a reproducible provenance receipt, never raw gameplay notes."""
         sessions = self.sessions(owner, authorized=authorized, limit=limit)
