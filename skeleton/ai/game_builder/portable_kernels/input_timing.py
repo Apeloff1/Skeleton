@@ -106,3 +106,20 @@ def debounce_buttons(samples: object, *, stable_frames: int=2) -> tuple[int,...]
         result.append(accepted)
     return tuple(result)
 
+
+def button_auto_repeat(pressed: object, *, delay: int=20,
+                       interval: int=5) -> tuple[bool,...]:
+    """Deterministic keyboard/gamepad repeat on the simulation frame clock."""
+    wait=_int(delay,"repeat delay",1,240)
+    period=_int(interval,"repeat interval",1,120)
+    if (not isinstance(pressed,(tuple,list)) or not 1<=len(pressed)<=4096
+            or any(type(x) is not bool for x in pressed)):
+        raise InputTimingError("boolean held-button frame sequence required")
+    held=0
+    result=[]
+    for state in pressed:
+        held=held+1 if state else 0
+        age=held-1
+        result.append(bool(held and (held==1 or (age>=wait and (age-wait)%period==0))))
+    return tuple(result)
+
