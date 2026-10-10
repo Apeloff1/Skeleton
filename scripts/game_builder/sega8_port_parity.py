@@ -231,6 +231,11 @@ def verify_ports(root: Path) -> dict[str, object]:
             or native_route["hardware_screen_states_verified"]
                != native_route["controller_actions_replayed"] + 1
             or native_route["real_z80_instruction_count"] <= 0
+            or type(native_route.get("real_z80_active_joypad_port_reads")) is not int
+            or native_route["real_z80_active_joypad_port_reads"]
+               < native_route["controller_actions_replayed"]
+            or type(native_route.get("real_z80_directions_seen_as_active_low_buttons")) is not int
+            or not 1 <= native_route["real_z80_directions_seen_as_active_low_buttons"] <= 15
             or native_route.get("total_instruction_budget_enforced") is not True
             or native_route.get("total_frame_budget_enforced") is not True
             or type(native_route.get("semantic_trace_steps_hashed")) is not int
