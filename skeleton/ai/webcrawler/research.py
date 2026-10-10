@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 from .core import CrawlDocument
 
 _WORD = re.compile(r"[a-z0-9]{2,}", re.I)
-_YEAR = re.compile(r"(?<!\\d)((?:19|20)\\d{2})(?!\\d)")
+_YEAR = re.compile(r"(?<!\d)((?:19|20)\d{2})(?!\d)")
 _NEG = re.compile(r"\b(?:not|never|no|false|denies?|rejects?|without)\b", re.I)
 
 def tokens(text: str) -> frozenset[str]:
@@ -39,7 +39,8 @@ class ResearchQuery:
         for name in ("diversity_weight","contradiction_weight","min_relevance","min_source_score"):
             value=getattr(self,name)
             if not isinstance(value,(int,float)) or isinstance(value,bool) or not math.isfinite(value) or not 0<=value<=1: raise ValueError(f"{name} must be finite and between 0 and 1")
-        if self.diversity_weight+self.contradiction_weight>1: raise ValueError("research weights exceed score budget")
+        # The diversity bonus and contradiction penalty are independent;
+        # the final assurance is bounded to [0, 1].
 
 @dataclass(frozen=True)
 class EvidenceObservation:
@@ -59,7 +60,7 @@ class EvidenceObservation:
     def from_document(cls, doc: CrawlDocument, query: str) -> "EvidenceObservation":
         excerpt = doc.text[:2000]
         oid = hashlib.sha256(
-            f"{doc.content_hash}\0{query.lower()}".encode()
+            f"{doc.canonical_url}\0{doc.content_hash}\0{query.lower()}".encode()
         ).hexdigest()
         return cls(
             observation_id=oid,
