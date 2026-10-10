@@ -315,12 +315,22 @@ class GameMechanicsMemory:
                     PreferenceSignal.ENJOYED, PreferenceSignal.DISLIKED,
                 )
             ]
-            total = sum(obs.confidence for obs in confirmed)
-            score = (
-                sum(obs.confidence * (
-                    1 if obs.preference is PreferenceSignal.ENJOYED else -1
-                ) for obs in confirmed) / total if total else 0.0
-            )
+            by_session: dict[str, list[GameObservation]] = {}
+            for obs, sid in observations:
+                if obs.user_confirmed and obs.preference in (
+                    PreferenceSignal.ENJOYED, PreferenceSignal.DISLIKED,
+                ):
+                    by_session.setdefault(sid, []).append(obs)
+            independent_scores = []
+            for items in by_session.values():
+                weight = sum(obs.confidence for obs in items)
+                if weight:
+                    independent_scores.append(sum(
+                        obs.confidence * (
+                            1 if obs.preference is PreferenceSignal.ENJOYED else -1
+                        ) for obs in items
+                    ) / weight)
+            score = sum(independent_scores) / len(independent_scores) if independent_scores else 0.0
             confidence = sum(obs.confidence for obs, _ in observations) / len(observations)
             examples = tuple(sorted({
                 obs.description for obs, _ in observations
