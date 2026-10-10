@@ -22,3 +22,11 @@ def test_rgb555_roundtrip_quantization_bounded():
     with pytest.raises(PaletteError):
         decode_rgb555(0x8000)
 
+
+def test_rgb565_hardware_packing():
+    assert encode_rgb565((255,0,0)) == 0xf800
+    assert encode_rgb565((0,255,0)) == 0x07e0
+    assert encode_rgb565((0,0,255)) == 0x001f
+    with pytest.raises(PaletteError):
+        encode_rgb565((256,0,0))
+
