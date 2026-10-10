@@ -337,6 +337,12 @@ jobs:
             --rom "$CAMPAIGN/build/skeleton-original.$EXT" \
             --target "$TARGET" \
             --receipt-out "/tmp/$TARGET-eight-worlds-z80-boot.json"
+          python -m scripts.game_builder.sega8_real_z80_gameplay \
+            --rom "$CAMPAIGN/build/skeleton-original.$EXT" \
+            --source-dir "$CAMPAIGN" \
+            --route "/tmp/$TARGET-eight-worlds-route.json" \
+            --target "$TARGET" \
+            --receipt-out "/tmp/$TARGET-eight-worlds-z80-gameplay.json"
           python - <<'PY'
           import json, os
           from pathlib import Path
@@ -348,6 +354,7 @@ jobs:
           route=json.loads(Path("/tmp/"+target+"-eight-worlds-route.json").read_text())
           host=json.loads(Path("/tmp/"+target+"-eight-worlds-host-replay.json").read_text())
           boot=json.loads(Path("/tmp/"+target+"-eight-worlds-z80-boot.json").read_text())
+          actual=json.loads(Path("/tmp/"+target+"-eight-worlds-z80-gameplay.json").read_text())
           manifest=json.loads((root/"manifest.json").read_text())
           native=verify(
               target,root,root/"build"/("skeleton-original."+suffix),
@@ -363,6 +370,17 @@ jobs:
           assert route["steps"][-1]["bond_rank"]==7
           assert route["steps"][-1]["won"]==1
           assert host["original_levels_verified"]==8
+          assert actual["original_levels_replayed"]==8
+          assert actual["controller_actions_replayed"]==len(route["steps"])
+          assert actual["hardware_screen_states_verified"]==len(route["steps"])+1
+          assert actual["original_hardware_stage_color_accents_verified"] is True
+          assert actual["original_hardware_stage_accents_verified_per_move"]==len(route["steps"])+1
+          assert actual["native_attract_demo_full_solution_verified_on_guest_z80"] is True
+          assert actual["native_attract_demo_controller_free_actions_verified"]==len(route["steps"])
+          assert actual["native_attract_demo_semantic_trace_sha256"]==actual["semantic_controller_screen_trace_sha256"]
+          assert actual["original_companion_rank_and_reward_verified"] is True
+          assert actual["rights_independently_verified"] is False
+          assert actual["release_approved"] is False
           assert host["original_native_solution_attract_mode_host_verified"] is True
           assert host["original_demo_controller_actions_verified"]==len(route["steps"])
           assert boot["hardware_boot_smoke_verified"] is True
