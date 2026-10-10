@@ -16,6 +16,10 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { authHeaders } from '../auth/gameforgeAuth';
 import { API_BASE } from '../../utils/apiBase';
+import {
+  parseNativeBoard, stepNativePreview, visibleNativeBoard,
+  type EditorPreviewState, type PuzzleMove,
+} from '../product/dragonPuzzlePreview';
 
 const API = (API_BASE || '').replace(/\/$/, '');
 const ENDPOINT = API + '/api/dragon-academy/native/production/puzzle';
@@ -76,6 +80,7 @@ export default function DragonOriginalPuzzleEditor({
   const [validating, setValidating] = React.useState(false);
   const [status, setStatus] = React.useState('');
   const [validated, setValidated] = React.useState<Validation | null>(null);
+  const [play, setPlay] = React.useState<EditorPreviewState | null>(null);
   const fetchEpoch = React.useRef(0);
 
   React.useEffect(() => {
@@ -88,6 +93,7 @@ export default function DragonOriginalPuzzleEditor({
     const generation = ++fetchEpoch.current;
     onApprovedLevels(null);
     setValidated(null);
+    setPlay(null);
     setCurrent(0);
     setBoards([]);
     setStatus('');
@@ -129,7 +135,7 @@ export default function DragonOriginalPuzzleEditor({
   if (!enabled) return null;
 
   const applyTool = (x: number, y: number) => {
-    if (busy || validating || !boards[current]) return;
+    if (busy || validating || play || !boards[current]) return;
     const next = boards.map(board => [...board]);
     const selected = next[current];
     if (!selected[y] || x < 0 || x >= WIDTH) return;
@@ -145,6 +151,7 @@ export default function DragonOriginalPuzzleEditor({
     selected[y] = copy.join('');
     setBoards(next);
     setValidated(null);
+    setPlay(null);
     setStatus('');
     onApprovedLevels(null);
   };
@@ -223,6 +230,7 @@ export default function DragonOriginalPuzzleEditor({
       }
       const rows = (parsed.levels as string[][]).map(grid => [...grid]);
       setBoards(rows);
+      setPlay(null);
       setValidated(null);
       setCurrent(0);
       onApprovedLevels(null);
@@ -280,7 +288,28 @@ export default function DragonOriginalPuzzleEditor({
     }
   };
 
-  const active = boards[current] || newBoard();
+  const startGamePreview = () => {
+    if (busy || validating) return;
+    if (play) {
+      setPlay(null);
+      setStatus('');
+      return;
+    }
+    try {
+      setPlay(parseNativeBoard(boards[current]));
+      setStatus('Local design playtest only. Exact solver validation remains required before export.');
+    } catch {
+      setStatus('Place one hero and matching crates/goals before local playtesting.');
+    }
+  };
+
+  const movePlaytest = (action: PuzzleMove | 'undo' | 'reset') => {
+    if (busy || validating || !play) return;
+    try { setPlay(stepNativePreview(play, action)); }
+    catch { setStatus('Original game preview rejected this move.'); }
+  };
+
+  const active = play ? visibleNativeBoard(play) : boards[current] || newBoard();
 
   return (
     <View style={styles.frame}>
@@ -295,7 +324,7 @@ export default function DragonOriginalPuzzleEditor({
         {TOOLS.map(option => (
           <TouchableOpacity key={option.token} accessibilityRole="button"
             accessibilityState={{ selected: option.token === tool }}
-            disabled={busy || validating} onPress={() => setTool(option.token)}
+            disabled={busy || validating || !!play} onPress={() => setTool(option.token)}
             style={[styles.tool, option.token === tool && styles.selected]}>
             <Text style={styles.toolText}>{option.token} {option.label}</Text>
           </TouchableOpacity>
@@ -306,7 +335,7 @@ export default function DragonOriginalPuzzleEditor({
         {boards.map((_, index) => (
           <TouchableOpacity key={index} accessibilityRole="button"
             accessibilityState={{ selected: index === current }}
-            onPress={() => setCurrent(index)}
+            onPress={() => { setCurrent(index); setPlay(null); }}
             style={[styles.tool, index === current && styles.selected]}>
             <Text style={styles.toolText}>Stage {index + 1}</Text>
           </TouchableOpacity>
@@ -321,7 +350,7 @@ export default function DragonOriginalPuzzleEditor({
                 accessibilityRole="button"
                 accessibilityLabel={'Stage ' + (current + 1) + ' row ' + (y + 1) +
                   ' column ' + (x + 1) + ': ' + cell}
-                disabled={busy || validating}
+                disabled={busy || validating || !!play}
                 onPress={() => applyTool(x, y)}
                 style={[styles.cell,
                   cell === '#' ? styles.wall :
@@ -335,6 +364,41 @@ export default function DragonOriginalPuzzleEditor({
           </View>
         ))}
       </View>
+      <TouchableOpacity accessibilityRole="button"
+        disabled={busy || validating || !boards[current]}
+        style={[styles.fileButton, { alignSelf: 'flex-start' },
+          (busy || validating) && styles.disabled]}
+        onPress={startGamePreview}>
+        <Text style={styles.actionText}>
+          {play ? 'Exit local game playtest' : 'Play-test my original game board'}
+        </Text>
+      </TouchableOpacity>
+      {play && (
+        <View style={styles.results}>
+          <Text style={play.completed ? styles.accepted : styles.help}>
+            {play.completed ? 'Puzzle completed!' : 'Original game in progress'}
+            {' · '}Moves: {play.moves} · Pushes: {play.pushes}
+          </Text>
+          <View style={styles.fileActions}>
+            {([
+              ['← Left', 'a'], ['↑ Up', 'w'],
+              ['↓ Down', 's'], ['→ Right', 'd'],
+              ['Undo', 'undo'], ['Reset', 'reset'],
+            ] as const).map(([label, action]) => (
+              <TouchableOpacity key={action} accessibilityRole="button"
+                accessibilityLabel={'Original game ' + label}
+                onPress={() => movePlaytest(action)}
+                style={styles.fileButton}>
+                <Text style={styles.actionText}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.help}>
+            This local test runs actual Sokoban movement rules but is not a
+            compiled binary. Native gameplay testing is separate.
+          </Text>
+        </View>
+      )}
       <Text style={styles.help}>
         Grid data only—no scripts, commercial maps or third-party characters.
         Changing a cell immediately revokes its previous validation.
