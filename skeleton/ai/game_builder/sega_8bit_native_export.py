@@ -34,7 +34,9 @@ def _authored_stage_accents(
     accents and selectively brighten channels within each console's limits.
     Gameplay semantics never use this array.
     """
-    if bits not in (2, 4) or not 1 <= levels <= 8 or len(palette) != 4:
+    if (type(bits) is not int or bits not in (2, 4)
+            or type(levels) is not int or not 1 <= levels <= 8
+            or not isinstance(palette, tuple) or len(palette) != 4):
         raise Sega8BitNativeError("invalid stage palette hardware envelope")
     mask = (1 << bits) - 1
     def recolor(color: int, stage: int) -> int:
