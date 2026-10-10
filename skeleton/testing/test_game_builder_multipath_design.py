@@ -121,7 +121,7 @@ def test_revisits_count_real_tiles_not_length_surrogates():
     loop = ("down", "up") + direct.actions
     replay = evaluate_route(p, loop)
     assert route_revisits(direct) == 0
-    assert route_revisits(replay) == 2
+    assert route_revisits(replay) == 1
     assert replay.steps == direct.steps + 2
 
 
@@ -130,7 +130,7 @@ def test_turn_metric_distinguishes_direct_route_from_detour():
     direct = solve_route(p)
     assert route_turns(direct) == 0
     detour = evaluate_route(p, ("down", "right", "up") + ("right",) * 5)
-    assert route_turns(detour) == 2
+    assert route_turns(detour) == 3
     assert detour.steps == 8
 
 
