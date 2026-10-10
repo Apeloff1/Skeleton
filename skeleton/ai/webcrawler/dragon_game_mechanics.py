@@ -377,6 +377,7 @@ class GameMechanicsMemory:
                     for x in insights
                 ],
                 "directives": directives,
+                "supporting_session_digests": sorted({sid for events in groups.values() for _, sid in events}),
                 "review_required": not insights or any(not x.user_confirmed for x in insights) or conflicting,
             },
             sort_keys=True, separators=(",", ":"), ensure_ascii=True,
