@@ -43,6 +43,7 @@ from .idle_studio import (
     task_fingerprint,
 )
 from .task_squad import reject_non_evidence_payload
+from .shift_supervisor.consumer_plan import canonical_queue_drained
 
 PACKAGE_VERSION = 2
 MAX_PACKAGE_BYTES = 1_500_000
@@ -601,6 +602,10 @@ def propose(state_path: Path, package_path: Path, audit_path: Path, report_path:
                 "reason": safety.reason,
             }
         )
+    elif canonical_queue_drained(data.get("_shift_supervisor"), "idle"):
+        status = "idle-no-work"
+        generation_id = ""
+        planner = PlannerDecision((), "canonical-queue-drained")
     elif not repository_is_idle(runs, current_run_id):
         status = "busy"
         generation_id = ""
