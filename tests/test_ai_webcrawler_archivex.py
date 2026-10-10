@@ -98,3 +98,23 @@ def test_unrelated_sources_cannot_be_compared():
             store.read("alice", first.snapshot_id, authorized=True),
             store.read("alice", second.snapshot_id, authorized=True),
         )
+
+def test_snapshot_identity_survives_integer_vs_sqlite_float_epoch_round_trip():
+    store = archive()
+    integer = capture(store, b"timestamp normalization", observed=100)
+    same = capture(store, b"timestamp normalization", observed=100.0)
+    assert integer.snapshot_id == same.snapshot_id
+    assert store.read("alice", integer.snapshot_id, authorized=True)[1] == b"timestamp normalization"
+    assert len(store.timeline("alice", URL, authorized=True)) == 1
+    different = capture(store, b"timestamp normalization", observed=100.5)
+    assert different.snapshot_id != integer.snapshot_id
+    assert store.read("alice", different.snapshot_id, authorized=True)[0].observed_at == 100.5
+
+
+def test_archive_rejects_non_finite_snapshot_identity_clock():
+    store = archive()
+    for bad in (float("nan"), float("inf"), -float("inf")):
+        with pytest.raises(ValueError, match="clock"):
+            store.capture("alice", source_url=URL, body=b"evidence",
+                          observed_at=bad, now=100.0,
+                          license_note="Authorized excerpt", authorized=True)
