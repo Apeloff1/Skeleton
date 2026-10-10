@@ -309,6 +309,14 @@ SetVRAM:
 
 ; TMS9918A color mode 1: ASCII patterns and $1800 name table.
 DrawWorld:
+    ; Coleco's VDP asserts NMI, not a maskable IRQ. DI does NOT guard
+    ; the two-byte $BF address latch. Quiesce VBlank at the VDP itself
+    ; while changing tile/name-table addresses, then restore at exit.
+    in a,(VDP_CTRL)           ; Clear any pending VBlank and reset latch.
+    ld a,0C0h               ; R1: display ON; VDP interrupts OFF.
+    out (VDP_CTRL),a
+    ld a,081h
+    out (VDP_CTRL),a
     ld hl,BG_NAME
     call SetVRAM
     ld bc,768
@@ -405,6 +413,11 @@ AddHeroX:
     call SetVRAM
     ld a,'@'
     out (VDP_DATA),a
+    in a,(VDP_CTRL)          ; Do not re-assert stale VBlank immediately.
+    ld a,0E0h              ; R1: display ON and fresh NMI each frame.
+    out (VDP_CTRL),a
+    ld a,081h
+    out (VDP_CTRL),a
     ret
 
 PrintString:
