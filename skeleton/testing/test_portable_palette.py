@@ -30,3 +30,11 @@ def test_rgb565_hardware_packing():
     with pytest.raises(PaletteError):
         encode_rgb565((256,0,0))
 
+
+def test_rgb565_boundaries_and_roundtrip():
+    assert decode_rgb565(0xffff)==(255,255,255)
+    for c in ((10,20,30),(127,128,129),(255,0,255)):
+        assert max(abs(a-b) for a,b in zip(c,decode_rgb565(encode_rgb565(c))))<=5
+    with pytest.raises(PaletteError):
+        decode_rgb565(-1)
+
