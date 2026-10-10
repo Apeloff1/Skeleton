@@ -59,3 +59,11 @@ def test_rect_collision_uses_half_open_nonpenetrating_boundaries():
     assert not rect_intersects((0,0,2,2),(0,2,2,2))
     with pytest.raises(GeometryError):
         rect_intersects((0,0,0,2),(0,0,1,1))
+
+def test_swept_aabb_reports_exact_fraction_for_contact():
+    assert swept_aabb_hit((0,0,2,2),(4,0,2,2),4,0)==Fraction(1,2)
+    assert swept_aabb_hit((0,0,2,2),(0,4,2,2),0,4)==Fraction(1,2)
+    assert swept_aabb_hit((0,0,2,2),(2,0,2,2),-4,0) is None
+    assert swept_aabb_hit((0,0,2,2),(1,1,2,2),3,3)==Fraction(0)
+    with pytest.raises(GeometryError):
+        swept_aabb_hit((0,0,2,2),(4,0,2,2),4096,0)
