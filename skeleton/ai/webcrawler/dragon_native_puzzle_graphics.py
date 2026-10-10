@@ -200,4 +200,17 @@ def enable_puzzle_graphics(files:dict[str,str])->dict[str,str]:
         "\t$(CC) $(CFLAGS) -Iinclude $(shell pkg-config --cflags sdl2) "
         "src/graphics.c -o dragon_game_sdl $(shell pkg-config --libs sdl2)\n"
     )
+    result["CMakeLists.txt"]+=(
+        "\nfind_package(PkgConfig QUIET)\n"
+        "if(PkgConfig_FOUND)\n"
+        "  pkg_check_modules(DRAGON_SDL2 QUIET sdl2)\n"
+        "  if(DRAGON_SDL2_FOUND)\n"
+        "    add_executable(dragon_game_sdl src/graphics.c)\n"
+        "    target_include_directories(dragon_game_sdl PRIVATE include ${DRAGON_SDL2_INCLUDE_DIRS})\n"
+        "    target_compile_options(dragon_game_sdl PRIVATE ${DRAGON_SDL2_CFLAGS_OTHER})\n"
+        "    target_link_directories(dragon_game_sdl PRIVATE ${DRAGON_SDL2_LIBRARY_DIRS})\n"
+        "    target_link_libraries(dragon_game_sdl ${DRAGON_SDL2_LIBRARIES})\n"
+        "  endif()\n"
+        "endif()\n"
+    )
     return result
