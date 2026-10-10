@@ -416,3 +416,58 @@ def test_portable_creator_api_does_not_coerce_or_execute_design(fields):
     data.update(fields)
     with pytest.raises(ValidationError):
         route.NativeProductionSourceRequest(**data)
+
+
+
+def test_authenticated_creator_preview_is_read_only_and_exposes_hardware_degradations(
+    monkeypatch,
+):
+    from skeleton.ai.webcrawler import dragon_native_production as production
+    def fail_if_emitted(**kwargs):
+        raise AssertionError("source emitter must never execute during preview")
+    monkeypatch.setattr(production, "render_native_project", fail_if_emitted)
+    body = route.NativeProductionSourceRequest(
+        title="Original Trail Quest", style="arcade_score_attack",
+        targets=["game_boy", "pc_linux"], approved=False,
+        original_work_attested=True,
+        portable_design=route.NativeProductionDesignBody(
+            palette="modern_neon", hero="explorer",
+            stages=6, candidates=12, difficulty=7,
+        ),
+    )
+    result = route.native_production_preview(body, owner=identity())
+    assert result["ok"]
+    assert result["status"] == "source_ready"
+    assert result["can_export_sources"]
+    assert result["evidence"] == "none"
+    assert result["candidate_count"] == 2
+    rows = {item["target"]: item for item in result["targets"]}
+    assert rows["game_boy"]["target_stages"] == 1
+    assert rows["game_boy"]["target_palette"] == "handheld"
+    assert rows["pc_linux"]["target_stages"] == 6
+    assert not rows["pc_linux"]["adaptations"]
+
+
+def test_native_creator_preview_cannot_bypass_original_rights_declaration():
+    body = route.NativeProductionSourceRequest(
+        title="Original Trail Quest", style="arcade_score_attack",
+        targets=["game_boy"], approved=False, original_work_attested=False,
+    )
+    with pytest.raises(HTTPException) as denied:
+        route.native_production_preview(body, owner=identity())
+    assert denied.value.status_code == 403
+
+
+def test_native_creator_preview_discloses_blocked_licensed_sdk():
+    body = route.NativeProductionSourceRequest(
+        title="Original Trail Quest", style="arcade_score_attack",
+        targets=["game_boy", "ps5"], approved=False,
+        original_work_attested=True,
+    )
+    report = route.native_production_preview(body, owner=identity())
+    assert not report["can_export_sources"]
+    assert {t["target"]: t["state"] for t in report["targets"]} == {
+        "game_boy": "source_ready",
+        "ps5": "blocked",
+    }
+    assert "no generated code" in report["claim_boundary"]
