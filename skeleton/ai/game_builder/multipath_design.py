@@ -384,4 +384,19 @@ def flood_fill(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill"]
+def connected_regions(
+    problem: RouteProblem, *, allow_hazards: bool = False,
+) -> tuple[frozenset[Position], ...]:
+    """Partition all open cells, keeping even unreachable design pockets."""
+    remaining = set(walkable_cells(problem, include_hazards=allow_hazards))
+    regions: list[frozenset[Position]] = []
+    while remaining:
+        origin = min(remaining, key=lambda p: (p[1], p[0]))
+        region = flood_fill(problem, origin, allow_hazards=allow_hazards)
+        regions.append(region)
+        remaining.difference_update(region)
+    return tuple(regions)
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions"]
