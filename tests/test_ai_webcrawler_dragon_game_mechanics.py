@@ -159,3 +159,10 @@ def test_policy_confidence_rejects_boolean_and_nonfinite():
         with pytest.raises(ValueError, match="confidence"):
             GameMechanicsMemory(sqlite3.connect(":memory:"), policy=CapturePolicy(min_confidence=bad))
 
+
+def test_owner_identity_rejects_control_and_whitespace():
+    store = setup()
+    for bad in (" alice", "alice ", "alice\\nother", "alice\\x00shadow"):
+        with pytest.raises(ValueError, match="owner"):
+            store.sessions(bad, authorized=True)
+
