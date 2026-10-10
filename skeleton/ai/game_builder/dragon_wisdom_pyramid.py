@@ -435,15 +435,21 @@ class DragonWisdomPyramid:
         revoked = {e["review_digest"] for e in events if e["kind"] == "revoked"}
         promoted = [e for e in events if e["kind"] == "promoted"]
         cards: list[dict[str, Any]] = []
+        seen_mechanics: set[str] = set()
         for event in reversed(promoted):
             review = self._review(events, event["review_digest"])
             if (review["digest"] in revoked or review["knowledge_root"] != root
                     or not event["at"] <= now or not review["at"] <= now < review["expires_at"]
+                    or review["mechanic"] in seen_mechanics
                     or any(ref[0] in pending for ref in review["source_refs"])
+                    # New independent review always supersedes an older
+                    # approval, even if the newer review is itself accepted
+                    # but awaiting fresh explicit human approval.
                     or any(e["kind"] == "wiki_review" and e["mechanic"] == review["mechanic"]
-                           and e["sequence"] > review["sequence"] and e["disposition"] != "accepted"
+                           and e["sequence"] > review["sequence"]
                            for e in events)):
                 continue
+            seen_mechanics.add(review["mechanic"])
             cards.append({
                 "mechanic": review["mechanic"],
                 "grade": "independently_reviewed_not_universal_truth",
