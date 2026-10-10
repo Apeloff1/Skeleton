@@ -124,3 +124,11 @@ def test_distillation_is_deterministic():
     assert store.distill("alice", authorized=True) == store.distill(
         "alice", authorized=True,
     )
+
+def test_policy_rejects_type_confusion():
+    from skeleton.ai.webcrawler.dragon_game_mechanics import CapturePolicy
+    with pytest.raises(ValueError, match="duration"):
+        GameMechanicsMemory(sqlite3.connect(":memory:"), policy=CapturePolicy(max_session_seconds=True))
+    with pytest.raises(ValueError, match="CapturePolicy"):
+        GameMechanicsMemory(sqlite3.connect(":memory:"), policy=None)
+
