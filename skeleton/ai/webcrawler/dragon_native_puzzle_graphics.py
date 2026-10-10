@@ -66,8 +66,9 @@ static void render_original_game(SDL_Renderer*r,SDL_Window*w){
  }
  char title[180];
  snprintf(title,sizeof(title),
-  "Original Dragon Game | stage %d/%d | moves %d | stars %d",
-  chapter+1,LEVEL_COUNT,state.moves,native_puzzle_stars());
+  "Original Dragon Game | stage %d/%d | moves %d | stars %d | tension %d/100 | paths %d",
+  chapter+1,LEVEL_COUNT,state.moves,native_puzzle_stars(),
+  dragon_stage_tension[chapter],dragon_branch_count[chapter]);
  SDL_SetWindowTitle(w,title);
 }
 static void keyboard(SDL_Keycode k){
