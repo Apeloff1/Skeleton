@@ -379,3 +379,31 @@ python -m scripts.game_builder.emulate_sega8_sdcc_boot \
   --rom ./homebrew-gg/build/skeleton-original.gg \
   --target sega_game_gear --receipt-out ./game-gear-z80-boot.json
 ```
+
+## Cross-console originality and gameplay-parity gate
+
+A separate CI job runs only after both independent cartridge-build jobs
+complete. It retrieves the two original-game evidence artifacts without
+downloading or distributing the game ROMs themselves. It verifies that
+the Sega Master System and Game Gear ports preserve the **same original
+project, world digest, safe winning replay, author-evidence fingerprint,
+visual theme, level count, world dimensions and title**.
+
+The required native binaries must have **different** SHA-256 hashes and
+console-specific .sms/.gg header identities. Gameplay test receipts must
+confirm the same level and input-action counts, while independently
+binding each console's own source SHA-256 and compiled-ROM SHA-256.
+The hardware-facing Z80 boot smoke must also have passed independently
+for each variant. Source-specific host reference hashes are not required
+to match, since they incorporate intentionally distinct native outputs.
+
+Release review is fail-closed: missing, duplicated, symlinked, hardlinked,
+tampered, incorrectly routed or rights-elevating JSON evidence is rejected.
+The generated cross-port receipt is content-hashed and keeps full Z80
+playthrough, physical hardware verification, external rights review and
+release authorization marked **false** until those gates actually succeed.
+
+Both targets are original homebrew. Hardware compatibility headers,
+recognizable genre conventions and independent reimplementation are not
+treated as permission to extract commercial assets, distribute proprietary
+firmware or plagiarize a protected game's audiovisual presentation.
