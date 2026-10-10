@@ -531,3 +531,11 @@ def test_collectible_relocation_changes_actual_objective_search():
     with pytest.raises(MultipathError):
         relocate_collectible(p, (4, 1), p.start, authorized=True)
 
+
+def test_moved_exit_is_new_required_completion_not_a_renamed_receipt():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    edited = relocate_exit(p, (7, 3), authorized=True)
+    assert edited.after.goal == (7, 3)
+    assert edited.safe_proof.positions[-1] == (7, 3)
+    assert verify_route_proof(edited.after, edited.safe_proof)
+
