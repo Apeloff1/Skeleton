@@ -135,6 +135,70 @@ class SegaReproducibilityReceipt:
         return {**self._core(), "comparison_sha256": self.comparison_sha256}
 
 
+def verify_separate_authoring_runs(
+    first_source: str | Path, second_source: str | Path, *,
+    target: str, expected_source_sha256: str,
+) -> dict[str, object]:
+    """Confirm two independent source directories hold byte-identical authored code.
+
+    This compares a second actual game generation to the original authored
+    output. It cannot prove that two generators were genuinely executed:
+    only CI's trusted invocation transcript can establish that fact.
+    """
+    _require(target in _TARGETS, "unknown native homebrew source target")
+    _require(isinstance(expected_source_sha256, str)
+             and bool(_SHA.fullmatch(expected_source_sha256)),
+             "expected independently measured source digest must be SHA-256")
+    _require(Path(first_source) != Path(second_source),
+             "the same source path cannot represent two generation runs")
+
+    roots: list[tuple[str, list[bytes]]] = []
+    for path,allow_build in ((first_source,True),(second_source,False)):
+        rootfd = _open_directory(Path(path))
+        try:
+            found = set(os.listdir(rootfd))
+            approved = set(_SOURCE_FILES)
+            if allow_build and "build" in found:
+                build_stat = os.stat("build", dir_fd=rootfd, follow_symlinks=False)
+                _require(stat.S_ISDIR(build_stat.st_mode),
+                         "native build output directory cannot be a link")
+                approved.add("build")
+            _require(found==approved,
+                     "original source regeneration contains unreviewed files")
+            content = [
+                _read_bounded(Path(filename),max_bytes=1024*1024,root_fd=rootfd)
+                for filename in _SOURCE_FILES
+            ]
+        finally:
+            os.close(rootfd)
+        digest=sha256(b"\0".join(content)).hexdigest()
+        roots.append((digest,content))
+        manifest=_json(content[2],"originally generated Sega source")
+        _require(
+            manifest.get("schema")=="skeleton.game_builder.native_sega8_source.v1"
+            and manifest.get("platform")==target
+            and manifest.get("target_rom_suffix")==_TARGETS[target][1:],
+            "the regenerated source is not for the same Sega console",
+        )
+        _require(all(manifest.get(k) is False for k in _MANIFEST_FALSE),
+                 "authored game source contains pre-certified legal or hardware claims")
+    _require(
+        roots[0][0]==roots[1][0]==expected_source_sha256
+        and roots[0][1]==roots[1][1],
+        "independent source-generation runs differ from the reviewed game",
+    )
+    return {
+        "schema":"skeleton.game_builder.sega_source_regeneration.v1",
+        "target":target,
+        "identical_authoring_source_sha256":expected_source_sha256,
+        "actual_source_files_compared":list(_SOURCE_FILES),
+        "identical_source_bytes":True,
+        "generator_invocations_independently_attested":False,
+        "author_copyright_title_independently_proven":False,
+        "release_authorized":False,
+    }
+
+
 def verify_rebuilt_sega_cartridge(
     *, target: str, source_directory: str | Path,
     first_cartridge: str | Path, rebuilt_cartridge: str | Path,
