@@ -40,6 +40,7 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
       { id: 'maze-forge', title: 'Constructive maze builder', description: 'Create genuinely finishable original mazes with scenic circuits, doublebacks, dead-end discoveries, climate-safe paths and native C99 source evidence.', operation: 'dragon.routes.maze', href: '/dragon-maze-world' },
       { id: 'route-atlas', title: 'World-scale route atlas', description: 'Play 12 independently certified maze regions with hundreds of rooms, alternate portal routes and full-world scenic expeditions.', operation: 'dragon.routes.atlas', href: '/dragon-route-atlas' },
       { id: 'living-worlds', title: 'Living worlds and postgame', description: 'Build never-ending sandbox and survival worlds, changing labyrinths, multiple realms, consequence-driven endings and persistent postgame exploration.', operation: 'dragon.worlds.living', href: '/dragon-living-world' },
+      { id: 'genomic-universe', title: 'Genomic universe forge', description: 'Use 24 actual simulation axes, exact quintillion-plus world addresses, environmental routes and 16-decision independently replayed paths.', operation: 'dragon.worlds.genomic', href: '/dragon-genomic-universe' },
     ],
   },
   {
@@ -55,6 +56,7 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
       { id: 'world-mazes', title: 'Design guaranteed mazes', description: 'Play and export certified worlds with every-room recovery, secret detours, scenic routes and optional maze difficulty.', operation: 'world.mazes.guaranteed', href: '/dragon-maze-world' },
       { id: 'world-route-atlas', title: 'Compose regional worlds', description: 'Connect up to 576 independently certified rooms across 12 playable regions with optional shortcuts and scenic full-world paths.', operation: 'world.regions.atlas', href: '/dragon-route-atlas' },
       { id: 'world-lifecycle', title: 'Create living and endless worlds', description: 'Change victory rules, world eras, faction consequences, ecology, moving mazes and post-ending open exploration across 32 active original gameplay profiles.', operation: 'world.lifecycle.author', href: '/dragon-living-world' },
+      { id: 'world-genome', title: 'Compose genomic world universes', description: 'Control 24 working terrain, climate, resource, faction, narrative and postgame axes and replay exact-addressed large-world journeys.', operation: 'world.genome.author', href: '/dragon-genomic-universe' },
       { id: 'systems', title: 'Author systems', description: 'Compose quests, economy, crafting, NPCs and progression.', operation: 'world.systems.compose' },
       { id: 'assets', title: 'Forge assets', description: 'Generate and organize reusable world assets.', operation: 'asset.forge' },
     ],
