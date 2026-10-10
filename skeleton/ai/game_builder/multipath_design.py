@@ -610,4 +610,25 @@ def route_coverage_ppm(problem: RouteProblem, proof: RouteProof) -> int:
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm"]
+def objective_dispersion(problem: RouteProblem) -> dict[str, int]:
+    """Exact shortest-path distribution between collectibles and endpoints."""
+    if not isinstance(problem, RouteProblem):
+        raise MultipathError("typed problem required for collectible dispersion")
+    points = (problem.start, *problem.collectibles, problem.goal)
+    pair_distances: list[int] = []
+    for i, start in enumerate(points):
+        distances = tile_distances(problem, start)
+        for goal in points[i+1:]:
+            if goal not in distances:
+                raise MultipathError("objective components are disconnected")
+            pair_distances.append(distances[goal])
+    return {
+        "minimum_steps": min(pair_distances),
+        "maximum_steps": max(pair_distances),
+        "mean_steps_ppm": sum(pair_distances) * 1_000_000 // len(pair_distances),
+        "pairs": len(pair_distances),
+    }
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion"]
