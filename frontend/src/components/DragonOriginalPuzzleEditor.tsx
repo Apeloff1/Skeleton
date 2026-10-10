@@ -90,6 +90,9 @@ export default function DragonOriginalPuzzleEditor({
   const [play, setPlay] = React.useState<EditorPreviewState | null>(null);
   const [demoCursor, setDemoCursor] = React.useState(-1);
   const fetchEpoch = React.useRef(0);
+  const hintEpoch = React.useRef(0);
+  const [liveHint, setLiveHint] = React.useState('');
+  const [hintBusy, setHintBusy] = React.useState(false);
 
   React.useEffect(() => {
     if (!enabled) {
@@ -103,9 +106,13 @@ export default function DragonOriginalPuzzleEditor({
     setValidated(null);
     setPlay(null);
     setDemoCursor(-1);
+    hintEpoch.current += 1;
+    setLiveHint('');
+    setHintBusy(false);
     setCurrent(0);
     setBoards([]);
     setEditHistory(null);
+    setLiveHint('');
     setStatus('');
     setBusy(true);
     void (async () => {
@@ -163,6 +170,8 @@ export default function DragonOriginalPuzzleEditor({
     setValidated(null);
     setPlay(null);
     setDemoCursor(-1);
+    hintEpoch.current += 1;
+    setLiveHint('');
     setStatus('');
     onApprovedLevels(null);
   };
@@ -176,6 +185,8 @@ export default function DragonOriginalPuzzleEditor({
     setCurrent(updated.current.stage);
     setValidated(null);
     setDemoCursor(-1);
+    hintEpoch.current += 1;
+    setLiveHint('');
     setStatus('Board paint history changed. Validate the campaign before native export.');
     onApprovedLevels(null);
   };
@@ -191,6 +202,8 @@ export default function DragonOriginalPuzzleEditor({
       setCurrent(destination);
       setValidated(null);
       setDemoCursor(-1);
+      hintEpoch.current += 1;
+      setLiveHint('');
       setStatus('Game stage order changed. Revalidate the campaign before source export.');
       onApprovedLevels(null);
     } catch {
@@ -275,6 +288,8 @@ export default function DragonOriginalPuzzleEditor({
       }
       const rows = (parsed.levels as string[][]).map(grid => [...grid]);
       setBoards(rows);
+      hintEpoch.current += 1;
+      setLiveHint('');
       setEditHistory(initializePuzzleHistory(rows));
       setPlay(null);
       setDemoCursor(-1);
@@ -338,6 +353,8 @@ export default function DragonOriginalPuzzleEditor({
   const startGamePreview = () => {
     if (busy || validating) return;
     if (play) {
+      hintEpoch.current += 1;
+      setLiveHint('');
       setPlay(null);
       setDemoCursor(-1);
       setStatus('');
@@ -345,6 +362,8 @@ export default function DragonOriginalPuzzleEditor({
     }
     try {
       setDemoCursor(-1);
+      hintEpoch.current += 1;
+      setLiveHint('');
       setPlay(parseNativeBoard(boards[current]));
       setStatus('Local design playtest only. Exact solver validation remains required before export.');
     } catch {
@@ -354,14 +373,61 @@ export default function DragonOriginalPuzzleEditor({
 
   const movePlaytest = (action: PuzzleMove | 'undo' | 'reset') => {
     if (busy || validating || !play) return;
-    try { setDemoCursor(-1); setPlay(stepNativePreview(play, action)); }
+    try {
+      hintEpoch.current += 1;
+      setLiveHint('');
+      setDemoCursor(-1);
+      setPlay(stepNativePreview(play, action));
+    }
     catch { setStatus('Original game preview rejected this move.'); }
+  };
+
+  const fetchCurrentHint = async () => {
+    if (!play || hintBusy || busy || validating || !boards[current]) return;
+    const generation = ++hintEpoch.current;
+    setHintBusy(true);
+    setLiveHint('');
+    try {
+      const response = await fetch(ENDPOINT + '/current-hint', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        cache: 'no-store',
+        body: JSON.stringify({
+          rows: boards[current], player: play.player, crates: play.crates,
+        }),
+      });
+      if (!response.ok) throw new Error('No bounded live route was proven from this game state.');
+      const result = await response.json() as {
+        ok: boolean; next_move: string | null;
+        shortest_route: string; remaining_moves: number; solved: boolean;
+      };
+      if (!result.ok || typeof result.shortest_route !== 'string' ||
+          !/^[wasd]{0,400}$/.test(result.shortest_route) ||
+          result.shortest_route.length !== result.remaining_moves ||
+          (result.solved ? result.next_move !== null :
+            result.next_move !== result.shortest_route[0])) {
+        throw new Error('Original current-state solver returned inconsistent gameplay proof.');
+      }
+      if (generation === hintEpoch.current) {
+        setLiveHint(result.solved ? 'This original puzzle is already complete.' :
+          'From this position: ' + result.remaining_moves + ' moves. Next: ' +
+          ({w:'↑',a:'←',s:'↓',d:'→'} as Record<string,string>)[result.next_move!]);
+      }
+    } catch (error) {
+      if (generation === hintEpoch.current) {
+        setLiveHint(error instanceof Error ? error.message : 'Live current-position hint failed.');
+      }
+    } finally {
+      if (generation === hintEpoch.current) setHintBusy(false);
+    }
   };
 
   const walkthrough = validated?.stages[current]?.shortest_solution ?? '';
   const beginWalkthrough = () => {
     if (busy || validating || !validated || !boards[current] || !walkthrough) return;
     try {
+      hintEpoch.current += 1;
+      setLiveHint('');
       setPlay(parseNativeBoard(boards[current]));
       setDemoCursor(0);
       setStatus('Follow the independently solved shortest route, one actual game move at a time.');
@@ -380,6 +446,8 @@ export default function DragonOriginalPuzzleEditor({
       setStatus('The optimal walkthrough diverged. Revalidate this board.');
       return;
     }
+    hintEpoch.current += 1;
+    setLiveHint('');
     setPlay(next);
     setDemoCursor(demoCursor + 1);
     if (demoCursor + 1 === walkthrough.length) {
@@ -418,7 +486,10 @@ export default function DragonOriginalPuzzleEditor({
         {boards.map((_, index) => (
           <TouchableOpacity key={index} accessibilityRole="button"
             accessibilityState={{ selected: index === current }}
-            onPress={() => { setCurrent(index); setPlay(null); setDemoCursor(-1); }}
+            onPress={() => {
+              hintEpoch.current += 1; setLiveHint('');
+              setCurrent(index); setPlay(null); setDemoCursor(-1);
+            }}
             style={[styles.tool, index === current && styles.selected]}>
             <Text style={styles.toolText}>Stage {index + 1}</Text>
           </TouchableOpacity>
@@ -525,6 +596,15 @@ export default function DragonOriginalPuzzleEditor({
             {play.completed ? 'Puzzle completed!' : 'Original game in progress'}
             {' · '}Moves: {play.moves} · Pushes: {play.pushes}
           </Text>
+          <TouchableOpacity accessibilityRole="button"
+            accessibilityLabel="Ask Dragon for an exact hint from current puzzle position"
+            disabled={hintBusy || busy || validating}
+            onPress={fetchCurrentHint} style={styles.fileButton}>
+            <Text style={styles.actionText}>
+              {hintBusy ? 'Solving current game position…' : 'Get shortest hint from here'}
+            </Text>
+          </TouchableOpacity>
+          {!!liveHint && <Text style={styles.accepted}>{liveHint}</Text>}
           <View style={styles.fileActions}>
             {([
               ['← Left', 'a'], ['↑ Up', 'w'],
