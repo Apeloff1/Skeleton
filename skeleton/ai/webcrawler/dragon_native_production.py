@@ -250,7 +250,11 @@ def validate_native_source(project: NativeProject) -> dict[str, str]:
         prior_files = {name: content for name, content in project.files.items()
                        if name not in ("dragon-hardware-budget.json",
                                        "dragon-native-manifest.json", "README.md")}
-        expected_budget = asdict(analyze_project_budget(project.target_id, prior_files))
+        # JSON decoders produce lists, while dataclass asdict preserves tuple
+        # fields (e.g. warnings). Compare the same canonical JSON representation.
+        expected_budget = json.loads(_canonical(asdict(
+            analyze_project_budget(project.target_id, prior_files)
+        )))
     except (KeyError, ValueError, TypeError) as exc:
         raise ValueError("hardware budget claim cannot be revalidated") from exc
     if declared_budget != expected_budget or declared_budget.get("status") != "source_budget_checked_only":
