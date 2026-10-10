@@ -126,6 +126,18 @@ static int graphics_selftest(SDL_Renderer*r,SDL_Window*w){
    if(!perform(solution[i]))return 42;
   if(!level_done()||native_puzzle_stars()!=3||!frame_checked(r,w))
    return 43;
+  for(int branch=0;branch<dragon_branch_count[level];branch++){
+   int expected=dragon_branch_next[level][branch];
+   if(!load_level(level))return 44;
+   for(int step=0;step<dragon_solution_length[level];step++)
+    if(!perform(dragon_solutions[level][step]))return 45;
+   if(!level_done())return 46;
+   if(branch==0)keyboard(SDLK_1);
+   else gamepad(SDL_CONTROLLER_BUTTON_Y);
+   if(chapter!=expected||!frame_checked(r,w))return 47;
+   printf("DRAGON_SDL_BRANCH_PASS from=%d choice=%d to=%d\n",
+          level+1,branch+1,expected+1);
+  }
   printf("DRAGON_SDL_STAGE_PASS level=%d\n",level+1);
  }
  printf("DRAGON_SDL_RENDER_GAMEPLAY_PASS stages=%d\n",LEVEL_COUNT);
