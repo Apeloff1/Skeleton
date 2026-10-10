@@ -16,6 +16,7 @@ from skeleton.ai.webcrawler.dragon_platform_readiness import (
 )
 from skeleton.ai.webcrawler.dragon_native_projects import EMITTERS,render_native_project
 from skeleton.ai.webcrawler.dragon_native_legacy_expansion import native_legacy_source
+from skeleton.ai.webcrawler.dragon_desktop_abi import DESKTOP_NATIVE
 from skeleton.ai.webcrawler.dragon_hardware_budget import budget_for
 from skeleton.ai.webcrawler.dragon_game_mechanics import Mechanic
 
@@ -114,6 +115,45 @@ def test_incapable_and_licensed_hardware_remain_fail_closed():
                 title="Dragon must not fake code",target_id=target,
                 style="arcade_score_attack",candidate_id="e"*64,
                 mechanics=(Mechanic.MOVEMENT,),authorized=True)
+
+
+@pytest.mark.parametrize("target_id",sorted(EMITTERS - DESKTOP_NATIVE))
+def test_every_console_and_historic_source_emitter_delivers_real_project(target_id):
+    """Each advertised native producer must run, not merely appear in EMITTERS."""
+    project=render_native_project(
+        title="Dragon Original Hardware Census",
+        target_id=target_id,style="arcade_score_attack",
+        candidate_id=sha256(("dragon-hardware-"+target_id).encode()).hexdigest(),
+        mechanics=(Mechanic.MOVEMENT,Mechanic.EXPLORATION),
+        authorized=True,
+    )
+    assert project.target_id==target_id
+    assert project.status=="source_generated"
+    assert project.files
+    assert project.digest
+    info=json.loads(project.files["dragon-native-manifest.json"])
+    assert info["target"]==target_id
+    assert info["status"]=="source_generated"
+    assert info["output_extension"]==CATALOG[target_id].output
+    assert project.toolchain==CATALOG[target_id].toolchain
+    assert any(name.endswith((".asm",".s",".c",".cpp",".h",".py",".ino"))
+               for name in project.files)
+    assert not any(name.endswith((".exe",".gb",".gbc",".nes",".prg",".dol",
+                                  ".3dsx",".pbp",".sms",".sfc",".gba",".nds",
+                                  ".xbe",".z64",".xex",".tap"))
+                   for name in project.files)
+
+
+@pytest.mark.parametrize("target_id",sorted(set(CATALOG)-EMITTERS))
+def test_every_unimplemented_target_rejects_fake_native_game_output(target_id):
+    """No fallback desktop source may masquerade as unimplemented hardware."""
+    with pytest.raises((PermissionError,ValueError)):
+        render_native_project(
+            title="Original Dragon Requires Source",
+            target_id=target_id,style="arcade_score_attack",
+            candidate_id="a"*64,mechanics=(Mechanic.MOVEMENT,),
+            authorized=True,
+        )
 
 @pytest.mark.parametrize("target",LEGACY_NEW)
 def test_new_native_system_has_original_gameplay_and_correct_build_target(target):
