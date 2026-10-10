@@ -14,6 +14,8 @@ on:
       - "scripts/game_builder/native_sega_8bit_ci.py"
       - "scripts/game_builder/sega8_source_replay.py"
       - "scripts/game_builder/emulate_sega8_sdcc_boot.py"
+      - "scripts/game_builder/sega8_port_parity.py"
+      - "skeleton/testing/test_game_builder_sega8_port_parity.py"
       - "skeleton/testing/test_game_builder_sega8_sdcc_cpu_boot.py"
       - "scripts/game_builder/sega8_host_shim.h"
       - "scripts/game_builder/sega8_host_replay.c"
@@ -265,3 +267,51 @@ jobs:
           retention-days: 7
       # No ROM is published: legal review and real emulator or hardware
       # gameplay acceptance are separate and remain fail-closed.
+
+  compare-original-ports:
+    name: Confirm authentic cross-console gameplay and source parity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    needs: [build-original-cartridge]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download non-distribution original-game evidence from both console builds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: original-sega8-source-and-hash-evidence-*
+          path: original-port-evidence
+          merge-multiple: false
+      - name: Validate adversarial cross-hardware original port receipts
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          python -m pip install --disable-pip-version-check "pytest>=8.4,<9"
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_sega8_port_parity.py
+      - name: Verify identical game rules and independent ROM bytes
+        run: |
+          python -m scripts.game_builder.sega8_port_parity \
+            --evidence-root original-port-evidence \
+            --output original-sega8-crossport-equivalence.json
+          python - <<'PY'
+          import json
+          with open("original-sega8-crossport-equivalence.json",encoding="utf-8") as stream:
+              receipt=json.load(stream)
+          assert receipt["gameplay_parity_verified"] is True
+          assert receipt["independent_native_rom_formats_verified"] is True
+          assert receipt["real_z80_startup_checked_per_platform"] is True
+          assert receipt["original_controller_actions_verified_per_platform"] > 50
+          assert receipt["full_native_z80_gameplay_replay_verified"] is False
+          assert receipt["release_approved"] is False
+          PY
+      - name: Retain only original cross-port identity receipt, never cartridge bytes
+        uses: actions/upload-artifact@v4
+        with:
+          name: original-sega8-crossport-identity-evidence
+          path: original-sega8-crossport-equivalence.json
+          if-no-files-found: error
+          retention-days: 7
