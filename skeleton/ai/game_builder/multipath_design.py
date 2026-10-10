@@ -359,4 +359,29 @@ def walkable_cells(problem: RouteProblem, *, include_hazards: bool = False) -> t
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells"]
+def flood_fill(
+    problem: RouteProblem, start: Position, *,
+    allow_hazards: bool = False,
+) -> frozenset[Position]:
+    """Enumerate a physically reachable region with a deterministic BFS."""
+    if (not isinstance(problem, RouteProblem) or not isinstance(start, tuple)
+            or len(start) != 2 or any(type(v) is not int for v in start)
+            or type(allow_hazards) is not bool):
+        raise MultipathError("invalid flood-fill parameters")
+    if problem.tile(start) == "#" or (start in problem.hazards and not allow_hazards):
+        raise MultipathError("flood-fill origin is not traversable")
+    seen = {start}
+    pending = deque([start])
+    while pending:
+        point = pending.popleft()
+        for _, nxt in problem.neighbors(point, allow_hazards=allow_hazards):
+            if nxt not in seen:
+                seen.add(nxt)
+                pending.append(nxt)
+        if len(seen) > MAX_DIMENSION * MAX_DIMENSION:
+            raise MultipathError("flood-fill state budget exceeded")
+    return frozenset(seen)
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill"]
