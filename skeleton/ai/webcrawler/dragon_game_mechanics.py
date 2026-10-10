@@ -240,6 +240,7 @@ class GameMechanicsMemory:
             ORDER BY session_id LIMIT ?
         """, (owner, limit))
         sessions = []
+        total_bytes = 0
         for session_id, label, duration, raw in rows:
             if (not isinstance(raw, str)
                     or len(raw.encode("utf-8")) > MAX_STORED_SESSION_BYTES):
