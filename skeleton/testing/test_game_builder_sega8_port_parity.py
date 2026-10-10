@@ -41,6 +41,14 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
                 "reference_safe_replay_digest": REPLAY,
                 "source_rights_evidence_sha256": RIGHTS,
                 "original_color_theme": "space",
+                "native_per_stage_hardware_bg_palette_accents": True,
+                "native_stage_palettes_change_core_gameplay": False,
+                "game_gear_original_stage_rgb444_accents": [
+                    [100, 200], [300, 400], [500, 600],
+                ],
+                "master_system_original_stage_rgb222_accents": [
+                    [11, 22], [33, 44], [55, 60],
+                ],
                 "original_native_solution_attract_mode": True,
                 "original_demo_playback_steps": 256,
                 "original_demo_compressed_rom_bytes": 65,
@@ -123,6 +131,8 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
             "native_pause_blocks_gameplay_and_mutes_psg_verified": True,
             "native_restart_restores_original_theme_verified": True,
             "actual_victory_palette_verified": True,
+            "original_hardware_stage_color_accents_verified": True,
+            "original_hardware_stage_accents_verified_per_move": 257,
             "native_attract_demo_chord_started_from_victory": True,
             "native_attract_demo_full_solution_verified_on_guest_z80": True,
             "native_attract_demo_controller_free_actions_verified": 256,
@@ -201,6 +211,8 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     assert receipt["independent_native_rom_formats_verified"] is True
     assert receipt["real_z80_startup_checked_per_platform"] is True
     assert receipt["original_on_cartridge_demo_equivalent_across_platforms"] is True
+    assert receipt["original_stage_hardware_color_parity_verified"] is True
+    assert receipt["original_stage_color_accents_verified_per_console"] == 257
     assert receipt["native_attract_demo_entry_and_cancel_verified_on_both_platforms"] is True
     assert receipt["native_autonomous_full_game_replayed_on_both_platforms"] is True
     assert receipt["native_autonomous_guest_semantic_trace_sha256"] == "f"*64
@@ -227,6 +239,12 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     ("manifest", "reference_safe_replay_digest", "e" * 64),
     ("manifest", "source_rights_evidence_sha256", "f" * 64),
     ("manifest", "original_color_theme", "desert"),
+    ("manifest", "native_per_stage_hardware_bg_palette_accents", False),
+    ("manifest", "native_stage_palettes_change_core_gameplay", True),
+    ("manifest", "game_gear_original_stage_rgb444_accents", [[-1,20]]),
+    ("manifest", "master_system_original_stage_rgb222_accents", [[100,2]]),
+    ("native_route", "original_hardware_stage_color_accents_verified", False),
+    ("native_route", "original_hardware_stage_accents_verified_per_move", 1),
     ("manifest", "original_demo_solution_sha256", "0"*64),
     ("manifest", "original_demo_playback_steps", 42),
     ("manifest", "original_demo_compressed_rom_bytes", 257),
