@@ -65,7 +65,8 @@ def test_native_emitters_make_platform_specific_source_not_html(target):
     else:
         assert "Makefile" in p.files or "CMakeLists.txt" in p.files
         assert ("src/main.c" in p.files or "src/main.asm" in p.files
-                or "src/main.s" in p.files or "source/main.c" in p.files)
+                or "src/main.s" in p.files or "src/main.bas" in p.files
+                or "source/main.c" in p.files)
     assert "source_generated" in p.files["dragon-native-manifest.json"]
     assert "physics" in p.deferred_mechanics if target in ("game_boy","nes","dos_vga") else True
 

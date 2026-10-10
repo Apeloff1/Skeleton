@@ -136,7 +136,7 @@ def test_every_console_and_historic_source_emitter_delivers_real_project(target_
     assert info["status"]=="source_generated"
     assert info["output_extension"]==CATALOG[target_id].output
     assert project.toolchain==CATALOG[target_id].toolchain
-    assert any(name.endswith((".asm",".s",".c",".cpp",".h",".py",".ino"))
+    assert any(name.startswith(("src/","source/","Games/")) and name.endswith((".asm",".s",".c",".cpp",".h",".py",".ino",".bas"))
                for name in project.files)
     assert not any(name.endswith((".exe",".gb",".gbc",".nes",".prg",".dol",
                                   ".3dsx",".pbp",".sms",".sfc",".gba",".nds",
