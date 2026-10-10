@@ -520,7 +520,8 @@ jobs:
             skeleton/ai/webcrawler/dragon_living_world_routes.py \
             skeleton/ai/webcrawler/dragon_living_world_checkpoint.py \
             skeleton/ai/webcrawler/dragon_living_world_store.py \
-            skeleton/ai/webcrawler/dragon_living_maze_solvers.py
+            skeleton/ai/webcrawler/dragon_living_maze_solvers.py \
+            skeleton/ai/webcrawler/dragon_living_world_lattice.py
       - name: Install only deterministic living-world test harness
         run: python -m pip install --disable-pip-version-check pytest
       - name: Prove original non-win sandboxes, mutable maze, ending choices and signed world continuation
@@ -531,7 +532,8 @@ jobs:
             tests/test_ai_dragon_living_world_routes.py \
             tests/test_ai_dragon_living_world_checkpoint.py \
             tests/test_ai_dragon_living_world_store.py \
-            tests/test_ai_dragon_living_maze_solvers.py
+            tests/test_ai_dragon_living_maze_solvers.py \
+            tests/test_ai_dragon_living_world_lattice.py
       - name: Replay real postgame, no-win and shifting labyrinth alternative source proofs
         run: |
           set -euo pipefail
