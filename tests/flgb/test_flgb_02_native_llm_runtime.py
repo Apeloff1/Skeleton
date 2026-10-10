@@ -580,8 +580,8 @@ class TestNativeLLMRuntime(unittest.TestCase):
         runtime = self.runtime()
         sequence = runtime.encode("hello world")
         original_digest = runtime.tokenizer.digest
-        runtime.tokenizer.digest = "0" * 64 if original_digest != "0" * 64 else "1" * 64
-        with self.assertRaisesRegex(RuntimeContractError, "token sequence tokenizer identity mismatch|tokenizer mutated"):
+        runtime.tokenizer._digest = "0" * 64 if original_digest != "0" * 64 else "1" * 64
+        with self.assertRaisesRegex(RuntimeContractError, "token sequence tokenizer identity mismatch|tokenizer drift during inference"):
             runtime.infer_sequence(sequence)
 
     def test_inference_rejects_nonboolean_cache_policy(self):
@@ -597,25 +597,25 @@ class TestNativeLLMRuntime(unittest.TestCase):
         runtime = self.runtime()
         sequence = runtime.encode("hello world")
         runtime.model.bout[0] += 0.5
-        runtime.tokenizer.digest = "0" * 64
+        runtime.tokenizer._digest = "0" * 64
         with self.assertRaises(RuntimeContractError):
             runtime.infer_sequence(sequence)
 
     def test_inference_rejects_mutated_tokenizer_even_with_matching_sequence_digest(self):
         runtime = self.runtime()
         sequence = runtime.encode("hello world")
-        runtime.tokenizer.digest = "0" * 64
+        runtime.tokenizer._digest = "0" * 64
         forged = TokenSequence("0" * 64, sequence.token_ids, sequence.source_digest)
-        with self.assertRaisesRegex(RuntimeContractError, "tokenizer mutated"):
+        with self.assertRaisesRegex(RuntimeContractError, "tokenizer drift during inference"):
             runtime.infer_sequence(forged)
 
 
     def test_checkpoint_rejects_mutated_tokenizer_with_runtime_contract(self):
         runtime = self.runtime()
-        runtime.tokenizer.digest = "0" * 64
-        with self.assertRaisesRegex(RuntimeContractError, "tokenizer mutated before checkpoint"):
+        runtime.tokenizer._digest = "0" * 64
+        with self.assertRaisesRegex(RuntimeContractError, "tokenizer changed before checkpoint"):
             runtime.checkpoint()
-        with self.assertRaisesRegex(RuntimeContractError, "tokenizer mutated before checkpoint"):
+        with self.assertRaisesRegex(RuntimeContractError, "tokenizer changed before checkpoint"):
             runtime.checkpoint_json()
 
 
@@ -636,7 +636,7 @@ class TestNativeLLMRuntime(unittest.TestCase):
         self.assertEqual(next(stream).kind, "admitted")
         self.assertEqual(next(stream).kind, "prompt")
         self.assertEqual(next(stream).kind, "token")
-        runtime.tokenizer.digest = "0" * 64
+        runtime.tokenizer._digest = "0" * 64
         with self.assertRaisesRegex(RuntimeContractError, "tokenizer mutated"):
             list(stream)
 
