@@ -327,12 +327,16 @@ def _cost(edge:Traverse,wait:int,objective:str,reused:int)->int:
     return max(1,base)+reused*18
 
 def _requirements(items:tuple[str,...])->None:
-    _ids(items,limit=8)
+    if not isinstance(items,tuple) or len(items)>8 or len(set(items))!=len(items):
+        raise ValueError("original routing milestones must be unique and bounded")
     for item in items:
-        if not (item.startswith(("mode:","family:","shape:","place:")) and
+        if not isinstance(item,str) or not (
+                item.startswith(("mode:","family:","shape:","place:")) and
                 item.count(":")==1):
             raise ValueError("route milestone must name a mode/family/shape/place")
         kind,name=item.split(":")
+        if not VALID_ID.fullmatch(name):
+            raise ValueError("route milestone identifier is unsafe")
         if (kind=="mode" and name not in MODES or
             kind=="family" and name not in set(MODES.values()) or
             kind=="shape" and name not in ROUTE_SHAPES):
@@ -463,7 +467,7 @@ def portfolio(world:World,traveller:Traveller=Traveller(),*,
     truncated=False
     for objective,conditions,long_min in tasks:
         if len(solutions)>=max_routes:break
-        avoid=tuple(route.edges[0] for route in solutions if route.edges)
+        avoid=tuple(dict.fromkeys(route.edges[0] for route in solutions if route.edges))
         found,count_states,limited=plan(
             world,traveller,objective=objective,requires=conditions,
             minimum_minutes=long_min,avoid=avoid[-10:],
