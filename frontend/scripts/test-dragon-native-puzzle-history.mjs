@@ -3,7 +3,7 @@ import test from 'node:test';
 import {
   initializePuzzleHistory, paintOriginalCell, undoPuzzleEdit,
   redoPuzzleEdit, replacePuzzleCampaign, canUndoPuzzle,
-  canRedoPuzzle, validCampaign, EDIT_LIMIT,
+  canRedoPuzzle, validCampaign, EDIT_LIMIT, reorderPuzzleStage,
 } from '../src/product/dragonPuzzleHistory.ts';
 
 const BOARD = [
@@ -98,4 +98,28 @@ test('source authoring stays constrained to proper original grid cells',()=>{
   }
   assert.throws(()=>initializePuzzleHistory([BOARD],1));
   assert.throws(()=>initializePuzzleHistory([BOARD],0,200));
+});
+
+
+
+test('reordering actual campaign stages updates export order and survives undo/redo',()=>{
+  const first=initializePuzzleHistory([BOARD,DIFFERENT]);
+  const moved=reorderPuzzleStage(first,0,1);
+  assert.deepEqual(moved.current.boards[0],DIFFERENT);
+  assert.deepEqual(moved.current.boards[1],BOARD);
+  assert.equal(moved.current.stage,1);
+  const restored=undoPuzzleEdit(moved);
+  assert.deepEqual(restored.current.boards[0],BOARD);
+  assert.deepEqual(restored.current.boards[1],DIFFERENT);
+  const done=redoPuzzleEdit(restored);
+  assert.deepEqual(done.current.boards,moved.current.boards);
+  assert.equal(first.current.boards[0],BOARD);
+  assert.equal(reorderPuzzleStage(first,0,0),first);
+});
+
+test('native stage reordering rejects out-of-range or noninteger stages',()=>{
+  const first=initializePuzzleHistory([BOARD,DIFFERENT]);
+  for (const positions of [[-1,0],[0,2],[0,-1],[2,1],[0,0.5]]) {
+    assert.throws(()=>reorderPuzzleStage(first,positions[0],positions[1]));
+  }
 });
