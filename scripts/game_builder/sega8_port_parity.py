@@ -271,6 +271,16 @@ def verify_ports(root: Path) -> dict[str, object]:
             or boot.get("zero_score_hud_verified") is not True
         ):
             raise Sega8PortParityError("actual compiled cartridge startup was not observed")
+        # Distinguish a counterfeit or divergent native gameplay trace from
+        # missing controller/cosmetic acceptance. The semantic mismatch is a
+        # first-class integration blocker, not a generic "never won" failure.
+        if (
+            native_route.get("native_attract_demo_semantic_trace_sha256")
+            != native_route.get("semantic_controller_screen_trace_sha256")
+        ):
+            raise Sega8PortParityError(
+                "compiled Z80 autonomous and manual semantic trace fingerprints differ"
+            )
         if (
             native_route.get("schema") != "skeleton.game_builder.sega8_actual_z80_gameplay_replay.v1"
             or native_route.get("target") != target
