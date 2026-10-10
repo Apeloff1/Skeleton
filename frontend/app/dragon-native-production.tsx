@@ -36,7 +36,9 @@ const API = (API_BASE || '').replace(/\/$/, '');
 const ENDPOINT = API + '/api/dragon-academy/native/production';
 const MAX_DOWNLOAD_BYTES = 3_000_000;
 const MAX_TARGETS = 3;
-const FILE_NAME = 'dragon-original-native-sources.zip';
+const PALETTES = ['vga_dusk', 'dmg_green', 'handheld', 'cga', 'crt_arcade', 'modern_neon'] as const;
+const HEROES = ['hatchling', 'knight', 'explorer', 'pilot', 'astronaut', 'robot'] as const;
+const THEMES = ['ancient_ruins', 'crystals', 'forest', 'ice', 'space', 'volcano', 'clockwork'] as const;
 
 function supported(capability: PlatformCapability, style: string): boolean {
   return capability.native_source_emitter &&
@@ -48,7 +50,7 @@ function formatStyle(style: string): string {
   return style.replace(/_/g, ' ');
 }
 
-async function saveBundle(blob: Blob): Promise<void> {
+async function saveBundle(blob: Blob, name: string): Promise<void> {
   if (!blob.size || blob.size > MAX_DOWNLOAD_BYTES) {
     throw new Error('The native source ZIP exceeds the maximum download size.');
   }
@@ -57,7 +59,7 @@ async function saveBundle(blob: Blob): Promise<void> {
     try {
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = FILE_NAME;
+      anchor.download = name;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -88,7 +90,7 @@ async function saveBundle(blob: Blob): Promise<void> {
     };
     reader.readAsDataURL(blob);
   });
-  const destination = FileSystem.documentDirectory + FILE_NAME;
+  const destination = FileSystem.documentDirectory + name;
   await FileSystem.writeAsStringAsync(destination, base64, {
     encoding: FileSystem.EncodingType.Base64,
   });
@@ -107,6 +109,12 @@ function NativeSourceEditor() {
   const [loading, setLoading] = React.useState(true);
   const [title, setTitle] = React.useState('Original Dragon Adventure');
   const [style, setStyle] = React.useState('arcade_score_attack');
+  const [palette, setPalette] = React.useState<string>('vga_dusk');
+  const [hero, setHero] = React.useState<string>('hatchling');
+  const [questTheme, setQuestTheme] = React.useState<string>('ancient_ruins');
+  const [difficulty, setDifficulty] = React.useState(4);
+  const [stageCount, setStageCount] = React.useState(4);
+  const [searchBudget, setSearchBudget] = React.useState(8);
   const [targets, setTargets] = React.useState<string[]>(['game_boy']);
   const [attested, setAttested] = React.useState(false);
   const [approved, setApproved] = React.useState(false);
@@ -182,9 +190,14 @@ function NativeSourceEditor() {
     setSuccess('');
   };
 
+  const usesCartridgeTargets = targets.some(id =>
+    !['pc_linux', 'pc_windows', 'pc_macos', 'steam_deck'].includes(id));
+  const usesDesktopTargets = targets.some(id =>
+    ['pc_linux', 'pc_windows', 'pc_macos', 'steam_deck'].includes(id));
+
   const generate = async () => {
     if (busy || !isEditor || !attested || !approved || !title.trim() ||
-        title.trim().length > 80 || targets.length < 1 ||
+        !/^[A-Za-z][A-Za-z0-9 ._'!-]{2,79}$/.test(title.trim()) || targets.length < 1 ||
         targets.length > MAX_TARGETS || !targets.every(id =>
           eligible.some(item => item.id === id))) return;
     const controller = new AbortController();
@@ -205,6 +218,11 @@ function NativeSourceEditor() {
           title: title.trim(), style, targets, seed: 1,
           original_work_attested: true, approved: true,
           rights_basis: 'original_homebrew', rights_reference: '',
+          portable_design: {
+            palette, hero, quest_theme: questTheme, difficulty,
+            stages: stageCount, candidates: searchBudget,
+            project_notes: 'Original native homebrew; platform-scaled design',
+          },
         }),
       });
       if (!response.ok) {
@@ -222,7 +240,11 @@ function NativeSourceEditor() {
       }
       const blob = await response.blob();
       if (controller.signal.aborted) return;
-      await saveBundle(blob);
+      const identity = response.headers.get('x-dragon-request-id') || '';
+      if (!/^[a-f0-9]{64}$/.test(identity)) {
+        throw new Error('Source bundle lacks canonical production identity.');
+      }
+      await saveBundle(blob, 'dragon-original-' + identity.slice(0, 20) + '.zip');
       if (!controller.signal.aborted) {
         setSuccess('Original source ZIP delivered. Compile with an authorized local toolchain. Emulator and hardware playtesting are still required.');
       }
@@ -292,6 +314,88 @@ function NativeSourceEditor() {
             </Text>
           </TouchableOpacity>
         ))}
+
+        <Text style={stylesUi.label}>Game design controls</Text>
+        <Text style={stylesUi.hint}>
+          These controls are applied where the destination emitter implements them.
+          Retro cartridge emitters use one stage and one candidate and may not
+          apply the protagonist, theme, palette or difficulty visually.
+          The release receipt records these adaptations.
+        </Text>
+        <Text style={stylesUi.label}>Protagonist</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}
+          contentContainerStyle={stylesUi.chips}>
+          {HEROES.map(item => (
+            <TouchableOpacity key={item} accessibilityRole="button"
+              accessibilityState={{ selected: hero === item }} disabled={busy}
+              onPress={() => setHero(item)}
+              style={[stylesUi.chip, hero === item && stylesUi.selected]}>
+              <Text style={stylesUi.chipText}>{formatStyle(item)}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <Text style={stylesUi.label}>World theme</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}
+          contentContainerStyle={stylesUi.chips}>
+          {THEMES.map(item => (
+            <TouchableOpacity key={item} accessibilityRole="button"
+              accessibilityState={{ selected: questTheme === item }} disabled={busy}
+              onPress={() => setQuestTheme(item)}
+              style={[stylesUi.chip, questTheme === item && stylesUi.selected]}>
+              <Text style={stylesUi.chipText}>{formatStyle(item)}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <Text style={stylesUi.label}>Color palette</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}
+          contentContainerStyle={stylesUi.chips}>
+          {PALETTES.map(item => (
+            <TouchableOpacity key={item} accessibilityRole="button"
+              accessibilityState={{ selected: palette === item }} disabled={busy}
+              onPress={() => setPalette(item)}
+              style={[stylesUi.chip, palette === item && stylesUi.selected]}>
+              <Text style={stylesUi.chipText}>{formatStyle(item)}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        {([
+          ['Difficulty', difficulty, 1, 10, setDifficulty],
+          ['Campaign stages', stageCount, 1, 8, setStageCount],
+          ['Candidate search budget', searchBudget, 1, 24, setSearchBudget],
+        ] as const).map(([name, value, low, high, setter]) => (
+          <View style={stylesUi.counter} key={name}>
+            <View style={{ flex: 1 }}>
+              <Text style={stylesUi.label}>{name}</Text>
+              <Text style={stylesUi.hint}>{value} / {high}</Text>
+            </View>
+            <TouchableOpacity accessibilityRole="button"
+              accessibilityLabel={'Reduce ' + name} disabled={busy || value <= low}
+              style={stylesUi.counterButton} onPress={() => setter(
+                Math.max(low, value - 1))}>
+              <Text style={stylesUi.actionText}>−</Text>
+            </TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button"
+              accessibilityLabel={'Increase ' + name} disabled={busy || value >= high}
+              style={stylesUi.counterButton} onPress={() => setter(
+                Math.min(high, value + 1))}>
+              <Text style={stylesUi.actionText}>+</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+        {usesCartridgeTargets && (
+          <Text style={stylesUi.warning}>
+            Cartridge adaptation: one stage and one candidate per original
+            console template. Full cinematic campaigns, character/theme
+            customization and equivalent cross-console mechanics are not claimed.
+          </Text>
+        )}
+        {usesDesktopTargets && (
+          <Text style={stylesUi.hint}>
+            Desktop targets use the requested seed and bounded stage, candidate,
+            difficulty, world theme and hero settings where implemented.
+          </Text>
+        )}
+
         <TouchableOpacity accessibilityRole="checkbox"
           accessibilityState={{ checked: attested }} disabled={busy}
           style={stylesUi.consent} onPress={() => setAttested(!attested)}>
@@ -347,6 +451,9 @@ const stylesUi = StyleSheet.create({
   input: { borderWidth: 1, borderColor: '#45675b', borderRadius: 10,
     padding: 12, color: '#f7fffc', backgroundColor: '#182833' },
   platform: { backgroundColor: '#192a34', borderRadius: 12, padding: 12, gap: 5 },
+  counter: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
+  counterButton: { backgroundColor: '#326f56', borderRadius: 10, minWidth: 42,
+    padding: 10, alignItems: 'center' },
   platformTitle: { fontWeight: '700', color: '#e4f7ec', fontSize: 15 },
   consent: { padding: 14, borderRadius: 12, backgroundColor: '#1d3540' },
   action: { backgroundColor: '#326f56', borderRadius: 12, alignItems: 'center', padding: 15 },
