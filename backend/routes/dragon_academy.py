@@ -735,6 +735,96 @@ def native_living_world_checkpoint_inspect(
             detail="World checkpoint verification failed") from None
 
 
+class NativeLivingStoreRequest(NativeLivingWorldRequest):
+    token:str=Field(strict=True,min_length=100,max_length=12000,
+                    pattern=r"^[A-Za-z0-9_.-]+$")
+    slot:StrictInt=Field(default=0,ge=0,le=9)
+    replace_existing:StrictBool=Field(default=False)
+    expected_digest:str|None=Field(default=None,
+        pattern=r"^[a-f0-9]{64}$")
+
+
+class NativeLivingRestoreRequest(NativeLivingWorldRequest):
+    slot:StrictInt=Field(default=0,ge=0,le=9)
+
+
+@router.post("/native/production/worlds/store")
+def native_living_world_store(
+    body:NativeLivingStoreRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_living_world_checkpoint import open_checkpoint
+    from skeleton.ai.webcrawler.dragon_living_world_store import store
+    world=_dragon_living_world(body)
+    try:
+        state=open_checkpoint(world,body.token,owner)
+        with sqlite3.connect(str(_database_path()),timeout=5) as db:
+            db.execute("PRAGMA busy_timeout=5000")
+            return {"ok":True,**store(
+                db,world,state,owner,body.slot,
+                expected_digest=body.expected_digest,
+                replace_existing=body.replace_existing,
+            )}
+    except RuntimeError:
+        raise HTTPException(status_code=503,
+            detail="Durable original world signing has not been configured") from None
+    except PermissionError:
+        raise HTTPException(status_code=403,
+            detail="Original game checkpoint is not authorized or save was modified") from None
+    except FileExistsError:
+        raise HTTPException(status_code=409,
+            detail="Durable save slot occupied or stale version; refusing to overwrite choices") from None
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original living-world state or optimistic save receipt invalid") from None
+    except sqlite3.Error:
+        raise HTTPException(status_code=503,
+            detail="Durable original world database unavailable") from None
+
+
+@router.post("/native/production/worlds/restore")
+def native_living_world_restore(
+    body:NativeLivingRestoreRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_living_world_store import restore
+    world=_dragon_living_world(body)
+    try:
+        with sqlite3.connect(str(_database_path()),timeout=5) as db:
+            db.execute("PRAGMA busy_timeout=5000")
+            return {"ok":True,**restore(db,world,owner,body.slot)}
+    except FileNotFoundError:
+        raise HTTPException(status_code=404,
+            detail="No original game save exists in this user's slot") from None
+    except PermissionError:
+        raise HTTPException(status_code=403,
+            detail="Saved world belongs to another player or has invalid integrity") from None
+    except (RuntimeError,sqlite3.Error):
+        raise HTTPException(status_code=503,
+            detail="Original game durable save store or signing is unavailable") from None
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original game requested restore has invalid parameters") from None
+
+
+@router.get("/native/production/worlds/saves")
+def native_living_world_saves(
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_living_world_store import list_saves
+    try:
+        with sqlite3.connect(str(_database_path()),timeout=5) as db:
+            db.execute("PRAGMA busy_timeout=5000")
+            return {
+                "ok":True,
+                "schema":"skeleton.ai.dragon.durable_living_world_save.v1",
+                "saves":list(list_saves(db,owner)),
+            }
+    except sqlite3.Error:
+        raise HTTPException(status_code=503,
+            detail="Original world save index is unavailable") from None
+
+
 class NativeTemporalMazeRequest(NativeLivingWorldRequest):
     """Optional local waypoint: no fictitious mandatory victory condition."""
     model_config=ConfigDict(extra="forbid")
