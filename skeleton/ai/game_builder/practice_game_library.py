@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import os
 from pathlib import Path
 import re
 import stat
@@ -99,12 +100,25 @@ def load_practice_game(game_id: str, *, authorized: bool) -> OriginalPracticeGam
         before = path.lstat()
         if not stat.S_ISREG(before.st_mode) or not 1 <= before.st_size <= MAX_PRACTICE_GAME_BYTES:
             raise PracticeGameError("practice game must be bounded regular source")
-        with path.open("rb") as source:
-            opened = path.stat()
-            if (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino):
+        flags = (
+            os.O_RDONLY | getattr(os, "O_BINARY", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+        )
+        fd = os.open(path, flags)
+        with os.fdopen(fd, "rb") as source:
+            opened = os.fstat(source.fileno())
+            if (not stat.S_ISREG(opened.st_mode)
+                    or (before.st_dev, before.st_ino) !=
+                    (opened.st_dev, opened.st_ino)):
                 raise PracticeGameError("practice game replaced during admission")
             raw = source.read(MAX_PRACTICE_GAME_BYTES + 1)
-            after = path.stat()
+            after = os.fstat(source.fileno())
+        current = path.lstat()
+        if (not stat.S_ISREG(current.st_mode)
+                or (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino)):
+            raise PracticeGameError("practice game path changed during read")
         if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
             after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns
         ):
