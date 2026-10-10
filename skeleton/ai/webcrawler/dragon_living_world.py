@@ -322,6 +322,33 @@ def _add_unique(values:tuple[str,...],value:str,cap:int)->tuple[str,...]:
     return values+(value,)
 
 
+def terrain_for_state(world:LivingWorld,state:LivingState,
+                      realm:int,x:int,y:int)->dict:
+    """Project player-built settlements and reclaimed terrain onto real cells."""
+    validate_world(world);validate_state(world,state)
+    tile=terrain(world,realm,x,y).copy()
+    here=replace(state,realm=realm,x=x,y=y)
+    region=_discovery_key(world,here)
+    structures=[]
+    for action,description in (
+        ("shelter_","original_settlement"),
+        ("farm_","original_farm"),
+        ("reclaimed_","reclaimed_garden"),
+        ("outpost_","postgame_frontier_outpost"),
+        ("memorial_","postgame_story_memorial"),
+    ):
+        if action+region in state.world_changes:
+            structures.append(description)
+    if "reclaimed_garden" in structures:
+        tile["original_biome"]=tile["biome"]
+        tile["biome"]="garden"
+    if structures:
+        tile["landmark"]=structures[-1]
+    tile["built_local_structures"]=structures
+    tile["player_caused_terrain_change"]=bool(structures)
+    return tile
+
+
 def _legal(world:LivingWorld,state:LivingState)->dict[str,dict]:
     rules=set(world.rules)
     choices={}
@@ -404,6 +431,19 @@ def _legal(world:LivingWorld,state:LivingState)->dict[str,dict]:
             (state.research>=2 or state.allies>=2),
             to=[state.realm,state.x+8,state.y+1],
             movement_model="abstract_transport_not_spaceflight_physics")
+    if state.endings_seen and world.allows_continuation:
+        add("postgame_outpost","requires_two_wood",
+            state.wood>=2)
+        add("postgame_memorial","requires_original_crystal",
+            state.crystal>=1)
+        add("postgame_rebuild","requires_two_ore",
+            state.ore>=2)
+        add("postgame_expedition","requires_food_and_energy",
+            state.food>=1 and state.energy>=2 and
+            abs(state.x+3)<=MAX_ABS_COORD and
+            abs(state.y+1)<=MAX_ABS_COORD)
+        add("postgame_council","requires_two_allies",
+            state.allies>=2)
     if world.includes_goal:
         requirements={
             "civic_union":state.faction_civic>=2 and state.allies>=1,
@@ -519,7 +559,9 @@ def take_action(world:LivingWorld,state:LivingState,action:str)->LivingState:
                      settlement_level=_cap(state.settlement_level+1),
                      energy=state.energy-2,
                      world_changes=_add_unique(
-                        state.world_changes,"settlement_built",24))
+                        _add_unique(state.world_changes,
+                                    "settlement_built",24),
+                        "shelter_"+_discovery_key(world,state),24))
     elif action=="craft":
         next=replace(next,wood=state.wood-1,ore=state.ore-1,
                      crystal=_cap(state.crystal+1),research=_cap(state.research+1))
@@ -530,11 +572,15 @@ def take_action(world:LivingWorld,state:LivingState,action:str)->LivingState:
     elif action=="farm":
         next=replace(next,wood=state.wood-1,food=_cap(state.food+7),
                      world_changes=_add_unique(
-                        state.world_changes,"farm_established",24))
+                        _add_unique(state.world_changes,
+                                    "farm_established",24),
+                        "farm_"+_discovery_key(world,state),24))
     elif action=="terraform":
         next=replace(next,ore=state.ore-2,
                      world_changes=_add_unique(
-                        state.world_changes,"land_reclaimed",24))
+                        _add_unique(state.world_changes,
+                                    "land_reclaimed",24),
+                        "reclaimed_"+_discovery_key(world,state),24))
     elif action=="research":
         next=replace(next,crystal=state.crystal-1,
                      research=_cap(state.research+1),portal_key=True)
@@ -600,6 +646,38 @@ def take_action(world:LivingWorld,state:LivingState,action:str)->LivingState:
         elif ending=="restored_world":
             next=replace(next,health=100,energy=100,
                          settlement_level=_cap(next.settlement_level+3))
+    elif action=="postgame_outpost":
+        next=replace(next,wood=state.wood-2,
+                     settlement_level=_cap(state.settlement_level+1),
+                     chapter=state.chapter+1,
+                     world_changes=_add_unique(
+                        state.world_changes,
+                        "outpost_"+_discovery_key(world,state),24))
+    elif action=="postgame_memorial":
+        next=replace(next,crystal=state.crystal-1,
+                     chapter=state.chapter+1,
+                     world_changes=_add_unique(
+                        state.world_changes,
+                        "memorial_"+_discovery_key(world,state),24))
+    elif action=="postgame_rebuild":
+        next=replace(next,ore=state.ore-2,
+                     chapter=state.chapter+1,
+                     world_changes=_add_unique(
+                        state.world_changes,
+                        "reclaimed_"+_discovery_key(world,state),24))
+    elif action=="postgame_expedition":
+        next=replace(next,x=state.x+3,y=state.y+1,
+                     food=state.food-1,energy=state.energy-2,
+                     chapter=state.chapter+2,portal_key=True,
+                     world_changes=_add_unique(
+                        state.world_changes,"new_frontier",24))
+    elif action=="postgame_council":
+        next=replace(next,allies=state.allies-2,
+                     faction_civic=min(100,state.faction_civic+1),
+                     faction_wild=min(100,state.faction_wild+1),
+                     chapter=state.chapter+1,
+                     world_changes=_add_unique(
+                        state.world_changes,"postgame_peace_council",24))
     elif action=="restart_run":
         resumed=initial_state(world)
         next=replace(resumed,turn=state.turn+1,run=state.run+1,
@@ -647,7 +725,7 @@ def replay(world:LivingWorld,actions:tuple[str,...]=(),
 def describe(world:LivingWorld,state:LivingState,
              *,include_options:bool=True)->dict:
     validate_world(world);validate_state(world,state)
-    current=terrain(world,state.realm,state.x,state.y)
+    current=terrain_for_state(world,state,state.realm,state.x,state.y)
     return {
         "schema":SCHEMA,"world_id":world.world_id,
         "variation":world.variant,"style":world.style,
