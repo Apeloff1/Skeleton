@@ -105,9 +105,9 @@ def emit(
         rights_basis="project_owned",
         evidence_sha256=author_reference,
         creative_identity=(
-            "independently created star puzzles",
-            "original grid and constellation drawing",
-            "fresh game rules and level arrangements",
+            "original independently authored maze and puzzle world",
+            "originally drawn console-safe tiles and thematic stage palettes",
+            "fresh generator-created layouts and companion behavior",
         ),
     )
     # This explicit backend is in addition to the independently written Z80
@@ -295,6 +295,16 @@ def main() -> None:
             profile=args.profile, original_config=overrides or None,
         )
     else:
+        if args.profile != "standard" or any(
+            getattr(args, field) is not None
+            for field in (
+                "original_project_id", "original_title", "original_subtitle",
+                "original_seed", "original_theme", "original_levels",
+                "original_width", "original_height", "original_collectibles",
+                "original_hazards", "original_health",
+            )
+        ):
+            ap.error("game-generation profile options cannot modify a verification-only ROM")
         if args.source_dir is None or args.toolchain_revision is None:
             ap.error("--source-dir and --toolchain-revision required with --verify-rom")
         receipt = verify(
