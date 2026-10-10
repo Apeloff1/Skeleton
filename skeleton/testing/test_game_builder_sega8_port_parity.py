@@ -230,6 +230,7 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     ("manifest", "original_demo_solution_sha256", "0"*64),
     ("manifest", "original_demo_playback_steps", 42),
     ("manifest", "original_demo_compressed_rom_bytes", 257),
+    ("manifest", "original_demo_compressed_rom_bytes", 1),
     ("manifest", "original_demo_direction_encoding", "uncompressed"),
     ("manifest", "original_demo_autostart", True),
     ("manifest", "original_demo_external_content", True),
