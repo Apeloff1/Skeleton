@@ -717,3 +717,16 @@ def test_route_editor_builds_actual_game_world_and_replays_win():
         apply_edit_to_playable_world(world, 0, edit, authorized=False)
     with pytest.raises(MultipathError):
         apply_edit_to_playable_world(world, 1, edit, authorized=True)
+
+
+def test_multipath_product_api_preserves_existing_portable_flood_fill_owner():
+    from skeleton.ai import game_builder
+
+    problem = RouteProblem.from_rows(OPEN_LEVEL)
+    assert game_builder.RouteProblem is RouteProblem
+    assert game_builder.evaluate_level_challenge(problem)["world_digest"] == problem.digest
+    assert game_builder.apply_edit_to_playable_world is apply_edit_to_playable_world
+    assert game_builder.route_flood_fill(problem, problem.start) == flood_fill(
+        problem, problem.start,
+    )
+    assert game_builder.route_portfolio(problem) == route_portfolio(problem)
