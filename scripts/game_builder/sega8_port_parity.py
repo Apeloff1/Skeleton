@@ -262,6 +262,8 @@ def verify_ports(root: Path) -> dict[str, object]:
             or meta.get("original_demo_uses_identical_game_rules") is not True
             or meta.get("original_demo_autostart") is not False
             or meta.get("original_demo_external_content") is not False
+            or type(meta.get("levels")) is not int
+            or not 1 <= meta["levels"] <= 8
             or type(meta.get("original_demo_playback_steps")) is not int
             or meta["original_demo_playback_steps"]
                != host["original_controller_actions_verified"]
