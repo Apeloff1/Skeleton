@@ -95,3 +95,31 @@ def filter_practice_games(
     return tuple(sorted(
         candidates, key=lambda x: (x.route_cost, x.game_id),
     ))[:limit]
+
+
+def plan_practice_progression(
+    *, authorized: bool, count: int = 8, theme: str | None = None,
+) -> tuple[PracticeGameSummary, ...]:
+    """Select an increasing verified-route sequence across a difficulty range.
+
+    The order is a transparent heuristic and cannot be used as evidence of
+    learned skill, user preference, model training or hardware mastery.
+    """
+    if authorized is not True:
+        raise PermissionError("practice progression planning requires authorization")
+    if type(count) is not int or not 1 <= count <= 20:
+        raise PracticeSelectionError("practice progression count must be 1..20")
+    available = filter_practice_games(
+        authorized=True, theme=theme, limit=100,
+    )
+    if len(available) < count:
+        raise PracticeSelectionError("not enough verified games for progression")
+    if count == 1:
+        return (available[0],)
+    indices = [
+        i * (len(available) - 1) // (count - 1)
+        for i in range(count)
+    ]
+    if len(set(indices)) != count:
+        raise PracticeSelectionError("practice progression repeated a game")
+    return tuple(available[index] for index in indices)
