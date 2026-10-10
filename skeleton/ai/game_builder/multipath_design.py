@@ -427,4 +427,19 @@ def degree_histogram(problem: RouteProblem) -> dict[int, int]:
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram"]
+def dead_end_cells(
+    problem: RouteProblem, *, include_objectives: bool = False,
+) -> tuple[Position, ...]:
+    """Detect structural cul-de-sacs, with opt-in endpoints for diagnostics."""
+    if type(include_objectives) is not bool:
+        raise MultipathError("invalid dead-end reporting policy")
+    objectives = {problem.start, problem.goal, *problem.collectibles}
+    return tuple(
+        cell for cell in walkable_cells(problem)
+        if len(problem.neighbors(cell, allow_hazards=False)) <= 1
+        and (include_objectives or cell not in objectives)
+    )
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells"]
