@@ -326,10 +326,18 @@ def emit_native_puzzle(*,seed:int,stages:int=4,difficulty:int=4,
             raise ValueError("authored game stage count must match emitted campaign")
     from .dragon_native_campaign_paths import design_campaign, graph_header, graph_report
     from .dragon_native_multipath import analyse_routes,route_report
-    layouts=[];solutions=[];proofs=[];alternatives=[]
+    from .dragon_native_level_curation import curate_level,curation_report
+    layouts=[];solutions=[];proofs=[];alternatives=[];curation=[]
     for index in range(stages):
-        grid=(original_pack.levels[index].rows if original_pack is not None
-              else transformed_level(index,seed,difficulty,procedural=procedural))
+        if original_pack is not None:
+            grid=original_pack.levels[index].rows
+            curation.append(None)
+        else:
+            grid,picked=curate_level(
+                stage=index,seed=seed,difficulty=difficulty,
+                procedural=procedural,profile=challenge_profile,
+            )
+            curation.append(curation_report(picked))
         path,states=solve_grid(grid)
         start,boxes,goals,walls=_parse(grid)
         layouts.append(grid);solutions.append(path)
@@ -407,6 +415,7 @@ clean:
       "route_analysis":[{"stage":index,**record}
                         for index,record in enumerate(alternatives)],
       "challenge_director":challenge_report(challenge),
+      "level_curation":curation,
       "native_runtime_test_required":True,
       "proof_scope":"optimal abstract grid moves, not C executable verification",
     }
