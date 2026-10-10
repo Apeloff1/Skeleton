@@ -393,7 +393,8 @@ jobs:
             tests/test_ai_webcrawler_dragon_chip_music.py \
             tests/test_ai_webcrawler_dragon_native_variants.py \
             tests/test_ai_dragon_native_puzzle_graphics.py \
-            tests/test_ai_dragon_native_capture_operator.py
+            tests/test_ai_dragon_native_capture_operator.py \
+            tests/test_ai_dragon_native_media_storyboard.py
 
 
       - name: Record and audit genuine original game pixels from native SDL
@@ -424,6 +425,37 @@ jobs:
               assert archive.read("frames/level-03-frame-02.bmp")[:2]==b"BM"
           print("ORIGINAL_NATIVE_GAMEPLAY_PIXELS_VERIFIED",verification["binary_sha256"])
           PY
+      - name: Render actual original game preview storyboard PNG
+        run: |
+          set -euo pipefail
+          set -- /tmp/original-game-media/dragon-original-game-frames-*.zip
+          test "$#" -eq 1
+          python -m skeleton.ai.webcrawler.dragon_native_media_storyboard \
+            --capture "$1" --out /tmp/dragon-original-storyboard \
+            --authorize-storyboard > /tmp/dragon-storyboard-report.json
+          python - <<'PY'
+          import json,struct
+          from pathlib import Path
+          from skeleton.ai.webcrawler.dragon_native_media_storyboard import verify_original_storyboard
+          result=json.loads(Path("/tmp/dragon-storyboard-report.json").read_text())
+          assert result["frames"]==9 and result["stages"]==3
+          root=Path("/tmp/dragon-original-storyboard")
+          png=(root/result["image"]).read_bytes()
+          assert png[:8]==b"\x89PNG\r\n\x1a\n"
+          assert struct.unpack_from(">II",png,16)==(480,360)
+          proof=verify_original_storyboard((root/result["archive"]).read_bytes())
+          assert proof["frames"]==9
+          print("ORIGINAL_GAME_PREVIEW_PNG_VERIFIED",proof["image_sha256"])
+          PY
+      - name: Publish original preview storyboard PNG
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-original-gameplay-png-preview
+          path: |
+            /tmp/dragon-original-storyboard/dragon-original-storyboard-*.png
+            /tmp/dragon-original-storyboard/dragon-original-storyboard-*.zip
+          if-no-files-found: error
+          retention-days: 7
       - name: Publish original gameplay frame evidence
         uses: actions/upload-artifact@v4
         with:
