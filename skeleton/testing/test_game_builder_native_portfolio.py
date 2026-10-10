@@ -29,6 +29,18 @@ def _arguments(tmp_path):
     }
 
 
+def test_multi_platform_portfolio_refuses_symlink_rights_evidence_atomically(tmp_path):
+    args = _arguments(tmp_path)
+    alias = tmp_path / "authorship-alias.txt"
+    try:
+        alias.symlink_to(args["rights_evidence"])
+    except OSError:
+        pytest.skip("symlinks unavailable")
+    with pytest.raises(ValueError, match="bounded local regular file"):
+        compile_native_portfolio(**(args | {"rights_evidence": alias}))
+    assert not args["output"].exists()
+
+
 def test_full_portfolio_really_exports_all_supported_native_machine_sources(tmp_path):
     args=_arguments(tmp_path)
     report=compile_native_portfolio(**args)
