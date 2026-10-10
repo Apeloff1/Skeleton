@@ -33,3 +33,11 @@ def encode_gb_2bpp(tile: Sequence[Sequence[int]]) -> bytes:
             out.append(sum(((pixel >> plane) & 1) << (7 - x) for x, pixel in enumerate(row)))
     return bytes(out)
 
+
+def decode_gb_2bpp(data: bytes) -> tuple[tuple[int, ...], ...]:
+    """Invert the 16-byte Game Boy 2bpp bitplane layout exactly."""
+    raw = _raw(data, 16)
+    return tuple(tuple(((raw[2*y] >> (7-x)) & 1) |
+                       (((raw[2*y+1] >> (7-x)) & 1) << 1)
+                       for x in range(8)) for y in range(8))
+
