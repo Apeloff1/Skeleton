@@ -77,7 +77,7 @@ def test_regenerated_nes_source_mutation_fails_before_native_release(tmp_path,ch
     args=prepared(tmp_path)
     target=args["second_source"]/changed_file
     target.write_bytes(target.read_bytes()+b"\nUNREVIEWED")
-    with pytest.raises(NESReproducibilityError,match="deterministic"):
+    with pytest.raises(NESReproducibilityError,match="source"):
         verify_original_nes_rebuild(**args)
 
 
