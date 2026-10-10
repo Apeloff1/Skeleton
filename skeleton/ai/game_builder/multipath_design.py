@@ -298,4 +298,18 @@ def route_turns(proof: RouteProof) -> int:
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns"]
+def route_overlap_ppm(left: RouteProof, right: RouteProof) -> int:
+    """Integer Jaccard intersection of traversed undirected corridors."""
+    if (not isinstance(left, RouteProof) or not isinstance(right, RouteProof)
+            or left.problem_digest != right.problem_digest):
+        raise MultipathError("route overlap requires the same verified world")
+    def edges(route: RouteProof) -> set[tuple[Position, Position]]:
+        return {tuple(sorted((a, b))) for a, b in route_edges(route)}
+    a = edges(left)
+    b = edges(right)
+    union = len(a | b)
+    return 1_000_000 if union == 0 else len(a & b) * 1_000_000 // union
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm"]
