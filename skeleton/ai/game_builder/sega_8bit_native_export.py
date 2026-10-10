@@ -100,6 +100,7 @@ static unsigned char paused, reduced_motion, sound_enabled;
 static unsigned char demo_active, demo_chord_frames;
 static unsigned int demo_step;
 static unsigned char sound_frames, sound_phase;
+static unsigned char companion_pets; /* affection is cosmetic, not scored XP */
 static const unsigned char bond_goal[7] = { 3, 7, 12, 18, 25, 33, 42 };
 __sfr __at (0x7F) PSG_PORT;
 #define VRAM_QUEUE_CAPACITY 16
@@ -186,6 +187,19 @@ static void draw_hud(void) {
 }
 /* Friendly companion progression is cosmetic: never changes world collision,
  * source game health, release rights or deterministic collectible scoring. */
+/* A quick two-button tap pets the companion; a 25-frame hold instead
+ * runs the fully original solution attract mode. Never alter board[],
+ * health, score, gem counts, win state or replay authenticity. */
+static void pet_companion(void) {
+    if (companion_pets<255) ++companion_pets;
+    companion_mood=(companion_pets%4==0) ? BUDDY_CHEER : BUDDY_HAPPY;
+    mood_hold=(companion_pets%4==0) ? 75 : 42;
+    if (pending_count<VRAM_QUEUE_CAPACITY) {
+        queue_tile(LEFT+18,HUD_Y,companion_mood);
+        companion_drawn=companion_mood;
+    }
+    if (!paused) psg_start(330,10);
+}
 static void grant_companion_bond(void) {
     if (bond_collected < 48) ++bond_collected;
     if (bond_rank < 7 && bond_collected >= bond_goal[bond_rank]) {
@@ -281,6 +295,7 @@ static void reset_original_run(void) {
     health=INITIAL_HEALTH;
     won=lost=paused=move_cooldown=0;
     bond_collected=bond_rank=0;
+    companion_pets=0;
     companion_clock=0;
     companion_mood=BUDDY_IDLE;
     mood_hold=0;
@@ -373,6 +388,7 @@ void main(void) {
     companion_clock=0;
     hero_pose=HERO;
     bond_rank=bond_collected=0;
+    companion_pets=0;
     companion_mood=BUDDY_IDLE;
     sound_frames=0;
     demo_active=demo_chord_frames=0;
@@ -397,6 +413,7 @@ void main(void) {
         if ((keys & (PORT_A_KEY_1 | PORT_A_KEY_2)) ==
                     (PORT_A_KEY_1 | PORT_A_KEY_2)) {
             if (!demo_active && demo_chord_frames<DEMO_CHORD_FRAMES) {
+                if (demo_chord_frames==0) pet_companion();
                 ++demo_chord_frames;
                 if (demo_chord_frames==DEMO_CHORD_FRAMES) {
                     reset_original_run();
@@ -411,14 +428,18 @@ void main(void) {
         if (!demo_active) {
 #ifdef TARGET_GG
         if (pressed & GG_KEY_START) {
+            if (won || lost) { reset_original_run(); continue; }
             paused=!paused;
+            if (paused) { sound_frames=0; PSG_PORT=0x9F; }
             queue_tile(LEFT+18,HUD_Y,paused ? BUDDY_BLINK : BUDDY_HAPPY);
             companion_drawn=paused ? BUDDY_BLINK : BUDDY_HAPPY;
         }
         if (pressed & PORT_A_KEY_2) reduced_motion=!reduced_motion;
 #else
         if (pressed & PORT_A_KEY_2) {
+            if (won || lost) { reset_original_run(); continue; }
             paused=!paused;
+            if (paused) { sound_frames=0; PSG_PORT=0x9F; }
             queue_tile(LEFT+18,HUD_Y,paused ? BUDDY_BLINK : BUDDY_HAPPY);
             companion_drawn=paused ? BUDDY_BLINK : BUDDY_HAPPY;
         }
@@ -728,6 +749,10 @@ def compile_native_sega_8bit(
         "original_demo_uses_identical_game_rules":True,
         "original_demo_autostart":False,
         "original_demo_external_content":False,
+        "native_two_button_short_pet":True,
+        "native_companion_pet_no_gameplay_authority":True,
+        "native_console_restart_after_victory_or_defeat":True,
+        "native_paused_psg_immediately_muted":True,
         "original_companion_pose_count":5,
         "original_hero_pose_count":2,
         "companion_bond_ranks":8,
