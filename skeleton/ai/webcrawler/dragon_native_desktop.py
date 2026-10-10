@@ -157,6 +157,19 @@ def _puzzle_proof(source_archive: bytes) -> tuple[dict, dict[str, str]]:
             raise ValueError("native puzzle level proof hashes changed")
         if row.get("optimal_within_abstract_grid") is not True:
             raise ValueError("puzzle optimality scope absent")
+    # Independently regenerate the canonical C99 executable, level header
+    # and entire proof from the verified authored/generated map specification.
+    # A recomputed ZIP SHA alone could otherwise conceal modified native code
+    # or a mismatched map after the index was forged.
+    from .dragon_native_puzzle import emit_native_puzzle
+    canonical=emit_native_puzzle(
+        seed=expected_seed,stages=len(rows),difficulty=difficulty,
+        procedural=procedural,
+        authored_levels=authored.rows if authored is not None else None,
+    )
+    for name in REQUIRED_SOURCE_FILES:
+        if canonical[name] != inventory[name]:
+            raise ValueError("native runnable source does not match original proven levels")
     return receipt, inventory
 
 
