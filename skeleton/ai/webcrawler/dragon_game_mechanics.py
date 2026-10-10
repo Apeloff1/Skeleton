@@ -237,7 +237,7 @@ class GameMechanicsMemory:
             SELECT session_id, game_label, duration_ms, observations_json
             FROM dragon_game_sessions WHERE owner=?
             ORDER BY session_id LIMIT ?
-        """, (owner, limit)).fetchall()
+        """, (owner, limit))
         sessions = []
         for session_id, label, duration, raw in rows:
             if (not isinstance(raw, str)
