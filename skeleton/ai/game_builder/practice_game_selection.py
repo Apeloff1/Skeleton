@@ -67,3 +67,31 @@ def practice_game_catalog(*, authorized: bool) -> tuple[PracticeGameSummary, ...
             len(level.hazards), len(game.proof.action_receipts), world.digest,
         ))
     return tuple(results)
+
+
+def filter_practice_games(
+    *, authorized: bool, theme: str | None = None,
+    min_solution_steps: int = 0, max_solution_steps: int = 20000,
+    max_hazards: int = 24, limit: int = 100,
+) -> tuple[PracticeGameSummary, ...]:
+    """Deterministic, bounded selectors for the companion/editor UI."""
+    if authorized is not True:
+        raise PermissionError("practice game discovery requires authorization")
+    if theme is not None and theme not in {
+        "forest", "space", "desert", "ocean", "arcade",
+    }:
+        raise PracticeSelectionError("unknown original game theme")
+    if (type(min_solution_steps) is not int or type(max_solution_steps) is not int
+            or not 0 <= min_solution_steps <= max_solution_steps <= 20000
+            or type(max_hazards) is not int or not 0 <= max_hazards <= 24
+            or type(limit) is not int or not 1 <= limit <= 100):
+        raise PracticeSelectionError("invalid practice game selection budget")
+    candidates = (
+        item for item in practice_game_catalog(authorized=True)
+        if (theme is None or item.theme == theme)
+        and min_solution_steps <= item.solution_steps <= max_solution_steps
+        and item.hazard_count <= max_hazards
+    )
+    return tuple(sorted(
+        candidates, key=lambda x: (x.route_cost, x.game_id),
+    ))[:limit]
