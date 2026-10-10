@@ -195,7 +195,8 @@ static void queue_hud(unsigned char tile) {
         queue_tile(LEFT+9,HUD_Y,DIGIT_BASE+((level_index+1)/10));
         queue_tile(LEFT+10,HUD_Y,DIGIT_BASE+((level_index+1)%10));
     }
-    if (tile==GEM) {
+    /* Finish rewards must also redraw all score digits before terminal freeze. */
+    if (tile==GEM || (tile==EXIT && gems_left==0)) {
         queue_tile(LEFT+13,HUD_Y,DIGIT_BASE+((score/1000)%10));
         queue_tile(LEFT+14,HUD_Y,DIGIT_BASE+((score/100)%10));
         queue_tile(LEFT+15,HUD_Y,DIGIT_BASE+((score/10)%10));
