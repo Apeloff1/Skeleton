@@ -192,3 +192,10 @@ def test_game_labels_reject_embedded_control_characters():
         with pytest.raises(ValueError, match="game label"):
             store.record(replace(session(store), game_label=name), authorized=True)
 
+
+def test_duration_bool_cannot_cross_recording_boundary():
+    from dataclasses import replace
+    store = setup()
+    with pytest.raises(ValueError, match="duration"):
+        store.record(replace(session(store), duration_ms=True), authorized=True)
+
