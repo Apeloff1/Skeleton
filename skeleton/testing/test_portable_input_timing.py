@@ -37,3 +37,13 @@ def test_release_edges_only_when_button_transitions_high_to_low():
     with pytest.raises(InputTimingError):
         edge_released(0,65536)
 
+
+def test_axis_deadzone_preserves_sign_and_no_center_drift():
+    assert deadzone_axis(0)==0
+    assert deadzone_axis(4096)==0
+    assert deadzone_axis(32767)==32767
+    assert deadzone_axis(-32768)==-32767
+    assert deadzone_axis(8192)>0
+    with pytest.raises(InputTimingError):
+        deadzone_axis(1,threshold=32767)
+
