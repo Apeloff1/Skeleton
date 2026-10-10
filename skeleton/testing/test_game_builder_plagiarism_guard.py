@@ -463,3 +463,26 @@ def test_direct_similarity_scan_requires_admitted_typed_samples():
         find_expression_overlap(sample(), "not an ExpressionSample")
     with pytest.raises(OriginalityError, match="typed"):
         find_expression_overlap(None, external(SYNTHETIC_TEXT))
+
+
+@pytest.mark.parametrize("mutation", [
+    {"overlap_findings": ("not an expressive match",)},
+    {"media_overlap_findings": ("untrusted third-party score",)},
+    {"overlap_findings": []},
+    {"class_coverage": ("artwork",)},
+    {"class_coverage": tuple(sorted(MODALITIES)) + ("artwork",)},
+    {"blockers": ("duplicate", "duplicate")},
+    {"review_issues": ("x" * 513,)},
+    {"unexamined_external_media": ["artwork"]},
+])
+def test_originality_report_refuses_malformed_or_duplicated_review_evidence(mutation):
+    report = run(references=(external(SYNTHETIC_TEXT),))
+    with pytest.raises(OriginalityError):
+        replace(report, **mutation)
+
+
+def test_originality_report_preserves_human_review_status_after_typed_check():
+    report = run(references=(external(SYNTHETIC_TEXT),))
+    assert report.public_receipt()["release_permitted"] is False
+    assert all(not finding.legal_infringement_determined
+               for finding in report.overlap_findings)
