@@ -32,11 +32,11 @@ _GIT_REVISION = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 def emit(target: str, output: Path, authorship_file: Path) -> dict[str, object]:
     if target not in _TARGETS:
         raise ValueError("unsupported real Z80 console target")
-    if not authorship_file.is_file() or authorship_file.is_symlink():
-        raise ValueError("original author evidence must be an ordinary local file")
-    if not 0 < authorship_file.stat().st_size <= 8 * 1024 * 1024:
-        raise ValueError("authorship evidence size invalid")
-    author_reference = sha256(authorship_file.read_bytes()).hexdigest()
+    try:
+        declared_author_bytes = _read_bounded(Path(authorship_file), max_bytes=8*1024*1024)
+    except (ValueError, OSError) as exc:
+        raise ValueError("original author evidence must be an ordinary, private, bounded local file") from exc
+    author_reference = sha256(declared_author_bytes).hexdigest()
     intent = GameBuildIntent(
         project_id="skeleton-original-sega-evolution",
         title="Original Stardust Exploration",
