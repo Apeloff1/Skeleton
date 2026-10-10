@@ -15,11 +15,11 @@ OLD_DONE='''  if(level_done()){
    printf("Campaign completed; final stage is complete.\\n");'''
 NEW_DONE='''  if(level_done()){
    if(dragon_branch_count[chapter]==0)
-    printf("Original campaign ending reached at stage %d! Q to quit.\\\\n",chapter+1);
+    printf("Original campaign ending reached at stage %d! Q to quit.\\n",chapter+1);
    else {
-    printf("Stage solved! Select your own next path (N, 1 or 2):\\\\n");
+    printf("Stage solved! Select your own next path (N, 1 or 2):\\n");
     for(int option=0;option<dragon_branch_count[chapter];option++)
-     printf("  %d - chapter %d\\\\n",option+1,
+     printf("  %d - chapter %d\\n",option+1,
             dragon_branch_next[chapter][option]+1);
    }
   }'''
