@@ -281,7 +281,9 @@ int main(int argc,char**argv){
 
 def emit_native_puzzle(*,seed:int,stages:int=4,difficulty:int=4,
                        procedural:bool=False,
-                       authored_levels:tuple[tuple[str,...],...]|None=None)->dict[str,str]:
+                       authored_levels:tuple[tuple[str,...],...]|None=None,
+                       hero:str="hatchling",theme:str="ancient_ruins",
+                       palette:str="dmg_green")->dict[str,str]:
     if isinstance(stages,bool) or not isinstance(stages,int) or not 1<=stages<=MAX_LEVELS:
         raise ValueError("native puzzle stages must be 1..8")
     if type(procedural) is not bool:
@@ -377,4 +379,5 @@ clean:
             "CMakeLists.txt":cmake,"Makefile":make,
             "dragon-puzzle-proof.json":json.dumps(info,sort_keys=True,indent=2)+"\n",
             "README.puzzle.md":readme}
-    return enable_puzzle_graphics(native)
+    return enable_puzzle_graphics(native,hero=hero,theme=theme,
+                                  palette=palette,seed=seed)
