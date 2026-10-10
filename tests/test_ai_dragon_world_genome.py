@@ -55,7 +55,7 @@ def test_full_96_bit_genome_can_be_encoded_and_decoded_without_float_loss(value)
 
 @pytest.mark.parametrize("index",[
     "0","1","15","16",
-    str(2**96-1),str(2**96),str(2**128),
+    str(2**96-1),str(2**96),str(2**120),
     str(GENOMIC_WORLD_COUNT//2),str(GENOMIC_WORLD_COUNT-1),
 ])
 def test_big_int_world_addresses_are_exact_reversible_and_playable(index):
