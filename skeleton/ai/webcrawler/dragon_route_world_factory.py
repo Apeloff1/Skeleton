@@ -134,7 +134,7 @@ def make_frontier(*,seed:int=1,weather:str="clear",
             spectacle=70,shapes=("loop","free_roam"))
     connect("river_to_forest","river","forest","trail",30,fatigue=10,
             spectacle=38,shapes=("loop",))
-    connect("meadow_to_goal","meadow","citadel","hiking_kit" if False else "trail",
+    connect("meadow_to_goal","meadow","citadel","trail",
             66,fatigue=30,spectacle=70,shapes=("impractical","scenic"))
     connect("river_to_goal","river","citadel","kayak",59,fatigue=15,
             spectacle=66,shapes=("alternate","scenic"),
@@ -254,7 +254,7 @@ def make_frontier(*,seed:int=1,weather:str="clear",
             price=40,requires=("space_suit",),shapes=("impractical","detour"))
     connect("moon_to_gate","moon_outpost","orbital_gate","space_taxi",90,
             price=20,requires=("space_suit",),shapes=("detour","alternate"))
-    connect("gate_to_goal","orbital_gate","citadel","stargate",3,
+    connect("stargate_to_goal","orbital_gate","citadel","stargate",3,
             requires=("stargate_key",),shapes=("shortcut","unlockable",
                                                "world_transition"))
     connect("asteroid_visit","orbit","asteroid","eva",60,fatigue=12,
