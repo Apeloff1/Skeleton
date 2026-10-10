@@ -85,6 +85,9 @@ def make_frontier(*,seed:int=1,weather:str="clear",
     place("orbit",region="space",biome="vacuum",scenery=100)
     place("moon_outpost",region="space",biome="lunar",gifts=("stellar_gate_key",),
           scenery=95)
+    place("distant_star",region="space",biome="interstellar",
+          gifts=("colony_key",),scenery=100)
+    place("nomad_colony",region="space",biome="vacuum",scenery=95)
     place("asteroid",region="space",biome="vacuum",scenery=100)
     place("orbital_gate",region="space",biome="vacuum",scenery=100)
     place("ruins_approach",biome="desert",scenery=55)
@@ -275,6 +278,21 @@ def make_frontier(*,seed:int=1,weather:str="clear",
             requires=("space_suit",),shapes=("return_only",))
     connect("moon_to_citadel","moon_outpost","citadel","wormhole",19,
             mana=15,requires=("stellar_gate_key",),shapes=("shortcut","world_transition"))
+
+    # Truly long optional route: a 20-year generation-ship leg followed
+    # by five in-game years of independent deep-space travel. The return
+    # requires a genuinely acquired original colony key and mana; no
+    # claim of astrophysics or cryosleep simulation is made.
+    connect("generation_ship_voyage","orbit","distant_star",
+            "generation_ship",10_512_000,price=100,
+            requires=("space_suit",),
+            shapes=("impractical","world_transition","scenic"))
+    connect("deep_space_crossing","distant_star","nomad_colony",
+            "deep_space_cruise",2_628_000,price=25,
+            shapes=("impractical","world_transition","scenic"))
+    connect("stellar_return","nomad_colony","citadel","stellar_gate",10,
+            mana=20,requires=("colony_key",),
+            shapes=("shortcut","unlockable","world_transition"))
 
     # Synthetic seed changes costs on *some* genuinely traversable edges.
     # This is original variation, not a copied map reordering.
