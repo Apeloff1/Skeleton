@@ -11,6 +11,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import re
+import unicodedata
 
 from .legal_paths import MaterialKind, MaterialRecord
 
@@ -23,6 +24,16 @@ _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 _SHA = re.compile(r"^[0-9a-f]{64}$")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _UNSAFE_LICENSE_MARKERS = ("-NC", "-ND", "BY-NC", "BY-ND", "GPL-", "AGPL-", "-SA")
+
+
+def _unsafe_invisible(value: str) -> bool:
+    # Explicit bidirectional override, zero-width formatting and surrogate
+    # characters can visually falsify legal authorship and licence obligations.
+    return bool(_CONTROL.search(value)) or any(
+        unicodedata.category(ch) in {"Cf", "Cs", "Zl", "Zp"}
+        for ch in value
+    )
+
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,11 +59,11 @@ class AttributionEntry:
             "adaptation_description", "permitted_medium", "attribution_text",
         ):
             value = getattr(self, label)
-            if not isinstance(value, str) or not 1 <= len(value) <= 500 or _CONTROL.search(value):
+            if not isinstance(value, str) or not 1 <= len(value) <= 500 or _unsafe_invisible(value):
                 raise CreditsError("missing/unsafe credit line " + label)
         if self.license_url is not None and (
             not isinstance(self.license_url, str) or len(self.license_url) > 512
-            or not self.license_url.startswith("https://") or _CONTROL.search(self.license_url)
+            or not self.license_url.startswith("https://") or _unsafe_invisible(self.license_url)
         ):
             raise CreditsError("untrusted license URL")
         for name in ("license_text_sha256", "release_permission_evidence_sha256"):
@@ -151,7 +162,7 @@ def compile_game_credits(
     ):
         raise CreditsError("typed third-party credits required")
     if not isinstance(original_authors, tuple) or not original_authors or any(
-        not isinstance(v, str) or not 1 <= len(v) <= 200 or _CONTROL.search(v)
+        not isinstance(v, str) or not 1 <= len(v) <= 200 or _unsafe_invisible(v)
         for v in original_authors
     ):
         raise CreditsError("named original authorship required")
