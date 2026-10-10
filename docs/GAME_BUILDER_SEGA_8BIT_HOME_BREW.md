@@ -343,3 +343,39 @@ ROM, game-engine and reviewer-identity suites.
 **Outstanding:** the SDCC development kit's license compatibility still
 requires accountable human review. Full SMS/Game Gear emulator *gameplay*
 replay and physical-console validation remain separate milestones.
+
+## Real Z80 opcode startup acceptance
+
+The dedicated build workflow now performs a strictly bounded *compiled cartridge
+boot test* as well as the existing host-C gameplay replay. It opens the real
+32 KiB .sms or .gg cartridge with the no-follow binary intake, verifies Sega
+header and checksums, then interprets **the actual Z80 opcodes at reset PC 0**
+using the separately installed z80-python==0.4.0 instruction core.
+
+The device test bench models unbanked ROM, mirrored 8 KiB console RAM,
+active-low controller ports, Mode-4 VRAM and VDP command writes,
+Master System RGB222 and Game Gear RGB444 CRAM, PSG ports and synthetic
+VBlank interrupts. Unsupported hardware I/O and execution beyond strict
+instruction/frame limits fail the test.
+
+The ROM must actually initialize color and video hardware, enable display,
+draw one hero on its game board, draw the original companion expression
+and zero-score HUD, initialize PSG sound and acknowledge a video interrupt.
+Every successful result is bound to the actual cartridge SHA-256.
+
+The resulting receipt can assert hardware_boot_smoke_verified only after
+this real machine-code execution. It retains **false** values for
+entire_game_playthrough_verified, independent_cycle_exact_emulator_verified,
+physical_hardware_verified and release_approved. A successful boot smoke
+test cannot substitute for a full input-driven winning route, cycle-accurate
+console emulation, electrical compatibility or legal distribution clearance.
+
+Run the gate against an original cartridge compiled using the pinned
+devkitSMS/SDCC workflow:
+
+```bash
+python -m pip install z80-python==0.4.0
+python -m scripts.game_builder.emulate_sega8_sdcc_boot \
+  --rom ./homebrew-gg/build/skeleton-original.gg \
+  --target sega_game_gear --receipt-out ./game-gear-z80-boot.json
+```
