@@ -173,3 +173,33 @@ def practice_portfolio_receipt(*, authorized: bool) -> dict[str, object]:
     }
     payload["digest"] = canonical_digest(payload)
     return payload
+
+
+def compare_practice_challenges(
+    first_id: str, second_id: str, *, authorized: bool,
+) -> dict[str, object]:
+    """Explain factual game differences to the editor; not a quality ranking."""
+    if authorized is not True:
+        raise PermissionError("practice comparison requires authorization")
+    if first_id == second_id:
+        raise PracticeSelectionError("choose distinct practice game identities")
+    first = load_practice_game(first_id, authorized=True)
+    second = load_practice_game(second_id, authorized=True)
+    left, right = first.world.levels[0], second.world.levels[0]
+    return {
+        "schema": "skeleton.dragon.practice_game_comparison.v1",
+        "first_game_id": first_id,
+        "second_game_id": second_id,
+        "first_world_digest": first.world.digest,
+        "second_world_digest": second.world.digest,
+        "route_step_difference": (
+            len(second.proof.action_receipts) - len(first.proof.action_receipts)
+        ),
+        "collectible_difference": len(right.collectibles) - len(left.collectibles),
+        "hazard_difference": len(right.hazards) - len(left.hazards),
+        "tile_count_difference": (
+            right.width * right.height - left.width * left.height
+        ),
+        "quality_comparison_authorized": False,
+        "release_authorized": False,
+    }
