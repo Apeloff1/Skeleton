@@ -84,14 +84,22 @@ def curate_level(*,stage:int,seed:int,difficulty:int,procedural:bool,
         selected=min(candidates,key=lambda row:(row[0],row[1],row[2]))
         role="gentle_accessible_path"
     elif profile=="challenging":
-        selected=max(candidates,key=lambda row:(row[0],-row[1],-row[2]))
-        role="chosen_higher_challenge"
-    elif profile=="spicy":
-        recovery=(stage+1)%4==0
+        recovery=(stage+1)%3==0
         selected=(min(candidates,key=lambda row:(row[0],row[1],row[2]))
                   if recovery else
                   max(candidates,key=lambda row:(row[0],-row[1],-row[2])))
-        role="deliberate_recovery" if recovery else "higher_tension"
+        role="deliberate_recovery" if recovery else "chosen_higher_challenge"
+    elif profile=="spicy":
+        recovery=(stage+1)%4==0
+        spike=stage>0 and stage%4==1
+        selected=(min(candidates,key=lambda row:(row[0],row[1],row[2]))
+                  if recovery else
+                  max(candidates,key=lambda row:(row[0],-row[1],-row[2]))
+                  if spike else
+                  candidates[0])
+        role=("deliberate_recovery" if recovery else
+              "deliberate_frustration_spike_with_escape" if spike else
+              "exploration")
     else:
         selected=candidates[0]
         role="legacy_original_geometry"
