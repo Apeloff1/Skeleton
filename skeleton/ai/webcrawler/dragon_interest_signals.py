@@ -91,24 +91,30 @@ def normalize_tag(tag: str) -> str:
 
 
 def validate_signal(signal: InterestSignal, now: float, policy: SignalPolicy) -> tuple[str, ...]:
-    if not signal.consent:
+    if not isinstance(signal, InterestSignal):
+        raise ValueError("typed opt-in interest signal required")
+    if signal.consent is not True:
         raise PermissionError("interest tracking requires explicit consent")
-    if not signal.signal_id or len(signal.signal_id) > 128:
+    if (not isinstance(signal.signal_id, str) or not 1 <= len(signal.signal_id) <= 128
+            or any(ord(ch) < 32 or ord(ch) == 127 for ch in signal.signal_id)):
         raise ValueError("invalid signal id")
     if not isinstance(signal.kind, SignalKind):
         raise ValueError("invalid signal kind")
-    if not isfinite(signal.observed_at) or signal.observed_at > now:
+    if (isinstance(signal.observed_at, bool)
+            or not isinstance(signal.observed_at, (int, float))
+            or not isfinite(signal.observed_at)
+            or signal.observed_at < 0 or signal.observed_at > now):
         raise ValueError("invalid signal time")
-    if not isfinite(signal.strength) or not 0 <= signal.strength <= 1:
+    if (isinstance(signal.strength, bool)
+            or not isinstance(signal.strength, (int, float))
+            or not isfinite(signal.strength) or not 0 <= signal.strength <= 1):
         raise ValueError("invalid signal strength")
-    if not signal.tags or len(signal.tags) > 16:
+    if not isinstance(signal.tags, tuple) or not 1 <= len(signal.tags) <= 16:
         raise ValueError("invalid tag count")
-    if len(signal.source_id) > 128:
-        raise ValueError("source id too long")
-    try:
-        return tuple(sorted({normalize_tag(tag) for tag in signal.tags}))
-    except (TypeError, AttributeError) as exc:
-        raise ValueError("invalid signal tags") from exc
+    if (not isinstance(signal.source_id, str) or len(signal.source_id) > 128
+            or any(ord(ch) < 32 or ord(ch) == 127 for ch in signal.source_id)):
+        raise ValueError("invalid source id")
+    return tuple(sorted({normalize_tag(tag) for tag in signal.tags}))
 
 
 def build_interest_profile(
