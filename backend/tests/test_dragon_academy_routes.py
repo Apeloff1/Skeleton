@@ -628,3 +628,21 @@ def test_native_original_level_editor_rejects_malformed_or_unbounded_canvas(bad)
     from pydantic import ValidationError
     with pytest.raises(ValidationError):
         route.NativePuzzleGridValidationRequest(**bad)
+
+
+
+@pytest.mark.parametrize("endpoint",[
+    "/api/dragon-academy/native/production/puzzle/validate",
+    "/api/dragon-academy/native/production/puzzle/starter",
+])
+def test_original_puzzle_cpu_budgets_are_editor_only(endpoint):
+    """Authenticated viewers cannot trigger expensive exact BFS source design."""
+    selected=next(x for x in route.router.routes if x.path==endpoint)
+    assert any(item.call is route._native_source_editor
+               for item in selected.dependant.dependencies)
+    visitor={"email":"guest@example.test","tenant_id":"tenant-a","role":"viewer"}
+    with pytest.raises(HTTPException) as denied:
+        route._native_source_editor(visitor)
+    assert denied.value.status_code==403
+    editor={"email":"maker@example.test","tenant_id":"tenant-a","role":"editor"}
+    assert len(route._native_source_editor(editor))==64
