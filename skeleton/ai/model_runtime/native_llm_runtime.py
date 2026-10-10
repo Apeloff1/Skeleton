@@ -618,6 +618,10 @@ class NativeLLMRuntime:
             device_digest=self.device.digest,
             seed=config.seed,
         )
+        # Construct and validate the durable checkpoint before announcing
+        # completion. An invalidated model or tokenizer must never emit a
+        # terminal success event whose final replay receipt is unavailable.
+        checkpoint = self.checkpoint()
         event = RuntimeEvent(
             sequence,
             "completed",
@@ -627,7 +631,6 @@ class NativeLLMRuntime:
         events.append(event)
         yield event
 
-        checkpoint = self.checkpoint()
         return GenerationResult(
             prompt_sequence=prompt_sequence,
             generated_ids=generated_ids,
@@ -700,18 +703,23 @@ class NativeLLMRuntime:
             raise RuntimeContractError("duplicate batch request id")
 
         aggregate = 0
+        admitted: list[tuple[BatchGenerationRequest, TokenSequence]] = []
         for request in requests:
             sequence, _ = self._admit(request.prompt, request.config)
             aggregate += len(sequence.token_ids) + request.config.max_new_tokens
             if aggregate > self.limits.max_batch_tokens:
                 raise RuntimeContractError("batch token budget exceeded")
+            admitted.append((request, sequence))
 
+        # Each admitted sequence is immutable and bound to the tokenizer
+        # digest. Re-encoding a prompt here would create a second admission
+        # boundary and allow a different token trajectory after preflight.
         return tuple(
             BatchGenerationResult(
                 request.request_id,
-                self.generate(request.prompt, request.config),
+                self.generate_sequence(sequence, request.config),
             )
-            for request in requests
+            for request, sequence in admitted
         )
 
     def replay(
