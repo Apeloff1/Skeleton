@@ -364,9 +364,17 @@ class GameMechanicsMemory:
             for values in groups.values()
         )
         fingerprint = sha256(json.dumps(
-            [owner, [(x.mechanic.value, x.observation_count,
-                      x.preference_score, x.confidence) for x in insights]],
-            separators=(",", ":"), ensure_ascii=True,
+            {
+                "owner": owner,
+                "insights": [
+                    (x.mechanic.value, x.observation_count, x.supporting_sessions,
+                     x.preference_score, x.confidence, x.examples, x.user_confirmed)
+                    for x in insights
+                ],
+                "directives": directives,
+                "review_required": any(not x.user_confirmed for x in insights) or conflicting,
+            },
+            sort_keys=True, separators=(",", ":"), ensure_ascii=True,
         ).encode()).hexdigest()
         return GameTasteProfile(
             owner, tuple(insights), tuple(directives),
