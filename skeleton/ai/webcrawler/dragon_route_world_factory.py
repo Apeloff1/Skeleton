@@ -308,8 +308,21 @@ def make_frontier(*,seed:int=1,weather:str="clear",
     from .dragon_route_world_variants import mutate_original_world
     world=mutate_original_world(world,seed=seed)
     validate_world(world)
-    return world,Traveller(cash=240,energy=100,max_energy=100,
-                           start_minute=hour*60)
+    hero=Traveller(cash=240,energy=100,max_energy=100,
+                   start_minute=hour*60)
+    # Every generated climate/seed must retain a complete, actually
+    # traversable original baseline. The 25-year optional journey and
+    # unusual modes must not eliminate the ordinary guaranteed win.
+    from .dragon_route_world import replay
+    for climate in ("clear","rain","windy","storm","snow","high_tide"):
+        scenario=replace(world,environment=(climate,))
+        victory=replay(
+            scenario,("walk_to_bazaar","walk_to_goal"),
+            hero,objective="all_climate_original_world_witness",
+        )
+        if not victory.success:
+            raise ValueError("seeded original free-roam world lost its playable goal")
+    return world,hero
 
 def structural_report(world:World)->dict:
     validate_world(world)
