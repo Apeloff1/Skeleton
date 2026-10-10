@@ -65,6 +65,27 @@ def test_project_notes_can_include_ordinary_semicolon_prose():
     assert parse_design(fields).project_notes == fields["project_notes"]
 
 
+def test_native_generator_refuses_forged_design_dataclass():
+    from dataclasses import replace
+    from skeleton.ai.webcrawler.dragon_game_design import verify_design
+    design = parse_design(starter_design(
+        title="Dragon Original FPS", genre="first_person_shooter", seed=145,
+    ))
+    altered = replace(design, seed=146)
+    forged = replace(design, digest="0" * 64)
+    for tampered in (altered, forged):
+        with pytest.raises(ValueError, match="mutated"):
+            verify_design(tampered)
+        with pytest.raises(ValueError, match="mutated"):
+            render_native_project(
+                title=design.title, target_id=design.target,
+                style=design.genre, candidate_id=sha256(b"design").hexdigest(),
+                mechanics=(Mechanic.MOVEMENT, Mechanic.EXPLORATION),
+                authorized=True, design=tampered,
+            )
+    assert verify_design(design) is design
+
+
 def test_unknown_schema_fields_and_duplicate_keys_rejected(tmp_path):
     data=starter_design()
     data["command"]="curl attacker"
