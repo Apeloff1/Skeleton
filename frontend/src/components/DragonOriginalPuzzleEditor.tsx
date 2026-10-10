@@ -53,6 +53,8 @@ type Props = {
   enabled: boolean;
   stages: number;
   onApprovedLevels: (levels: string[][] | null) => void;
+  campaignPathing?: 'branching' | 'linear';
+  challengeProfile?: 'gentle' | 'balanced' | 'challenging' | 'spicy';
 };
 
 function boundedBoard(value: unknown): value is string[] {
@@ -78,6 +80,7 @@ function newBoard(): string[] {
 
 export default function DragonOriginalPuzzleEditor({
   enabled, stages, onApprovedLevels,
+  campaignPathing='branching', challengeProfile='balanced',
 }: Props) {
   const [boards, setBoards] = React.useState<string[][]>([]);
   const [editHistory, setEditHistory] = React.useState<PuzzleHistory | null>(null);
@@ -94,6 +97,12 @@ export default function DragonOriginalPuzzleEditor({
   const [liveHint, setLiveHint] = React.useState('');
   const routeEpoch = React.useRef(0);
   const [routeBusy, setRouteBusy] = React.useState(false);
+  const [campaignBusy, setCampaignBusy] = React.useState(false);
+  const [campaignAnalysis, setCampaignAnalysis] = React.useState<{
+    endings: number; forks: number; routes: number;
+    stages: Array<{stage: number; tension: number; warningCount: number}>;
+    warnings: string[];
+  } | null>(null);
   const [selectedRoute, setSelectedRoute] = React.useState<string | null>(null);
   const [routeChoices, setRouteChoices] = React.useState<Array<{
     path: string; moves: number; pushes: number;
@@ -166,7 +175,9 @@ export default function DragonOriginalPuzzleEditor({
     setRouteBusy(false);
     setRouteChoices(null);
     setSelectedRoute(null);
-  }, [boards, current, validated]);
+    setCampaignBusy(false);
+    setCampaignAnalysis(null);
+  }, [boards, current, validated, campaignPathing, challengeProfile]);
 
   if (!enabled) return null;
 
@@ -446,6 +457,71 @@ export default function DragonOriginalPuzzleEditor({
 
   const walkthrough = selectedRoute ??
     validated?.stages[current]?.shortest_solution ?? '';
+  const analyzeWholeGame = async () => {
+    if (!validated || busy || validating || campaignBusy ||
+        boards.length!==stages || !boards.every(boundedBoard)) return;
+    const epoch=++routeEpoch.current;
+    setCampaignBusy(true);
+    setCampaignAnalysis(null);
+    try {
+      const response=await fetch(ENDPOINT + '/campaign/analyze', {
+        method:'POST',cache:'no-store',
+        headers:authHeaders({'Content-Type':'application/json'}),
+        body:JSON.stringify({
+          levels:boards,mode:campaignPathing,
+          challenge_profile:challengeProfile,route_budget:1500,
+        }),
+      });
+      if (!response.ok)
+        throw new Error('Could not verify the original branching campaign.');
+      const result=await response.json() as {
+        ok: boolean;
+        chapter_paths?: {
+          ending_count:number;choice_nodes:number;complete_routes:unknown[];
+        };
+        challenge?: {
+          profile:string;overall_fairness_warnings:string[];
+          stages:Array<{stage:number;measured_complexity:number;warnings:string[]}>;
+          has_player_observations:boolean;
+        };
+      };
+      const paths=result.chapter_paths;
+      const plan=result.challenge;
+      if (!result.ok || !paths || !plan ||
+          plan.profile!==challengeProfile ||
+          plan.has_player_observations!==false ||
+          !Number.isInteger(paths.ending_count) ||
+          !Number.isInteger(paths.choice_nodes) ||
+          !Array.isArray(paths.complete_routes) ||
+          paths.complete_routes.length<1 ||
+          !Array.isArray(plan.stages) || plan.stages.length!==boards.length ||
+          plan.stages.some((x,index) => x.stage!==index+1 ||
+            !Number.isInteger(x.measured_complexity) ||
+            x.measured_complexity<0 || x.measured_complexity>100 ||
+            !Array.isArray(x.warnings))) {
+        throw new Error('Campaign graph or challenge measurements are incomplete.');
+      }
+      if (epoch===routeEpoch.current) {
+        setCampaignAnalysis({
+          endings:paths.ending_count,
+          forks:paths.choice_nodes,
+          routes:paths.complete_routes.length,
+          stages:plan.stages.map(x=>({
+            stage:x.stage,tension:x.measured_complexity,
+            warningCount:x.warnings.length,
+          })),
+          warnings:plan.overall_fairness_warnings.slice(0,8),
+        });
+      }
+    } catch (error) {
+      if (epoch===routeEpoch.current)
+        setStatus(error instanceof Error ? error.message :
+                  'Original campaign review failed.');
+    } finally {
+      if (epoch===routeEpoch.current) setCampaignBusy(false);
+    }
+  };
+
   const findAlternatives = async () => {
     if (!validated || !boards[current] || routeBusy || busy || validating) return;
     const generation = ++routeEpoch.current;
@@ -669,6 +745,50 @@ export default function DragonOriginalPuzzleEditor({
                 </Text>
               </TouchableOpacity>
             ))}
+          </>}
+        </View>
+      )}
+      {validated && (
+        <View style={styles.results}>
+          <TouchableOpacity accessibilityRole="button"
+            onPress={analyzeWholeGame}
+            disabled={campaignBusy || busy || validating}
+            style={styles.fileButton}>
+            <Text style={styles.actionText}>
+              {campaignBusy
+                ? 'Analyzing real chapter routes and tension…'
+                : 'Analyze whole-game branching, endings and challenge'}
+            </Text>
+          </TouchableOpacity>
+          {campaignAnalysis && <>
+            <Text style={styles.accepted}>
+              {campaignAnalysis.routes} verified campaign paths
+              {' · '}{campaignAnalysis.forks} real forks
+              {' · '}{campaignAnalysis.endings} endings
+            </Text>
+            {campaignAnalysis.stages.map(record=>(
+              <TouchableOpacity key={record.stage}
+                accessibilityRole="button"
+                onPress={() => {
+                  setCurrent(record.stage-1);
+                  setPlay(null);setDemoCursor(-1);
+                }}
+                style={styles.fileButton}>
+                <Text style={styles.actionText}>
+                  Stage {record.stage} · measured complexity {record.tension}/100
+                </Text>
+                {!!record.warningCount && <Text style={styles.help}>
+                  {record.warningCount} design warning(s)
+                </Text>}
+              </TouchableOpacity>
+            ))}
+            {campaignAnalysis.warnings.map((warning,index)=>(
+              <Text key={index} style={styles.warning}>{warning}</Text>
+            ))}
+            <Text style={styles.help}>
+              Solver-derived difficulty is not proof of enjoyment. Playtest
+              actual players before claiming the intended frustration is fair.
+            </Text>
           </>}
         </View>
       )}
