@@ -175,7 +175,8 @@ def verify(
         "toolchain_revision": toolchain_revision,
         "toolchain_revision_hash_algorithm": "git-sha1" if len(toolchain_revision) == 40 else "git-sha256",
         "toolchain_source_authenticated": False,  # Exact Git ID is not a signed supply-chain attestation.
-        "native_rom_compiled": False,  # The byte verifier did not itself witness SDCC.\n        "real_rom_structure_verified": True,
+        "native_rom_compiled": False,  # Byte verification does not witness an SDCC execution.
+        "real_rom_structure_verified": True,
         "rom_header_checksum_verified": measured["native_rom_checksum_verified"],
         "emulator_playthrough_verified": False,
         "physical_hardware_verified": False,
