@@ -362,6 +362,15 @@ class NativeLLMRuntime:
         """Tokenize text and execute one next-token inference graph pass."""
         return self.infer_sequence(self.encode(text), use_cache=use_cache)
 
+    def _finalize_feed(self, feed: StreamingTextFeed) -> TokenSequence:
+        """Admit a bounded text feed without leaking tokenizer-specific errors."""
+        if not isinstance(feed, StreamingTextFeed):
+            raise RuntimeContractError("StreamingTextFeed required")
+        try:
+            return feed.finalize(self.tokenizer)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("feed tokenization failed admission") from exc
+
     def infer_feed(
         self,
         feed: StreamingTextFeed,
@@ -369,9 +378,7 @@ class NativeLLMRuntime:
         use_cache: bool = True,
     ) -> InferenceResult:
         """Execute next-token inference directly from a bounded text feed."""
-        if not isinstance(feed, StreamingTextFeed):
-            raise RuntimeContractError("StreamingTextFeed required")
-        return self.infer_sequence(feed.finalize(self.tokenizer), use_cache=use_cache)
+        return self.infer_sequence(self._finalize_feed(feed), use_cache=use_cache)
 
     def _config_digest(self, config: GenerationConfig) -> str:
         return digest_json(config.to_dict())
@@ -653,9 +660,7 @@ class NativeLLMRuntime:
         The feed is finalized once; token IDs are forwarded without a lossy
         text round-trip, and generation uses the canonical decoder.
         """
-        if not isinstance(feed, StreamingTextFeed):
-            raise RuntimeContractError("StreamingTextFeed required")
-        return self.stream_sequence(feed.finalize(self.tokenizer), config)
+        return self.stream_sequence(self._finalize_feed(feed), config)
 
     def generate_feed(
         self,
@@ -663,9 +668,7 @@ class NativeLLMRuntime:
         config: GenerationConfig | None = None,
     ) -> GenerationResult:
         """Finalize a StreamingTextFeed and execute it end-to-end."""
-        if not isinstance(feed, StreamingTextFeed):
-            raise RuntimeContractError("StreamingTextFeed required")
-        return self.generate_sequence(feed.finalize(self.tokenizer), config)
+        return self.generate_sequence(self._finalize_feed(feed), config)
 
     def generate(
         self,
