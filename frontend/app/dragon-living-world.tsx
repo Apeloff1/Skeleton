@@ -25,6 +25,12 @@ type Catalog={
   lifecycles:string[];world_style_count:number;
   addressable_world_ids:number;variants_per_world_id:number;
   addressable_world_variant_slots:number;
+  compositional_lattice?:{
+    reversibly_addressable_original_world_configurations:number;
+    indexed_world_configuration_path_slots:number;
+    valid_style_lifecycle_profiles:number;
+    default_claim:string;
+  };
 };
 type Choice={
   name:string;available:boolean;reason:string;
@@ -122,6 +128,14 @@ function LivingWorldEditor(){
   const editor=role==='admin'||role==='editor';
   const [catalog,setCatalog]=React.useState<Catalog|null>(null);
   const [worldNumber,setWorldNumber]=React.useState('1977');
+  const [designIndex,setDesignIndex]=React.useState('0');
+  const [indexedReview,setIndexedReview]=React.useState<{
+    design:{index:number;style:string;lifecycle:string;world_id:number;
+            variation:number;reviewed_finished_game:boolean};
+    route:{objective:string;actions:string[];original_endings:string[];
+           remains_playable:boolean;trace_digest:string};
+    verification:{verified:boolean};
+  }|null>(null);
   const [variation,setVariation]=React.useState(0);
   const [style,setStyle]=React.useState('mutable_labyrinth');
   const [lifecycle,setLifecycle]=React.useState<string>('unending');
@@ -160,6 +174,7 @@ function LivingWorldEditor(){
     setSessionMode(false);setLastDurableDigest(null);
     setPortfolio(null);setGuided(null);
     setTemporal(null);setFailure('');setNotice('');
+    setIndexedReview(null);
   };
   const changeStyle=(next:string)=>{
     setStyle(next);
