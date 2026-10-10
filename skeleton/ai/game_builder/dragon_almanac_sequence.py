@@ -253,7 +253,53 @@ class SequentialAlmanacWorker:
             raise
 
     def status(self, owner: str, *, authorized: bool) -> dict:
+        """Read-only sequential work progress, never an execution approval.
+
+        Completed stages are durable only when backed by the stage receipts
+        checked during claim/finish. The UI counts do not imply approval of
+        independent source review or neural training.
+        """
         _auth(owner, authorized)
-        counts = dict(self.db.execute("SELECT state,COUNT(*) FROM dragon_almanac_jobs WHERE owner=? GROUP BY state", (owner,)).fetchall())
-        return {"owner": owner, "jobs": counts, "total": sum(counts.values()),
-                "network_executor_attached": False, "neural_training_executed": False}
+        counts: dict[str, int] = {}
+        stage_counts = {stage: 0 for stage in STAGES}
+        completed_steps = 0
+        total = 0
+        leased = blocked = retries = 0
+        for stage, state, count, attempted in self.db.execute(
+            "SELECT stage,state,COUNT(*),COALESCE(SUM(attempts),0) "
+            "FROM dragon_almanac_jobs WHERE owner=? GROUP BY stage,state",
+            (owner,),
+        ):
+            if (type(stage) is not int or not 0 <= stage <= len(STAGES)
+                    or state not in {"pending", "leased", "blocked", "reviewed"}
+                    or (state == "reviewed") != (stage == len(STAGES))
+                    or type(count) is not int or count <= 0
+                    or type(attempted) is not int or attempted < 0):
+                raise ValueError("invalid persistent sequential almanac stage")
+            total += count
+            counts[state] = counts.get(state, 0) + count
+            completed_steps += stage * count
+            retries += attempted
+            if state == "leased":
+                leased += count
+            if state == "blocked":
+                blocked += count
+            if stage < len(STAGES):
+                stage_counts[STAGES[stage]] += count
+        total_steps = total * len(STAGES)
+        return {
+            "owner": owner,
+            "jobs": counts,
+            "total": total,
+            "stage_queues": stage_counts,
+            "completed_stage_slots": completed_steps,
+            "remaining_stage_slots": total_steps - completed_steps,
+            "stage_progress_ppm": (completed_steps * 1_000_000 // total_steps)
+                if total_steps else 0,
+            "active_leases": leased,
+            "blocked_jobs": blocked,
+            "attempts_since_last_stage": retries,
+            "network_executor_attached": False,
+            "neural_training_executed": False,
+            "rights_or_memory_promotion_authorized": False,
+        }
