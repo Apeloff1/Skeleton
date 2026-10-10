@@ -171,11 +171,6 @@ def _pe(reader: _Reader) -> tuple[str,int,int,int]:
             raw_ranges.append((raw_start,raw_start+raw_size))
         if properties & 0x20000000:
             executable_sections+=1
-            if virtual_rva <= entry_rva < virtual_rva+mapped:
-                entry_found=True
-                # Catch malformed starts in a section with no code stored.
-                _require(raw_size > 0, "PE entrypoint maps to empty executable section")
-                break_after=False
     # Check ALL ranges; early return would miss a malicious appended section.
     for (a,b),(c,d) in zip(sorted(raw_ranges),sorted(raw_ranges)[1:]):
         _require(b<=c, "overlapping PE on-disk sections")
