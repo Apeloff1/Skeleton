@@ -267,3 +267,79 @@ independent Z80/VDP input-driven emulation of the **compiled** SMS/GG ROM
 with a complete winning replay, external emulator confirmation,
 and targeted physical hardware tests. Each status is separately represented
 in the evidence and remains false until that test actually occurs.
+
+
+## Two-source, two-cartridge deterministic evidence (October 2026)
+
+The native Sega Master System and Game Gear CI now performs independent
+source-generation calls before native compilation. The second authored output
+lives outside the released source tree and must match `game.c`, `Makefile`
+and `manifest.json` **byte for byte**, along with the previously recorded
+source SHA-256. A file differing in an edited game mechanic, sprite table,
+audio engine, C flags, copyright/rights marker or legal claims fails closed.
+The comparison also rejects unreviewed extra files and linked source folders.
+
+After real SDCC and devkitSMS compilation, CI records the *first* native
+32 KiB ROM outside the game build directory. It performs a clean second
+build, then invokes:
+
+`python -m scripts.game_builder.sega_reproducibility_ci`
+
+The comparison insists on two distinct, safely opened cartridge paths,
+correct hardware-specific Sega headers and checksums, the exact same ROM
+SHA-256 as the first postbuild report, literal equality of the two 32 KiB
+cartridge payloads, and uninterrupted links to the authored source,
+author-declaration digest, safe replay digest, original world digest and
+pinned Git toolchain revision. The source root may include the legitimate
+`build` folder only; compiled output may not masquerade as source input.
+
+### Evidence terminology is deliberately narrower than legal certification
+
+| Receipt field | Meaning |
+| --- | --- |
+| `identical_source_bytes=true` | Two existing source folders actually contain the same reviewed file bytes |
+| `exact_rom_bytes_match=true` | Two actual ROM file payloads passed the format checks and are identical |
+| `source_and_authorship_digests_match=true` | The read source and author-declaration hashes agree with the separately supplied expected values |
+| `two_compiler_executions_independently_verified=false` | The byte reader cannot observe two actual process executions; trusted CI is responsible for that |
+| `generator_invocations_independently_attested=false` | Two source folders do not by themselves prove two independently executed generators |
+| `source_rights_independently_verified=false` | User-supplied authorship declarations are *not* proven legal title |
+| `gameplay_execution_verified=false` | Header/ROM comparison is not emulator or hardware playthrough |
+| `publication_licensed=false` | Source/ROM determinism cannot authorize third-party proprietary redistribution |
+
+The CI uploads **only** bounded JSON receipts (and preexisting permitted
+source metadata). The first and rebuilt ROMs are temporary and are not
+uploaded as public commercial game binaries by this release-integrity
+workflow. Other platform-specific output workflows have separately
+documented build artifacts and should not be misrepresented by this policy.
+
+The provenance receipt is written create-only, using a descriptor-anchored
+directory and exclusive file creation with restrictive permissions. It
+refuses overwriting or following existing output symlinks and removes only
+its own partially created file on serialization failure; it does not
+delete a preexisting file after an exclusive-open collision.
+
+### Highest-value adversarial examples
+
+- Replace the first cartridge with a ROM of the wrong console, a different
+  checksum-valid game, a copied commercial title or a header-only stub;
+  exact source and ROM hashes prevent inheriting previous evidence.
+- Keep the additive Sega checksum the same while swapping program bytes;
+  SHA-256 and actual byte comparison detect the change.
+- Modify only `Makefile`, `game.c`, `manifest.json`, source rights or
+  author declaration, then attempt to reuse the previous first-build proof.
+- Replace a generated source, author statement or cartridge with a linked
+  inode, symlinked parent, named pipe or sparse over-budget file.
+- Reuse a Sega Master System receipt for Game Gear, or a different project
+  world, release territory or unpinned developer revision.
+- Fake `source_rights_independently_verified`, `release_approved`,
+  hardware acceptance or compiler execution booleans in the prior JSON.
+- Replace an existing integrity JSON via a symlink or induce a failure
+  after creating a partial receipt.
+
+These cases are covered by
+`test_game_builder_sega_reproducibility.py` alongside the existing Sega
+ROM, game-engine and reviewer-identity suites.
+
+**Outstanding:** the SDCC development kit's license compatibility still
+requires accountable human review. Full SMS/Game Gear emulator *gameplay*
+replay and physical-console validation remain separate milestones.
