@@ -373,6 +373,103 @@ class ReviewedKnowledgeTests(unittest.TestCase):
         after = self.store.db.execute("SELECT COUNT(*) FROM game_builder_knowledge").fetchone()[0]
         self.assertEqual(before, after)
 
+    def refresh(self, **kwargs):
+        return self.store.plan_recrawl(
+            "studio-a", as_of="2026-10-10T12:00:00Z", authorized=True, **kwargs,
+        )
+
+    def test_recrawl_is_deterministic_read_only_and_parent_bound(self):
+        receipt = self.admit()
+        before = self.store.snapshot_root("studio-a", authorized=True)
+        plan = self.refresh(max_age_seconds=86400)
+        self.assertEqual(plan, self.refresh(max_age_seconds=86400))
+        self.assertEqual(plan["knowledge_root"], before)
+        self.assertFalse(plan["execution_authorized"])
+        self.assertFalse(plan["memory_promotion_authorized"])
+        request = plan["requests"][0]
+        self.assertEqual(request["expected_parent_digest"], receipt.revision_digest)
+        self.assertEqual(request["reasons"], ["insufficient_independent_support", "stale_observation"])
+        self.assertEqual(len(self.store.history("studio-a", "source-a", authorized=True)), 1)
+        self.store.close()
+        self.store = ReviewedKnowledgeStore(self.dbfile)
+        self.assertEqual(plan, self.refresh(max_age_seconds=86400))
+
+    def test_recrawl_finds_conflicts_before_limit_and_counts_deferred(self):
+        self.admit()
+        self.admit(document(source_id="source-b", stance="challenges", dependence_group="other"))
+        plan = self.refresh(limit=1)
+        self.assertEqual(plan["total_requests"], 2)
+        self.assertEqual(plan["deferred_requests"], 1)
+        self.assertEqual(plan["reason_counts"]["contradictory_evidence"], 2)
+        self.assertEqual(plan["requests"][0]["conflicting_mechanics"], ["platforming"])
+
+    def test_recrawl_independence_excludes_duplicates_stale_and_other_owners(self):
+        self.admit()
+        self.admit(document(source_id="source-b"))
+        self.admit(document(owner="other-owner", dependence_group="other"))
+        self.admit(document(source_id="old", dependence_group="third", time="2026-09-01T12:00:00Z"))
+        plan = self.refresh()
+        self.assertEqual(plan["active_sources"], 3)
+        self.assertTrue(all(r["independent_support_deficits"] == {"platforming": 1}
+                            for r in plan["requests"]))
+        self.admit(document(source_id="independent", dependence_group="fourth"))
+        plan = self.refresh()
+        self.assertEqual([r["source_id"] for r in plan["requests"]], ["old"])
+        self.assertEqual(plan["requests"][0]["reasons"], ["stale_observation"])
+
+    def test_recrawl_boundary_future_retraction_scope_and_uncertainty(self):
+        first = self.admit()
+        self.admit(document(source_id="future", time="2026-10-11T12:00:00Z"))
+        self.admit(document(source_id="private", scopes=("research",)))
+        self.admit(document(source_id="uncertain", stance="uncertain"))
+        plan = self.refresh(max_age_seconds=172800)
+        self.assertEqual(plan["requests"][0]["source_id"], "future")
+        self.assertIn("stale_observation", next(r for r in plan["requests"]
+                                                if r["source_id"] == "source-a")["reasons"])
+        self.assertNotIn("private", [r["source_id"] for r in plan["requests"]])
+        self.admit(replace(document(), observed_at="2026-10-10T11:00:00Z",
+                           notes=(), approved=False, status="retracted"), expected=first.revision_digest)
+        self.assertNotIn("source-a", [r["source_id"] for r in self.refresh()["requests"]])
+
+    def test_recrawl_refresh_replaces_request_but_preserves_history(self):
+        first = self.admit()
+        old = self.refresh(max_age_seconds=86400, min_independent_groups=1)
+        self.admit(replace(document(), observed_at="2026-10-10T11:00:00Z"), expected=first.revision_digest)
+        new = self.refresh(max_age_seconds=86400, min_independent_groups=1)
+        self.assertEqual(new["requests"], [])
+        self.assertNotEqual(old["knowledge_root"], new["knowledge_root"])
+        self.assertEqual(len(self.store.history("studio-a", "source-a", authorized=True)), 2)
+        with self.assertRaisesRegex(KnowledgeError, "parent"):
+            self.admit(replace(document(), observed_at="2026-10-10T12:00:00Z"),
+                       expected=old["requests"][0]["expected_parent_digest"])
+
+    def test_recrawl_rejects_bad_bounds_authority_and_corruption(self):
+        for kwargs in ({"limit": True}, {"max_age_seconds": 0},
+                       {"min_independent_groups": 101}, {"min_confidence_ppm": -1},
+                       {"scope": "training"}):
+            with self.subTest(kwargs=kwargs), self.assertRaises(KnowledgeError):
+                self.refresh(**kwargs)
+        for auth in (False, 1, "yes"):
+            with self.assertRaises(PermissionError):
+                self.store.plan_recrawl("studio-a", as_of="2026-10-10T12:00:00Z", authorized=auth)
+        self.admit()
+        self.store.db.execute("UPDATE game_builder_knowledge SET digest=?", ("0" * 64,))
+        with self.assertRaisesRegex(KnowledgeError, "integrity"):
+            self.refresh()
+
+    def test_recrawl_cli_outputs_bounded_plan(self):
+        from contextlib import redirect_stdout
+        from io import StringIO
+        from skeleton.ai.game_builder.knowledge_cli import main
+        self.admit()
+        output = StringIO()
+        with redirect_stdout(output):
+            status = main(["--store", str(self.dbfile), "--trusted-local-operator",
+                           "plan-recrawl", "--owner", "studio-a",
+                           "--as-of", "2026-10-10T12:00:00Z", "--limit", "1"])
+        self.assertEqual(status, 0)
+        self.assertEqual(json.loads(output.getvalue()), self.refresh(limit=1))
+
 
 if __name__ == "__main__":
     unittest.main()

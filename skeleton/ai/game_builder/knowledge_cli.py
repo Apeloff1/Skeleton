@@ -90,6 +90,15 @@ def build_parser() -> argparse.ArgumentParser:
     root = commands.add_parser("root", help="Compute validated owner knowledge root")
     root.add_argument("--owner", required=True)
 
+    refresh = commands.add_parser("plan-recrawl", help="Prioritize source review gaps without network I/O")
+    refresh.add_argument("--owner", required=True)
+    refresh.add_argument("--as-of", required=True, help="Trusted UTC timestamp, YYYY-MM-DDTHH:MM:SSZ")
+    refresh.add_argument("--scope", default="design_reference")
+    refresh.add_argument("--max-age-seconds", type=int, default=604800)
+    refresh.add_argument("--minimum-independent-groups", type=int, default=2)
+    refresh.add_argument("--minimum-confidence-ppm", type=int, default=800000)
+    refresh.add_argument("--limit", type=int, default=20)
+
     erased = commands.add_parser("erase-owner", help="Permanently delete owned source excerpts")
     erased.add_argument("--owner", required=True)
     erased.add_argument("--confirm-erasure", required=True, help="Must exactly repeat the owner")
@@ -144,6 +153,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                         )
                     ],
                 }
+            elif args.command == "plan-recrawl":
+                output = store.plan_recrawl(
+                    args.owner, as_of=args.as_of, scope=args.scope,
+                    max_age_seconds=args.max_age_seconds,
+                    min_independent_groups=args.minimum_independent_groups,
+                    min_confidence_ppm=args.minimum_confidence_ppm,
+                    limit=args.limit, authorized=True,
+                )
             elif args.command == "root":
                 output = {
                     "schema": "skeleton.game_builder.reviewed_root.v1",

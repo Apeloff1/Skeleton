@@ -77,3 +77,53 @@ A concurrent admission regression checks that eight requests never exceed two ad
 The canonical global-scheduler regression suite reports 12 passed and one fairness/aging test failed. The identical failure was reproduced in untouched baseline 79fe3870. This extension does not rewrite that independent scheduler policy. Product/global priority conventions differ and the adapter explicitly translates user priority to global 0; a regression verifies it.
 
 State topology explicitly registers the consented conversation projection as derived and production binding pending. The global resource contract records the Dragon adapter and its focused acceptance suite. Both topology and global resource contract validators pass.
+
+## Reviewed-library refresh increment
+
+The existing `ReviewedKnowledgeStore.plan_recrawl` now derives a bounded,
+deterministic refresh plan from one integrity-verified owner snapshot. No new
+database, service, provider, or state owner is introduced. This closes the local
+review-gap planning step for the Almanakk concept; Wiki/Hoag dual approval,
+authenticated crawler dispatch, and permanent-memory promotion remain open.
+
+Run the existing operator CLI with `plan-recrawl --owner STUDIO --as-of
+2026-10-10T12:00:00Z`, after its required `--store` and
+`--trusted-local-operator` arguments. Optional controls include
+`--max-age-seconds`, `--minimum-independent-groups`,
+`--minimum-confidence-ppm`, `--scope`, and `--limit`.
+
+The projection reports future timestamps, stale observations, conflicting
+mechanic evidence, uncertainty, low confidence and independent-support deficits.
+Future timestamps rank first, then contradictions, then stale sources, then
+other review gaps; older observations and stable source IDs break ties.
+It examines all bounded current sources before limiting output, and reports
+deferred work and reason counts. Retractions and out-of-scope sources are
+excluded. Only fresh, sufficiently confident supporting observations contribute
+independent dependence groups; repeated revisions and copied publishers do not
+increase that count. Group labels remain externally reviewed metadata, not a
+new empirical independence detector. Mechanic-level conflicts are conservative
+triage signals: a reviewer must resolve different contexts and applicability.
+
+Each request binds its source-body digest and expected revision parent. The
+existing transactional import rejects stale parents and preserves the revision
+chain. Plans include their evaluation clock, policy, owner snapshot and content
+digest. Digests detect identity changes; they are not authentication. The
+embedding runtime must replan before dispatch, authenticate actors, enforce
+crawler URL/permission/resource policy, and require fresh independent review
+before importing results. Citation URLs are not network permission. The
+projection explicitly grants neither execution nor memory promotion.
+
+L00–L03 retain canonical library ownership and trusted-operator admission.
+L04–L07 use read-only snapshot projection and existing optimistic revision
+imports, tenant filters and corruption rejection. L08 reports bounded counts
+without raw source bodies. L09 is bounded by existing owner revision/claim
+quotas and output limits; this is an O(current claims) local planning pass,
+not consumer-device performance qualification. L10 covers restart, timestamp
+boundary, conflict-before-limit, duplicate provenance, scope/retraction,
+stale-parent rejection, corruption and real CLI output. L11–L12 need no schema
+migration: rollback removes the command/consumer; canonical revisions remain.
+L13 remains open for authenticated end-to-end crawl/review/promotion acceptance.
+
+Validation: `python -m pytest tests/test_game_builder_reviewed_knowledge.py -q`
+passed 31 tests and 11 subtests. Sign-off: Codex, 2026-10-10, limited to this
+local planning implementation and its focused validation; no volume closure.
