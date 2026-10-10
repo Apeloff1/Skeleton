@@ -205,7 +205,7 @@ def test_reproducibility_receipt_cannot_forge_its_content_digest(tmp_path):
 
 def test_exclusive_local_receipt_write_is_atomic_and_does_not_overwrite(tmp_path):
     destination=tmp_path/"rebuild-proof.json"
-    proof=verify_rebuilt_sega_cartridge(**prepared(tmp_path/"first-evaluation")).public_receipt()
+    proof=verify_rebuilt_sega_cartridge(**prepared(tmp_path)).public_receipt()
     emit_receipt(destination,proof)
     assert json.loads(destination.read_text())==proof
     assert stat.S_IMODE(destination.stat().st_mode)==0o600
