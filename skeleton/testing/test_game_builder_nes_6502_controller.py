@@ -44,6 +44,7 @@ def test_original_nes_game_declaration_derives_first_move_from_world(tmp_path):
     assert 0<=target[1]<manifest["height"]
     assert manifest["emulator_verified"] is False
     assert manifest["hardware_verified"] is False
+    assert len(manifest["original_stage_zero_bg_sha256"]) == 64
 
 
 @pytest.mark.parametrize("wrong",[
