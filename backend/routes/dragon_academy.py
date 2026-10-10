@@ -561,13 +561,13 @@ def native_living_world_preview(
 )->dict:
     from dataclasses import asdict
     from skeleton.ai.webcrawler.dragon_living_world import (
-        initial_state,describe,terrain,
+        initial_state,describe,terrain_for_state,
     )
     try:
         world=_dragon_living_world(body)
         player=initial_state(world)
         tilemap=[
-            terrain(world,0,x,y)
+            terrain_for_state(world,player,0,x,y)
             for y in range(-2,3) for x in range(-2,3)
         ]
     except ValueError:
@@ -589,13 +589,13 @@ def native_living_world_play(
     body:NativeLivingPlayRequest,
     owner:str=Depends(_native_source_editor),
 )->dict:
-    from skeleton.ai.webcrawler.dragon_living_world import replay,describe,terrain
+    from skeleton.ai.webcrawler.dragon_living_world import replay,describe,terrain_for_state
     try:
         world=_dragon_living_world(body)
         state=replay(world,tuple(body.moves))
         current=describe(world,state)
         surroundings=[
-            terrain(world,state.realm,state.x+dx,state.y+dy)
+            terrain_for_state(world,state,state.realm,state.x+dx,state.y+dy)
             for dy in range(-2,3) for dx in range(-2,3)
         ]
     except ValueError:
@@ -677,7 +677,7 @@ def native_living_world_checkpoint_advance(
     owner:str=Depends(_native_source_editor),
 )->dict:
     from skeleton.ai.webcrawler.dragon_living_world_checkpoint import continue_world
-    from skeleton.ai.webcrawler.dragon_living_world import describe,terrain
+    from skeleton.ai.webcrawler.dragon_living_world import describe,terrain_for_state_for_state
     try:
         world=_dragon_living_world(body)
         signed=continue_world(
