@@ -95,3 +95,41 @@ Upstream technical references (not bundled):
 **Verification status:** Original source emitted; no verified ROM, emulated
 controller replay, actual-hardware proof, legal certificate or permission to
 redistribute claimed.
+
+
+## Living companion, musical reactions, and eight cosmetic ranks
+
+The SDL-free cartridge generator now emits distinct **native Z80 code** for an
+original expressive follower. The actual authored display assets are 8x8
+four-plane VDP pixels (22 tiles × 32 bytes), not PNG animations, JavaScript,
+HTML or sprite frames extracted from a commercial game. In addition to the
+player's alternate pose, the tiny follower has curious, blink, joy, injury and
+celebration expressions. A second renderer uses the Sega VDP's **hardware
+sprite attribute table**, with a visual bob above the player. The companion
+also lives in the score HUD, where the player can see its current expression.
+
+Collectibles grant a **purely cosmetic bond progression** through eight ranks.
+Thresholds are 3, 7, 12, 18, 25, 33 and 42 collectibles. A level-up changes
+the follower's expression and plays a short reward cue, but it never modifies
+the source game's authoritative map, collision, pathfinding, collectible
+scoring, health, win condition, release rights or signed provenance. The
+original deterministic replay remains the authoritative gameplay reference.
+
+All sounds are synthesized as original SN76489 PSG register writes; no
+third-party sample, music file, commercial game melody, BIOS sound or
+proprietary API is copied. Pickup, damage, game-over and advancement signals
+use bounded tones rather than arbitrary host-side playback.
+
+Display updates are coalesced into a small queue and limited to three name
+table changes per VBlank. The independently authored familiar uses separate
+sprite memory and a two-step bob instead of writing over game collision tiles.
+Neither implementation has yet been proven on the real hardware in this
+increment. The presence of native source and test assertions is **not**
+emulator acceptance.
+
+The manifest records all optional animations, personality ranks, reaction
+sound capability and non-authoritative cosmetic status. It deliberately keeps
+`emulator_playthrough_verified`, `physical_hardware_verified`, and
+`release_approved` false. Exact cartridge generation, gameplay replay,
+audio timing and physical console compatibility remain separately gated.
+
