@@ -111,6 +111,10 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
             "original_levels_replayed": 3,
             "controller_actions_replayed": 256,
             "hardware_screen_states_verified": 257,
+            "semantic_controller_screen_trace_sha256": "f"*64,
+            "semantic_trace_steps_hashed": 257,
+            "total_instruction_budget_enforced": True,
+            "total_frame_budget_enforced": True,
             "real_z80_instruction_count": 123456,
             "independent_cycle_exact_full_console_emulator_verified": False,
             "physical_hardware_verified": False,
@@ -178,6 +182,8 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     assert receipt["original_controller_actions_verified_per_platform"] == 256
     assert receipt["world_digest"] == WORLD
     assert receipt["full_native_z80_gameplay_replay_verified"] is True
+    assert receipt["native_guest_semantic_trace_sha256"] == "f"*64
+    assert receipt["native_guest_semantic_snapshots_verified_per_platform"] == 257
     assert receipt["native_z80_controller_actions_verified_per_platform"] == 256
     assert set(receipt["guest_z80_gameplay_receipt_sha256_by_platform"]) == set(EXTS)
     assert receipt["physical_hardware_verified"] is False
@@ -199,6 +205,10 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     ("boot", "physical_hardware_verified", True),
     ("compile", "real_rom_structure_verified", False),
     ("compile", "rom_sha256", "0" * 64),
+    ("native_route", "semantic_controller_screen_trace_sha256", "0"*64),
+    ("native_route", "semantic_trace_steps_hashed", 256),
+    ("native_route", "total_instruction_budget_enforced", False),
+    ("native_route", "total_frame_budget_enforced", "true"),
     ("native_route", "rom_sha256", "0" * 64),
     ("native_route", "original_world_digest", "d" * 64),
     ("native_route", "original_route_sha256", "e" * 64),
@@ -343,3 +353,24 @@ def test_cross_port_output_parent_symlink_cannot_redirect_a_game_receipt(tmp_pat
     with pytest.raises(ValueError):
         emit_receipt(alias/"evidence.json",result)
     assert list(actual.iterdir())==[]
+
+
+
+def test_cross_console_rejects_divergent_guest_cpu_semantic_gameplay_trace(tmp_path):
+    paths=_fixtures(tmp_path)
+    _mutate(paths["sega_game_gear"]["native_route"],
+            "semantic_controller_screen_trace_sha256","e"*64)
+    with pytest.raises(Sega8PortParityError,match="semantic trace"):
+        verify_ports(tmp_path)
+
+
+@pytest.mark.parametrize("value",[True,False,None,"true",0,1,[],{}])
+def test_native_guest_replay_budget_attestation_cannot_be_suppressed(tmp_path,value):
+    files=_fixtures(tmp_path)
+    _mutate(files["sega_master_system"]["native_route"],
+            "total_instruction_budget_enforced",value)
+    if value is True:
+        assert verify_ports(tmp_path)["native_guest_semantic_snapshots_verified_per_platform"]==257
+    else:
+        with pytest.raises(Sega8PortParityError):
+            verify_ports(tmp_path)
