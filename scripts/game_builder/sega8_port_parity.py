@@ -231,8 +231,14 @@ def verify_ports(root: Path) -> dict[str, object]:
             or native_route["hardware_screen_states_verified"]
                != native_route["controller_actions_replayed"] + 1
             or native_route["real_z80_instruction_count"] <= 0
+            or native_route.get("total_instruction_budget_enforced") is not True
+            or native_route.get("total_frame_budget_enforced") is not True
+            or type(native_route.get("semantic_trace_steps_hashed")) is not int
+            or native_route["semantic_trace_steps_hashed"]
+               != native_route["controller_actions_replayed"] + 1
         ):
             raise Sega8PortParityError("native Z80 replay not bound to every expected game action")
+        _sha(native_route.get("semantic_controller_screen_trace_sha256"), "actual Z80 semantic trace")
         _sha(meta.get("world_digest"), "world")
         _sha(meta.get("reference_safe_replay_digest"), "safe replay")
         _sha(meta.get("source_rights_evidence_sha256"), "rights evidence")
@@ -265,6 +271,9 @@ def verify_ports(root: Path) -> dict[str, object]:
         != gg["native_route"]["hardware_screen_states_verified"]
     ):
         raise Sega8PortParityError("original Z80 cartridge gameplay differs between hardware ports")
+    if (sms["native_route"]["semantic_controller_screen_trace_sha256"]
+            != gg["native_route"]["semantic_controller_screen_trace_sha256"]):
+        raise Sega8PortParityError("same original game has different guest-observed Z80 semantic trace")
     if sms["manifest"].get("target_rom_suffix") == gg["manifest"].get("target_rom_suffix"):
         raise Sega8PortParityError("different native ports share incorrect ROM extension")
     result = {
@@ -288,6 +297,10 @@ def verify_ports(root: Path) -> dict[str, object]:
             for target in sorted(_TARGETS)
         },
         "full_native_z80_gameplay_replay_verified": True,
+        "native_guest_semantic_trace_sha256":
+            sms["native_route"]["semantic_controller_screen_trace_sha256"],
+        "native_guest_semantic_snapshots_verified_per_platform":
+            sms["native_route"]["semantic_trace_steps_hashed"],
         "native_z80_controller_actions_verified_per_platform":
             sms["native_route"]["controller_actions_replayed"],
         "guest_z80_gameplay_receipt_sha256_by_platform": {
