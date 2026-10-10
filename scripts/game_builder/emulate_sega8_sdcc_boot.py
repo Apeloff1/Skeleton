@@ -207,7 +207,16 @@ def boot_rom(
     cpu.pc = 0
     frames = 0
     observed = None
+    # Bounded instruction samples help distinguish a dead startup vector,
+    # HALT/IRQ deadlock and a real machine initialization failure. This is
+    # diagnostic evidence only, never a permissive path to success.
+    sample_pc: list[tuple[int, int, bool, int, int]] = []
     for n in range(1, max_instructions + 1):
+        if n in (1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024) or (
+            n % 250000 == 0
+        ):
+            sample_pc.append((n, cpu.pc, bool(cpu.halted),
+                              int(getattr(cpu, "iff1", 0)), cpu.sp))
         if n % frame_instructions == 0:
             frames += 1
             machine.frame_ready = True
@@ -234,7 +243,10 @@ def boot_rom(
             "compiled Sega cartridge did not initialize and draw expected game "
             f"in {max_instructions} CPU instructions; "
             f"VDP writes={machine.vdp_writes}, CRAM writes={machine.cram_writes}, "
-            f"PSG writes={machine.psg_writes}, status reads={machine.vdp_read_status}"
+            f"PSG writes={machine.psg_writes}, status reads={machine.vdp_read_status}; "
+            f"PC samples={sample_pc}; reset vector={binary[:16].hex()}; "
+            f"final_pc={cpu.pc:#06x} sp={cpu.sp:#06x} halted={cpu.halted}; "
+            f"VBlank events={machine.interrupts_issued}"
         )
     return {
         "schema": "skeleton.game_builder.sega8_real_z80_boot_smoke.v1",
