@@ -81,6 +81,7 @@ jobs:
             tests/test_ai_game_builder_governance.py \
             tests/test_game_builder_knowledge_rights_bridge.py \
             tests/test_game_builder_reviewed_knowledge.py \
+            tests/test_dragon_wisdom_pyramid.py \
             tests/test_dragon_wisdom_integration.py \
             tests/test_dragon_visual_play_integration.py \
             tests/test_dragon_evidence_timestamp_compatibility.py; do
