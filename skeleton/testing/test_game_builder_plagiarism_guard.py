@@ -439,3 +439,27 @@ def test_plagiarism_report_cannot_be_mutated_into_fake_clearance():
     blocked = run(assets=tuple(blocked_asset))
     with pytest.raises(OriginalityError):
         replace(blocked, disposition=OriginalityDisposition.HUMAN_REVIEW_REQUIRED)
+
+
+@pytest.mark.parametrize("mutation", [
+    {"legal_infringement_determined": True},
+    {"candidate_shingle_share": float("nan")},
+    {"candidate_shingle_share": 1.5},
+    {"shared_word_shingles": -1},
+    {"longest_consecutive_tokens": 16_001},
+    {"triage_signal": "LEGAL_COPYRIGHT_CERTIFIED"},
+    {"sample_sha256": "invalid"},
+    {"sample_id": "bad\\nidentity"},
+    {"modality": "music_audio"},
+])
+def test_expressive_overlap_cannot_be_forged_into_legal_finding(mutation):
+    finding = run(references=(external(SYNTHETIC_TEXT),)).overlap_findings[0]
+    with pytest.raises(OriginalityError):
+        replace(finding, **mutation)
+
+
+def test_direct_similarity_scan_requires_admitted_typed_samples():
+    with pytest.raises(OriginalityError, match="typed"):
+        find_expression_overlap(sample(), "not an ExpressionSample")
+    with pytest.raises(OriginalityError, match="typed"):
+        find_expression_overlap(None, external(SYNTHETIC_TEXT))
