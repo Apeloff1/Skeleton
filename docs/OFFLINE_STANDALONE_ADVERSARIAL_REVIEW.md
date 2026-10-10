@@ -1,9 +1,9 @@
 # Offline Standalone AI — Adversarial Engineering Review
 
-**Review date:** 2026-10-09  
+**Review date:** 2026-10-09
 **Scope:** PR #3593, application-shell offline native/GGUF inference, Windows
 console distribution, local FTS5 document index, revisioned conversations,
-SQLite indexing queue, portable snapshots and Windows per-program egress rules.  
+SQLite indexing queue, portable snapshots and Windows per-program egress rules.
 **Status:** Code changes committed; final-head CI and real-device acceptance
 **not yet passed or signed**. No verified claim of whole-product air-gapped
 operation. This ledger is review evidence, not a production security
@@ -162,4 +162,4 @@ verified. The original data bank is unchanged; the active subset remains
 
 **Release decision remains unsigned.** P2 Local Inference and Windows
 Installer must produce successful exact-head results, with genuine
-model/device acceptance separately established. 
+model/device acceptance separately established.
