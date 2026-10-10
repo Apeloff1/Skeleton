@@ -176,12 +176,14 @@ def _pe(reader: _Reader) -> tuple[str,int,int,int]:
         _require(b<=c, "overlapping PE on-disk sections")
     _require(any(
         (lambda virtual_size,virtual_rva,raw_size,flags:
-          flags & 0x20000000 and raw_size>0 and
-          virtual_rva <= entry_rva < virtual_rva+max(virtual_size,raw_size))(
+          bool(flags & 0x20000000) and raw_size>0 and
+          virtual_rva <= entry_rva < virtual_rva+min(
+              max(virtual_size,1),raw_size
+          ))(
             *reader.unpack("<IIII",sec_table+i*40+8)[:3],
             reader.unpack("<I",sec_table+i*40+36)[0],
         ) for i in range(nsections)
-    ), "Windows native entrypoint does not map to an executable section")
+    ), "Windows native entrypoint does not map to file-backed executable code")
     return _MACHINE_PE[machine],nsections,executable_sections,entry_rva
 
 
