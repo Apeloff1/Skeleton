@@ -19,8 +19,9 @@ NEW_DONE='''  if(level_done()){
    else {
     printf("Stage solved! Select your own next path (N, 1 or 2):\\n");
     for(int option=0;option<dragon_branch_count[chapter];option++)
-     printf("  %d - chapter %d\\n",option+1,
-            dragon_branch_next[chapter][option]+1);
+     printf("  %d - chapter %d (measured complexity %d/100)\\n",option+1,
+            dragon_branch_next[chapter][option]+1,
+            dragon_stage_tension[dragon_branch_next[chapter][option]]);
    }
   }'''
 OLD_NEXT='''   if(key=='n'||key=='N'){
