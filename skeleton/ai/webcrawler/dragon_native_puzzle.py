@@ -101,7 +101,7 @@ def solve_grid(rows:tuple[str,...])->tuple[str,int]:
         raise ValueError("native puzzle solution exceeds bounded input sequence")
     return solution,len(parents)
 
-def transformed_level(stage:int,seed:int,difficulty:int=4)->tuple[str,...]:
+def transformed_level(stage:int,seed:int,difficulty:int=4,*,procedural:bool=False)->tuple[str,...]:
     if isinstance(stage,bool) or not isinstance(stage,int) or not 0<=stage<MAX_LEVELS:
         raise ValueError("native puzzle level index out of bounds")
     if isinstance(seed,bool) or not isinstance(seed,int) or not 0<=seed<2**32:
@@ -114,6 +114,13 @@ def transformed_level(stage:int,seed:int,difficulty:int=4)->tuple[str,...]:
     if flags&1:rows=tuple(r[::-1] for r in rows)
     if flags&2:rows=tuple(reversed(rows))
     _parse(rows)
+    if type(procedural) is not bool:
+        raise ValueError("procedural native puzzle mode must be a boolean")
+    if procedural:
+        from .dragon_native_puzzle_variants import vary_original_level
+        rows,_=vary_original_level(
+            rows,seed=seed,stage=stage,difficulty=difficulty,solve=solve_grid,
+        )
     return rows
 
 C_SOURCE=r'''/* Dragon Native Sokoban: pure C99, ANSI terminal, no SDL/no WebView.
@@ -272,12 +279,15 @@ int main(int argc,char**argv){
 }
 '''
 
-def emit_native_puzzle(*,seed:int,stages:int=4,difficulty:int=4)->dict[str,str]:
+def emit_native_puzzle(*,seed:int,stages:int=4,difficulty:int=4,
+                       procedural:bool=False)->dict[str,str]:
     if isinstance(stages,bool) or not isinstance(stages,int) or not 1<=stages<=MAX_LEVELS:
         raise ValueError("native puzzle stages must be 1..8")
+    if type(procedural) is not bool:
+        raise ValueError("procedural native puzzle flag must be a boolean")
     layouts=[];solutions=[];proofs=[]
     for index in range(stages):
-        grid=transformed_level(index,seed,difficulty)
+        grid=transformed_level(index,seed,difficulty,procedural=procedural)
         path,states=solve_grid(grid)
         start,boxes,goals,walls=_parse(grid)
         layouts.append(grid);solutions.append(path)
@@ -326,6 +336,7 @@ clean:
       "mode":"original_native_sokoban",
       "search":"exact bounded BFS over player location and crate set",
       "seed":seed,"stages":stages,"difficulty":difficulty,
+      "procedural":procedural,
       "level_proofs":[asdict(p) for p in proofs],
       "native_runtime_test_required":True,
       "proof_scope":"optimal abstract grid moves, not C executable verification",
