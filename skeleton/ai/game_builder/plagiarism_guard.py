@@ -261,28 +261,64 @@ def _shingles(tokens: tuple[str, ...]) -> frozenset[tuple[str, ...]]:
 
 
 def _longest_overlap(left: tuple[str, ...], right: tuple[str, ...]) -> int:
-    """Bounded longest contiguous token match; avoids quadratic pairwise DP."""
+    """Exact longest shared contiguous token run in O(n + m) time.
+
+    The previous bounded-offset shingle matcher still performed quadratic
+    extensions on repeated words, and capped 32 offsets per phrase. That
+    allowed adversarial repetitive inputs to exhaust CPU and miss later
+    distinctive matches. A suffix automaton indexes *all* right-hand token
+    substrings with at most 2*n states, then streams the left tokens once.
+    """
     if not left or not right:
         return 0
-    positions: dict[tuple[str, ...], list[int]] = {}
-    for j in range(max(0, len(right) - _SHINGLE + 1)):
-        key = right[j:j + _SHINGLE]
-        slot = positions.setdefault(key, [])
-        if len(slot) < 32:
-            slot.append(j)
-    longest = 0
-    for i in range(max(0, len(left) - _SHINGLE + 1)):
-        for j in positions.get(left[i:i + _SHINGLE], ()):
-            limit = min(len(left) - i, len(right) - j)
-            if limit <= longest or left[i + longest] != right[j + longest]:
-                continue
-            k = max(_SHINGLE, longest)
-            while k < limit and left[i + k] == right[j + k]:
-                k += 1
-            longest = max(longest, k)
-    if not longest and len(left) < _SHINGLE and left == right:
-        return len(left)
-    return longest
+    # A state's transitions are token -> next state ID.
+    links: list[int] = [-1]
+    lengths: list[int] = [0]
+    edges: list[dict[str, int]] = [{}]
+    last = 0
+    for token in right:
+        cur = len(links)
+        links.append(0)
+        lengths.append(lengths[last] + 1)
+        edges.append({})
+        parent = last
+        while parent != -1 and token not in edges[parent]:
+            edges[parent][token] = cur
+            parent = links[parent]
+        if parent == -1:
+            links[cur] = 0
+        else:
+            target = edges[parent][token]
+            if lengths[parent] + 1 == lengths[target]:
+                links[cur] = target
+            else:
+                clone = len(links)
+                links.append(links[target])
+                lengths.append(lengths[parent] + 1)
+                edges.append(edges[target].copy())
+                while parent != -1 and edges[parent].get(token) == target:
+                    edges[parent][token] = clone
+                    parent = links[parent]
+                links[target] = clone
+                links[cur] = clone
+        last = cur
+
+    current = 0
+    shared = 0
+    best = 0
+    for token in left:
+        while current != 0 and token not in edges[current]:
+            current = links[current]
+            shared = min(shared, lengths[current])
+        next_state = edges[current].get(token)
+        if next_state is None:
+            current = 0
+            shared = 0
+        else:
+            current = next_state
+            shared += 1
+            best = max(best, shared)
+    return best
 
 
 def find_expression_overlap(
@@ -305,6 +341,8 @@ def find_expression_overlap(
     # Short generic text and conventional code may be non-protectable.
     if exact and len(original) >= 8:
         signal = "IDENTICAL_NORMALIZED_EXPRESSION"
+    elif exact and len(original) >= 6 and submission.modality != "source_code":
+        signal = "SHORT_IDENTICAL_NARRATIVE_FOR_REVIEW"
     elif longest >= 12:
         signal = "LONG_IDENTICAL_EXPRESSION_RUN"
     elif common >= 4 and share >= 0.30:
