@@ -238,11 +238,15 @@ class DragonResourceSession:
                 # Only an actual worker-stop acknowledgement releases the
                 # global grant, including grants revoked by another plane.
                 grant_id = self._grants[task_id]
-                grant = next(g for g in self._global.active_grants() if g.grant_id == grant_id)
-                if grant.state == "revoking":
-                    self._global.ack_preempted(grant_id)
-                else:
-                    self._global.release(grant_id)
+                grant = next((g for g in self._global.active_grants()
+                              if g.grant_id == grant_id), None)
+                if grant is not None:
+                    if grant.state == "revoking":
+                        self._global.ack_preempted(grant_id)
+                    else:
+                        self._global.release(grant_id)
+                # If the global authority already revoked/released the grant,
+                # do not double-release or strand the stopped worker locally.
                 del self._grants[task_id]
             del self._active[task_id]
             self._yielding.discard(task_id)
