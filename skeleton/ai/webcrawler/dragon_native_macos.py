@@ -139,10 +139,15 @@ def build_native_macos_game(spec:ProductionRequest,*,authorized:bool,
         from .dragon_native_puzzle_trace import simulate_grid,parse_native_state_line
         traces=[]
         for number in range(proof["stages"]):
+            from .dragon_native_level_curation import curate_level
             board=(tuple(proof["authored_level_rows"][number])
                    if proof.get("authoring_mode")=="authored" else
-                   transformed_level(number,proof["seed"],proof["difficulty"],
-                                     procedural=proof.get("procedural",False)))
+                   curate_level(
+                       stage=number,seed=proof["seed"],
+                       difficulty=proof["difficulty"],
+                       procedural=proof.get("procedural",False),
+                       profile=proof.get("challenge_profile","balanced"),
+                   )[0])
             solution,_=solve_grid(board)
             for commands in (solution,"r"+solution,"su"+solution):
                 expected=simulate_grid(board,commands,level=number+1)
