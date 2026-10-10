@@ -168,3 +168,12 @@ def test_route_portfolio_finds_real_distinct_routes_and_caps_work():
     with pytest.raises(MultipathError):
         route_portfolio(p, max_routes=0)
 
+
+def test_walkable_cell_catalog_distinguishes_hazard_cost():
+    p = RouteProblem.from_rows(HAZARD_LEVEL)
+    safe = walkable_cells(p)
+    all_cells = walkable_cells(p, include_hazards=True)
+    assert (3, 1) not in safe and (3, 1) in all_cells
+    assert len(all_cells) == len(safe) + 1
+    assert all(p.tile(point) != "#" for point in all_cells)
+
