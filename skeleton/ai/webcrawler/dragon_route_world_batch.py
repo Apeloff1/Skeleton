@@ -52,6 +52,10 @@ class WorldBatch:
     schema:str
     start_seed:int
     next_seed:int
+    weather:str
+    start_hour:int
+    audit_budget:int
+    prior_content_digests:tuple[str,...]
     attempted:int
     admitted:int
     rejected:int
@@ -81,7 +85,7 @@ def create_candidate_batch(*,start_seed:int,count:int,weather:str="clear",
             start_seed+count>2**32):
         raise ValueError("original candidate batch beyond seed or resource budget")
     if (not isinstance(examined_digests,frozenset) or
-            len(examined_digests)>10000 or
+            len(examined_digests)>512 or
             any(type(x) is not str or len(x)!=64 or
                 any(ch not in "0123456789abcdef" for ch in x)
                 for x in examined_digests)):
@@ -121,7 +125,8 @@ def create_candidate_batch(*,start_seed:int,count:int,weather:str="clear",
             False,False,
         ))
     return WorldBatch(
-        SCHEMA,start_seed,start_seed+count,count,
+        SCHEMA,start_seed,start_seed+count,weather,hour,audit_budget,
+        tuple(sorted(examined_digests)),count,
         len(candidates),len(denials),tuple(candidates),tuple(denials),
         len({x.digest for x in candidates}),
         0,LEGAL_HOLDS,
@@ -137,22 +142,18 @@ def verify_batch(data:dict)->WorldBatch:
         raise ValueError("unknown original route candidate ledger")
     start=data.get("start_seed")
     count=data.get("attempted")
-    weather="clear"
-    hour=8
-    entries=data.get("candidates")
-    if not isinstance(entries,list):
-        raise ValueError("original game candidate entries not a sequence")
-    if entries:
-        first=entries[0]
-        weather=first.get("weather")
-        hour=first.get("start_hour")
-    # Verify immutable version-1 ledger deterministically from actual seed
-    # range, not self-asserted candidate statistics. The external cumulative
-    # duplicate exclusion set belongs to a separate future signed batch
-    # history, so foreign exclusions cannot be silently invented here.
-    expected=create_candidate_batch(start_seed=start,count=count,
-                                    weather=weather,hour=hour,
-                                    audit_budget=1200)
+    seen=data.get("prior_content_digests")
+    if not isinstance(seen,list) or len(seen)>512:
+        raise ValueError("original candidate batch duplicate cursor invalid")
+    # Complete original seed/quality/preceding-content input is retained,
+    # so a ledger is independently recomputable, not a signed-looking guess.
+    expected=create_candidate_batch(
+        start_seed=start,count=count,
+        weather=data.get("weather"),
+        hour=data.get("start_hour"),
+        audit_budget=data.get("audit_budget"),
+        examined_digests=frozenset(seen),
+    )
     if json.loads(json.dumps(batch_dict(expected)))!=data:
         raise ValueError("original world candidate ledger differs from canonical recomputation")
     return expected
