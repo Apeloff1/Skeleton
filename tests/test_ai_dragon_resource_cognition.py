@@ -335,3 +335,38 @@ def test_global_priority_translation_preserves_user_first():
     session.dispatch((SessionTask('learn', 'acquisition', 1024, 1),), hardware(), now=10)
     assert scheduler.active_grants()[0].priority == 6
     session.stopped('learn')
+
+
+def test_lost_global_grant_forces_checkpoint_before_any_more_work():
+    scheduler = global_scheduler()
+    session = DragonResourceSession(global_resources=scheduler, tenant="a")
+    task = SessionTask("work", "acquisition", 1024, 1)
+    decision = session.dispatch((task,), hardware(), now=10)
+    assert decision.execution_authorized
+    assert session.yield_requested("work") is False
+
+    # Another global authority can terminate capacity before the local
+    # worker sees the next chunk. The worker must stop, not compute anyway.
+    active = scheduler.active_grants()
+    assert len(active) == 1
+    scheduler.release(active[0].grant_id)
+    assert scheduler.active_grants() == ()
+    assert session.yield_requested("work") is True
+    session.stopped("work")
+    assert scheduler.usage("background").empty
+    with pytest.raises(ValueError, match="unknown active task"):
+        session.yield_requested("work")
+
+
+def test_released_global_grant_does_not_strand_local_worker_or_double_release():
+    scheduler = global_scheduler()
+    session = DragonResourceSession(global_resources=scheduler, tenant="a")
+    task = SessionTask("chat", "user", 1024, 1)
+    assert session.dispatch((task,), hardware(), now=10).execution_authorized
+    grant = scheduler.active_grants()[0]
+    scheduler.release(grant.grant_id)
+    # Completion after externally revoked grant is still an honest worker stop.
+    session.stopped("chat")
+    assert scheduler.usage("interactive").empty
+    assert session.dispatch((task,), hardware(), now=10).execution_authorized
+    session.stopped("chat")
