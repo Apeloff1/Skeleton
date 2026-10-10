@@ -291,6 +291,44 @@ def native_production_puzzle_starter(
         raise HTTPException(status_code=422, detail="Unsupported starter game stage count") from None
 
 
+class NativePuzzleCurrentHintRequest(BaseModel):
+    """Editor-only exact live hints: symbolic board data, never executable source."""
+    model_config = ConfigDict(extra="forbid")
+    rows: NativeOriginalGrid
+    player: StrictInt = Field(ge=0, lt=120)
+    crates: list[StrictInt] = Field(min_length=1, max_length=3)
+
+
+@router.post("/native/production/puzzle/current-hint")
+def native_production_current_puzzle_hint(
+    body: NativePuzzleCurrentHintRequest,
+    owner: str = Depends(_native_source_editor),
+) -> dict:
+    from skeleton.ai.webcrawler.dragon_native_puzzle import solve_grid
+    original = tuple(body.rows)
+    try:
+        moves,visited = solve_grid(
+            original,
+            current_player=body.player,
+            current_crates=tuple(body.crates),
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail="Original current game board state has no bounded proven route",
+        ) from None
+    return {
+        "ok": True,
+        "schema": "skeleton.ai.dragon.original_puzzle_current_hint.v1",
+        "next_move": moves[0] if moves else None,
+        "remaining_moves": len(moves),
+        "shortest_route": moves,
+        "search_states": visited,
+        "solved": len(moves) == 0,
+        "proof_scope": "bounded exact abstract Sokoban grid only; no compiled hardware claim",
+    }
+
+
 @router.post("/native/production/preview")
 def native_production_preview(
     body: NativeProductionSourceRequest,
