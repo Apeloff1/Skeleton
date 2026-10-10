@@ -28,7 +28,9 @@ _FALSE = ("cartridge_built", "emulator_verified", "hardware_verified",
           "release_approved", "distribution_licensed")
 _WORLD_KEYS = ("project_id", "target", "world_digest", "safe_replay_digest",
                "blueprint_digest", "rights_reference_sha256", "levels",
-               "width", "height", "reference_safe_moves")
+               "width", "height", "reference_safe_moves",
+               "original_stage_zero_bg_sha256", "original_first_controller_action",
+               "original_first_player_spawn", "original_first_controller_target")
 
 
 class NESReproducibilityError(ValueError):
@@ -86,7 +88,7 @@ def _source(source_dir: Path) -> dict[str, Any]:
         _require(manifest.get(name) is False,
                  "NES source cannot pre-certify publication or hardware success")
     for key in ("world_digest","safe_replay_digest","blueprint_digest",
-                "rights_reference_sha256"):
+                "rights_reference_sha256","original_stage_zero_bg_sha256"):
         _digest(manifest.get(key),key)
     _require(
         isinstance(manifest.get("project_id"),str)
