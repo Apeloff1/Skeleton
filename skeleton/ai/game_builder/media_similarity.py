@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 from io import BytesIO
-from math import sqrt
+from math import sqrt, isfinite
 import struct
 import wave
 
@@ -34,6 +34,32 @@ class MediaFingerprint:
     length_or_pixels: int
     raw_bytes_evaluated: bool = True
     release_safe: bool = False
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.media_id, str) or not 1 <= len(self.media_id) <= 128:
+            raise MediaScreenError("bounded media identifier required")
+        if any(ord(c) < 32 or ord(c) == 127 for c in self.media_id):
+            raise MediaScreenError("media identifier contains controls")
+        if (not isinstance(self.content_sha256, str)
+                or len(self.content_sha256) != 64
+                or any(c not in "0123456789abcdef" for c in self.content_sha256)):
+            raise MediaScreenError("canonical media SHA-256 required")
+        if type(self.length_or_pixels) is not int or self.length_or_pixels <= 0:
+            raise MediaScreenError("measured media size required")
+        if self.category == "artwork":
+            if (type(self.feature) is not int or not 0 <= self.feature < 2**64
+                    or self.length_or_pixels > _MAX_IMAGE_PIXELS):
+                raise MediaScreenError("invalid bounded 64-bit artwork fingerprint")
+        elif self.category == "music_audio":
+            if (not isinstance(self.feature, tuple) or len(self.feature) != _WINDOWS
+                    or self.length_or_pixels > _MAX_WAV_FRAMES
+                    or any(type(x) not in (float, int) or not isfinite(x)
+                           or not 0 <= x <= 1 for x in self.feature)):
+                raise MediaScreenError("invalid bounded audio fingerprint")
+        else:
+            raise MediaScreenError("unknown media fingerprint category")
+        if self.raw_bytes_evaluated is not True or self.release_safe is not False:
+            raise MediaScreenError("media triage cannot self-certify legal release")
 
 
 @dataclass(frozen=True, slots=True)
