@@ -547,3 +547,19 @@ def test_session_idempotence_detects_corrupt_prior_evidence():
                      ("tampered prior source", "alice"))
     with pytest.raises(ValueError, match="evidence drift"):
         store.record(original, authorized=True)
+
+def test_selective_erasure_preserves_other_game_and_other_owner():
+    store = setup()
+    first = store.build_session("alice", "One", 20000, (observation(),),
+                                capture_consent=True, analysis_consent=True)
+    second = store.build_session("alice", "Two", 20000, (observation(),),
+                                 capture_consent=True, analysis_consent=True)
+    foreign = session(store, owner="bob")
+    for entry in (first, second, foreign):
+        store.record(entry, authorized=True)
+    with pytest.raises(PermissionError):
+        store.erase_session("alice", first.session_id, authorized=1)
+    assert store.erase_session("alice", first.session_id, authorized=True)
+    assert not store.erase_session("alice", first.session_id, authorized=True)
+    assert {x.session_id for x in store.sessions("alice", authorized=True)} == {second.session_id}
+    assert {x.session_id for x in store.sessions("bob", authorized=True)} == {foreign.session_id}
