@@ -74,8 +74,8 @@ def test_real_tms9918_control_latch_vdp_name_table_and_video_nmi():
     with pytest.raises(ColecoCPUError,match="half"):
         h.write_port(0xBE,ord("@"))
     h.write_port(0xBF,0x40|(address>>8))
-    h.write_port(0xBE,ord("@"))
-    assert h.vram[address]==ord("@")
+    h.write_port(0xBE,0xA8)
+    assert h.vram[address]==0xA8
     assert h.video_writes==1
     assert h.read_port(0xBF)==0x80
     assert h.vblank_acks==1
@@ -138,3 +138,41 @@ def test_guest_original_replay_refuses_forged_hardware_authority_and_tampering()
         _reference(route,{**manifest,"platform":"sega_master_system"})
     with pytest.raises(ColecoCPUError,match="falsely"):
         _reference(route,{**manifest,"native_binary_compiled":True})
+
+def test_original_dragon_art_and_color_groups_must_be_physically_written_to_vram():
+    import hashlib
+    from skeleton.ai.game_builder.coleco_native_export import (
+        _ORIGINAL_8X8_TILES, _ORIGINAL_COLOR_GROUPS,
+    )
+    h=_host()
+    pixels=bytes(n for tile in _ORIGINAL_8X8_TILES for n in tile)
+    colors=bytes(_ORIGINAL_COLOR_GROUPS)
+    evidence={
+        "original_tile_sha256":hashlib.sha256(pixels).hexdigest(),
+        "original_palette_sha256":hashlib.sha256(colors).hexdigest(),
+        "original_8x8_tile_count":6,
+        "distinct_background_color_groups":6,
+    }
+    with pytest.raises(ColecoCPUError,match="diverged"):
+        h.assert_authored_art(evidence)
+    for i,tile in enumerate(_ORIGINAL_8X8_TILES):
+        addr=0x400+i*64
+        h.write_port(0xBF,addr&255)
+        h.write_port(0xBF,0x40|(addr>>8))
+        for n in tile:
+            h.write_port(0xBE,n)
+    h.write_port(0xBF,0x10)
+    h.write_port(0xBF,0x60)
+    for n in colors:
+        h.write_port(0xBE,n)
+    assert h.assert_authored_art(evidence)=={
+        "guest_vram_original_art_sha256":evidence["original_tile_sha256"],
+        "guest_vram_original_palette_sha256":evidence["original_palette_sha256"],
+    }
+    h.vram[0x400]^=1
+    with pytest.raises(ColecoCPUError,match="diverged"):
+        h.assert_authored_art(evidence)
+    h.vram[0x400]^=1
+    h.vram[0x2010]^=1
+    with pytest.raises(ColecoCPUError,match="diverged"):
+        h.assert_authored_art(evidence)
