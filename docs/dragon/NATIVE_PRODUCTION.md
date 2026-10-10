@@ -100,6 +100,43 @@ a ROM compiler, and viewer/dev/anonymous principals cannot obtain a new
 creator source release. The existing Dragon practice progress, XP, evidence
 signer and lessons are unaffected.
 
+### Frontend creator experience
+
+The production endpoint is now exposed in the existing Expo product application:
+
+- Open **Product → Studio → Native homebrew**, or navigate to
+  \`/dragon-native-production\`.
+- Sign in as \`editor\` or \`admin\`; read-only, anonymous and development
+  fallback principals cannot export.
+- The screen loads the authoritative platform/style matrix. Only platforms
+  with implemented source emitters are selectable; a selection is bounded
+  to three targets.
+- Enter the title and style, confirm original-work rights separately from
+  permission to generate, then request an original source ZIP.
+- The response is validated as a source-only ZIP with a bounded size before
+  saving/downloading. Web uses the browser download action; Android/iOS save
+  locally and use platform sharing when available.
+- Neither the screen nor the backend grants compilation, rights approval,
+  independently signed release evidence, or knowledge/memory promotion.
+
+The application obtains source ZIPs on demand and does not persist a phantom
+"completed ROM" or invent browser-side build history. A source bundle remains
+a preliminary project artifact, not a playable certified game.
+
+### Release verification and index integrity
+
+A release index is **not trusted merely because its archive hashes match**.
+The independent verifier now recomputes aggregate evidence level,
+source/binary state, style, per-platform gameplay mode, claimed fidelity,
+source budget, release inventory and the legal-claim limitation from verified
+nested release receipts. Altered top-level labels are rejected even when
+individual source ZIP bytes remain unchanged.
+
+Self-contained hashes provide corruption and consistency detection, **not**
+publisher authentication or tamper-proof origin against an actor who can
+replace every archive and index. Independently keyed release signatures and
+trusted builder custody remain future requirements for stronger origin proof.
+
 ## What the outputs mean
 
 - `source_generated`: original platform source files were emitted, budget
