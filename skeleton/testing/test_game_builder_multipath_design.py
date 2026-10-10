@@ -415,3 +415,16 @@ def test_challenge_selection_cannot_self_certify_fun():
     assert decision["requires_playtesting"] is True
     assert decision["player_enjoyment_proven"] is False
 
+
+def test_astar_returns_same_optimal_length_as_bfs_with_replay_proof():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    baseline = solve_route(p)
+    optimal = solve_route_astar(p)
+    assert optimal.steps == baseline.steps
+    assert verify_route_proof(p, optimal)
+    rapid = solve_route_astar(p, heuristic_weight_ppm=1_600_000)
+    assert verify_route_proof(p, rapid)
+    assert rapid.steps >= baseline.steps
+    with pytest.raises(MultipathError):
+        solve_route_astar(p, heuristic_weight_ppm=0)
+
