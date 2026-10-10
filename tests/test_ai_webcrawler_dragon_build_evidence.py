@@ -79,3 +79,40 @@ def test_forged_toolchain_corrupt_binary_and_signing_key_rejected():
     with pytest.raises(ValueError,match="signature"):
         signer.history("alice",authorized=True)
     assert receipt.binary_sha256==sha256(valid_nrom()).hexdigest()
+
+
+def test_c64_real_compile_receipt_and_curriculum_round_trip(tmp_path):
+    import shutil
+    from skeleton.ai.webcrawler.dragon_native_projects import NativeProject
+    from skeleton.ai.webcrawler.dragon_native_compile import compile_local
+    from skeleton.ai.webcrawler.dragon_native_curriculum import DragonNativeCurriculum
+    if not shutil.which("cl65"):
+        pytest.skip("cc65 required for actual C64 build evidence")
+    db, parent, lab, _ = fixture()
+    attempt = lab.generate("alice", target_id="commodore_64", style="arcade_score_attack",
+                           authorized=True, consent=True, now=3)
+    source = NativeProject(**lab.project("alice", attempt.attempt_id, authorized=True))
+    for name, text in source.files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+    result = compile_local(source, tmp_path, authorized=True)
+    assert result.state == "compiled_native", result.message
+    signer = DragonBuildEvidence(db, lab, private_signing_key=b"k" * 32)
+    with pytest.raises(ValueError, match="compiler"):
+        signer.attest_from_local_file("alice", attempt.attempt_id, result.binary_path,
+            authorized=True, trusted_worker=True, toolchain="RGBDS", now=4)
+    receipt = signer.attest_from_local_file("alice", attempt.attempt_id, result.binary_path,
+        authorized=True, trusted_worker=True, toolchain="cc65", now=4)
+    assert receipt.binary_sha256 == result.binary_sha256
+    assert receipt.source_digest == source.digest
+    assert receipt.claim == "native_program_header_and_content_verified_not_gameplay_verified"
+    assert signer.history("alice", authorized=True) == (receipt,)
+    assert signer.history("bob", authorized=True) == ()
+    snapshot = DragonNativeCurriculum(lab, signer).evaluate("alice", authorized=True)
+    assert snapshot.structural_build_targets == ("commodore_64",)
+    assert snapshot.curriculum_level == 1  # A C64 receipt does not prove GB/NES mastery.
+    duplicate = signer.attest_from_local_file("alice", attempt.attempt_id, result.binary_path,
+        authorized=True, trusted_worker=True, toolchain="cc65", now=5)
+    assert duplicate == receipt
+    assert parent.progress("alice", authorized=True).xp == 30

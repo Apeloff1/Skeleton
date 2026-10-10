@@ -30,6 +30,7 @@ def structural_gb_fixture():
     for b in rom[0x134:0x14D]:
         checksum=(checksum-b-1)&0xff
     rom[0x14D]=checksum
+    rom[0x14E:0x150] = (sum(rom) & 0xFFFF).to_bytes(2, "big")
     return bytes(rom)
 
 def test_new_dragon_earns_no_console_mastery_from_source_count_alone():

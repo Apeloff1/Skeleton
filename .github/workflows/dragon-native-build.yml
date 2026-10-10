@@ -123,6 +123,11 @@ jobs:
           python -m skeleton.ai.webcrawler.dragon_native_cli \
             --target nes --out /tmp/dragon-nes --compile
           test -s /tmp/dragon-nes/build/dragon.nes
+      - name: Build original Commodore 64 executable
+        run: |
+          python -m skeleton.ai.webcrawler.dragon_native_cli \
+            --target commodore_64 --out /tmp/dragon-c64 --compile
+          test -s /tmp/dragon-c64/build/dragon.prg
       - name: Publish original homebrew ROM artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -130,6 +135,7 @@ jobs:
           path: |
             /tmp/dragon-gameboy/build/dragon.gb
             /tmp/dragon-nes/build/dragon.nes
+            /tmp/dragon-c64/build/dragon.prg
             /tmp/dragon-gameboy-color/build/dragon.gbc
             /tmp/dragon-gameboy-platform/build/dragon.gb
           if-no-files-found: error

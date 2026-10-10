@@ -22,9 +22,10 @@ def emit_demo(target:str, output_dir:Path, *, title:str="Dragon Tiny Adventure",
         target,title,style=design.target,design.title,design.genre
     if style not in STYLES:
         raise ValueError("unknown original game style")
-    output_dir=output_dir.expanduser().resolve()
+    output_dir=output_dir.expanduser()
     if output_dir.is_symlink():
         raise ValueError("refusing to write to symlinked project root")
+    output_dir=output_dir.resolve()
     identity=sha256((title+"\0"+target+"\0"+style+
                      ("\0"+design.digest if design is not None else "")).encode()).hexdigest()
     project=render_native_project(
@@ -35,16 +36,33 @@ def emit_demo(target:str, output_dir:Path, *, title:str="Dragon Tiny Adventure",
     # Prevent accidental replacement of existing user project files.
     if output_dir.exists() and any(output_dir.iterdir()) and not overwrite:
         raise FileExistsError("destination is not empty; choose another folder")
+    from .dragon_native_compile import _safe_member
+    from tempfile import TemporaryDirectory
+    import os
+    # Preflight the entire plan before overwriting any existing user file.
+    for name in project.files:
+        dest = _safe_member(output_dir, name)
+        if dest.exists() and not dest.is_file():
+            raise ValueError("native output collides with an existing directory")
+        parent = dest.parent
+        while parent != output_dir:
+            if parent.exists() and not parent.is_dir():
+                raise ValueError("native output parent must be a directory")
+            parent = parent.parent
     output_dir.mkdir(parents=True,exist_ok=True)
     created={}
-    for name,content in sorted(project.files.items()):
-        dest=output_dir/name
-        dest.parent.mkdir(parents=True,exist_ok=True)
-        # Never follow symlinks, even in user-selected existing directories.
-        if dest.is_symlink() or dest.parent.is_symlink():
-            raise ValueError("refusing symlinked output paths")
-        dest.write_text(content,encoding="utf-8")
-        created[name]=sha256(content.encode()).hexdigest()
+    with TemporaryDirectory(prefix=".dragon-source-", dir=output_dir) as temporary:
+        staging = Path(temporary)
+        for name, content in sorted(project.files.items()):
+            staged = staging / name
+            staged.parent.mkdir(parents=True, exist_ok=True)
+            staged.write_text(content, encoding="utf-8")
+        for name, content in sorted(project.files.items()):
+            dest = _safe_member(output_dir, name)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            # Replacement does not mutate another file through a hard link.
+            os.replace(staging / name, dest)
+            created[name]=sha256(content.encode()).hexdigest()
     return created
 
 def main() -> None:
@@ -54,7 +72,7 @@ def main() -> None:
     parser.add_argument("--title",default="Dragon Tiny Adventure")
     parser.add_argument("--out",type=Path,required=True)
     parser.add_argument("--overwrite",action="store_true")
-    parser.add_argument("--compile",action="store_true",help="Compile GB/NES/CGB with a local toolchain")
+    parser.add_argument("--compile",action="store_true",help="Compile GB/CGB/NES/C64 with a local toolchain")
     parser.add_argument("--spec",type=Path,help="Strict game-design JSON; overrides title/target/style")
     args=parser.parse_args()
     design=load_design(args.spec) if args.spec else None
