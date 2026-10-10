@@ -64,3 +64,10 @@ def test_decode_sms_4bpp_roundtrip_and_reject_nonbytes():
     with pytest.raises(PortableCodecError):
         decode_sms_4bpp(memoryview(b"\x00"*32))
 
+
+def test_encode_genesis_packs_left_pixel_into_high_nibble():
+    row = (1, 2, 4, 8, 15, 0, 0, 0)
+    assert encode_genesis_4bpp((row,)*8) == bytes([0x12,0x48,0xF0,0x00]*8)
+    with pytest.raises(PortableCodecError):
+        encode_genesis_4bpp(((1.0,)*8,)*8)
+
