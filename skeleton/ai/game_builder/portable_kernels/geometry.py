@@ -141,3 +141,9 @@ def astar_path(rows: object, origin: object, destination: object) -> tuple[tuple
                 priority=alternative+abs(nxt[0]-goal[0])+abs(nxt[1]-goal[1])
                 heappush(queue,(priority,alternative,nxt[1],nxt[0]))
     return ()
+
+def rect_intersects(first: object, second: object) -> bool:
+    """Half-open AABB collision; edge contact alone is never penetration."""
+    ax,ay,aw,ah=_rect(first)
+    bx,by,bw,bh=_rect(second)
+    return ax<bx+bw and bx<ax+aw and ay<by+bh and by<ay+ah
