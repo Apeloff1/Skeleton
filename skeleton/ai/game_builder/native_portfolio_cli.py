@@ -24,6 +24,7 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 from .native_game_cli import _NATIVE, build_game
+from .rights_evidence import read_rights_evidence
 
 _SCHEMA = "skeleton.game_builder.native_portfolio.v1"
 
@@ -137,6 +138,12 @@ def compile_native_portfolio(
         with (scratch / "portfolio-manifest.json").open("x", encoding="utf-8", newline="\n") as stream:
             json.dump(manifest, stream, indent=2, sort_keys=True, ensure_ascii=False)
             stream.write("\n")
+        # Every target is independently source-custodied during generation,
+        # but the operator's evidence may still change before publication.
+        # Detect that drift while the entire portfolio is inside staging,
+        # before the final atomic directory move.
+        if read_rights_evidence(rights_evidence).document_sha256 != rights_digest:
+            raise NativePortfolioError("original rights evidence changed before portfolio publication")
         if dest.exists() or dest.is_symlink():
             raise FileExistsError(str(dest))
         os.rename(scratch, dest)
