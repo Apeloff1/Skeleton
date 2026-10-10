@@ -18,6 +18,7 @@ typedef struct {
  int enemies[2][2];
  int invulnerability;
  uint32_t rng;
+ uint32_t initial_seed;
 } DragonGame;
 void dragon_reset(DragonGame *g,uint32_t seed);
 void dragon_step(DragonGame *g,int dx,int dy,int attack,int restart);
@@ -56,7 +57,8 @@ static void start_stage(DragonGame*g){
 }
 void dragon_reset(DragonGame*g,uint32_t seed){
  memset(g,0,sizeof(*g));
- g->rng=seed?seed:0x1f15d00du;
+ g->initial_seed=seed?seed:0x1f15d00du;
+ g->rng=g->initial_seed;
  g->hp=5;g->energy=8;g->status=DRAGON_PLAY;
  start_stage(g);
 }
@@ -76,7 +78,7 @@ static void enemy_tick(DragonGame*g,int index){
 }
 void dragon_step(DragonGame*g,int dx,int dy,int attack,int restart){
  if(!g)return;
- if(restart){uint32_t saved=g->rng;dragon_reset(g,saved);return;}
+ if(restart){uint32_t saved=g->initial_seed;dragon_reset(g,saved);return;}
  if(g->status!=DRAGON_PLAY)return;
  dx=clamp(dx,-1,1);dy=clamp(dy,-1,1);
  /* One axis per step: prevents diagonal wall tunneling. */
@@ -151,10 +153,40 @@ int dragon_selftest(void){
  dragon_step(&a,1,0,0,0);
  if(a.status!=DRAGON_WON)return 6;
  dragon_reset(&a,DRAGON_SEED);
- if(a.hp!=5||a.score!=0||a.stage!=0)return 7;
+ if(a.hp!=5||a.score!=0||a.stage!=0 || a.rng!=a.initial_seed)return 7;
  for(int y=0;y<DRAGON_H;y++)
   for(int x=0;x<DRAGON_W;x++)
    if(dragon_tile(&a,x,y)==0)return 8;
+ /* Reject travel across solid boundary cells. */
+ a.x=1;a.y=2;
+ dragon_step(&a,-1,0,0,0);
+ if(a.x!=1 || a.y!=2)return 9;
+ /* Firing consumes two energy and removes an on-axis nearby enemy. */
+ a.x=9;a.y=2;a.enemies[0][0]=12;a.enemies[0][1]=2;
+ int prev_energy=a.energy,prev_score=a.score;
+ dragon_step(&a,0,0,1,0);
+ if(a.energy!=prev_energy-2 || a.score!=prev_score+30)return 10;
+ a.energy=1;prev_score=a.score;
+ dragon_step(&a,0,0,1,0);
+ if(a.energy!=1 || a.score!=prev_score)return 11;
+ /* Collision damages once, then protects during invulnerability. */
+ a.x=3;a.y=3;a.invulnerability=0;
+ a.enemies[0][0]=3;a.enemies[0][1]=3;
+ int hp=a.hp;
+ dragon_step(&a,0,0,0,0);
+ if(a.hp!=hp-1 || a.invulnerability<=0)return 12;
+ dragon_step(&a,0,0,0,0);
+ if(a.hp!=hp-1)return 13;
+ /* Loss freezes player until explicit restart, restoring the first seed. */
+ a.hp=1;a.invulnerability=0;
+ a.enemies[0][0]=a.x;a.enemies[0][1]=a.y;
+ dragon_step(&a,0,0,0,0);
+ if(a.status!=DRAGON_LOST || a.hp!=0)return 14;
+ dragon_step(&a,1,0,0,0);
+ if(a.status!=DRAGON_LOST)return 15;
+ dragon_step(&a,0,0,0,1);
+ dragon_reset(&b,DRAGON_SEED);
+ if(memcmp(&a,&b,sizeof(a))!=0)return 16;
  return 0;
 }
 '''
