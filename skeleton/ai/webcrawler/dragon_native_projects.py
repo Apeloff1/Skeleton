@@ -15,6 +15,7 @@ EMITTERS=EMITTERS|frozenset(("playdate","arduboy"))
 from .dragon_compatible_revisions import COMPATIBILITY
 EMITTERS=EMITTERS|frozenset(COMPATIBILITY)|frozenset(("commodore_pet","commodore_plus4","bbc_micro","oric_atmos"))
 EMITTERS=EMITTERS|frozenset(("atari_5200","colecovision","zx81","msx2","thumby"))
+EMITTERS=EMITTERS|frozenset(("lynx","saturn","ps_vita"))
 
 @dataclass(frozen=True)
 class NativeProject:
@@ -548,6 +549,11 @@ def render_native_project(*,title:str,target_id:str,style:str,
     elif target_id=="snes":
         from .dragon_native_snes import snes_source
         files=snes_source(seed)
+    elif target_id in ("lynx","saturn","ps_vita"):
+        from .dragon_native_lynx import lynx_source
+        from .dragon_native_vita_saturn import vita_source,saturn_source
+        files=(lynx_source(seed) if target_id=="lynx" else
+               saturn_source(seed) if target_id=="saturn" else vita_source(seed))
     elif target_id in ("nintendo_64","nintendo_ds","psp"):
         from .dragon_native_3d_era import n64_source,ds_source,psp_source
         files=(n64_source(seed) if target_id=="nintendo_64" else

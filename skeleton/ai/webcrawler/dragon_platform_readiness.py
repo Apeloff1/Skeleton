@@ -81,6 +81,11 @@ SOURCE_RENDERERS.update({
     "zx81":"Z80 16K ZX81 ULA text and real keyboard game",
     "msx2":"Z80 MSX2 V9938 BIOS text + native MSX joystick",
 })
+SOURCE_RENDERERS.update({
+    "lynx":"65C02 cc65 Lynx Suzy/Mikey TGI + native joypad",
+    "saturn":"dual SH-2 Sega Saturn Jo Engine VDP2 text/pad",
+    "ps_vita":"ARM Cortex-A9 VitaSDK vita2d GPU/SceCtrl/touch",
+})
 assert set(SOURCE_RENDERERS)==EMITTERS
 
 @dataclass(frozen=True)

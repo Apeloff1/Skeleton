@@ -580,3 +580,48 @@ This increases the identified inventory's **source-implemented count to
 77/169 (45.6%)** and reduces unsupported native source identities to
 **92**. This does **not** mean 77 verified binaries; the Thumby target is
 a MicroPython script executed by the existing on-device interpreter.
+
+## New verified-source development slice, 10 October 2026
+
+The current latest source census supersedes older intermediate totals
+appearing in historical sections of this growing file:
+
+- 169 curated unique hardware/OS identities.
+- 80 distinct target identities with native source project generation;
+  this includes ABI and compatible-revision projects, NOT 80 unrelated
+  graphics engines or executables.
+- 89 catalogued targets still without native source emitters.
+- Source stage **80/169 = 47.3%**. This is not total project completion.
+- Existing platform-build CI verified at the preceding head; this new
+  three-target compiler integration requires a fresh passing run.
+
+New hardware-specific original game backends:
+1. **Atari Lynx**: 65C02 cc65 TGI 160x102 colour game with static Lynx
+   joystick driver, three enemy pursuers, original 20-crystal win state,
+   score, HP, invulnerability and restart. The dedicated all-era CI runner
+   already installs cc65; it must compile the generated source as a real
+   .lnx cartridge. Source-level byte existence is not emulator play evidence.
+2. **Sega Saturn**: original dual-SH2 Jo Engine game using the native Sega
+   Saturn pad API and Jo Engine screen text, pursuing enemy, score and
+   18-crystal victory. Real public Jo Engine engine+Compiler source tree
+   must be installed as JO_ENGINE_ROOT and provide a compatible startup
+   and CD build. Source project exists; no self-contained Saturn CD ISO
+   is included or claimed.
+3. **PlayStation Vita**: original C99 VitaSDK/libvita2d GPU game with real
+   analog/D-pad, front touch, five pursuers, life, power progression and
+   25 collectible victory. Generates the Vita SDK CMake toolchain, SELF
+   and VPK packaging path (requires public VitaSDK/libvita2d installed).
+   Front touch coordinate scaling, VPK installation and physical device
+   behavior are still unverified.
+
+All native projects reject unsupported genre selections rather than
+pretending every platform has the same ten types of games. The source
+archive does not contain copied commercial artwork, binaries, DRM
+materials, system firmware or proprietary SDKs. Device support is a
+capability road map, not a legal right to distribute arbitrary ports.
+
+Developer toolchain references used for the new implementations:
+- Atari Lynx cc65 native TGI: https://cc65.github.io/doc/lynx.html
+- Atari Lynx cart compiler: https://cc65.github.io/doc/cc65.html
+- Jo Engine official Saturn build conventions: https://www.jo-engine.org/
+- PS Vita VitaSDK public toolchain: https://vitasdk.org/
