@@ -121,12 +121,20 @@ def _puzzle_proof(source_archive: bytes) -> tuple[dict, dict[str, str]]:
         design_campaign,verify_graph_report,graph_report,
     )
     campaign=verify_graph_report(proof.get("campaign_graph"))
+    challenge_rows=proof.get("route_analysis")
+    if (not isinstance(challenge_rows,list) or len(challenge_rows)!=len(rows) or
+            any(not isinstance(item,dict) or
+                type(item.get("difficulty_estimate")) is not int
+                for item in challenge_rows)):
+        raise ValueError("measured stage challenge missing for original game forks")
+    stage_ratings=tuple(item["difficulty_estimate"] for item in challenge_rows)
     if (len(campaign.chapters)!=len(rows) or
             proof.get("campaign_mode")!=campaign.mode or
             json.dumps(graph_report(design_campaign(
                 len(rows),seed=proof["seed"],
                 mode=proof["campaign_mode"],
                 intensity=proof.get("challenge_profile", "balanced"),
+                stage_difficulty=stage_ratings,
             )),sort_keys=True)!=json.dumps(proof["campaign_graph"],sort_keys=True)):
         raise ValueError("native campaign graph routes or ending receipt altered")
     # Recheck every level with the existing exact bounded BFS solver, rather
