@@ -381,6 +381,54 @@ def verify_original_z80_gameplay(
         session.step_frame("attract")
     after_chord = observe_actual_gameplay(machine,width=meta["width"],height=meta["height"])
     _assert_state(after_chord,reference["initial"],0)
+    # Run the complete original exhibition without any controller direction
+    # presses. The actual cartridge must advance on its embedded 2-bit route.
+    # Read all resulting states back from the guest VDP, never guest RAM
+    # overrides or a separately executed Python world simulation.
+    attract_trace=advance_semantic_trace(seed,0,None,after_chord)
+    attract_frames=0
+    for demo_index, expected in enumerate(reference["steps"],1):
+        achieved=False
+        last_observed=None
+        for _ in range(MAX_INPUT_FRAMES):
+            session.step_frame(None)
+            attract_frames+=1
+            try:
+                observed=observe_actual_gameplay(
+                    machine,width=meta["width"],height=meta["height"],
+                )
+            except Sega8NativeGameplayError:
+                continue
+            last_observed=observed
+            if all(observed[key]==expected[key] for key in _STATE_KEYS):
+                attract_trace=advance_semantic_trace(
+                    attract_trace,demo_index,expected["button"],observed,
+                )
+                achieved=True
+                break
+        if not achieved:
+            raise Sega8NativeGameplayError(
+                f"real Z80 autoplay differs from original solution at step "
+                f"{demo_index}; observed={last_observed}, pc={session.cpu.pc:#06x}"
+            )
+    if attract_trace!=trace:
+        raise Sega8NativeGameplayError(
+            "entire guest Z80 automatic demonstration diverges from manual winning trace"
+        )
+    if target=="sega_master_system":
+        attract_victory=(machine.cram[3],)
+    else:
+        attract_victory=(machine.cram[6],machine.cram[7])
+    if attract_victory!=expected_victory_color:
+        raise Sega8NativeGameplayError(
+            "automatically completed original game omitted native victory palette"
+        )
+    # Start a second original demonstration from the completed game so that
+    # cancellation can be verified without sacrificing full autoplay proof.
+    for _ in range(25):
+        session.step_frame("attract")
+    after_chord = observe_actual_gameplay(machine,width=meta["width"],height=meta["height"])
+    _assert_state(after_chord,reference["initial"],0)
     attract_first_step_verified = False
     for _ in range(16):
         session.step_frame(None)
@@ -447,6 +495,10 @@ def verify_original_z80_gameplay(
         "native_pause_blocks_gameplay_and_mutes_psg_verified": True,
         "native_restart_restores_original_theme_verified": True,
         "native_attract_demo_chord_started_from_victory": True,
+        "native_attract_demo_full_solution_verified_on_guest_z80": True,
+        "native_attract_demo_controller_free_actions_verified": len(reference["steps"]),
+        "native_attract_demo_semantic_trace_sha256": attract_trace.hex(),
+        "native_attract_demo_screen_frames": attract_frames,
         "native_attract_demo_performed_first_original_move": True,
         "native_attract_demo_user_cancel_restored_game": True,
         "actual_victory_palette_verified": True,
