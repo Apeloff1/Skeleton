@@ -341,7 +341,8 @@ jobs:
           assert set(receipt["native_rebuild_provenance_sha256_by_platform"]) == {"sega_master_system", "sega_game_gear"}
           assert all(len(value) == 64 for value in receipt["native_rebuild_provenance_sha256_by_platform"].values())
           assert receipt["original_controller_actions_verified_per_platform"] > 50
-          assert receipt["full_native_z80_gameplay_replay_verified"] is False
+          assert receipt["full_native_z80_gameplay_replay_verified"] is True
+          assert receipt["native_z80_controller_actions_verified_per_platform"] > 50
           assert receipt["release_approved"] is False
           PY
       - name: Retain only original cross-port identity receipt, never cartridge bytes
