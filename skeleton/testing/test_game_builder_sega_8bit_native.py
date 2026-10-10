@@ -227,7 +227,7 @@ def test_artifact_must_not_forge_machine_execution_or_release_flags():
         replace(p,physical_hardware_verified=True)
     meta=json.loads(p.manifest_json)
     meta["release_approved"]=True
-    forged_manifest=json.dumps(meta,indent=2,sort_keys=True)+"\\n"
-    forged_hash=sha256((p.game_c+"\\0"+p.makefile+"\\0"+forged_manifest).encode()).hexdigest()
+    forged_manifest=json.dumps(meta,indent=2,sort_keys=True)+"\n"
+    forged_hash=sha256((p.game_c+"\0"+p.makefile+"\0"+forged_manifest).encode()).hexdigest()
     with pytest.raises(Sega8BitNativeError,match="cannot claim release"):
         replace(p,manifest_json=forged_manifest,content_digest=forged_hash)
