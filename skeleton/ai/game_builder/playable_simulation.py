@@ -377,6 +377,29 @@ def fork_replay(
     return resume_replay(world, prefix, alternative_actions, authorized=True)
 
 
+
+def replay_divergence(
+    world: PlayableWorld, first: GameReplay, second: GameReplay, *,
+    authorized: bool,
+) -> int | None:
+    """Earliest move at which two *verified* replay histories differ.
+
+    A strict prefix is considered divergent at the missing next move.
+    This does not infer player preference or grant any quality promotion.
+    """
+    if authorized is not True:
+        raise PermissionError("replay comparison requires authorization")
+    verify_replay(world, first, authorized=True)
+    verify_replay(world, second, authorized=True)
+    shared = min(len(first.action_receipts), len(second.action_receipts))
+    for index in range(shared):
+        if first.action_receipts[index].digest != second.action_receipts[index].digest:
+            return index
+    if len(first.action_receipts) != len(second.action_receipts):
+        return shared
+    return None
+
+
 def demonstrate_solvable(world: PlayableWorld, *, authorized: bool) -> GameReplay:
     """Execute each level's hazard-free proof with the real transition engine."""
     if authorized is not True:
