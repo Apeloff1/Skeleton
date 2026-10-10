@@ -515,6 +515,148 @@ def native_world_maze_source_bundle(
             detail="Maze source must replay every location and weather proof before export") from None
 
 
+class NativeLivingWorldRequest(BaseModel):
+    """Exact operator-selected original game-world style and lifecycle."""
+    model_config=ConfigDict(extra="forbid")
+    world_id:StrictInt=Field(default=0,ge=0,lt=1_600_000)
+    variation:StrictInt=Field(default=0,ge=0,le=9)
+    style:str|None=Field(default=None,
+        pattern=r"^[a-z][a-z_]{2,47}$")
+    lifecycle:str|None=Field(default=None,
+        pattern=r"^[a-z][a-z_]{2,47}$")
+
+
+class NativeLivingPlayRequest(NativeLivingWorldRequest):
+    moves:list[str]=Field(default_factory=list,max_length=192)
+
+
+class NativeLivingRouteRequest(NativeLivingWorldRequest):
+    slot:StrictInt=Field(default=0,ge=0,le=9)
+
+
+class NativeLivingJournalRequest(NativeLivingPlayRequest):
+    expected_final_digest:str|None=Field(
+        default=None,pattern=r"^[a-f0-9]{64}$")
+
+
+def _dragon_living_world(body:NativeLivingWorldRequest):
+    from skeleton.ai.webcrawler.dragon_living_world import create_world
+    return create_world(
+        world_id=body.world_id,variant=body.variation,
+        style=body.style,lifecycle=body.lifecycle,
+    )
+
+
+@router.get("/native/production/worlds/catalog")
+def native_living_world_catalog(owner:str=Depends(_principal))->dict:
+    from skeleton.ai.webcrawler.dragon_living_world import catalog
+    return {"ok":True,**catalog()}
+
+
+@router.post("/native/production/worlds/preview")
+def native_living_world_preview(
+    body:NativeLivingWorldRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from dataclasses import asdict
+    from skeleton.ai.webcrawler.dragon_living_world import (
+        initial_state,describe,terrain,
+    )
+    try:
+        world=_dragon_living_world(body)
+        player=initial_state(world)
+        tilemap=[
+            terrain(world,0,x,y)
+            for y in range(-2,3) for x in range(-2,3)
+        ]
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Selected original living-world style or lifecycle is unsupported") from None
+    return {
+        "ok":True,
+        "schema":"skeleton.ai.dragon.living_world_preview.v1",
+        "world":asdict(world),
+        "player":describe(world,player),
+        "tiles":tilemap,
+        "render_scope":"abstract original living-world game mechanics, not a voxel or 3D engine",
+        "address_scope":"16m lazily indexed possible original world-variant slots, not completed games",
+    }
+
+
+@router.post("/native/production/worlds/play")
+def native_living_world_play(
+    body:NativeLivingPlayRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_living_world import replay,describe,terrain
+    try:
+        world=_dragon_living_world(body)
+        state=replay(world,tuple(body.moves))
+        current=describe(world,state)
+        surroundings=[
+            terrain(world,state.realm,state.x+dx,state.y+dy)
+            for dy in range(-2,3) for dx in range(-2,3)
+        ]
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="World action is locked, unsupported or exceeds bounded play history") from None
+    return {
+        "ok":True,"played_moves":list(body.moves),
+        "current":current,"surroundings":surroundings,
+    }
+
+
+@router.post("/native/production/worlds/alternatives")
+def native_living_world_alternatives(
+    body:NativeLivingWorldRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_living_world_routes import portfolio
+    try:
+        return {"ok":True,**portfolio(_dragon_living_world(body),limit=10)}
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original alternative paths could not be independently replayed") from None
+
+
+@router.post("/native/production/worlds/route")
+def native_living_world_route(
+    body:NativeLivingRouteRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from dataclasses import asdict
+    from skeleton.ai.webcrawler.dragon_living_world_routes import (
+        materialize_route,verify_route,
+    )
+    try:
+        world=_dragon_living_world(body)
+        route=materialize_route(world,body.slot)
+        verified=verify_route(world,route)
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Indexed route address did not produce real original gameplay") from None
+    return {"ok":True,"route":asdict(route),"verification":verified}
+
+
+@router.post("/native/production/worlds/journal")
+def native_living_world_journal(
+    body:NativeLivingJournalRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_living_world import journal
+    try:
+        world=_dragon_living_world(body)
+        report=journal(world,tuple(body.moves))
+        actual=report["final"]["player"]["history_digest"]
+        if (body.expected_final_digest is not None and
+                body.expected_final_digest!=actual):
+            raise ValueError("replayed original-world history differs from claimed state")
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original world choice history does not match a real game replay") from None
+    return {"ok":True,**report}
+
+
 class NativeAtlasWorldRequest(BaseModel):
     """Multi-region original world: bounded multi-maze compositional gameplay."""
     model_config=ConfigDict(extra="forbid")
