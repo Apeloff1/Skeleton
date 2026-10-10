@@ -19,6 +19,29 @@ def test_ai_file_tree_manifest_is_valid_and_drift_free() -> None:
     assert _module().validate() == []
 
 
+def test_ai_file_tree_live_summary_counts_match_governed_collections() -> None:
+    import json
+
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    mappings = manifest["mappings"]
+    native_owners = manifest["native_ai_owners"]
+    readiness = manifest["pre_move_readiness"]
+
+    expected_batches: dict[str, int] = {}
+    for mapping in mappings:
+        batch = mapping["move_batch"]
+        expected_batches[batch] = expected_batches.get(batch, 0) + 1
+
+    assert readiness["governed_mapping_count"] == len(mappings)
+    assert readiness["native_ai_owner_count"] == len(native_owners)
+    assert readiness["batch_counts"] == expected_batches
+    assert manifest["object_audit"]["current_mapping_count"] == len(mappings)
+    assert manifest["validation_state"].startswith(
+        f"{len(mappings)}_mapping_plus_{len(native_owners)}_native_owner_"
+    )
+    assert f"{len(mappings)}-mapping" in manifest["implementation_signoff"]["statement"]
+
+
 def test_ai_file_tree_contains_jeeves_and_build_planning() -> None:
     assert (ROOT / "skeleton/ai/agents/jeeves/__init__.py").is_file()
     assert (ROOT / "skeleton/ai/build/shift_supervisor/__init__.py").is_file()
@@ -397,3 +420,80 @@ def test_namespace_composition_rejects_unmapped_members(tmp_path: Path, monkeypa
     assert not module._mappings_cover_planned_source(mappings, "skeleton/research")
     members.clear()
     assert not module._mappings_cover_planned_source(mappings, "skeleton/research")
+
+
+def test_mature_volume_paths_are_traceable_to_governed_ai_tree_owners() -> None:
+    import json
+
+    module = _module()
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    master_plan = json.loads((ROOT / "machine/ai_master_plan.json").read_text(encoding="utf-8"))
+    mappings = manifest["mappings"]
+    native_owners = manifest["native_ai_owners"]
+    mature = {"implemented", "hardened", "verified", "complete", "completed"}
+
+    for volume in master_plan["volumes"]:
+        if volume.get("implementation_status") not in mature:
+            continue
+        owners = set()
+        for implementation_path in volume.get("implementation_paths", []):
+            if not isinstance(implementation_path, str) or implementation_path.startswith("planned:"):
+                continue
+            if not implementation_path.startswith(("skeleton/", "backend/")):
+                continue
+            owner = module._owned_mapping_for_implementation_path(mappings, implementation_path)
+            if owner is not None:
+                owners.add(("mapping", owner["id"]))
+                continue
+            native_owner = module._owned_native_ai_path(native_owners, implementation_path)
+            if native_owner is not None:
+                owners.add(("native", native_owner["id"]))
+                continue
+            if implementation_path.startswith("skeleton/ai/"):
+                raise AssertionError((volume["key"], implementation_path))
+        for owner_kind, owner_id in owners:
+            collection = mappings if owner_kind == "mapping" else native_owners
+            owner = next(item for item in collection if item["id"] == owner_id)
+            assert volume["key"] in owner.get("volume_refs", []), (volume["key"], owner_id)
+
+
+def test_native_ai_owners_are_canonical_and_residual_where_needed() -> None:
+    import json
+
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    owners = {item["id"]: item for item in manifest["native_ai_owners"]}
+    assert owners["AIFT-NATIVE-AGENTS-ROOT"]["residual_only"] is True
+    assert owners["AIFT-NATIVE-BUILD-ROOT"]["residual_only"] is True
+    assert owners["AIFT-NATIVE-EXTENSIONS-ROOT"]["residual_only"] is True
+    assert owners["AIFT-NATIVE-DEFERRED-RUNTIME"]["residual_only"] is False
+    assert "VOL-209" in owners["AIFT-NATIVE-ARTIFACT-REVIEW"]["volume_refs"]
+
+
+def test_every_tracked_ai_file_has_governed_owner() -> None:
+    import json
+    import subprocess
+
+    module = _module()
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    destinations = {
+        item["destination"]
+        for item in manifest["mappings"]
+        if isinstance(item, dict) and isinstance(item.get("destination"), str)
+    }
+    native_owners = manifest["native_ai_owners"]
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z", "skeleton/ai"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.split("\0")
+    unowned = []
+    for path in tracked:
+        if not path:
+            continue
+        mapping_owned = any(module._path_within(path, destination) for destination in destinations)
+        native_owned = module._owned_native_ai_path(native_owners, path) is not None
+        if not mapping_owned and not native_owned:
+            unowned.append(path)
+    assert unowned == []

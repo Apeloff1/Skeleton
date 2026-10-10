@@ -1,0 +1,163 @@
+name: Masterplan Zero-Gap Verification
+
+on:
+  pull_request:
+    paths:
+      - "machine/ai_zero_gap_verification_candidate.json"
+      - "machine/ai_master_plan.json"
+      - "machine/ai_build_accountability.json"
+      - "skeleton/testing/test_data_governance.py"
+      - "skeleton/testing/test_data_lifecycle.py"
+      - "skeleton/testing/test_lifecycle_adapters.py"
+      - "skeleton/testing/test_vol027_privacy_completion.py"
+      - "skeleton/testing/test_simulation_authority_boundary.py"
+      - "skeleton/testing/test_vol073_scenario_runtime.py"
+      - "skeleton/testing/test_vol074_instruction_runtime.py"
+      - "skeleton/testing/test_vol081_formal_methods.py"
+      - "skeleton/testing/test_vol085_explainability.py"
+      - "skeleton/testing/test_vol088_compliance.py"
+      - "skeleton/testing/test_vol089_090_documentation_engine.py"
+      - "skeleton/testing/test_vol091_runbooks.py"
+      - "skeleton/testing/test_vol092_repository_maintenance.py"
+      - "skeleton/testing/test_priority_engine.py"
+      - "skeleton/testing/test_work_package_integrity.py"
+      - "skeleton/testing/test_vs000_foundation_recovery.py"
+      - ".github/workflows/masterplan-zero-gap-verification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: masterplan-zero-gap-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  authority:
+    name: Zero-gap authority preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Validate candidate authority and exact head
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(".")
+          candidate = json.loads((root / "machine/ai_zero_gap_verification_candidate.json").read_text())
+          plan = json.loads((root / "machine/ai_master_plan.json").read_text())
+          accountability = json.loads((root / "machine/ai_build_accountability.json").read_text())
+
+          assert candidate["schema_version"] == "skeleton.ai.masterplan.zero_gap_verification.v1"
+          assert candidate["status"] == "independent_verification_candidate"
+          authority = candidate["authority"]
+          assert authority["may_modify_implementation"] is False
+          assert authority["may_self_promote_completion"] is False
+          assert authority["require_implementation_signed"] is True
+          assert authority["require_verification_unsigned_at_candidate_time"] is True
+          assert authority["require_completion_checkbox_false"] is True
+          assert authority["require_zero_masterplan_gaps"] is True
+
+          volumes = {
+              item["key"]: item
+              for item in plan["volumes"]
+              if isinstance(item, dict) and isinstance(item.get("key"), str)
+          }
+
+          records = {}
+          def walk(value):
+              if isinstance(value, list):
+                  for item in value:
+                      walk(item)
+              elif isinstance(value, dict):
+                  rid = value.get("id")
+                  if isinstance(rid, str) and rid.startswith("ACC-VOL-"):
+                      records[rid] = value
+                  for item in value.values():
+                      walk(item)
+          walk(accountability)
+
+          expected = [item["key"] for item in candidate["volumes"]]
+          assert len(expected) == 13
+          assert len(set(expected)) == len(expected)
+
+          for item in candidate["volumes"]:
+              key = item["key"]
+              volume = volumes[key]
+              record = records["ACC-" + key]
+              assert volume["implementation_status"] == "implemented", key
+              assert volume["completion_checkbox"] is False, key
+              assert volume.get("gaps", []) == [], key
+              assert record["status"] == "implemented", key
+              assert record["checkbox"] is False, key
+              assert record["implementation_signoff"]["signed"] is True, key
+              assert record["verification_signoff"]["signed"] is False, key
+              declared = set(volume.get("tests", []))
+              for test_path in item["tests"]:
+                  assert test_path in declared, (key, test_path)
+                  assert (root / test_path).is_file(), (key, test_path)
+
+          head = os.environ.get("GITHUB_SHA", "")
+          assert len(head) == 40
+          print(json.dumps({"status": "valid", "volume_count": len(expected), "head": head}, sort_keys=True))
+          PY
+
+  verify:
+    name: ${{ matrix.volume }} independent verification
+    needs: authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - volume: VOL-027
+            tests: "skeleton/testing/test_data_governance.py skeleton/testing/test_data_lifecycle.py skeleton/testing/test_lifecycle_adapters.py skeleton/testing/test_vol027_privacy_completion.py"
+          - volume: VOL-073
+            tests: "skeleton/testing/test_simulation_authority_boundary.py skeleton/testing/test_vol073_scenario_runtime.py"
+          - volume: VOL-074
+            tests: "skeleton/testing/test_vol074_instruction_runtime.py"
+          - volume: VOL-081
+            tests: "skeleton/testing/test_vol081_formal_methods.py"
+          - volume: VOL-085
+            tests: "skeleton/testing/test_vol085_explainability.py"
+          - volume: VOL-088
+            tests: "skeleton/testing/test_vol088_compliance.py"
+          - volume: VOL-089
+            tests: "skeleton/testing/test_vol089_090_documentation_engine.py"
+          - volume: VOL-090
+            tests: "skeleton/testing/test_vol089_090_documentation_engine.py"
+          - volume: VOL-091
+            tests: "skeleton/testing/test_vol091_runbooks.py"
+          - volume: VOL-092
+            tests: "skeleton/testing/test_vol092_repository_maintenance.py"
+          - volume: VOL-094
+            tests: "skeleton/testing/test_priority_engine.py"
+          - volume: VOL-095
+            tests: "skeleton/testing/test_work_package_integrity.py"
+          - volume: VOL-096
+            tests: "skeleton/testing/test_vs000_foundation_recovery.py"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install focused test dependency
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9" "pytest-asyncio>=0.24,<2" "pydantic>=2,<3"
+      - name: Run focused regression
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest -q --noconftest -p pytest_asyncio.plugin ${{ matrix.tests }}

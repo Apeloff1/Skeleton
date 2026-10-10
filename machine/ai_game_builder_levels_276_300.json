@@ -1,0 +1,1599 @@
+{
+  "schema_version": "skeleton.ai_game_builder_levels_shard.v1",
+  "manifest": "machine/ai_game_builder_500_levels.json",
+  "start": 276,
+  "end": 300,
+  "count": 25,
+  "levels": [
+    {
+      "id": "GBL-276",
+      "ordinal": 276,
+      "family_id": "GB28",
+      "family": "2D, Pixel Art & Sprite Systems",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Generate/import sprites, tiles, pixel art, atlases, palettes, UI imagery and frame-accurate animation with pixel-level QA.",
+      "owner": "skeleton/jeeves/game_engine_assets.py",
+      "batches": [
+        "B052",
+        "B075"
+      ],
+      "metrics": [
+        "pixel readability",
+        "palette coherence",
+        "frame consistency",
+        "atlas efficiency"
+      ],
+      "requirements": [
+        "Run deterministic import/build/capture tests and visual regression fixtures.",
+        "Attack single-pixel artifact, palette drift, sprite jitter, atlas bleed.",
+        "Retain failed frames/assets as regressions."
+      ],
+      "adversarial": [
+        "single-pixel artifact",
+        "palette drift",
+        "sprite jitter",
+        "atlas bleed",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-276 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-277",
+      "ordinal": 277,
+      "family_id": "GB28",
+      "family": "2D, Pixel Art & Sprite Systems",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Generate/import sprites, tiles, pixel art, atlases, palettes, UI imagery and frame-accurate animation with pixel-level QA.",
+      "owner": "skeleton/jeeves/game_engine_assets.py",
+      "batches": [
+        "B052",
+        "B075"
+      ],
+      "metrics": [
+        "pixel readability",
+        "palette coherence",
+        "frame consistency",
+        "atlas efficiency"
+      ],
+      "requirements": [
+        "Improve pixel readability, palette coherence, frame consistency, atlas efficiency together with aesthetics, accessibility, performance and maintainability.",
+        "Reject quality gains that exceed platform budgets or reduce gameplay readability.",
+        "Keep champion if challenger is non-Pareto."
+      ],
+      "adversarial": [
+        "single-pixel artifact",
+        "palette drift",
+        "sprite jitter",
+        "atlas bleed",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-277 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-278",
+      "ordinal": 278,
+      "family_id": "GB28",
+      "family": "2D, Pixel Art & Sprite Systems",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Generate/import sprites, tiles, pixel art, atlases, palettes, UI imagery and frame-accurate animation with pixel-level QA.",
+      "owner": "skeleton/jeeves/game_engine_assets.py",
+      "batches": [
+        "B052",
+        "B075"
+      ],
+      "metrics": [
+        "pixel readability",
+        "palette coherence",
+        "frame consistency",
+        "atlas efficiency"
+      ],
+      "requirements": [
+        "Support source-preserving diff, reversible transforms, migration and checkpoint recovery.",
+        "Resume exact source/tool/canon/rival/evaluator state.",
+        "No destructive bake becomes sole authority."
+      ],
+      "adversarial": [
+        "single-pixel artifact",
+        "palette drift",
+        "sprite jitter",
+        "atlas bleed",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-278 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-279",
+      "ordinal": 279,
+      "family_id": "GB28",
+      "family": "2D, Pixel Art & Sprite Systems",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Generate/import sprites, tiles, pixel art, atlases, palettes, UI imagery and frame-accurate animation with pixel-level QA.",
+      "owner": "skeleton/jeeves/game_engine_assets.py",
+      "batches": [
+        "B052",
+        "B075"
+      ],
+      "metrics": [
+        "pixel readability",
+        "palette coherence",
+        "frame consistency",
+        "atlas efficiency"
+      ],
+      "requirements": [
+        "Run 100/1000/10000 rounds, three stages each, no wall-clock deadline.",
+        "Inspect broad asset/frame/quality-tier samples with bounded compute/storage.",
+        "Detect overprocessing, temporal inconsistency, evaluator drift and style collapse."
+      ],
+      "adversarial": [
+        "single-pixel artifact",
+        "palette drift",
+        "sprite jitter",
+        "atlas bleed",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-279 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "deep-effort visual report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-280",
+      "ordinal": 280,
+      "family_id": "GB28",
+      "family": "2D, Pixel Art & Sprite Systems",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Generate/import sprites, tiles, pixel art, atlases, palettes, UI imagery and frame-accurate animation with pixel-level QA.",
+      "owner": "skeleton/jeeves/game_engine_assets.py",
+      "batches": [
+        "B052",
+        "B075"
+      ],
+      "metrics": [
+        "pixel readability",
+        "palette coherence",
+        "frame consistency",
+        "atlas efficiency"
+      ],
+      "requirements": [
+        "Require independent exact-head visual/technical evidence.",
+        "Block unknown rights, unresolved similarity, style/canon, performance or source-loss failures.",
+        "Expire qualification on material identity drift."
+      ],
+      "adversarial": [
+        "single-pixel artifact",
+        "palette drift",
+        "sprite jitter",
+        "atlas bleed",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-280 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "deep-effort visual report",
+        "independent promotion verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-281",
+      "ordinal": 281,
+      "family_id": "GB29",
+      "family": "3D Mesh & Geometry",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Generate/import meshes with valid topology, scale, UVs, LODs, collision, deformation and platform budgets.",
+      "owner": "skeleton/jeeves/game_engine_3d.py",
+      "batches": [
+        "B053"
+      ],
+      "metrics": [
+        "topology validity",
+        "silhouette quality",
+        "LOD quality",
+        "budget adherence"
+      ],
+      "requirements": [
+        "Specify 3D Mesh & Geometry: Generate/import meshes with valid topology, scale, UVs, LODs, collision, deformation and platform budgets.",
+        "Declare fidelity, target budgets, anti-goals and perceptual/technical acceptance tests.",
+        "Bind skeleton/jeeves/game_engine_3d.py and B053."
+      ],
+      "adversarial": [
+        "nonmanifold mesh",
+        "UV corruption",
+        "LOD pop",
+        "collision mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-281 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-282",
+      "ordinal": 282,
+      "family_id": "GB29",
+      "family": "3D Mesh & Geometry",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Generate/import meshes with valid topology, scale, UVs, LODs, collision, deformation and platform budgets.",
+      "owner": "skeleton/jeeves/game_engine_3d.py",
+      "batches": [
+        "B053"
+      ],
+      "metrics": [
+        "topology validity",
+        "silhouette quality",
+        "LOD quality",
+        "budget adherence"
+      ],
+      "requirements": [
+        "Define typed asset/material identity, coordinate/color/unit space, provenance, dependencies and deterministic representation.",
+        "Preserve source and scene parent context.",
+        "Define target/version compatibility."
+      ],
+      "adversarial": [
+        "nonmanifold mesh",
+        "UV corruption",
+        "LOD pop",
+        "collision mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-282 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-283",
+      "ordinal": 283,
+      "family_id": "GB29",
+      "family": "3D Mesh & Geometry",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Generate/import meshes with valid topology, scale, UVs, LODs, collision, deformation and platform budgets.",
+      "owner": "skeleton/jeeves/game_engine_3d.py",
+      "batches": [
+        "B053"
+      ],
+      "metrics": [
+        "topology validity",
+        "silhouette quality",
+        "LOD quality",
+        "budget adherence"
+      ],
+      "requirements": [
+        "Generate/import/edit through canonical pipelines using ProjectDNA, style bible, canon and rights-classified evidence.",
+        "Record tool/model/transforms.",
+        "Retain editable source plus reference output."
+      ],
+      "adversarial": [
+        "nonmanifold mesh",
+        "UV corruption",
+        "LOD pop",
+        "collision mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-283 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-284",
+      "ordinal": 284,
+      "family_id": "GB29",
+      "family": "3D Mesh & Geometry",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Generate/import meshes with valid topology, scale, UVs, LODs, collision, deformation and platform budgets.",
+      "owner": "skeleton/jeeves/game_engine_3d.py",
+      "batches": [
+        "B053"
+      ],
+      "metrics": [
+        "topology validity",
+        "silhouette quality",
+        "LOD quality",
+        "budget adherence"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote and rotate rivals.",
+        "Inspect down to mesh element/texel/pixel/shader sample where useful and submit an improved artifact.",
+        "Independent deterministic gates decide promotion."
+      ],
+      "adversarial": [
+        "nonmanifold mesh",
+        "UV corruption",
+        "LOD pop",
+        "collision mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-284 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-285",
+      "ordinal": 285,
+      "family_id": "GB29",
+      "family": "3D Mesh & Geometry",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Generate/import meshes with valid topology, scale, UVs, LODs, collision, deformation and platform budgets.",
+      "owner": "skeleton/jeeves/game_engine_3d.py",
+      "batches": [
+        "B053"
+      ],
+      "metrics": [
+        "topology validity",
+        "silhouette quality",
+        "LOD quality",
+        "budget adherence"
+      ],
+      "requirements": [
+        "Verify scene scale, camera, gameplay affordance, collision, animation, VFX, visual language and narrative motifs.",
+        "Propagate changed assumptions.",
+        "Reject local beauty that breaks cross-scene coherence/readability."
+      ],
+      "adversarial": [
+        "nonmanifold mesh",
+        "UV corruption",
+        "LOD pop",
+        "collision mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-285 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-286",
+      "ordinal": 286,
+      "family_id": "GB29",
+      "family": "3D Mesh & Geometry",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Generate/import meshes with valid topology, scale, UVs, LODs, collision, deformation and platform budgets.",
+      "owner": "skeleton/jeeves/game_engine_3d.py",
+      "batches": [
+        "B053"
+      ],
+      "metrics": [
+        "topology validity",
+        "silhouette quality",
+        "LOD quality",
+        "budget adherence"
+      ],
+      "requirements": [
+        "Run deterministic import/build/capture tests and visual regression fixtures.",
+        "Attack nonmanifold mesh, UV corruption, LOD pop, collision mismatch.",
+        "Retain failed frames/assets as regressions."
+      ],
+      "adversarial": [
+        "nonmanifold mesh",
+        "UV corruption",
+        "LOD pop",
+        "collision mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-286 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-287",
+      "ordinal": 287,
+      "family_id": "GB29",
+      "family": "3D Mesh & Geometry",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Generate/import meshes with valid topology, scale, UVs, LODs, collision, deformation and platform budgets.",
+      "owner": "skeleton/jeeves/game_engine_3d.py",
+      "batches": [
+        "B053"
+      ],
+      "metrics": [
+        "topology validity",
+        "silhouette quality",
+        "LOD quality",
+        "budget adherence"
+      ],
+      "requirements": [
+        "Improve topology validity, silhouette quality, LOD quality, budget adherence together with aesthetics, accessibility, performance and maintainability.",
+        "Reject quality gains that exceed platform budgets or reduce gameplay readability.",
+        "Keep champion if challenger is non-Pareto."
+      ],
+      "adversarial": [
+        "nonmanifold mesh",
+        "UV corruption",
+        "LOD pop",
+        "collision mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-287 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-288",
+      "ordinal": 288,
+      "family_id": "GB29",
+      "family": "3D Mesh & Geometry",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Generate/import meshes with valid topology, scale, UVs, LODs, collision, deformation and platform budgets.",
+      "owner": "skeleton/jeeves/game_engine_3d.py",
+      "batches": [
+        "B053"
+      ],
+      "metrics": [
+        "topology validity",
+        "silhouette quality",
+        "LOD quality",
+        "budget adherence"
+      ],
+      "requirements": [
+        "Support source-preserving diff, reversible transforms, migration and checkpoint recovery.",
+        "Resume exact source/tool/canon/rival/evaluator state.",
+        "No destructive bake becomes sole authority."
+      ],
+      "adversarial": [
+        "nonmanifold mesh",
+        "UV corruption",
+        "LOD pop",
+        "collision mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-288 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-289",
+      "ordinal": 289,
+      "family_id": "GB29",
+      "family": "3D Mesh & Geometry",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Generate/import meshes with valid topology, scale, UVs, LODs, collision, deformation and platform budgets.",
+      "owner": "skeleton/jeeves/game_engine_3d.py",
+      "batches": [
+        "B053"
+      ],
+      "metrics": [
+        "topology validity",
+        "silhouette quality",
+        "LOD quality",
+        "budget adherence"
+      ],
+      "requirements": [
+        "Run 100/1000/10000 rounds, three stages each, no wall-clock deadline.",
+        "Inspect broad asset/frame/quality-tier samples with bounded compute/storage.",
+        "Detect overprocessing, temporal inconsistency, evaluator drift and style collapse."
+      ],
+      "adversarial": [
+        "nonmanifold mesh",
+        "UV corruption",
+        "LOD pop",
+        "collision mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-289 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "deep-effort visual report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-290",
+      "ordinal": 290,
+      "family_id": "GB29",
+      "family": "3D Mesh & Geometry",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Generate/import meshes with valid topology, scale, UVs, LODs, collision, deformation and platform budgets.",
+      "owner": "skeleton/jeeves/game_engine_3d.py",
+      "batches": [
+        "B053"
+      ],
+      "metrics": [
+        "topology validity",
+        "silhouette quality",
+        "LOD quality",
+        "budget adherence"
+      ],
+      "requirements": [
+        "Require independent exact-head visual/technical evidence.",
+        "Block unknown rights, unresolved similarity, style/canon, performance or source-loss failures.",
+        "Expire qualification on material identity drift."
+      ],
+      "adversarial": [
+        "nonmanifold mesh",
+        "UV corruption",
+        "LOD pop",
+        "collision mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-290 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "deep-effort visual report",
+        "independent promotion verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-291",
+      "ordinal": 291,
+      "family_id": "GB30",
+      "family": "Materials, Shaders & Lighting",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Design materials, shaders, lighting, shadows, GI and VFX integration across deterministic quality tiers.",
+      "owner": "skeleton/jeeves/game_engine_rendering.py",
+      "batches": [
+        "B054",
+        "B059"
+      ],
+      "metrics": [
+        "visual coherence",
+        "shader correctness",
+        "lighting readability",
+        "GPU cost"
+      ],
+      "requirements": [
+        "Specify Materials, Shaders & Lighting: Design materials, shaders, lighting, shadows, GI and VFX integration across deterministic quality tiers.",
+        "Declare fidelity, target budgets, anti-goals and perceptual/technical acceptance tests.",
+        "Bind skeleton/jeeves/game_engine_rendering.py and B054, B059."
+      ],
+      "adversarial": [
+        "shader divergence",
+        "lighting readability loss",
+        "overdraw spike",
+        "quality-tier mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-291 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-292",
+      "ordinal": 292,
+      "family_id": "GB30",
+      "family": "Materials, Shaders & Lighting",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Design materials, shaders, lighting, shadows, GI and VFX integration across deterministic quality tiers.",
+      "owner": "skeleton/jeeves/game_engine_rendering.py",
+      "batches": [
+        "B054",
+        "B059"
+      ],
+      "metrics": [
+        "visual coherence",
+        "shader correctness",
+        "lighting readability",
+        "GPU cost"
+      ],
+      "requirements": [
+        "Define typed asset/material identity, coordinate/color/unit space, provenance, dependencies and deterministic representation.",
+        "Preserve source and scene parent context.",
+        "Define target/version compatibility."
+      ],
+      "adversarial": [
+        "shader divergence",
+        "lighting readability loss",
+        "overdraw spike",
+        "quality-tier mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-292 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-293",
+      "ordinal": 293,
+      "family_id": "GB30",
+      "family": "Materials, Shaders & Lighting",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Design materials, shaders, lighting, shadows, GI and VFX integration across deterministic quality tiers.",
+      "owner": "skeleton/jeeves/game_engine_rendering.py",
+      "batches": [
+        "B054",
+        "B059"
+      ],
+      "metrics": [
+        "visual coherence",
+        "shader correctness",
+        "lighting readability",
+        "GPU cost"
+      ],
+      "requirements": [
+        "Generate/import/edit through canonical pipelines using ProjectDNA, style bible, canon and rights-classified evidence.",
+        "Record tool/model/transforms.",
+        "Retain editable source plus reference output."
+      ],
+      "adversarial": [
+        "shader divergence",
+        "lighting readability loss",
+        "overdraw spike",
+        "quality-tier mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-293 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-294",
+      "ordinal": 294,
+      "family_id": "GB30",
+      "family": "Materials, Shaders & Lighting",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Design materials, shaders, lighting, shadows, GI and VFX integration across deterministic quality tiers.",
+      "owner": "skeleton/jeeves/game_engine_rendering.py",
+      "batches": [
+        "B054",
+        "B059"
+      ],
+      "metrics": [
+        "visual coherence",
+        "shader correctness",
+        "lighting readability",
+        "GPU cost"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote and rotate rivals.",
+        "Inspect down to mesh element/texel/pixel/shader sample where useful and submit an improved artifact.",
+        "Independent deterministic gates decide promotion."
+      ],
+      "adversarial": [
+        "shader divergence",
+        "lighting readability loss",
+        "overdraw spike",
+        "quality-tier mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-294 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-295",
+      "ordinal": 295,
+      "family_id": "GB30",
+      "family": "Materials, Shaders & Lighting",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Design materials, shaders, lighting, shadows, GI and VFX integration across deterministic quality tiers.",
+      "owner": "skeleton/jeeves/game_engine_rendering.py",
+      "batches": [
+        "B054",
+        "B059"
+      ],
+      "metrics": [
+        "visual coherence",
+        "shader correctness",
+        "lighting readability",
+        "GPU cost"
+      ],
+      "requirements": [
+        "Verify scene scale, camera, gameplay affordance, collision, animation, VFX, visual language and narrative motifs.",
+        "Propagate changed assumptions.",
+        "Reject local beauty that breaks cross-scene coherence/readability."
+      ],
+      "adversarial": [
+        "shader divergence",
+        "lighting readability loss",
+        "overdraw spike",
+        "quality-tier mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-295 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-296",
+      "ordinal": 296,
+      "family_id": "GB30",
+      "family": "Materials, Shaders & Lighting",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Design materials, shaders, lighting, shadows, GI and VFX integration across deterministic quality tiers.",
+      "owner": "skeleton/jeeves/game_engine_rendering.py",
+      "batches": [
+        "B054",
+        "B059"
+      ],
+      "metrics": [
+        "visual coherence",
+        "shader correctness",
+        "lighting readability",
+        "GPU cost"
+      ],
+      "requirements": [
+        "Run deterministic import/build/capture tests and visual regression fixtures.",
+        "Attack shader divergence, lighting readability loss, overdraw spike, quality-tier mismatch.",
+        "Retain failed frames/assets as regressions."
+      ],
+      "adversarial": [
+        "shader divergence",
+        "lighting readability loss",
+        "overdraw spike",
+        "quality-tier mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-296 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-297",
+      "ordinal": 297,
+      "family_id": "GB30",
+      "family": "Materials, Shaders & Lighting",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Design materials, shaders, lighting, shadows, GI and VFX integration across deterministic quality tiers.",
+      "owner": "skeleton/jeeves/game_engine_rendering.py",
+      "batches": [
+        "B054",
+        "B059"
+      ],
+      "metrics": [
+        "visual coherence",
+        "shader correctness",
+        "lighting readability",
+        "GPU cost"
+      ],
+      "requirements": [
+        "Improve visual coherence, shader correctness, lighting readability, GPU cost together with aesthetics, accessibility, performance and maintainability.",
+        "Reject quality gains that exceed platform budgets or reduce gameplay readability.",
+        "Keep champion if challenger is non-Pareto."
+      ],
+      "adversarial": [
+        "shader divergence",
+        "lighting readability loss",
+        "overdraw spike",
+        "quality-tier mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-297 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-298",
+      "ordinal": 298,
+      "family_id": "GB30",
+      "family": "Materials, Shaders & Lighting",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Design materials, shaders, lighting, shadows, GI and VFX integration across deterministic quality tiers.",
+      "owner": "skeleton/jeeves/game_engine_rendering.py",
+      "batches": [
+        "B054",
+        "B059"
+      ],
+      "metrics": [
+        "visual coherence",
+        "shader correctness",
+        "lighting readability",
+        "GPU cost"
+      ],
+      "requirements": [
+        "Support source-preserving diff, reversible transforms, migration and checkpoint recovery.",
+        "Resume exact source/tool/canon/rival/evaluator state.",
+        "No destructive bake becomes sole authority."
+      ],
+      "adversarial": [
+        "shader divergence",
+        "lighting readability loss",
+        "overdraw spike",
+        "quality-tier mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-298 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-299",
+      "ordinal": 299,
+      "family_id": "GB30",
+      "family": "Materials, Shaders & Lighting",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Design materials, shaders, lighting, shadows, GI and VFX integration across deterministic quality tiers.",
+      "owner": "skeleton/jeeves/game_engine_rendering.py",
+      "batches": [
+        "B054",
+        "B059"
+      ],
+      "metrics": [
+        "visual coherence",
+        "shader correctness",
+        "lighting readability",
+        "GPU cost"
+      ],
+      "requirements": [
+        "Run 100/1000/10000 rounds, three stages each, no wall-clock deadline.",
+        "Inspect broad asset/frame/quality-tier samples with bounded compute/storage.",
+        "Detect overprocessing, temporal inconsistency, evaluator drift and style collapse."
+      ],
+      "adversarial": [
+        "shader divergence",
+        "lighting readability loss",
+        "overdraw spike",
+        "quality-tier mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-299 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "deep-effort visual report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-300",
+      "ordinal": 300,
+      "family_id": "GB30",
+      "family": "Materials, Shaders & Lighting",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Design materials, shaders, lighting, shadows, GI and VFX integration across deterministic quality tiers.",
+      "owner": "skeleton/jeeves/game_engine_rendering.py",
+      "batches": [
+        "B054",
+        "B059"
+      ],
+      "metrics": [
+        "visual coherence",
+        "shader correctness",
+        "lighting readability",
+        "GPU cost"
+      ],
+      "requirements": [
+        "Require independent exact-head visual/technical evidence.",
+        "Block unknown rights, unresolved similarity, style/canon, performance or source-loss failures.",
+        "Expire qualification on material identity drift."
+      ],
+      "adversarial": [
+        "shader divergence",
+        "lighting readability loss",
+        "overdraw spike",
+        "quality-tier mismatch",
+        "protected expressive similarity",
+        "cross-scene style regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "visual/gameplay consistency",
+        "bounded resources and platform budgets",
+        "editable source retained",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-300 fixture",
+        "exact-head pipeline identity",
+        "rival transcript",
+        "style/integration report",
+        "rights report",
+        "build/capture regression",
+        "quality delta",
+        "deep-effort visual report",
+        "independent promotion verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    }
+  ]
+}

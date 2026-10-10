@@ -117,6 +117,10 @@ from skeleton.persistence.spine_surface_seal import SpineSurfaceSeal
 from skeleton.persistence.spine_ci_witness import SpineCiWitness
 from skeleton.persistence.spine_ci_qualification import SpineCiQualification
 from skeleton.persistence.spine_ci_qualification_verify import SpineCiQualificationVerify
+from skeleton.persistence.spine_ci_reuse import (
+    SpineCiReuseError,
+    can_reuse_verified_qualification,
+)
 from skeleton.persistence.spine_merge_gate import SpineMergeGate
 from skeleton.persistence.spine_probe_replay import SpineProbeReplay
 from skeleton.persistence.spine_motor_witness import SpineMotorWitness
@@ -329,6 +333,8 @@ __all__ = [
     "SpineCiWitness",
     "SpineCiQualification",
     "SpineCiQualificationVerify",
+    "SpineCiReuseError",
+    "can_reuse_verified_qualification",
     "SpineMergeGate",
     "SpineProbeReplay",
     "SpineMotorWitness",

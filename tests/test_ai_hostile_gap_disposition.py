@@ -36,7 +36,11 @@ def test_current_hostile_gap_ledger_is_complete_and_valid() -> None:
     assert result["valid"] is True, result["errors"]
     assert result["audit_gap_count"] == 200
     assert sum(result["severity_counts"].values()) == 200
-    assert result["status_counts"]["implementation_pr_open"] == 10
+    expected_open = sum(
+        gap["status"] == "implementation_pr_open"
+        for gap in _ledger()["gaps"]
+    )
+    assert result["status_counts"]["implementation_pr_open"] == expected_open
 
 
 def test_missing_gap_fails_closed(monkeypatch) -> None:

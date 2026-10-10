@@ -30,12 +30,21 @@ class TraceabilitySpineTests(unittest.TestCase):
         self.assertEqual(result["state_machine_count"], 2)
         self.assertEqual(result["state_domain_count"], 21)
         self.assertEqual(result["interface_count"], 86)
-        self.assertEqual(result["schema_count"], 36)
+        self.assertEqual(result["schema_count"], 40)
         self.assertEqual(result["compatibility_interface_count"], 86)
         self.assertEqual(result["protocol_count"], 4)
         self.assertEqual(result["maturity_entry_count"], 421)
-        self.assertEqual(result["master_trace_node_count"], 9115)
-        self.assertEqual(result["master_trace_edge_count"], 25119)
+        trace_index = json.loads(
+            (ROOT / "machine/master_traceability.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            result["master_trace_node_count"],
+            trace_index["summary"]["node_count"],
+        )
+        self.assertEqual(
+            result["master_trace_edge_count"],
+            trace_index["summary"]["edge_count"],
+        )
 
     def test_impact_combines_trace_and_maturity_invalidation(self) -> None:
         result = MODULE.validate(

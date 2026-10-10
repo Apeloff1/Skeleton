@@ -14,6 +14,21 @@ from skeleton.observability.correlation import (
     set_correlation_id,
 )
 from skeleton.observability.event_bridge import EventMetricsBridge, ObservedEvent
+from skeleton.observability.explainability import (
+    EXPLANATION_SCHEMA,
+    DecisionFactor,
+    DecisionFactorKind,
+    ExplanationBuilder,
+    ExplanationError,
+    ExplanationLedger,
+    ExplanationPolicy,
+    ExplanationRecord,
+    FactorRelation,
+    FactorSensitivity,
+    OperationProvenance,
+    factor_from_reconstruction_receipt,
+    source_digest,
+)
 from skeleton.observability.health import HealthRegistry, ProbeResult, probe
 from skeleton.observability.jvm_accelerator import (
     AcceleratorStatus,
@@ -49,9 +64,40 @@ from skeleton.observability.resilient_telemetry import (
     ResilientTelemetryError,
     TelemetryEmitResult,
 )
+from skeleton.observability.runbooks import (
+    RUNBOOK_SCHEMA,
+    Runbook,
+    RunbookError,
+    RunbookRegistry,
+    RunbookStep,
+    RunbookValidation,
+    StepKind,
+    ValidationStatus,
+)
 from skeleton.observability.tracing import InMemoryExporter, Span, Tracer
 
 __all__ = [
+    "RUNBOOK_SCHEMA",
+    "Runbook",
+    "RunbookError",
+    "RunbookRegistry",
+    "RunbookStep",
+    "RunbookValidation",
+    "StepKind",
+    "ValidationStatus",
+    "EXPLANATION_SCHEMA",
+    "DecisionFactor",
+    "DecisionFactorKind",
+    "ExplanationBuilder",
+    "ExplanationError",
+    "ExplanationLedger",
+    "ExplanationPolicy",
+    "ExplanationRecord",
+    "FactorRelation",
+    "FactorSensitivity",
+    "OperationProvenance",
+    "factor_from_reconstruction_receipt",
+    "source_digest",
     "Sampler",
     "default_sampler",
     "MetricsCollector",

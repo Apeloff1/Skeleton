@@ -108,10 +108,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-131",
     "title": "Internal Protocols",
-    "required_gap_texts": [
-      "unify protocol envelopes",
-      "bind protocols to tracing"
-    ]
+    "required_gap_texts": []
   },
   "authority_role": "runtime_protocol_projection",
   "canonical_source": "machine/protocol_registry.json"

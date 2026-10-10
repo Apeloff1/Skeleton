@@ -8,7 +8,7 @@ import unittest
 
 from skeleton.repo_machine.builder import RepositoryModelBuilder
 from skeleton.repo_machine.config import load_machine_config
-from skeleton.repo_machine.planner import derive_work_candidates
+from skeleton.repo_machine.planner import _normalize_finding_path, derive_work_candidates
 
 
 CONFIG = """
@@ -60,6 +60,12 @@ class RepoMachineTests(unittest.TestCase):
         (root / ".machine").mkdir()
         (root / ".machine" / "repository.toml").write_text(CONFIG, encoding="utf-8")
         return temp
+
+    def test_planner_normalizes_windows_finding_paths(self) -> None:
+        self.assertEqual(
+            _normalize_finding_path(r".\\alpha\\nested\\module.py"),
+            "alpha/nested/module.py",
+        )
 
     def test_supervisor_context_uses_real_bounded_repository_model(self) -> None:
         from unittest.mock import patch

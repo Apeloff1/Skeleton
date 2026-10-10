@@ -44,7 +44,7 @@ def _write_machine(root: Path, *, closed: bool = True) -> None:
             {
                 "gap": "gap-streaming-protocol",
                 "closure_decision": closure_status,
-                "implementation_state": closure_status,
+                "implementation_state": "complete" if closed else "open",
                 "outstanding_evidence": [] if closed else ["exact-head gate"],
                 "blockers": [] if closed else ["exact-head gate"],
                 "evidence_present": [

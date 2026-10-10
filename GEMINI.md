@@ -11,7 +11,9 @@ Before modifying, generating, reviewing, repairing, or assembling repository cod
 7. `machine/ai_capabilities.json`
 8. `machine/ai_implementation_handoff.json`
 9. `machine/ai_closure_evidence.json`
-10. `docs/AI_APP_CONSTRUCTION_MANUAL.md`
+10. `machine/enterprise_ai_superiority.json`
+11. `machine/enterprise_ai_implementation_notes_index.json`
+12. `docs/AI_APP_CONSTRUCTION_MANUAL.md`
 
 The machine contracts are authoritative. Do not create a new runtime root, provider boundary, service, capability owner, or cross-plane dependency unless it is declared there first.
 
@@ -21,8 +23,8 @@ Required construction behavior:
 - route credential-bearing runtime model calls through `skeleton/provider_runtime.py`; treat `backend/core/ai_provider.py` as compatibility-only;
 - never import provider SDKs from feature/application code;
 - preserve fail-closed provider architecture acknowledgement through `skeleton/provider_contract.py`;
-- add tests, failure behavior, observability, evaluation, and rollback implications with the implementation;
-- run `python scripts/check_architecture_map.py`, `python scripts/check_ai_app_construction.py`, `python scripts/check_capability_interfaces.py`, `python scripts/check_provider_bootstrap.py`, and relevant domain tests before declaring work complete;
+- implement the relevant VOL-xxx dossier through L00-L13 and add tests, failure/recovery behavior, observability, economics, deployment, operator controls, evaluation, and rollback implications with the implementation;
+- run `python scripts/check_architecture_map.py`, `python scripts/check_ai_app_construction.py`, `python scripts/check_capability_interfaces.py`, `python scripts/check_provider_bootstrap.py`, `python scripts/check_enterprise_ai_superiority.py --json`, `python scripts/check_enterprise_ai_implementation_notes.py --json`, and relevant domain tests before declaring work complete;
 - update the construction contract when architecture changes instead of bypassing a validator.
 
 If a required plane, provider, interface, authority rule, failure mode, or acceptance gate is missing, treat it as a construction gap and close the canonical gap instead of creating a parallel subsystem.

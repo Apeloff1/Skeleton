@@ -110,3 +110,41 @@ test('invalid sequence fails closed', () => {
     /invalid sequence/,
   );
 });
+
+
+test('conversation turn transport targets assembled AI route and keeps reconnect controls', async () => {
+  const clientUrl = new URL(
+    '../src/product/conversationClient.ts',
+    import.meta.url,
+  );
+  const source = await readFile(clientUrl, 'utf8');
+  const output = ts.transpileModule(source, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.ES2022,
+      strict: true,
+    },
+    fileName: 'conversationClient.ts',
+    reportDiagnostics: true,
+  });
+  const diagnostics = output.diagnostics || [];
+  assert.equal(
+    diagnostics.length,
+    0,
+    diagnostics.map((item) => ts.flattenDiagnosticMessageText(
+      item.messageText,
+      '\n',
+    )).join('\n'),
+  );
+
+  assert.match(source, /export async function startConversationTurn/);
+  assert.match(source, /export async function getConversationTurn/);
+  assert.match(source, /export async function cancelConversationTurn/);
+  assert.match(source, /export async function followConversationTurn/);
+  assert.match(source, /\/api\/ai\/chat/);
+  assert.doesNotMatch(source, /\/api\/v1\/ai\/chat/);
+  assert.match(source, /response_mode:/);
+  assert.match(source, /'deferred'/);
+  assert.match(source, /engine_execution_id/);
+  assert.match(source, /AbortSignal/);
+});

@@ -30,6 +30,7 @@ from skeleton.frontier.runtime.operation_stream import (
     StreamReplayGapError,
     StreamTerminalError,
 )
+from skeleton.frontier.runtime.event_architecture import EventRetentionPolicy
 
 
 class StreamStoreCorruptionError(StreamContractError):
@@ -983,6 +984,95 @@ class SQLiteOperationEventStore:
                     WHERE namespace = ? AND operation_id = ?
                     """,
                     (safe, self.namespace, operation_id),
+                )
+                self._connection.execute("COMMIT")
+                return int(cursor.rowcount)
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def compact_with_retention(
+        self,
+        operation_id: str,
+        policy: EventRetentionPolicy,
+        *,
+        now: datetime | None = None,
+    ) -> int:
+        """Compact to the policy-bounded active-consumer watermark atomically.
+
+        This is the retention-aware counterpart to compact_acknowledged(). It
+        refuses to invent acknowledgement when no active consumer exists and
+        always preserves the policy's required replay tail.
+        """
+        if not isinstance(policy, EventRetentionPolicy):
+            raise StreamContractError("policy must be EventRetentionPolicy")
+        instant = _aware_utc(now)
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                head = self._ensure_head(operation_id)
+                current = _persisted_int(
+                    head["compacted_through"],
+                    "compacted_through",
+                )
+                ack_row = self._connection.execute(
+                    """
+                    SELECT MIN(acknowledged_through)
+                    FROM operation_stream_consumer
+                    WHERE namespace = ? AND operation_id = ? AND lease_expires_at > ?
+                    """,
+                    (self.namespace, operation_id, instant.isoformat()),
+                ).fetchone()
+                acknowledged = (
+                    None
+                    if ack_row is None or ack_row[0] is None
+                    else _persisted_int(
+                        ack_row[0],
+                        "acknowledged_through",
+                    )
+                )
+                latest_row = self._connection.execute(
+                    """
+                    SELECT COALESCE(MAX(sequence), ?)
+                    FROM operation_stream_event
+                    WHERE namespace = ? AND operation_id = ?
+                    """,
+                    (current, self.namespace, operation_id),
+                ).fetchone()
+                latest = _persisted_int(
+                    latest_row[0],
+                    "latest_sequence",
+                )
+                terminal_raw = head["terminal"]
+                if terminal_raw not in (0, 1, False, True):
+                    raise StreamStoreCorruptionError(
+                        "terminal must be persisted as boolean integer"
+                    )
+                decision = policy.plan(
+                    compacted_through=current,
+                    latest_sequence=latest,
+                    acknowledged_through=acknowledged,
+                    terminal=bool(terminal_raw),
+                )
+                target = decision.compact_through
+                if target <= current:
+                    self._connection.execute("COMMIT")
+                    return 0
+
+                cursor = self._connection.execute(
+                    """
+                    DELETE FROM operation_stream_event
+                    WHERE namespace = ? AND operation_id = ? AND sequence <= ?
+                    """,
+                    (self.namespace, operation_id, target),
+                )
+                self._connection.execute(
+                    """
+                    UPDATE operation_stream_head
+                    SET compacted_through = ?
+                    WHERE namespace = ? AND operation_id = ?
+                    """,
+                    (target, self.namespace, operation_id),
                 )
                 self._connection.execute("COMMIT")
                 return int(cursor.rowcount)

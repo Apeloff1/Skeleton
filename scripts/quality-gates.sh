@@ -179,7 +179,21 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_api_gateway_error_redaction.py \
   tests/test_webhook_destination_security.py \
   skeleton/testing/test_tiered_cache.py \
+  skeleton/testing/test_toolchain_bootstrap.py \
+  skeleton/testing/test_remote_build.py \
+  skeleton/testing/test_release_graph.py \
+  skeleton/testing/test_parallel_scheduler.py \
+  skeleton/testing/test_asset_pipeline.py \
+  skeleton/testing/test_build_observability.py \
   skeleton/testing/test_cache_contract.py \
+  skeleton/testing/test_intent_compiler.py \
+  skeleton/testing/test_creator_work_leases.py \
+  skeleton/testing/test_creator_approval_boundary.py \
+  skeleton/testing/test_creator_generated_history.py \
+  skeleton/testing/test_creator_semantic_diff.py \
+  skeleton/testing/test_creator_preview_transaction.py \
+  skeleton/testing/test_creator_command_surface.py \
+  skeleton/testing/test_creator_design_graph.py \
   skeleton/testing/test_reference_provenance.py \
   skeleton/testing/test_retrieval_hot_path.py \
   skeleton/testing/test_orchestration_reliability_profiles.py \

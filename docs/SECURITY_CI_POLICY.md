@@ -44,7 +44,7 @@ The primary assets are source integrity, maintainer credentials, CI tokens, rele
 
 ## CI security controls
 
-The repository keeps security controls split into focused workflows so failures identify a concrete boundary. The canonical merge summary remains **`CI/CD / Merge Readiness`** as described in [`CI_REQUIRED_CHECKS.md`](CI_REQUIRED_CHECKS.md).
+The repository keeps security controls split into focused workflows so failures identify a concrete boundary. The canonical merge summary remains **`Merge Readiness`** as described in [`CI_REQUIRED_CHECKS.md`](CI_REQUIRED_CHECKS.md).
 
 Representative source-controlled controls include:
 
@@ -150,7 +150,7 @@ Prefer metadata such as error class, status category, correlation ID, bounded pa
 
 Some guarantees cannot be enforced by repository source alone:
 
-- branch protection/rulesets must require the stable **`CI/CD / Merge Readiness`** check and prevent ordinary direct bypass;
+- branch protection/rulesets must require the stable **`Merge Readiness`** check and prevent ordinary direct bypass;
 - organization/repository settings determine who can change workflows, rulesets, secrets, environments, and release/deployment permissions;
 - external registries/providers determine token revocation, audit retention, artifact immutability, and some provenance guarantees;
 - self-hosted runner hardening, if introduced, requires host-level controls outside this repository.

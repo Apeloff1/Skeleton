@@ -14,6 +14,7 @@ on:
       - "scripts/check_ai_build_accountability.py"
       - "machine/ai_build_accountability.json"
       - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_p1_terminal_closure.json"
       - "docs/plan/BUILD_ACCOUNTABILITY_LEDGER.md"
       - "skeleton/testing/test_evidence_ingestion.py"
       - "skeleton/testing/test_promotion_evidence.py"
@@ -40,6 +41,7 @@ on:
       - "scripts/check_ai_build_accountability.py"
       - "machine/ai_build_accountability.json"
       - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_p1_terminal_closure.json"
       - "docs/plan/BUILD_ACCOUNTABILITY_LEDGER.md"
       - "skeleton/testing/test_evidence_ingestion.py"
       - "skeleton/testing/test_promotion_evidence.py"
@@ -58,8 +60,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: p1-evidence-identity-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Evidence-critical: exact-head signing verification must survive unrelated main churn.
+  group: p1-evidence-identity-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:

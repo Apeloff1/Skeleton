@@ -14,6 +14,7 @@ on:
       - "frontend/yarn.lock"
       - "frontend/scripts/patch-node-modules.js"
       - "frontend/scripts/verify-image-size-security.js"
+      - "frontend/scripts/verify-no-release-npm-security.js"
       - "frontend/scripts/enforce-yarn-audit.js"
       - "frontend/scripts/test-enforce-yarn-audit.js"
       - ".github/workflows/dependency-security.yml"
@@ -30,6 +31,7 @@ on:
       - "frontend/yarn.lock"
       - "frontend/scripts/patch-node-modules.js"
       - "frontend/scripts/verify-image-size-security.js"
+      - "frontend/scripts/verify-no-release-npm-security.js"
       - "frontend/scripts/enforce-yarn-audit.js"
       - "frontend/scripts/test-enforce-yarn-audit.js"
       - ".github/workflows/dependency-security.yml"
@@ -109,6 +111,10 @@ jobs:
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
 
+      - name: Syntax-check local node_modules patcher
+        working-directory: frontend
+        run: node --check scripts/patch-node-modules.js
+
       - name: Install frozen frontend dependency graph without lifecycle scripts
         working-directory: frontend
         run: yarn install --frozen-lockfile --non-interactive --ignore-scripts
@@ -126,6 +132,11 @@ jobs:
         working-directory: frontend
         run: node scripts/verify-image-size-security.js
 
+      - name: Verify no-release npm security mitigations
+        id: npm-compensating-security
+        working-directory: frontend
+        run: node scripts/verify-no-release-npm-security.js
+
       - name: Audit production JavaScript dependencies
         id: yarn-audit
         working-directory: frontend
@@ -138,7 +149,7 @@ jobs:
           exit 0
 
       - name: Generate Yarn-aware CycloneDX SBOM
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0 / Syft v1.42.3
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0 / Syft v1.42.3
         with:
           path: frontend
           format: cyclonedx-json
@@ -175,6 +186,7 @@ jobs:
         if: always()
         env:
           IMAGE_SIZE_SECURITY_VERIFIED: ${{ steps.image-size-security.outcome }}
+          NPM_COMPENSATING_SECURITY_VERIFIED: ${{ steps.npm-compensating-security.outcome }}
           YARN_AUDIT_STATUS: ${{ steps.yarn-audit.outputs.status }}
         working-directory: frontend
         run: node scripts/enforce-yarn-audit.js "$RUNNER_TEMP/yarn-audit.json"

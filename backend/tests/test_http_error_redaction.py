@@ -168,6 +168,8 @@ JSON_ENVELOPE_FILES = [
 ]
 TELEMETRY = REPO_ROOT / "backend" / "routes" / "telemetry.py"
 SERVER = REPO_ROOT / "backend" / "server.py"
+SWARM_COLD_LEGION = REPO_ROOT / "backend" / "routes" / "swarm_cold_legion.py"
+GAMEFORGE_BUILD = REPO_ROOT / "backend" / "routes" / "gameforge_build.py"
 
 _PRIVATE = "private-detail-must-not-leak-7f31"
 
@@ -312,6 +314,25 @@ def test_json_envelopes_do_not_expose_upstream_response_bodies() -> None:
     source = (REPO_ROOT / "backend" / "routes" / "game_command_agents.py").read_text(encoding="utf-8")
     assert "response.text" not in source
     assert "Image generation unavailable (" not in source
+
+
+def test_swarm_roster_resolution_does_not_expose_exception_detail() -> None:
+    leaks = _broad_failure_http_leaks(SWARM_COLD_LEGION)
+    assert leaks == [], (
+        "swarm_cold_legion.py exposes caught exception data in HTTP responses "
+        f"at lines {leaks}"
+    )
+    source = SWARM_COLD_LEGION.read_text(encoding="utf-8")
+    assert "cannot resolve code '{code}': {ex}" not in source
+    assert '"cannot resolve agent code"' in source
+
+
+def test_gameforge_native_build_diagnostics_are_not_returned_to_clients() -> None:
+    source = GAMEFORGE_BUILD.read_text(encoding="utf-8")
+    assert '"stderr": proc.stderr' not in source
+    assert 'engine_log = ((run.stdout or "") + (run.stderr or ""))' not in source
+    assert '"pyinstaller build failed"' in source
+    assert '"engine_validation_failed"' in source
 
 
 def test_internal_http_error_is_stable_and_typed() -> None:

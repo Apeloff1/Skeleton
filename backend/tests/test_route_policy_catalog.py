@@ -20,7 +20,7 @@ def principal() -> VerifiedPrincipal:
 
 
 def test_catalog_version_and_summary_are_stable_and_report_only():
-    assert ROUTE_POLICY_CATALOG_VERSION == "2026-09-15.v2"
+    assert ROUTE_POLICY_CATALOG_VERSION == "2026-10-03.v3"
     summary = catalog_summary()
     assert summary["version"] == ROUTE_POLICY_CATALOG_VERSION
     assert summary["enforcement"] == "report_only"
@@ -74,6 +74,8 @@ def test_specific_domains_win_before_legacy_fallback():
         "/api/interpreter/run": "code_execution",
         "/api/compiler/compile": "code_execution",
         "/api/tools/invoke": "tooling",
+        "/api/mirror-room/observatory": "learning",
+        "/api/mirror-room/file-tree": "learning",
         "/api/unknown-legacy-surface": "legacy_api",
     }
     actor = principal()

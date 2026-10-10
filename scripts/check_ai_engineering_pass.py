@@ -89,6 +89,8 @@ def validate() -> list[str]:
     }
     if not isinstance(chain, list) or not required_chain.issubset(set(chain)):
         errors.append("closure_chain is incomplete")
+    elif len(chain) != len(set(chain)):
+        errors.append("closure_chain must not contain duplicate stages")
 
     task_propagation = engineering.get("task_propagation")
     if not isinstance(task_propagation, dict):
@@ -103,6 +105,8 @@ def validate() -> list[str]:
     fields = budget.get("required_fields")
     if not isinstance(fields, list) or len(fields) < 9:
         errors.append("budget binding policy must define threshold metadata")
+    elif len(fields) != len(set(fields)):
+        errors.append("budget binding policy required_fields must be unique")
     if "measured values" not in str(budget.get("production_rule", "")):
         errors.append("production budget rule must require measured values")
 
@@ -135,6 +139,8 @@ def validate() -> list[str]:
         pdims = profile.get("required_dimensions")
         if not isinstance(pdims, list) or not pdims:
             errors.append(f"{pid}: required_dimensions must be non-empty")
+        elif len(pdims) != len(set(pdims)):
+            errors.append(f"{pid}: required_dimensions must be unique")
         elif any(d not in known_dims for d in pdims):
             errors.append(f"{pid}: unknown engineering dimension")
         for field in (
@@ -145,6 +151,8 @@ def validate() -> list[str]:
             value = profile.get(field)
             if not isinstance(value, list) or not value:
                 errors.append(f"{pid}: {field} must be non-empty")
+            elif len(value) != len(set(value)):
+                errors.append(f"{pid}: {field} must be unique")
         if "No verified/hardened/production promotion" not in str(profile.get("promotion_rule", "")):
             errors.append(f"{pid}: promotion rule must fail closed")
 

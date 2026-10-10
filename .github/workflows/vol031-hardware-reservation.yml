@@ -1,0 +1,160 @@
+name: VOL-031 Hardware and Reservation Gate
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/distributed/network/hardware_topology.py"
+      - "skeleton/ai/runtime/distributed/network/hardware_topology.py"
+      - "skeleton/distributed/network/placement_scheduler.py"
+      - "skeleton/ai/runtime/distributed/network/placement_scheduler.py"
+      - "skeleton/distributed/network/model_placement.py"
+      - "skeleton/ai/runtime/distributed/network/model_placement.py"
+      - "skeleton/shells/worker_reservations.py"
+      - "skeleton/testing/test_model_placement.py"
+      - "skeleton/testing/test_vol031_hardware_reservation.py"
+      - ".github/workflows/vol031-hardware-reservation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skeleton/distributed/network/hardware_topology.py"
+      - "skeleton/ai/runtime/distributed/network/hardware_topology.py"
+      - "skeleton/distributed/network/placement_scheduler.py"
+      - "skeleton/ai/runtime/distributed/network/placement_scheduler.py"
+      - "skeleton/distributed/network/model_placement.py"
+      - "skeleton/ai/runtime/distributed/network/model_placement.py"
+      - "skeleton/shells/worker_reservations.py"
+      - "skeleton/testing/test_model_placement.py"
+      - "skeleton/testing/test_vol031_hardware_reservation.py"
+      - ".github/workflows/vol031-hardware-reservation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vol031-hardware-reservation-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hardware-reservation:
+    name: Hardware topology and scheduler reservation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic==2.13.5"
+
+      - name: Compile VOL-031 boundaries
+        run: >-
+          python -m py_compile
+          skeleton/distributed/network/hardware_topology.py
+          skeleton/ai/runtime/distributed/network/hardware_topology.py
+          skeleton/distributed/network/placement_scheduler.py
+          skeleton/ai/runtime/distributed/network/placement_scheduler.py
+          skeleton/distributed/network/model_placement.py
+          skeleton/ai/runtime/distributed/network/model_placement.py
+          skeleton/testing/test_vol031_hardware_reservation.py
+
+      - name: Run placement and reservation regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_model_placement.py
+          skeleton/testing/test_vol031_hardware_reservation.py
+
+      - name: Assert exact mirrors and scheduler binding
+        run: |
+          python - <<'PY'
+          import hashlib
+          import os
+          from pathlib import Path
+
+          root = Path(".")
+          pairs = (
+              (
+                  root / "skeleton/distributed/network/hardware_topology.py",
+                  root / "skeleton/ai/runtime/distributed/network/hardware_topology.py",
+              ),
+              (
+                  root / "skeleton/distributed/network/placement_scheduler.py",
+                  root / "skeleton/ai/runtime/distributed/network/placement_scheduler.py",
+              ),
+              (
+                  root / "skeleton/distributed/network/model_placement.py",
+                  root / "skeleton/ai/runtime/distributed/network/model_placement.py",
+              ),
+          )
+          for source, mirror in pairs:
+              left = source.read_bytes()
+              right = mirror.read_bytes()
+              if left != right:
+                  raise SystemExit(f"VOL-031 mirror drift: {source}")
+              print(source, hashlib.sha256(left).hexdigest())
+
+          scheduler = (
+              root / "skeleton/distributed/network/placement_scheduler.py"
+          ).read_text(encoding="utf-8")
+          for token in (
+              "select_model_placement(",
+              "reservations.reserve(",
+              "reservations.require(reservation)",
+              "qualify_model_placement(",
+              "reservations.release(reservation)",
+              '"capacity-reservation-only"',
+              "production_authority: bool = False",
+              "hardware-registration-snapshot-mismatch",
+              "hardware-snapshot-stale",
+          ):
+              if token not in scheduler:
+                  raise SystemExit(f"VOL-031 scheduler binding missing: {token}")
+
+          topology = (
+              root / "skeleton/distributed/network/hardware_topology.py"
+          ).read_text(encoding="utf-8")
+          for token in (
+              "cpu_logical_cores",
+              "ram_bytes",
+              "storage_free_bytes",
+              "network_mbps",
+              "numa_nodes",
+              "DeviceDescriptor",
+              "hardware-generation-mismatch",
+              "hardware-observation-stale",
+              "canonical_json_bytes",
+          ):
+              if token not in topology:
+                  raise SystemExit(f"VOL-031 hardware collector missing: {token}")
+
+          forbidden = ("subprocess.", "os.system(", "requests.", "httpx.")
+          for target in (scheduler, topology):
+              for token in forbidden:
+                  if token in target:
+                      raise SystemExit(
+                          f"VOL-031 boundary gained external execution surface: {token}"
+                      )
+
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if not expected:
+              raise SystemExit("exact head SHA missing")
+          print("VOL-031 exact head:", expected)
+          PY

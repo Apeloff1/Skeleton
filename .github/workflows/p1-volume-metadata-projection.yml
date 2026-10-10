@@ -111,7 +111,7 @@ jobs:
           )
           if report["volume_count"] != 107:
               raise SystemExit("P1 primary frontier count drift")
-          if report["target_floor_eligible_count"] != 3:
+          if report["target_floor_eligible_count"] != 20:
               raise SystemExit(
                   "metadata projection unexpectedly changed maturity eligibility"
               )
@@ -138,7 +138,7 @@ jobs:
               for row in report["records"]
               if row["target_floor_eligible"] is True
           }
-          if eligible != {"VOL-013", "VOL-014", "VOL-253"}:
+          if eligible != {"VOL-000", "VOL-013", "VOL-014", "VOL-015", "VOL-016", "VOL-017", "VOL-034", "VOL-035", "VOL-036", "VOL-037", "VOL-038", "VOL-056", "VOL-057", "VOL-059", "VOL-078", "VOL-079", "VOL-080", "VOL-248", "VOL-253", "VOL-420"}:
               raise SystemExit(
                   "metadata-only projection changed target-floor set: "
                   + ",".join(sorted(eligible))

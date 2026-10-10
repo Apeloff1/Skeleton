@@ -28,6 +28,7 @@ _COMMANDS = [
     "plan",
     "cockpit",
     "walk",
+    "doctor",
     "contracts",
     "capabilities",
     "invoke",

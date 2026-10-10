@@ -10,19 +10,13 @@
       "volume_ref": "VOL-089",
       "title": "Documentation Engine",
       "accountability_id": "ACC-VOL-089",
-      "required_gap_texts": [
-        "define generated-doc boundaries",
-        "materialize doc drift gate"
-      ]
+      "required_gap_texts": []
     },
     {
       "volume_ref": "VOL-090",
       "title": "Generated Documentation",
       "accountability_id": "ACC-VOL-090",
-      "required_gap_texts": [
-        "define generated artifact manifest",
-        "add regeneration cleanliness gate"
-      ]
+      "required_gap_texts": []
     }
   ],
   "boundary_policy": {

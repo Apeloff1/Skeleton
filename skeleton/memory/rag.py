@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import math
 import re
 from collections import defaultdict
@@ -15,6 +16,57 @@ from .store import MemoryStore
 # =============================================================================
 # RAG — RETRIEVAL-AUGMENTED GENERATION
 # =============================================================================
+
+def _clone_chunk(chunk: MemoryChunk) -> MemoryChunk:
+    """Validate and detach admitted/query-visible memory data from callers."""
+    if not isinstance(chunk.id, str) or not chunk.id:
+        raise ValueError("chunk id must be a non-empty string")
+    if not isinstance(chunk.text, str):
+        raise TypeError("chunk text must be a string")
+    if not isinstance(chunk.metadata, dict):
+        raise TypeError("chunk metadata must be a dict")
+
+    embedding = None
+    if chunk.embedding is not None:
+        if not isinstance(chunk.embedding, list):
+            raise TypeError("chunk embedding must be a list when provided")
+        checked_embedding: list[float] = []
+        for value in chunk.embedding:
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise TypeError("chunk embedding values must be numeric")
+            numeric = float(value)
+            if not math.isfinite(numeric):
+                raise ValueError("chunk embedding values must be finite")
+            checked_embedding.append(numeric)
+        embedding = checked_embedding
+
+    timestamp = chunk.timestamp
+    if (
+        isinstance(timestamp, bool)
+        or not isinstance(timestamp, (int, float))
+        or not math.isfinite(float(timestamp))
+    ):
+        raise ValueError("chunk timestamp must be finite numeric data")
+    if not isinstance(chunk.source_tier, str) or not chunk.source_tier:
+        raise ValueError("chunk source_tier must be a non-empty string")
+    confidence = chunk.confidence
+    if (
+        isinstance(confidence, bool)
+        or not isinstance(confidence, (int, float))
+        or not math.isfinite(float(confidence))
+    ):
+        raise ValueError("chunk confidence must be finite numeric data")
+
+    return MemoryChunk(
+        id=chunk.id,
+        text=chunk.text,
+        metadata=copy.deepcopy(chunk.metadata),
+        embedding=embedding,
+        timestamp=float(timestamp),
+        source_tier=chunk.source_tier,
+        confidence=float(confidence),
+    )
+
 
 class InMemoryTFIDFStore(MemoryStore):
     """
@@ -78,8 +130,9 @@ class InMemoryTFIDFStore(MemoryStore):
         else:
             self._total_docs += 1
 
-        self._chunks[chunk.id] = chunk
-        for token in set(self._tokenize(chunk.text)):
+        stored = _clone_chunk(chunk)
+        self._chunks[stored.id] = stored
+        for token in set(self._tokenize(stored.text)):
             self._doc_freq[token] += 1
 
     def query(
@@ -128,7 +181,11 @@ class InMemoryTFIDFStore(MemoryStore):
 
         results.sort(key=lambda item: (-item[0], item[1].id))
         return [
-            MemoryQueryResult(chunk=chunk, score=score, rank=i + 1)
+            MemoryQueryResult(
+                chunk=_clone_chunk(chunk),
+                score=score,
+                rank=i + 1,
+            )
             for i, (score, chunk) in enumerate(results[:top_k])
         ]
 

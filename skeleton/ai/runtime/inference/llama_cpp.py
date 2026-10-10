@@ -288,12 +288,15 @@ def _identity(path_value: str, *, executable: bool, reject_symlink: bool) -> Art
         if resolved_command is None:
             raise FileNotFoundError(f"local runtime executable not found: {path_value}")
         raw = Path(resolved_command)
-    if reject_symlink and raw.is_symlink():
-        raise LlamaCppRuntimeError(f"artifact symlink rejected: {raw}")
+    lexical=Path(os.path.abspath(raw))
     try:
         resolved = raw.resolve(strict=True)
     except OSError as exc:
         raise FileNotFoundError(f"local artifact not found: {raw}") from exc
+    if reject_symlink and lexical!=resolved:
+        raise LlamaCppRuntimeError(
+            f"artifact symlinked path component rejected: {raw}"
+        )
     if not resolved.is_file():
         raise LlamaCppRuntimeError(f"local artifact is not a regular file: {resolved}")
     if executable and not os.access(resolved, os.X_OK):

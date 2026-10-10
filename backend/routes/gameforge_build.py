@@ -193,7 +193,7 @@ async def build_desktop(b: DesktopBody, user=Depends(_editor)):
         return {"ok": False, "error": "pyinstaller build timed out"}
     binary = _resolve_under_dir(workdir, "dist", build_id)
     if proc.returncode != 0 or not os.path.exists(binary):
-        return {"ok": False, "error": "pyinstaller build failed", "stderr": proc.stderr[-400:]}
+        return {"ok": False, "error": "pyinstaller build failed"}
     zip_path = _resolve_under_dir(workdir, f"{build_id}.zip")
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
         z.write(binary, os.path.basename(binary))
@@ -256,7 +256,7 @@ async def build_godot(b: BuildBody, user=Depends(_editor)):
     engine = _godot_bin()
     engine_validated = False
     engine_version = None
-    engine_log = ""
+    engine_log = "not_run"
     if engine:
         try:
             ver = subprocess.run([engine, "--headless", "--version"], capture_output=True, text=True, timeout=30)
@@ -264,8 +264,8 @@ async def build_godot(b: BuildBody, user=Depends(_editor)):
             # Run the project headless — imports resources and executes main scene.
             run = subprocess.run([engine, "--headless", "--path", workdir, "--quit"],
                                  capture_output=True, text=True, timeout=90)
-            engine_log = ((run.stdout or "") + (run.stderr or ""))[-400:]
             engine_validated = "GameForge Godot build" in (run.stdout or "") or run.returncode == 0
+            engine_log = "engine_validated" if engine_validated else "engine_validation_failed"
         except Exception:  # noqa: BLE001
             engine_log = "engine_run_failed"
 

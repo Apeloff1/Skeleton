@@ -36,6 +36,79 @@ class GateVerdict(str, Enum):
     ESCALATE = "escalate"
 
 
+class UncertaintyEvidenceKind(str, Enum):
+    """Typed uncertainty semantics for presentation and downstream policy.
+
+    Confidence is deliberately distinct from probability. UNKNOWN means there
+    is not enough evidence to quantify uncertainty safely; AMBIGUOUS means
+    evidence exists but does not support a single confident interpretation.
+    """
+
+    PROBABILITY = "probability"
+    CONFIDENCE = "confidence"
+    UNKNOWN = "unknown"
+    AMBIGUOUS = "ambiguous"
+
+
+@dataclass(frozen=True)
+class UncertaintyExplanation:
+    """UI-safe, deterministic explanation of an uncertainty gate decision."""
+
+    verdict: GateVerdict
+    evidence_kind: UncertaintyEvidenceKind
+    message_key: str
+    mean_confidence: float
+    agreement: float
+    entropy: float
+    effective_confidence: float
+    probability_semantics: bool = False
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.verdict, GateVerdict):
+            raise UncertaintyError("explanation verdict must be GateVerdict")
+        if not isinstance(self.evidence_kind, UncertaintyEvidenceKind):
+            raise UncertaintyError(
+                "explanation evidence_kind must be UncertaintyEvidenceKind"
+            )
+        if (
+            not isinstance(self.message_key, str)
+            or not self.message_key.startswith("uncertainty.")
+        ):
+            raise UncertaintyError("explanation message_key must be canonical")
+        for field in (
+            "mean_confidence",
+            "agreement",
+            "entropy",
+            "effective_confidence",
+        ):
+            value = getattr(self, field)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+                or not 0.0 <= float(value) <= 1.0
+            ):
+                raise UncertaintyError(
+                    f"explanation {field} must be in [0, 1]"
+                )
+        if self.probability_semantics is not False:
+            raise UncertaintyError(
+                "confidence-derived explanations cannot claim probability semantics"
+            )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "verdict": self.verdict.value,
+            "evidence_kind": self.evidence_kind.value,
+            "message_key": self.message_key,
+            "mean_confidence": round(self.mean_confidence, 4),
+            "agreement": round(self.agreement, 4),
+            "entropy": round(self.entropy, 4),
+            "effective_confidence": round(self.effective_confidence, 4),
+            "probability_semantics": False,
+        }
+
+
 @dataclass(frozen=True)
 class Candidate:
     text: str
@@ -65,6 +138,62 @@ class GateDecision:
 
 def _normalise(text: str) -> str:
     return " ".join((text or "").lower().split())[:200]
+
+
+_EXPLANATION_TAXONOMY: Dict[
+    str,
+    Tuple[UncertaintyEvidenceKind, str],
+] = {
+    "no_candidates": (
+        UncertaintyEvidenceKind.UNKNOWN,
+        "uncertainty.no_candidates",
+    ),
+    "empty_answer": (
+        UncertaintyEvidenceKind.UNKNOWN,
+        "uncertainty.empty_answer",
+    ),
+    "confident_agreement": (
+        UncertaintyEvidenceKind.CONFIDENCE,
+        "uncertainty.confident_agreement",
+    ),
+    "below_escalate_threshold": (
+        UncertaintyEvidenceKind.CONFIDENCE,
+        "uncertainty.low_effective_confidence",
+    ),
+    "uncertain_middle_band": (
+        UncertaintyEvidenceKind.AMBIGUOUS,
+        "uncertainty.ambiguous_evidence",
+    ),
+}
+
+
+def explain_decision(decision: GateDecision) -> UncertaintyExplanation:
+    """Project a gate decision into a bounded UI/presentation contract.
+
+    The projection never includes candidate text and never re-labels
+    self-reported confidence as calibrated probability.
+    """
+
+    if not isinstance(decision, GateDecision):
+        raise TypeError("decision must be GateDecision")
+    try:
+        evidence_kind, message_key = _EXPLANATION_TAXONOMY[decision.reason]
+    except KeyError as exc:
+        raise UncertaintyError(
+            "unknown gate reason cannot be exposed as an explanation"
+        ) from exc
+    effective = decision.mean_confidence * (
+        0.5 + 0.5 * decision.agreement
+    )
+    return UncertaintyExplanation(
+        verdict=decision.verdict,
+        evidence_kind=evidence_kind,
+        message_key=message_key,
+        mean_confidence=decision.mean_confidence,
+        agreement=decision.agreement,
+        entropy=decision.entropy,
+        effective_confidence=effective,
+    )
 
 
 class UncertaintyGate:

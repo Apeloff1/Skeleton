@@ -35,6 +35,21 @@ class EntropySource:
     read: callable  # int -> bytes
 
 
+# Repetition-count health test (after NIST SP 800-90B §4.4.1): a healthy
+# source essentially never emits a long run of one byte value. A run of
+# _MAX_RUN identical bytes has probability 2^-8*(_MAX_RUN-1) per position.
+_MAX_RUN = 8
+
+
+def _stuck(data: bytes) -> bool:
+    run = 1
+    for prev, cur in zip(data, data[1:]):
+        run = run + 1 if cur == prev else 1
+        if run >= _MAX_RUN:
+            return True
+    return False
+
+
 class EntropyRegistry:
     """Register sources and fetch bytes while recording origin."""
 
@@ -57,8 +72,12 @@ class EntropyRegistry:
         if entry is None:
             raise EntropyError("unknown entropy source", context={"source": selected})
         data = entry.read(n_bytes)
-        if len(data) != n_bytes:
+        if not isinstance(data, (bytes, bytearray)) or len(data) != n_bytes:
             raise EntropyError("short entropy read", context={"source": selected})
+        data = bytes(data)
+        if _stuck(data):
+            raise EntropyError("entropy source failed health check (stuck output)",
+                               context={"source": selected, "bytes": n_bytes})
         self._audit.append({"source": selected, "bytes": n_bytes})
         return data
 

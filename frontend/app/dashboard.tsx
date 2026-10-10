@@ -133,6 +133,23 @@ export default function Dashboard() {
           <QuickBtn icon="planet" label="Build" color="#8B5CF6" onPress={() => router.push('/gallery' as any)} />
         </View>
 
+        <TouchableOpacity
+          style={s.mirrorCard}
+          onPress={() => router.push('/mirror-room' as any)}
+          activeOpacity={0.78}
+        >
+          <View style={s.mirrorIcon}>
+            <Ionicons name="sparkles" size={22} color="#F5C451" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.mirrorTitle}>Mirror Room Observatory</Text>
+            <Text style={s.mirrorSubtitle}>
+              Watch the 100-stage adversarial ratchet raise quality and detail.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#A78BFA" />
+        </TouchableOpacity>
+
         {/* Jeeves greeting — taps trigger persona TTS with appropriate
             mannerism. Long-press opens the full Jeeves modal. */}
         <TouchableOpacity
@@ -340,6 +357,10 @@ const s = StyleSheet.create({
   quickBtn: { flex: 1, backgroundColor: '#262626', borderRadius: 10, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#404040' },
   quickIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
   quickLabel: { color: '#F8FAFC', fontSize: 11, fontWeight: '700' },
+  mirrorCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#211D2B', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#4C3F66' },
+  mirrorIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#F5C4511A', alignItems: 'center', justifyContent: 'center' },
+  mirrorTitle: { color: '#F8FAFC', fontSize: 14, fontWeight: '800' },
+  mirrorSubtitle: { color: '#94A3B8', fontSize: 11, lineHeight: 16, marginTop: 2 },
   card: { backgroundColor: '#262626', borderRadius: 10, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#404040' },
   cardHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 6 },
   cardTitle: { color: '#F8FAFC', fontSize: 13, fontWeight: '700', flex: 1 },

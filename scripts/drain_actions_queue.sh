@@ -91,6 +91,12 @@ control_plane_paths = frozenset(
         ".github/workflows/merge-readiness.yml",
         ".github/workflows/pr-obsolete-run-drain.yml",
         ".github/workflows/queue-drain.yml",
+        ".github/workflows/p1-evidence-identity.yml",
+        ".github/workflows/p1-maturity-reconciliation.yml",
+        ".github/workflows/p1-required-gate-authority.yml",
+        ".github/workflows/p1-risk-evidence-binding.yml",
+        ".github/workflows/p1-reproducibility-bundle.yml",
+        ".github/workflows/p1-scope-freeze.yml",
     }
 )
 

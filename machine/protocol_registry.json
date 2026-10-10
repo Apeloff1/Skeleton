@@ -6,10 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-131",
     "title": "Internal Protocols",
-    "required_gap_texts": [
-      "unify protocol envelopes",
-      "bind protocols to tracing"
-    ]
+    "required_gap_texts": []
   },
   "canonical_envelope": {
     "source": "skeleton/contracts/protocol.py",

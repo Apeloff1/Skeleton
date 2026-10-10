@@ -52,6 +52,9 @@ class MemoryTrinity:
         metadata_filter: Optional[Dict[str, Any]] = None,
     ) -> UnifiedContext:
         """Query all tiers and fuse into unified context."""
+        self._validate_query(query_text,top_k_per_tier)
+        if metadata_filter is not None and not isinstance(metadata_filter,dict):
+            raise TypeError("metadata_filter must be a mapping")
         # Query each tier
         rag_results = self.rag.query(
             query_text, top_k=top_k_per_tier, metadata_filter=metadata_filter
@@ -63,6 +66,91 @@ class MemoryTrinity:
             query_text, top_k=top_k_per_tier, metadata_filter=metadata_filter
         )
 
+        return self._compose(
+            query_text,
+            rag_results,
+            cag_results,
+            mag_results,
+            top_k_per_tier=top_k_per_tier,
+        )
+
+    def query_scoped(
+        self,
+        query_text: str,
+        *,
+        rag_scope: Dict[str,str],
+        persona_id: str,
+        user_id: str,
+        top_k_per_tier: int = 3,
+    ) -> UnifiedContext:
+        """Fuse memory only after each tier independently enforces its authority scope."""
+        self._validate_query(query_text,top_k_per_tier)
+        if (
+            not isinstance(rag_scope,dict)
+            or not rag_scope
+            or any(
+                not isinstance(key,str)
+                or not key
+                or not isinstance(value,str)
+                or not value
+                for key,value in rag_scope.items()
+            )
+        ):
+            raise ValueError("rag_scope must contain non-empty string keys and values")
+        if not isinstance(persona_id,str) or not persona_id:
+            raise ValueError("persona_id must be non-empty")
+        if not isinstance(user_id,str) or not user_id:
+            raise ValueError("user_id must be non-empty")
+
+        rag_query=getattr(self.rag,"query_scoped",None)
+        cag_query=getattr(self.cag,"query_scoped",None)
+        mag_query=getattr(self.mag,"query_scoped",None)
+        if not callable(rag_query) or not callable(cag_query) or not callable(mag_query):
+            raise TypeError("all memory tiers must implement query_scoped")
+
+        rag_results=rag_query(
+            query_text,
+            top_k=top_k_per_tier,
+            scope=dict(rag_scope),
+        )
+        cag_results=cag_query(
+            query_text,
+            top_k=top_k_per_tier,
+            scope={"persona_id":persona_id},
+        )
+        mag_results=mag_query(
+            query_text,
+            top_k=top_k_per_tier,
+            scope={"user_id":user_id},
+        )
+        return self._compose(
+            query_text,
+            rag_results,
+            cag_results,
+            mag_results,
+            top_k_per_tier=top_k_per_tier,
+        )
+
+    @staticmethod
+    def _validate_query(query_text: str, top_k_per_tier: int) -> None:
+        if not isinstance(query_text,str) or not query_text.strip():
+            raise ValueError("query_text must be non-empty")
+        if (
+            isinstance(top_k_per_tier,bool)
+            or not isinstance(top_k_per_tier,int)
+            or top_k_per_tier<1
+        ):
+            raise ValueError("top_k_per_tier must be a positive integer")
+
+    def _compose(
+        self,
+        query_text: str,
+        rag_results: List[MemoryQueryResult],
+        cag_results: List[MemoryQueryResult],
+        mag_results: List[MemoryQueryResult],
+        *,
+        top_k_per_tier: int,
+    ) -> UnifiedContext:
         # Apply tier weights
         for r in rag_results:
             r.fusion_contribution = r.score * self._tier_weights["rag"]
@@ -82,7 +170,14 @@ class MemoryTrinity:
                 seen_texts[text_hash] = r
 
         # Re-rank by fusion contribution
-        all_results = sorted(seen_texts.values(), key=lambda x: x.fusion_contribution, reverse=True)
+        all_results = sorted(
+            seen_texts.values(),
+            key=lambda item:(
+                -item.fusion_contribution,
+                item.chunk.source_tier,
+                item.chunk.id,
+            ),
+        )
 
         # Build context within token budget
         tokens_used = 0

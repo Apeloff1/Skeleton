@@ -173,6 +173,27 @@ def test_build_stages_constant():
     assert len(sch.BUILD_STAGES) == 13
 
 
+def test_async_execution_never_mutates_global_live_phase_cap():
+    original = sch.MAX_LIVE_PHASES
+    phases = [f"p{i:02d}" for i in range(1, original + 5)]
+    jid = sch.start_async(
+        "execute",
+        build_id="async_cap_isolation",
+        phases=phases,
+        seed=2,
+        platoon_size=3,
+        persist=False,
+    )
+    assert sch.MAX_LIVE_PHASES == original
+    for _ in range(100):
+        job = sch.get_job(jid)
+        if job and job["status"] in ("done", "error"):
+            break
+        time.sleep(0.05)
+    assert sch.MAX_LIVE_PHASES == original
+    assert job["status"] == "done", job.get("error")
+
+
 def test_async_job_lifecycle():
     jid = sch.start_async("execute", build_id="async_test",
                           phases=["p01", "p02"], seed=1, platoon_size=3, persist=False)

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-02:kv_cache:v1",
+  "title": "FLGB-02 kv cache",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "request_id",
+    "bytes",
+    "last_used_sequence",
+    "pinned"
+  ],
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "last_used_sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "pinned": {
+      "type": "boolean"
+    }
+  }
+}

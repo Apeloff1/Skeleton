@@ -26,3 +26,7 @@ __all__ = [
     "load_plan",
     "snapshot_b001",
 ]
+
+from .repository_graph import DependencyEdge, FileNode, RepositoryGraph, RepositoryGraphError
+from .change_planner import ChangePlan, plan_change
+from .source_extraction import MAX_SOURCE_BYTES, SourceFile, build_repository_graph

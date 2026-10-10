@@ -14,6 +14,7 @@ from scripts.reconcile_p1_risk_evidence import (
     RiskKind,
     derive_obligations,
     reconcile_repository,
+    retired_gap_owner_from_id,
 )
 
 VERIFIER_HEAD = "dfeaadc5da74c0205785adf2387c607603d9cdb4"
@@ -78,14 +79,27 @@ def test_bulk_binding_provenance_is_exact_and_complete() -> None:
         )
 
 
-def test_bulk_bindings_match_live_canonical_obligations() -> None:
+def test_bulk_bindings_match_live_or_governed_retired_obligations() -> None:
     obligations = {item.obligation_id: item for item in _obligations()}
+    retired = []
 
     for row in _bulk_records():
-        obligation = obligations[row["obligation_id"]]
+        obligation = obligations.get(row["obligation_id"])
+        if obligation is None:
+            retired.append(row)
+            assert row["obligation_id"].startswith("P1-GAP-")
+            assert retired_gap_owner_from_id(row["obligation_id"]) == row["owner_id"]
+            assert row["disposition"] == "evidence"
+            assert row["evidence"]
+            assert row["accepted_risk"] is None
+            continue
+
         assert row["obligation_digest"] == obligation.obligation_digest
         assert obligation.kind in {RiskKind.RISK, RiskKind.GAP}
         assert obligation.source_ref.split(":", 1)[0] in row["owner_id"]
+
+    assert retired
+    assert all(row["obligation_id"].startswith("P1-GAP-") for row in retired)
 
 
 def test_governed_frontier_is_497_resolved_16_adversarial() -> None:
@@ -112,21 +126,25 @@ def test_governed_frontier_is_497_resolved_16_adversarial() -> None:
 def test_bulk_binding_does_not_mutate_masterplan_source_obligations() -> None:
     master = _load(ROOT / MASTER)
     by_key = {row["key"]: row for row in master["volumes"]}
+    obligations = {item.obligation_id: item for item in _obligations()}
 
     for row in _bulk_records():
         volume_key = row["owner_id"].removeprefix("ACC-")
         volume = by_key[volume_key]
+        obligation = obligations.get(row["obligation_id"])
+
         if row["obligation_id"].startswith("P1-RISK-"):
-            assert any(
-                item.obligation_id == row["obligation_id"]
-                for item in _obligations()
-                if item.kind is RiskKind.RISK
-            )
+            assert obligation is not None
+            assert obligation.kind is RiskKind.RISK
             assert volume["risks"]
-        else:
-            assert any(
-                item.obligation_id == row["obligation_id"]
-                for item in _obligations()
-                if item.kind is RiskKind.GAP
-            )
+            continue
+
+        if obligation is not None:
+            assert obligation.kind is RiskKind.GAP
             assert volume["gaps"]
+            continue
+
+        assert retired_gap_owner_from_id(row["obligation_id"]) == row["owner_id"]
+        assert row["disposition"] == "evidence"
+        assert row["evidence"]
+        assert row["accepted_risk"] is None

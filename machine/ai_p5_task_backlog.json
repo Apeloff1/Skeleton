@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "status": "reviewed_clear",
+  "tasks": [
+    {
+      "task_id": "P5-PROBE-01",
+      "title": "Replay closed-plane adversaries",
+      "completion_checkbox": false,
+      "status": "held"
+    },
+    {
+      "task_id": "P5-GAP-01",
+      "title": "Hold open function gaps",
+      "completion_checkbox": false,
+      "status": "clear"
+    }
+  ],
+  "findings": []
+}

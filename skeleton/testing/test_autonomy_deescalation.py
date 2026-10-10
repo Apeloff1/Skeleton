@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+
 import pytest
 
 from skeleton.agents.autonomy_control import (
@@ -13,7 +15,7 @@ from skeleton.agents.autonomy_control import (
     evaluate_autonomy_transition,
 )
 from skeleton.agents.delegation_qualification import AgentDelegationDecision
-from skeleton.contracts.canonical import EvidenceRef
+from skeleton.contracts.canonical import EvidenceRef, canonical_json_bytes
 
 
 NOW = 1_800_000_000.0
@@ -383,6 +385,34 @@ def test_authorization_evidence_is_sorted_deduplicated_and_digest_stable() -> No
     assert left.digest == right.digest
 
 
+def test_autonomy_identities_use_shared_canonical_contract_bytes() -> None:
+    delegation = _delegation()
+    state = _state(delegation)
+    signal = AutonomySignal()
+    policy = AutonomyPolicy()
+    authorization = _authorization(state, delegation)
+
+    decision = evaluate_autonomy_transition(
+        state=state,
+        requested_level=AutonomyLevel.AUTONOMOUS,
+        signal=signal,
+        delegation=delegation,
+        observed_at=NOW,
+        authorization=authorization,
+        policy=policy,
+    )
+
+    assert state.digest == hashlib.sha256(canonical_json_bytes(state.payload())).hexdigest()
+    assert signal.digest == hashlib.sha256(canonical_json_bytes(signal.payload())).hexdigest()
+    assert policy.digest == hashlib.sha256(canonical_json_bytes(policy.payload())).hexdigest()
+    assert authorization.digest == hashlib.sha256(
+        canonical_json_bytes(authorization.payload())
+    ).hexdigest()
+    assert decision.decision_digest == hashlib.sha256(
+        canonical_json_bytes(decision.payload())
+    ).hexdigest()
+
+
 def test_invalid_signal_policy_and_state_values_fail_closed() -> None:
     delegation = _delegation()
 
@@ -401,3 +431,13 @@ def test_invalid_signal_policy_and_state_values_fail_closed() -> None:
             delegation_digest=delegation.decision_digest,
             version=0,
         )
+
+
+def test_source_and_ai_autonomy_control_mirror_are_byte_identical() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    source = root / "skeleton/automation/agents/autonomy_control.py"
+    mirror = root / "skeleton/ai/agents/core/autonomy_control.py"
+
+    assert source.read_bytes() == mirror.read_bytes()

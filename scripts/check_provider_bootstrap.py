@@ -616,6 +616,8 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
         "COPY --chown=appuser:appuser machine/ai_capabilities.json ./machine/ai_capabilities.json",
         "COPY --chown=appuser:appuser machine/ai_implementation_handoff.json ./machine/ai_implementation_handoff.json",
         "COPY --chown=appuser:appuser machine/ai_closure_evidence.json ./machine/ai_closure_evidence.json",
+        "COPY --chown=appuser:appuser machine/enterprise_ai_superiority.json ./machine/enterprise_ai_superiority.json",
+        "COPY --chown=appuser:appuser machine/enterprise_ai_implementation_notes_index.json ./machine/enterprise_ai_implementation_notes_index.json",
         "COPY --chown=appuser:appuser docs/AI_APP_CONSTRUCTION_MANUAL.md ./docs/AI_APP_CONSTRUCTION_MANUAL.md",
     )
     for image_label, image_path in (

@@ -29,6 +29,7 @@ PR_AUTOMATION_TESTS = (
     "skeleton/testing/test_runner_v2_runtime.py",
     "skeleton/testing/test_runner_v2_transaction_report.py",
     "skeleton/testing/test_runner_v2_engine.py",
+    "tests/test_required_checks_policy.py",
 )
 CONCURRENCY_GROUP = "group: merge-readiness-${{ github.event.pull_request.number || github.sha }}"
 CANCEL_POLICY = "cancel-in-progress: ${{ github.event_name == 'pull_request' }}"
@@ -118,6 +119,16 @@ def main() -> int:
         failures,
     )
     require("python scripts/check_flaky_quarantine.py" in text, "quarantine policy checker must run", failures)
+    require(
+        "python scripts/check_required_checks_policy.py" in job_block(text, "quarantine_policy"),
+        "required-check policy guard must run in the Quarantine Policy lane",
+        failures,
+    )
+    require(
+        (ROOT / ".github/ci/required-checks.json").is_file(),
+        "machine-readable required-check policy missing",
+        failures,
+    )
     require("bash scripts/quality-gates.sh" in text, "canonical quality/security gates must run", failures)
     require(GITLEAKS_PIN in text, "full-history Gitleaks action pin drifted", failures)
     require("continue-on-error: true" not in text, "required merge gates must not hide failures", failures)

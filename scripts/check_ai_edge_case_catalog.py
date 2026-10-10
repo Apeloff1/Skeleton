@@ -58,6 +58,8 @@ def validate() -> list[str]:
         mapped = entry.get("mapped_volumes")
         if not isinstance(mapped, list) or not mapped:
             errors.append(f"{entry_id}: mapped_volumes must be non-empty")
+        elif len(set(mapped)) != len(mapped):
+            errors.append(f"{entry_id}: mapped_volumes must be unique")
         elif any(v not in volume_ids for v in mapped):
             errors.append(f"{entry_id}: references unknown volume")
 
@@ -67,11 +69,15 @@ def validate() -> list[str]:
         modes = entry.get("recommended_test_modes")
         if not isinstance(modes, list) or not modes:
             errors.append(f"{entry_id}: recommended_test_modes must be non-empty")
+        elif len(set(modes)) != len(modes):
+            errors.append(f"{entry_id}: recommended_test_modes must be unique")
         elif set(modes) - allowed_modes:
             errors.append(f"{entry_id}: unknown recommended_test_modes")
         refs = entry.get("work_package_refs")
         if not isinstance(refs, list) or not refs:
             errors.append(f"{entry_id}: work_package_refs must be non-empty")
+        elif len(set(refs)) != len(refs):
+            errors.append(f"{entry_id}: work_package_refs must be unique")
         elif set(refs) - work_packages:
             errors.append(f"{entry_id}: unknown work_package_refs")
 

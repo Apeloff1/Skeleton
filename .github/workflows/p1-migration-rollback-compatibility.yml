@@ -11,6 +11,11 @@ on:
       - "skeleton/release/qualification.py"
       - "skeleton/release/__init__.py"
       - "skeleton/contracts/migration_tests.py"
+      - "machine/state_topology.json"
+      - "machine/ai_master_plan.json"
+      - "scripts/state_migration_compatibility.py"
+      - "skeleton/testing/test_state_migration_compatibility.py"
+      - ".github/workflows/state-recovery-drill.yml"
       - "skeleton/config/**"
       - "skeleton/testing/test_migration_rollback_compatibility.py"
       - "skeleton/testing/test_installer_lifecycle.py"
@@ -29,6 +34,11 @@ on:
       - "skeleton/release/qualification.py"
       - "skeleton/release/__init__.py"
       - "skeleton/contracts/migration_tests.py"
+      - "machine/state_topology.json"
+      - "machine/ai_master_plan.json"
+      - "scripts/state_migration_compatibility.py"
+      - "skeleton/testing/test_state_migration_compatibility.py"
+      - ".github/workflows/state-recovery-drill.yml"
       - "skeleton/config/**"
       - "skeleton/testing/test_migration_rollback_compatibility.py"
       - "skeleton/testing/test_installer_lifecycle.py"
@@ -80,6 +90,7 @@ jobs:
           skeleton/release/lifecycle.py
           skeleton/release/migration.py
           skeleton/contracts/migration_tests.py
+          scripts/state_migration_compatibility.py
           skeleton/config
 
       - name: Run release migration regressions
@@ -88,6 +99,45 @@ jobs:
           skeleton/testing/test_release_qualification.py
           skeleton/testing/test_installer_lifecycle.py
           skeleton/testing/test_migration_rollback_compatibility.py
+          skeleton/testing/test_state_migration_compatibility.py
+
+      - name: Rehearse real durable-state migrations
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/state_migration_compatibility.py
+          --workdir "${RUNNER_TEMP}/skeleton_state_migration_compatibility"
+          --output "${RUNNER_TEMP}/state-migration-compatibility.json"
+          --print-evidence
+
+      - name: Assert real state migration compatibility
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              (Path(os.environ["RUNNER_TEMP"]) / "state-migration-compatibility.json")
+              .read_text(encoding="utf-8")
+          )
+          if receipt["head_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("VOL-005 migration rehearsal head mismatch")
+          if receipt["kind"] != "vol005-state-migration-compatibility":
+              raise SystemExit("unexpected VOL-005 migration receipt kind")
+          if receipt["volume"] != "VOL-005" or receipt["passed"] is not True:
+              raise SystemExit("VOL-005 migration compatibility rejected")
+          if set(receipt["stores"]) != {"execution", "tool_receipts", "quota"}:
+              raise SystemExit("VOL-005 state migration store coverage incomplete")
+          if receipt["topology"]["closed_gap_references"] != 0:
+              raise SystemExit("closed state-authority gaps remain")
+          if receipt["topology"]["partial_authorities"] != 0:
+              raise SystemExit("partial authoritative state remains")
+          if len(receipt["receipt_digest"]) != 64:
+              raise SystemExit("VOL-005 migration receipt digest invalid")
+          print("VOL-005 real migration compatibility OK")
+          print(receipt["receipt_digest"])
+          PY
 
       - name: Run canonical migration replay guard
         run: |

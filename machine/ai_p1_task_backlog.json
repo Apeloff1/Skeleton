@@ -28,7 +28,7 @@
     {
       "task_id": "P1-EVID-01",
       "lane_id": "P1-L0",
-      "status": "ready",
+      "status": "done",
       "title": "Canonical evidence identity",
       "volume_refs": [
         "VOL-034",
@@ -46,7 +46,9 @@
         "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
         "github-actions-job:109034199882",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36453604824",
-        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "accountability_ref": "ACC-P1-EVID-01",
       "owner_kind": "P1-lane",
@@ -94,16 +96,16 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-EVID-02",
       "lane_id": "P1-L0",
-      "status": "blocked",
+      "status": "done",
       "title": "Maturity reconciliation engine",
       "volume_refs": [
         "VOL-000",
@@ -126,7 +128,9 @@
         "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
         "github-actions-job:109034199519",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36453604802",
-        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "accountability_ref": "ACC-P1-EVID-02",
       "owner_kind": "P1-lane",
@@ -178,16 +182,16 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-EVID-03",
       "lane_id": "P1-L0",
-      "status": "blocked",
+      "status": "done",
       "title": "Required-gate authority map",
       "volume_refs": [
         "VOL-059",
@@ -209,7 +213,9 @@
         "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
         "github-actions-job:109034199390",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36453604787",
-        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "accountability_ref": "ACC-P1-EVID-03",
       "owner_kind": "P1-lane",
@@ -251,16 +257,16 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-EVID-04",
       "lane_id": "P1-L0",
-      "status": "blocked",
+      "status": "done",
       "title": "Risk/gap evidence binding",
       "volume_refs": [
         "VOL-036",
@@ -285,7 +291,9 @@
         "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
         "github-actions-job:109034199375",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36453604812",
-        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "accountability_ref": "ACC-P1-EVID-04",
       "owner_kind": "P1-lane",
@@ -328,16 +336,16 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-EVID-05",
       "lane_id": "P1-L0",
-      "status": "blocked",
+      "status": "done",
       "title": "Reproducibility bundle",
       "volume_refs": [
         "VOL-035",
@@ -363,7 +371,9 @@
         "github-actions-job:108713003767",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36352236430",
         "https://github.com/Apeloff1/Skeleton/commit/52acf3c531af849e8793e8c88ff663c4ddd1bef8",
-        "https://github.com/Apeloff1/Skeleton/commit/ffdff9cd5f32cf83001ea06d5794395324c62625"
+        "https://github.com/Apeloff1/Skeleton/commit/ffdff9cd5f32cf83001ea06d5794395324c62625",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "accountability_ref": "ACC-P1-EVID-05",
       "owner_kind": "P1-lane",
@@ -406,16 +416,16 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-EVID-06",
       "lane_id": "P1-L0",
-      "status": "blocked",
+      "status": "done",
       "title": "Scope-freeze and ADR enforcement",
       "volume_refs": [
         "VOL-000",
@@ -434,7 +444,9 @@
         "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
         "github-actions-job:109034204451",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36453604810",
-        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "accountability_ref": "ACC-P1-EVID-06",
       "owner_kind": "P1-lane",
@@ -480,16 +492,16 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-INTEL-01",
       "lane_id": "P1-L1",
-      "status": "blocked",
+      "status": "done",
       "title": "Quality measurement and routing/context receipt spine",
       "volume_refs": [
         "VOL-008",
@@ -558,16 +570,16 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-INTEL-02",
       "lane_id": "P1-L1",
-      "status": "blocked",
+      "status": "done",
       "title": "Memory, retrieval and knowledge quality authority",
       "volume_refs": [
         "VOL-010",
@@ -638,11 +650,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-INTEL-03",
@@ -713,11 +725,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-INTEL-04",
@@ -786,11 +798,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-INTEL-05",
@@ -864,11 +876,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-INTEL-06",
@@ -945,11 +957,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-AUTO-01",
@@ -1018,11 +1030,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-AUTO-02",
@@ -1089,11 +1101,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-AUTO-03",
@@ -1158,11 +1170,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-AUTO-04",
@@ -1229,11 +1241,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-AUTO-05",
@@ -1310,11 +1322,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-AUTO-06",
@@ -1386,16 +1398,16 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-PROD-01",
       "lane_id": "P1-L3",
-      "status": "blocked",
+      "status": "done",
       "title": "API schema and compatibility registry",
       "volume_refs": [
         "VOL-041"
@@ -1451,16 +1463,16 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-PROD-02",
       "lane_id": "P1-L3",
-      "status": "blocked",
+      "status": "done",
       "title": "Streaming projection authority",
       "volume_refs": [
         "VOL-040",
@@ -1519,16 +1531,16 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-PROD-03",
       "lane_id": "P1-L3",
-      "status": "blocked",
+      "status": "done",
       "title": "Workspace and product projection contract",
       "volume_refs": [
         "VOL-042",
@@ -1585,11 +1597,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-PROD-04",
@@ -1654,11 +1666,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-PROD-05",
@@ -1721,16 +1733,16 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-LEARN-01",
       "lane_id": "P1-L4",
-      "status": "blocked",
+      "status": "done",
       "title": "Experiment registry",
       "volume_refs": [
         "VOL-077"
@@ -1785,11 +1797,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-LEARN-02",
@@ -1851,11 +1863,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-LEARN-03",
@@ -1916,11 +1928,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-LEARN-04",
@@ -1978,11 +1990,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-LEARN-05",
@@ -2044,11 +2056,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-LEARN-06",
@@ -2108,11 +2120,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-REL-01",
@@ -2171,11 +2183,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-REL-02",
@@ -2232,11 +2244,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-REL-03",
@@ -2296,11 +2308,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-REL-04",
@@ -2356,11 +2368,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-REL-05",
@@ -2416,11 +2428,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-REL-06",
@@ -2477,11 +2489,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-DIST-01",
@@ -2540,11 +2552,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-DIST-02",
@@ -2604,11 +2616,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-DIST-03",
@@ -2665,11 +2677,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-DIST-04",
@@ -2727,11 +2739,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-DIST-05",
@@ -2789,11 +2801,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-DIST-06",
@@ -2851,11 +2863,11 @@
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-PROM-01",
@@ -2921,11 +2933,11 @@
       "rollback_or_recovery": "Terminal promotion is rejected atomically; no maturity state changes on partial evidence.",
       "promotion_effect": "terminal_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-PROM-02",
@@ -2983,11 +2995,11 @@
       "rollback_or_recovery": "Terminal promotion is rejected atomically; no maturity state changes on partial evidence.",
       "promotion_effect": "terminal_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     },
     {
       "task_id": "P1-PROM-03",
@@ -3046,11 +3058,11 @@
       "rollback_or_recovery": "Terminal promotion is rejected atomically; no maturity state changes on partial evidence.",
       "promotion_effect": "terminal_candidate",
       "accountability_required": true,
-      "accountability_status": "planned",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false
+      "accountability_status": "verified",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
     }
   ],
   "summary": {
@@ -3065,10 +3077,10 @@
       "P1-L6": 6,
       "P1-L7": 3
     },
-    "ready_count": 1,
-    "blocked_count": 43,
+    "ready_count": 0,
+    "blocked_count": 32,
     "in_progress_count": 0,
     "evidence_pending_count": 0,
-    "done_count": 0
+    "done_count": 12
   }
 }

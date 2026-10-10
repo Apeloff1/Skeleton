@@ -6,10 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-058",
     "title": "ADR Program",
-    "required_gap_texts": [
-      "create canonical ADR index schema",
-      "bind cross-cutting changes to ADR check"
-    ]
+    "required_gap_texts": []
   },
   "policy": {
     "adr_directory": "docs/adr",

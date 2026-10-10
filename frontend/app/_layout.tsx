@@ -25,6 +25,7 @@ import { StabilityBanner } from '../src/components/StabilityBanner';
 import { installGlobalErrorHandlers } from '../src/utils/globalErrors';
 import { startTunnelHeartbeat } from '../src/utils/tunnelHeartbeat';
 import { initSkin, useActiveSkin } from '../src/utils/skinStore';
+import { LocaleProvider } from '../src/i18n';
 
 installCrashTrace();
 installMemoryGuard();
@@ -74,8 +75,9 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <FeatureFlagProvider>
-        <View style={[styles.root, { backgroundColor: theme.colors.bg }]} key={`skin-${skinVersion}`}>
+      <LocaleProvider>
+        <FeatureFlagProvider>
+          <View style={[styles.root, { backgroundColor: theme.colors.bg }]} key={`skin-${skinVersion}`}>
           <StatusBar style="light" />
           <ErrorBoundary>
             <ScreenGuard key={pathname || '/'} name={pathname || '/'}>
@@ -86,8 +88,9 @@ export default function RootLayout() {
           <ToastHost />
           <ActionSheetHost />
           <DiagnosticsOverlay />
-        </View>
-      </FeatureFlagProvider>
+          </View>
+        </FeatureFlagProvider>
+      </LocaleProvider>
     </SafeAreaProvider>
   );
 }

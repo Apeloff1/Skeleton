@@ -21,6 +21,23 @@ from skeleton.automation.swarm.mesh import (
     standard_platoons,
 )
 from skeleton.automation.swarm.mesh_boundary import boundary
+from skeleton.automation.swarm.multi_agent_orchestration import (
+    AgentHandoff,
+    ArbitrationCandidate,
+    ArbitrationDecision,
+    ArbitrationStatus,
+    BoundedOrchestrationPolicy,
+    ConflictDomain,
+    ConflictDomainBusy,
+    ConflictDomainRegistry,
+    ConflictRecord,
+    EvidenceArbitrator,
+    EvidenceClaim,
+    FencingToken,
+    MultiAgentOrchestrationError,
+    MultiAgentOrchestrator,
+    WorkLease,
+)
 from skeleton.automation.swarm.mesh_handoff import handoff
 from skeleton.automation.swarm.ready_wave_runner import ReadyWaveReport, ReadyWaveRunner
 
@@ -46,4 +63,19 @@ __all__ = [
     "SubmitError",
     "ReadyWaveRunner",
     "ReadyWaveReport",
+    "AgentHandoff",
+    "ArbitrationCandidate",
+    "ArbitrationDecision",
+    "ArbitrationStatus",
+    "BoundedOrchestrationPolicy",
+    "ConflictDomain",
+    "ConflictDomainBusy",
+    "ConflictDomainRegistry",
+    "ConflictRecord",
+    "EvidenceArbitrator",
+    "EvidenceClaim",
+    "FencingToken",
+    "MultiAgentOrchestrationError",
+    "MultiAgentOrchestrator",
+    "WorkLease",
 ]

@@ -1,0 +1,163 @@
+name: VOL-007 Inference Closure
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "skeleton/inference/**"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/provider_contract.py"
+      - "backend/core/engine_text.py"
+      - "skeleton/testing/test_vol007_inference_session.py"
+      - "skeleton/testing/test_vol007_provider_bridge.py"
+      - "skeleton/testing/test_vol007_inference_replay.py"
+      - "skeleton/testing/test_vol007_async_runtime.py"
+      - "skeleton/testing/test_vol007_batching.py"
+      - "skeleton/testing/test_vol007_speculation.py"
+      - "scripts/verify_vol007_inference.py"
+      - "tests/test_vol007_inference_independent.py"
+      - ".github/workflows/vol007-inference.yml"
+  push:
+    branches: [main]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "skeleton/inference/**"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/provider_contract.py"
+      - "backend/core/engine_text.py"
+      - "skeleton/testing/test_vol007_inference_session.py"
+      - "skeleton/testing/test_vol007_provider_bridge.py"
+      - "skeleton/testing/test_vol007_inference_replay.py"
+      - "skeleton/testing/test_vol007_async_runtime.py"
+      - "skeleton/testing/test_vol007_batching.py"
+      - "skeleton/testing/test_vol007_speculation.py"
+      - "scripts/verify_vol007_inference.py"
+      - "tests/test_vol007_inference_independent.py"
+      - ".github/workflows/vol007-inference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vol007-inference-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  inference-behavior:
+    name: Canonical inference behavior
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install inference test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          .
+          "pytest>=8,<9"
+          "pytest-asyncio>=0.24,<1"
+
+      - name: Compile inference surfaces
+        run: >-
+          python -m compileall -q
+          skeleton/inference
+          scripts/verify_vol007_inference.py
+
+      - name: Run canonical inference regressions
+        run: >-
+          python -m pytest -q -p pytest_asyncio.plugin --noconftest
+          skeleton/testing/test_vol007_inference_session.py
+          skeleton/testing/test_vol007_provider_bridge.py
+          skeleton/testing/test_vol007_inference_replay.py
+          skeleton/testing/test_vol007_async_runtime.py
+          skeleton/testing/test_vol007_batching.py
+          skeleton/testing/test_vol007_speculation.py
+
+      - name: Validate masterplan consistency
+        run: python scripts/check_ai_master_plan.py
+
+  inference-independent:
+    name: Independent exact-head inference verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install independent verifier dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+
+      - name: Run independent verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_vol007_inference_independent.py
+
+      - name: Emit independent exact-head receipt
+        run: >-
+          python scripts/verify_vol007_inference.py
+          --evidence-out .vol007-inference-independent.json
+          --print-evidence
+
+      - name: Assert exact-head receipt identity and coverage
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".vol007-inference-independent.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("VOL-007 receipt does not bind exact head")
+          if receipt.get("verifier") != "independent-vol007-inference-v1":
+              raise SystemExit("unexpected VOL-007 verifier identity")
+          if receipt.get("volume") != "VOL-007":
+              raise SystemExit("inference verifier bound wrong volume")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent VOL-007 verification failed")
+          if receipt.get("checked_invariant_count", 0) < 40:
+              raise SystemExit("VOL-007 invariant coverage is incomplete")
+          if len(receipt.get("source_digests") or {}) != 6:
+              raise SystemExit("VOL-007 source digest coverage is incomplete")
+          if len((receipt.get("volume_binding") or {}).get("binding_digest") or "") != 64:
+              raise SystemExit("VOL-007 plan binding digest is missing")
+          if len(receipt.get("receipt_digest") or "") != 64:
+              raise SystemExit("VOL-007 receipt digest is invalid")
+          print("VOL-007 independent exact-head receipt:", expected, receipt["receipt_digest"])
+          PY

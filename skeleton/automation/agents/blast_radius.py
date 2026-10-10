@@ -13,7 +13,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 import hashlib
-import json
 import math
 from typing import Any, Iterable
 
@@ -21,8 +20,20 @@ from skeleton.automation.agents.human_control import (
     HumanControlAction,
     HumanControlDecision,
 )
-from skeleton.contracts.canonical import EvidenceRef, evidence_ref_identity
+from skeleton.contracts.canonical import (
+    CanonicalContractError,
+    EvidenceRef,
+    canonical_json_bytes,
+    evidence_ref_identity,
+)
 from skeleton.contracts.risk_evidence import RiskBindingEvaluation
+from skeleton.contracts.safety_hazards import (
+    DEFAULT_SAFETY_HAZARD_MANIFEST,
+    DEFAULT_SAFETY_HAZARD_MANIFEST_DIGEST,
+    DEFAULT_SAFETY_POLICY_ID,
+    DEFAULT_SAFETY_POLICY_VERSION,
+    SafetyHazardManifest,
+)
 
 
 BLAST_RADIUS_SCHEMA_VERSION = 1
@@ -86,14 +97,8 @@ def _positive_int(value: object, field: str) -> int:
 
 def _canonical_digest(value: object) -> str:
     try:
-        encoded = json.dumps(
-            value,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
+        encoded = canonical_json_bytes(value)
+    except CanonicalContractError as exc:
         raise BlastRadiusError("blast-radius payload must be canonical JSON") from exc
     return hashlib.sha256(encoded).hexdigest()
 
@@ -133,6 +138,7 @@ class BlastRadiusPolicy:
     critical_tenant_threshold: int = 10
     critical_resource_threshold: int = 500
     require_independent_adversarial: bool = True
+    hazard_manifest: SafetyHazardManifest = DEFAULT_SAFETY_HAZARD_MANIFEST
 
     def __post_init__(self) -> None:
         for field in (
@@ -158,6 +164,10 @@ class BlastRadiusPolicy:
             raise BlastRadiusError(
                 "require_independent_adversarial must be boolean"
             )
+        if not isinstance(self.hazard_manifest, SafetyHazardManifest):
+            raise BlastRadiusError(
+                "hazard_manifest must be SafetyHazardManifest"
+            )
 
     def payload(self) -> dict[str, Any]:
         return {
@@ -166,6 +176,9 @@ class BlastRadiusPolicy:
             "critical_tenant_threshold": self.critical_tenant_threshold,
             "critical_resource_threshold": self.critical_resource_threshold,
             "require_independent_adversarial": self.require_independent_adversarial,
+            "safety_policy_id": self.hazard_manifest.policy_id,
+            "safety_policy_version": self.hazard_manifest.policy_version,
+            "hazard_manifest_digest": self.hazard_manifest.manifest_digest,
         }
 
     @property
@@ -396,6 +409,10 @@ class BlastRadiusDecision:
     policy_digest: str
     risk_evaluation_digest: str | None
     human_receipt_digest: str | None
+    safety_policy_id: str = DEFAULT_SAFETY_POLICY_ID
+    safety_policy_version: int = DEFAULT_SAFETY_POLICY_VERSION
+    hazard_manifest_digest: str = DEFAULT_SAFETY_HAZARD_MANIFEST_DIGEST
+    triggered_hazard_ids: tuple[str, ...] = ()
     task_id: str = BLAST_RADIUS_TASK_ID
     accountability_id: str = BLAST_RADIUS_ACCOUNTABILITY_ID
     schema_version: int = BLAST_RADIUS_SCHEMA_VERSION
@@ -425,6 +442,32 @@ class BlastRadiusDecision:
             value = getattr(self, field)
             if value is not None:
                 object.__setattr__(self, field, _sha256(value, field))
+        object.__setattr__(
+            self,
+            "safety_policy_id",
+            _text(self.safety_policy_id, "safety_policy_id", maximum=256),
+        )
+        object.__setattr__(
+            self,
+            "safety_policy_version",
+            _positive_int(self.safety_policy_version, "safety_policy_version"),
+        )
+        object.__setattr__(
+            self,
+            "hazard_manifest_digest",
+            _sha256(self.hazard_manifest_digest, "hazard_manifest_digest"),
+        )
+        if not isinstance(self.triggered_hazard_ids, tuple):
+            raise BlastRadiusError("triggered_hazard_ids must be a tuple")
+        hazard_ids = tuple(
+            _text(value, "triggered_hazard_ids", maximum=256)
+            for value in self.triggered_hazard_ids
+        )
+        if hazard_ids != tuple(sorted(set(hazard_ids))):
+            raise BlastRadiusError(
+                "triggered_hazard_ids must be sorted unique canonical values"
+            )
+        object.__setattr__(self, "triggered_hazard_ids", hazard_ids)
         if self.task_id != BLAST_RADIUS_TASK_ID:
             raise BlastRadiusError("task_id drift")
         if self.accountability_id != BLAST_RADIUS_ACCOUNTABILITY_ID:
@@ -450,6 +493,10 @@ class BlastRadiusDecision:
             "policy_digest": self.policy_digest,
             "risk_evaluation_digest": self.risk_evaluation_digest,
             "human_receipt_digest": self.human_receipt_digest,
+            "safety_policy_id": self.safety_policy_id,
+            "safety_policy_version": self.safety_policy_version,
+            "hazard_manifest_digest": self.hazard_manifest_digest,
+            "triggered_hazard_ids": list(self.triggered_hazard_ids),
         }
 
     @property
@@ -478,6 +525,78 @@ def _risk_eval_digest(value: RiskBindingEvaluation | None) -> str | None:
     if not isinstance(value, RiskBindingEvaluation):
         raise TypeError("risk_evaluation must be RiskBindingEvaluation")
     return _canonical_digest(value.as_dict())
+
+
+def _hazard_signals(
+    *,
+    profile: ActionRiskProfile,
+    alignment: AdversarialAlignmentReport,
+    impact: ImpactClass,
+    risk_evaluation: RiskBindingEvaluation | None,
+    human_approval: HumanControlDecision | None,
+) -> tuple[str, ...]:
+    signals: set[str] = set()
+    if profile.reversibility is ReversibilityClass.IRREVERSIBLE:
+        signals.add("action.irreversible")
+    if profile.destructive:
+        signals.add("action.destructive")
+    if profile.privileged:
+        signals.add("action.privileged")
+    if profile.sensitive_data:
+        signals.add("data.sensitive")
+    if profile.affected_tenants > 1:
+        signals.add("scope.cross_tenant")
+    if profile.externally_observable and profile.writes_persistent_state:
+        signals.add("effect.external_persistent")
+    if alignment.authority_digest != profile.authority_digest:
+        signals.add("authority.mismatch")
+    if alignment.goal_drift_detected:
+        signals.add("alignment.goal_drift")
+    if alignment.specification_gaming_detected:
+        signals.add("alignment.specification_gaming")
+    if alignment.policy_conflict_detected:
+        signals.add("alignment.policy_conflict")
+    if alignment.deceptive_behavior_detected:
+        signals.add("alignment.deceptive_behavior")
+    if alignment.unresolved_counterexamples:
+        signals.add("alignment.counterexample")
+    if (
+        profile.reversibility is ReversibilityClass.RECOVERABLE
+        and (
+            profile.recovery_plan_digest is None
+            or profile.rollback_test_digest is None
+        )
+    ):
+        signals.add("recovery.evidence_missing")
+
+    if impact in {ImpactClass.HIGH, ImpactClass.CRITICAL}:
+        if risk_evaluation is None:
+            signals.add("risk_binding.missing")
+        elif (
+            isinstance(risk_evaluation, RiskBindingEvaluation)
+            and (not risk_evaluation.resolved or risk_evaluation.blockers)
+        ):
+            signals.add("risk_binding.unresolved")
+
+        if human_approval is None:
+            signals.add("approval.missing")
+        elif isinstance(human_approval, HumanControlDecision):
+            invalid_approval = (
+                not human_approval.accepted
+                or human_approval.action is not HumanControlAction.APPROVE
+                or human_approval.operation_id != profile.operation_id
+                or human_approval.execution_id != profile.execution_id
+                or human_approval.agent_id != profile.agent_id
+                or human_approval.arguments_digest != profile.action_digest
+                or human_approval.authority_digest != profile.authority_digest
+                or not human_approval.independent
+            )
+            if invalid_approval:
+                signals.add("approval.invalid")
+            if human_approval.authority_digest != profile.authority_digest:
+                signals.add("authority.mismatch")
+
+    return tuple(sorted(signals))
 
 
 def qualify_blast_radius(
@@ -584,6 +703,16 @@ def qualify_blast_radius(
                 reasons.append("human-approval-expired")
 
     normalized = tuple(sorted(set(reasons)))
+    hazard_signals = _hazard_signals(
+        profile=profile,
+        alignment=alignment,
+        impact=impact,
+        risk_evaluation=risk_evaluation,
+        human_approval=human_approval,
+    )
+    triggered_hazard_ids = active.hazard_manifest.hazards_for_signals(
+        hazard_signals
+    )
     return BlastRadiusDecision(
         accepted=not normalized,
         impact=impact,
@@ -600,6 +729,10 @@ def qualify_blast_radius(
         human_receipt_digest=(
             None if human_approval is None else human_approval.receipt_digest
         ),
+        safety_policy_id=active.hazard_manifest.policy_id,
+        safety_policy_version=active.hazard_manifest.policy_version,
+        hazard_manifest_digest=active.hazard_manifest.manifest_digest,
+        triggered_hazard_ids=triggered_hazard_ids,
     )
 
 

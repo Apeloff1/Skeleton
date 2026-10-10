@@ -22,8 +22,50 @@ from typing import Any, Mapping, Sequence
 ROOT = Path(__file__).resolve().parents[1]
 TOPOLOGY_PATH = Path("machine/state_topology.json")
 BACKUP_POLICY_PATH = Path("machine/state_backup_policy.json")
+MASTERPLAN_PATH = Path("machine/ai_master_plan.json")
 COMPOSE_PATH = Path("docker-compose.yml")
 RECOVERY_WORKFLOW_PATH = Path(".github/workflows/state-recovery-drill.yml")
+RELEASE_WORKFLOW_PATH = Path(
+    ".github/workflows/p1-migration-rollback-compatibility.yml"
+)
+MIGRATION_TOOL_PATH = Path("scripts/state_migration_compatibility.py")
+MIGRATION_TEST_PATH = Path(
+    "skeleton/testing/test_state_migration_compatibility.py"
+)
+RETIRED_AUTHORITY_GAPS = {
+    "gap-state-authority-convergence",
+    "gap-memory-durable-authority",
+}
+
+VOL005_QUALIFICATION_GAP = (
+    "independent exact-head VOL-005 Data & Persistence Closure "
+    "qualification remains pending"
+)
+REQUIRED_VOL005_PATHS = {
+    "machine/state_topology.json",
+    "skeleton/persistence",
+    "backend/services/database.py",
+    "scripts/state_recovery_drill.py",
+    "machine/state_backup_policy.json",
+    "scripts/state_migration_compatibility.py",
+    "scripts/verify_state_authority_closure.py",
+    ".github/workflows/state-recovery-drill.yml",
+    ".github/workflows/p1-migration-rollback-compatibility.yml",
+}
+REQUIRED_VOL005_TESTS = {
+    "skeleton/testing/test_state_recovery_drill.py",
+    "skeleton/testing/test_operation_store.py",
+    "backend/tests/test_rag_state_authority.py",
+    "skeleton/testing/test_state_migration_compatibility.py",
+    "tests/test_state_authority_independent_verifier.py",
+}
+REQUIRED_VOL005_EVALUATIONS = {
+    "scripts/check_state_topology.py --json",
+    "scripts/state_migration_compatibility.py",
+    "scripts/verify_state_authority_closure.py",
+    ".github/workflows/state-recovery-drill.yml",
+    ".github/workflows/p1-migration-rollback-compatibility.yml",
+}
 
 REQUIRED_AUTHORITIES = {
     "backend-core-app-state": "mongo",
@@ -189,6 +231,18 @@ def _verify_authorities(
                 f"state-authority gap still owns unbound domain {domain_id}"
             )
         if authority == "authoritative":
+            status = str(domain.get("status", "")).lower()
+            if "partial" in status or "transitional" in status:
+                errors.append(
+                    f"authoritative domain {domain_id} remains partially bound: "
+                    f"{domain.get('status')!r}"
+                )
+            gap_id = domain.get("gap")
+            if gap_id in RETIRED_AUTHORITY_GAPS:
+                errors.append(
+                    f"authoritative domain {domain_id} retains retired gap "
+                    f"{gap_id!r}"
+                )
             if domain.get("source_of_truth") is not True:
                 errors.append(
                     f"authoritative domain {domain_id} must be source_of_truth"
@@ -393,16 +447,120 @@ def _verify_deployment(root: Path, errors: list[str]) -> None:
         "scripts/state_recovery_drill.py live-sqlite",
         "scripts/state_recovery_drill.py live-engine-sqlite",
         "scripts/verify_state_authority_closure.py",
+        MIGRATION_TOOL_PATH.as_posix(),
+        MIGRATION_TEST_PATH.as_posix(),
     ):
         if token not in workflow:
             errors.append(
                 f"State Recovery Drill lost required closure step: {token}"
             )
 
+    try:
+        release_workflow = (root / RELEASE_WORKFLOW_PATH).read_text(
+            encoding="utf-8"
+        )
+    except OSError as exc:
+        raise VerificationError(
+            ".github/workflows/p1-migration-rollback-compatibility.yml "
+            "is unavailable"
+        ) from exc
+    for token in (
+        MIGRATION_TOOL_PATH.as_posix(),
+        MIGRATION_TEST_PATH.as_posix(),
+    ):
+        if token not in release_workflow:
+            errors.append(
+                f"Release migration gate lost state rehearsal binding: {token}"
+            )
+
+
+def _verify_vol005_binding(
+    master: Mapping[str, Any],
+    errors: list[str],
+) -> dict[str, Any]:
+    volumes = master.get("volumes")
+    if not isinstance(volumes, list):
+        errors.append("masterplan volumes must be a list")
+        return {}
+    volume = next(
+        (
+            row
+            for row in volumes
+            if isinstance(row, dict) and row.get("key") == "VOL-005"
+        ),
+        None,
+    )
+    if not isinstance(volume, dict):
+        errors.append("masterplan missing VOL-005")
+        return {}
+
+    if volume.get("title") != "Data & Persistence":
+        errors.append("VOL-005 title drift")
+    if volume.get("scope") != "canonical-plan":
+        errors.append("VOL-005 scope drift")
+    if volume.get("implementation_status") not in {"implemented", "hardened", "verified"}:
+        errors.append("VOL-005 implementation status below implemented")
+
+    live_gaps = list(volume.get("gaps") or [])
+    if live_gaps not in ([VOL005_QUALIFICATION_GAP], []):
+        errors.append(
+            "VOL-005 gap state must be pending exact-head qualification or signed"
+        )
+    if not live_gaps and volume.get("completion_checkbox") is not True:
+        errors.append("VOL-005 cannot clear qualification gap before signoff")
+    if live_gaps and volume.get("completion_checkbox") is True:
+        errors.append("VOL-005 cannot remain signed with pending qualification")
+
+    paths = set(volume.get("implementation_paths") or [])
+    tests = set(volume.get("tests") or [])
+    evaluations = set(volume.get("evaluations") or [])
+    for label, required, actual in (
+        ("implementation path", REQUIRED_VOL005_PATHS, paths),
+        ("test", REQUIRED_VOL005_TESTS, tests),
+        ("evaluation", REQUIRED_VOL005_EVALUATIONS, evaluations),
+    ):
+        missing = sorted(required - actual)
+        if missing:
+            errors.append(
+                f"VOL-005 {label} binding incomplete: {', '.join(missing)}"
+            )
+
+    requirements = tuple(str(item) for item in volume.get("requirements") or [])
+    for phrase in (
+        "authoritative, derived, cache and ephemeral state classes",
+        "transactional/outbox or explicit compensation semantics",
+        "migration, backup, restore, deletion and retention behavior",
+    ):
+        if not any(phrase in requirement for requirement in requirements):
+            errors.append(f"VOL-005 requirement invariant lost: {phrase}")
+
+    binding = {
+        "key": volume.get("key"),
+        "title": volume.get("title"),
+        "implementation_status": volume.get("implementation_status"),
+        "completion_checkbox": volume.get("completion_checkbox"),
+        "completion_checkbox_mark": volume.get("completion_checkbox_mark"),
+        "gaps": live_gaps,
+        "implementation_paths": sorted(paths),
+        "tests": sorted(tests),
+        "evaluations": sorted(evaluations),
+    }
+    binding["binding_digest"] = hashlib.sha256(
+        json.dumps(
+            binding,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+    return binding
+
 
 def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     topology = _load_json(root, TOPOLOGY_PATH)
     policy = _load_json(root, BACKUP_POLICY_PATH)
+    master = _load_json(root, MASTERPLAN_PATH)
     errors: list[str] = []
 
     if topology.get("schema_version") != 1:
@@ -424,7 +582,33 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     authorities = _verify_authorities(root, stores, domains, errors)
     derived = _verify_derived(domains, errors)
     backup = _verify_backup_policy(policy, errors)
+    volume_binding = _verify_vol005_binding(master, errors)
     _verify_deployment(root, errors)
+
+    migration = topology.get("migration_compatibility")
+    expected_migration = {
+        "tool": MIGRATION_TOOL_PATH.as_posix(),
+        "test": MIGRATION_TEST_PATH.as_posix(),
+        "release_workflow": RELEASE_WORKFLOW_PATH.as_posix(),
+        "recovery_workflow": RECOVERY_WORKFLOW_PATH.as_posix(),
+    }
+    if not isinstance(migration, dict):
+        errors.append("state topology must bind migration_compatibility")
+    else:
+        for key, value in expected_migration.items():
+            if migration.get(key) != value:
+                errors.append(
+                    f"state topology migration_compatibility.{key} must be "
+                    f"{value}"
+                )
+            if not (root / value).is_file():
+                errors.append(
+                    f"state migration compatibility path is missing: {value}"
+                )
+        if not isinstance(migration.get("policy"), str) or not migration["policy"].strip():
+            errors.append(
+                "state topology migration_compatibility.policy must be non-empty"
+            )
 
     topology_backup = topology.get("backup_policy")
     if not isinstance(topology_backup, dict):
@@ -461,9 +645,10 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         ).encode("utf-8")
     ).hexdigest()
 
-    return {
+    receipt: dict[str, Any] = {
         "schema_version": 1,
-        "verifier": "independent-state-authority-v1",
+        "verifier": "independent-state-authority-v2",
+        "volume": "VOL-005",
         "head_sha": (
             os.environ.get("EVIDENCE_HEAD_SHA", "").strip()
             or os.environ.get("GITHUB_SHA", "").strip()
@@ -474,9 +659,20 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         "authoritative_domains": authorities,
         "derived_domains": derived,
         "backup_stores": backup,
+        "volume_binding": volume_binding,
         "errors": errors,
         "valid": not errors,
     }
+    receipt["receipt_digest"] = hashlib.sha256(
+        json.dumps(
+            receipt,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+    return receipt
 
 
 def main(argv: Sequence[str] | None = None) -> int:

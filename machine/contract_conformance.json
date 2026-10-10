@@ -1,15 +1,16 @@
 {
   "schema_version": "skeleton.architecture.contract_conformance.v1",
-  "catalog_version": "0.1.0",
+  "catalog_version": "0.3.0",
   "status": "active",
   "purpose": "Complete producer/consumer plane inventory for canonical runtime records plus shared fail-closed JSON/schema conformance vectors.",
   "masterplan_binding": {
     "volume_ref": "VOL-003",
     "title": "Canonical Contract System",
-    "required_gap_texts": [
+    "retired_implementation_gaps": [
       "materialize shared conformance vectors",
       "complete producer/consumer inventory for every canonical contract"
-    ]
+    ],
+    "qualification_gap": "independent exact-head VOL-003 Contract Conformance Closure qualification remains pending"
   },
   "sources": {
     "schema_catalog": "machine/ai_runtime_schemas.json",
@@ -445,6 +446,71 @@
       ],
       "consumer_derivation": "capability_interface_incoming_edges",
       "override_rationale": null
+    },
+    {
+      "contract": "ProtocolEnvelope",
+      "schema_version": 1,
+      "producer_plane": "foundation",
+      "consumer_planes": [
+        "configuration-secrets",
+        "data-persistence",
+        "identity",
+        "memory",
+        "model-provider",
+        "observability",
+        "orchestration",
+        "prompt-context",
+        "tool-runtime"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
+    },
+    {
+      "contract": "ProtocolExecutionEnvelope",
+      "schema_version": 2,
+      "producer_plane": "orchestration",
+      "consumer_planes": [
+        "application-api",
+        "engine-api",
+        "reasoning-verification"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
+    },
+    {
+      "contract": "ProtocolReceipt",
+      "schema_version": 1,
+      "producer_plane": "observability",
+      "consumer_planes": [
+        "cost-capacity",
+        "deployment-release",
+        "engine-api",
+        "evaluation",
+        "feedback-learning",
+        "jobs-durability",
+        "model-routing",
+        "operator-control",
+        "product-experience",
+        "resilience",
+        "streaming-realtime",
+        "tool-runtime"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
+    },
+    {
+      "contract": "ConsistencyProfile",
+      "schema_version": 1,
+      "producer_plane": "data-persistence",
+      "consumer_planes": [
+        "artifact-files",
+        "jobs-durability",
+        "memory",
+        "resilience",
+        "retrieval"
+      ],
+      "consumer_derivation": "capability_interface_incoming_edges",
+      "override_rationale": null
     }
   ],
   "vectors": [
@@ -479,7 +545,7 @@
     {
       "id": "JSON-UNICODE-ROUNDTRIP",
       "kind": "raw_json",
-      "payload": "{\"text\":\"Ångström — 東京 — 😀\"}",
+      "payload": "{\"text\":\"\u00c5ngstr\u00f6m \u2014 \u6771\u4eac \u2014 \ud83d\ude00\"}",
       "expected": "accept",
       "reason": "UTF-8 Unicode round-trips without authority changes"
     },
@@ -514,6 +580,69 @@
       "mutation": "null:deadline",
       "expected": "accept",
       "reason": "declared nullable fields accept explicit null"
+    },
+    {
+      "id": "JSON-SAFE-MAX-INTEGER",
+      "kind": "raw_json",
+      "payload": "{\"a\":9007199254740991}",
+      "expected": "accept",
+      "reason": "largest interoperable IEEE-754 integer must remain exact"
+    },
+    {
+      "id": "JSON-UNSAFE-POSITIVE-INTEGER",
+      "kind": "raw_json",
+      "payload": "{\"a\":9007199254740992}",
+      "expected": "reject",
+      "reason": "integer exceeds interoperable IEEE-754 exact range"
+    },
+    {
+      "id": "JSON-UNSAFE-NEGATIVE-INTEGER",
+      "kind": "raw_json",
+      "payload": "{\"a\":-9007199254740992}",
+      "expected": "reject",
+      "reason": "integer exceeds interoperable IEEE-754 exact range"
+    },
+    {
+      "id": "JSON-POSITIVE-ZERO",
+      "kind": "raw_json",
+      "payload": "{\"a\":0.0}",
+      "expected": "accept",
+      "reason": "positive zero has stable canonical sign"
+    },
+    {
+      "id": "JSON-NEGATIVE-ZERO",
+      "kind": "raw_json",
+      "payload": "{\"a\":-0.0}",
+      "expected": "reject",
+      "reason": "negative zero has divergent cross-runtime canonicalization"
+    },
+    {
+      "id": "JSON-LONE-HIGH-SURROGATE",
+      "kind": "raw_json",
+      "payload": "{\"text\":\"\\ud800\"}",
+      "expected": "reject",
+      "reason": "an unpaired high surrogate cannot be represented as interoperable UTF-8"
+    },
+    {
+      "id": "JSON-LONE-LOW-SURROGATE-KEY",
+      "kind": "raw_json",
+      "payload": "{\"\\udc00\":0}",
+      "expected": "reject",
+      "reason": "property names must also contain valid Unicode scalar values"
+    },
+    {
+      "id": "JSON-VALID-SURROGATE-PAIR",
+      "kind": "raw_json",
+      "payload": "{\"text\":\"\\ud83d\\ude00\"}",
+      "expected": "accept",
+      "reason": "a valid escaped surrogate pair reconstructs one Unicode scalar"
+    },
+    {
+      "id": "JSON-EXCESSIVE-NESTING",
+      "kind": "raw_json",
+      "payload": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]",
+      "expected": "reject",
+      "reason": "nested contract data must remain within the bounded parse depth"
     }
   ]
 }

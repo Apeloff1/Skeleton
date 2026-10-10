@@ -52,6 +52,7 @@ class PreferenceEmbedding:
         self.dimension = dimension
         self.vector: List[float] = [0.0] * dimension
         self.update_count: int = 0
+        self.total_weight: float = 0.0
 
     def update(self, interaction_vector: List[float], weight: float = 1.0) -> None:
         """Online moving-average update."""
@@ -61,10 +62,14 @@ class PreferenceEmbedding:
             raise ValueError("interaction values must be finite")
         if isinstance(weight, bool) or not isinstance(weight, (int, float)) or not math.isfinite(float(weight)) or float(weight) <= 0:
             raise ValueError("weight must be positive")
-        self.update_count += 1
-        alpha = weight / self.update_count
+        weight_value=float(weight)
+        next_total=self.total_weight+weight_value
+        alpha=weight_value/next_total
         for i in range(self.dimension):
-            self.vector[i] = (1 - alpha) * self.vector[i] + alpha * interaction_vector[i]
+            observed=float(interaction_vector[i])
+            self.vector[i]=(1.0-alpha)*self.vector[i]+alpha*observed
+        self.total_weight=next_total
+        self.update_count += 1
 
     def similarity(self, other: "PreferenceEmbedding") -> float:
         """Cosine similarity between preference vectors."""
@@ -117,6 +122,11 @@ class MAGStore(MemoryStore):
             raise ValueError("importance must be non-negative")
         if tags is not None and not isinstance(tags, set):
             raise TypeError("tags must be a set when provided")
+        normalized_tags: set[str] = set()
+        for tag in tags or set():
+            if not isinstance(tag, str) or not tag.strip():
+                raise ValueError("episode tags must be non-empty strings")
+            normalized_tags.add(tag.strip())
         episode_id = f"mag_{self.user_id}_{hashlib.sha256(content.encode()).hexdigest()[:16]}"
 
         previous = self._episodes.get(episode_id)
@@ -130,9 +140,9 @@ class MAGStore(MemoryStore):
             episode_id=episode_id,
             timestamp=time.time(),
             content=content,
-            emotional_valence=emotional_valence,
-            importance=importance,
-            tags=tags or set(),
+            emotional_valence=float(emotional_valence),
+            importance=float(importance),
+            tags=normalized_tags,
         )
         self._episodes[episode_id] = episode
         for tag in episode.tags:

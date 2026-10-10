@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import hashlib
 
 import pytest
 
-from skeleton.contracts.canonical import EvidenceRef
+from skeleton.contracts.canonical import EvidenceRef, canonical_json_bytes
 from skeleton.contracts.reproducibility import ReproducibilityBundle
 from skeleton.eval.benchmark_registry import (
     BenchmarkDataset,
@@ -761,3 +762,52 @@ def test_rejected_candidate_and_promotion_cannot_be_evidence() -> None:
         match="cannot become promotion evidence",
     ):
         rejected_promotion.accepted_evidence_ref()
+
+
+def test_candidate_and_registry_identity_use_shared_canonical_contract_bytes() -> None:
+    candidate = CandidateArtifact(
+        candidate_id="candidate-v1",
+        version="v1",
+        candidate_ref="candidate:v1",
+        artifact_digest="a" * 64,
+        source_commit="b" * 40,
+        experiment_manifest_digest="c" * 64,
+        benchmark_manifest_digest="d" * 64,
+        benchmark_qualification_digest="e" * 64,
+        reproducibility_bundle_digest="f" * 64,
+        tags=("core",),
+    )
+
+    assert candidate.candidate_digest == hashlib.sha256(
+        canonical_json_bytes(candidate.payload())
+    ).hexdigest()
+
+    registry = ChampionRegistry(
+        registry_id="core-model",
+        candidates=(candidate,),
+        initial_champion_digest=candidate.candidate_digest,
+    )
+    expected_registry = {
+        "schema_version": registry.schema_version,
+        "task_id": "P1-LEARN-03",
+        "accountability_id": "ACC-P1-LEARN-03",
+        "registry_id": registry.registry_id,
+        "candidates": [candidate.payload()],
+        "initial_champion_digest": candidate.candidate_digest,
+        "transitions": [],
+        "current_champion_digest": candidate.candidate_digest,
+        "production_authority": False,
+    }
+    assert registry.registry_digest == hashlib.sha256(
+        canonical_json_bytes(expected_registry)
+    ).hexdigest()
+
+
+def test_champion_registry_source_and_ai_mirror_are_byte_identical() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    source = root / "skeleton/eval/champion_registry.py"
+    mirror = root / "skeleton/ai/evaluation/champion_registry.py"
+
+    assert source.read_bytes() == mirror.read_bytes()

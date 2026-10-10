@@ -11,6 +11,7 @@ Provides:
 
 from __future__ import annotations
 
+import hashlib
 import math
 import time
 from dataclasses import dataclass, field
@@ -323,11 +324,11 @@ class MemoryTrinity:
         chunks: Dict[str, Chunk] = {}
 
         for rank, result in enumerate(results, 1):
-            cid = result.chunk.chunk_id or hash(result.chunk.text)
-            scores[cid] = scores.get(cid, 0) + 1.0 / (k + rank)
+            cid = result.chunk.chunk_id or ("text:" + hashlib.sha256(result.chunk.text.encode("utf-8")).hexdigest())
+            scores[cid] = scores.get(cid, 0.0) + 1.0 / (k + rank)
             chunks[cid] = result.chunk
 
-        ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        ranked = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
         return [ScoredChunk(chunk=chunks[cid], score=score, plane="fused") for cid, score in ranked]
 
     def stats(self) -> Dict[str, Any]:

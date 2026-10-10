@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import math
 from pathlib import Path
 import sys
 from typing import Any
@@ -44,11 +46,41 @@ def _strict_json(text: str) -> Any:
             out[key] = value
         return out
 
-    return json.loads(
+    value = json.loads(
         text,
         parse_constant=reject_constant,
         object_pairs_hook=reject_duplicates,
     )
+    _validate_portable_scalars(value)
+    return value
+
+
+def _validate_portable_scalars(value: Any, *, _depth: int = 0) -> None:
+    # Independent vector replayers apply the same portable JSON limits
+    # without importing or trusting the canonical serializer.
+    if _depth > 64:
+        raise ValueError("canonical JSON nesting depth exceeded")
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if any(0xD800 <= ord(char) <= 0xDFFF for char in key):
+                raise ValueError("unpaired Unicode surrogate key")
+            _validate_portable_scalars(child, _depth=_depth + 1)
+        return
+    if isinstance(value, list):
+        for child in value:
+            _validate_portable_scalars(child, _depth=_depth + 1)
+        return
+    if isinstance(value, str) and any(
+        0xD800 <= ord(char) <= 0xDFFF for char in value
+    ):
+        raise ValueError("unpaired Unicode surrogate value")
+    if type(value) is int and abs(value) > 9_007_199_254_740_991:
+        raise ValueError("integer exceeds portable JSON range")
+    if type(value) is float:
+        if not math.isfinite(value):
+            raise ValueError("non-finite number")
+        if value == 0.0 and math.copysign(1.0, value) < 0:
+            raise ValueError("negative zero is not portable")
 
 
 def _sample_value(field: dict[str, Any], scalars: dict[str, Any], enums: dict[str, Any]) -> Any:
@@ -133,11 +165,38 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         (v for v in master.get("volumes", []) if isinstance(v, dict) and v.get("key") == "VOL-003"),
         None,
     )
-    if not isinstance(volume, dict) or binding.get("title") != volume.get("title"):
+    if not isinstance(volume, dict):
+        raise ContractConformanceError("masterplan must contain VOL-003")
+    if binding.get("volume_ref") != "VOL-003" or binding.get("title") != volume.get("title"):
         raise ContractConformanceError("contract conformance must remain bound to VOL-003")
-    for gap in binding.get("required_gap_texts", []):
-        if gap not in volume.get("gaps", []):
-            raise ContractConformanceError(f"VOL-003 masterplan gap drift: {gap!r}")
+    qualification_gap = binding.get("qualification_gap")
+    if not isinstance(qualification_gap, str) or not qualification_gap.strip():
+        raise ContractConformanceError("VOL-003 qualification_gap must be non-empty")
+    retired_gaps = binding.get("retired_implementation_gaps")
+    if not isinstance(retired_gaps, list) or not all(
+        isinstance(item, str) and item for item in retired_gaps
+    ):
+        raise ContractConformanceError(
+            "VOL-003 retired_implementation_gaps must be non-empty strings"
+        )
+    live_gaps = list(volume.get("gaps") or [])
+    if live_gaps not in ([qualification_gap], []):
+        raise ContractConformanceError(
+            "VOL-003 gap state must be pending exact-head qualification or signed"
+        )
+    for retired_gap in retired_gaps:
+        if retired_gap in live_gaps:
+            raise ContractConformanceError(
+                f"retired VOL-003 implementation gap reappeared: {retired_gap!r}"
+            )
+    if not live_gaps and volume.get("completion_checkbox") is not True:
+        raise ContractConformanceError(
+            "VOL-003 cannot clear qualification gap before completion signoff"
+        )
+    if live_gaps and volume.get("completion_checkbox") is True:
+        raise ContractConformanceError(
+            "VOL-003 cannot remain signed with a pending qualification gap"
+        )
 
     records = schemas.get("records")
     if not isinstance(records, dict) or not records:
@@ -244,6 +303,26 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
             )
         executed += 1
 
+    source_paths = {
+        "catalog": CATALOG,
+        "schema_catalog": Path(sources["schema_catalog"]),
+        "interface_registry": Path(sources["interface_registry"]),
+    }
+    source_digests = {
+        key: hashlib.sha256((root / relative).read_bytes()).hexdigest()
+        for key, relative in source_paths.items()
+    }
+    qualification_payload = {
+        "contracts": sorted(by_name),
+        "source_digests": source_digests,
+        "vector_ids": sorted(vector_ids),
+        "override_count": override_count,
+        "authority_scope": "contract-conformance-only",
+    }
+    qualification_digest = hashlib.sha256(
+        json.dumps(qualification_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
     return {
         "status": "valid",
         "contract_count": len(records),
@@ -251,6 +330,9 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         "vector_count": len(vectors),
         "executed_vector_count": executed,
         "masterplan_binding": "VOL-003",
+        "source_digests": source_digests,
+        "qualification_digest": qualification_digest,
+        "authority_scope": "contract-conformance-only",
     }
 
 

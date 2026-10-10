@@ -242,8 +242,8 @@ def roster_resolve(code: str) -> dict:
     from core import full_roster as fr
     try:
         aid = fr.id_of_code(code)
-    except Exception as ex:
-        raise HTTPException(404, f"cannot resolve code '{code}': {ex}")
+    except Exception:
+        raise HTTPException(404, "cannot resolve agent code") from None
     loc = fr.locate(aid)
     c = loc["cohort"]
     return {

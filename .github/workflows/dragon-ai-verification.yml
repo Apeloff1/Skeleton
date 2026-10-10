@@ -1,0 +1,79 @@
+name: Dragon AI Verification
+on:
+  push:
+    branches: [main]
+    paths:
+      - "skeleton/ai/webcrawler/dragon_*.py"
+      - "tests/test_ai*dragon*.py"
+      - "frontend/src/components/Dragon*.tsx"
+      - "frontend/src/components/dragon*.ts"
+      - "frontend/src/components/GameplayRecorder.tsx"
+      - "frontend/scripts/test-dragon-companion.cjs"
+      - "frontend/scripts/test-dragon-canonical-wire.cjs"
+      - "tests/fixtures/dragon_visual_wire_v1.json"
+      - ".github/workflows/dragon-ai-verification.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "skeleton/ai/webcrawler/dragon_*.py"
+      - "tests/test_ai*dragon*.py"
+      - "frontend/src/components/Dragon*.tsx"
+      - "frontend/src/components/dragon*.ts"
+      - "frontend/src/components/GameplayRecorder.tsx"
+      - "frontend/scripts/test-dragon-companion.cjs"
+      - ".github/workflows/dragon-ai-verification.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: dragon-ai-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  python:
+    name: Dragon Python
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with: {python-version: "3.11.16"}
+      - name: Install focused test runtime
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+      - name: Compile Dragon modules
+        run: python -m compileall -q skeleton/ai/webcrawler
+      - name: Run Dragon regression suite
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          set -euo pipefail
+          mapfile -t tests < <(find tests -maxdepth 1 -type f -name 'test_ai*dragon*.py' -print | sort)
+          if [ "${#tests[@]}" -eq 0 ]; then
+            echo "No Dragon tests discovered" >&2
+            exit 1
+          fi
+          printf 'Running %s Dragon test modules\n' "${#tests[@]}"
+          python -m pytest -q --noconftest "${tests[@]}"
+  frontend:
+    name: Dragon Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run: {working-directory: frontend}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24.20.0"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+      - name: Install locked dependencies
+        run: yarn install --frozen-lockfile --ignore-scripts
+      - name: Dragon component contract
+        run: yarn test:dragon-companion
+      - name: Cross-language canonical wire parity
+        run: yarn test:dragon-wire
+      - name: TypeScript compile
+        run: yarn typecheck

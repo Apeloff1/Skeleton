@@ -113,7 +113,8 @@ class P2RepositoryControlTests(unittest.TestCase):
         record = next(
             item
             for item in data["records"]
-            if item.get("checkbox") is True
+            if item.get("type") == "queue_task"
+            and item.get("checkbox") is True
             and item.get("implementation_signoff", {}).get("signed") is True
             and item.get("verification_signoff", {}).get("signed") is True
             and item.get("evidence")

@@ -404,6 +404,9 @@ async def regenerate_assistant_message(
                 tool_receipt_refs=tuple(
                     getattr(result, "tool_receipts", ())
                 ),
+                provider_receipt_refs=tuple(
+                    getattr(result, "provider_receipts", ())
+                ),
                 memory_refs=tuple(
                     getattr(result, "memory_refs", ())
                 ),
@@ -430,6 +433,9 @@ async def regenerate_assistant_message(
         "evidence_refs": list(result.evidence_refs),
         "tool_receipt_refs": list(
             getattr(result, "tool_receipts", ())
+        ),
+        "provider_receipt_refs": list(
+            getattr(result, "provider_receipts", ())
         ),
         "memory_refs": list(
             getattr(result, "memory_refs", ())

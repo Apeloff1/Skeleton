@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-01:conversation_state:v1",
+  "title": "FLGB-01 Conversation State",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "conversation_id",
+    "revision",
+    "turns"
+  ],
+  "properties": {
+    "conversation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "turns": {
+      "type": "array",
+      "maxItems": 4096
+    }
+  }
+}

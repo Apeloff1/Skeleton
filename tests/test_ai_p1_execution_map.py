@@ -50,7 +50,7 @@ def test_current_p1_execution_map_is_valid() -> None:
         "deferred_volume_count": 314,
         "canonical_p1_gap_count": 3,
         "task_count": 44,
-        "ready_task_count": 1,
+        "ready_task_count": 0,
         "terminal_lane": "P1-L7",
         "terminal_task": "P1-PROM-03",
     }
@@ -315,7 +315,7 @@ def test_p1_backlog_realizes_lane_dependencies(tmp_path: Path) -> None:
 
 UPSTREAM_P1_EVIDENCE = {
     "P1-EVID-01": (
-        "ready",
+        "in_progress",
         "1a66b2212c438cdc8d77ba912160d46682775a94",
         "36453604824",
         "109034199882",
@@ -394,8 +394,12 @@ def test_upstream_p1_dependency_evidence_is_materialized_and_exact_head() -> Non
         )
 
         assert task["status"] == status
-        assert task["accountability_status"] == "planned"
-        assert task["implementation_signed"] is False
+        if task_id.startswith("P1-EVID-"):
+            assert task["accountability_status"] == "evidence_pending"
+            assert task["implementation_signed"] is True
+        else:
+            assert task["accountability_status"] == "planned"
+            assert task["implementation_signed"] is False
         assert task["verification_signed"] is False
         assert task["completion_checkbox"] is False
         assert task["completion_checkbox_mark"] == "[ ]"
@@ -482,8 +486,8 @@ def test_evid_02_06_use_materialized_exact_head_evidence(
     )
 
     assert task["status"] == "blocked"
-    assert task["accountability_status"] == "planned"
-    assert task["implementation_signed"] is False
+    assert task["accountability_status"] == "evidence_pending"
+    assert task["implementation_signed"] is True
     assert task["verification_signed"] is False
     assert task["completion_checkbox"] is False
     assert task["completion_checkbox_mark"] == "[ ]"
@@ -1120,3 +1124,55 @@ def test_terminal_lane_dependency_chain_is_preserved() -> None:
     ]
     assert task_by_id["P1-PROM-02"]["depends_on"] == ["P1-PROM-01"]
     assert task_by_id["P1-PROM-03"]["depends_on"] == ["P1-PROM-02"]
+
+def test_p1_phase_sequence_rejects_boolean_alias(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+
+    def drift(payload: dict) -> None:
+        phase = next(item for item in payload["phases"] if item["id"] == "P1-PH1")
+        phase["sequence"] = True
+
+    _mutate(root, MAP_PATH, drift)
+    errors, _ = validate_repository(root)
+
+    assert any(
+        "P1-PH1: sequence must be a non-boolean integer" in error
+        for error in errors
+    )
+
+
+def test_p1_backlog_rejects_duplicate_task_dependency(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+
+    def duplicate(payload: dict) -> None:
+        task = next(
+            item for item in payload["tasks"] if item["task_id"] == "P1-EVID-04"
+        )
+        task["depends_on"].append(task["depends_on"][0])
+
+    _mutate(root, BACKLOG_PATH, duplicate)
+    errors, _ = validate_repository(root)
+
+    assert any(
+        "P1-EVID-04: depends_on must not contain duplicates" in error
+        for error in errors
+    )
+
+
+def test_p1_lane_rejects_duplicate_primary_volume_reference(
+    tmp_path: Path,
+) -> None:
+    root = _repo(tmp_path)
+
+    def duplicate(payload: dict) -> None:
+        lane = next(item for item in payload["lanes"] if item["id"] == "P1-L1")
+        lane["primary_volume_refs"].append(lane["primary_volume_refs"][0])
+
+    _mutate(root, MAP_PATH, duplicate)
+    errors, _ = validate_repository(root)
+
+    assert any(
+        "P1-L1: primary_volume_refs must not contain duplicates" in error
+        for error in errors
+    )
+

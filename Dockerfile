@@ -26,6 +26,8 @@ COPY --chown=appuser:appuser machine/ai_capabilities.json ./machine/ai_capabilit
 COPY --chown=appuser:appuser machine/ai_runtime_schemas.json ./machine/ai_runtime_schemas.json
 COPY --chown=appuser:appuser machine/ai_implementation_handoff.json ./machine/ai_implementation_handoff.json
 COPY --chown=appuser:appuser machine/ai_closure_evidence.json ./machine/ai_closure_evidence.json
+COPY --chown=appuser:appuser machine/enterprise_ai_superiority.json ./machine/enterprise_ai_superiority.json
+COPY --chown=appuser:appuser machine/enterprise_ai_implementation_notes_index.json ./machine/enterprise_ai_implementation_notes_index.json
 COPY --chown=appuser:appuser docs/AI_APP_CONSTRUCTION_MANUAL.md ./docs/AI_APP_CONSTRUCTION_MANUAL.md
 
 # The installer toolchain is build-time only. pip 26.2+ also carries vendored
@@ -34,7 +36,7 @@ COPY --chown=appuser:appuser docs/AI_APP_CONSTRUCTION_MANUAL.md ./docs/AI_APP_CO
 # attack surface and causes image scanners to report them independently of
 # the application's installed packages. Install first, then remove the full
 # installer/toolchain surface from the final runtime.
-RUN pip install --no-cache-dir . \
+RUN pip install --no-cache-dir ".[local-inference]" \
     && pip uninstall -y msgpack setuptools \
     && rm -rf /usr/local/lib/python3.14/site-packages/msgpack* \
               /usr/local/lib/python3.14/site-packages/setuptools* \

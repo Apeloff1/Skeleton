@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import pytest
 
 from scripts import check_ai_master_plan as checker
 
@@ -309,25 +310,130 @@ def test_master_plan_rejects_scope_freeze_policy_weakening() -> None:
 
 
 
-def test_closed_gaps_require_hardened_implementation_status() -> None:
+@pytest.mark.parametrize(
+    "implementation_status",
+    (
+        "evidence_pending",
+        "implemented",
+        "integrated",
+        "verified",
+        "hardened",
+        "production",
+    ),
+)
+def test_closed_gaps_are_allowed_after_implementation_materializes(
+    implementation_status: str,
+) -> None:
     data = checker.load_plan()
+    mutated = json.loads(json.dumps(data))
+    volume = mutated["volumes"][13]
+    volume["implementation_status"] = implementation_status
+    volume["gaps"] = []
 
-    hardened = json.loads(json.dumps(data))
-    hardened_volume = hardened["volumes"][13]
-    hardened_volume["implementation_status"] = "hardened"
-    hardened_volume["gaps"] = []
-    hardened_errors = checker.validate(hardened)
-    assert not any(
-        error == "VOL-013: depth pass requires non-empty gaps"
-        for error in hardened_errors
-    )
+    errors = checker.validate(mutated)
 
-    integrated = json.loads(json.dumps(data))
-    integrated_volume = integrated["volumes"][13]
-    integrated_volume["implementation_status"] = "integrated"
-    integrated_volume["gaps"] = []
-    integrated_errors = checker.validate(integrated)
+    assert "VOL-013: depth pass requires non-empty gaps" not in errors
+
+
+def test_unverified_depth_pass_still_requires_gap_inventory() -> None:
+    data = checker.load_plan()
+    mutated = json.loads(json.dumps(data))
+    volume = mutated["volumes"][13]
+    volume["implementation_status"] = "unverified"
+    volume["gaps"] = []
+
+    errors = checker.validate(mutated)
+
+    assert "VOL-013: depth pass requires non-empty gaps" in errors
+
+
+def test_master_plan_rejects_stale_execution_frontier_snapshot() -> None:
+    data = checker.load_plan()
+    mutated = json.loads(json.dumps(data))
+    mutated["execution_frontier"]["queue_snapshot"]["done"] = 41
+    mutated["execution_frontier"]["queue_snapshot"]["pending"] = 1
+
+    errors = checker.validate(mutated)
+
     assert (
-        "VOL-013: depth pass requires non-empty gaps"
-        in integrated_errors
+        "execution_frontier queue_snapshot disagrees with canonical frontier"
+        in errors
     )
+
+
+
+def test_lifecycle_volumes_bind_landed_shared_contracts() -> None:
+    data = checker.load_plan()
+    ids = {407, 408, 410, 411, 412, 413, 416, 417, 418}
+    for volume in data["volumes"]:
+        if volume["id"] not in ids:
+            continue
+        assert "skeleton/ai/runtime/deferred/lifecycle_governance.py" in volume["implementation_paths"]
+        assert volume["tests"] == ["skeleton/testing/test_lifecycle_governance.py"]
+        assert not any(path.startswith("planned:") for path in volume["implementation_paths"] + volume["tests"])
+        assert volume["implementation_status"] == "unverified"
+        assert volume["completion_checkbox"] is False
+
+
+def test_master_plan_binds_200_level_competitive_engineering_overlay() -> None:
+    data = checker.load_plan()
+    overlay = data["competitive_engineering_ladder"]
+    ladder = json.loads(checker.COMPETITIVE_LADDER.read_text(encoding="utf-8"))
+
+    assert overlay["authority"] == "machine/competitive_ai_engineering_ladder.json"
+    assert overlay["human_spec"] == "docs/architecture/COMPETITIVE_AI_ENGINEERING_LADDER.md"
+    assert overlay["family_count"] == 20
+    assert overlay["levels_per_family"] == 10
+    assert overlay["total_levels"] == 200
+    assert len(ladder["families"]) == 20
+    assert len(ladder["levels"]) == 200
+    assert ladder["levels"][0]["id"] == "ENG-001"
+    assert ladder["levels"][-1]["id"] == "ENG-200"
+
+
+def test_master_plan_rejects_competitive_engineering_topology_drift() -> None:
+    data = checker.load_plan()
+    mutated = json.loads(json.dumps(data))
+    mutated["competitive_engineering_ladder"]["total_levels"] = 199
+
+    errors = checker.validate(mutated)
+
+    assert "competitive engineering total_levels must equal 200" in errors
+
+
+def test_master_plan_binds_500_level_ai_game_builder_overlay() -> None:
+    data = checker.load_plan()
+    overlay = data["ai_game_builder_500_levels"]
+    authority = json.loads(checker.GAME_BUILDER.read_text(encoding="utf-8"))
+    duel = json.loads(checker.GAME_BUILDER_DUEL.read_text(encoding="utf-8"))
+
+    assert overlay["authority"] == "machine/ai_game_builder_500_levels.json"
+    assert overlay["dual_rival_authority"] == "machine/ai_game_builder_dual_rival_forge.json"
+    assert overlay["human_spec"] == "docs/architecture/AI_GAME_BUILDER_500_LEVELS.md"
+    assert overlay["family_count"] == 50
+    assert overlay["levels_per_family"] == 10
+    assert overlay["total_levels"] == 500
+    assert overlay["effort_modes"] == {
+        "forge_100": 100,
+        "forge_1000": 1000,
+        "forge_10000": 10000,
+    }
+    assert overlay["stages_per_round"] == 3
+    assert overlay["wall_clock_deadline"] is None
+    assert len(authority["families"]) == 50
+    assert authority["topology"]["total_levels"] == 500
+    assert duel["effort_modes"]["forge_100"]["rounds"] == 100
+    assert duel["effort_modes"]["forge_1000"]["rounds"] == 1000
+    assert duel["effort_modes"]["forge_10000"]["rounds"] == 10000
+
+
+def test_master_plan_rejects_ai_game_builder_topology_drift() -> None:
+    data = checker.load_plan()
+    mutated = json.loads(json.dumps(data))
+    mutated["ai_game_builder_500_levels"]["total_levels"] = 499
+    mutated["ai_game_builder_500_levels"]["effort_modes"]["forge_10000"] = 9999
+
+    errors = checker.validate(mutated)
+
+    assert "AI game builder total_levels must equal 500" in errors
+    assert "AI game builder effort modes must equal 100/1000/10000" in errors

@@ -1,0 +1,100 @@
+name: Enterprise AI Superiority Authority
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: enterprise-ai-superiority-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-enterprise-ai:
+    name: Validate enterprise AI volume authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused test dependency
+        run: >-
+          python -m pip install --disable-pip-version-check --no-input
+          "pytest>=8,<9"
+
+      - name: Compile superiority validator
+        run: >-
+          python -m py_compile
+          scripts/check_enterprise_ai_superiority.py
+          scripts/check_enterprise_ai_implementation_notes.py
+          scripts/report_enterprise_ai_progress.py
+          tests/test_enterprise_ai_superiority.py
+          tests/test_enterprise_ai_implementation_notes.py
+
+      - name: Validate machine authority
+        run: python scripts/check_enterprise_ai_superiority.py --json
+
+      - name: Validate canonical AI construction integration
+        run: python scripts/check_ai_app_construction.py --json
+
+      - name: Validate October 2026 implementation dossiers
+        run: python scripts/check_enterprise_ai_implementation_notes.py --json
+
+      - name: Run superiority contract regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_enterprise_ai_superiority.py
+          tests/test_enterprise_ai_implementation_notes.py
+
+      - name: Report enterprise AI completion
+        run: python scripts/report_enterprise_ai_progress.py --json
+
+      - name: Confirm exact-head identity
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_SHA"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          policy = json.loads(
+              Path("machine/enterprise_ai_superiority.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          master = json.loads(
+              Path("machine/ai_master_plan.json").read_text(encoding="utf-8")
+          )
+          print(
+              "enterprise-ai-superiority",
+              "policy_version=",
+              policy["version"],
+              "master_plan_version=",
+              master["plan_version"],
+              "profiles=",
+              len(policy["profiles"]),
+              "head=",
+              __import__("os").environ["EXPECTED_SHA"],
+          )
+          PY

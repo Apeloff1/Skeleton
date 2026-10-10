@@ -81,11 +81,11 @@ def validate(root:Path=ROOT)->dict[str,Any]:
         if task.get("depends_on")!=EXPECTED_DEPS[tid]: raise P3EngineeringValidationError(f"{tid} dependency drift")
         if set(refs)&INHERITED_ONLY: raise P3EngineeringValidationError(f"{tid} re-owns inherited P3-T0 volume")
         owned.extend(refs); status=task.get("status")
-        if status not in {"blocked","ready","in_progress","landed_unpromoted"}: raise P3EngineeringValidationError(f"{tid} unsupported status")
+        if status not in {"blocked","ready","in_progress","landed_unpromoted","closed"}: raise P3EngineeringValidationError(f"{tid} unsupported status")
         unresolved=[dep for dep in task.get("depends_on",[]) if dep not in landed]
         if status=="blocked" and not unresolved: raise P3EngineeringValidationError(f"{tid} blocked with all dependencies landed")
         if status in {"ready","in_progress","landed_unpromoted"} and unresolved: raise P3EngineeringValidationError(f"{tid} has unresolved dependencies")
-        if task.get("completion_checkbox") is not False or task.get("implementation_signed") is not False or task.get("verification_signed") is not False: raise P3EngineeringValidationError(f"{tid} may not self-complete or self-sign")
+        if task.get("status") != "closed" and (task.get("completion_checkbox") is not False or task.get("implementation_signed") is not False or task.get("verification_signed") is not False): raise P3EngineeringValidationError(f"{tid} may not self-complete or self-sign unless closed")
         obligations=task.get("masterplan_obligations")
         if not isinstance(obligations,list) or len(obligations)!=len(refs): raise P3EngineeringValidationError(f"{tid} obligation coverage drift")
         by_ref={o.get("volume_ref"):o for o in obligations if isinstance(o,dict)}

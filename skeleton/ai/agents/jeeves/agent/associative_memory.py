@@ -19,6 +19,7 @@ therefore remains neutral rather than being silently counted as failure.
 
 from __future__ import annotations
 
+import heapq
 import math
 import threading
 import time
@@ -194,6 +195,9 @@ class AssociativeMemoryMesh:
         self._edges: dict[str, MemoryAssociation] = {}
         self._outgoing: defaultdict[tuple[str, str], set[str]] = defaultdict(set)
         self._ngrams: Counter[tuple[str, tuple[str, ...]]] = Counter()
+        self._prefix_next: defaultdict[
+            tuple[str, tuple[str, ...]], Counter[str]
+        ] = defaultdict(Counter)
         self._lock = threading.RLock()
 
     @staticmethod
@@ -317,7 +321,7 @@ class AssociativeMemoryMesh:
             for order in range(2, min(self.policy.ngram_max_order, len(ids)) + 1):
                 for start in range(0, len(ids) - order + 1):
                     gram = ids[start : start + order]
-                    self._ngrams[(namespace.key, gram)] += 1
+                    self._record_ngram(namespace.key, gram)
         return tuple(edges)
 
     def observe_higher_order_sequence(
@@ -348,7 +352,7 @@ class AssociativeMemoryMesh:
             for order in range(minimum, maximum + 1):
                 for start in range(0, len(ids) - order + 1):
                     gram = ids[start : start + order]
-                    self._ngrams[(namespace.key, gram)] += 1
+                    self._record_ngram(namespace.key, gram)
                     updates += 1
         return updates
 
@@ -412,16 +416,18 @@ class AssociativeMemoryMesh:
                 + self.policy.direction_weight * edge.direction_confidence
             )
             hits.append(AssociationHit(edge, max(0.0, min(1.0, score)), recency, posterior))
-        hits.sort(
-            key=lambda item: (
-                item.score,
-                item.association.observations,
-                item.association.updated_at,
-                item.association.association_id,
-            ),
-            reverse=True,
+        return tuple(
+            heapq.nlargest(
+                limit_value,
+                hits,
+                key=lambda item: (
+                    item.score,
+                    item.association.observations,
+                    item.association.updated_at,
+                    item.association.association_id,
+                ),
+            )
         )
-        return tuple(hits[:limit_value])
 
     def predict_next(self, namespace: MemoryNamespace, prefix: Sequence[str], *, limit: int = 8) -> SequencePrediction:
         limit = positive_int("limit", limit, maximum=1000)
@@ -432,15 +438,17 @@ class AssociativeMemoryMesh:
         counts: Counter[str] = Counter()
         evidence = 0
         with self._lock:
-            for (namespace_key, gram), count in self._ngrams.items():
-                if namespace_key != namespace.key or len(gram) < 2:
+            maximum_prefix = min(
+                len(use_prefix),
+                self.policy.ngram_max_order - 1,
+            )
+            for prefix_length in range(1, maximum_prefix + 1):
+                gram_prefix = tuple(use_prefix[-prefix_length:])
+                bucket = self._prefix_next.get((namespace.key, gram_prefix))
+                if not bucket:
                     continue
-                gram_prefix = gram[:-1]
-                if len(gram_prefix) > len(use_prefix):
-                    continue
-                if tuple(use_prefix[-len(gram_prefix) :]) == gram_prefix:
-                    counts[gram[-1]] += count
-                    evidence += count
+                counts.update(bucket)
+                evidence += sum(bucket.values())
         if not counts:
             return SequencePrediction(
                 namespace.key,
@@ -464,6 +472,18 @@ class AssociativeMemoryMesh:
                 {"namespace": namespace.key, "prefix": use_prefix, "counts": sorted(counts.items())}
             ),
         )
+
+    def _record_ngram(
+        self,
+        namespace_key: str,
+        gram: tuple[str, ...],
+        *,
+        count: int = 1,
+    ) -> None:
+        if len(gram) < 2:
+            return
+        self._ngrams[(namespace_key, gram)] += count
+        self._prefix_next[(namespace_key, gram[:-1])][gram[-1]] += count
 
     def record_retrieval_outcome(
         self,

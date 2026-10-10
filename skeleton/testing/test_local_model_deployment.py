@@ -210,7 +210,7 @@ def test_deployment_rejects_model_symlink(tmp_path: Path) -> None:
     payload = json.loads(manifest.read_text(encoding="utf-8"))
     payload["model_path"] = "models/linked.gguf"
     manifest.write_text(json.dumps(payload), encoding="utf-8")
-    with pytest.raises(LocalModelDeploymentError, match="model_path symlink is forbidden"):
+    with pytest.raises(LocalModelDeploymentError, match="model_path symlinked path component is forbidden"):
         LocalModelDeployment.load(manifest)
 
 
@@ -279,3 +279,98 @@ def test_manifest_bootstrap_fails_when_live_qualification_cannot_execute(
             AsyncToolRuntime(),
             verification_hook=_verification,
         )
+
+def test_deployment_rejects_model_under_symlinked_parent(tmp_path: Path) -> None:
+    if os.name == "nt":
+        pytest.skip("symlink semantics vary on Windows")
+    manifest, _, model = _deployment(tmp_path)
+    real_parent=model.parent
+    linked_parent=tmp_path/"linked-models"
+    linked_parent.symlink_to(real_parent, target_is_directory=True)
+    payload=json.loads(manifest.read_text(encoding="utf-8"))
+    payload["model_path"]="linked-models/agent.gguf"
+    manifest.write_text(json.dumps(payload),encoding="utf-8")
+
+    with pytest.raises(
+        LocalModelDeploymentError,
+        match="symlinked path component is forbidden",
+    ):
+        LocalModelDeployment.load(manifest)
+
+
+def test_deployment_rejects_unknown_top_level_manifest_field(tmp_path: Path) -> None:
+    manifest, _, _ = _deployment(tmp_path)
+    payload=json.loads(manifest.read_text(encoding="utf-8"))
+    payload["download_url"]="https://example.invalid/model.gguf"
+    manifest.write_text(json.dumps(payload),encoding="utf-8")
+
+    with pytest.raises(
+        LocalModelDeploymentError,
+        match="unsupported deployment manifest key",
+    ):
+        LocalModelDeployment.load(manifest)
+
+
+def test_qualification_rejects_model_id_identity_drift(tmp_path: Path) -> None:
+    from skeleton.ai.runtime.inference.deployment import _qualification_receipt
+    from skeleton.ai.runtime.inference.llama_cpp import LlamaCppModel
+    from skeleton.ai.runtime.inference import LocalInferenceResult
+
+    manifest,_,_= _deployment(tmp_path)
+    deployment=LocalModelDeployment.load(manifest)
+    model=LlamaCppModel(deployment.llama_cpp_config(rehash_artifacts_each_run=True))
+    result=LocalInferenceResult(
+        text="offline ready",
+        model_id="different-model-id",
+        model_digest=deployment.model_sha256,
+        input_tokens=2,
+        output_tokens=2,
+        finish_reason="completed",
+        response_id=(
+            "local:test:"
+            +deployment.executable_sha256
+            +":"
+            +deployment.model_sha256
+        ),
+    )
+
+    with pytest.raises(LocalModelDeploymentError,match="model identity drift"):
+        _qualification_receipt(
+            deployment,
+            model,
+            result,
+            prompt="qualification",
+        )
+
+
+def test_qualification_rejects_truncated_response(tmp_path: Path) -> None:
+    from skeleton.ai.runtime.inference.deployment import _qualification_receipt
+    from skeleton.ai.runtime.inference.llama_cpp import LlamaCppModel
+    from skeleton.ai.runtime.inference import LocalInferenceResult
+
+    manifest,_,_= _deployment(tmp_path)
+    deployment=LocalModelDeployment.load(manifest)
+    model=LlamaCppModel(deployment.llama_cpp_config(rehash_artifacts_each_run=True))
+    result=LocalInferenceResult(
+        text="partial readiness",
+        model_id=deployment.model_id,
+        model_digest=deployment.model_sha256,
+        input_tokens=2,
+        output_tokens=2,
+        finish_reason="length",
+        response_id=(
+            "local:test:"
+            +deployment.executable_sha256
+            +":"
+            +deployment.model_sha256
+        ),
+    )
+
+    with pytest.raises(LocalModelDeploymentError,match="did not reach a completed"):
+        _qualification_receipt(
+            deployment,
+            model,
+            result,
+            prompt="qualification",
+        )
+

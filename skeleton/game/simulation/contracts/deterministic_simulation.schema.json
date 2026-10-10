@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-10:deterministic_simulation:v1",
+  "title": "FLGB-10 deterministic simulation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tick",
+    "ecs_digest",
+    "transform_digest",
+    "physics_digest",
+    "rng_state_digest",
+    "input_digest",
+    "system_order"
+  ],
+  "properties": {
+    "tick": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "ecs_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "transform_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "physics_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rng_state_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "input_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "system_order": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    }
+  }
+}
