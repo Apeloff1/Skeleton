@@ -489,3 +489,50 @@ model and synthetic video interrupts. It is **not** a cycle-accurate
 full-consumer emulator, physical-console acceptance, or legal permission
 to redistribute ROMs, outside artwork or proprietary firmware. The
 latter statuses remain explicitly false even after a successful replay.
+
+
+## Deterministic native screen-state transcript (October 10, 2026)
+
+The original Sega game now records a compact **instruction-level gameplay
+semantic chain** while replaying the independently generated winning route
+against actual compiled Z80 ROM bytes. The chain commits to the actual
+VDP-observed player X/Y, stage, life, collectible count, score and companion
+rank, and the real controller button and input position. **Host reference
+predictions never supply the recorded screen-state input.**
+
+The chain begins with a domain-separated SHA-256 digest of the original
+world identity, then folds each observed initial screen and each actual
+controller movement into the prior digest. The replay report records the
+final `semantic_controller_screen_trace_sha256`, the exact count of screens
+hashed, a total native Z80 instruction budget and a total frame budget.
+Bounded execution rejects loops and routes that exhaust the hard budget,
+rather than silently keeping the worker occupied indefinitely.
+
+The Master System/Game Gear cross-port validator now demands the
+**same semantic gameplay trace**, not just matching level counts, game
+identity and overall action count. Hardware-specific render placement,
+color palette, instruction count and scheduling may differ; actual
+gameplay state and controller-input sequences may not.
+
+The source reference and generated manifest use the strict bounded JSON
+intake with duplicate-key detection. Exact typed fields are enforced at
+the root, original initial state and each action. A replay must not start
+already won or lost; floating infinities, non-finite values, unknown
+extra source fields, invalid controller actions or altered rights/status
+claims fail closed even when an attacker recomputes the unsiged JSON digest.
+
+**Boundaries:** the trace demonstrates an instruction-level Z80 guest
+running under the project's deliberately limited SMS/Game Gear model.
+It is not an independent cycle-accurate console emulation, physical
+controller/audio measurement, anti-malware audit, official platform
+certification or copyright release approval. Those remain independent
+human/technical gates with separate evidence.
+
+Target tests:
+- `skeleton/testing/test_game_builder_sega8_real_z80_gameplay.py`
+- `skeleton/testing/test_game_builder_sega8_port_parity.py`
+- `skeleton/testing/test_game_builder_sega8_route_security.py`
+
+All are now in the focused historical archive checks; the native
+Sega CI also runs original source replay and compiled native guest
+execution for both consoles.
