@@ -44,3 +44,10 @@ def test_encode_snes_4bpp_high_planes_in_second_bank():
     with pytest.raises(PortableCodecError):
         encode_snes_4bpp(((16,)*8,)*8)
 
+
+def test_decode_snes_4bpp_recovers_all_palette_indices():
+    tile = tuple(tuple((x+y*8) % 16 for x in range(8)) for y in range(8))
+    assert decode_snes_4bpp(encode_snes_4bpp(tile)) == tile
+    with pytest.raises(PortableCodecError):
+        decode_snes_4bpp(b"\x00"*16)
+
