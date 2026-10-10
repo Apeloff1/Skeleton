@@ -287,6 +287,30 @@ function LivingWorldEditor(){
         caught instanceof Error?caught.message:'Route analysis failed.');
     }finally{if(ticket===runId.current)setBusy(false);}
   };
+  const restartWorld=async()=>{
+    if(!preview||busy)return;
+    const ticket=++runId.current;
+    setBusy(true);setFailure('');
+    try{
+      let minted:string|null=null;
+      if(sessionMode){
+        const fresh=await apiPost<SignedAdvance>('/checkpoint/advance',{
+          ...config,moves:[],
+        });
+        if(!fresh.ok||!fresh.new_checkpoint)
+          throw new Error('Clean original-world checkpoint failed');
+        minted=fresh.new_checkpoint;
+      }
+      if(ticket===runId.current){
+        setHistory([]);setGame(preview.player);setTerrain(preview.tiles);
+        setSessionToken(minted);setPreviousTokens([]);
+        setGuided(null);setNotice('New original world run started.');
+      }
+    }catch(caught){
+      if(ticket===runId.current)setFailure(
+        caught instanceof Error?caught.message:'World restart failed.');
+    }finally{if(ticket===runId.current)setBusy(false);}
+  };
   const beginExample=async(alternative:Alternative)=>{
     if(!preview||busy)return;
     const ticket=++runId.current;
@@ -527,7 +551,7 @@ function LivingWorldEditor(){
           <Text style={s.heading}>Take a real world action</Text>
           {game.options.map(option=>(
             <TouchableOpacity key={option.name} accessibilityRole="button"
-              disabled={!option.available||busy||history.length>=192}
+              disabled={!option.available||busy||(!sessionToken&&history.length>=192)}
               style={[s.option,(!option.available||busy)&&s.disabled]}
               onPress={()=>move(option.name)}>
               <Text style={s.actionText}>
@@ -544,19 +568,20 @@ function LivingWorldEditor(){
           ))}
           <View style={s.chips}>
             <TouchableOpacity style={s.chip} onPress={rewind}
-              disabled={busy||!history.length}>
+              disabled={busy||(sessionToken?previousTokens.length===0:!history.length)}>
               <Text style={s.actionText}>Undo decision</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.chip}
-              onPress={()=>{setHistory([]);setGame(preview.player);setTerrain(preview.tiles);
-                setGuided(null);setNotice('');setFailure('');}}
-              disabled={busy}>
+              onPress={restartWorld} disabled={busy}>
               <Text style={s.actionText}>Restart this world</Text>
             </TouchableOpacity>
           </View>
           <Text style={s.hint}>
-            {history.length}/192 actions in this bounded local replay.
-            Save and restore revalidate every action before accepting state.
+            {game.player.turn} actual world decisions ·
+            {sessionToken
+              ?' renewable signed session (7-day expiry, 32-step undo cache)'
+              :' 192-action bounded replay until server signing is configured'}.
+            Save/restore always checks the original server replay or owner-bound signature.
           </Text>
           {Platform.OS!=='web'&&<View style={s.chips}>
             <TouchableOpacity style={s.chip} onPress={save} disabled={busy}>
