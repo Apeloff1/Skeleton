@@ -789,4 +789,76 @@ def challenge_route_selection(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection"]
+def solve_route_astar(
+    problem: RouteProblem, *, heuristic_weight_ppm: int = 1_000_000,
+    max_expansions: int = _MAX_STATES,
+) -> RouteProof:
+    """A* on (position, objectives), with optimal mode at weight 1.0.
+
+    Weighted mode is useful to study throughput but DOES NOT promise an optimal
+    path. Manhattan-to-next-objective never overstates unavoidable safe steps.
+    """
+    if (not isinstance(problem, RouteProblem) or type(heuristic_weight_ppm) is not int
+            or not 1_000_000 <= heuristic_weight_ppm <= 2_000_000
+            or type(max_expansions) is not int or not 1 <= max_expansions <= _MAX_STATES):
+        raise MultipathError("invalid bounded A* configuration")
+    bits = {p: 1 << index for index, p in enumerate(problem.collectibles)}
+    full = (1 << len(bits)) - 1
+
+    def heuristic(state: State) -> int:
+        x, y, mask = state
+        remaining = [pos for pos, bit in bits.items() if not (mask & bit)]
+        goals = remaining if remaining else [problem.goal]
+        return min(abs(x - p[0]) + abs(y - p[1]) for p in goals)
+
+    initial: State = (*problem.start, 0)
+    costs = {initial: 0}
+    parents: dict[State, tuple[State, str] | None] = {initial: None}
+    priority: list[tuple[int, int, int, State]] = [
+        (heuristic(initial) * heuristic_weight_ppm, 0, 0, initial),
+    ]
+    serial = 0
+    expanded = 0
+    endpoint = None
+    while priority:
+        _, current, _, state = heappop(priority)
+        if current != costs.get(state):
+            continue
+        expanded += 1
+        if expanded > max_expansions:
+            raise MultipathError("A* expansion budget exceeded")
+        if state[:2] == problem.goal and state[2] == full:
+            endpoint = state
+            break
+        for action, next_pos in problem.neighbors(state[:2], allow_hazards=False):
+            nxt: State = (*next_pos, state[2] | bits.get(next_pos, 0))
+            proposed = current + 1
+            if proposed >= costs.get(nxt, 2**63):
+                continue
+            costs[nxt] = proposed
+            parents[nxt] = (state, action)
+            serial += 1
+            priority_score = (
+                proposed * 1_000_000 + heuristic(nxt) * heuristic_weight_ppm
+            )
+            heappush(priority, (priority_score, proposed, serial, nxt))
+        if len(costs) > _MAX_STATES:
+            raise MultipathError("A* state limit exceeded")
+    if endpoint is None:
+        raise MultipathError("no safe A* route meets all objectives")
+    actions: list[str] = []
+    state = endpoint
+    while parents[state] is not None:
+        state, action = parents[state]
+        actions.append(action)
+        if len(actions) > _MAX_PATH_STEPS:
+            raise MultipathError("A* path length budget exceeded")
+    actions.reverse()
+    return evaluate_route(
+        problem, actions, solver=("astar" if heuristic_weight_ppm == 1_000_000
+                                  else "weighted_astar"), expanded_states=expanded,
+    )
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar"]
