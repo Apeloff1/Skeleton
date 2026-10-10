@@ -47,3 +47,9 @@ def decode_rgb565(word: object) -> tuple[int,int,int]:
     n=_packed(word,0xffff)
     return (((n>>11)&31)*255+15)//31, (((n>>5)&63)*255+31)//63, ((n&31)*255+15)//31
 
+
+def encode_rgb332(pixel: object) -> int:
+    """8-bit RGB332 packed display palette: 3R, 3G, 2B."""
+    r,g,b=_rgb(pixel)
+    return ((r*7+127)//255)<<5 | ((g*7+127)//255)<<2 | ((b*3+127)//255)
+
