@@ -757,4 +757,29 @@ def rank_routes(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes"]
+def challenge_route_selection(
+    problem: RouteProblem, routes: Sequence[RouteProof],
+) -> dict[str, object]:
+    """Return fast, exploratory and friction-rich routes with honest qualifiers."""
+    if not isinstance(routes, (list, tuple)) or not routes or len(routes) > 8:
+        raise MultipathError("bounded route choices required")
+    for proof in routes:
+        verify_route_proof(problem, proof)
+    shortest = rank_routes(problem, routes, preference="shortest")[0]
+    explore = rank_routes(problem, routes, preference="exploration")[0]
+    highest_friction = max(routes, key=lambda proof: (
+        route_friction_ppm(problem, proof), proof.steps, proof.digest))
+    return {
+        "schema": "skeleton.game_builder.route_challenge_selection.v1",
+        "world_digest": problem.digest,
+        "fastest_digest": shortest.digest,
+        "explorer_digest": explore.digest,
+        "high_friction_digest": highest_friction.digest,
+        "route_options_verified": len({p.actions for p in routes}),
+        "player_enjoyment_proven": False,
+        "requires_playtesting": True,
+    }
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection"]
