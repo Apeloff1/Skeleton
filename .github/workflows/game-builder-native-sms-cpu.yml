@@ -1,0 +1,88 @@
+name: Game Builder Native SMS Z80 CPU Replay
+
+on:
+  pull_request:
+    paths:
+      - 'skeleton/ai/game_builder/**'
+      - 'scripts/game_builder/native_sms_ci.py'
+      - 'scripts/game_builder/emulate_sms_z80_ci.py'
+      - '.github/workflows/game-builder-native-sms-cpu.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-sms-cpu-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  actually-run-original-master-system-z80:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /skeleton/__init__.py
+            /skeleton/ai/__init__.py
+            /skeleton/ai/capability_map.py
+            /skeleton/ai/game_builder/
+            /scripts/game_builder/native_sms_ci.py
+            /scripts/game_builder/emulate_sms_z80_ci.py
+            /skeleton/testing/test_game_builder_sms_cpu.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile actual Sega Mode4 CPU game from independently authored world
+        env:
+          PYTHONPATH: .
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends z80asm make
+          python scripts/game_builder/native_sms_ci.py --emit sms-cpu-game > original-game-world.json
+          make -C sms-cpu-game
+          python scripts/game_builder/native_sms_ci.py \
+            --verify-rom sms-cpu-game/build/skeleton-original.sms \
+            --binary sms-cpu-game/build/skeleton-original.bin > actual-sms-z80-artifact.json
+      - name: Install independently validated Zilog instruction-level CPU reference
+        run: |
+          python -m pip install --disable-pip-version-check "z80-python==0.4.0" "pytest>=8.4,<9"
+      - name: Verify adversarial RAM memory map and exact hardware side effects
+        env:
+          PYTHONPATH: .
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+        run: |
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_sms_cpu.py
+      - name: Run every original controller action in actual native Z80 machine code
+        env:
+          PYTHONPATH: .
+        run: |
+          python scripts/game_builder/emulate_sms_z80_ci.py \
+            --rom sms-cpu-game/build/skeleton-original.sms \
+            --route sms-cpu-game/guest-cpu-reference.json \
+            --out sms-actual-z80-cpu-acceptance.json
+          python - <<'PY'
+          import json
+          r=json.load(open("sms-actual-z80-cpu-acceptance.json",encoding="utf-8"))
+          assert r["native_cpu_and_mode4_io_passed"] is True
+          assert r["all_original_stages_verified"] == 3
+          assert r["original_controller_actions_verified"] > 100
+          assert r["final_guest_z80_ram"]["won"] == 1
+          assert r["independent_full_console_emulator_verified"] is False
+          assert r["physical_hardware_verified"] is False
+          print("ACTUAL_ORIGINAL_SMS_Z80_CPU_GAMEPLAY_VERIFIED",r["original_controller_actions_verified"])
+          PY
+      - name: Upload actual CPU and VDP hardware replay evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: skeleton-original-sms-z80-cpu-playthrough-evidence
+          path: |
+            sms-cpu-game/build/skeleton-original.sms
+            sms-cpu-game/guest-cpu-reference.json
+            sms-actual-z80-cpu-acceptance.json
+            original-game-world.json
+          if-no-files-found: error
+          retention-days: 7
