@@ -568,3 +568,43 @@ The overall editor currently exposes **14 machine-specific native
 source targets** (including Game Gear's source-only stage), against
 524 archived historical hardware candidates. Counts refer to source
 authoring, not to independently completed hardware qualification.
+
+## ColecoVision (1982) — real OS7/TMS9918A Z80 console cartridge
+
+The native hardware-target catalogue now includes a genuinely distinct
+**ColecoVision** engine, not a Master System Z80 binary renamed for
+Coleco. `coleco_native_export.py` converts an independently generated,
+solvable original game into ColecoVision Z80 assembly, and the companion
+`coleco_rom.py` packages the assembled source as a 32KiB unbanked
+ColecoVision `.col` cartridge.
+
+The machine-specific program contains the actual BIOS-recognized
+`55 AA` direct-boot header, seven OS7 restart callbacks, game
+INIT address and VBlank NMI soft vector at cartridge address $8021.
+It calls Coleco OS7 `MODE_1` and `LOAD_ASCII` BIOS routines, then
+renders the original maze using the physical TMS9918A VRAM at
+$1800 through VDP port $BE/control port $BF, with interrupt-synchronized
+updates, a player-one joystick at port $FC selected by $C0, and
+short original SN76489 PSG chimes through port $FF.
+
+ColecoVision's memory architecture is not the Master System memory
+architecture. It has only **1KiB of physical game RAM**, mirrored in
+$6000–$7FFF. The game specifically places source-derived mutable world
+tiles at $7000, score/health/player data at $7300, and its native Z80
+stack below $73F0. Its authoring compiler rejects worlds that exceed
+the 32x24 display or one-KiB memory envelope rather than moving game
+state into nonexistent $C000 RAM.
+
+The `Game Builder Native ColecoVision Z80 ROM` workflow genuinely
+assembles the independent Z80 game, checks every required header and
+soft vector, verifies the ROM against its original binary source, and
+runs adversarial tests for hardware memory, original game rights,
+forged headers and tampered code. No BIOS file, commercial cartridge
+image or externally owned artwork is bundled. Importantly, completion
+of this build workflow **does not** imply independent ColecoVision
+emulator playthrough, original hardware qualification or commercial
+distribution approval.
+
+This increases separately implemented native machine-*source*
+destinations to **15** of 524 archive candidates. The source count
+must not be confused with qualified playable hardware binaries.
