@@ -363,7 +363,20 @@ def emit_route_game(world:World,traveller:Traveller,*,authorized:bool)->dict[str
         "\n".join(proof_data)+"\n};\n#endif\n"
     )
     from .dragon_route_world_assurance import demand_viable_world
+    from .dragon_route_legal_provenance import (
+        SourceRights,assess_route_originality,
+        assert_original_game_candidate,review_json,
+    )
     quality=demand_viable_world(world,traveller)
+    rights=assess_route_originality(
+        world,rights=SourceRights(
+            owner_reference="Dragon generated original world route source",
+            original_creation=True,
+            individual_clearance=("authored_route_graph_source",),
+            human_reviewer_approved=False,
+        ),
+    )
+    assert_original_game_candidate(rights)
     analysis=structural_report(world)
     manifest={
         "schema":SCHEMA,
@@ -382,6 +395,7 @@ def emit_route_game(world:World,traveller:Traveller,*,authorized:bool)->dict[str
         "token_registry":token_list,
         "abstract_graph_audit":analysis,
         "full_route_world_assurance":quality,
+        "originality_screen":review_json(rights),
         "probes":probes,
         "original_work_attested":world.original_work_attested,
         "rights_claim":"originality attested; not independent copyright/patent/trademark clearance",
