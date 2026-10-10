@@ -165,3 +165,43 @@ def test_original_sprite_palette_honors_bounded_hardware_color_indices():
     assert len(raw_tile_data(base,"gb"))==len(raw_tile_data(alt,"nes"))==128
     assert base["dragon"]==HEROES_8["explorer"]
     assert set("".join(alt["dragon"]))<=set("0123")
+
+
+
+@pytest.mark.parametrize("target,expected", [
+    ("game_boy", ".playerMoving"),
+    ("game_boy_color", ".playerMoving"),
+    ("nes", "DragonMoving:"),
+])
+def test_original_hero_animation_runs_on_real_controller_movement(target,expected):
+    approved=make_request(target)
+    project=_render(approved,target)
+    source=project.files["src/main.s" if target=="nes" else "src/main.asm"]
+    assert expected in source
+    if target=="nes":
+        assert "DragonAnimationTick: .res 1" in source
+        assert "sta $0201" in source
+        assert "lda #2\nDragonPaint:" in source
+        assert "sta DragonPreviousX" in source
+    else:
+        assert "PreviousPlayerX: ds 1" in source
+        assert "PreviousPlayerY: ds 1" in source
+        assert "ld [OAM+2], a" in source
+        assert "ld a, 2\n.drawHeroFrame:" in source
+    assert verify_source_release(make_source_release(project,approved)[0])["evidence"]=="source_generated"
+
+
+@pytest.mark.parametrize("target,animation_label", [
+    ("game_boy", ".playerMoving"),
+    ("nes", "DragonMoving:"),
+])
+def test_cartridge_art_auditor_does_not_accept_inert_hero_animation(target,animation_label):
+    from skeleton.ai.webcrawler.dragon_native_artforge import verify_original_art
+    game=make_request(target)
+    source=_render(game,target)
+    files=dict(source.files)
+    name="src/main.s" if target=="nes" else "src/main.asm"
+    files[name]=files[name].replace(animation_label,animation_label[:-1]+"Fake:",1)
+    _,port=_adapt_portable_design(game,target)
+    with pytest.raises(ValueError,match="animation source"):
+        verify_original_art(files,port,"arcade_score_attack")
