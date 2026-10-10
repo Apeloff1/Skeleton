@@ -61,6 +61,10 @@ class PuzzleBuildEvidence:
     runtime_selftest: str
     native_hint_selftest: str
     hint_output_sha256: str
+    native_branch_selftest: str
+    branch_output_sha256: str
+    branch_transitions_verified: int
+    branch_endings_verified: int
     independent_replays_verified: int
     replay_transcripts_sha256: str
     native_challenge_selftest: str
@@ -342,6 +346,26 @@ def build_native_puzzle_executable(
         hint = _invoke([str(executable), "--hint-selftest"], root=root,
                        timeout=timeout_seconds)
         _hint_stages(hint.stdout, proof["stages"])
+        branch=_invoke([str(executable),"--branch-selftest"],root=root,
+                       timeout=timeout_seconds)
+        from .dragon_native_campaign_paths import verify_graph_report
+        graph=verify_graph_report(proof["campaign_graph"])
+        expected_branch=[]
+        for entry in graph.chapters:
+            for option,next_stage in enumerate(entry.exits,1):
+                expected_branch.append(
+                    f"DRAGON_BRANCH_PASS from={entry.stage+1} "
+                    f"choice={option} to={next_stage+1}"
+                )
+            if not entry.exits:
+                expected_branch.append(f"DRAGON_ENDING_PASS stage={entry.stage+1}")
+        transitions=sum(len(x.exits) for x in graph.chapters)
+        expected_branch.append(
+            f"DRAGON_BRANCH_CAMPAIGN_PASS stages={proof['stages']} "
+            f"transitions={transitions} endings={graph.ending_count}"
+        )
+        if branch.stdout.splitlines()!=expected_branch:
+            raise ValueError("native branch transitions or alternate ending gameplay diverged")
         from .dragon_native_puzzle import transformed_level, solve_grid
         from .dragon_native_puzzle_trace import simulate_grid, parse_native_state_line
         transcripts = []
@@ -407,6 +431,10 @@ def build_native_puzzle_executable(
         runtime_selftest="native_executable_all_stages_passed",
         native_hint_selftest="current_position_bfs_all_stages_passed",
         hint_output_sha256=_hash(hint.stdout.encode("utf-8")),
+        native_branch_selftest="all_actual_branch_transitions_and_endings_replayed",
+        branch_output_sha256=_hash(branch.stdout.encode("utf-8")),
+        branch_transitions_verified=transitions,
+        branch_endings_verified=graph.ending_count,
         independent_replays_verified=len(transcripts),
         replay_transcripts_sha256=_hash(_canonical(transcripts)),
         native_challenge_selftest="optimal_route_three_stars_all_stages",
@@ -483,6 +511,13 @@ def verify_native_puzzle_executable(package: bytes) -> dict:
                              str(evidence.get("replay_transcripts_sha256", ""))) or
             evidence.get("runtime_selftest") != "native_executable_all_stages_passed" or
             evidence.get("native_hint_selftest") != "current_position_bfs_all_stages_passed" or
+            evidence.get("native_branch_selftest") !=
+                "all_actual_branch_transitions_and_endings_replayed" or
+            evidence.get("branch_transitions_verified") != sum(
+                len(x.exits) for x in graph.chapters) or
+            evidence.get("branch_endings_verified") != graph.ending_count or
+            not re.fullmatch(r"[a-f0-9]{64}",
+                             str(evidence.get("branch_output_sha256", ""))) or
             evidence.get("native_challenge_selftest") != "optimal_route_three_stars_all_stages" or
             evidence.get("native_save_resume_selftest") !=
                 "original_level_bound_save_reload_and_corruption_denial" or
