@@ -352,6 +352,19 @@ def emit_route_game(world:World,traveller:Traveller,*,authorized:bool)->dict[str
         "src/main.c":C_GAME,
         "include/dragon_route_world.h":header,
         "dragon-original-route-proof.json":_canonical(manifest),
+        "CMakeLists.txt":(
+            "cmake_minimum_required(VERSION 3.16)\n"
+            "project(DragonOriginalRouteWorld C)\n"
+            "set(CMAKE_C_STANDARD 99)\n"
+            "set(CMAKE_C_STANDARD_REQUIRED ON)\n"
+            "add_executable(dragon_route_game src/main.c)\n"
+            "target_include_directories(dragon_route_game PRIVATE include)\n"
+            "if(MSVC)\n"
+            "  target_compile_options(dragon_route_game PRIVATE /W4)\n"
+            "else()\n"
+            "  target_compile_options(dragon_route_game PRIVATE -Wall -Wextra -Wpedantic)\n"
+            "endif()\n"
+        ),
         "Makefile":(
             "CC ?= cc\n"
             "CFLAGS ?= -O2 -std=c99 -Wall -Wextra -pedantic\n"
