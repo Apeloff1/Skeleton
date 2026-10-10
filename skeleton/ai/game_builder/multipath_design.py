@@ -711,4 +711,27 @@ def route_exclusive_edges(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges"]
+def portfolio_profile(problem: RouteProblem, routes: Sequence[RouteProof]) -> dict[str, object]:
+    """Stable game-design indicators, never a fabricated player satisfaction score."""
+    if not isinstance(routes, (list, tuple)) or not routes or len(routes) > 8:
+        raise MultipathError("bounded non-empty portfolio required")
+    for proof in routes:
+        if not verify_route_proof(problem, proof):
+            raise MultipathError("unverified route in portfolio")
+    return {
+        "schema": "skeleton.game_builder.route_portfolio_profile.v1",
+        "world_digest": problem.digest,
+        "route_count": len(routes),
+        "distinct_action_sequences": len({p.actions for p in routes}),
+        "min_steps": min(p.steps for p in routes),
+        "max_steps": max(p.steps for p in routes),
+        "objective_orders": len({p.collectible_order for p in routes}),
+        "corridor_diversity_ppm": portfolio_diversity_ppm(routes),
+        "has_structural_loops": cycle_rank(problem) > 0,
+        "route_digests": [p.digest for p in routes],
+        "human_playtest_verified": False,
+    }
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile"]
