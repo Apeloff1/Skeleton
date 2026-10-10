@@ -311,3 +311,14 @@ def test_corrupted_stored_payload_over_budget_fails_before_decode(monkeypatch):
     with pytest.raises(ValueError, match="byte budget"):
         store.sessions("alice", authorized=True)
 
+
+def test_history_reads_are_bounded_and_ordered_across_sessions():
+    store = setup()
+    for text in ("First", "Second", "Third"):
+        record = store.build_session("alice", text, 20000, (observation(),),
+                                     capture_consent=True, analysis_consent=True)
+        store.record(record, authorized=True)
+    result = store.sessions("alice", authorized=True, limit=2)
+    assert len(result) == 2
+    assert [s.session_id for s in result] == sorted(s.session_id for s in result)
+
