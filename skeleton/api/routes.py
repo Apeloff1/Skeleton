@@ -21,6 +21,14 @@ _APP_MANIFEST = load_manifest()
 # a client retry replays the first recorded response instead of re-executing.
 _idempotency = IdempotencyGuard()
 
+# Query fan-out caps. Requests above these bounds are rejected with HTTP 422
+# (``invalid_argument``) instead of being silently clamped, so a single call
+# cannot fan unbounded work across retrieval planes or memory tiers.
+# ``_MAX_RETRIEVAL_K`` mirrors the CLI retrieve handler's ``_MAX_RETRIEVE_K``
+# (skeleton.app.runtime.runtime_commands); a test pins them together.
+_MAX_RETRIEVAL_K = 32
+_MAX_MEMORY_TOP_K = 100
+
 
 def _state():
     return get_state()
@@ -40,11 +48,18 @@ def _payload_error(exc: Exception) -> HTTPException:
     return HTTPException(status_code=422, detail=str(exc))
 
 
-def _int_field(payload: Dict[str, Any], key: str, default: int, *, minimum: int = 1) -> int:
+def _int_field(
+    payload: Dict[str, Any],
+    key: str,
+    default: int,
+    *,
+    minimum: int = 1,
+    maximum: int | None = None,
+) -> int:
     from skeleton.application.command_contracts import CommandError, require_int
 
     try:
-        return require_int(payload, key, default, minimum=minimum)
+        return require_int(payload, key, default, minimum=minimum, maximum=maximum)
     except CommandError as exc:
         raise _payload_error(exc) from exc
 
@@ -209,7 +224,7 @@ async def retrieval_query(request: Dict[str, Any], state=Depends(_state)) -> Dic
     query = _text_field(request, "query", "").strip()
     if not query:
         raise HTTPException(status_code=422, detail="query is required")
-    k = _int_field(request, "k", 8, minimum=1)
+    k = _int_field(request, "k", 8, minimum=1, maximum=_MAX_RETRIEVAL_K)
     results = quad.retrieve(query, k=k, use_cache=_bool_field(request, "use_cache", True))
     return {
         "query": query,
@@ -1081,7 +1096,7 @@ async def jeeves_matrices(session_id: str, state=Depends(_state)) -> Dict[str, A
 async def memory_query(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     result = _require(state.memory_trinity, "Memory").query_unified(
         _text_field(request, "query", ""),
-        top_k_per_tier=_int_field(request, "top_k", 3, minimum=1),
+        top_k_per_tier=_int_field(request, "top_k", 3, minimum=1, maximum=_MAX_MEMORY_TOP_K),
         metadata_filter=_mapping_field(request, "metadata_filter", None, optional=True),
     )
     body: Dict[str, Any] = {
