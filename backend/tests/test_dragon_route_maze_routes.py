@@ -109,6 +109,7 @@ def test_original_maze_export_requires_separate_creation_rights_and_approval():
 @pytest.mark.parametrize("endpoint",[
     "/api/dragon-academy/native/production/routes/maze/preview",
     "/api/dragon-academy/native/production/routes/maze/play",
+    "/api/dragon-academy/native/production/routes/maze/recovery",
     "/api/dragon-academy/native/production/routes/maze/source-bundle",
 ])
 def test_original_maze_solver_generation_and_export_are_not_available_to_viewers(endpoint):
@@ -138,3 +139,36 @@ def test_original_maze_request_fails_closed_on_invalid_world_controls(invalid):
 def test_original_maze_request_rejects_more_than_80_playable_decisions():
     with pytest.raises(ValidationError):
         route.NativeMazePlayRequest(moves=["spine_0_0_0_1"]*81)
+
+
+
+def test_maze_creator_gets_actual_midgame_escape_hint_instead_of_fake_solvability():
+    from skeleton.ai.webcrawler.dragon_route_maze import MazeRequest,build_maze
+    maze=build_maze(MazeRequest(seed=1977,width=4,height=4))
+    witness=maze.certificate.doubleback_witnesses[0]
+    index=next(i for i,edge in enumerate(witness) if edge.startswith("branch_"))
+    report=route.native_world_maze_recovery(route.NativeMazePlayRequest(
+        seed=1977,width=4,height=4,moves=list(witness[:index+1]),
+    ),owner=_owner())
+    assert report["ok"]
+    assert report["reachable_now"]
+    assert not report["reset_required"]
+    assert report["remaining_actions"]>0
+    assert report["next_move"]==report["recovery_suffix"][0]
+    assert "replay" in report["proof"]
+
+
+def test_maze_creator_cannot_fake_escape_after_reaching_move_cap():
+    from skeleton.ai.webcrawler.dragon_route_maze import MazeRequest,build_maze
+    maze=build_maze(MazeRequest(seed=1977,width=4,height=4))
+    first=maze.certificate.backbone[0]
+    back=next(x.id for x in maze.world.connections
+              if x.origin==maze.world.connections[0].destination
+              and x.destination==maze.world.start
+              and "recovery" in x.shapes)
+    verdict=route.native_world_maze_recovery(route.NativeMazePlayRequest(
+        seed=1977,width=4,height=4,moves=[first,back]*40,
+    ),owner=_owner())
+    assert verdict["ok"]
+    assert verdict["reset_required"]
+    assert not verdict["reachable_now"]
