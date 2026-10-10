@@ -334,3 +334,12 @@ def test_collectible_spread_uses_walkable_distance_not_wall_ignoring_geometry():
     assert d["maximum_steps"] == 6
     assert d["mean_steps_ppm"] == 4_000_000
 
+
+def test_linear_map_has_structurally_unavoidable_chokepoints():
+    p = RouteProblem.from_rows((
+        "#########", "#S.C...G#", "#########", "#########",
+        "#########", "#########", "#########", "#########", "#########",
+    ))
+    route = solve_route(p)
+    assert route_chokepoint_ppm(p, route) == 5 * 1_000_000 // 7
+
