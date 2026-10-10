@@ -391,3 +391,15 @@ def test_portfolio_profile_is_evidence_only_and_deterministic():
     assert profile["human_playtest_verified"] is False
     assert profile["has_structural_loops"] is True
 
+
+def test_route_ranking_is_explainable_and_stable():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    routes = route_portfolio(p, max_routes=4)
+    by_speed = rank_routes(p, routes)
+    by_explore = rank_routes(p, routes, preference="exploration")
+    assert [r.steps for r in by_speed] == sorted(r.steps for r in routes)
+    assert route_coverage_ppm(p, by_explore[0]) == max(
+        route_coverage_ppm(p, r) for r in routes)
+    with pytest.raises(MultipathError):
+        rank_routes(p, routes, preference="guaranteed_delight")
+
