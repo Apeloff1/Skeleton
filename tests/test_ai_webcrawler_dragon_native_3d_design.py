@@ -70,7 +70,7 @@ def test_native_3d_source_has_dda_projection_depth_enemy_and_controller():
     assert "DRAGON_RAYCAST_SMOKE" in source
     assert "distanceX<distanceY" in source
     assert "float depth=" in source
-    assert "depths[col]" in source
+    assert "depths[c]" in source
     assert "ty<depths[col/2]" in source
     assert "SDL_GameControllerGetButton" in source
     assert "SDL_SCANCODE_RIGHT" in source
@@ -107,3 +107,15 @@ def test_real_3d_sdl_binary_build_and_headless_depth_scan(tmp_path,genre):
         timeout=20,capture_output=True,text=True)
     assert run.returncode==0,(run.stdout,run.stderr)
     assert "DRAGON_RAYCAST_SMOKE PASS" in run.stdout
+
+
+def test_default_game_design_remains_valid_after_note_sanitization():
+    default=starter_design()
+    parsed=parse_design(default)
+    assert parsed.project_notes=="Original local native game; source only"
+    assert parsed.stages==4
+    assert parsed.difficulty==4
+    injected=starter_design()
+    injected["project_notes"]="; rm -rf /"
+    with pytest.raises(ValueError):
+        parse_design(injected)

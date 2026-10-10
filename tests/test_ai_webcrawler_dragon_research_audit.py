@@ -55,3 +55,21 @@ def test_owner_can_erase_receipts():
     audit.append("alice", "consent_revoked", "all", now=10)
     assert audit.erase("alice") == 1
     assert audit.verify("alice")
+
+
+def test_integer_and_float_audit_timestamps_produce_stable_signed_chain():
+    db=sqlite3.connect(":memory:")
+    audit=DragonResearchAudit(db)
+    one=audit.append("owner","proposal_created","p1",now=10)
+    two=audit.append("owner","proposal_approved","p1",now=11.0)
+    assert one.observed_at==10.0 and two.observed_at==11.0
+    assert audit.verify("owner")
+    old=DragonResearchAudit._digest("legacy",1,"proposal_created","p1",10,"0"*64)
+    db.execute("""INSERT INTO dragon_research_audit VALUES(?,?,?,?,?,?,?)""",
+               ("legacy",1,"proposal_created","p1",10,"0"*64,old))
+    db.commit()
+    assert audit.verify("legacy")
+    db.execute("""UPDATE dragon_research_audit SET subject_id='tampered'
+                  WHERE owner='legacy'""")
+    db.commit()
+    assert not audit.verify("legacy")

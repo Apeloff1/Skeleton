@@ -29,9 +29,16 @@ jobs:
       matrix:
         host: [ubuntu-24.04, windows-2025, macos-15]
     steps:
+      # The monorepo contains unrelated legacy Windows paths longer than
+      # MAX_PATH. Only two pure-Python native puzzle files are required;
+      # no monorepo package initializer or heavy AI dependencies are loaded.
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          sparse-checkout: |
+            /skeleton/ai/webcrawler/dragon_native_release.py
+            /skeleton/ai/webcrawler/dragon_native_puzzle.py
+          sparse-checkout-cone-mode: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -39,7 +46,7 @@ jobs:
         run: cmake --version
       - name: Build native executable and replay all original puzzle stages
         run: >
-          python -m skeleton.ai.webcrawler.dragon_native_release
+          python skeleton/ai/webcrawler/dragon_native_release.py
           --out _generated/dragon-puzzle
           --title "Original Dragon Puzzle Quest"
       - name: Verify release ZIP SHA and native executable evidence
