@@ -181,6 +181,61 @@ class DragonWisdomRefreshTests(TestCase):
         self.assertEqual(source_a["priority"], 1)
 
 
+    def test_operator_cli_queues_and_inspects_same_durable_authority(self):
+        import io
+        import json
+        from contextlib import redirect_stdout, redirect_stderr
+        from skeleton.ai.game_builder.knowledge_cli import main
+        base = ["--store", str(self.path), "--trusted-local-operator"]
+        def invoke(*command):
+            out = io.StringIO()
+            with redirect_stdout(out):
+                code = main([*base, *command])
+            self.assertEqual(code, 0, out.getvalue())
+            return json.loads(out.getvalue())
+        response = invoke("queue-recrawls", "--owner", OWNER, "--at-epoch", str(NOW))
+        self.assertEqual(len(response["queued"]), 2)
+        self.assertFalse(response["execution_authorized"])
+        queue = invoke("pending-recrawls", "--owner", OWNER, "--at-epoch", str(NOW))
+        self.assertEqual(len(queue["orders"]), 2)
+        self.assertTrue(all(not x["execution_authorized"] for x in queue["orders"]))
+        hoag = invoke("hoag-view", "--owner", OWNER, "--at-epoch", str(NOW))
+        self.assertEqual(hoag["pending_recrawls"], 2)
+        self.assertEqual(hoag["items"], [])
+        rejected = io.StringIO()
+        with redirect_stderr(rejected):
+            self.assertEqual(main(["--store", str(self.path), "queue-recrawls",
+                                   "--owner", OWNER, "--at-epoch", str(NOW)]), 2)
+        self.assertIn("external operator authentication", rejected.getvalue())
+
+    def test_new_accepted_review_supersedes_prior_card_until_reapproved(self):
+        # No source drift: even a second accepted Wiki review needs a new
+        # explicit human approval and must not keep the older card visible.
+        brief = self.library.build_brief(
+            OWNER, "jump", authorized=True, min_independent_groups=2,
+        )
+        def approve(at, hash_char):
+            return self.wiki.wiki_review(
+                OWNER, brief, mechanic="platforming", disposition="accepted",
+                independent_reviewer_id="wiki-human",
+                review_evidence_digest=hash_char * 64, now=at,
+                expires_at=at + 3600, authorized=True, trusted_worker=True,
+            )
+        first = approve(NOW, "a")
+        self.wiki.promote(OWNER, first["digest"], now=NOW+1,
+                          authorized=True, trusted_worker=True, human_approved=True)
+        self.assertEqual(len(self.wiki.hoag_view(
+            OWNER, now=NOW+1, authorized=True)["items"]), 1)
+        next_review = approve(NOW+2, "b")
+        self.assertEqual(self.wiki.hoag_view(
+            OWNER, now=NOW+2, authorized=True)["items"], [])
+        self.wiki.promote(OWNER, next_review["digest"], now=NOW+3,
+                          authorized=True, trusted_worker=True, human_approved=True)
+        view = self.wiki.hoag_view(OWNER, now=NOW+3, authorized=True)
+        self.assertEqual(len(view["items"]), 1)
+        self.assertEqual(view["items"][0]["review_digest"], next_review["digest"])
+
+
 if __name__ == "__main__":
     import unittest
     unittest.main()
