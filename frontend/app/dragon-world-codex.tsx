@@ -2,8 +2,10 @@
  * Exact world IDs are strings; hardware content != compiled executables.
  */
 import React from 'react';
-import {ActivityIndicator,SafeAreaView,ScrollView,StyleSheet,Text,
+import {ActivityIndicator,Platform,SafeAreaView,ScrollView,StyleSheet,Text,
   TextInput,TouchableOpacity,View} from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import StudioLoginGate,{useStudioAuth} from '../src/auth/StudioLoginGate';
 import {authHeaders} from '../src/auth/gameforgeAuth';
 import {API_BASE} from '../utils/apiBase';
@@ -275,6 +277,40 @@ function Editor(){
       }
     }catch(e){if(ticket===generation.current)setError(
       e instanceof Error?e.message:'Original optional passage proof unavailable.');}
+    finally{if(ticket===generation.current)setBusy(false);}
+  };
+  const saveActualC99Game=async()=>{
+    if(!opened||busy)return;
+    const ticket=++generation.current;setBusy(true);setError('');
+    try{
+      const generated=await api<{
+        ok:boolean;project:{
+          source_name:string;source:string;source_sha256:string;
+          actual_native_binary_produced:boolean;
+        };
+        independent_source_verification:{verified_source:boolean};
+      }>('/native-desktop-source',{index:address});
+      if(!generated.ok||!generated.independent_source_verification.verified_source||
+         generated.project.actual_native_binary_produced||
+         generated.project.source_name!=='dragon_codex_game.c'||
+         !generated.project.source.includes('DRAGON_CODEX_SELFTEST_PASS')||
+         !generated.project.source.includes('#define AXES 128')||
+         generated.project.source.length>120000||
+         !FileSystem.documentDirectory)
+        throw Error('Original C99 source is invalid or mobile export unavailable.');
+      const path=FileSystem.documentDirectory+'dragon-codex-'+
+        opened.design.codex_digest.slice(0,16)+'.c';
+      await FileSystem.writeAsStringAsync(path,generated.project.source);
+      if(Platform.OS!=='web'&&await Sharing.isAvailableAsync()){
+        await Sharing.shareAsync(path,{
+          mimeType:'text/x-c',dialogTitle:'Export original Dragon C99 game source',
+          UTI:'public.c-source',
+        });
+      }
+      if(ticket===generation.current)setNotice(
+        'Original C99 game source saved. Compile locally and run --selftest; no binary or hardware certification is implied.');
+    }catch(e){if(ticket===generation.current)setError(
+      e instanceof Error?e.message:'Original C99 game source cannot be exported.');}
     finally{if(ticket===generation.current)setBusy(false);}
   };
   const inspectPlatforms=async()=>{
@@ -564,6 +600,24 @@ function Editor(){
               Source replay {accessProof.actual_replay_digest?.slice(0,22)}…
             </Text>}
         </View>}
+      </View>
+      <View style={s.panel}>
+        <Text style={s.heading}>Playable C99 world game source</Text>
+        <Text style={s.copy}>
+          Export an original interactive desktop game with 128 trained
+          abilities, sixteen temporal travel gates, endless exploration
+          and a sixteen-gate executable self-test. This is genuine source
+          code, not a fake binary for unsupported hardware.
+        </Text>
+        <TouchableOpacity style={s.action} disabled={busy}
+          onPress={saveActualC99Game}>
+          <Text style={s.actionText}>Save and share original C99 game</Text>
+        </TouchableOpacity>
+        <Text style={s.hint}>
+          Linux/macOS toolchains: cc -std=c99 dragon_codex_game.c -o dragon_codex
+          and then run ./dragon_codex --selftest. Windows requires a
+          compatible C99 compiler. Hardware SDK releases remain separate.
+        </Text>
       </View>
       <View style={s.panel}>
         <Text style={s.heading}>Hardware-specific world content</Text>
