@@ -465,6 +465,77 @@ the selected runner genuinely provides that hardware. Mac App Store
 signing, notarization, OS compatibility across versions, and controller
 support remain separate operational releases and are not asserted here.
 
+### Real native game editor, playtest, saves and rewards
+
+Dragon's original puzzle creator now supports a complete interactive
+authoring loop:
+
+1. Create or import one to eight original 12×10 game boards and paint
+   walls, paths, crate goals and the player in Expo.
+2. **Play-test the actual grid data** with directional controls, pushes,
+   undo and reset using bounded local Sokoban physics; this browser/mobile
+   preview never substitutes for native C99 runtime proof.
+3. Validate each level's existence, unique grid identity and solver-optimal
+   path on the backend, then explicitly approve it for source export.
+4. Build the same original level data as a real C99 game for Linux, macOS
+   or a Windows x64 build; use local binary execution tests where supported.
+
+The C99 game includes a bounded live-current-position shortest-path hint
+solver, on-screen optimality-derived star grading, and a small local
+\`dragon-save-v1.dat\` save/resume slot (interactive K/L, native SDL F5/F9
+or supported gamepad controls). A save is bound to the exact generated
+campaign geometry and rejects malformed, mismatched or corrupt state.
+This is a local user game save, not cloud identity, user tracking or
+permission to rewrite Jeeves memory.
+
+A graphical **SDL2 renderer** is now included with every original puzzle
+project as a separately compiled optional target (\`make graphics\`).
+Its actual C99 game engine is included directly, not rewritten as a
+browser imitation. The 640×480 native game window uses original 2bpp
+inspired pixel art and real creator-selected protagonists and biomes.
+Its gameplay includes keyboard/controller input, goals, crates, stage
+progression, native stars, efficiency HUD and victory state. The terminal
+game still compiles without SDL2.
+
+### Source-grounded gameplay screenshots and storyboards
+
+For an original Linux game, a separate operator-approved local mode
+compiles the SDL2 source, executes the gameplay with a software renderer
+and captures an actual BMP image of each level at start, midpoint and
+completion. The source, SDL ELF, screen frames and hashes are packaged
+and independently audited. The screenshots are **only generated original
+game frames**—there is no general screen recorder, website recorder
+or capturing the user's machine.
+
+\`\`\`sh
+python -m skeleton.ai.webcrawler.dragon_native_capture_operator capture \
+  --title "Original Dragon Gameplay" --seed 1977 --stages 3 \
+  --attest-original-rights --authorize-local-capture \
+  --out ./original-game-capture
+\`\`\`
+
+To turn those real original frames into a reviewable portable PNG contact
+sheet (three columns start/middle/solved; one row per level), use:
+
+\`\`\`sh
+python -m skeleton.ai.webcrawler.dragon_native_media_storyboard \
+  --capture ./original-game-capture/dragon-original-game-frames-<digest>.zip \
+  --out ./original-game-storyboard --authorize-storyboard
+\`\`\`
+
+The storyboard is generated from verified BMP bytes using a bounded
+standard-library PNG encoder and published as both an actual \`.png\`
+and an immutable ZIP containing the exact original capture and receipt.
+Verification reconstructs the storyboard pixels from those source frames,
+so a repainted or substituted image fails offline audit.
+
+These capabilities provide real, source-grounded visual review and
+playability evidence where GitHub's native build runners execute.
+They do not assert emulator compatibility, pixel-exact physical console
+capture, verified controller hardware, OS signing, independent publisher
+authentication, or subjective game quality. The cross-platform build
+gates must still pass on the exact PR head before production signoff.
+
 ### Release verification and index integrity
 
 A release index is **not trusted merely because its archive hashes match**.
