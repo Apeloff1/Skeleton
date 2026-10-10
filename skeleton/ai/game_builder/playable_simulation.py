@@ -304,6 +304,32 @@ def verify_replay(
         raise GameplayError("replay final state mismatch")
 
 
+
+def replay_prefix(
+    world: PlayableWorld, replay: GameReplay, count: int, *,
+    authorized: bool,
+) -> GameReplay:
+    """Seek to an independently verified action boundary without trusting the
+    stored final state or its untrusted chain of intermediate receipts.
+    """
+    if authorized is not True:
+        raise PermissionError("replay seeking requires authorization")
+    if type(count) is not int or not 0 <= count <= MAX_REPLAY_ACTIONS:
+        raise GameplayError("replay seek count out of bounds")
+    verify_replay(world, replay, authorized=True)
+    if count > len(replay.action_receipts):
+        raise GameplayError("replay prefix exceeds verified history")
+    if count == len(replay.action_receipts):
+        return replay
+    state = initial_state(world, authorized=True)
+    for receipt in replay.action_receipts[:count]:
+        state = advance(world, state, receipt.action, authorized=True)
+    return GameReplay(
+        world.digest, replay.action_receipts[:count], state,
+        replay.initial_state_digest,
+    )
+
+
 def demonstrate_solvable(world: PlayableWorld, *, authorized: bool) -> GameReplay:
     """Execute each level's hazard-free proof with the real transition engine."""
     if authorized is not True:
