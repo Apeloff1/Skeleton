@@ -71,7 +71,7 @@ jobs:
         run: |
           python -m scripts.game_builder.native_sega_8bit_ci \
             --target "$TARGET" --emit "output/$TARGET" \
-            --author-evidence /tmp/original-sega-authorship.txt
+            --author-evidence /tmp/original-sega-authorship.txt > "/tmp/$TARGET-generated-source.json"
       - name: Build actual original cartridge with SDCC and devkitSMS
         env:
           TARGET: ${{ matrix.platform }}
@@ -90,11 +90,22 @@ jobs:
             sega_game_gear) EXT=gg ;;
             *) exit 3 ;;
           esac
+          SOURCE_DIGEST="$(python -c 'import json,os; print(json.load(open("/tmp/"+os.environ["TARGET"]+"-generated-source.json", encoding="utf-8"))["source_content_digest"])')"
           python -m scripts.game_builder.native_sega_8bit_ci \
             --verify-rom "output/$TARGET/build/skeleton-original.$EXT" \
             --source-dir "output/$TARGET" --target "$TARGET" \
+            --expected-source-sha256 "$SOURCE_DIGEST" \
             --toolchain-revision 533ae572c897cf44f1da865013ebf690134301a3 \
             --receipt-out "/tmp/$TARGET-compilation-evidence.json"
           python -m json.tool "/tmp/$TARGET-compilation-evidence.json" >/dev/null
+          python - <<'PY'
+          import json, os
+          r=json.load(open("/tmp/"+os.environ["TARGET"]+"-compilation-evidence.json", encoding="utf-8"))
+          assert r["source_digest_matches_expected"] is True
+          assert r["source_digest_independently_attested"] is False
+          assert r["toolchain_revision_hash_algorithm"] == "git-sha1"
+          assert r["toolchain_source_authenticated"] is False
+          assert r["release_approved"] is False
+          PY
       # No ROM is published: linking requirements and legal review remain
       # separate. This workflow does not assert emulator or hardware gameplay.
