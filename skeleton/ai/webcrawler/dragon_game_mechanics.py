@@ -251,6 +251,11 @@ class GameMechanicsMemory:
                     or not 1 <= len(recorded) <= self.policy.max_observations
                     or any(not isinstance(row, list) or len(row) != 6 for row in recorded)):
                 raise ValueError("stored game observations have invalid shape")
+            if (not isinstance(label, str) or not 1 <= len(label) <= 200
+                    or not label.isprintable() or len(label.encode("utf-8")) > 600
+                    or type(duration) is not int
+                    or not 0 < duration <= self.policy.max_session_seconds * 1000):
+                raise ValueError("stored game session metadata invalid")
             observations = tuple(
                 GameObservation(t, Mechanic(m), d, c, PreferenceSignal(p), u)
                 for t, m, d, c, p, u in recorded
