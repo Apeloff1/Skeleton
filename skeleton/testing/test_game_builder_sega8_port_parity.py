@@ -96,6 +96,28 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
             },
         }
 
+        # Synthetic JSON fixtures exercise cross-port gate behavior only.
+        # They are never an attestation of an actually executed Z80 game.
+        content["native_route"] = {
+            "schema": "skeleton.game_builder.sega8_actual_z80_gameplay_replay.v1",
+            "target": target,
+            "rom_sha256": str(index+3)*64,
+            "source_content_digest": str(index)*64,
+            "original_world_digest": WORLD,
+            "original_route_sha256": str(index+6)*64,
+            "original_source_game_verified_on_instruction_level_cpu": True,
+            "original_companion_rank_and_reward_verified": True,
+            "actual_victory_palette_verified": True,
+            "original_levels_replayed": 3,
+            "controller_actions_replayed": 256,
+            "hardware_screen_states_verified": 257,
+            "real_z80_instruction_count": 123456,
+            "independent_cycle_exact_full_console_emulator_verified": False,
+            "physical_hardware_verified": False,
+            "rights_independently_verified": False,
+            "distribution_licensed": False,
+            "release_approved": False,
+        }
         comparable = {
             "schema": "skeleton.game_builder.sega_reproducibility.v1",
             "target": target,
@@ -127,6 +149,7 @@ def _fixtures(tmp_path: Path) -> dict[str, dict[str, Path]]:
             "host": root / (target + "-host-gameplay-receipt.json"),
             "boot": root / (target + "-real-z80-boot.json"),
             "reproducibility": root / (target + "-reproducibility.json"),
+            "native_route": root / (target + "-native-z80-gameplay.json"),
         }
         for name, path in paths.items():
             path.write_text(json.dumps(content[name], indent=2), encoding="utf-8")
@@ -154,7 +177,9 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     assert all(len(value)==64 for value in receipt["native_rebuild_provenance_sha256_by_platform"].values())
     assert receipt["original_controller_actions_verified_per_platform"] == 256
     assert receipt["world_digest"] == WORLD
-    assert receipt["full_native_z80_gameplay_replay_verified"] is False
+    assert receipt["full_native_z80_gameplay_replay_verified"] is True
+    assert receipt["native_z80_controller_actions_verified_per_platform"] == 256
+    assert set(receipt["guest_z80_gameplay_receipt_sha256_by_platform"]) == set(EXTS)
     assert receipt["physical_hardware_verified"] is False
     assert receipt["release_approved"] is False
     assert len(receipt["receipt_sha256"]) == 64
@@ -174,6 +199,15 @@ def test_two_real_console_formats_share_original_identity_not_binary(tmp_path):
     ("boot", "physical_hardware_verified", True),
     ("compile", "real_rom_structure_verified", False),
     ("compile", "rom_sha256", "0" * 64),
+    ("native_route", "rom_sha256", "0" * 64),
+    ("native_route", "original_world_digest", "d" * 64),
+    ("native_route", "original_route_sha256", "e" * 64),
+    ("native_route", "controller_actions_replayed", 100),
+    ("native_route", "hardware_screen_states_verified", 256),
+    ("native_route", "real_z80_instruction_count", 0),
+    ("native_route", "original_companion_rank_and_reward_verified", False),
+    ("native_route", "actual_victory_palette_verified", False),
+    ("native_route", "release_approved", True),
     ("reproducibility", "cartridge_sha256", "0" * 64),
     ("reproducibility", "toolchain_git_revision", "a" * 40),
     ("reproducibility", "source_sha256", "b" * 64),
