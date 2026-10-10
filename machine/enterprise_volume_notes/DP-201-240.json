@@ -41,15 +41,13 @@
           "spoofed agent identity",
           "message replay"
         ],
-        "gaps": [
-          "define canonical envelope",
-          "bind to trace/authority"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_agent_delegation_qualification.py",
           "skeleton/testing/test_swarm_exact_lease_atomicity.py",
           "skeleton/testing/test_swarm_fencing.py",
-          "skeleton/testing/test_swarm_fencing_concurrency.py"
+          "skeleton/testing/test_swarm_fencing_concurrency.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-agent-delegation-qualification.yml"
@@ -275,15 +273,13 @@
           "authority amplification",
           "lost context"
         ],
-        "gaps": [
-          "standardize handoff schema",
-          "bind custody to task ledger"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_agent_delegation_qualification.py",
           "skeleton/testing/test_swarm_exact_lease_atomicity.py",
           "skeleton/testing/test_swarm_fencing.py",
-          "skeleton/testing/test_swarm_fencing_concurrency.py"
+          "skeleton/testing/test_swarm_fencing_concurrency.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-agent-delegation-qualification.yml"
@@ -505,12 +501,10 @@
           "self-reported success",
           "Goodhart behavior"
         ],
-        "gaps": [
-          "define evidence metrics",
-          "bind to evaluation harness"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_agent_performance_evidence.py"
+          "skeleton/testing/test_agent_performance_evidence.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "skeleton/testing/test_agent_performance_evidence.py"
@@ -731,12 +725,10 @@
           "runaway delegation spend",
           "cheap low-quality routing"
         ],
-        "gaps": [
-          "bind to cost governor",
-          "define delegation accounting"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_agent_economics.py"
+          "skeleton/testing/test_agent_economics.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "skeleton/testing/test_agent_economics.py"
@@ -961,15 +953,13 @@
           "delegation explosion",
           "orphan child work"
         ],
-        "gaps": [
-          "define budget lattice",
-          "bind to scheduler/leases"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_agent_delegation_qualification.py",
           "skeleton/testing/test_swarm_exact_lease_atomicity.py",
           "skeleton/testing/test_swarm_fencing.py",
-          "skeleton/testing/test_swarm_fencing_concurrency.py"
+          "skeleton/testing/test_swarm_fencing_concurrency.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-agent-delegation-qualification.yml"
@@ -1191,12 +1181,10 @@
           "false consensus",
           "majority amplifies shared error"
         ],
-        "gaps": [
-          "define aggregation rules",
-          "bind reviewer independence"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_consensus_disagreement.py"
+          "skeleton/testing/test_consensus_disagreement.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "skeleton/testing/test_consensus_disagreement.py"
@@ -1422,15 +1410,13 @@
           "reviewer collusion",
           "unactionable criticism"
         ],
-        "gaps": [
-          "define reviewer prompt/contract",
-          "bind findings to repair workflow"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_blast_radius_alignment.py",
           "skeleton/testing/test_human_control.py",
           "skeleton/testing/test_autonomy_deescalation.py",
-          "skeleton/testing/test_agent_delegation_qualification.py"
+          "skeleton/testing/test_agent_delegation_qualification.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-blast-radius-alignment.yml"
@@ -1657,17 +1643,15 @@
           "self-verification",
           "rubber-stamp approval"
         ],
-        "gaps": [
-          "bind identity separation",
-          "materialize verifier evidence checks"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_blast_radius_alignment.py",
           "skeleton/testing/test_human_control.py",
           "skeleton/testing/test_autonomy_deescalation.py",
           "skeleton/testing/test_agent_delegation_qualification.py",
           "skeleton/testing/test_safe_autonomy_bundle.py",
-          "skeleton/testing/test_privileged_tool_transaction.py"
+          "skeleton/testing/test_privileged_tool_transaction.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-blast-radius-alignment.yml",
@@ -1891,12 +1875,10 @@
           "review targets old version",
           "approval bypass"
         ],
-        "gaps": [
-          "define review state machine",
-          "bind to artifact registry"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_artifact_review_workflow.py"
+          "skeleton/testing/test_artifact_review_workflow.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "skeleton/testing/test_artifact_review_workflow.py"
@@ -2110,18 +2092,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai/agents",
-          "experiments"
+          "experiments",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "citation laundering",
           "role overlap reduces independence"
         ],
-        "gaps": [
-          "define role templates",
-          "bind to VS-003"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_research_agent_team.py"
+          "planned:skeleton/testing/test_research_agent_team.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:multi-agent research benchmark"
@@ -2331,18 +2313,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "planned:skeleton/research"
+          "planned:skeleton/research",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "paper spam",
           "stale/retracted claim"
         ],
-        "gaps": [
-          "define source adapters",
-          "bind triage to research backlog"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_literature_watch.py"
+          "planned:skeleton/testing/test_literature_watch.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:duplicate/retraction evaluation"
@@ -2552,18 +2534,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/retrieval"
+          "skeleton/retrieval",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "citation popularity bias",
           "wrong source version"
         ],
-        "gaps": [
-          "build citation schema",
-          "bind to evidence graph"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_citation_graph.py"
+          "planned:skeleton/testing/test_citation_graph.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:contradictory-citation evaluation"
@@ -2773,18 +2755,18 @@
         ],
         "canonical_paths": [
           "experiments",
-          "planned:skeleton/artifacts"
+          "planned:skeleton/artifacts",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "hidden dependency",
           "package cannot reproduce claim"
         ],
-        "gaps": [
-          "define bundle format",
-          "bind to experiment/reproducibility"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_reproduction_packages.py"
+          "planned:skeleton/testing/test_reproduction_packages.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:cold-environment reproduction"
@@ -2994,18 +2976,18 @@
         ],
         "canonical_paths": [
           "experiments",
-          "skeleton/eval"
+          "skeleton/eval",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "apples-to-oranges comparison",
           "selective run choice"
         ],
-        "gaps": [
-          "define comparison eligibility",
-          "bind to statistical analysis"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_experiment_comparison.py"
+          "planned:skeleton/testing/test_experiment_comparison.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:confounded-comparison evaluation"
@@ -3215,18 +3197,18 @@
         ],
         "canonical_paths": [
           "skeleton/eval",
-          "experiments"
+          "experiments",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "p-hacking",
           "invalid independence assumptions"
         ],
-        "gaps": [
-          "define approved methods",
-          "bind analyses to benchmark metadata"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_statistical_analysis.py"
+          "planned:skeleton/testing/test_statistical_analysis.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:synthetic known-effect validation"
@@ -3436,18 +3418,18 @@
         ],
         "canonical_paths": [
           "skeleton/eval",
-          "benchmarks"
+          "benchmarks",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "prompt drift",
           "contamination"
         ],
-        "gaps": [
-          "unify eval runner",
-          "bind quality vector"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_model_eval_harness.py"
+          "planned:skeleton/testing/test_model_eval_harness.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:multi-model baseline evaluation"
@@ -3657,18 +3639,18 @@
         ],
         "canonical_paths": [
           "skeleton/eval",
-          "skeleton/ai/agents"
+          "skeleton/ai/agents",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "reward gaming",
           "trajectory hidden behind final answer"
         ],
-        "gaps": [
-          "define scenario format",
-          "bind to performance evidence"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_agent_eval_harness.py"
+          "planned:skeleton/testing/test_agent_eval_harness.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:tool/recovery task suite"
@@ -3878,18 +3860,18 @@
         ],
         "canonical_paths": [
           "benchmarks",
-          "skeleton/ai/agents"
+          "skeleton/ai/agents",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "short-task proxy misleads",
           "state drift"
         ],
-        "gaps": [
-          "materialize bounded long-horizon suite",
-          "bind to autonomy acceptance"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_long_horizon_benchmarks.py"
+          "planned:skeleton/testing/test_long_horizon_benchmarks.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:aging/zombie-work evaluation"
@@ -4099,18 +4081,18 @@
         ],
         "canonical_paths": [
           "skeleton/eval",
-          "datasets"
+          "datasets",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "false clean claim",
           "hash-only misses paraphrases"
         ],
-        "gaps": [
-          "define fingerprint methods",
-          "bind audit to SOTA claims"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_contamination_auditor.py"
+          "planned:skeleton/testing/test_contamination_auditor.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:seeded-overlap detection"
@@ -4320,18 +4302,18 @@
         ],
         "canonical_paths": [
           "skeleton/eval",
-          "frontend"
+          "frontend",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "rater bias",
           "rubric drift"
         ],
-        "gaps": [
-          "define rubric schema",
-          "bind human evidence to quality vector"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_human_evaluation.py"
+          "planned:skeleton/testing/test_human_evaluation.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:rater consistency evaluation"
@@ -4540,18 +4522,19 @@
           "ModelCardEvidence"
         ],
         "canonical_paths": [
-          "skeleton/ai/governance/cards.py"
+          "skeleton/ai/governance/cards.py",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "stale marketing claim",
           "missing limitation"
         ],
-        "gaps": [
-          "independent exact-head model-card MBOM/evaluation generation validation remains pending"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_model_cards.py",
-          "skeleton/testing/test_engineering_standards_review.py"
+          "skeleton/testing/test_engineering_standards_review.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:model-card evidence audit"
@@ -4760,18 +4743,19 @@
           "DatasetCardEvidence"
         ],
         "canonical_paths": [
-          "skeleton/ai/governance/cards.py"
+          "skeleton/ai/governance/cards.py",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "unknown rights hidden",
           "card/version mismatch"
         ],
-        "gaps": [
-          "independent exact-head dataset-card registry/lineage validation remains pending"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_dataset_cards.py",
-          "skeleton/testing/test_engineering_standards_review.py"
+          "skeleton/testing/test_engineering_standards_review.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:dataset-card completeness audit"
@@ -4980,18 +4964,19 @@
           "ToolCardEvidence"
         ],
         "canonical_paths": [
-          "skeleton/ai/governance/cards.py"
+          "skeleton/ai/governance/cards.py",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "tool description prompt injection",
           "stale authority claim"
         ],
-        "gaps": [
-          "independent exact-head tool-card definition/security-review validation remains pending"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_tool_cards.py",
-          "skeleton/testing/test_engineering_standards_review.py"
+          "skeleton/testing/test_engineering_standards_review.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:tool-card contract parity"
@@ -5200,18 +5185,19 @@
           "AgentCardEvidence"
         ],
         "canonical_paths": [
-          "skeleton/ai/governance/cards.py"
+          "skeleton/ai/governance/cards.py",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "card overstates autonomy",
           "grant ambiguity"
         ],
-        "gaps": [
-          "independent exact-head agent-card registry/performance/control validation remains pending"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_agent_cards.py",
-          "skeleton/testing/test_engineering_standards_review.py"
+          "skeleton/testing/test_engineering_standards_review.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:card/agent authority parity"
@@ -5420,18 +5406,19 @@
           "HealthBlocker"
         ],
         "canonical_paths": [
-          "skeleton/ai/governance/health.py"
+          "skeleton/ai/governance/health.py",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "green average hides critical failure",
           "stale health"
         ],
-        "gaps": [
-          "independent exact-head component-health evidence-source validation remains pending"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_component_health_scorecard.py",
-          "skeleton/testing/test_engineering_standards_review.py"
+          "skeleton/testing/test_engineering_standards_review.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:blocker masking test"
@@ -5640,18 +5627,19 @@
           "UpgradePlan"
         ],
         "canonical_paths": [
-          "skeleton/ai/governance/health.py"
+          "skeleton/ai/governance/health.py",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "abandoned dependency",
           "upgrade breaks compatibility"
         ],
-        "gaps": [
-          "independent exact-head SBOM/dependency-backlog validation remains pending"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_dependency_health.py",
-          "skeleton/testing/test_engineering_standards_review.py"
+          "skeleton/testing/test_engineering_standards_review.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:stale/vulnerable dependency audit"
@@ -5860,18 +5848,19 @@
           "ProviderExitPlan"
         ],
         "canonical_paths": [
-          "skeleton/ai/providers/provider_risk.py"
+          "skeleton/ai/providers/provider_risk.py",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "vendor lock-in",
           "fallback violates privacy"
         ],
-        "gaps": [
-          "independent exact-head provider dependency/risk validation remains pending"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_provider_risk.py",
-          "skeleton/testing/test_engineering_standards_review.py"
+          "skeleton/testing/test_engineering_standards_review.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:provider-loss scenario"
@@ -6080,18 +6069,19 @@
           "ProviderOutcome"
         ],
         "canonical_paths": [
-          "skeleton/ai/providers/failover.py"
+          "skeleton/ai/providers/failover.py",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "double execution",
           "weaker privacy fallback"
         ],
-        "gaps": [
-          "independent exact-head compatibility-safe provider failover validation remains pending"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_provider_failover.py",
-          "skeleton/testing/test_engineering_standards_review.py"
+          "skeleton/testing/test_engineering_standards_review.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:provider outage/privacy fallback evaluation"
@@ -6306,12 +6296,11 @@
           "stale data presented current",
           "sync conflict"
         ],
-        "gaps": [
-          "independent exact-head offline capability/model/storage validation remains pending"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_offline_mode.py",
-          "skeleton/testing/test_engineering_standards_review.py"
+          "skeleton/testing/test_engineering_standards_review.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:disconnect/reconnect evaluation"
@@ -6526,12 +6515,11 @@
           "hidden egress dependency",
           "unsigned media import"
         ],
-        "gaps": [
-          "independent exact-head air-gap package trust/install validation remains pending"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_air_gapped_profile.py",
-          "skeleton/testing/test_engineering_standards_review.py"
+          "skeleton/testing/test_engineering_standards_review.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:network-denial acceptance"
@@ -6746,12 +6734,11 @@
           "resource thrash",
           "stale edge state"
         ],
-        "gaps": [
-          "independent exact-head edge resource-tier/router validation remains pending"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_edge_deployment.py",
-          "skeleton/testing/test_engineering_standards_review.py"
+          "skeleton/testing/test_engineering_standards_review.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:low-resource/intermittent network evaluation"
@@ -6966,12 +6953,11 @@
           "admin overprivilege",
           "unsupported topology drift"
         ],
-        "gaps": [
-          "independent exact-head enterprise topology/security acceptance validation remains pending"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_enterprise_deployment.py",
-          "skeleton/testing/test_engineering_standards_review.py"
+          "skeleton/testing/test_engineering_standards_review.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:HA/upgrade enterprise drill"
@@ -7186,12 +7172,11 @@
           "account takeover via claim mapping",
           "stale group grant"
         ],
-        "gaps": [
-          "independent exact-head federated principal/session/revocation validation remains pending"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_identity_federation.py",
-          "skeleton/testing/test_engineering_standards_review.py"
+          "skeleton/testing/test_engineering_standards_review.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:issuer/claim confusion evaluation"
@@ -7406,12 +7391,11 @@
           "admin CSRF/confused deputy",
           "unaudited change"
         ],
-        "gaps": [
-          "independent exact-head admin scope/approval/break-glass validation remains pending"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_administration_plane.py",
-          "skeleton/testing/test_engineering_standards_review.py"
+          "skeleton/testing/test_engineering_standards_review.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:privilege escalation evaluation"
@@ -7627,12 +7611,10 @@
           "audit omission",
           "sensitive log exposure"
         ],
-        "gaps": [
-          "define audit API contract",
-          "bind to provenance/trace"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:frontend audit UI tests"
+          "planned:frontend audit UI tests",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:tenant/redaction audit evaluation"
@@ -7848,12 +7830,10 @@
           "stale green dashboard",
           "alert overload"
         ],
-        "gaps": [
-          "define dashboard data contract",
-          "bind runbooks"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:frontend operations dashboard tests"
+          "planned:frontend operations dashboard tests",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:telemetry-loss UX evaluation"
@@ -8069,12 +8049,10 @@
           "UI authority bypass",
           "hidden zombie agent"
         ],
-        "gaps": [
-          "define agent ops projection",
-          "bind human control receipts"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:frontend agent operations tests"
+          "planned:frontend agent operations tests",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:orphan-agent control evaluation"
@@ -8290,12 +8268,10 @@
           "confidence visualization misleads",
           "stale source"
         ],
-        "gaps": [
-          "define research view model",
-          "bind citation/experiment graphs"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:frontend research dashboard tests"
+          "planned:frontend research dashboard tests",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:contradictory-evidence UX evaluation"
@@ -8511,12 +8487,10 @@
           "untracked model swap",
           "capacity mismatch"
         ],
-        "gaps": [
-          "unify model ops registry",
-          "bind router/release gates"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_model_operations.py"
+          "planned:skeleton/testing/test_model_operations.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:model failover/promotion drill"
@@ -8732,12 +8706,10 @@
           "mixed model version state",
           "stale KV/cache semantics"
         ],
-        "gaps": [
-          "define model version fencing",
-          "bind rollback to deployment registry"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_model_rollback.py"
+          "planned:skeleton/testing/test_model_rollback.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:bad-model rollback evaluation"

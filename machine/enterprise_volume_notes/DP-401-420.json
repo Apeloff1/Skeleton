@@ -31,18 +31,18 @@
         ],
         "canonical_paths": [
           "skeleton/eval",
-          "skeleton/runtime"
+          "skeleton/runtime",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "worker scorer drift",
           "duplicate evaluation"
         ],
-        "gaps": [
-          "bind Evaluation SDK",
-          "reuse worker attestation"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_evaluation_farm.py"
+          "planned:skeleton/testing/test_evaluation_farm.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:multi-worker result reproducibility"
@@ -253,18 +253,18 @@
         ],
         "canonical_paths": [
           "experiments",
-          "skeleton/runtime"
+          "skeleton/runtime",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "research starvation",
           "research overloads production"
         ],
-        "gaps": [
-          "define research classes",
-          "bind quotas/fairness"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_research_compute_queue.py"
+          "planned:skeleton/testing/test_research_compute_queue.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:mixed research/production load evaluation"
@@ -483,12 +483,10 @@
           "quota bypass",
           "leaked reservation"
         ],
-        "gaps": [
-          "define quota hierarchy",
-          "bind schedulers"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_budget_accounting_ledger.py"
+          "skeleton/testing/test_budget_accounting_ledger.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-budget-accounting.yml"
@@ -713,12 +711,10 @@
           "accounting drift",
           "negative budget race"
         ],
-        "gaps": [
-          "unify cost/delegation ledgers",
-          "bind forecasts"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_budget_accounting_ledger.py"
+          "skeleton/testing/test_budget_accounting_ledger.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-budget-accounting.yml"
@@ -943,13 +939,11 @@
           "bad forecast drives overprovisioning",
           "uncertainty ignored"
         ],
-        "gaps": [
-          "define baseline statistical models",
-          "bind autoscaling/budgets"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_forecasting_engine.py",
-          "skeleton/testing/test_cost_anomaly_detection.py"
+          "skeleton/testing/test_cost_anomaly_detection.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-forecast-anomaly-loop.yml"
@@ -1174,13 +1168,11 @@
           "false alarm fatigue",
           "slow leak missed"
         ],
-        "gaps": [
-          "define anomaly baselines",
-          "bind incident/workflow"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_forecasting_engine.py",
-          "skeleton/testing/test_cost_anomaly_detection.py"
+          "skeleton/testing/test_cost_anomaly_detection.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-forecast-anomaly-loop.yml"
@@ -1396,18 +1388,18 @@
         ],
         "canonical_paths": [
           "machine",
-          "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+          "skeleton/ai/runtime/deferred/lifecycle_governance.py",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "missing license provenance",
           "incompatible combination"
         ],
-        "gaps": [
-          "bind SBOM/MBOM/datasets",
-          "define review policy"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_lifecycle_governance.py"
+          "skeleton/testing/test_lifecycle_governance.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:license conflict evaluation"
@@ -1619,17 +1611,18 @@
         "canonical_paths": [
           "skeleton/data",
           "skeleton/security",
-          "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+          "skeleton/ai/runtime/deferred/lifecycle_governance.py",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "rights lost on transform",
           "unauthorized training"
         ],
-        "gaps": [
-          "bind lineage/training/exports"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_lifecycle_governance.py"
+          "skeleton/testing/test_lifecycle_governance.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:derived-data rights evaluation"
@@ -1849,13 +1842,11 @@
           "missing required notice",
           "false attribution"
         ],
-        "gaps": [
-          "bind provenance graphs",
-          "generate release notices"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_release_attribution.py",
-          "tests/test_p1_release_attribution.py"
+          "tests/test_p1_release_attribution.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-release-attribution.yml"
@@ -2072,18 +2063,18 @@
         "canonical_paths": [
           "experiments",
           "docs",
-          "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+          "skeleton/ai/runtime/deferred/lifecycle_governance.py",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "unreviewed sensitive study",
           "ethics process becomes checkbox"
         ],
-        "gaps": [
-          "define trigger criteria",
-          "bind research proposals"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_lifecycle_governance.py"
+          "skeleton/testing/test_lifecycle_governance.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:sensitive-research scenario review"
@@ -2295,17 +2286,18 @@
         "canonical_paths": [
           "machine",
           "skeleton/ai/providers",
-          "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+          "skeleton/ai/runtime/deferred/lifecycle_governance.py",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "untracked production model",
           "retired model reused"
         ],
-        "gaps": [
-          "bind model ops/MBOM"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_lifecycle_governance.py"
+          "skeleton/testing/test_lifecycle_governance.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:invalid transition evaluation"
@@ -2517,18 +2509,18 @@
         "canonical_paths": [
           "skeleton/ai/providers",
           "machine",
-          "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+          "skeleton/ai/runtime/deferred/lifecycle_governance.py",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "forced migration regression",
           "deprecated model never retired"
         ],
-        "gaps": [
-          "inventory consumers",
-          "bind provider/model cards"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_lifecycle_governance.py"
+          "skeleton/testing/test_lifecycle_governance.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:consumer migration evaluation"
@@ -2740,17 +2732,18 @@
         "canonical_paths": [
           "skeleton/ai/providers",
           "skeleton/eval",
-          "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+          "skeleton/ai/runtime/deferred/lifecycle_governance.py",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "behavior drift",
           "data residency regression"
         ],
-        "gaps": [
-          "bind shadow traffic"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_lifecycle_governance.py"
+          "skeleton/testing/test_lifecycle_governance.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:provider parity benchmark"
@@ -2970,12 +2963,10 @@
           "candidate side effect leaks",
           "non-comparable traffic"
         ],
-        "gaps": [
-          "define eligibility/redaction",
-          "bind champion/challenger"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_shadow_traffic.py"
+          "skeleton/testing/test_shadow_traffic.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-shadow-traffic-isolation.yml"
@@ -3202,13 +3193,11 @@
           "benchmark gaming",
           "candidate overwrites champion"
         ],
-        "gaps": [
-          "unify self-improvement registry",
-          "bind release gates"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_champion_registry.py",
-          "tests/test_p1_champion_registry.py"
+          "tests/test_p1_champion_registry.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-champion-registry.yml"
@@ -3425,17 +3414,18 @@
         "canonical_paths": [
           "experiments",
           "skeleton/security",
-          "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+          "skeleton/ai/runtime/deferred/lifecycle_governance.py",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "experiment leaks authority",
           "experiment becomes permanent"
         ],
-        "gaps": [
-          "bind feature flags/technology radar"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_lifecycle_governance.py"
+          "skeleton/testing/test_lifecycle_governance.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:kill-switch/isolation evaluation"
@@ -3647,18 +3637,18 @@
         "canonical_paths": [
           "experiments",
           "docs/plan",
-          "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+          "skeleton/ai/runtime/deferred/lifecycle_governance.py",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "branch sprawl",
           "unreviewed experiment merged"
         ],
-        "gaps": [
-          "define branch naming/retention",
-          "bind evidence packages"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_lifecycle_governance.py"
+          "skeleton/testing/test_lifecycle_governance.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:research-to-production promotion audit"
@@ -3870,18 +3860,18 @@
         "canonical_paths": [
           "machine",
           "docs",
-          "skeleton/ai/runtime/deferred/lifecycle_governance.py"
+          "skeleton/ai/runtime/deferred/lifecycle_governance.py",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "dead technique remains critical path",
           "history deleted"
         ],
-        "gaps": [
-          "bind technology radar/debt",
-          "define archive policy"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_lifecycle_governance.py"
+          "skeleton/testing/test_lifecycle_governance.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:retired-tech reference audit"
@@ -4103,13 +4093,11 @@
           "same failure repeated",
           "anecdote becomes dogma"
         ],
-        "gaps": [
-          "ingest incidents/negative results",
-          "bind risk/test generation"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_failure_knowledge.py",
-          "tests/test_p1_failure_knowledge.py"
+          "tests/test_p1_failure_knowledge.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-failure-knowledge.yml"

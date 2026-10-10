@@ -16,6 +16,8 @@ from typing import Any
 from skeleton.ai.runtime.inference.artifact import load_local_model_artifact
 from skeleton.ai.runtime.inference.local import LocalInferenceRequest, LocalInferenceResult, LocalInferenceEngine
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
+from skeleton.app.local_ai_transcript import load_transcript, save_transcript
+from skeleton.app.local_ai_gguf import OfflineGGUFSession
 
 
 MAX_USER_CHARS = 4096
@@ -33,6 +35,31 @@ def load_native_checkpoint(source: str | Path) -> NativeRuntimeLocalModel:
         raise OfflineAIError("checkpoint must contain a native transformer, not a reference/demo model")
     loaded.model.assert_identity()
     return loaded.model
+
+
+def inspect_local_model(backend: NativeRuntimeLocalModel) -> dict[str, object]:
+    """Report actual offline model limits and identity without executing a prompt.
+
+    This is technical capability inspection, NOT a trained-quality or general
+    intelligence certificate.
+    """
+    if not isinstance(backend, NativeRuntimeLocalModel):
+        raise OfflineAIError("native transformer model required")
+    backend.assert_identity()
+    runtime = backend.runtime
+    return {
+        "schema_version": 1,
+        "model_id": backend.model_id,
+        "model_digest": backend.model_digest,
+        "tokenizer_digest": backend.tokenizer_digest,
+        "runtime_digest": backend.runtime_digest,
+        "max_context_tokens": runtime.limits.max_context,
+        "max_output_tokens": runtime.limits.max_new_tokens,
+        "model_bytes": runtime.model_bytes,
+        "provider_credentials_required": False,
+        "network_required": False,
+        "model_quality_certified": False,
+    }
 
 
 @dataclass(frozen=True)
@@ -64,8 +91,31 @@ class OfflineAISession:
         self.history = ()
 
     @property
+    def ui_output_budget(self) -> int:
+        limits = self.backend.runtime.limits
+        return min(32, limits.max_new_tokens, max(1, limits.max_context // 4))
+
+    @property
     def model_digest(self) -> str:
         return self.backend.model_digest
+
+    def export_transcript(self, path: str | Path) -> str:
+        """User-requested offline snapshot; not the durable assistant authority."""
+        self.backend.assert_identity()
+        return save_transcript(
+            path, model_digest=self.backend.model_digest,
+            tokenizer_digest=self.backend.tokenizer_digest, history=self.history,
+        )
+
+    def import_transcript(self, path: str | Path) -> int:
+        """Restore only fully verified turns bound to this exact native model."""
+        self.backend.assert_identity()
+        restored = load_transcript(
+            path, model_digest=self.backend.model_digest,
+            tokenizer_digest=self.backend.tokenizer_digest,
+        )
+        self.history = restored  # commit only after all checks pass
+        return len(restored) // 2
 
     def _request(self, prompt: str, max_output_tokens: int) -> tuple[LocalInferenceRequest, tuple[tuple[str, str], ...]]:
         if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_USER_CHARS:
@@ -135,12 +185,12 @@ class OfflineAIWindow:
         self.window.geometry("850x660")
         self.window.minsize(600, 440)
         self.window.protocol("WM_DELETE_WINDOW", self.close)
-        self.session: OfflineAISession | None = None
+        self.session: OfflineAISession | OfflineGGUFSession | None = None
         self.events: Queue[tuple[str, object]] = Queue()
         self.active = False
         self.closed = False
         self.worker_loop: asyncio.AbstractEventLoop | None = None
-        self.worker_task: asyncio.Task[OfflineAnswer] | None = None
+        self.worker_task: asyncio.Task[OfflineAnswer | object] | None = None
         self.worker_lock = threading.Lock()
 
         frame = ttk.Frame(self.window, padding=14)
@@ -148,15 +198,29 @@ class OfflineAIWindow:
         ttk.Label(frame, text="Local AI · no Docker / no hosted provider", font=("Segoe UI", 13, "bold")).pack(anchor="w")
         ttk.Label(
             frame,
-            text="Runs an explicitly selected native checkpoint offline. No trained model is supplied; quality depends on your checkpoint.",
+            text="Select a native checkpoint or an operator-owned GGUF plus local llama.cpp executable. Neither model weights nor llama.cpp are bundled.",
             wraplength=790,
         ).pack(anchor="w", pady=(4, 10))
         toolbar = ttk.Frame(frame)
         toolbar.pack(fill="x")
         self.load_button = ttk.Button(toolbar, text="Load checkpoint…", command=self.choose_model)
         self.load_button.pack(side="left")
+        self.gguf_button = ttk.Button(toolbar, text="Load GGUF…", command=self.choose_gguf)
+        self.gguf_button.pack(side="left", padx=4)
+        tools_row = ttk.Frame(frame)
+        tools_row.pack(fill="x", pady=(3, 3))
+        self.train_button = ttk.Button(tools_row, text="Train small local model…", command=self.train_model)
+        self.train_button.pack(side="left", padx=4)
+        self.improve_button = ttk.Button(tools_row, text="Improve model…", command=self.improve_model)
+        self.improve_button.pack(side="left", padx=4)
+        self.benchmark_button = ttk.Button(tools_row, text="Evaluate…", command=self.benchmark_model)
+        self.benchmark_button.pack(side="left", padx=4)
         self.clear_button = ttk.Button(toolbar, text="New conversation", command=self.clear)
         self.clear_button.pack(side="left", padx=8)
+        self.open_history_button = ttk.Button(toolbar, text="Open chat…", command=self.open_history)
+        self.open_history_button.pack(side="left", padx=4)
+        self.save_history_button = ttk.Button(toolbar, text="Save chat…", command=self.save_history)
+        self.save_history_button.pack(side="left", padx=4)
         self.cancel_button = ttk.Button(toolbar, text="Cancel generation", command=self.cancel)
         self.cancel_button.pack(side="left")
         self.status = tk.StringVar(value="Choose a local native model checkpoint to begin.")
@@ -173,9 +237,19 @@ class OfflineAIWindow:
 
     def _refresh(self) -> None:
         self.load_button.configure(state="disabled" if self.active else "normal")
+        self.gguf_button.configure(state="disabled" if self.active else "normal")
+        self.train_button.configure(state="disabled" if self.active else "normal")
+        self.improve_button.configure(
+            state="normal" if isinstance(self.session, OfflineAISession) and not self.active else "disabled"
+        )
+        self.benchmark_button.configure(
+            state="normal" if isinstance(self.session, OfflineAISession) and not self.active else "disabled"
+        )
         self.send_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.clear_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.cancel_button.configure(state="normal" if self.active else "disabled")
+        self.open_history_button.configure(state="normal" if isinstance(self.session, OfflineAISession) and not self.active else "disabled")
+        self.save_history_button.configure(state="normal" if isinstance(self.session, OfflineAISession) and not self.active else "disabled")
 
     def _append(self, speaker: str, text: str) -> None:
         self.transcript.configure(state="normal")
@@ -206,6 +280,245 @@ class OfflineAIWindow:
 
         threading.Thread(target=work, name="skeleton-local-model-load", daemon=True).start()
 
+    def choose_gguf(self) -> None:
+        """Explicitly select both existing artifacts; no installation/download."""
+        if self.active:
+            return
+        from tkinter import messagebox
+
+        executable = self.filedialog.askopenfilename(
+            parent=self.window,
+            title="Select EXISTING local llama.cpp executable",
+            filetypes=[("Executable", "*.exe"), ("All files", "*.*")],
+        )
+        if not executable:
+            return
+        model = self.filedialog.askopenfilename(
+            parent=self.window,
+            title="Select operator-owned GGUF model weights",
+            filetypes=[("GGUF open weights", "*.gguf"), ("All files", "*.*")],
+        )
+        if not model:
+            return
+        if not messagebox.askyesno(
+            "Run local llama.cpp executable",
+            "This starts the explicitly selected LOCAL executable to run the "
+            "selected GGUF weights. Nothing is downloaded, and hosted API "
+            "credentials are excluded from its process environment. Continue?",
+            parent=self.window,
+        ):
+            return
+        self.active = True
+        self.status.set("Validating local GGUF and llama.cpp executable identities…")
+        self._refresh()
+
+        def work() -> None:
+            try:
+                session = OfflineGGUFSession(executable, model)
+                self.events.put(("loaded_gguf", session))
+            except Exception as exc:
+                self.events.put(("error", str(exc)))
+
+        threading.Thread(
+            target=work, name="skeleton-operator-gguf-load", daemon=True,
+        ).start()
+
+    def train_model(self) -> None:
+        """Bootstrap one genuine, tiny CPU checkpoint from user-chosen text.
+
+        This is an educational/experimental local transformer, not
+        production-trained LLM weights. Never train on startup without consent.
+        """
+        if self.active:
+            return
+        from tkinter import messagebox
+
+        if not messagebox.askyesno(
+            "Experimental CPU model training",
+            "Train a small transformer only on the local text you choose? "
+            "The output is experimental and not comparable to a trained "
+            "foundation language model. No data is uploaded.",
+            parent=self.window,
+        ):
+            return
+        source = self.filedialog.askopenfilename(
+            parent=self.window, title="Choose UTF-8 local training text",
+            filetypes=[("UTF-8 text", "*.txt"), ("All files", "*.*")],
+        )
+        if not source:
+            return
+        destination = self.filedialog.asksaveasfilename(
+            parent=self.window, title="Save new experimental native checkpoint",
+            defaultextension=".json", filetypes=[("Native checkpoint", "*.json")],
+        )
+        if not destination:
+            return
+        self.active = True
+        self.status.set("Training a bounded native CPU transformer locally…")
+        self._refresh()
+
+        def work() -> None:
+            try:
+                from skeleton.app.local_ai_training import train_local_text
+
+                receipt = train_local_text(source, destination)
+                session = OfflineAISession(load_native_checkpoint(destination))
+                self.events.put(("trained", (session, receipt)))
+            except Exception as exc:
+                self.events.put(("error", str(exc)))
+
+        threading.Thread(
+            target=work, daemon=True, name="skeleton-native-cpu-training",
+        ).start()
+
+    def improve_model(self) -> None:
+        """Consent-bound learning never modifies the loaded checkpoint itself."""
+        if self.active or not isinstance(self.session, OfflineAISession):
+            return
+        from tkinter import messagebox
+
+        if not messagebox.askyesno(
+            "Evaluate experimental model improvement",
+            "Continue CPU training this model on your chosen text, "
+            "evaluate it on a separate held-out text file, and save "
+            "a NEW checkpoint only if held-out perplexity improves? "
+            "The current model is kept unchanged. No data is uploaded.",
+            parent=self.window,
+        ):
+            return
+        parent_path = self.filedialog.askopenfilename(
+            parent=self.window, title="Choose current native checkpoint",
+            filetypes=[("Native checkpoint", "*.json"), ("All files", "*.*")],
+        )
+        if not parent_path:
+            return
+        training_path = self.filedialog.askopenfilename(
+            parent=self.window, title="Choose incremental training text",
+            filetypes=[("UTF-8 text", "*.txt"), ("All files", "*.*")],
+        )
+        if not training_path:
+            return
+        heldout_path = self.filedialog.askopenfilename(
+            parent=self.window, title="Choose separate held-out evaluation text",
+            filetypes=[("UTF-8 text", "*.txt"), ("All files", "*.*")],
+        )
+        if not heldout_path:
+            return
+        protected_suite = None
+        if messagebox.askyesno(
+            "Protect model capabilities",
+            "Also require an independent multi-category benchmark suite to "
+            "pass before saving new weights? All suite cases must be separate "
+            "from training and held-out epoch-selection text.",
+            parent=self.window,
+        ):
+            protected_suite = self.filedialog.askopenfilename(
+                parent=self.window, title="Choose independent capability benchmark",
+                filetypes=[("JSON benchmark", "*.json"), ("All files", "*.*")],
+            )
+            if not protected_suite:
+                return
+        destination = self.filedialog.asksaveasfilename(
+            parent=self.window, title="Save evaluated checkpoint to NEW file",
+            defaultextension=".json", filetypes=[("Native checkpoint", "*.json")],
+        )
+        if not destination:
+            return
+        session = self.session
+        self.active = True
+        self.status.set("Training locally and checking held-out model quality…")
+        self._refresh()
+
+        def work() -> None:
+            try:
+                from skeleton.app.local_ai_improvement import improve_local_model
+
+                parent = load_native_checkpoint(parent_path)
+                if parent.model_digest != session.model_digest:
+                    raise OfflineAIError(
+                        "selected checkpoint does not match the active local model"
+                    )
+                receipt = improve_local_model(
+                    parent_path, training_path, heldout_path, destination,
+                    protected_suite=protected_suite,
+                )
+                improved = OfflineAISession(load_native_checkpoint(destination))
+                self.events.put(("improved", (improved, receipt)))
+            except Exception as exc:
+                self.events.put(("error", str(exc)))
+
+        threading.Thread(
+            target=work, daemon=True, name="skeleton-evaluated-local-learning",
+        ).start()
+
+    def benchmark_model(self) -> None:
+        """Evaluate active weights with a user-chosen category suite, read-only."""
+        if self.active or not isinstance(self.session, OfflineAISession):
+            return
+        from tkinter import messagebox
+
+        source = self.filedialog.askopenfilename(
+            parent=self.window, title="Select active native checkpoint",
+            filetypes=[("Native checkpoint", "*.json"), ("All files", "*.*")],
+        )
+        if not source:
+            return
+        suite = self.filedialog.askopenfilename(
+            parent=self.window, title="Select JSON multi-category evaluation suite",
+            filetypes=[("Evaluation suite", "*.json"), ("All files", "*.*")],
+        )
+        if not suite:
+            return
+        compare = messagebox.askyesno(
+            "Compare checkpoints", "Compare a second model without training or promotion?",
+            parent=self.window,
+        )
+        candidate = None
+        if compare:
+            candidate = self.filedialog.askopenfilename(
+                parent=self.window, title="Select candidate checkpoint",
+                filetypes=[("Native checkpoint", "*.json"), ("All files", "*.*")],
+            )
+            if not candidate:
+                return
+        exclusion = None
+        if messagebox.askyesno(
+            "Check training-data leakage",
+            "Do you want to exclude benchmark cases that overlap an explicit "
+            "local training corpus? This protects against reused examples "
+            "but cannot prove disjointness from all historical training.",
+            parent=self.window,
+        ):
+            exclusion = self.filedialog.askopenfilename(
+                parent=self.window, title="Choose training text for exclusion",
+                filetypes=[("UTF-8 text", "*.txt"), ("All files", "*.*")],
+            )
+            if not exclusion:
+                return
+        current_digest = self.session.model_digest
+        self.active = True
+        self.status.set("Evaluating category-aware offline benchmark…")
+        self._refresh()
+
+        def work() -> None:
+            try:
+                from skeleton.app.local_ai_benchmark import benchmark_native_models
+
+                parent = load_native_checkpoint(source)
+                if parent.model_digest != current_digest:
+                    raise OfflineAIError("benchmark baseline is not the active model")
+                result = benchmark_native_models(
+                    suite, baseline=source, candidate=candidate,
+                    excluded_training_text=exclusion,
+                )
+                self.events.put(("benchmark", result))
+            except Exception as exc:
+                self.events.put(("error", str(exc)))
+
+        threading.Thread(
+            target=work, daemon=True, name="skeleton-local-category-evaluation",
+        ).start()
+
     def clear(self) -> None:
         if self.active or self.session is None:
             return
@@ -215,6 +528,45 @@ class OfflineAIWindow:
         self.transcript.configure(state="disabled")
         self.status.set("Conversation reset in memory.")
 
+    def open_history(self) -> None:
+        """Import is explicit and never modifies the session on bad input."""
+        if self.active or not isinstance(self.session, OfflineAISession):
+            return
+        selected = self.filedialog.askopenfilename(
+            parent=self.window, title="Open an offline Skeleton chat",
+            filetypes=[("Skeleton chat", "*.json"), ("All files", "*.*")],
+        )
+        if not selected:
+            return
+        try:
+            turns = self.session.import_transcript(selected)
+        except (ValueError, OSError) as exc:
+            self.status.set("Chat not opened: " + str(exc))
+            return
+        self.transcript.configure(state="normal")
+        self.transcript.delete("1.0", "end")
+        self.transcript.configure(state="disabled")
+        for role, text in self.session.history:
+            self._append("You" if role == "user" else "Skeleton · Local", text)
+        self.status.set(f"Restored {turns} complete offline turns for this model.")
+
+    def save_history(self) -> None:
+        """The chosen file is readable local plaintext; no background upload."""
+        if self.active or not isinstance(self.session, OfflineAISession):
+            return
+        selected = self.filedialog.asksaveasfilename(
+            parent=self.window, title="Save offline chat as plaintext JSON",
+            defaultextension=".json", filetypes=[("Skeleton chat", "*.json")],
+        )
+        if not selected:
+            return
+        try:
+            digest = self.session.export_transcript(selected)
+        except (ValueError, OSError) as exc:
+            self.status.set("Chat not saved: " + str(exc))
+            return
+        self.status.set("Saved local chat · SHA-256 " + digest[:16] + "… · file is plaintext.")
+
     def send(self) -> None:
         if self.active or self.session is None:
             return
@@ -222,7 +574,9 @@ class OfflineAIWindow:
         if not prompt:
             return
         self.composer.delete("1.0", "end")
-        self._append("You", prompt)
+        # Display turns only after the model result passed identity, text and
+        # tool-call validation. Failed or cancelled sends must not fabricate
+        # a conversation turn in the visible transcript.
         self.active = True
         self.status.set("Generating locally…")
         self._refresh()
@@ -230,7 +584,7 @@ class OfflineAIWindow:
 
         def work() -> None:
             async def generate() -> OfflineAnswer:
-                task = asyncio.create_task(session.ask(prompt, max_output_tokens=min(32, session.backend.runtime.limits.max_new_tokens, max(1, session.backend.runtime.limits.max_context // 4))))
+                task = asyncio.create_task(session.ask(prompt, max_output_tokens=session.ui_output_budget))
                 with self.worker_lock:
                     self.worker_loop = asyncio.get_running_loop()
                     self.worker_task = task
@@ -238,11 +592,13 @@ class OfflineAIWindow:
 
             try:
                 answer = asyncio.run(generate())
-                self.events.put(("answer", answer))
+                self.events.put(("answer", (prompt, answer)))
             except asyncio.CancelledError:
-                self.events.put(("error", "Generation cancelled; no conversation state committed."))
+                self.events.put(("generation_error", (
+                    prompt, "Generation cancelled; no conversation state committed.",
+                )))
             except Exception as exc:
-                self.events.put(("error", str(exc)))
+                self.events.put(("generation_error", (prompt, str(exc))))
             finally:
                 with self.worker_lock:
                     self.worker_loop = None
@@ -264,19 +620,95 @@ class OfflineAIWindow:
             while True:
                 kind, value = self.events.get_nowait()
                 self.active = False
-                if kind == "loaded":
+                if kind == "benchmark":
+                    result = value
+                    summary = (
+                        "Suite " + result["suite_digest"][:16] + "… · "
+                        + str(result["case_count"]) + " cases / "
+                        + str(result["category_count"]) + " categories\n"
+                        + "Baseline perplexity: "
+                        + f"{result['baseline']['overall_perplexity']:.3f}"
+                    )
+                    if result["candidate"] is not None:
+                        summary += (
+                            "\nCandidate perplexity: "
+                            + f"{result['candidate']['overall_perplexity']:.3f}"
+                            + "\nLocal regression gate: "
+                            + ("PASS" if result["passes_local_regression_gate"] else "FAIL")
+                        )
+                        for name, comparison in sorted(result["category_comparisons"].items()):
+                            summary += (
+                                "\n" + name + ": "
+                                + f"{comparison['baseline_perplexity']:.3f} → "
+                                + f"{comparison['candidate_perplexity']:.3f}"
+                                + (" [OK]" if comparison["perplexity_nonregression"]
+                                   and comparison["top1_nonregression"] else " [REGRESSION]")
+                            )
+                    self._append("Read-only native evaluation", summary)
+                    self.status.set("Offline benchmark complete · model unchanged.")
+                elif kind == "improved":
+                    self.session, receipt = value  # type: ignore[misc]
+                    # Different weight identity means old turns are not silently
+                    # assigned to the newly evaluated model.
+                    self.clear()
+                    self.status.set(
+                        "Local candidate accepted by held-out perplexity · "
+                        + f"{receipt.baseline_perplexity:.2f} → "
+                        + f"{receipt.accepted_perplexity:.2f}"
+                        + " · keep parent checkpoint for rollback"
+                    )
+                elif kind == "trained":
+                    self.session, receipt = value  # type: ignore[misc]
+                    self.clear()
+                    self.status.set(
+                        "Experimental CPU checkpoint ready · "
+                        + str(receipt.training_steps) + " SGD steps · "
+                        + f"corpus perplexity {receipt.initial_perplexity:.2f} → "
+                        + f"{receipt.final_perplexity:.2f} · not quality certified"
+                    )
+                elif kind == "loaded_gguf":
                     self.session = value  # type: ignore[assignment]
                     self.clear()
-                    self.status.set("Native model loaded: " + self.session.model_digest[:16] + "…")
-                elif kind == "answer":
-                    answer = value
-                    self._append("Skeleton · Local", answer.text)  # type: ignore[attr-defined]
+                    backend = self.session.backend
                     self.status.set(
-                        "Completed · " + str(answer.input_tokens) + " input / " + str(answer.output_tokens) + " output tokens · receipt " + answer.execution_receipt_digest[:12]  # type: ignore[attr-defined]
+                        "Operator-owned GGUF ready · "
+                        + str(backend.model_artifact.size_bytes)
+                        + " bytes · "
+                        + self.session.model_digest[:12]
+                        + "… · tokenizer counts estimated; no transcript persistence"
                     )
+                elif kind == "loaded":
+                    self.session = value  # type: ignore[assignment]
+                    self.clear()
+                    info = inspect_local_model(self.session.backend)
+                    self.status.set(
+                        "Native model loaded · context "
+                        + str(info["max_context_tokens"])
+                        + " tokens · weights "
+                        + str(info["model_bytes"])
+                        + " bytes · " + self.session.model_digest[:12] + "…"
+                    )
+                elif kind == "answer":
+                    prompt, answer = value
+                    self._append("You", prompt)
+                    self._append("Skeleton · Local", answer.text)
+                    self.status.set(
+                        "Completed · " + str(answer.input_tokens) + " input / " + str(answer.output_tokens)
+                        + " output tokens · " + (
+                            "receipt " + answer.execution_receipt_digest[:12]
+                            if answer.execution_receipt_digest else
+                            "no execution receipt from this backend; GGUF token counts estimated"
+                        )
+                    )
+                elif kind == "generation_error":
+                    rejected_prompt, reason = value
+                    # Restore the rejected prompt for editing or retry, but
+                    # never replay an unsuccessful assistant turn into history.
+                    if not self.composer.get("1.0", "end-1c").strip():
+                        self.composer.insert("1.0", rejected_prompt)
+                    self.status.set("Local generation rejected: " + str(reason))
                 else:
-                    self._append("Local runtime", "Request rejected: " + str(value))
-                    self.status.set("Local model unavailable or request rejected.")
+                    self.status.set("Local model unavailable or request rejected: " + str(value))
                 self._refresh()
         except Empty:
             pass
@@ -324,9 +756,20 @@ def smoke_offline_native_inference() -> bool:
     ))
     session = OfflineAISession(NativeRuntimeLocalModel(runtime))
     answer = asyncio.run(session.ask("hello", max_output_tokens=2))
+    # The Windows bundled binary must also round-trip a verified, private
+    # conversation snapshot without importing optional hosted services.
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="skeleton-native-smoke-") as folder:
+        transcript = Path(folder) / "chat.json"
+        session.export_transcript(transcript)
+        restored = OfflineAISession(NativeRuntimeLocalModel(runtime))
+        turns = restored.import_transcript(transcript)
+        snapshot_ok = turns == 1 and restored.history == session.history
     return (
         bool(answer.text)
         and answer.model_digest == runtime.model_digest
         and len(answer.execution_receipt_digest) == 64
         and len(session.history) == 2
+        and snapshot_ok
     )

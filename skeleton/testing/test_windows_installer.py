@@ -97,6 +97,8 @@ def test_inno_setup_contract_is_per_user_and_uninstallable():
     assert 'Parameters: "--stop --quiet"' in source
     assert 'Type: files; Name: "{app}\\.env"' in source
     assert "{userdesktop}\\Skeleton" in source
+    assert 'Name: "{group}\\Skeleton Local AI (offline)"' in source
+    assert 'Parameters: "--local-ai"' in source
     assert "{commondesktop}" not in source
 
 
@@ -111,6 +113,8 @@ def test_windows_launcher_is_bundled_runtime_control_surface():
     assert "shell=True" not in source
     assert "shell=False" in source
     assert "CREATE_NO_WINDOW" in source
+    assert '"--offline-command"' in source
+    assert 'arguments[0] != "local-ai"' in source
 
 
 def test_windows_build_is_pinned_and_hashes_installer():
@@ -127,6 +131,12 @@ def test_windows_build_is_pinned_and_hashes_installer():
     assert "& git @ArchiveArgs" in source
     assert "Get-FileHash -Algorithm SHA256" in source
     assert "Skeleton-Setup-*-windows-x64.exe" in source
+    assert '"--windowed",' in source
+    assert '$ConsoleArgs[$WindowFlagIndex] = "--console"' in source
+    assert '$ConsoleArgs[$LauncherNameIndex] = "SkeletonCLI"' in source
+    assert 'Join-Path $LauncherDist "SkeletonCLI.exe"' in source
+    assert 'Join-Path $PayloadDir "SkeletonCLI.exe"' in source
+    assert '"--hidden-import", "skeleton.app.local_ai_acceptance",' in source
     assert "ISCC.exe" in source
 
 
@@ -184,6 +194,36 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert "sparse-checkout-cone-mode: false" in source
     assert "scripts/windows/build_installer.ps1" in source
     assert "Smoke install generated Setup.exe" in source
+    assert '@("--local-ai-training-smoke")' in source
+    assert '@("--local-ai-benchmark-smoke")' in source
+    assert '"--offline-command", "local-ai"' in source
+    assert 'Join-Path $installDir "SkeletonCLI.exe"' in source
+    assert '$cliTrain = Start-Process -FilePath $cliLauncher' in source
+    assert '$cliInspect = Start-Process -FilePath $cliLauncher' in source
+    assert '-RedirectStandardOutput $cliTrainReceipt' in source
+    assert '-RedirectStandardOutput $cliInspectReceipt' in source
+    assert '$inspectedReceipt.model_digest -ne $trainedReceipt.model_digest' in source
+    assert '$inspectedReceipt.tokenizer_digest -ne $trainedReceipt.tokenizer_digest' in source
+    assert '$trainedReceipt.training_steps -lt 1' in source
+    assert '$acceptance = Start-Process -FilePath $cliLauncher' in source
+    assert '$missingGguf = Start-Process -FilePath $cliLauncher' in source
+    assert "uninstall left installed native console executable behind" in source
+    assert '"--gguf-model"' in source
+    assert '"--llama-executable"' in source
+    assert "GGUF command did not fail closed" in source
+    assert '"--prompt", "offline", "--json"' in source
+    assert '"offline must fail closed"' not in source
+    assert '"local GGUF request rejected:"' in source
+    assert "-RedirectStandardOutput $ggufStdout" in source
+    assert "-RedirectStandardError $ggufStderr" in source
+    assert '$missingGguf.ExitCode -ne 1' in source
+    assert '"--inspect-model", "--json"' in source
+    assert '"--offline-command", "local-ai", "--self-check", "--json"' in source
+    assert 'skeleton.app.local_ai.acceptance.v1' in source
+    assert 'general_model_quality_certified -ne $false' in source
+    assert 'enterprise_release_qualified -ne $false' in source
+    assert 'gguf_model_qualified -ne $false' in source
+    assert '@("--local-ai-smoke")' in source
     assert '"/VERYSILENT"' in source
     assert 'Start-Process -FilePath $launcher -ArgumentList @("--help") -Wait -PassThru' in source
     assert "$launch.ExitCode" in source

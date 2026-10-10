@@ -42,14 +42,12 @@
           "override blocked by congested data plane",
           "child authority persists"
         ],
-        "gaps": [
-          "define control channel",
-          "bind all autonomous runtimes"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_human_control.py",
           "skeleton/testing/test_autonomy_deescalation.py",
-          "skeleton/testing/test_agent_delegation_qualification.py"
+          "skeleton/testing/test_agent_delegation_qualification.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-human-control.yml"
@@ -276,14 +274,12 @@
           "half-written state",
           "cancel reported before effect stops"
         ],
-        "gaps": [
-          "annotate interruptible operations",
-          "bind recovery semantics"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_human_control.py",
           "skeleton/testing/test_autonomy_deescalation.py",
-          "skeleton/testing/test_agent_delegation_qualification.py"
+          "skeleton/testing/test_agent_delegation_qualification.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-human-control.yml"
@@ -510,15 +506,13 @@
           "false positive freezes work",
           "subtle drift missed"
         ],
-        "gaps": [
-          "define drift features",
-          "bind planning checkpoints"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_blast_radius_alignment.py",
           "skeleton/testing/test_human_control.py",
           "skeleton/testing/test_autonomy_deescalation.py",
-          "skeleton/testing/test_agent_delegation_qualification.py"
+          "skeleton/testing/test_agent_delegation_qualification.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-blast-radius-alignment.yml"
@@ -745,17 +739,15 @@
           "tests teach exact exploits only",
           "intent not measurable"
         ],
-        "gaps": [
-          "seed historical failure cases",
-          "bind promotion gates"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_blast_radius_alignment.py",
           "skeleton/testing/test_human_control.py",
           "skeleton/testing/test_autonomy_deescalation.py",
           "skeleton/testing/test_agent_delegation_qualification.py",
           "skeleton/testing/test_regression_corpus.py",
-          "tests/test_p1_regression_corpus.py"
+          "tests/test_p1_regression_corpus.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-blast-radius-alignment.yml",
@@ -987,15 +979,13 @@
           "unplanned side effects",
           "plan says done without action evidence"
         ],
-        "gaps": [
-          "bind action receipts to plan DAG",
-          "add deviation policy"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_blast_radius_alignment.py",
           "skeleton/testing/test_human_control.py",
           "skeleton/testing/test_autonomy_deescalation.py",
-          "skeleton/testing/test_agent_delegation_qualification.py"
+          "skeleton/testing/test_agent_delegation_qualification.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-blast-radius-alignment.yml"
@@ -1210,18 +1200,18 @@
         ],
         "canonical_paths": [
           "frontend",
-          "docs"
+          "docs",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "confusing critical UI",
           "automation bias"
         ],
-        "gaps": [
-          "define critical interaction principles",
-          "bind acceptance studies"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:frontend human-factors tests"
+          "planned:frontend human-factors tests",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:operator scenario evaluation"
@@ -1431,18 +1421,18 @@
         ],
         "canonical_paths": [
           "skeleton/security",
-          "frontend"
+          "frontend",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "rubber-stamping",
           "overbroad remembered approval"
         ],
-        "gaps": [
-          "define reusable approval limits",
-          "bind risk model"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_approval_fatigue.py"
+          "planned:skeleton/testing/test_approval_fatigue.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:high-volume approval simulation"
@@ -1652,18 +1642,18 @@
         ],
         "canonical_paths": [
           "frontend",
-          "skeleton/eval"
+          "skeleton/eval",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "overtrust",
           "warning fatigue"
         ],
-        "gaps": [
-          "define trust UI patterns",
-          "bind quality/uncertainty"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_trust_calibration.py"
+          "planned:skeleton/testing/test_trust_calibration.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:user calibration evaluation"
@@ -1873,18 +1863,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/persistence"
+          "skeleton/persistence",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "old instruction persists",
           "summary drops constraint"
         ],
-        "gaps": [
-          "define intent store",
-          "bind context compiler/handoffs"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_user_intent_continuity.py"
+          "planned:skeleton/testing/test_user_intent_continuity.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:long-session intent drift evaluation"
@@ -2094,18 +2084,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/persistence"
+          "skeleton/persistence",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "cross-project leak",
           "stale decision retained"
         ],
-        "gaps": [
-          "define project memory schema",
-          "bind workspace model"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_project_memory.py"
+          "planned:skeleton/testing/test_project_memory.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:project-memory poisoning evaluation"
@@ -2315,18 +2305,18 @@
         ],
         "canonical_paths": [
           "planned:skeleton/product",
-          "skeleton/persistence"
+          "skeleton/persistence",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "workspace becomes shadow state",
           "stale permissions"
         ],
-        "gaps": [
-          "define authoritative workspace schema",
-          "bind product shell"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_workspace_model.py"
+          "planned:skeleton/testing/test_workspace_model.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:multi-user workspace evaluation"
@@ -2536,18 +2526,18 @@
         ],
         "canonical_paths": [
           "skeleton/foundation",
-          "machine"
+          "machine",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "name collision",
           "path traversal"
         ],
-        "gaps": [
-          "define namespace grammar",
-          "bind resource service"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_resource_namespace.py"
+          "planned:skeleton/testing/test_resource_namespace.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:path/confusable fuzzing"
@@ -2757,18 +2747,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/persistence"
+          "skeleton/persistence",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "alias races",
           "cross-tenant resolution"
         ],
-        "gaps": [
-          "define resolver interface",
-          "bind artifact/model/tool registries"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_resource_resolution.py"
+          "planned:skeleton/testing/test_resource_resolution.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:stale/unauthorized resolution evaluation"
@@ -2978,18 +2968,18 @@
         ],
         "canonical_paths": [
           "planned:skeleton/artifacts",
-          "machine"
+          "machine",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "missing edge",
           "wrong-version dependency"
         ],
-        "gaps": [
-          "populate graph from producers",
-          "bind rebuild/impact"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_artifact_dependency_graph.py"
+          "planned:skeleton/testing/test_artifact_dependency_graph.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:dependency mutation evaluation"
@@ -3199,18 +3189,18 @@
         ],
         "canonical_paths": [
           "planned:skeleton/artifacts",
-          "scripts"
+          "scripts",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "non-reproducible producer",
           "rebuild cascades unbounded"
         ],
-        "gaps": [
-          "define rebuild policies",
-          "bind content addressing/cache"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_artifact_rebuild.py"
+          "planned:skeleton/testing/test_artifact_rebuild.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:clean rebuild evaluation"
@@ -3420,18 +3410,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai/build",
-          "machine"
+          "machine",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "missed dependency",
           "overbroad impact slows CI"
         ],
-        "gaps": [
-          "unify graph sources",
-          "bind changeset budget/CI"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_impact_analysis.py"
+          "planned:skeleton/testing/test_impact_analysis.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:known-change impact benchmark"
@@ -3641,18 +3631,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai/build",
-          "skeleton/eval"
+          "skeleton/eval",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "false low risk",
           "metric gaming"
         ],
-        "gaps": [
-          "define baseline model",
-          "bind safe change planner"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_change_risk_estimator.py"
+          "planned:skeleton/testing/test_change_risk_estimator.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:historical backtest"
@@ -3862,18 +3852,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai/build",
-          "machine"
+          "machine",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "unsafe plan",
           "missing integration step"
         ],
-        "gaps": [
-          "bind impact/risk inputs",
-          "integrate engineering agent"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_safe_change_planner.py"
+          "planned:skeleton/testing/test_safe_change_planner.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:known migration planning scenarios"
@@ -4083,18 +4073,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai/build",
-          "scripts"
+          "scripts",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "generated architecture diverges",
           "compiler hides decisions"
         ],
-        "gaps": [
-          "define bounded initial targets",
-          "bind provenance/review"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_system_compiler.py"
+          "planned:skeleton/testing/test_system_compiler.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:roundtrip/generation evaluation"
@@ -4304,18 +4294,18 @@
         ],
         "canonical_paths": [
           "scripts",
-          "machine"
+          "machine",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "hand edits lost",
           "generator/schema mismatch"
         ],
-        "gaps": [
-          "select generators",
-          "bind generated-file policy"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_contract_codegen.py"
+          "planned:skeleton/testing/test_contract_codegen.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:clean regeneration evaluation"
@@ -4525,18 +4515,18 @@
         ],
         "canonical_paths": [
           "scripts",
-          "backend"
+          "backend",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "client/server drift",
           "auth semantics omitted"
         ],
-        "gaps": [
-          "define source API schema",
-          "publish SDK artifacts"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_api_client_generator.py"
+          "planned:skeleton/testing/test_api_client_generator.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:generated client contract test"
@@ -4746,18 +4736,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "machine"
+          "machine",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "SDK becomes god API",
           "leaky internals"
         ],
-        "gaps": [
-          "define export surface",
-          "migrate consumers"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_internal_sdk.py"
+          "planned:skeleton/testing/test_internal_sdk.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:forbidden-deep-import audit"
@@ -4967,18 +4957,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai/providers",
-          "backend"
+          "backend",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "provider leakage",
           "unequal fallback semantics"
         ],
-        "gaps": [
-          "formalize adapter hooks",
-          "bind registry/router"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_provider_sdk.py"
+          "planned:skeleton/testing/test_provider_sdk.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:multi-provider conformance suite"
@@ -5188,18 +5178,18 @@
         ],
         "canonical_paths": [
           "skeleton/persistence",
-          "skeleton/ai"
+          "skeleton/ai",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "store-specific leakage",
           "wrong consistency assumption"
         ],
-        "gaps": [
-          "define storage capabilities",
-          "migrate direct clients"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_storage_sdk.py"
+          "planned:skeleton/testing/test_storage_sdk.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:backend conformance tests"
@@ -5409,18 +5399,18 @@
         ],
         "canonical_paths": [
           "skeleton/frontier",
-          "skeleton/persistence"
+          "skeleton/persistence",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "duplicate handling inconsistent",
           "schema drift"
         ],
-        "gaps": [
-          "extract event primitives",
-          "bind schema registry"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_event_sdk.py"
+          "planned:skeleton/testing/test_event_sdk.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:publisher/consumer conformance"
@@ -5630,18 +5620,18 @@
         ],
         "canonical_paths": [
           "skeleton/eval",
-          "benchmarks"
+          "benchmarks",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "metric implementation drift",
           "hidden judge config"
         ],
-        "gaps": [
-          "define SDK contracts",
-          "migrate eval harnesses"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_evaluation_sdk.py"
+          "planned:skeleton/testing/test_evaluation_sdk.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:scorer conformance"
@@ -5851,18 +5841,18 @@
         ],
         "canonical_paths": [
           "benchmarks",
-          "skeleton/eval"
+          "skeleton/eval",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "benchmark plugin executes unsafe code",
           "version ambiguity"
         ],
-        "gaps": [
-          "define plugin sandbox",
-          "bind technology radar"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_benchmark_plugins.py"
+          "planned:skeleton/testing/test_benchmark_plugins.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:malformed plugin evaluation"
@@ -6072,18 +6062,18 @@
         ],
         "canonical_paths": [
           "machine",
-          "skeleton/data"
+          "skeleton/data",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "semantic drift without schema change",
           "unit mismatch"
         ],
-        "gaps": [
-          "inventory data interfaces",
-          "bind quality/lineage"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_data_contracts.py"
+          "planned:skeleton/testing/test_data_contracts.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:producer/consumer compatibility evaluation"
@@ -6293,18 +6283,18 @@
         ],
         "canonical_paths": [
           "skeleton/observability",
-          "skeleton/data"
+          "skeleton/data",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "availability hides stale data",
           "SLI sampled incorrectly"
         ],
-        "gaps": [
-          "define service objectives",
-          "bind error budgets"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_data_service_slos.py"
+          "planned:skeleton/testing/test_data_service_slos.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:stale-but-available evaluation"
@@ -6514,18 +6504,18 @@
         ],
         "canonical_paths": [
           "skeleton/retrieval",
-          "machine"
+          "machine",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "index mixes dimensions/models",
           "stale embeddings"
         ],
-        "gaps": [
-          "define embedding metadata",
-          "bind vector migrations"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_embedding_lifecycle.py"
+          "planned:skeleton/testing/test_embedding_lifecycle.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:mixed-space detection"
@@ -6735,18 +6725,18 @@
         ],
         "canonical_paths": [
           "skeleton/retrieval",
-          "skeleton/persistence"
+          "skeleton/persistence",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "partial index",
           "mixed embedding routing"
         ],
-        "gaps": [
-          "define index aliases",
-          "bind rollback"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_vector_index_migration.py"
+          "planned:skeleton/testing/test_vector_index_migration.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:online migration evaluation"
@@ -6956,18 +6946,18 @@
         ],
         "canonical_paths": [
           "skeleton/retrieval",
-          "skeleton/persistence"
+          "skeleton/persistence",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "index becomes authoritative",
           "watermark loss"
         ],
-        "gaps": [
-          "inventory indexes",
-          "bind lineage/freshness"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_search_index_lifecycle.py"
+          "planned:skeleton/testing/test_search_index_lifecycle.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:rebuild/compaction evaluation"
@@ -7177,18 +7167,18 @@
         ],
         "canonical_paths": [
           "skeleton/retrieval",
-          "skeleton/ai"
+          "skeleton/ai",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "stale result presented current",
           "refresh storm"
         ],
-        "gaps": [
-          "define freshness metadata",
-          "bind knowledge refresh"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_retrieval_freshness.py"
+          "planned:skeleton/testing/test_retrieval_freshness.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:stale-evidence benchmark"
@@ -7398,18 +7388,18 @@
         ],
         "canonical_paths": [
           "skeleton/retrieval",
-          "skeleton/security"
+          "skeleton/security",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "authority inferred from rank",
           "trust label laundering"
         ],
-        "gaps": [
-          "define trust dimensions",
-          "bind context compiler"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_source_trust.py"
+          "planned:skeleton/testing/test_source_trust.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:malicious-source evaluation"
@@ -7619,18 +7609,18 @@
         ],
         "canonical_paths": [
           "skeleton/retrieval",
-          "skeleton/eval"
+          "skeleton/eval",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "many copies appear independent",
           "diversity gaming"
         ],
-        "gaps": [
-          "build lineage heuristics",
-          "bind answer quality"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_source_diversity.py"
+          "planned:skeleton/testing/test_source_diversity.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:syndication/copy-chain evaluation"
@@ -7840,18 +7830,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/retrieval"
+          "skeleton/retrieval",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "overmerge contradictory scope",
           "duplicate evidence inflation"
         ],
-        "gaps": [
-          "define equivalence rules",
-          "bind knowledge graph"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_claim_deduplication.py"
+          "planned:skeleton/testing/test_claim_deduplication.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:paraphrase/scope evaluation"
@@ -8061,18 +8051,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/retrieval"
+          "skeleton/retrieval",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "different populations conflated",
           "scope lost in summary"
         ],
-        "gaps": [
-          "define scope schema",
-          "bind citations/answers"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_claim_scope.py"
+          "planned:skeleton/testing/test_claim_scope.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:scope mismatch corpus"
@@ -8282,18 +8272,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/retrieval"
+          "skeleton/retrieval",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "old claim remains active",
           "overaggressive expiration"
         ],
-        "gaps": [
-          "define validity policies",
-          "bind knowledge refresh"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_claim_expiration.py"
+          "planned:skeleton/testing/test_claim_expiration.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:volatile-domain freshness evaluation"
@@ -8503,18 +8493,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "skeleton/eval"
+          "skeleton/eval",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "false single truth",
           "winner chosen by popularity"
         ],
-        "gaps": [
-          "define reconciliation policies",
-          "bind human review thresholds"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_knowledge_reconciliation.py"
+          "planned:skeleton/testing/test_knowledge_reconciliation.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:contradictory evidence evaluation"
@@ -8724,18 +8714,18 @@
         ],
         "canonical_paths": [
           "skeleton/ai",
-          "planned:skeleton/artifacts"
+          "planned:skeleton/artifacts",
+          "skeleton/volumes/wave4/engine.py",
+          "skeleton/volumes/wave4/catalog.py"
         ],
         "risks": [
           "incomplete snapshot",
           "stale restore overwrite"
         ],
-        "gaps": [
-          "define snapshot bundle",
-          "bind research/evaluation reproducibility"
-        ],
+        "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_knowledge_snapshots.py"
+          "planned:skeleton/testing/test_knowledge_snapshots.py",
+          "tests/flgb/test_volume_wave4_completion.py"
         ],
         "evaluations": [
           "planned:snapshot replay evaluation"

@@ -143,6 +143,10 @@ jobs:
           if (-not (Test-Path -LiteralPath $launcher)) {
             throw "installed Skeleton.exe missing"
           }
+          $cliLauncher = Join-Path $installDir "SkeletonCLI.exe"
+          if (-not (Test-Path -LiteralPath $cliLauncher)) {
+            throw "installed SkeletonCLI.exe missing; offline command stdout cannot be verified"
+          }
           $launch = Start-Process -FilePath $launcher -ArgumentList @("--help") -Wait -PassThru
           if ($launch.ExitCode -ne 0) {
             throw "installed Skeleton.exe launch smoke exited $($launch.ExitCode)"
@@ -153,6 +157,127 @@ jobs:
           $nativeSmoke = Start-Process -FilePath $launcher -ArgumentList @("--local-ai-smoke") -Wait -PassThru
           if ($nativeSmoke.ExitCode -ne 0) {
             throw "installed Skeleton.exe native offline inference smoke exited $($nativeSmoke.ExitCode)"
+          }
+
+          # The frozen binary also needs to train actual native weights,
+          # persist them, reload identity and execute a real inference turn.
+          $trainSmoke = Start-Process -FilePath $launcher -ArgumentList @("--local-ai-training-smoke") -Wait -PassThru
+          if ($trainSmoke.ExitCode -ne 0) {
+            throw "installed Skeleton.exe local CPU training smoke exited $($trainSmoke.ExitCode)"
+          }
+
+          # Exercise real two-checkpoint/per-category heldout evaluation inside
+          # the installed frozen executable; never self-promote models.
+          $benchmarkSmoke = Start-Process -FilePath $launcher -ArgumentList @("--local-ai-benchmark-smoke") -Wait -PassThru
+          if ($benchmarkSmoke.ExitCode -ne 0) {
+            throw "installed Skeleton.exe native multi-category benchmark smoke exited $($benchmarkSmoke.ExitCode)"
+          }
+
+          # Public frozen native CLI: use actual operator syntax to train and
+          # inspect a local model, without Docker or a system Python runtime.
+          $cliDir = Join-Path $env:TEMP ("skeleton-native-cli-" + [guid]::NewGuid().ToString("N"))
+          New-Item -ItemType Directory -Force -Path $cliDir | Out-Null
+          try {
+            $cliSource = Join-Path $cliDir "train.txt"
+            $cliModel = Join-Path $cliDir "checkpoint.json"
+            $cliTrainReceipt = Join-Path $cliDir "trained-receipt.json"
+            $cliInspectReceipt = Join-Path $cliDir "inspected-receipt.json"
+            Set-Content -LiteralPath $cliSource -Value @(
+              "user hello assistant world",
+              "user world assistant hello"
+            ) -Encoding utf8
+            $cliTrain = Start-Process -FilePath $cliLauncher -ArgumentList @(
+              "--offline-command", "local-ai",
+              "--train-corpus", ('"' + $cliSource + '"'),
+              "--output-model", ('"' + $cliModel + '"'),
+              "--epochs", "1", "--json"
+            ) -Wait -PassThru -RedirectStandardOutput $cliTrainReceipt
+            if ($cliTrain.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $cliModel)) {
+              throw "installed Skeleton.exe offline command training failed"
+            }
+            $cliInspect = Start-Process -FilePath $cliLauncher -ArgumentList @(
+              "--offline-command", "local-ai",
+              "--model", ('"' + $cliModel + '"'),
+              "--inspect-model", "--json"
+            ) -Wait -PassThru -RedirectStandardOutput $cliInspectReceipt
+            if ($cliInspect.ExitCode -ne 0) {
+              throw "installed SkeletonCLI.exe offline model inspection failed"
+            }
+            # A nonzero exit alone is not proof that training, model receipt
+            # identity and native inspection all belong to the same weights.
+            $trainedReceipt = Get-Content -LiteralPath $cliTrainReceipt -Raw | ConvertFrom-Json
+            $inspectedReceipt = Get-Content -LiteralPath $cliInspectReceipt -Raw | ConvertFrom-Json
+            if (
+              $trainedReceipt.schema_version -ne 1 -or
+              $trainedReceipt.model_digest -notmatch "^[0-9a-f]{64}$" -or
+              $trainedReceipt.tokenizer_digest -notmatch "^[0-9a-f]{64}$" -or
+              $trainedReceipt.checkpoint_sha256 -notmatch "^[0-9a-f]{64}$" -or
+              $trainedReceipt.training_steps -lt 1 -or
+              $trainedReceipt.model_quality_certified -ne $false -or
+              $inspectedReceipt.model_digest -ne $trainedReceipt.model_digest -or
+              $inspectedReceipt.tokenizer_digest -ne $trainedReceipt.tokenizer_digest -or
+              $inspectedReceipt.model_quality_certified -ne $false -or
+              $inspectedReceipt.network_required -ne $false
+            ) {
+              throw "installed SkeletonCLI.exe failed native model/receipt identity qualification"
+            }
+          } finally {
+            Remove-Item -LiteralPath $cliDir -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
+          # Public user-runnable offline functionality check validates all
+          # three real native operations inside the *installed* frozen app,
+          # without Python/Docker/provider service availability.
+          $acceptanceOut = Join-Path $env:TEMP ("skeleton-acceptance-" + [guid]::NewGuid().ToString("N") + ".json")
+          $acceptanceErr = $acceptanceOut + ".err"
+          try {
+            $acceptance = Start-Process -FilePath $cliLauncher -ArgumentList @(
+              "--offline-command", "local-ai", "--self-check", "--json"
+            ) -Wait -PassThru -RedirectStandardOutput $acceptanceOut -RedirectStandardError $acceptanceErr
+            if ($acceptance.ExitCode -ne 0) {
+              Write-Host ("Acceptance stdout: " + (Get-Content -LiteralPath $acceptanceOut -Raw -ErrorAction SilentlyContinue))
+              Write-Host ("Acceptance stderr: " + (Get-Content -LiteralPath $acceptanceErr -Raw -ErrorAction SilentlyContinue))
+              throw "installed Skeleton.exe offline native functionality acceptance failed with exit $($acceptance.ExitCode)"
+            }
+            $acceptanceReport = Get-Content -LiteralPath $acceptanceOut -Raw | ConvertFrom-Json
+            if (
+              $acceptanceReport.schema -ne "skeleton.app.local_ai.acceptance.v1" -or
+              $acceptanceReport.passed -ne $true -or
+              $acceptanceReport.checks_passed -ne 3 -or
+              $acceptanceReport.checks_total -ne 3 -or
+              $acceptanceReport.general_model_quality_certified -ne $false -or
+              $acceptanceReport.enterprise_release_qualified -ne $false -or
+              $acceptanceReport.gguf_model_qualified -ne $false
+            ) {
+              throw "installed Skeleton.exe acceptance returned untrusted or exaggerated evidence"
+            }
+          } finally {
+            Remove-Item -LiteralPath $acceptanceOut, $acceptanceErr -Force -ErrorAction SilentlyContinue
+          }
+
+          # No GGUF or llama.cpp binary is shipped. Verify that the installed
+          # command fails closed on missing operator-owned artifacts, rather
+          # than invoking a downloader or silently falling back to hosted AI.
+          $ggufStdout = Join-Path $env:TEMP ("skeleton-gguf-rejection-" + [guid]::NewGuid().ToString("N") + ".out")
+          $ggufStderr = $ggufStdout + ".err"
+          try {
+            # Start-Process joins the argument array into a Windows command
+            # line; use one token for a genuinely unambiguous refusal probe.
+            $missingGguf = Start-Process -FilePath $cliLauncher -ArgumentList @(
+              "--offline-command", "local-ai",
+              "--gguf-model", ('"' + (Join-Path $env:TEMP "missing-native-model.gguf") + '"'),
+              "--llama-executable", ('"' + (Join-Path $env:TEMP "missing-llama-cli.exe") + '"'),
+              "--prompt", "offline", "--json"
+            ) -Wait -PassThru -RedirectStandardOutput $ggufStdout -RedirectStandardError $ggufStderr
+            $ggufOutput = Get-Content -LiteralPath $ggufStdout -Raw -ErrorAction SilentlyContinue
+            $ggufError = Get-Content -LiteralPath $ggufStderr -Raw -ErrorAction SilentlyContinue
+            if ($missingGguf.ExitCode -ne 1 -or $ggufOutput -notmatch "local GGUF request rejected:") {
+              Write-Host ("GGUF stdout: " + $ggufOutput)
+              Write-Host ("GGUF stderr: " + $ggufError)
+              throw "installed Skeleton.exe GGUF command did not fail closed on missing artifacts: expected authenticated artifact refusal (1), got $($missingGguf.ExitCode)"
+            }
+          } finally {
+            Remove-Item -LiteralPath $ggufStdout, $ggufStderr -Force -ErrorAction SilentlyContinue
           }
 
           $uninstaller = Join-Path $installDir "unins000.exe"
@@ -170,6 +295,9 @@ jobs:
           Start-Sleep -Seconds 1
           if (Test-Path -LiteralPath $launcher) {
             throw "uninstall left installed launcher behind"
+          }
+          if (Test-Path -LiteralPath $cliLauncher) {
+            throw "uninstall left installed native console executable behind"
           }
 
       - name: Upload Windows installer

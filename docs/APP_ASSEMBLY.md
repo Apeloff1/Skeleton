@@ -44,6 +44,10 @@ does not download them.
 # On a machine with Python + Tk, without Docker/Mongo/hosted-provider tokens:
 python -m skeleton app local-ai
 
+# Validate/checkpoint identity and capacity without executing a model prompt:
+python -m skeleton app local-ai --model ./native-runtime.json \
+  --inspect-model --json
+
 # Headless model inference with a bound JSON receipt, for scripts/automation:
 python -m skeleton app local-ai --model ./native-runtime.json \\
   --prompt "hello" --max-output-tokens 8 --json
@@ -51,6 +55,261 @@ python -m skeleton app local-ai --model ./native-runtime.json \\
 # From the Windows installer (no system Python required):
 Skeleton.exe --local-ai
 ```
+
+### Check real offline functionality after installation
+
+The user-facing, Docker-free native AI acceptance mode runs actual finite
+native-model inference with private chat-transcript round-trip, actual bounded
+CPU gradient training with artifact reload, and a two-checkpoint categorical
+benchmark. It uses disposable local files and **does not** qualify the
+general quality of any model, ship pretrained weights, download GGUF weights,
+or install a llama.cpp runtime.
+
+```powershell
+SkeletonCLI.exe --offline-command local-ai --self-check --json
+```
+
+For developers without the Windows installer:
+
+```bash
+python -m skeleton app local-ai --self-check --json
+```
+
+A successful exit code `0` means **only** these three concrete packaged-native
+functions completed. Exit `1` means at least one function failed, with
+per-check success/failure and exception *class only* (local error paths and
+prompts are not echoed). Passing does not certify useful pretrained-model
+quality, GGUF readiness, independent security, enterprise release or
+end-to-end Docker-based services. The exact same mode is exercised in the
+installed-executable Windows CI workflow.
+
+### Two distinct Windows executables for reliable offline operation
+
+The installer ships **`Skeleton.exe`** as a windowed desktop launcher and
+**`SkeletonCLI.exe`** as a console-capable executable. Both are fully frozen
+Python runtimes built from the same source; neither requires a separate
+Python interpreter, provider connection or Docker for the native AI command
+path. They deliberately use different subsystems for output: the desktop
+app opens windows, whereas the console app supports real stdout/stderr,
+redirected JSON receipts, exit status codes and shell automation.
+
+This split is required on Windows because a PyInstaller `--windowed`
+executable may have no usable stdout/stderr and therefore cannot reliably
+serve a command-line JSON API. Run the commands below with
+`SkeletonCLI.exe`, not `Skeleton.exe`.
+
+### Run native AI commands directly from the installed Windows executable
+
+No external Python executable, Docker daemon, hosted API credentials or
+additional terminal runtime is required for the native local AI commands
+in the Windows installer. The same canonical `skeleton.app.cli` operations
+can be invoked through the installed executable:
+
+```powershell
+# Run in PowerShell, from a directory with UTF-8 source data:
+SkeletonCLI.exe --offline-command local-ai --train-corpus .\notes.txt --output-model .\checkpoint.json --epochs 1 --json
+SkeletonCLI.exe --offline-command local-ai --model .\checkpoint.json --inspect-model --json
+SkeletonCLI.exe --offline-command local-ai --model .\checkpoint.json --prompt "hello" --json
+SkeletonCLI.exe --offline-command local-ai --benchmark-suite .\suite.json --model .\checkpoint.json --json
+```
+
+The `--offline-command` mode is deliberately restricted to `local-ai`:
+it cannot activate Docker services, arbitrary shell commands or Python
+modules. The Windows CI builds, installs and invokes this public console CLI path
+for an actual CPU training/checkpoint/inspection round-trip. Full
+frontend/backend/Mongo service assembly still uses Docker separately.
+
+### Run operator-owned GGUF weights through the existing local llama.cpp engine
+
+The offline window now offers **Load GGUF…** as well as **Load checkpoint…**.
+The GGUF path requires you to choose *both* an existing local llama.cpp
+executable and your own GGUF weight file. The selected local executable is
+run as an explicit subprocess after a confirmation dialog. Skeleton does
+not download a model, install the binary, invoke a shell, or forward hosted
+provider credentials. Prefer binaries and model weights you trust.
+
+The same operation is available in the headless canonical application CLI,
+including in the installed Windows executable:
+
+```powershell
+SkeletonCLI.exe --offline-command local-ai `
+  --llama-executable "C:\path\to\llama-cli.exe" `
+  --gguf-model "D:\models\my-model.gguf" `
+  --prompt "Describe your offline capabilities" `
+  --max-output-tokens 128 --json
+```
+
+Model and executable bytes are content-hashed; both identities are validated
+before inference. The existing `llama.cpp` execution plane prohibits
+remote acquisition flags, sanitizes its child process environment, writes
+the prompt to a private local file rather than argv, limits output and
+deadline, and observes cancellation. These are local-process protections,
+not a guarantee that an arbitrary operator-selected executable is benign.
+
+The receipt labels llama.cpp token counts as **estimated** and exposes
+`execution_receipt_digest: null` when the upstream backend has not produced
+one. The GUI keeps only ephemeral conversation history for GGUF because
+Skeleton cannot currently bind those turns to a verified GGUF tokenizer
+identity. **Native checkpoint transcript import/export, CPU training and
+category benchmarks apply only to native checkpoints**, not GGUF.
+
+GGUF quality depends entirely on the user's actual model weights. Bundling
+a local process adapter does not bundle trained weights or establish a
+general-purpose model-quality certificate. Full Docker service assembly
+remains a separate deployment profile.
+
+### Train a small native checkpoint on your own text
+
+The desktop window's **Train small local model…** action can train a genuine,
+small, causal transformer from an explicitly chosen UTF-8 text file using the
+existing CPU training kernels, then reload and verify its native checkpoint.
+No Docker, hosted API key, network, model download or external Python package
+is required inside the bundled Windows executable. This is an **experimental
+small model**, not a pretrained/production LLM; brief, low-quality outputs are
+expected, and no general model-quality certification is made. It does not
+perform unattended collection, training, promotion or overwrite weights.
+
+```bash
+python -m skeleton app local-ai --train-corpus ./notes.txt \
+  --output-model ./my-native.json --epochs 1 --json
+python -m skeleton app local-ai --model ./my-native.json --inspect-model --json
+python -m skeleton app local-ai --model ./my-native.json \
+  --prompt "user: hello" --max-output-tokens 8 --json
+```
+
+### Multi-category benchmark: reject localized regressions
+
+Use **Evaluate…** in the native offline window, or use the headless suite
+runner to test a checkpoint across several independent categories. Unlike a
+single aggregate corpus score, a candidate fails the local regression gate
+if **any** category becomes worse in predicted-token-weighted perplexity
+(or if an optional next-token top-1 objective loses correct predictions),
+even if overall perplexity improves.
+
+Create a bounded `suite.json` using the exact native vocabulary in your
+checkpoint. Cases must have distinct identities and distinct normalized token
+sequences; case text is hashed and is not echoed in the report.
+
+```json
+{
+  "schema": "skeleton.ai.offline.benchmark.v1",
+  "cases": [
+    {"id": "dialog-1", "category": "dialog", "text": "user hello assistant world"},
+    {"id": "dialog-2", "category": "dialog", "text": "hello user world assistant"},
+    {"id": "reason-1", "category": "reason", "text": "world alpha hello"},
+    {"id": "reason-2", "category": "reason", "text": "hello alpha world"}
+  ]
+}
+```
+
+```bash
+# Read-only benchmark for one checkpoint:
+python -m skeleton app local-ai --benchmark-suite ./suite.json \
+  --model ./my-native.json --json
+
+# Protected-category acceptance (exit 0 = local nonregression, 1 = rejected):
+python -m skeleton app local-ai --benchmark-suite ./suite.json \
+  --model ./my-native.json --candidate-model ./my-native-v2.json --json
+```
+
+To test against an explicitly known training corpus, supply
+`--exclude-train-corpus ./train.txt`. The benchmark fails closed when a
+case is identical to a training line after tokenization or copied as a
+contiguous multi-token fragment. The receipt includes the training-source
+digest without echoing the raw training text. The check cannot prove
+disjointness from unknown, historical, third-party or otherwise unavailable
+training data.
+
+The suite is limited to 64 cases, 16 categories, 128 KiB and 1024 total
+tokens, with strict duplicate-key / non-finite / symlink rejection. Every case
+is evaluated against the same verified tokenizer identity and its metrics
+carry the suite/content hashes; no release state is modified. Category
+results are diagnostics, **not** independent certification of safety or
+general model performance. The optional `expected_next` case field
+can evaluate top-1 accuracy for a token from the exact checkpoint vocabulary.
+
+### Continue improving existing weights, with rollback
+
+The **Improve model…** button and CLI can continue local CPU training of
+an existing native checkpoint and measure held-out perplexity on a distinct,
+explicitly supplied UTF-8 file. Both corpora must use the existing vocabulary;
+unknown words and exact overlapping training/evaluation lines fail closed.
+The source checkpoint is never modified. A new candidate checkpoint is written
+**only if** at least one trained epoch lowers held-out perplexity versus the
+original. The best measured epoch is selected; all regressions reject the
+candidate with no output file. This is a bounded local improvement trial,
+**not** evidence of generalized intelligence or a production-model promotion.
+
+```bash
+python -m skeleton app local-ai --improve-model ./my-native.json \
+  --train-corpus ./train.txt --eval-corpus ./heldout.txt \
+  --output-model ./my-native-v2.json --epochs 3 --json
+
+# Optional stricter training: require a THIRD, independent benchmark
+# suite (disjoint from training and held-out epoch-selection text).
+python -m skeleton app local-ai --improve-model ./my-native.json \
+  --train-corpus ./train.txt --eval-corpus ./heldout.txt \
+  --protect-suite ./protected-suite.json \
+  --output-model ./my-native-v2-protected.json --epochs 3 --json
+```
+
+After saving a candidate, run a **read-only comparative evaluation** using the
+same separate held-out file. This returns exit code 0 only when the candidate
+beats the parent on bounded token perplexity, and exit code 1 on a regression.
+It does not change either checkpoint or grant release-promotion authority.
+
+```bash
+python -m skeleton app local-ai --compare-model ./my-native.json \
+  --candidate-model ./my-native-v2.json \
+  --eval-corpus ./heldout.txt --json
+```
+
+Both model identities and tokenizer consistency are verified before scoring;
+the receipt records validation source identity, measured perplexity for both
+models, and the Boolean result. If you edit the validation source, the digest
+changes and previous scores cannot be silently treated as comparable.
+
+### Reproduce a learned checkpoint from its source evidence
+
+A local candidate can be independently **recomputed** without touching its
+existing parent or candidate checkpoint. Save the original improvement CLI
+output to a JSON file, then invoke the deterministic replay verifier:
+
+```bash
+python -m skeleton app local-ai --improve-model ./my-native.json \
+  --train-corpus ./train.txt --eval-corpus ./heldout.txt \
+  --output-model ./my-native-v2.json --epochs 3 --json > accepted-receipt.json
+
+python -m skeleton app local-ai --replay-improvement ./accepted-receipt.json \
+  --compare-model ./my-native.json --candidate-model ./my-native-v2.json \
+  --train-corpus ./train.txt --eval-corpus ./heldout.txt --json
+```
+
+For a protected improvement, also supply the original `--protect-suite`
+file during both generation and replay. Replay strictly validates the receipt
+JSON, all four artifact/data identities, training and validation metrics, and
+the optional protected suite. It then **re-trains actual CPU weights** into
+temporary storage and verifies that the resulting checkpoint has the exact
+same digest. The scratch data is deleted afterward. Edited sources, mismatched
+weights, corrupt receipts or nonreproducible floating-point behavior fail
+closed, without modifying either input checkpoint.
+
+The receipt is a content-addressed local record, **not** a signed identity or
+third-party audit. Matching a tiny native checkpoint is not an independent
+production-model quality, safety or general intelligence certification.
+
+The JSON receipt binds the original/candidate model digests, tokenizer identity,
+both source digests, original/new artifact hashes, CPU training steps, best epoch,
+and baseline/accepted held-out perplexity. Keep the input artifact to roll back.
+No remote provider, autonomous data harvesting, hidden training, or destructive
+overwrite is permitted. Held-out fit is a **narrow** metric and not independently
+certified safety, reliability or broad intelligence.
+
+Training is bounded to a 32-KiB input file, at most 512 normalized tokens,
+256 vocabulary entries, and 1–4 CPU epochs with a fixed small architecture.
+The output is checkpointed using the existing model artifact writer, loaded
+again and verified against the trained native model digest. A path that
+already exists is refused rather than overwriting previous weights.
 
 Use **Load checkpoint…** to open a `write_local_model_artifact`-compatible
 native transformer JSON artifact. File size, duplicate keys, SHA-based model
@@ -60,8 +319,26 @@ window carries conversational context within the model's finite token budget,
 drops only oldest *full* turns when required, offers generation cancellation,
 and only commits a turn to its session history after the local inference
 receipt is complete. No tools, providers or network transport are granted by
-this window. The local transcript is ephemeral and discarded on close; the
-canonical governed assistant/workspace remains the durable product authority.
+this window. The local transcript stays in memory by default. **Open chat…** and **Save chat…**
+support explicit, private, model/tokenizer-bound JSON snapshots: the file
+contains readable plaintext conversation, has a SHA-256 corruption check
+(not a cryptographic signature), rejects symlinks/oversized or malformed
+inputs, and is atomically replaced on save. The user chooses when and where to
+save it; no cloud upload, background autosave, extra runtime service or
+provider credentials are involved. A transcript can only be imported when
+the exact checkpoint and tokenizer identities match. It is a portable
+non-authoritative projection, **not** the governed assistant's persistent
+transactional conversation state.
+
+```bash
+python -m skeleton app local-ai --model ./native-runtime.json \
+  --prompt "Hello" --max-output-tokens 8 --save-chat ./chat.json --json
+python -m skeleton app local-ai --model ./native-runtime.json \
+  --prompt "Continue" --max-output-tokens 8 \
+  --load-chat ./chat.json --save-chat ./chat.json --json
+```
+
+The canonical governed assistant/workspace remains the durable product authority.
 
 **Scope:** this is an independently usable local desktop execution surface,
 not a claim that the complete product shell, all 421 masterplan volumes, advanced
@@ -74,7 +351,7 @@ Windows runner before this mode can be described as shipped.
 Targeted source validation:
 
 ```bash
-python -m unittest tests.flgb.test_desktop_offline_ai -v
+python -m unittest tests.flgb.test_desktop_offline_ai tests.flgb.test_offline_chat_transcript tests.flgb.test_offline_native_training -v
 python -m unittest tests.flgb.test_flgb_02_native_local_provider -v
 python scripts/check_ai_app_construction.py
 python scripts/check_architecture_map.py

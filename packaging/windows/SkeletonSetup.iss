@@ -54,6 +54,7 @@ Source: "{#PayloadDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 [Icons]
 Name: "{group}\Skeleton"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"
+Name: "{group}\Skeleton Local AI (offline)"; Filename: "{app}\{#AppExeName}"; Parameters: "--local-ai"; WorkingDir: "{app}"
 Name: "{group}\Repair Skeleton"; Filename: "{app}\{#AppExeName}"; Parameters: "--repair"; WorkingDir: "{app}"
 Name: "{userdesktop}\Skeleton"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 

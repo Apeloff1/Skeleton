@@ -63,14 +63,27 @@ class TestLargeMilestoneExecution(unittest.TestCase):
         self.assertEqual(state["volumes_covered"], 421)
         self.assertEqual(state["independently_qualified_milestones"], 0)
 
-    def test_evidence_shortlist_identifies_real_unverified_volumes(self):
+    def test_evidence_shortlist_identifies_current_unverified_volumes(self):
+        # The canonical 421-volume signoff state advances over time; pinning
+        # an old partial-signature example makes valid index refreshes fail.
+        # Verify derived navigation against the current signed source set,
+        # while still rejecting any *milestone* qualification claim.
         state = run()
+        signed = set(self.sources["accountability_index"]["fast_sets"]["fully_complete"])
         self.assertEqual(len(state["evidence_proximity_shortlist"]), 10)
-        self.assertEqual(state["evidence_proximity_shortlist"][0], "MDM-008")
-        focus = next(m for m in state["milestones"] if m["id"] == "MDM-008")
-        self.assertEqual(focus["signed_source_volumes"], 4)
-        self.assertEqual([row["volume"] for row in focus["remaining"]], ["VOL-039"])
-        self.assertTrue(focus["remaining"][0]["tests"])
+        self.assertEqual(state["source_signed_volumes"], len(signed))
+        for milestone, row in zip(self.roadmap["milestones"], state["milestones"]):
+            expected_missing = [v["id"] for v in milestone["volumes"] if v["id"] not in signed]
+            self.assertEqual([entry["volume"] for entry in row["remaining"]], expected_missing)
+            self.assertEqual(
+                row["signed_source_volumes"],
+                len(milestone["volumes"]) - len(expected_missing),
+            )
+            for entry in row["remaining"]:
+                self.assertTrue(entry["tests"])
+                self.assertTrue(entry["implementation_paths"])
+        self.assertEqual(state["independently_qualified_milestones"], 0)
+        self.assertTrue(all(m["completion_signoff"] is None for m in self.roadmap["milestones"]))
 
     def test_source_signed_subgroup_cannot_auto_promote_milestone(self):
         mock = copy.deepcopy(self.sources["accountability_index"])
