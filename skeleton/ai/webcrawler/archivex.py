@@ -77,8 +77,14 @@ class ArchiveX:
 
     @staticmethod
     def _identity(source_url: str, observed_at: float, digest: str) -> str:
+        # SQLite REAL round-trips integer epoch seconds as floating-point.
+        # Keep snapshot IDs invariant between initial capture and DB reads,
+        # without weakening byte/digest/identity verification.
+        if not isinstance(observed_at, (int, float)) or isinstance(observed_at, bool) or not isfinite(observed_at):
+            raise ValueError("invalid archival observation timestamp")
+        normalized_at = float(observed_at)
         canonical = json.dumps(
-            [source_url, observed_at, digest],
+            [source_url, normalized_at, digest],
             separators=(",", ":"), ensure_ascii=True, allow_nan=False,
         )
         return sha256(canonical.encode("utf-8")).hexdigest()
