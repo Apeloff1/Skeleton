@@ -162,6 +162,50 @@ class DragonWisdomMemory:
             "training_authorized": False, "release_authorized": False,
         }
 
+    def read_current(self, owner: str, *, now: int, authorized: bool,
+                     mechanic: str | None = None, limit: int = 32) -> dict:
+        """Read-only, fail-closed index projection suitable for product routes.
+
+        Never mutates on GET. The trusted background reconciler separately
+        applies withdrawals; stale persisted cards are excluded immediately
+        even if that worker has not run.
+        """
+        if authorized is not True:
+            raise PermissionError("authenticated advisory memory read required")
+        _id(owner); _time(now)
+        if mechanic is not None:
+            _id(mechanic)
+        if type(limit) is not int or not 1 <= limit <= 64:
+            raise ValueError("bounded advisory retrieval required")
+        events = self._events(owner)
+        persisted = self._rows(owner)
+        source = self.pyramid.hoag_view(owner, now=now, authorized=True, limit=64)
+        promoted = {row["review_digest"]: row
+                    for row in self.pyramid._history(owner)
+                    if row["kind"] == "promoted"}
+        valid = {}
+        for card in source["items"]:
+            rec = persisted.get(card["review_digest"])
+            approval = promoted[card["review_digest"]].get("approval_evidence_digest")
+            if (rec is None or not isinstance(approval, str)
+                    or rec["approval_evidence_digest"] != approval
+                    or rec["knowledge_root"] != source["knowledge_root"]
+                    or rec["review_evidence_digest"] != card["review_evidence_digest"]
+                    or rec["source_revisions"] != card["source_revisions"]
+                    or rec["expires_at"] != card["expires_at"]
+                    or (mechanic is not None and rec["mechanic"] != mechanic)):
+                continue
+            valid[card["review_digest"]] = rec
+        rows = sorted(valid.values(), key=lambda x: (x["mechanic"], x["review_digest"]))
+        return {
+            "schema": "skeleton.dragon.advisory_memory_view.v1",
+            "owner": owner, "items": rows[:limit],
+            "knowledge_root": source["knowledge_root"],
+            "journal_head": events[-1]["digest"] if events else None,
+            "reconciliation_required": set(valid) != set(persisted),
+            "training_authorized": False, "release_authorized": False,
+        }
+
     def retrieve(self, owner: str, mechanic: str, *, now: int,
                  authorized: bool, trusted_worker: bool, limit: int = 16) -> tuple[dict, ...]:
         _id(owner); _id(mechanic); _time(now)
