@@ -63,14 +63,34 @@ def _authored_stage_accents(
         channels_b = [(second >> (bits*n)) & mask for n in range(3)]
         distance = sum(abs(a - b) for a, b in zip(channels_a, channels_b))
         if distance < minimum_delta and index > 0:
-            channel = index % 3
-            value = channels_b[channel]
-            channels_b[channel] = (
-                min(mask, value + minimum_delta)
-                if value <= mask - minimum_delta
-                else max(0, value - minimum_delta)
-            )
-            second = sum(v << (bits*n) for n, v in enumerate(channels_b))
+            options: list[tuple[tuple[int, int, int], int]] = []
+            # Move a single RGB channel by at most one meaningful hardware
+            # brightness quantum. Choose the smallest adjustment that really
+            # increases perceptual separation (not merely numeric inequality).
+            for channel in range(3):
+                for offset in (-minimum_delta, minimum_delta):
+                    candidate = max(0, min(mask, channels_b[channel] + offset))
+                    change = abs(candidate - channels_b[channel])
+                    if not change:
+                        continue
+                    candidate_distance = (
+                        distance
+                        - abs(channels_a[channel] - channels_b[channel])
+                        + abs(channels_a[channel] - candidate)
+                    )
+                    if candidate_distance >= minimum_delta:
+                        proposal = list(channels_b)
+                        proposal[channel] = candidate
+                        new_color = sum(
+                            value << (bits*n) for n, value in enumerate(proposal)
+                        )
+                        options.append((
+                            (change, -candidate_distance, (channel-index)%3),
+                            new_color,
+                        ))
+            if not options:
+                raise Sega8BitNativeError("native stage colors collapse after quantization")
+            second = min(options)[1]
         accents.append((first, second))
     return tuple(accents)
 
