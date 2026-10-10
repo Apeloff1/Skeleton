@@ -321,7 +321,11 @@ def test_complete_native_release_pipeline_binds_real_bytes_and_signed_domains(tm
         **inputs, trust_registry=trust, attestations=signatures,
         evaluation_utc="2026-10-11T12:00:00Z",
     )
-    assert receipt.independent_reviews_complete is True
+    # This compatibility gate checks signatures against caller-provided keys
+    # only. Independent identity requires the pinned-root entrypoint.
+    assert receipt.independent_reviews_complete is False
+    assert receipt.review_signatures_structurally_complete is True
+    assert receipt.public_receipt()["external_reviewer_root_pinned"] is False
     assert receipt.bytes_and_review_bound is True
     assert receipt.intake.native_binary_sha256 == inputs["candidate"].native_binary_sha256
     assert receipt.signed_review.candidate_sha256 == inputs["candidate"].digest
