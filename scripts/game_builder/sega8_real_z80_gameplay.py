@@ -165,6 +165,40 @@ def observe_actual_gameplay(machine: Sega8Machine, *, width: int, height: int) -
     }
 
 
+def verify_original_stage_palette(
+    machine: Sega8Machine, meta: dict[str, Any], stage: int,
+) -> None:
+    """Read guest VDP CRAM for each independently authored native stage."""
+    name = (
+        "game_gear_original_stage_rgb444_accents"
+        if machine.target == "sega_game_gear"
+        else "master_system_original_stage_rgb222_accents"
+    )
+    entries = meta.get(name)
+    if (not isinstance(entries, list)
+            or len(entries) != meta.get("levels")
+            or type(stage) is not int
+            or not 0 <= stage < len(entries)):
+        raise Sega8NativeGameplayError("native stage color metadata is malformed")
+    expected = entries[stage]
+    bound = 4095 if machine.target == "sega_game_gear" else 63
+    if (not isinstance(expected, list) or len(expected) != 2
+            or any(type(c) is not int or not 0 <= c <= bound for c in expected)):
+        raise Sega8NativeGameplayError("original stage accent exceeds hardware CRAM limits")
+    if machine.target == "sega_game_gear":
+        observed = [
+            machine.cram[2] | (machine.cram[3] << 8),
+            machine.cram[4] | (machine.cram[5] << 8),
+        ]
+    else:
+        observed = [machine.cram[1], machine.cram[2]]
+    if observed != expected:
+        raise Sega8NativeGameplayError(
+            f"actual native {machine.target} CRAM diverges on stage {stage}: "
+            f"observed {observed}, expected {expected}"
+        )
+
+
 class ActualZ80GameSession:
     """Interrupt-paced Z80 guest, without host-authoritative game mutations."""
 
@@ -271,6 +305,7 @@ def verify_original_z80_gameplay(
     session = ActualZ80GameSession(rom, target)
     first = session.run_to_playable_boot(meta["width"], meta["height"])
     _assert_state(first, reference["initial"], 0)
+    verify_original_stage_palette(session.machine,meta,first["level"])
     # Verify actual Z80 companion interactions independently of the game's
     # reference actions. A single chord frame pets without starting demo.
     session.step_frame("attract")
@@ -345,6 +380,7 @@ def verify_original_z80_gameplay(
             session.machine,width=meta["width"],height=meta["height"],
         )
         _assert_state(stable,expected,index)
+        verify_original_stage_palette(session.machine,meta,stable["level"])
         trace = advance_semantic_trace(trace,index,expected["button"],stable)
         snapshots_checked += 1
 
@@ -401,6 +437,7 @@ def verify_original_z80_gameplay(
                 continue
             last_observed=observed
             if all(observed[key]==expected[key] for key in _STATE_KEYS):
+                verify_original_stage_palette(machine,meta,observed["level"])
                 attract_trace=advance_semantic_trace(
                     attract_trace,demo_index,expected["button"],observed,
                 )
@@ -490,6 +527,9 @@ def verify_original_z80_gameplay(
         "real_z80_directions_seen_as_active_low_buttons":
             machine.active_joypad_bits_observed,
         "original_companion_rank_and_reward_verified": True,
+        "original_hardware_stage_color_accents_verified": True,
+        "original_hardware_stage_accents_verified_per_move":
+            snapshots_checked,
         "native_companion_pet_verified_on_guest_z80": True,
         "native_pet_preserves_gameplay_verified": True,
         "native_pause_blocks_gameplay_and_mutes_psg_verified": True,
