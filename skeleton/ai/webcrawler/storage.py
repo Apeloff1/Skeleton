@@ -14,17 +14,8 @@ class SqliteCrawlStore:
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA foreign_keys=ON")
         self.db.execute("PRAGMA busy_timeout=30000")
-        self.db.executescript("""
-        CREATE TABLE IF NOT EXISTS documents(
-          content_hash TEXT PRIMARY KEY, canonical_url TEXT NOT NULL, fetched_url TEXT NOT NULL,
-          title TEXT NOT NULL, text TEXT NOT NULL, content_type TEXT NOT NULL,
-          fetched_at REAL NOT NULL, source_score REAL NOT NULL, provenance TEXT NOT NULL, links TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS urls(
-          canonical_url TEXT PRIMARY KEY, content_hash TEXT NOT NULL REFERENCES documents(content_hash));
-        CREATE TABLE IF NOT EXISTS checkpoints(
-          key TEXT PRIMARY KEY, state TEXT NOT NULL);
-        """)
-        self.db.commit()
+        # Explicit version-1 tables and later indexes share one migration owner.
+        # Direct migration of a clean SQLite DB must work identically.
         migrate(self.db)
     def close(self): self.db.close()
     def has_url(self,url:str)->bool:
