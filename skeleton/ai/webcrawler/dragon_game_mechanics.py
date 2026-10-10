@@ -143,7 +143,9 @@ class GameMechanicsMemory:
         owner = self._owner(session.owner)
         if session.raw_video_retained is not False:
             raise ValueError("raw recording retention requires a separate storage policy")
-        if not isinstance(session.game_label, str) or not 1 <= len(session.game_label) <= 200:
+        if (not isinstance(session.game_label, str) or not 1 <= len(session.game_label) <= 200
+                or not session.game_label.isprintable()
+                or len(session.game_label.encode("utf-8")) > 600):
             raise ValueError("invalid game label")
         if not isinstance(session.duration_ms, int) or not 0 < session.duration_ms <= self.policy.max_session_seconds * 1000:
             raise ValueError("invalid session duration")
