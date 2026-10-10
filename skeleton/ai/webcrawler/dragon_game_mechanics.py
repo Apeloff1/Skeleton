@@ -263,6 +263,7 @@ class GameMechanicsMemory:
                 or not isinstance(m, str) or not isinstance(p, str)
                 or not isinstance(d, str) or not 1 <= len(d) <= self.policy.max_note_chars
                 or not d.isprintable()
+                or len(d.encode("utf-8")) > self.policy.max_note_chars * 4
                 or type(c) not in (int, float) or not 0 <= c <= 1 or not isfinite(c)
                 or type(u) is not bool
                 for t, m, d, c, p, u in recorded
