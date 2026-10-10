@@ -878,3 +878,32 @@ no separate counters may be used to award compiler or hardware assurance.
 Toolchain references: https://github.com/erique/human68k-gcc ;
 https://github.com/freemint/libcmini ;
 https://wiki.amigaos.net/wiki/Graphics_Library_and_Text .
+
+## Two additional honest Motorola-compatible hardware source revisions
+
+The new native Atari ST and Amiga 500 programs also produce bounded
+**source-custody projects** for Atari Falcon and Amiga 1200, respectively.
+
+- **Atari Falcon**: runs the original conservative Motorola 68000 TOS/
+  GEMDOS program in its backward-compatible mode. Generates an original
+  Falcon-targeted manifest and retains the Atari ST parent source digest.
+  It does not imply VIDEL enhancements, 68030-specific code, DSP audio
+  support, target-native compilation, or physical Falcon validation.
+- **Amiga 1200**: preserves the actual Kickstart 1.3 graphics/Intuition
+  program and Amiga Hunk executable format on the 68020 AGA family.
+  It does not implicitly enable AGA graphics, CD32 pad controls,
+  faster 68020 code, hardware audio, or the Amiga floppy ADF packaging.
+
+These targets are not counted as newly authored gameplay engines. They
+reuse a compatible OS/ABI source implementation with explicit
+parent-source fingerprint, unverified target flags and destination
+hardware constraints. **Amiga CD32 deliberately remains unsupported**
+because its native bundled controller lacks the game's mandatory
+keyboard controls; simply renaming the Amiga 500 output would create
+a non-playable console game.
+
+Together this pass adds three independently authored native 68000
+game engines plus two explicitly compatible source destinations, for
+five new source-capable platform identities. Source-stage readiness is
+not hardware or distribution completion. The current full coverage
+can be reproduced from dragon_platform_readiness.coverage_report().

@@ -80,9 +80,9 @@ sharp_x68000|Sharp|16-bit Japanese PC|1987|68000|custom sprite GPU|YM2151|keyboa
 nec_pc_8801|NEC|8-bit Japanese PC|1981|Z80|NEC video|YM2203|keyboard|PC-88 cross compiler|d88|toolchain_adapter
 nec_pc_9801|NEC|16-bit Japanese PC|1982|8086|GDC|YM2608|keyboard|OpenWatcom PC-98|exe|toolchain_adapter
 fm_towns|Fujitsu|CD-ROM era PC|1989|386|FM Towns graphics|YM2612|keyboard|FM Towns homebrew|exe|toolchain_adapter
-amiga_1200|Commodore|32-bit computer|1992|68020|AGA|Paula|mouse/joystick|vbcc / vasm|adf|toolchain_adapter
+amiga_1200|Commodore|32-bit computer|1992|68020|AGA|Paula|mouse/joystick|vbcc +kick13|hunk|native_source
 amiga_cd32|Commodore|32-bit CD console|1993|68020|AGA|Paula|CD32 pad|vbcc / vasm|iso|toolchain_adapter
-atari_falcon|Atari|32-bit computer|1992|68030|VIDEL|DSP56001|mouse/joystick|m68k GCC|prg|toolchain_adapter
+atari_falcon|Atari|32-bit computer|1992|68030|VIDEL|DSP56001|mouse/joystick|m68k-atari-mint-gcc|tos|native_source
 atari_jaguar|Atari|64-bit marketed console|1993|68000/TOM/JERRY|Object Processor|JERRY DSP|pad|JagStudio|jag|toolchain_adapter
 philips_cdi|Philips|multimedia console|1991|68070|CD-i video|ADPCM|remote|CD-i SDK|iso|licensed_sdk
 3do|The 3DO Company|32-bit console|1993|ARM60|CEL|DSP|pad|3DO homebrew SDK|iso|toolchain_adapter

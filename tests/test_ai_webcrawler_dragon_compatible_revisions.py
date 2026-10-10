@@ -20,8 +20,8 @@ def _game(target,style="arcade_score_attack"):
         mechanics=(Mechanic.MOVEMENT,Mechanic.EXPLORATION),
         authorized=True)
 
-def test_all_13_revisions_have_same_cartridge_abi_and_external_checks():
-    assert len(REVISIONS)==len(COMPATIBILITY)==13
+def test_all_15_revisions_have_same_cartridge_abi_and_external_checks():
+    assert len(REVISIONS)==len(COMPATIBILITY)==15
     assert len(EMITTERS)>=86
     assert len({r.target for r in REVISIONS})==len(REVISIONS)
     for r in REVISIONS:
@@ -117,3 +117,34 @@ def test_unauthorized_compatibility_calls_fail_closed():
             target_id="game_boy_pocket",style="arcade_score_attack",
             candidate_id="f"*64,mechanics=(Mechanic.MOVEMENT,),
             authorized=False)
+
+
+@pytest.mark.parametrize("target,parent,output",[
+    ("amiga_1200","amiga_500","hunk"),
+    ("atari_falcon","atari_st","tos"),
+])
+def test_classic_68000_os_compatibility_without_claiming_enhanced_chipsets(
+    target,parent,output,
+):
+    source=_game(target)
+    original=_game(parent)
+    assert source.output==original.output==output
+    assert source.files["src/main.c"]==original.files["src/main.c"]
+    assert source.files["Makefile"]==original.files["Makefile"]
+    proof=json.loads(source.files["dragon-compatible-revision.json"])
+    assert proof["target"]==target
+    assert proof["parent"]==parent
+    assert not proof["target_compiler_verified"]
+    assert not proof["target_hardware_verified"]
+    assert not proof["target_emulator_verified"]
+    assert "dragon-m68k-contract.json" in source.files
+    assert "dragon-parent-hardware-budget.json" in source.files
+    assert "dragon-hardware-budget.json" not in source.files
+    assert "source custody" in source.files["README.compatibility.md"].lower() or (
+        "source" in source.files["README.compatibility.md"].lower()
+    )
+    assert target in EMITTERS
+    assert "arcade_score_attack" in next(
+        r for r in target_catalog() if r["id"]==target)["supported_styles"]
+    assert "grand_strategy" not in next(
+        r for r in target_catalog() if r["id"]==target)["supported_styles"]

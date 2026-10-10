@@ -59,6 +59,12 @@ REVISIONS=(
  CompatibleRevision("sega_mark_iii","master_system","Mark III compatible Sega VDP/Z80","sms",
   "Mark III cartridge connections and FM variants require separate review",
   "SMS compatible Z80 ROM build and Mark III controller/palette"),
+ CompatibleRevision("amiga_1200","amiga_500","Kickstart-compatible 68000 Amiga Hunk","hunk",
+  "A1200 68020/AGA can execute original 68000 Intuition 1.3 window source; no enhanced AGA graphics, faster CPU or CD32 pad claimed",
+  "vbcc +kick13 build and A1200 keyboard/graphics.library AmigaOS emulator replay"),
+ CompatibleRevision("atari_falcon","atari_st","Atari TOS/GEMDOS 68000 compatible executable","tos",
+  "Falcon 68030 supports TOS user-mode GEMDOS; does not prove VIDEL/DSP sound, enhanced display or 68030-specific performance",
+  "m68k-atari-mint-gcc build plus Falcon TOS keyboard and 68000 code compatibility emulator replay"),
 )
 COMPATIBILITY={r.target:r for r in REVISIONS}
 assert len(COMPATIBILITY)==len(REVISIONS)
