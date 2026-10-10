@@ -8,11 +8,10 @@ hardware certification. Fail closed on unknown device I/O or exhausted budget.
 from __future__ import annotations
 
 import argparse
-from hashlib import sha256
 import json
 from pathlib import Path
 
-from skeleton.ai.game_builder.sega_8bit_rom import validate_rom_file, validate_rom
+from skeleton.ai.game_builder.sega_8bit_rom import validate_rom
 from skeleton.ai.game_builder.native_release_intake import _read_bounded
 
 MAX_INSTRUCTIONS = 3_000_000
