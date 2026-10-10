@@ -299,3 +299,11 @@ def test_hazard_awareness_map_excludes_hazard_tile_and_respects_radius():
     with pytest.raises(MultipathError):
         hazard_proximity(p, radius=0)
 
+
+def test_hazard_exposure_counts_near_misses_without_collision():
+    p = RouteProblem.from_rows(HAZARD_LEVEL)
+    route = solve_route(p)
+    assert route.hazard_visits == 0
+    assert route_exposure_score(p, route, radius=2) > 0
+    assert route_exposure_score(p, route, radius=1) <= route_exposure_score(p, route, radius=2)
+
