@@ -453,6 +453,7 @@ def verify_source_release(payload: bytes) -> dict:
             if receipt.get("evidence") != "rom_structural_verified":
                 raise ValueError("binary evidence state inconsistent")
         elif (receipt.get("binary_sha256") is not None or
+              receipt.get("compiler_state") == "compiled_native" or
               receipt.get("evidence") != "source_generated"):
             raise ValueError("source-only release falsely claims compiled evidence")
         if set(names) != expected:
@@ -531,7 +532,9 @@ def verify_source_bundle(bundle: bytes) -> dict:
         if "production-index.json" not in names:
             raise ValueError("missing canonical production index")
         infos = source.infolist()
-        if any(i.flag_bits & 1 or i.file_size > 3_000_000 for i in infos):
+        if any(i.flag_bits & 1 or
+               ((i.external_attr >> 16) & 0o170000) == 0o120000 or
+               i.file_size > 3_000_000 for i in infos):
             raise ValueError("unsafe source bundle member")
         if sum(i.file_size for i in infos) > 3_000_000:
             raise ValueError("expanded source bundle budget exceeded")
@@ -562,6 +565,8 @@ def verify_source_bundle(bundle: bytes) -> dict:
                     receipt["request_id"] != index["request_id"] or
                     receipt["source_fingerprint"] != row.get("source_fingerprint") or
                     receipt["gameplay_mode"] != row.get("gameplay_mode") or
+                    receipt["binary_sha256"] is not None or
+                    receipt["binary_member"] is not None or
                     row.get("binary_sha256") is not None):
                 raise ValueError("nested release evidence mismatch")
             seen.add(target)
@@ -618,7 +623,9 @@ def publish_production(
     if dry_run:
         return {"schema": SCHEMA, "status": "planned", "request_id": request.request_id,
                 "targets": [asdict(x) for x in decisions], "artifacts": []}
-    destination = Path(destination).expanduser()
+    destination = Path(destination).expanduser().absolute()
+    if any(p.is_symlink() for p in (destination, *destination.parents)):
+        raise ValueError("unsafe symlink anywhere in destination ancestry")
     if destination.is_symlink() or (destination.exists() and not destination.is_dir()):
         raise ValueError("unsafe destination directory")
     if destination.exists() and any(p.is_symlink() for p in destination.iterdir()):
@@ -682,7 +689,9 @@ def verify_published_production(destination: Path, index_name: str) -> dict:
     _path(index_name)
     if not re.fullmatch(r"dragon-production-[a-f0-9]{20}\.json", index_name):
         raise ValueError("index filename is not a production receipt")
-    root = Path(destination)
+    root = Path(destination).absolute()
+    if any(p.is_symlink() for p in (root, *root.parents)):
+        raise ValueError("unsafe portfolio ancestor")
     if root.is_symlink() or not root.is_dir():
         raise ValueError("unsafe portfolio directory")
     index_path = root / index_name
