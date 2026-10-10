@@ -7,9 +7,10 @@ network connection. Causal replay is over typed actions and content hashes.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from typing import Sequence
 
-from .contracts import canonical_digest
+from .contracts import canonical_digest, canonical_json
 from .playable_world import (
     DIRECTIONS, MAX_COLLECTIBLES, GameBuildIntent, PlayableWorld,
     PlayableWorldError,
@@ -398,6 +399,32 @@ def replay_divergence(
     if len(first.action_receipts) != len(second.action_receipts):
         return shared
     return None
+
+
+
+MAX_SERIALIZED_REPLAY_BYTES = 12 * 1024 * 1024
+
+
+def serialize_replay(
+    world: PlayableWorld, replay: GameReplay, *, authorized: bool,
+) -> bytes:
+    """Produce a bounded, canonical offline-save blob with replay custody.
+
+    No user credential, unreviewed assets or executable code is embedded.
+    The world remains a separately verified source of gameplay authority.
+    """
+    if authorized is not True:
+        raise PermissionError("replay serialization requires authorization")
+    verify_replay(world, replay, authorized=True)
+    raw = canonical_json({
+        "schema": "skeleton.game_builder.offline-replay-save.v1",
+        "world_digest": world.digest,
+        "replay": replay.to_payload(),
+        "replay_digest": replay.digest,
+    }).encode("ascii")
+    if not 0 < len(raw) <= MAX_SERIALIZED_REPLAY_BYTES:
+        raise GameplayError("offline replay save exceeds byte budget")
+    return raw
 
 
 def demonstrate_solvable(world: PlayableWorld, *, authorized: bool) -> GameReplay:
