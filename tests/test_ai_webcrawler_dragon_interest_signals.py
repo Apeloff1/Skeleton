@@ -68,6 +68,37 @@ def test_invalid_topics_are_rejected(tags):
     assert profile.rejected_signals == 1
 
 
+@pytest.mark.parametrize("override", [
+    {"consent": "yes"},
+    {"signal_id": None},
+    {"signal_id": "invalid\\nline"},
+    {"observed_at": "future"},
+    {"observed_at": True},
+    {"observed_at": -1.0},
+    {"strength": "1"},
+    {"strength": True},
+    {"tags": ["not", "tuple"]},
+    {"source_id": None},
+    {"source_id": "newline\\rsource"},
+])
+def test_malformed_interest_signal_rejected_without_profile_crash(override):
+    from dataclasses import replace
+    valid = make_signal("safe", SignalKind.LIKE, ["original_homebrew"])
+    profile = build_interest_profile([replace(valid, **override)], now=1000.0)
+    assert profile.accepted_signals == 0
+    assert profile.rejected_signals == 1
+    assert profile.topics == ()
+
+
+def test_forged_opt_in_signal_is_not_accepted():
+    profile = build_interest_profile(
+        [object(), make_signal("real", SignalKind.SAVE, ["art"])], now=1000.0,
+    )
+    assert profile.accepted_signals == 1
+    assert profile.rejected_signals == 1
+    assert signal_search_terms(profile) == ("art",)
+
+
 def test_processing_budget_is_fail_closed():
     signals = [make_signal(str(i), SignalKind.LIKE, ["topic"]) for i in range(3)]
     with pytest.raises(ValueError, match="budget"):
