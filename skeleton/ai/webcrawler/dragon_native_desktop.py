@@ -62,6 +62,8 @@ class PuzzleBuildEvidence:
     hint_output_sha256: str
     independent_replays_verified: int
     replay_transcripts_sha256: str
+    native_challenge_selftest: str
+    challenge_output_sha256: str
     runtime_output_sha256: str
     runtime_stages_verified: int
     abstract_levels_verified: int
@@ -300,6 +302,18 @@ def build_native_puzzle_executable(
                         parsed["solved"] != expected.solved):
                     raise ValueError("compiled game diverges from independent native physics")
                 transcripts.append(observed.stdout.strip())
+        challenge=_invoke([str(executable),"--challenge-selftest"],root=root,
+                          timeout=timeout_seconds)
+        challenge_lines=[line.strip() for line in challenge.stdout.splitlines()
+                         if line.strip()]
+        if (len(challenge_lines)!=proof["stages"]+1 or
+                challenge_lines[-1]!=
+                    f'DRAGON_NATIVE_CHALLENGE PASS stages={proof["stages"]}' or
+                any(not re.fullmatch(
+                    rf"PUZZLE_CHALLENGE_PASS level={index} stars=3 optimal=[1-9][0-9]*",
+                    challenge_lines[index-1],
+                ) for index in range(1,proof["stages"]+1))):
+            raise ValueError("native optimal-path challenge score selftest failed")
         # Exercise a separate real executable route beyond the selftest.
         listing = _invoke([str(executable), "--list"], root=root,
                           timeout=timeout_seconds)
@@ -321,6 +335,8 @@ def build_native_puzzle_executable(
         hint_output_sha256=_hash(hint.stdout.encode("utf-8")),
         independent_replays_verified=len(transcripts),
         replay_transcripts_sha256=_hash(_canonical(transcripts)),
+        native_challenge_selftest="optimal_route_three_stars_all_stages",
+        challenge_output_sha256=_hash(challenge.stdout.encode("utf-8")),
         runtime_output_sha256=_hash(passed.stdout.encode("utf-8")),
         runtime_stages_verified=proof["stages"],
         abstract_levels_verified=proof["stages"],
@@ -390,6 +406,8 @@ def verify_native_puzzle_executable(package: bytes) -> dict:
                              str(evidence.get("replay_transcripts_sha256", ""))) or
             evidence.get("runtime_selftest") != "native_executable_all_stages_passed" or
             evidence.get("native_hint_selftest") != "current_position_bfs_all_stages_passed" or
+            evidence.get("native_challenge_selftest") != "optimal_route_three_stars_all_stages" or
+            not re.fullmatch(r"[a-f0-9]{64}",str(evidence.get("challenge_output_sha256", ""))) or
             not re.fullmatch(r"[a-f0-9]{64}", str(evidence.get("hint_output_sha256", ""))) or
             not re.fullmatch(r"[a-f0-9]{64}", str(evidence.get("runtime_output_sha256", ""))) or
             evidence.get("legal_claim") !=
