@@ -62,7 +62,7 @@ def _authored_stage_accents(
         channels_a = [(first >> (bits*n)) & mask for n in range(3)]
         channels_b = [(second >> (bits*n)) & mask for n in range(3)]
         distance = sum(abs(a - b) for a, b in zip(channels_a, channels_b))
-        if distance < minimum_delta:
+        if distance < minimum_delta and index > 0:
             channel = index % 3
             value = channels_b[channel]
             channels_b[channel] = (
@@ -776,7 +776,7 @@ def compile_native_sega_8bit(
         raise Sega8BitNativeError("original demonstration exceeds verified playback capacity")
     themes = {
         "forest": ((0x000, 0x2A4, 0x5A8, 0xFFF),
-                   (0, 13, 29, 63)),
+                   (0, 9, 29, 63)),
         "space": ((0x000, 0xD94, 0x8DC, 0xFFF),
                   (0, 53, 60, 63)),
         "desert": ((0x000, 0xC74, 0xFC2, 0xFFF),
