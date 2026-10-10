@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from collections.abc import Callable
 from typing import Any
 
@@ -223,12 +223,23 @@ class DragonWisdomPyramid:
                        for h in citations})
         groups = {h.dependence_group for h in citations if h.stance == "supports"}
         source_ids = {h.source_id for h in citations if h.stance == "supports"}
-        if disposition == "accepted" and (
-            len(groups) < 2 or len(source_ids) < 2
-            or any(h.stance != "supports" for h in citations)
-            or mechanic in brief.conflicts
-        ):
-            raise ValueError("acceptance needs two independent supporting sources without challenge")
+        if disposition == "accepted":
+            # A brief is a bounded, relevance-ranked view. It may omit a lower-
+            # ranked contradiction. Recheck EVERY current, in-scope claim for
+            # this mechanic before admitting even a selected clean subset.
+            # The canonical _rows method validates the complete custody chain.
+            all_stances = []
+            for source in self.library._rows(owner):
+                if source["status"] != "active" or "design_reference" not in source["allowed_scopes"]:
+                    continue
+                for entry in source["notes"]:
+                    if entry["note"]["mechanic"] == mechanic:
+                        all_stances.append(entry["note"]["stance"])
+            if (len(groups) < 2 or len(source_ids) < 2
+                    or any(h.stance != "supports" for h in citations)
+                    or mechanic in brief.conflicts
+                    or any(stance != "supports" for stance in all_stances)):
+                raise ValueError("acceptance needs two independent supporting sources without challenge")
 
         def check(events: list[dict[str, Any]]) -> None:
             self.library.require_fresh_brief(brief, authorized=True)
@@ -288,6 +299,110 @@ class DragonWisdomPyramid:
         return self._append(owner, "revoked", {
             "review_digest": review_digest, "reason": reason,
         }, now, check)
+
+    def enqueue_canonical_refreshes(
+        self, owner: str, *, now: int, authorized: bool,
+        trusted_worker: bool, max_age_seconds: int = 604800,
+        min_independent_groups: int = 2, min_confidence_ppm: int = 800000,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Atomically bridge the authoritative gap planner to this journal.
+
+        No crawler executes and no request gains global resource authority.
+        A single canonical source snapshot determines the full capped batch;
+        repeated scheduling ignores outstanding orders instead of minting
+        duplicate requests. Historical planners/policies remain separate.
+        """
+        _authority(authorized, trusted_worker)
+        _id(owner)
+        _time(now)
+        if type(limit) is not int or not 1 <= limit <= 32:
+            raise ValueError("bounded recrawl enqueue limit required")
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            events = self._history(owner)
+            if events and now < events[-1]["at"]:
+                raise ValueError("refresh clock predates the source journal")
+            utc = datetime.fromtimestamp(now, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            plan = self.library.plan_recrawl(
+                owner, as_of=utc, scope="design_reference", authorized=True,
+                max_age_seconds=max_age_seconds,
+                min_independent_groups=min_independent_groups,
+                min_confidence_ppm=min_confidence_ppm, limit=limit,
+            )
+            if plan["knowledge_root"] != self.library.snapshot_root(owner, authorized=True):
+                raise ValueError("canonical knowledge changed during planning")
+            outstanding = self._open_orders(events)
+            scheduled: list[dict[str, Any]] = []
+            skipped: list[str] = []
+            reason_map = {
+                "future_observation": "stale_source",
+                "contradictory_evidence": "contradiction",
+                "stale_observation": "stale_source",
+                "uncertain_evidence": "missing_evidence",
+                "low_confidence": "missing_evidence",
+                "insufficient_independent_support": "missing_evidence",
+            }
+            for request in plan["requests"]:
+                source_id = _id(request["source_id"])
+                revision = _hash(request["expected_parent_digest"])
+                if source_id in outstanding:
+                    skipped.append(source_id)
+                    continue
+                if revision != self._latest_revision(owner, source_id):
+                    raise ValueError("canonical parent changed before enqueue")
+                reasons = request["reasons"]
+                if not isinstance(reasons, list) or not reasons or any(
+                    reason not in reason_map for reason in reasons
+                ):
+                    raise ValueError("unrecognized canonical recrawl reason")
+                # Preserve all original reasons for audit, but emit a
+                # deterministic primary handling category for queue clients.
+                primary = next(reason_map[r] for r in (
+                    "future_observation", "contradictory_evidence",
+                    "stale_observation", "uncertain_evidence",
+                    "low_confidence", "insufficient_independent_support",
+                ) if r in reasons)
+                if len(events) + len(scheduled) >= 10000:
+                    raise ValueError("refresh journal capacity exhausted")
+                sequence = len(events) + len(scheduled)
+                previous = (scheduled[-1]["digest"] if scheduled
+                            else events[-1]["digest"] if events else None)
+                body = {
+                    "schema": _SCHEMA, "owner": owner, "sequence": sequence,
+                    "prior_digest": previous, "kind": "recrawl_requested",
+                    "at": now, "source_id": source_id, "revision": revision,
+                    "reason": primary, "priority": max(1, request["priority"]),
+                    "plan_digest": _hash(plan["plan_digest"]),
+                    "request_digest": _hash(request["request_digest"]),
+                    "plan_reasons": reasons,
+                }
+                raw = canonical_json(body)
+                if len(raw.encode("utf-8")) > 8192:
+                    raise ValueError("refresh event exceeds journal budget")
+                digest = canonical_digest(body)
+                self.db.execute("""INSERT INTO dragon_wisdom_pyramid
+                    (owner,sequence,prior_digest,body,digest) VALUES(?,?,?,?,?)""",
+                    (owner, sequence, previous, raw, digest))
+                scheduled.append({**body, "digest": digest})
+            self.db.execute("COMMIT")
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
+        return {
+            "schema": "skeleton.dragon.recrawl_bridge.v1",
+            "owner": owner, "knowledge_root": plan["knowledge_root"],
+            "plan_digest": plan["plan_digest"],
+            "planned": len(plan["requests"]),
+            "queued": tuple({
+                "source_id": row["source_id"], "order_digest": row["digest"],
+                "source_revision": row["revision"], "priority": row["priority"],
+                "reason": row["reason"], "request_digest": row["request_digest"],
+            } for row in scheduled),
+            "already_pending": tuple(skipped),
+            "deferred": plan["deferred_requests"],
+            "execution_authorized": False, "memory_promotion_authorized": False,
+        }
 
     def recrawl_queue(self, owner: str, *, now: int, authorized: bool,
                       limit: int = 32) -> tuple[dict[str, Any], ...]:
