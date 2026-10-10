@@ -12,7 +12,12 @@ import json
 from pathlib import Path
 import re
 
-from skeleton.ai.game_builder.native_game_cli import build_game
+from skeleton.ai.game_builder.playable_world import GameBuildIntent, generate_playable_world
+from skeleton.ai.game_builder.playable_simulation import demonstrate_solvable
+from skeleton.ai.game_builder.port_planner import HomebrewSource
+from skeleton.ai.game_builder.sega_8bit_native_export import (
+    compile_native_sega_8bit, export_native_sega_8bit,
+)
 from skeleton.ai.game_builder.sega_8bit_rom import validate_rom_file
 
 
@@ -25,27 +30,47 @@ def emit(target: str, output: Path, authorship_file: Path) -> dict[str, object]:
         raise ValueError("unsupported real Z80 console target")
     if not authorship_file.is_file() or authorship_file.is_symlink():
         raise ValueError("original author evidence must be an ordinary local file")
-    proof = build_game(
-        target=target,
-        basis="bandai_wonderswan",
+    if not 0 < authorship_file.stat().st_size <= 8 * 1024 * 1024:
+        raise ValueError("authorship evidence size invalid")
+    author_reference = sha256(authorship_file.read_bytes()).hexdigest()
+    intent = GameBuildIntent(
         project_id="skeleton-original-sega-evolution",
         title="Original Stardust Exploration",
-        seed=198701,
-        width=17,
-        height=15,
-        levels=3,
-        collectibles=3,
-        hazards=4,
-        health=4,
-        rights_evidence=authorship_file,
+        subtitle="Self-authored console game, not commercial-content replication",
+        seed=198701, width=17, height=15, levels=3,
+        collectibles_per_level=3, hazards_per_level=4,
+        starting_health=4, theme="space",
+    )
+    world = generate_playable_world(intent, authorized=True)
+    rights = HomebrewSource(
+        project_id=intent.project_id,
+        platform_id="bandai_wonderswan",
+        rights_basis="project_owned",
+        evidence_sha256=author_reference,
         creative_identity=(
             "independently created star puzzles",
             "original grid and constellation drawing",
             "fresh game rules and level arrangements",
         ),
-        output=output,
-        authorized=True,
     )
+    # This explicit backend is in addition to the independently written Z80
+    # assembly SMS adapter. The generic native CLI is free to choose either.
+    project = compile_native_sega_8bit(world, rights, target, authorized=True)
+    folder = export_native_sega_8bit(project, output, authorized=True)
+    replay = demonstrate_solvable(world, authorized=True)
+    proof = {
+        "schema": "skeleton.game_builder.native_sega8_original_source_receipt.v1",
+        "target": target, "output_directory": str(folder),
+        "source_content_digest": project.content_digest,
+        "world_digest": world.digest,
+        "winning_replay_digest": replay.digest,
+        "rights_evidence_sha256": author_reference,
+        "native_binary_built": False,
+        "emulator_verified": False,
+        "physical_hardware_verified": False,
+        "rights_independently_verified": False,
+        "distribution_licensed": False,
+    }
     if any(proof.get(flag) is not False for flag in (
         "native_binary_built", "emulator_verified", "physical_hardware_verified",
         "rights_independently_verified", "distribution_licensed",
