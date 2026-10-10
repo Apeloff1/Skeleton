@@ -234,3 +234,71 @@ async def test_long_canonical_owner_identity_can_delete_its_derived_data(tmp_pat
     await binding.after_commit(thread,messages)
     await binding.delete_thread(thread.tenant_id,owner,thread.thread_id)
     assert await binding.context_segments(thread,'godot')==()
+
+
+@pytest.mark.asyncio
+async def test_cold_expiry_is_bounded_tenant_scoped_and_cascades_postings(tmp_path):
+    thread,messages,connections,policy,binding=fixtures(tmp_path)
+    await binding.after_commit(thread,messages)
+    with connections() as db:
+        row=db.execute('SELECT * FROM dragon_conversation_micro_logs').fetchone()
+        for tenant,index,expiry in [('tenant',i,20) for i in range(6)]+[('foreign',99,20),('tenant',100,2000)]:
+            db.execute('INSERT INTO dragon_conversation_micro_logs VALUES(?,?,?,?,?,?,?,?)',
+                (tenant,row[1],str(index),row[3],row[4],row[5],row[6],expiry))
+            db.execute('INSERT INTO dragon_conversation_micro_terms VALUES(?,?,?,?,?,?)',
+                (tenant,row[1],str(index),row[3],row[4],'godot'))
+        db.execute('INSERT INTO dragon_conversation_micro_fences VALUES(?,?,?,?)',('tenant',row[1],'live',999))
+        db.commit()
+    binding.clock=lambda:30
+    result=await binding.expire_tenant('tenant',limit=2)
+    assert result=={'expired_checkpoints':2,'more_due':True,'batch_limit':2}
+    assert (await binding.expire_tenant('tenant',limit=2))['more_due']
+    assert (await binding.expire_tenant('tenant',limit=2))['more_due'] is False
+    assert (await binding.expire_tenant('tenant',limit=2))['expired_checkpoints']==0
+    with connections() as db:
+        assert db.execute("SELECT count(*) FROM dragon_conversation_micro_logs WHERE tenant='foreign'").fetchone()[0]==1
+        assert db.execute("SELECT count(*) FROM dragon_conversation_micro_logs WHERE tenant='tenant'").fetchone()[0]==2
+        assert db.execute("SELECT count(*) FROM dragon_conversation_micro_terms WHERE tenant='tenant'").fetchone()[0]>0
+        assert db.execute("SELECT count(*) FROM dragon_conversation_micro_terms WHERE thread IN ('0','1','2','3','4','5')").fetchone()[0]==0
+        assert db.execute("SELECT blocked_until FROM dragon_conversation_micro_fences WHERE thread='live'").fetchone()[0]==999
+
+
+@pytest.mark.asyncio
+async def test_canonical_empty_retention_plan_drains_cold_projection(tmp_path):
+    thread,messages,connections,policy,binding=fixtures(tmp_path)
+    await binding.after_commit(thread,messages)
+    authority,_=authority_for(thread,messages,binding)
+    async def planner(**kwargs): return {'tenant_id':kwargs['tenant_id'],'plan_id':None,'actions':[]}
+    authority.governance_retention_planner=planner
+    binding.clock=lambda:1001
+    result=await authority.execute_due_retention(tenant_id=thread.tenant_id)
+    assert result['complete'] and result['dragon_projection']['expired_checkpoints']==1
+    with connections() as db:
+        assert db.execute('SELECT count(*) FROM dragon_conversation_micro_terms').fetchone()[0]==0
+
+
+@pytest.mark.asyncio
+async def test_retention_failure_is_not_acknowledged_and_retry_recovers(tmp_path):
+    from core.conversations import ConversationStorageUnavailable
+    thread,messages,connections,policy,binding=fixtures(tmp_path)
+    await binding.after_commit(thread,messages)
+    authority,_=authority_for(thread,messages,binding)
+    async def planner(**kwargs): return {'tenant_id':kwargs['tenant_id'],'plan_id':None,'actions':[]}
+    authority.governance_retention_planner=planner
+    original=binding.expire_tenant
+    async def broken(*args,**kwargs): raise OSError('private storage path')
+    binding.expire_tenant=broken
+    with pytest.raises(ConversationStorageUnavailable,match='projection retention unavailable'):
+        await authority.execute_due_retention(tenant_id=thread.tenant_id)
+    binding.expire_tenant=original;binding.clock=lambda:1001
+    assert (await authority.execute_due_retention(tenant_id=thread.tenant_id))['dragon_projection']['expired_checkpoints']==1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('limit',[True,0,1001,1.5])
+async def test_invalid_expiry_limits_never_mutate_storage(tmp_path,limit):
+    thread,messages,connections,policy,binding=fixtures(tmp_path)
+    await binding.after_commit(thread,messages);binding.clock=lambda:1001
+    with pytest.raises(ValueError): await binding.expire_tenant('tenant',limit=limit)
+    with connections() as db:
+        assert db.execute('SELECT count(*) FROM dragon_conversation_micro_logs').fetchone()[0]==1

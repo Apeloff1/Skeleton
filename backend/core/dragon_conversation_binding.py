@@ -61,6 +61,15 @@ class DragonConversationBinding:
         with self.connection_factory() as db:
             DragonConversationMicroLogs(db).delete_thread(tenant,owner,thread,authorized=True,now=self.clock())
 
+    async def expire_tenant(self, tenant, *, limit=128):
+        """Called by canonical retention, including when no parent action is due."""
+        now = self.clock()
+        with self.connection_factory() as db:
+            count = DragonConversationMicroLogs(db).expire(now=now, tenant=tenant, limit=limit)
+            remaining = (db.execute("SELECT 1 FROM dragon_conversation_micro_logs WHERE tenant=? AND expires_at<=? LIMIT 1", (tenant, now)).fetchone() is not None
+                         or db.execute("SELECT 1 FROM dragon_conversation_micro_fences WHERE tenant=? AND blocked_until<=? LIMIT 1", (tenant, now)).fetchone() is not None)
+        return {"expired_checkpoints": count, "more_due": remaining, "batch_limit": limit}
+
     async def context_segments(self, thread, query):
         policy=await self._policy(thread)
         if policy is None:

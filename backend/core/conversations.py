@@ -597,6 +597,7 @@ class MongoConversationAuthority:
                 "record_ids": [],
                 "linked_execution": None,
                 "conversation": None,
+                "dragon_projection": await self._expire_dragon_projection(str(tenant_id)),
                 "complete": True,
             }
 
@@ -679,8 +680,19 @@ class MongoConversationAuthority:
                 if conversation_result is None
                 else dict(conversation_result)
             ),
+            "dragon_projection": await self._expire_dragon_projection(str(tenant_id)),
             "complete": True,
         }
+
+    async def _expire_dragon_projection(self, tenant_id):
+        projection = getattr(self, "dragon_projection", None)
+        if projection is None:
+            return None
+        try:
+            return await asyncio.wait_for(projection.expire_tenant(tenant_id, limit=128), timeout=.25)
+        except Exception as exc:
+            # A parent sweep cannot acknowledge derived erasure it did not do.
+            raise ConversationStorageUnavailable("conversation projection retention unavailable") from exc
 
     async def execute_governed_deletion(
         self,

@@ -137,9 +137,9 @@ def test_ten_step_projection_disk_reopen_and_privacy(tmp_path):
     store = DragonConversationMicroLogs(db)
     thread, messages = thread_window()
     digest = store.checkpoint(thread, messages, {'genre': 'platformer', 'era': '1990'}, tenant='tenant', owner='a',
-        expires_at=30, authorized=True, retention_consent=True)
+        expires_at=30, authorized=True, retention_consent=True, now=10)
     assert digest and store.checkpoint(thread, messages, {'genre': 'platformer', 'era': '1990'}, tenant='tenant', owner='a',
-        expires_at=30, authorized=True, retention_consent=True) == digest
+        expires_at=30, authorized=True, retention_consent=True, now=10) == digest
     db.close()
     db = sqlite3.connect(path)
     store = DragonConversationMicroLogs(db)
@@ -159,8 +159,8 @@ def test_ten_steps_reject_uncommitted_and_integrity():
     store = DragonConversationMicroLogs(db)
     thread, messages = thread_window()
     with pytest.raises(ValueError):
-        store.checkpoint(replace(thread, message_sequence=9), messages, {}, tenant='tenant', owner='a', expires_at=30, authorized=True, retention_consent=True)
-    store.checkpoint(thread, messages, {'genre': 'platformer'}, tenant='tenant', owner='a', expires_at=30, authorized=True, retention_consent=True)
+        store.checkpoint(replace(thread, message_sequence=9), messages, {}, tenant='tenant', owner='a', expires_at=30, authorized=True, retention_consent=True, now=10)
+    store.checkpoint(thread, messages, {'genre': 'platformer'}, tenant='tenant', owner='a', expires_at=30, authorized=True, retention_consent=True, now=10)
     db.execute("UPDATE dragon_conversation_micro_logs SET payload='{}'")
     with pytest.raises(ValueError, match='integrity'):
         store.retrieve(thread, 'platformer', tenant='tenant', owner='a', now=10, authorized=True)
@@ -212,7 +212,7 @@ def test_checkpoint_deletion_removes_index_and_is_thread_scoped():
     db = sqlite3.connect(':memory:')
     store = DragonConversationMicroLogs(db)
     thread, messages = thread_window()
-    store.checkpoint(thread, messages, {'engine': 'nes'}, tenant='tenant', owner='a', expires_at=30, authorized=True, retention_consent=True)
+    store.checkpoint(thread, messages, {'engine': 'nes'}, tenant='tenant', owner='a', expires_at=30, authorized=True, retention_consent=True, now=10)
     store.delete_thread('tenant', 'b', thread.thread_id, authorized=True)
     assert store.retrieve(thread, 'nes', tenant='tenant', owner='a', now=10, authorized=True)
     store.delete_thread('tenant', 'a', thread.thread_id, authorized=True)

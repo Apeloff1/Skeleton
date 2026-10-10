@@ -57,6 +57,72 @@ class SequentialAlmanacWorker:
           FROM dragon_almanac_sources WHERE owner=?""", (owner,))
         return cur.rowcount
 
+    def _verify_prefix(self, owner, source, stage, input_digest, url, source_digest, now):
+        """Verify the complete bounded lineage before granting or advancing work.
+
+        Digests detect corruption; they are not worker authentication. The caller
+        still owns identity, network policy, rights review and resource admission.
+        Older receipts retain their original digest and require no migration.
+        """
+        _integer(stage, "job stage", 0, len(STAGES) - 1)
+        _digest(input_digest, "stage input")
+        rows = self.db.execute("""SELECT stage,
+          CASE WHEN length(CAST(body AS BLOB))<=32768 THEN body ELSE NULL END,digest
+          FROM dragon_almanac_steps WHERE owner=? AND source=? ORDER BY stage LIMIT ?""",
+          (owner, source, len(STAGES) + 1)).fetchall()
+        if len(rows) != stage:
+            raise ValueError("missing or extra acquisition lineage")
+        expected = source_digest
+        previous_time = 0
+        policy_expiry = None
+        for index, (stored_stage, raw, digest) in enumerate(rows):
+            if not isinstance(raw, str):
+                raise ValueError("acquisition receipt exceeds storage budget")
+            body = json.loads(raw)
+            if not isinstance(body, dict) or canonical_digest(body) != digest:
+                raise ValueError("acquisition receipt integrity invalid")
+            evidence = body.get("evidence")
+            at = body.get("at")
+            _integer(at, "receipt clock", previous_time, now)
+            output = body.get("output_digest")
+            _digest(output, "receipt output")
+            if (stored_stage != index or body.get("stage") != STAGES[index]
+                    or body.get("owner") != owner or body.get("source_id") != source
+                    or body.get("input_digest") != expected
+                    or body.get("training_authorized") is not False
+                    or not isinstance(evidence, dict)
+                    or evidence.get("url") != url
+                    or evidence.get("input_digest") != expected
+                    or evidence.get("output_digest") != output):
+                raise ValueError("acquisition receipt lineage mismatch")
+            self._validate_stage_evidence(STAGES[index], evidence, at)
+            if index == 0:
+                policy_expiry = evidence["expires_at"]
+            elif index == 1 and at >= policy_expiry:
+                raise ValueError("historical fetch occurred after policy expiry")
+            expected, previous_time = output, at
+        if expected != input_digest:
+            raise ValueError("acquisition input differs from current source lineage")
+        return previous_time
+
+    @staticmethod
+    def _validate_stage_evidence(stage, evidence, at):
+        if stage == "policy":
+            if (any(evidence.get(k) is not True for k in ("robots_permitted", "terms_permitted", "reference_use_permitted", "ssrf_checked"))
+                    or type(evidence.get("expires_at")) is not int or not at < evidence["expires_at"] <= at + 86400):
+                raise ValueError("current explicit crawler policy evidence required")
+        elif stage == "fetch":
+            if type(evidence.get("http_status")) is not int or evidence["http_status"] != 200 or evidence.get("redirects_rechecked") is not True:
+                raise ValueError("successful checked fetch required")
+            _integer(evidence.get("body_bytes"), "fetched bytes", 1, 16_000_000)
+        elif stage == "extract":
+            _id(evidence.get("parser_version"), "parser identity")
+            _digest(evidence.get("span_map_digest"), "span map")
+        elif stage == "analyze":
+            if evidence.get("derived_claims_are_unreviewed") is not True:
+                raise ValueError("machine inference cannot self-approve")
+            _integer(evidence.get("claim_count"), "claim count", 0, 256)
+
     def claim(self, owner: str, *, now: int, authorized: bool, trusted_worker: bool,
               ttl: int = 120) -> AlmanacClaim | None:
         _auth(owner, authorized)
@@ -83,6 +149,8 @@ class SequentialAlmanacWorker:
             source_body = json.loads(raw)
             if canonical_digest(source_body) != source_digest:
                 raise ValueError("discovery metadata corrupt")
+            self._verify_prefix(owner, source, stage, input_digest,
+                                source_body["url"], source_digest, now)
             token = token_hex(32)
             self.db.execute("UPDATE dragon_almanac_jobs SET state='leased',attempts=attempts+1,token=?,expires=?,started=? WHERE owner=? AND source=?",
                             (token, now + ttl, now, owner, source))
@@ -111,30 +179,20 @@ class SequentialAlmanacWorker:
         try:
             row = self.db.execute("SELECT stage,state,token,expires,input_digest,started FROM dragon_almanac_jobs WHERE owner=? AND source=?", (claim.owner, claim.source_id)).fetchone()
             if (row is None or row[1] != "leased" or row[2] != claim.token or row[3] <= now
-                    or row[3] != claim.expires_at or row[4] != claim.input_digest or STAGES[row[0]] != claim.stage or now < row[5]):
+                    or row[3] != claim.expires_at or row[4] != claim.input_digest
+                    or type(row[0]) is not int or not 0 <= row[0] < len(STAGES)
+                    or STAGES[row[0]] != claim.stage or now < row[5]):
                 raise ValueError("expired, replayed or mismatched job claim")
             source = self.db.execute("SELECT body,digest FROM dragon_almanac_sources WHERE owner=? AND source=?", (claim.owner, claim.source_id)).fetchone()
             if not source or canonical_digest(json.loads(source[0])) != source[1] or json.loads(source[0])["url"] != claim.url:
                 raise ValueError("claim URL differs from source registry")
-            if claim.stage == "policy":
-                if (any(evidence.get(k) is not True for k in ("robots_permitted", "terms_permitted", "reference_use_permitted", "ssrf_checked"))
-                        or type(evidence.get("expires_at")) is not int or not now < evidence["expires_at"] <= now + 86400):
-                    raise ValueError("current explicit crawler policy evidence required")
-            elif claim.stage == "fetch":
+            self._verify_prefix(claim.owner, claim.source_id, row[0], row[4],
+                                claim.url, source[1], now)
+            self._validate_stage_evidence(claim.stage, evidence, now)
+            if claim.stage == "fetch":
                 policy = self.db.execute("SELECT body,digest FROM dragon_almanac_steps WHERE owner=? AND source=? AND stage=0", (claim.owner, claim.source_id)).fetchone()
                 if not policy or canonical_digest(json.loads(policy[0])) != policy[1] or json.loads(policy[0])["evidence"]["expires_at"] <= now:
                     raise ValueError("fetch policy stale or corrupt")
-                if evidence.get("http_status") != 200 or evidence.get("redirects_rechecked") is not True:
-                    raise ValueError("successful checked fetch required")
-                _integer(evidence.get("body_bytes"), "fetched bytes", 1, 16_000_000)
-            elif claim.stage == "extract":
-                if evidence.get("parser_version") is None or evidence.get("span_map_digest") is None:
-                    raise ValueError("extraction needs parser identity and source-span map")
-                _digest(evidence["span_map_digest"], "span map")
-            elif claim.stage == "analyze":
-                if evidence.get("derived_claims_are_unreviewed") is not True:
-                    raise ValueError("machine inference cannot self-approve")
-                _integer(evidence.get("claim_count"), "claim count", 0, 256)
             elif claim.stage == "canonical_review":
                 fetch = self.db.execute("SELECT body,digest FROM dragon_almanac_steps WHERE owner=? AND source=? AND stage=1", (claim.owner, claim.source_id)).fetchone()
                 if not fetch or canonical_digest(json.loads(fetch[0])) != fetch[1]:

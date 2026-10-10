@@ -32,6 +32,10 @@ class DragonConversationMicroLogs:
         db.execute("""CREATE TABLE IF NOT EXISTS dragon_conversation_micro_fences(
             tenant TEXT NOT NULL,owner TEXT NOT NULL,thread TEXT NOT NULL,blocked_until REAL NOT NULL,
             PRIMARY KEY(tenant,owner,thread))""")
+        db.execute("CREATE INDEX IF NOT EXISTS dragon_micro_expiry ON dragon_conversation_micro_logs(expires_at)")
+        db.execute("CREATE INDEX IF NOT EXISTS dragon_micro_tenant_expiry ON dragon_conversation_micro_logs(tenant,expires_at)")
+        db.execute("CREATE INDEX IF NOT EXISTS dragon_micro_fence_expiry ON dragon_conversation_micro_fences(blocked_until)")
+        db.execute("CREATE INDEX IF NOT EXISTS dragon_micro_tenant_fence_expiry ON dragon_conversation_micro_fences(tenant,blocked_until)")
         db.commit()
 
     def checkpoint(self, thread: ConversationThread, messages: tuple[ConversationMessage, ...],
@@ -72,6 +76,8 @@ class DragonConversationMicroLogs:
         now = time.time() if now is None else now
         if isinstance(now, bool) or not isfinite(now):
             raise ValueError("invalid checkpoint clock")
+        if not now < expires_at <= now + 7 * 86400:
+            raise ValueError("checkpoint retention expiry outside permitted window")
         digest = sha256(payload.encode()).hexdigest()
         key = (tenant, owner, thread.thread_id, thread.active_branch_id, end)
         with self.db:
@@ -142,13 +148,30 @@ class DragonConversationMicroLogs:
             for table in ("dragon_conversation_micro_logs", "dragon_conversation_micro_terms"):
                 self.db.execute(f"DELETE FROM {table} WHERE tenant=? AND owner=? AND thread=?", (tenant, owner, thread))
 
-    def expire(self, *, now: float) -> int:
+    def expire(self, *, now: float, tenant: str | None = None, limit: int = 128) -> int:
+        """Erase one bounded batch, including postings, in one write snapshot.
+
+        A tenant sweep never changes another tenant's data or live negative
+        fences. Repeated admitted calls drain cold rows without materializing
+        their payloads. No model, consent grant or background timer is needed.
+        """
         if isinstance(now, bool) or not isfinite(now):
             raise ValueError("invalid expiry timestamp")
+        if type(limit) is not int or not 1 <= limit <= 1000:
+            raise ValueError("invalid expiry batch limit")
+        if tenant is not None and (not isinstance(tenant, str) or not 1 <= len(tenant) <= 1024
+                or any(ord(c) < 32 for c in tenant)):
+            raise ValueError("invalid expiry tenant")
+        scope = "" if tenant is None else " AND tenant=?"
+        args = (now,) if tenant is None else (now, tenant)
         with self.db:
-            self.db.execute("DELETE FROM dragon_conversation_micro_fences WHERE blocked_until<=?", (now,))
-            count = self.db.execute("DELETE FROM dragon_conversation_micro_logs WHERE expires_at<=?", (now,)).rowcount
-            self.db.execute("""DELETE FROM dragon_conversation_micro_terms AS t WHERE NOT EXISTS(
-                SELECT 1 FROM dragon_conversation_micro_logs l WHERE l.tenant=t.tenant AND l.owner=t.owner
-                AND l.thread=t.thread AND l.branch=t.branch AND l.end_sequence=t.end_sequence)""")
+            # Acquire the SQLite write lock before selecting the batch; no
+            # checkpoint writer can replace an expired key between these steps.
+            self.db.execute("UPDATE dragon_conversation_micro_fences SET blocked_until=blocked_until WHERE 0")
+            keys = self.db.execute("SELECT tenant,owner,thread,branch,end_sequence FROM dragon_conversation_micro_logs WHERE expires_at<=?" + scope + " ORDER BY expires_at,tenant,owner,thread,branch,end_sequence LIMIT ?", (*args, limit)).fetchall()
+            for key in keys:
+                for table in ("dragon_conversation_micro_terms", "dragon_conversation_micro_logs"):
+                    self.db.execute(f"DELETE FROM {table} WHERE tenant=? AND owner=? AND thread=? AND branch=? AND end_sequence=?", key)
+            self.db.execute("DELETE FROM dragon_conversation_micro_fences WHERE rowid IN (SELECT rowid FROM dragon_conversation_micro_fences WHERE blocked_until<=?" + scope + " ORDER BY blocked_until LIMIT ?)", (*args, limit))
+            count = len(keys)
         return count

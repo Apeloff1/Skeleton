@@ -230,3 +230,69 @@ def test_original_experiment_is_reproducible_and_holdout_disjoint():
     assert not train & test and len(train) == 32 and len(test) == 8
     assert result["summary"]["path_cost_parity"]
     assert not result["memory_promotion_authorized"]
+
+
+def _reach_extract(worker):
+    first = claim(worker)
+    policy(worker, first)
+    fetched = claim(worker, NOW+2)
+    finish(worker, fetched, now=NOW+3, output=sha256(TEXT.encode()).hexdigest(),
+           http_status=200, redirects_rechecked=True, body_bytes=len(TEXT))
+    return first, claim(worker, NOW+4)
+
+
+@pytest.mark.parametrize('change', ['owner', 'source_id', 'input_digest', 'output_digest', 'stage', 'at', 'training_authorized', 'evidence_url'])
+def test_rehashed_earlier_receipt_cannot_advance_later_stage(library, change):
+    worker = setup_worker(library)
+    first, extraction = _reach_extract(worker)
+    body = json.loads(library.db.execute('SELECT body FROM dragon_almanac_steps WHERE source=? AND stage=0', (first.source_id,)).fetchone()[0])
+    if change == 'evidence_url':
+        body['evidence']['url'] = 'https://foreign.example/'
+    else:
+        body[change] = {'at': NOW+100, 'training_authorized': True, 'stage': 'extract',
+                       'input_digest': 'f'*64, 'output_digest': 'e'*64}.get(change, 'foreign')
+    library.db.execute('UPDATE dragon_almanac_steps SET body=?,digest=? WHERE source=? AND stage=0',
+                       (canonical_json(body), canonical_digest(body), first.source_id))
+    with pytest.raises(ValueError):
+        finish(worker, extraction, now=NOW+5, parser_version='test-v1', span_map_digest='c'*64)
+    assert library.db.execute('SELECT stage FROM dragon_almanac_jobs WHERE source=?', (first.source_id,)).fetchone()[0] == 2
+    assert library.db.execute('SELECT count(*) FROM dragon_almanac_steps WHERE source=?', (first.source_id,)).fetchone()[0] == 2
+
+
+def test_corrupt_prefix_denies_new_lease_atomically(library):
+    worker = setup_worker(library)
+    first = claim(worker); policy(worker, first)
+    library.db.execute('DELETE FROM dragon_almanac_steps WHERE source=?', (first.source_id,))
+    with pytest.raises(ValueError, match='lineage'):
+        claim(worker, NOW+2)
+    assert library.db.execute('SELECT state,attempts FROM dragon_almanac_jobs WHERE source=?', (first.source_id,)).fetchone() == ('pending', 0)
+
+
+def test_registry_metadata_drift_invalidates_active_pipeline(library):
+    worker = setup_worker(library)
+    first, extraction = _reach_extract(worker)
+    raw = library.db.execute('SELECT body FROM dragon_almanac_sources WHERE source=?', (first.source_id,)).fetchone()[0]
+    source = json.loads(raw); source['rights'] = 'revoked'
+    library.db.execute('UPDATE dragon_almanac_sources SET body=?,digest=? WHERE source=?',
+                       (canonical_json(source), canonical_digest(source), first.source_id))
+    with pytest.raises(ValueError, match='lineage'):
+        finish(worker, extraction, now=NOW+5, parser_version='test-v1', span_map_digest='c'*64)
+
+
+def test_receipt_prefix_size_and_clock_rollback_are_bounded(library):
+    worker = setup_worker(library)
+    first = claim(worker); policy(worker, first, NOW+5)
+    with pytest.raises(ValueError): claim(worker, NOW+4)
+    library.db.execute('UPDATE dragon_almanac_steps SET body=? WHERE source=?', ('x'*32769, first.source_id))
+    with pytest.raises(ValueError, match='budget'): claim(worker, NOW+6)
+
+
+def test_rehashed_denied_policy_cannot_be_laundered_through_extract(library):
+    worker = setup_worker(library)
+    first, extraction = _reach_extract(worker)
+    body = json.loads(library.db.execute('SELECT body FROM dragon_almanac_steps WHERE source=? AND stage=0', (first.source_id,)).fetchone()[0])
+    body['evidence']['terms_permitted'] = False
+    library.db.execute('UPDATE dragon_almanac_steps SET body=?,digest=? WHERE source=? AND stage=0',
+                       (canonical_json(body), canonical_digest(body), first.source_id))
+    with pytest.raises(ValueError, match='policy'):
+        finish(worker, extraction, now=NOW+5, parser_version='test-v1', span_map_digest='c'*64)
