@@ -77,7 +77,7 @@ export function stepNativePreview(
       completed: completed(state, prior.crates),
     };
   }
-  if (!Object.hasOwn(DELTAS, action)) {
+  if (!Object.prototype.hasOwnProperty.call(DELTAS, action)) {
     throw new Error('Only original bounded movement controls are allowed');
   }
   const [dx, dy] = DELTAS[action];
