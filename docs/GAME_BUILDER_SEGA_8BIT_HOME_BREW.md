@@ -623,9 +623,13 @@ The dedicated native CI matrix now also creates this full campaign for
 complete independently generated reference, compiles real cartridges with
 the pinned legal toolchain, validates their genuine 32 KiB Sega ROM
 structures and boots their compiled Z80 instructions. The eight-stage
-campaign's complete *Z80 winning route* remains separately unverified;
-its **host C full-playthrough** and **native Z80 boot** have their own
-required gates. The compiled ROM is intentionally not uploaded or
+campaign additionally has a **required full compiled-Z80 winning route**,
+including every authored collectible, all eight stage exits, exact
+score and bond progression, actual hardware CRAM stage colors and a
+second autonomous on-cartridge completion with the same semantic trace.
+The native replay uses a bounded 30,000-frame overall execution envelope;
+CI must pass for both variants before this acceptance is considered
+verified. The compiled ROM is intentionally not uploaded or
 distributed as an artifact.
 
 ## Hardware-native stage color progression
