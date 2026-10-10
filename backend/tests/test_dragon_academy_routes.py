@@ -492,7 +492,7 @@ def test_signed_custody_and_memory_route_fail_closed_on_rollback(tmp_path, monke
                     start=0, end=len("Original input delay"),
                     stance="supports", confidence_ppm=900000,
                     dependence_group="publisher-"+suffix,
-                    tags=("input", "delay"),
+                    tags=("delay", "input"),
                 ),),
             ), expected_parent_digest=None, authorized=True)
         brief = library.build_brief(
