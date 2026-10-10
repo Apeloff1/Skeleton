@@ -55,7 +55,7 @@ def test_c99_headless_physics_interface_is_actually_inserted():
     assert "static int simulate_native_inputs" in source
     assert '--simulate' in source
     assert "static uint32_t state_hash" in source
-    assert "HINT_BUCKETS 131071" in source
+    assert "HINT_BUCKETS 262147" in source
     assert "if(action=='u'){rollback();continue;}" in source
 
 @pytest.mark.skipif(not shutil.which("cc"),reason="requires local C99 compiler")
