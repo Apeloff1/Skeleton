@@ -38,8 +38,9 @@ type Certificate={
   real_dead_ends:string[];return_edges:string[];
   all_climates_backbone_verified:string[];
   location_recovery_count:number;certificate_digest:string;
-  doubleback_witnesses:string[][];scenic_witnesses:string[][];
-  secret_witnesses:string[][];optional_shapes:string[];
+  doubleback_witnesses:string[][];impractical_witnesses:string[][];
+  scenic_witnesses:string[][];secret_witnesses:string[][];
+  optional_shapes:string[];
   guarantee_scope:string;
 };
 type Preview={
@@ -402,11 +403,12 @@ function Editor(){
             </Text>
             {([
               ['Long doubleback',cert.doubleback_witnesses[0]],
+              ['Deliberately impractical multi-lap route',cert.impractical_witnesses[0]],
               ['Scenic detour',cert.scenic_witnesses[0]],
               ['Secret clue route',cert.secret_witnesses[0]],
             ] as const).filter(x=>!!x[1]).map(([title,route])=>(
               <TouchableOpacity key={title} style={s.pass}
-                disabled={busy} onPress={()=>startWitness(route)}>
+                disabled={busy} onPress={()=>{if(route)startWitness(route);}}>
                 <Text style={s.actionText}>{title}</Text>
                 <Text style={s.copy}>{route?.length} actual maze steps</Text>
               </TouchableOpacity>
