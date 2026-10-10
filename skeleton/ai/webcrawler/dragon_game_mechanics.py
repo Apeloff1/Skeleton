@@ -247,6 +247,8 @@ class GameMechanicsMemory:
                 recorded = json.loads(raw)
             except (TypeError, ValueError, RecursionError) as exc:
                 raise ValueError("stored game observation JSON corrupt") from exc
+            if json.dumps(recorded, separators=(",", ":"), ensure_ascii=True) != raw:
+                raise ValueError("stored observation payload is not canonical")
             if (not isinstance(recorded, list)
                     or not 1 <= len(recorded) <= self.policy.max_observations
                     or any(not isinstance(row, list) or len(row) != 6 for row in recorded)):
