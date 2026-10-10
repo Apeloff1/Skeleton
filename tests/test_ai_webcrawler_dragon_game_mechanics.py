@@ -524,3 +524,17 @@ def test_unobserved_game_taste_has_no_approval_authority():
     assert result.insights == ()
     assert result.review_required is True
     assert result.design_directives == ()
+
+def test_taste_fingerprint_changes_with_source_session_lineage():
+    store = setup()
+    first = store.build_session("alice", "First original game", 20000,
+        (observation(),), capture_consent=True, analysis_consent=True)
+    store.record(first, authorized=True)
+    left = store.distill("alice", authorized=True)
+    store.erase("alice", authorized=True)
+    second = store.build_session("alice", "Second original game", 20000,
+        (observation(),), capture_consent=True, analysis_consent=True)
+    store.record(second, authorized=True)
+    right = store.distill("alice", authorized=True)
+    assert left.insights == right.insights
+    assert left.fingerprint != right.fingerprint
