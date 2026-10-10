@@ -88,5 +88,46 @@ def test_original_graphics_source_is_covered_by_independent_release_replay():
     package,_=make_source_release(native,item)
     receipt,sources=_puzzle_proof(package)
     assert receipt["target"]=="pc_linux"
-    assert sources["src/graphics.c"]==C_GRAPHICS
+    from skeleton.ai.webcrawler.dragon_native_puzzle_capture import enable_sdl_original_game_capture
+    assert sources["src/graphics.c"]==enable_sdl_original_game_capture(C_GRAPHICS)
     assert sources["include/dragon_puzzle_pixels.h"]==pixel_header()
+
+
+
+@pytest.mark.skipif(not shutil.which("cc") or not shutil.which("pkg-config"),
+                    reason="requires actual local SDL2 compiler")
+def test_native_game_screenshots_are_real_gameplay_frames_with_bmp_structure(tmp_path):
+    import struct
+    available=subprocess.run(["pkg-config","--exists","sdl2"],timeout=8)
+    if available.returncode!=0:
+        pytest.skip("SDL2 development library not installed")
+    files=source_game(seed=37,stages=2)
+    for name,content in files.items():
+        file=tmp_path/name
+        file.parent.mkdir(parents=True,exist_ok=True)
+        file.write_text(content)
+    compiled=subprocess.run(["make","graphics"],cwd=tmp_path,
+                            capture_output=True,text=True,timeout=35)
+    assert compiled.returncode==0,compiled.stderr
+    folder=tmp_path/"frames"
+    folder.mkdir()
+    output=subprocess.run(
+        [str(tmp_path/"dragon_game_sdl"),"--capture-frames",str(folder)],
+        cwd=tmp_path,capture_output=True,text=True,
+        env={**os.environ,"SDL_VIDEODRIVER":"dummy",
+             "SDL_AUDIODRIVER":"dummy"},timeout=40,
+    )
+    assert output.returncode==0,(output.stdout,output.stderr)
+    assert output.stdout.count("DRAGON_SDL_FRAME level=")==6
+    assert "DRAGON_SDL_CAPTURE_PASS stages=2 frames=6" in output.stdout
+    images=sorted(folder.glob("*.bmp"))
+    assert len(images)==6
+    assert images[0].name=="level-01-frame-00.bmp"
+    assert images[-1].name=="level-02-frame-02.bmp"
+    for path in images:
+        raw=path.read_bytes()
+        assert raw[:2]==b"BM"
+        assert struct.unpack_from("<I",raw,18)[0]==640
+        assert struct.unpack_from("<I",raw,22)[0]==480
+        assert len(raw)<3_000_000
+    assert images[0].read_bytes()!=images[2].read_bytes()
