@@ -99,8 +99,9 @@ def _elf_format(payload: bytes) -> str:
 def _puzzle_proof(source_archive: bytes) -> tuple[dict, dict[str, str]]:
     """Verify source archive, then decode original finite-grid solutions."""
     receipt = verify_source_release(source_archive)
-    if receipt["target"] != "pc_linux" or receipt["style"] != "fixed_screen_puzzle":
-        raise ValueError("native playable lane supports Linux original puzzle games only")
+    if (receipt["target"] not in ("pc_linux","pc_windows","pc_macos","steam_deck")
+            or receipt["style"] != "fixed_screen_puzzle"):
+        raise ValueError("original C99 puzzle source verification supports declared desktop targets only")
     with ZipFile(BytesIO(source_archive)) as archive:
         inventory = {}
         for name in REQUIRED_SOURCE_FILES:
