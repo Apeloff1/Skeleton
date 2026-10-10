@@ -508,3 +508,16 @@ def test_carved_corridor_creates_real_cycle_and_not_illusory_backtracking():
     with pytest.raises(MultipathError):
         carve_alternative_corridor(p, p.start, authorized=True)
 
+
+def test_seal_corridor_rejects_softlocks_but_preserves_safe_detours():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    edited = seal_safe_corridor(p, (3, 2), authorized=True)
+    assert edited.after.tile((3, 2)) == "#"
+    assert verify_route_proof(edited.after, edited.safe_proof)
+    single = RouteProblem.from_rows((
+        "#########", "#S.C...G#", "#########", "#########",
+        "#########", "#########", "#########", "#########", "#########",
+    ))
+    with pytest.raises(MultipathError):
+        seal_safe_corridor(single, (2, 1), authorized=True)
+
