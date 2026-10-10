@@ -71,3 +71,11 @@ def test_button_debounce_waits_for_stable_contiguous_frames():
     with pytest.raises(InputTimingError):
         debounce_buttons((1,),stable_frames=0)
 
+
+def test_key_repeat_has_one_shot_then_periodic_held_events():
+    assert button_auto_repeat((True,)*7,delay=2,interval=2)==(
+        True,False,True,False,True,False,True)
+    assert button_auto_repeat((True,False,True),delay=2)==(True,False,True)
+    with pytest.raises(InputTimingError):
+        button_auto_repeat((1,0))
+
