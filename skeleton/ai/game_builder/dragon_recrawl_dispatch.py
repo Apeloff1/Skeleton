@@ -75,6 +75,68 @@ class DragonRecrawlDispatcher:
             owner, now=now, authorized=True, limit=128,
         )
 
+    def preview(self, owner: str, sample: HardwareSample, *, now: int,
+                authorized: bool, limit: int = 32) -> dict:
+        """Read-only current recrawl work and resource-pressure preview.
+
+        A preview does not reserve resources, admit a worker, fetch content,
+        or approve the review/memory pyramid. Actual execution always enters
+        begin() with a fresh trusted worker and explicit acquisition consent.
+        """
+        if authorized is not True:
+            raise PermissionError("authenticated owner needed for recrawl preview")
+        _id(owner)
+        _time(now)
+        if owner != self.session.tenant:
+            raise PermissionError("recrawl preview must match session tenant")
+        if not isinstance(sample, HardwareSample):
+            raise ValueError("current typed hardware sample required")
+        if type(limit) is not int or not 1 <= limit <= 128:
+            raise ValueError("bounded recrawl preview limit required")
+        plan = plan_resources(sample, now=float(now), foreground=False)
+        with self.lock:
+            queue = self.pyramid.recrawl_queue(
+                owner, now=now, authorized=True, limit=128,
+            )
+            rows = []
+            for item in queue[:limit]:
+                digest = item["order_digest"]
+                ticket = self.active.get(digest)
+                stopped = self.stopped_tickets.get(digest)
+                current = (self.pyramid._latest_revision(owner, item["source_id"])
+                           == item["revision"])
+                rows.append({
+                    "source_id": item["source_id"],
+                    "source_revision": item["revision"],
+                    "order_digest": digest,
+                    "reason": item["reason"],
+                    "priority": item["priority"],
+                    "ordered_at": item["ordered_at"],
+                    "source_revision_current": current,
+                    "state": (
+                        "active_worker" if ticket is not None else
+                        "awaiting_independent_review" if stopped is not None else
+                        "queued_unleased"
+                    ),
+                    "execution_authorized": False,
+                    "memory_promotion_authorized": False,
+                })
+            return {
+                "schema": "skeleton.dragon.recrawl_preview.v1",
+                "owner": owner,
+                "at": now,
+                "pending_visible": len(rows),
+                "pending_capped": len(queue) > limit or len(queue) == 128,
+                "active_worker_count": len(self.active),
+                "awaiting_review_count": len(self.stopped_tickets),
+                "advisory_background_ready": plan.background_allowed,
+                "advisory_reason": plan.reason,
+                "items": rows,
+                "execution_authorized": False,
+                "network_io_performed": False,
+                "memory_promotion_authorized": False,
+            }
+
     def begin(self, owner: str, sample: HardwareSample, *, now: int,
               authorized: bool, trusted_worker: bool,
               consent: bool, memory_bytes: int = 8 * 1024 * 1024,
