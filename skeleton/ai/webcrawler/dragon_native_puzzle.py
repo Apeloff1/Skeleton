@@ -353,7 +353,7 @@ def emit_native_puzzle(*,seed:int,stages:int=4,difficulty:int=4,
        "static const char* dragon_solutions[LEVEL_COUNT]={"+
        ", ".join('"'+x+'"' for x in solutions)+"};\n"+
        "static const int dragon_solution_length[LEVEL_COUNT]={"+
-       ", ".join(str(len(p)) for p in solutions)+"};\n"
+       ", ".join(str(len(p)) for p in solutions)+"};\n"+
        graph_header(campaign)+
        "#endif\n"
     )
