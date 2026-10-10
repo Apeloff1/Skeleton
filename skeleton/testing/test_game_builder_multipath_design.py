@@ -351,3 +351,13 @@ def test_route_overrun_measures_detours_but_not_search_penalty_costs():
     assert route_overrun_ppm(p, best) == 0
     assert route_overrun_ppm(p, detour) == (8 - 6) * 1_000_000 // 6
 
+
+def test_route_proof_verifier_rejects_forged_cost_or_trajectory():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    route = solve_route(p)
+    assert verify_route_proof(p, route)
+    with pytest.raises(MultipathError, match="deterministic replay"):
+        verify_route_proof(p, replace(route, cost=route.cost + 4))
+    with pytest.raises(MultipathError, match="deterministic replay"):
+        verify_route_proof(p, replace(route, positions=tuple(reversed(route.positions))))
+
