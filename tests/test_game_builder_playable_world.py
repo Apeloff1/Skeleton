@@ -12,8 +12,9 @@ from skeleton.ai.game_builder.playable_world import (
 )
 from skeleton.ai.game_builder.playable_simulation import (
     ActionReceipt, GameReplay, GameplayError, PlayState,
-    advance, demonstrate_solvable, fork_replay, initial_state, play_actions,
-    replay_prefix, resume_replay, verify_replay,
+    advance, demonstrate_solvable, deserialize_replay, fork_replay,
+    initial_state, play_actions, replay_divergence, replay_prefix,
+    resume_replay, serialize_replay, verify_replay,
 )
 
 
@@ -172,6 +173,68 @@ class PlayableWorldTests(unittest.TestCase):
             with self.subTest(change=change):
                 with self.assertRaises(PlayableWorldError):
                     intent(**change)
+
+    def test_offline_replay_save_round_trip_is_canonical_and_deterministic(self):
+        game = generate_playable_world(intent(levels=1), authorized=True)
+        original = play_actions(game, ("right", "down", "left", "up"), authorized=True)
+        saved = serialize_replay(game, original, authorized=True)
+        self.assertTrue(saved.startswith(b'{"replay":'))
+        self.assertEqual(deserialize_replay(game, saved, authorized=True), original)
+        self.assertEqual(
+            serialize_replay(game, deserialize_replay(game, saved, authorized=True), authorized=True),
+            saved,
+        )
+        branched = fork_replay(game, original, 2, ("up", "right"), authorized=True)
+        self.assertNotEqual(serialize_replay(game, branched, authorized=True), saved)
+
+    def test_offline_replay_rejects_duplicate_json_keys_and_noncanonical_bytes(self):
+        import json
+        game = generate_playable_world(intent(levels=1), authorized=True)
+        replay = play_actions(game, ("right", "down"), authorized=True)
+        saved = serialize_replay(game, replay, authorized=True)
+        for bad in (
+            b'{"schema":"duplicate",' + saved[1:],
+            json.dumps(json.loads(saved), indent=2).encode("utf-8"),
+            saved.replace(b'"replay":', b'"evil":0,"replay":', 1),
+            b'{"not_finite":NaN}',
+            b"",
+            b"not-json",
+            b" " + saved,
+        ):
+            with self.subTest(bad=bad[:25]):
+                with self.assertRaises(GameplayError):
+                    deserialize_replay(game, bad, authorized=True)
+        with self.assertRaises(GameplayError):
+            deserialize_replay(game, b"x" * (12 * 1024 * 1024 + 1), authorized=True)
+        with self.assertRaises(GameplayError):
+            deserialize_replay(game, "raw", authorized=True)
+
+    def test_offline_replay_rejects_forged_action_even_with_resigned_outer_root(self):
+        import json
+        from skeleton.ai.game_builder.contracts import canonical_digest, canonical_json
+        game = generate_playable_world(intent(levels=1), authorized=True)
+        replay = play_actions(game, ("right", "down"), authorized=True)
+        body = json.loads(serialize_replay(game, replay, authorized=True))
+        body["replay"]["actions"][0]["action"] = "up"
+        row = body["replay"]["actions"][0]
+        row["digest"] = canonical_digest({
+            "schema": "skeleton.game_builder.action_receipt.v1",
+            **{k: row[k] for k in (
+                "index", "action", "before_digest", "after_digest", "prev_receipt_digest"
+            )},
+        })
+        body["replay_digest"] = canonical_digest(body["replay"])
+        with self.assertRaises(GameplayError):
+            deserialize_replay(game, canonical_json(body).encode("ascii"), authorized=True)
+
+    def test_replay_comparison_checks_real_verified_transition_history(self):
+        game = generate_playable_world(intent(levels=1), authorized=True)
+        left = play_actions(game, ("right", "down", "left"), authorized=True)
+        right = play_actions(game, ("right", "down", "up"), authorized=True)
+        self.assertIsNone(replay_divergence(game, left, left, authorized=True))
+        self.assertEqual(replay_divergence(game, left, right, authorized=True), 2)
+        shorter = replay_prefix(game, left, 1, authorized=True)
+        self.assertEqual(replay_divergence(game, shorter, left, authorized=True), 1)
 
     def test_seek_to_replay_prefix_verifies_all_old_actions(self):
         game = generate_playable_world(intent(levels=1), authorized=True)
