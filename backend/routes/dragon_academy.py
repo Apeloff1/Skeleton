@@ -206,6 +206,8 @@ class NativeProductionDesignBody(BaseModel):
     candidates: StrictInt = Field(default=8, ge=1, le=24)
     project_notes: str = Field(default="Original native homebrew; platform-scaled design", max_length=200)
     procedural_levels: StrictBool = Field(default=False)
+    campaign_pathing: str = Field(default="branching", pattern=r"^(linear|branching)$")
+    challenge_profile: str = Field(default="balanced", pattern=r"^(gentle|balanced|challenging|spicy)$")
 
 
 class NativeProductionSourceRequest(BaseModel):
@@ -297,6 +299,32 @@ class NativePuzzleCurrentHintRequest(BaseModel):
     rows: NativeOriginalGrid
     player: StrictInt = Field(ge=0, lt=120)
     crates: list[StrictInt] = Field(min_length=1, max_length=3)
+
+
+class NativeRouteAnalysisRequest(BaseModel):
+    """Small symbolic original game board; no third-party game extraction."""
+    model_config=ConfigDict(extra="forbid")
+    rows: NativeOriginalGrid
+    max_routes: StrictInt=Field(default=4,ge=1,le=8)
+    search_budget: StrictInt=Field(default=4000,ge=500,le=20000)
+
+
+@router.post("/native/production/puzzle/multiple-routes")
+def native_production_multiple_routes(
+    body: NativeRouteAnalysisRequest,
+    owner: str = Depends(_native_source_editor),
+) -> dict:
+    from skeleton.ai.webcrawler.dragon_native_multipath import analyse_routes,route_report
+    try:
+        routes=analyse_routes(
+            tuple(body.rows),
+            max_routes=body.max_routes,
+            expansion_cap=body.search_budget,
+        )
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original puzzle board could not produce bounded proven route analysis") from None
+    return {"ok":True,**route_report(routes)}
 
 
 @router.post("/native/production/puzzle/current-hint")
