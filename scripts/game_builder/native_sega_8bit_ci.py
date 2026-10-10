@@ -86,6 +86,7 @@ def emit(target: str, output: Path, authorship_file: Path) -> dict[str, object]:
 def verify(
     target: str, directory: Path, rom: Path, *,
     toolchain_revision: str, expected_source_sha256: str | None = None,
+    expected_authorship_sha256: str | None = None,
 ) -> dict[str, object]:
     """Verify *actual* bytes, not just strings in a source generation report."""
     if target not in _TARGETS:
@@ -97,6 +98,11 @@ def verify(
         or not _SHA.fullmatch(expected_source_sha256)
     ):
         raise ValueError("independently supplied source digest must be SHA-256")
+    if expected_authorship_sha256 is not None and (
+        not isinstance(expected_authorship_sha256, str)
+        or not _SHA.fullmatch(expected_authorship_sha256)
+    ):
+        raise ValueError("expected authorship evidence must be a SHA-256 digest")
     rootfd = _open_directory(directory)
     try:
         expected = {"game.c", "Makefile", "manifest.json"}
@@ -129,6 +135,19 @@ def verify(
         or not _SHA.fullmatch(manifest["reference_safe_replay_digest"])
     ):
         raise ValueError("native console project identity or replay invalid")
+    if (
+        not isinstance(manifest.get("source_rights_evidence_sha256"), str)
+        or not _SHA.fullmatch(manifest["source_rights_evidence_sha256"])
+        or not isinstance(manifest.get("project_id"), str)
+        or not manifest["project_id"]
+        or manifest.get("toolchain_license_review_required") is not True
+    ):
+        raise ValueError("source rights and third-party toolchain legal evidence incomplete")
+    if (
+        expected_authorship_sha256 is not None
+        and manifest["source_rights_evidence_sha256"] != expected_authorship_sha256
+    ):
+        raise ValueError("authorship evidence changed since source review")
     for field in (
         "binary_compiled", "emulator_playthrough_verified",
         "physical_hardware_verified", "release_approved",
@@ -148,6 +167,9 @@ def verify(
         "source_sha256": source_digest,
         "source_digest_matches_expected": expected_source_sha256 is not None,
         "source_digest_independently_attested": False,  # Caller-provided hash is not trusted external authority.
+        "source_rights_evidence_sha256": manifest["source_rights_evidence_sha256"],
+        "source_authorship_hash_matches_expected": expected_authorship_sha256 is not None,
+        "source_rights_independently_proven": False,
         "rom_sha256": measured["sha256"],
         "rom_size": measured["bytes"],
         "toolchain_revision": toolchain_revision,
@@ -173,6 +195,7 @@ def main() -> None:
     ap.add_argument("--source-dir", type=Path)
     ap.add_argument("--toolchain-revision")
     ap.add_argument("--expected-source-sha256")
+    ap.add_argument("--expected-authorship-sha256")
     ap.add_argument("--receipt-out", type=Path)
     args = ap.parse_args()
     if args.emit is not None:
@@ -186,6 +209,7 @@ def main() -> None:
             args.target, args.source_dir, args.verify_rom,
             toolchain_revision=args.toolchain_revision,
             expected_source_sha256=args.expected_source_sha256,
+            expected_authorship_sha256=args.expected_authorship_sha256,
         )
     if args.receipt_out is not None:
         if args.receipt_out.exists() or args.receipt_out.is_symlink():
