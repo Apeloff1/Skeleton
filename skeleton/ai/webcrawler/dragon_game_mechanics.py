@@ -149,8 +149,10 @@ class GameMechanicsMemory:
             raise ValueError("invalid game label")
         if type(session.duration_ms) is not int or not 0 < session.duration_ms <= self.policy.max_session_seconds * 1000:
             raise ValueError("invalid session duration")
-        if not 1 <= len(session.observations) <= self.policy.max_observations:
-            raise ValueError("invalid observation count")
+        if (not isinstance(session.observations, tuple)
+                or not 1 <= len(session.observations) <= self.policy.max_observations
+                or any(not isinstance(obs, GameObservation) for obs in session.observations)):
+            raise ValueError("invalid observation collection")
         rows = []
         for obs in session.observations:
             if not isinstance(obs.timestamp_ms, int) or not 0 <= obs.timestamp_ms <= session.duration_ms:
