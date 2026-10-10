@@ -66,11 +66,17 @@ class NativeReleaseGateReport:
             raise ValueError("native release composite receipt digest inconsistent with inputs")
 
     @property
-    def independent_reviews_complete(self) -> bool:
+    def review_signatures_structurally_complete(self) -> bool:
+        """Signed by caller-supplied keys; external root is NOT authenticated."""
         return (
             self.signed_review.status is
             ReleaseReadiness.REVIEW_RECEIPTS_SATISFIED_PUBLICATION_PENDING
         )
+
+    @property
+    def independent_reviews_complete(self) -> bool:
+        """Unpinned caller-supplied keys never establish independent trust."""
+        return False
 
     def public_receipt(self) -> dict[str, object]:
         return {
@@ -82,6 +88,8 @@ class NativeReleaseGateReport:
             "signed_review_receipt_sha256":self.signed_review.receipt_sha256,
             "review_status":self.signed_review.status.value,
             "independent_reviews_complete":self.independent_reviews_complete,
+            "review_signatures_structurally_complete":self.review_signatures_structurally_complete,
+            "external_reviewer_root_pinned":False,
             "file_bytes_verified":self.intake.file_bytes_verified,
             "native_binary_boot_verified":False,
             "legal_clearance_issued":False,
