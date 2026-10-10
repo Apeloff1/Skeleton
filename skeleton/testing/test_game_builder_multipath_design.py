@@ -521,3 +521,13 @@ def test_seal_corridor_rejects_softlocks_but_preserves_safe_detours():
     with pytest.raises(MultipathError):
         seal_safe_corridor(single, (2, 1), authorized=True)
 
+
+def test_collectible_relocation_changes_actual_objective_search():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    edited = relocate_collectible(p, (4, 1), (4, 2), authorized=True)
+    assert edited.after.collectibles == ((4, 2),)
+    assert edited.after.collectibles != p.collectibles
+    assert verify_route_proof(edited.after, edited.safe_proof)
+    with pytest.raises(MultipathError):
+        relocate_collectible(p, (4, 1), p.start, authorized=True)
+
