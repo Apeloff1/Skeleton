@@ -544,6 +544,15 @@ def compile_native_nes(
     if not (0<=first_target[0]<world.intent.width
             and 0<=first_target[1]<world.intent.height):
         raise NativeNESError("original NES first controller action exits world envelope")
+    # Exact original world-derived 32x30 stage-zero tile-map bytes as the
+    # independent acceptance target for the 6502/PPU write stream.
+    map_bytes = bytearray()
+    for row in world.levels[0].rows:
+        map_bytes.extend(_TILE_INDEX[tile] for tile in row)
+        map_bytes.extend(bytes(32-len(row)))
+    map_bytes.extend(bytes((30-len(world.levels[0].rows))*32))
+    if len(map_bytes) != 960:
+        raise NativeNESError("original NES source map did not fill 32x30 PPU name table")
     manifest = {
         "schema": "skeleton.game_builder.native_nes_source.v1",
         "project_id": source.project_id,
@@ -562,6 +571,7 @@ def compile_native_nes(
         "original_first_controller_action": first_move,
         "original_first_player_spawn": list(first_spawn),
         "original_first_controller_target": list(first_target),
+        "original_stage_zero_bg_sha256": sha256(map_bytes).hexdigest(),
         "cartridge_built": False,
         "emulator_verified": False,
         "hardware_verified": False,
