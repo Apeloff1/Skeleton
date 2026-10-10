@@ -286,3 +286,12 @@ def test_session_erasure_requires_explicit_boolean_true():
         store.erase("alice", authorized=1)
     assert len(store.sessions("alice", authorized=True)) == 1
 
+
+def test_session_record_refuses_unbounded_serialized_payload(monkeypatch):
+    import skeleton.ai.webcrawler.dragon_game_mechanics as module
+    store = setup()
+    monkeypatch.setattr(module, "MAX_STORED_SESSION_BYTES", 48)
+    with pytest.raises(ValueError, match="byte budget"):
+        store.record(session(store), authorized=True)
+    assert store.sessions("alice", authorized=True) == ()
+
