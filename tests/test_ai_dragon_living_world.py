@@ -212,7 +212,7 @@ def test_survival_crafting_farming_trade_mining_and_research_are_actual_state_tr
     settled=take_action(world,first,"trade")
     assert settled.trade==1
     assert settled.ore==first.ore-1
-    evolved=take_action(world,settled,"craft")
+    evolved=take_action(world,take_action(world,settled,"forage"),"craft")
     assert evolved.research==1
     assert evolved.crystal>=1
 
