@@ -19,6 +19,7 @@ from scripts.game_builder.native_sega_8bit_ci import emit, verify
 from scripts.game_builder.sega_reproducibility_ci import emit_receipt
 from skeleton.ai.game_builder.sega_reproducibility import (
     SegaBuildEvidenceError, verify_rebuilt_sega_cartridge,
+    verify_separate_authoring_runs,
 )
 from skeleton.testing.test_game_builder_native_sega8_ci import _rom, REVISION
 
@@ -240,3 +241,70 @@ def test_output_to_symlinked_parent_directory_fails_closed(tmp_path):
     with pytest.raises(ValueError):
         emit_receipt(alias/"out.json",{"incomplete":"untrusted"})
     assert list(actual.iterdir())==[]
+
+
+
+@pytest.mark.parametrize("target",["sega_master_system","sega_game_gear"])
+def test_independent_original_game_source_regeneration_matches_every_file(tmp_path,target):
+    args=prepared(tmp_path,target)
+    original=tmp_path/"second-authorship.txt"
+    original.write_text(
+        "All original line art, characters, world designs and chimes are newly authored.",
+        encoding="utf-8",
+    )
+    second=tmp_path/"regenerated"
+    proof=emit(target,second,original)
+    receipt=verify_separate_authoring_runs(
+        args["source_directory"],second,target=target,
+        expected_source_sha256=args["expected_source_sha256"],
+    )
+    assert proof["source_content_digest"]==args["expected_source_sha256"]
+    assert receipt["identical_source_bytes"] is True
+    assert receipt["generator_invocations_independently_attested"] is False
+    assert receipt["author_copyright_title_independently_proven"] is False
+    assert receipt["release_authorized"] is False
+
+
+@pytest.mark.parametrize("file",["game.c","Makefile","manifest.json"])
+def test_source_regeneration_flags_modified_homebrew_logic_and_metadata(tmp_path,file):
+    args=prepared(tmp_path)
+    second=tmp_path/"second"
+    author=tmp_path/"second-rights.txt"
+    author.write_text(
+        "All original line art, characters, world designs and chimes are newly authored.",
+        encoding="utf-8",
+    )
+    emit(args["target"],second,author)
+    path=second/file
+    path.write_bytes(path.read_bytes()+b"UNREVIEWED")
+    with pytest.raises(SegaBuildEvidenceError,match="differ"):
+        verify_separate_authoring_runs(
+            args["source_directory"],second,target=args["target"],
+            expected_source_sha256=args["expected_source_sha256"],
+        )
+
+
+def test_source_regeneration_cannot_hide_unreviewed_file_in_second_run(tmp_path):
+    args=prepared(tmp_path)
+    second=tmp_path/"regenerated"
+    author=tmp_path/"second-rights.txt"
+    author.write_text(
+        "All original line art, characters, world designs and chimes are newly authored.",
+        encoding="utf-8",
+    )
+    emit(args["target"],second,author)
+    (second/".hidden-proprietary-sprites").write_bytes(b"unreviewed")
+    with pytest.raises(SegaBuildEvidenceError,match="unreviewed"):
+        verify_separate_authoring_runs(
+            args["source_directory"],second,target=args["target"],
+            expected_source_sha256=args["expected_source_sha256"],
+        )
+
+
+def test_source_regeneration_does_not_compare_one_tree_against_itself(tmp_path):
+    args=prepared(tmp_path)
+    with pytest.raises(SegaBuildEvidenceError,match="same source"):
+        verify_separate_authoring_runs(
+            args["source_directory"],args["source_directory"],
+            target=args["target"],expected_source_sha256=args["expected_source_sha256"],
+        )
