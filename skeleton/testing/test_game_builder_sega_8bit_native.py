@@ -322,3 +322,31 @@ def test_original_native_console_has_replay_preserving_accessibility_and_pause(t
                 world,_rights(world),target,authorized=True,
                 reduced_motion=bad,
             )
+
+
+
+@pytest.mark.parametrize("target",("sega_master_system","sega_game_gear"))
+def test_five_real_hardware_original_color_themes_are_distinct_and_digest_bound(target):
+    from skeleton.ai.game_builder.playable_world import generate_playable_world
+
+    source_world=_world(seed=73911)
+    seen=set()
+    for theme in ("forest","space","desert","ocean","arcade"):
+        world=generate_playable_world(
+            replace(source_world.intent,theme=theme),authorized=True,
+        )
+        result=compile_native_sega_8bit(world,_rights(world),target,authorized=True)
+        meta=json.loads(result.manifest_json)
+        assert meta["original_color_theme"]==theme
+        assert len(meta["game_gear_original_rgb12_palette"])==4
+        assert len(meta["master_system_original_rgb222_palette"])==4
+        assert all(0<=color<=0xFFF for color in meta["game_gear_original_rgb12_palette"])
+        assert all(0<=color<=0x3F for color in meta["master_system_original_rgb222_palette"])
+        assert "GG_setBGPaletteColor(1, BASE_COLOR_1);" in result.game_c
+        assert "SMS_setBGPaletteColor(1, BASE_COLOR_1);" in result.game_c
+        assert "__GG_COLOR_1__" not in result.game_c
+        assert "__SMS_COLOR_1__" not in result.game_c
+        assert "#define BASE_COLOR_1 " in result.game_c
+        assert result.content_digest not in seen
+        seen.add(result.content_digest)
+    assert len(seen)==5
