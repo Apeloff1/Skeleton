@@ -10,6 +10,7 @@ from skeleton.ai.game_builder.coleco_native_export import (
 )
 from skeleton.ai.game_builder.coleco_rom import verify_col
 from skeleton.ai.game_builder.playable_world import GameBuildIntent,generate_playable_world
+from skeleton.ai.game_builder.game_boy_memory_replay import export_game_boy_memory_replay
 from skeleton.ai.game_builder.port_planner import HomebrewSource
 
 
@@ -30,6 +31,7 @@ def emit(output:Path)->dict[str,object]:
     )
     project=compile_native_coleco(world,rights,authorized=True)
     root=export_native_coleco(project,output,authorized=True)
+    export_game_boy_memory_replay(world,root/"independent-guest-reference.json")
     meta=json.loads((root/"manifest.json").read_text(encoding="utf-8"))
     if meta["world_digest"]!=world.digest or meta["native_binary_compiled"]:
         raise ValueError("Coleco machine-source provenance or certification inconsistent")
