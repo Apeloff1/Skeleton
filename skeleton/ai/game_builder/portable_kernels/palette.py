@@ -41,3 +41,9 @@ def encode_rgb565(pixel: object) -> int:
     r,g,b = _rgb(pixel)
     return ((r*31+127)//255)<<11 | ((g*63+127)//255)<<5 | ((b*31+127)//255)
 
+
+def decode_rgb565(word: object) -> tuple[int,int,int]:
+    """Decode RGB565 without accidentally swapping red and blue channels."""
+    n=_packed(word,0xffff)
+    return (((n>>11)&31)*255+15)//31, (((n>>5)&63)*255+31)//63, ((n&31)*255+15)//31
+
