@@ -502,4 +502,10 @@ def articulation_cells(problem: RouteProblem) -> tuple[Position, ...]:
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells"]
+def bridge_corridors(problem: RouteProblem) -> tuple[Edge, ...]:
+    """Identify physical edges whose closure disconnects a safe region."""
+    return _lowlink_report(problem)[1]
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors"]
