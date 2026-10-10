@@ -348,56 +348,156 @@ def native_world_route_play(
     return {"ok":True,**state}
 
 
+def _native_world_zip(files: dict[str,str], *,filename:str) -> Response:
+    """Shared bounded reproducible ZIP for genuinely playable original C99 game."""
+    from io import BytesIO
+    from zipfile import ZipFile,ZipInfo,ZIP_DEFLATED
+    allow={
+        "src/main.c","include/dragon_route_world.h",
+        "dragon-original-route-proof.json","Makefile",
+        "CMakeLists.txt","README.md",
+    }
+    if (set(files)!=allow or
+            any(type(value) is not str for value in files.values())):
+        raise ValueError("native original game source must use exact vetted archive names")
+    if sum(len(body.encode("utf-8")) for body in files.values())>1_500_000:
+        raise ValueError("native source archive exceeds size budget")
+    memory=BytesIO()
+    with ZipFile(memory,"w",ZIP_DEFLATED,compresslevel=9) as package:
+        for name in sorted(files):
+            record=ZipInfo(name,date_time=(1980,1,1,0,0,0))
+            record.compress_type=ZIP_DEFLATED
+            record.external_attr=0o100644<<16
+            package.writestr(record,files[name].encode("utf-8"))
+    payload=memory.getvalue()
+    if len(payload)>1_500_000:
+        raise ValueError("compressed original game archive exceeds limit")
+    return Response(content=payload,media_type="application/zip",headers={
+        "Content-Disposition":f'attachment; filename="{filename}"',
+        "X-Content-Type-Options":"nosniff",
+        "Cache-Control":"private, no-store",
+        "X-Content-SHA256":sha256(payload).hexdigest(),
+        "X-Dragon-Claim":"original-source-only-native-C99-not-compiled",
+    })
+
+
 @router.post("/native/production/routes/source-bundle")
 def native_world_route_source_bundle(
     body: NativeRouteSourceRequest,
     owner: str=Depends(_native_source_editor),
 ):
-    """In-memory source ZIP of actual playable original C99 routing game."""
     if not body.original_work_attested or not body.approved:
         raise HTTPException(status_code=403,
-                            detail="Explicit original-game rights and export approval required")
-    from io import BytesIO
-    from zipfile import ZipFile,ZipInfo,ZIP_DEFLATED
+            detail="Original creation rights and source export approval required")
     from skeleton.ai.webcrawler.dragon_route_world_factory import make_frontier
     from skeleton.ai.webcrawler.dragon_route_native_game import emit_route_game
     try:
         world,traveller=make_frontier(
             seed=body.seed,weather=body.weather,hour=body.hour)
         files=emit_route_game(world,traveller,authorized=True)
-        if (len(files)>12 or
-                any(not isinstance(x,str) or not isinstance(y,str)
-                    for x,y in files.items())):
-            raise ValueError("original routing game source format invalid")
-        total=sum(len(value.encode("utf-8")) for value in files.values())
-        if total>1_500_000:
-            raise ValueError("original game source exceeds bounded creator export")
-        buffer=BytesIO()
-        with ZipFile(buffer,"w",ZIP_DEFLATED,compresslevel=9) as archive:
-            for name in sorted(files):
-                if name not in (
-                    "src/main.c","include/dragon_route_world.h",
-                    "dragon-original-route-proof.json","Makefile","CMakeLists.txt",
-                    "README.md",
-                ):
-                    raise ValueError("unexpected source code path")
-                item=ZipInfo(name,date_time=(1980,1,1,0,0,0))
-                item.compress_type=ZIP_DEFLATED
-                item.external_attr=0o100644<<16
-                archive.writestr(item,files[name].encode("utf-8"))
-        payload=buffer.getvalue()
-        if len(payload)>1_500_000:
-            raise ValueError("original routing game ZIP exceeds source limit")
+        return _native_world_zip(files,filename="dragon-original-world-routes.zip")
     except ValueError:
         raise HTTPException(status_code=422,
-            detail="Original multimodal routing source could not be exported") from None
-    return Response(content=payload,media_type="application/zip",headers={
-        "Content-Disposition":'attachment; filename="dragon-original-world-routes.zip"',
-        "X-Content-Type-Options":"nosniff",
-        "Cache-Control":"private, no-store",
-        "X-Content-SHA256":sha256(payload).hexdigest(),
-        "X-Dragon-Claim":"original-source-only-native-C99-not-compiled",
-    })
+            detail="Original route-world C99 project did not pass export checks") from None
+
+
+class NativeMazeWorldRequest(BaseModel):
+    """Constructive maze: guaranteed playable backbone before alternatives."""
+    model_config=ConfigDict(extra="forbid")
+    width: StrictInt=Field(default=6,ge=4,le=8)
+    height: StrictInt=Field(default=6,ge=4,le=6)
+    seed: StrictInt=Field(default=1977,ge=0,le=0xffffffff)
+    scenic_density: StrictInt=Field(default=65,ge=0,le=100)
+    detour_density: StrictInt=Field(default=70,ge=0,le=100)
+    secret_count: StrictInt=Field(default=2,ge=0,le=4)
+    challenge: str=Field(default="balanced",
+        pattern=r"^(gentle|balanced|challenging|spicy)$")
+    weather: str=Field(default="clear",
+        pattern=r"^(clear|rain|windy|storm|snow|high_tide)$")
+
+
+class NativeMazePlayRequest(NativeMazeWorldRequest):
+    moves: list[str]=Field(default_factory=list,max_length=80)
+
+
+class NativeMazeSourceRequest(NativeMazeWorldRequest):
+    original_work_attested: StrictBool=Field(default=False)
+    approved: StrictBool=Field(default=False)
+
+
+def _construct_native_maze(body:NativeMazeWorldRequest):
+    from skeleton.ai.webcrawler.dragon_route_maze import MazeRequest,build_maze
+    return build_maze(MazeRequest(
+        width=body.width,height=body.height,seed=body.seed,
+        scenic_density=body.scenic_density,
+        detour_density=body.detour_density,
+        secret_count=body.secret_count,
+        challenge=body.challenge,weather=body.weather,
+    ))
+
+
+@router.post("/native/production/routes/maze/preview")
+def native_world_maze_preview(
+    body: NativeMazeWorldRequest,
+    owner: str=Depends(_native_source_editor),
+) -> dict:
+    from dataclasses import asdict
+    from skeleton.ai.webcrawler.dragon_route_maze import verify_maze
+    from skeleton.ai.webcrawler.dragon_route_world import experience
+    try:
+        created=_construct_native_maze(body)
+        proof=verify_maze(created)
+        player=experience(created.world,created.traveller)
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original multi-route maze has no valid completion certificate") from None
+    return {
+        "ok":True,
+        "schema":"skeleton.ai.dragon.maze_route_preview.v1",
+        "completion":proof,
+        "certificate":asdict(created.certificate),
+        "player":player,
+        "source_only":True,
+        "claim":"original constructive maze, playable recovery plus restart after exhausted budgets",
+    }
+
+
+@router.post("/native/production/routes/maze/play")
+def native_world_maze_play(
+    body: NativeMazePlayRequest,
+    owner: str=Depends(_native_source_editor),
+) -> dict:
+    from skeleton.ai.webcrawler.dragon_route_world import experience
+    try:
+        creation=_construct_native_maze(body)
+        player=experience(
+            creation.world,creation.traveller,path=tuple(body.moves))
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original maze passage is unavailable or resource limits were exceeded") from None
+    return {"ok":True,**player}
+
+
+@router.post("/native/production/routes/maze/source-bundle")
+def native_world_maze_source_bundle(
+    body: NativeMazeSourceRequest,
+    owner: str=Depends(_native_source_editor),
+):
+    if not body.original_work_attested or not body.approved:
+        raise HTTPException(status_code=403,
+            detail="Original maze rights and export approval required")
+    from skeleton.ai.webcrawler.dragon_route_native_game import emit_route_game
+    try:
+        created=_construct_native_maze(body)
+        project=emit_route_game(
+            created.world,created.traveller,authorized=True,
+            maze_creation=created,
+        )
+        return _native_world_zip(
+            project,filename="dragon-original-completable-maze.zip")
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Maze source must replay every location and weather proof before export") from None
 
 
 class NativePuzzleGridValidationRequest(BaseModel):
