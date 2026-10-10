@@ -578,3 +578,17 @@ def test_game_observation_history_receipt_is_content_bound_without_raw_notes():
     assert "Timing-based interaction" not in json.dumps(receipt)
     store.erase_session("alice", first.session_id, authorized=True)
     assert store.history_receipt("alice", authorized=True)["digest"] != receipt["digest"]
+
+def test_public_taste_snapshot_does_not_expose_raw_gameplay_notes():
+    import json
+    store = setup()
+    example = observation(preference=PreferenceSignal.ENJOYED, confirmed=True)
+    store.record(session(store, observations=(example,)), authorized=True)
+    receipt = store.public_taste_snapshot("alice", authorized=True)
+    assert receipt["signals"][0]["mechanic"] == "combat"
+    assert receipt["signals"][0]["fully_user_confirmed"] is True
+    assert receipt["memory_promotion_authorized"] is False
+    assert receipt["training_authorized"] is False
+    assert "Timing-based interaction" not in json.dumps(receipt)
+    with pytest.raises(PermissionError):
+        store.public_taste_snapshot("alice", authorized=1)
