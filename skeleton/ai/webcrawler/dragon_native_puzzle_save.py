@@ -101,7 +101,9 @@ static int read_local_original_save(void){
 }
 static int original_save_selftest(void){
  if(!load_level(0))return 51;
- if(!perform('d'))return 52;
+ /* Authored worlds may start against any wall or crate. Follow the exact
+    solver's first proven legal move rather than hard-coding rightward input. */
+ if(!dragon_solutions[0][0]||!perform(dragon_solutions[0][0]))return 52;
  State reference=state;
  if(!write_local_original_save())return 53;
  if(!load_level(0))return 54;
