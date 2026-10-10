@@ -99,6 +99,10 @@ def _adapt_portable_design(request: "ProductionRequest", target_id: str):
         adjustments.append("search_budget_reduced_to_one_candidate")
     if palette != profile.palette:
         adjustments.append("palette_adapted_to_cartridge_safe_class")
+    if desktop and request.style=="world_route_adventure":
+        adjustments.append("original_route_world_is_one_free_roam_goal_not_multistage_puzzle_campaign")
+        adjustments.append("art_theme_hero_and_candidate_budget_not_yet_used_by_abstract_route_emitter")
+        adjustments.append("world_mode_simulates_traversal_not_vehicle_specific_physics")
     if not desktop:
         adjustments.append("hero_theme_and_difficulty_not_runtime_applied_by_cartridge_emitter")
         adjustments.append("native_chapter_branching_not_applied_by_cartridge_emitter")
