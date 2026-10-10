@@ -293,6 +293,63 @@ class DragonOperationalTests(TestCase):
         self.assertTrue(scheduler.usage("background").empty)
 
 
+    def test_owner_local_erasure_requires_approval_and_purges_separate_anchors(self):
+        self.sign()
+        memory = DragonWisdomMemory(self.pyramid)
+        memory.reconcile(OWNER, now=NOW+2, authorized=True, trusted_worker=True)
+        self.anchor.checkpoint(self.pyramid, OWNER, now=NOW+3,
+                               authorized=True, trusted_worker=True,
+                               allow_initial_bootstrap=True)
+        # Another owner must survive an authenticated owner's deletion.
+        second_owner = "studio-b"
+        other_doc = replace(source("c"), owner=second_owner)
+        self.lib.import_document(other_doc,
+                                 expected_parent_digest=None, authorized=True)
+        with self.assertRaises(PermissionError):
+            memory.erase_local_owner(
+                OWNER, confirm_owner=OWNER, authorized=True,
+                trusted_worker=True, human_approved=False,
+                worker_quiesced=True, no_legal_hold=True,
+            )
+        with self.assertRaises(PermissionError):
+            memory.erase_local_owner(
+                OWNER, confirm_owner=second_owner, authorized=True,
+                trusted_worker=True, human_approved=True,
+                worker_quiesced=True, no_legal_hold=True,
+            )
+        result = memory.erase_local_owner(
+            OWNER, confirm_owner=OWNER, authorized=True,
+            trusted_worker=True, human_approved=True,
+            worker_quiesced=True, no_legal_hold=True,
+        )
+        self.assertGreater(result["rows_deleted"]["game_builder_knowledge"], 0)
+        self.assertTrue(result["external_anchor_purge_required"])
+        self.assertFalse(result["full_erasure_certified"])
+        self.assertEqual(self.lib.history(
+            OWNER, "source-a", authorized=True), ())
+        self.assertEqual(memory._rows(OWNER), {})
+        self.assertEqual(self.pyramid._history(OWNER), [])
+        self.assertEqual(len(self.lib.history(
+            second_owner, "source-c", authorized=True)), 1)
+        with self.assertRaises(ValueError):
+            self.anchor.verify(self.pyramid, OWNER, authorized=True)
+        with self.assertRaises(PermissionError):
+            self.anchor.purge_owner_anchors(
+                OWNER, confirm_owner=OWNER, authorized=True,
+                trusted_worker=True, human_approved=True,
+                no_legal_hold=False, local_erasure_verified=True,
+            )
+        purged = self.anchor.purge_owner_anchors(
+            OWNER, confirm_owner=OWNER, authorized=True,
+            trusted_worker=True, human_approved=True,
+            no_legal_hold=True, local_erasure_verified=True,
+        )
+        self.assertEqual(purged["anchors_purged"], 1)
+        self.assertFalse(purged["full_erasure_certified"])
+        self.assertFalse(self.anchor.verify(
+            self.pyramid, OWNER, authorized=True)["anchored"])
+
+
 if __name__ == "__main__":
     import unittest
     unittest.main()
