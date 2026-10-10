@@ -38,3 +38,11 @@ def test_rgb565_boundaries_and_roundtrip():
     with pytest.raises(PaletteError):
         decode_rgb565(-1)
 
+
+def test_rgb332_pack_three_three_two_layout():
+    assert encode_rgb332((255,0,0))==0xe0
+    assert encode_rgb332((0,255,0))==0x1c
+    assert encode_rgb332((0,0,255))==0x03
+    with pytest.raises(PaletteError):
+        encode_rgb332((1,2))
+
