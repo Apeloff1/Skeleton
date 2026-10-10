@@ -30,10 +30,27 @@ static void emit_state(void) {
 int main(void) {
     char action;
     unsigned int frame_count=0;
+#ifdef SKELETON_NATIVE_DEMO_REPLAY
+    unsigned char demo_stage;
+    unsigned int demo_index;
+#endif
     if (setjmp(host_boot_return)==0) skeleton_sega_native_entry();
     if (!host_display_enabled || host_palette_writes!=8) abort();
     emit_state();
+#ifdef SKELETON_NATIVE_DEMO_REPLAY
+    /* Read the physically emitted on-cartridge solution tables. No Python
+     * route is supplied to this executable: incorrect generator bytes fail
+     * independently against the authoritative Python expectations. */
+    for (demo_stage=0; demo_stage<LEVEL_COUNT; ++demo_stage) {
+        if (level_index!=demo_stage || won || lost
+            || original_demo_lengths[demo_stage]==0U) abort();
+        for (demo_index=0; demo_index<original_demo_lengths[demo_stage]; ++demo_index) {
+            unsigned char direction=original_demo_routes[demo_stage][demo_index];
+            if (direction>=4U) abort();
+            action="UDLR"[direction];
+#else
     while (scanf(" %c",&action)==1) {
+#endif
         if (++frame_count>20000U || won || lost) abort();
         switch (action) {
             case 'U': advance(0,-1); break;
@@ -45,7 +62,12 @@ int main(void) {
         while (pending_count) flush_pending();
         render_following_sprite();
         emit_state();
+#ifdef SKELETON_NATIVE_DEMO_REPLAY
+        }
     }
+#else
+    }
+#endif
     if (!won || lost || host_sprite_updates!=frame_count || host_tile_writes==0)
         abort();
     fprintf(stderr,"host_replay_validated_steps=%u tile_writes=%lu sprites=%lu\n",
