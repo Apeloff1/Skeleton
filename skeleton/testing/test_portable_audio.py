@@ -37,3 +37,11 @@ def test_sn76489_period_is_bounded_and_recoverable():
     with pytest.raises(AudioKernelError):
         sn76489_tone_period(440,master_clock=True)
 
+
+def test_ay38910_psg_12bit_tone_range():
+    period=ay38910_tone_period(440)
+    assert 1<=period<=4095
+    assert abs(1773400/(16*period)-440)<3
+    with pytest.raises(AudioKernelError):
+        ay38910_tone_period(0)
+
