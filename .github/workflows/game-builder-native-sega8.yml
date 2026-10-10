@@ -24,6 +24,7 @@ on:
       - "scripts/game_builder/sega8_host_replay.c"
       - "skeleton/testing/test_game_builder_sega8_host_replay.py"
       - "skeleton/testing/test_game_builder_sega8_native_attract.py"
+      - "skeleton/testing/test_game_builder_sega8_stage_palette.py"
       - "scripts/game_builder/sega_reproducibility_ci.py"
       - "skeleton/ai/game_builder/sega_reproducibility.py"
       - "skeleton/testing/test_game_builder_sega_reproducibility.py"
@@ -223,6 +224,8 @@ jobs:
           assert r["native_attract_demo_performed_first_original_move"] is True
           assert r["native_attract_demo_user_cancel_restored_game"] is True
           assert r["actual_victory_palette_verified"] is True
+          assert r["original_hardware_stage_color_accents_verified"] is True
+          assert r["original_hardware_stage_accents_verified_per_move"] == r["hardware_screen_states_verified"]
           assert r["independent_cycle_exact_full_console_emulator_verified"] is False
           assert r["physical_hardware_verified"] is False
           assert r["release_approved"] is False
@@ -357,6 +360,8 @@ jobs:
           assert receipt["gameplay_parity_verified"] is True
           assert receipt["independent_native_rom_formats_verified"] is True
           assert receipt["real_z80_startup_checked_per_platform"] is True
+          assert receipt["original_stage_hardware_color_parity_verified"] is True
+          assert receipt["original_stage_color_accents_verified_per_console"] > 50
           assert receipt["native_cartridge_rebuild_byte_equality_checked_per_platform"] is True
           assert set(receipt["native_rebuild_provenance_sha256_by_platform"]) == {"sega_master_system", "sega_game_gear"}
           assert all(len(value) == 64 for value in receipt["native_rebuild_provenance_sha256_by_platform"].values())
