@@ -81,3 +81,10 @@ def test_ordered_dither_handles_endpoints_and_repeats():
     with pytest.raises(PaletteError):
         ordered_luma_dither(((256,),))
 
+
+def test_contrast_ratio_enforces_readability_without_legal_claims():
+    assert contrast_ratio((0,0,0),(255,255,255)) == 21.0
+    assert contrast_ratio((100,100,100),(100,100,100)) == 1.0
+    assert contrast_ratio((0,0,0),(255,255,255)) == contrast_ratio((255,255,255),(0,0,0))
+    with pytest.raises(PaletteError):
+        contrast_ratio((0,0,0),(0,-1,0))
