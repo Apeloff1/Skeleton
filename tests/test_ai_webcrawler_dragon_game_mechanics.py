@@ -184,3 +184,11 @@ def test_raw_video_retention_flag_requires_explicit_false():
     with pytest.raises(ValueError, match="raw"):
         store.record(replace(session(store), raw_video_retained=0), authorized=True)
 
+
+def test_game_labels_reject_embedded_control_characters():
+    from dataclasses import replace
+    store = setup()
+    for name in ("Example\\x00Game", "Example\\nGame"):
+        with pytest.raises(ValueError, match="game label"):
+            store.record(replace(session(store), game_label=name), authorized=True)
+
