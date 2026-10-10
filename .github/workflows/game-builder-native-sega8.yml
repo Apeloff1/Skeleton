@@ -91,10 +91,12 @@ jobs:
             *) exit 3 ;;
           esac
           SOURCE_DIGEST="$(python -c 'import json,os; print(json.load(open("/tmp/"+os.environ["TARGET"]+"-generated-source.json", encoding="utf-8"))["source_content_digest"])')"
+          AUTHORSHIP_DIGEST="$(python -c 'import json,os; print(json.load(open("/tmp/"+os.environ["TARGET"]+"-generated-source.json", encoding="utf-8"))["rights_evidence_sha256"])')"
           python -m scripts.game_builder.native_sega_8bit_ci \
             --verify-rom "output/$TARGET/build/skeleton-original.$EXT" \
             --source-dir "output/$TARGET" --target "$TARGET" \
             --expected-source-sha256 "$SOURCE_DIGEST" \
+            --expected-authorship-sha256 "$AUTHORSHIP_DIGEST" \
             --toolchain-revision 533ae572c897cf44f1da865013ebf690134301a3 \
             --receipt-out "/tmp/$TARGET-compilation-evidence.json"
           python -m json.tool "/tmp/$TARGET-compilation-evidence.json" >/dev/null
@@ -102,6 +104,8 @@ jobs:
           import json, os
           r=json.load(open("/tmp/"+os.environ["TARGET"]+"-compilation-evidence.json", encoding="utf-8"))
           assert r["source_digest_matches_expected"] is True
+          assert r["source_authorship_hash_matches_expected"] is True
+          assert r["source_rights_independently_proven"] is False
           assert r["source_digest_independently_attested"] is False
           assert r["toolchain_revision_hash_algorithm"] == "git-sha1"
           assert r["toolchain_source_authenticated"] is False
