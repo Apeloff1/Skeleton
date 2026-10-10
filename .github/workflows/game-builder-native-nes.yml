@@ -130,7 +130,7 @@ jobs:
           assert move["native_sprite_dma_transfers"] >= 2
           assert move["full_controller_route_replayed"] is False
           assert move["cycle_accurate_ppu_apu_verified"] is False
-          assert move["legal_distribution_authorized"] is False          print("Compiled genuine native NES cartridge", result["sha256"])
+          assert move["legal_distribution_authorized"] is False          print("Compiled genuine native NES cartridge", rom["sha256"])
           PY
       - name: Save ROM with provenance and reproducible build source
         uses: actions/upload-artifact@v4
