@@ -35,6 +35,20 @@ type Platform={target:string;cohort:string;status:string;
     rooms_per_chunk:number;level_buckets:number}};
 type Platforms={ok:boolean;platforms:Platform[];
   available_catalog_targets:number};
+type OptionalGate={id:string;source_axis:string;source_domain:string;
+  route_type:string;accessible_now:boolean;reason:string;
+  earliest_turn:number;next_possible_turn:number|null;
+  season_window:number;current_season:number;period:number;
+  required_era:number;current_era:number;
+  required_mastery:number[];current_mastery:number[]};
+type OptionalAccessPreview={
+  ok:boolean;optional_paths:OptionalGate[];world_must_have_an_ending:boolean;
+};
+type OptionalAccessProof={
+  ok:boolean;gate:string;found_within_budget:boolean;
+  actions:string[];actual_replay_digest?:string;
+  not_a_global_unwinnability_claim:boolean;reason?:string;
+};
 async function api<T>(path:string,body?:object):Promise<T>{
   const response=await fetch(API+path,{
     method:body?'POST':'GET',cache:'no-store',
@@ -59,6 +73,8 @@ function Editor(){
   const [guide,setGuide]=React.useState<string[]>([]);
   const [platforms,setPlatforms]=React.useState<Platforms|null>(null);
   const [target,setTarget]=React.useState('game_boy');
+  const [access,setAccess]=React.useState<OptionalAccessPreview|null>(null);
+  const [accessProof,setAccessProof]=React.useState<OptionalAccessProof|null>(null);
   const [pack,setPack]=React.useState<{
     package:{target:string;content_sha256:string;
       projection:{active_axes:number;deferred_axes:string[];
@@ -79,6 +95,7 @@ function Editor(){
   const reset=()=>{
     generation.current++;setOpened(null);setWorld(null);
     setHistory([]);setGuide([]);setPlatforms(null);setPack(null);
+    setAccess(null);setAccessProof(null);
     setError('');setNotice('');
   };
   const load=async(index:string)=>{
@@ -93,6 +110,7 @@ function Editor(){
       if(ticket===generation.current){
         setOpened(result);setWorld(result.game);setAddress(index);
         setHistory([]);setGuide([]);setPlatforms(null);setPack(null);
+        setAccess(null);setAccessProof(null);
       }
     }catch(e){if(ticket===generation.current)setError(
       e instanceof Error?e.message:'Cannot generate this original world.');}
@@ -169,6 +187,41 @@ function Editor(){
       }
     }catch(e){if(ticket===generation.current)setError(
       e instanceof Error?e.message:'Cannot prove this passage.');}
+    finally{if(ticket===generation.current)setBusy(false);}
+  };
+  const inspectOptionalAccess=async()=>{
+    if(!opened||busy)return;
+    const ticket=++generation.current;setBusy(true);setError('');
+    try{
+      const result=await api<OptionalAccessPreview>(
+        '/access-matrix',{index:address,domain,actions:[]});
+      if(!result.ok||result.optional_paths.length!==8||
+         result.world_must_have_an_ending)
+        throw Error('Optional world route projection is malformed.');
+      if(ticket===generation.current){
+        setAccess(result);setAccessProof(null);
+        setNotice('Eight real optional access contracts loaded.');
+      }
+    }catch(e){if(ticket===generation.current)setError(
+      e instanceof Error?e.message:'Optional route inspection failed.');}
+    finally{if(ticket===generation.current)setBusy(false);}
+  };
+  const proveOptionalAccess=async(id:string)=>{
+    if(!opened||busy)return;
+    const ticket=++generation.current;setBusy(true);setError('');
+    try{
+      const actual=await api<OptionalAccessProof>(
+        '/access-proof',{index:address,gate_id:id,horizon:96});
+      if(!actual.ok||!actual.not_a_global_unwinnability_claim)
+        throw Error('Optional route evidence is inconsistent.');
+      if(ticket===generation.current){
+        setAccessProof(actual);
+        setNotice(actual.found_within_budget
+          ?'Actual seasonal and historical route was reached by replay.'
+          :'This optional route was not proven inside 96 turns; the world remains playable.');
+      }
+    }catch(e){if(ticket===generation.current)setError(
+      e instanceof Error?e.message:'Original optional passage proof unavailable.');}
     finally{if(ticket===generation.current)setBusy(false);}
   };
   const inspectPlatforms=async()=>{
@@ -355,6 +408,57 @@ function Editor(){
             instability {values.instability} · clock {values.clock}
           </Text>
         ))}
+      </View>
+      <View style={s.panel}>
+        <Text style={s.heading}>Advanced conditional access matrix</Text>
+        <Text style={s.copy}>
+          Every world axis also owns a real optional route. Routes can
+          require changing seasons, social mastery, historical progression,
+          specific calendar windows or multiple prerequisites.
+          A route may remain unreachable without invalidating the world.
+        </Text>
+        <TouchableOpacity style={s.action} disabled={busy}
+          onPress={inspectOptionalAccess}>
+          <Text style={s.actionText}>
+            Analyze eight optional {friendly(domain)} passages
+          </Text>
+        </TouchableOpacity>
+        {access&&access.optional_paths.map(item=>(
+          <View key={item.id} style={s.axis}>
+            <Text style={s.actionText}>
+              {friendly(item.source_axis)} · {friendly(item.route_type)}
+            </Text>
+            <Text style={s.copy}>
+              {friendly(item.reason)} ·
+              {' '}season {item.current_season+1} / {item.season_window+1} ·
+              {' '}era {item.current_era} / {item.required_era}
+            </Text>
+            <Text style={s.hint}>
+              Masteries {item.current_mastery.join(', ')}
+              {' '}/ {item.required_mastery.join(', ')} ·
+              earliest turn {item.earliest_turn} ·
+              window every {item.period} turns.
+            </Text>
+            <TouchableOpacity style={s.chip}
+              disabled={busy} onPress={()=>proveOptionalAccess(item.id)}>
+              <Text style={s.actionText}>
+                Find actual bounded access route
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+        {accessProof&&<View style={s.axis}>
+          <Text style={s.heading}>{friendly(accessProof.gate)}</Text>
+          <Text style={s.copy}>
+            {accessProof.found_within_budget
+              ?'Proved by '+accessProof.actions.length+' real decisions.'
+              :'Not proven in the bounded search. Not a world failure.'}
+          </Text>
+          {accessProof.found_within_budget&&
+            <Text style={s.hint}>
+              Source replay {accessProof.actual_replay_digest?.slice(0,22)}…
+            </Text>}
+        </View>}
       </View>
       <View style={s.panel}>
         <Text style={s.heading}>Hardware-specific world content</Text>
