@@ -5,6 +5,12 @@ on:
     paths:
       - 'skeleton/ai/webcrawler/dragon_native_*.py'
       - 'skeleton/ai/webcrawler/dragon_living_world*.py'
+      - 'skeleton/ai/webcrawler/dragon_world_genome.py'
+      - 'skeleton/ai/webcrawler/dragon_genomic_world.py'
+      - 'skeleton/ai/webcrawler/dragon_genomic_paths.py'
+      - 'tests/test_ai_dragon_world_genome.py'
+      - 'backend/tests/test_dragon_genomic_world_routes.py'
+      - 'frontend/app/dragon-genomic-universe.tsx'
       - 'skeleton/ai/webcrawler/dragon_living_maze_solvers.py'
       - 'skeleton/ai/webcrawler/dragon_route_*.py'
       - 'tests/test_ai_dragon_living_world*.py'
@@ -499,6 +505,89 @@ jobs:
         with:
           name: dragon-original-gameplay-sdl-frames
           path: /tmp/original-game-media/dragon-original-game-frames-*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  genomic-worlds-and-real-route-space:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check exact-address genomic game and route compiler syntax
+        run: |
+          set -euo pipefail
+          python -m compileall -q \
+            skeleton/ai/webcrawler/dragon_world_genome.py \
+            skeleton/ai/webcrawler/dragon_genomic_world.py \
+            skeleton/ai/webcrawler/dragon_genomic_paths.py
+      - name: Install deterministic local pytest tooling
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Execute all 24 physical world-axis and huge integer route checks
+        run: |
+          set -euo pipefail
+          python -m pytest -q tests/test_ai_dragon_world_genome.py
+      - name: Independently replay extreme indexed games and authored paths
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/dragon-genomic-world-proof
+          python - <<'PY'
+          from pathlib import Path
+          from dataclasses import asdict
+          import json
+          from skeleton.ai.webcrawler.dragon_world_genome import (
+              GENOMIC_WORLD_COUNT,AXIS_NAMES,unrank_genome_address,
+              edit_genome,lattice_summary,
+          )
+          from skeleton.ai.webcrawler.dragon_genomic_world import (
+              AXIS_ACTIONS,initial_genomic_state,play,cell,report,
+          )
+          from skeleton.ai.webcrawler.dragon_genomic_paths import (
+              GLOBAL_CHOICE_PATH_COUNT,PROGRAM_COUNT,materialize_path,
+              verify_path,sample_paths,
+          )
+          root=Path("/tmp/dragon-genomic-world-proof")
+          for name,index in (
+              ("first_world","0"),
+              ("largest_world",str(GENOMIC_WORLD_COUNT-1)),
+          ):
+              address=unrank_genome_address(index)
+              current=initial_genomic_state(address)
+              assert len(AXIS_ACTIONS)==len(AXIS_NAMES)==24
+              beginning=current
+              for action in AXIS_ACTIONS[:12]:
+                  current=play(address,current,action)
+              assert current.history_digest!=beginning.history_digest
+              assert current.base.turn==12
+              exact_path_index=str(int(index)*PROGRAM_COUNT)
+              proof=materialize_path(exact_path_index)
+              assert verify_path(proof)["verified"]
+              data={
+                  "schema":"skeleton.ai.dragon.genomic_release_gate.v1",
+                  "world":name,
+                  "exact_world_decimal_index":index,
+                  "genome":address.genome_digest,
+                  "physical":report(address,current,radius=1),
+                  "real_path":asdict(proof),
+                  "path_verification":verify_path(proof),
+                  "world_count_exact_decimal":str(GENOMIC_WORLD_COUNT),
+                  "path_count_exact_decimal":str(GLOBAL_CHOICE_PATH_COUNT),
+                  "disclaimer":"sampled original state machines, not billions of compiled games",
+              }
+              (root/(name+".json")).write_text(
+                  json.dumps(data,sort_keys=True,indent=2)+"\n",
+                  encoding="utf-8",
+              )
+          PY
+      - name: Publish actual source replay receipts rather than fake world counts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-genomic-world-and-route-evidence
+          path: /tmp/dragon-genomic-world-proof/*.json
           if-no-files-found: error
           retention-days: 7
 
