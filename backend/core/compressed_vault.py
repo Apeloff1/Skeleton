@@ -104,7 +104,7 @@ def _save_manifest() -> None:
 _load_manifest()
 
 
-_SAFE_SHARD_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\\Z")
+_SAFE_SHARD_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,95}")
 
 
 def _safe_name(name: str) -> str:
