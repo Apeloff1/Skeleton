@@ -16,6 +16,7 @@ from typing import Callable
 
 from .flgb_model_runtime import LocalModelReceipt, LocalModelRequest, ModelIdentity, digest_json
 from .native_llm_runtime import GenerationResult, NativeLLMRuntime
+from .tokenization import TokenizerContractError
 from .runtime_contracts import GenerationConfig, RuntimeContractError, RuntimeEvent
 
 

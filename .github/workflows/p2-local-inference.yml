@@ -4,6 +4,12 @@ on:
   pull_request:
     paths:
       - "skeleton/ai/runtime/inference/**"
+      - "skeleton/ai/model_runtime/**"
+      - "skeleton/cortex/transformer.py"
+      - "skeleton/cortex/torch_lm.py"
+      - "skeleton/cortex/device.py"
+      - "tests/test_consumer_transformer_acceleration.py"
+      - "tests/test_consumer_llama_budget.py"
       - "skeleton/app/local_ai.py"
       - "tests/flgb/test_desktop_offline_ai.py"
       - "skeleton/testing/test_local_inference.py"
@@ -22,6 +28,12 @@ on:
       - feat/p2-functional-ai-closure-atomic
     paths:
       - "skeleton/ai/runtime/inference/**"
+      - "skeleton/ai/model_runtime/**"
+      - "skeleton/cortex/transformer.py"
+      - "skeleton/cortex/torch_lm.py"
+      - "skeleton/cortex/device.py"
+      - "tests/test_consumer_transformer_acceleration.py"
+      - "tests/test_consumer_llama_budget.py"
       - "skeleton/app/local_ai.py"
       - "tests/flgb/test_desktop_offline_ai.py"
       - "skeleton/testing/test_local_inference.py"
@@ -82,3 +94,62 @@ jobs:
           skeleton/testing/test_llama_cpp_local_inference.py
           skeleton/testing/test_local_model_deployment.py
           tests/flgb/test_desktop_offline_ai.py
+          tests/test_consumer_transformer_acceleration.py
+          tests/test_consumer_llama_budget.py
+      - name: Verify CPU-only benchmark on reference engine
+        run: >-
+          python scripts/benchmark_consumer_transformer.py
+          --device cpu --dim 8 --heads 2 --layers 1 --ffn 12
+          --context 16 --prefill 4 --decode 2 --warmup 0 --runs 1
+          --assert-parity
+
+  consumer-transformer-cpu-torch:
+    # Verify the optimized numerical path on commodity CPU-only hardware.
+    # CUDA and Metal require their respective hardware runners for admission.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      OPENAI_API_KEY: ""
+      XAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install CPU PyTorch for reference parity
+        run: |
+          python -m pip install --disable-pip-version-check "pytest>=8,<9" "numpy==2.4.6" "pydantic==2.13.5" "pydantic-settings==2.15.0" "fastapi>=0.141.1"
+          python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu "torch==2.8.0"
+      - name: Run numerical parity and incremental KV cache tests
+        run: >-
+          python -m pytest -q
+          tests/test_consumer_transformer_acceleration.py
+          tests/test_consumer_llama_budget.py
+      - name: Verify measured Torch CPU prefill and decode parity
+        run: >-
+          python scripts/benchmark_consumer_transformer.py
+          --device torch --dim 8 --heads 2 --layers 1 --ffn 12
+          --context 16 --prefill 4 --decode 2 --warmup 0 --runs 1
+          --assert-parity
+      - name: Verify compact BF16 KV storage and parity without a discrete GPU
+        run: >-
+          python scripts/benchmark_consumer_transformer.py
+          --device torch --kv-dtype bf16 --kv-limit-mib 1
+          --dim 8 --heads 2 --layers 1 --ffn 12
+          --context 16 --prefill 4 --decode 2 --warmup 0 --runs 1
+          --assert-parity
+      - name: Verify bounded causal query tiles on CPU PyTorch
+        run: >-
+          python scripts/benchmark_consumer_transformer.py
+          --device torch --prefill-query-chunk 3
+          --dim 8 --heads 2 --layers 2 --ffn 12
+          --context 32 --prefill 14 --decode 3 --warmup 0 --runs 1
+          --assert-parity

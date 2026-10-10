@@ -16,6 +16,12 @@ on:
 permissions:
   contents: read
 
+# Isolate this workflow's queue from unrelated PRs/branches while still
+# canceling obsolete runs for the same head.
+concurrency:
+  group: ai-100-large-milestones-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     name: Verify 100 milestones and canonical source pins

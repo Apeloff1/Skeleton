@@ -176,6 +176,10 @@ class NativeLLMRuntime:
         if self.estimate_kv_bytes(self.limits.max_context) > self.limits.max_kv_bytes:
             raise RuntimeContractError("configured context exceeds KV memory budget")
         self.device = self._bind_device(self.device_policy)
+        self.model._strict_device_request = (
+            not self.device_policy.allow_fallback
+            and self.device_policy.requested in {"torch", "torch-cpu", "cuda", "gpu", "mps"}
+        )
 
     def _architecture(self) -> RuntimeArchitecture:
         return RuntimeArchitecture(
@@ -187,6 +191,11 @@ class NativeLLMRuntime:
             feed_forward=self.model.d_ff,
             norm=self.model.norm,
             ffn_kind=self.model.ffn_kind,
+            positional=(
+                "rope-only"
+                if getattr(self.model, "position_mode", "learned_rope") == "rope"
+                else "learned-position-embedding+rope-attention"
+            ),
         )
 
     @property
@@ -215,28 +224,67 @@ class NativeLLMRuntime:
 
     def _bind_device(self, policy: DevicePolicy) -> DeviceReceipt:
         requested = policy.requested
+        wants_kv_policy = (
+            policy.kv_dtype != "fp32" or policy.kv_limit_bytes is not None
+            or policy.prefill_query_chunk is not None
+        )
+        if policy.kv_limit_bytes is not None and (
+            policy.kv_limit_bytes > self.limits.max_kv_bytes
+        ):
+            raise RuntimeContractError(
+                "device KV allocation ceiling exceeds native runtime policy"
+            )
+        if requested == "cpu" and wants_kv_policy:
+            raise RuntimeContractError(
+                "KV compression/budget or chunked prefill requires a Torch execution device"
+            )
         current = str(getattr(self.model, "device", "cpu") or "cpu")
-        if requested == "cpu" and current == "cpu":
+        was_resident = bool(getattr(self.model, "resident", False))
+        if requested == "cpu" and current == "cpu" and not was_resident:
             actual = "cpu"
-            resident = bool(getattr(self.model, "resident", False))
+            resident = False
         else:
             try:
-                self.model.to(requested)
+                if wants_kv_policy:
+                    self.model.to(
+                        requested,
+                        kv_dtype=policy.kv_dtype,
+                        max_kv_bytes=policy.kv_limit_bytes,
+                        prefill_query_chunk=policy.prefill_query_chunk,
+                    )
+                else:
+                    # Preserve compatibility with legacy device binders and
+                    # one-argument test doubles when optional compact-KV
+                    # functionality has not been requested.
+                    self.model.to(requested)
             except Exception as exc:
                 raise RuntimeContractError("device binding failed") from exc
             actual = str(getattr(self.model, "device", "cpu") or "cpu")
             resident = bool(getattr(self.model, "resident", False))
         if requested in {"cuda", "gpu"}:
-            degraded = actual != "cuda"
+            degraded = actual != "cuda" or not resident
+        elif requested == "mps":
+            degraded = actual != "mps" or not resident
         elif requested in {"torch", "torch-cpu"}:
             degraded = not resident
         else:
             degraded = False
+        # Explicitly configured compact caches must be implemented by the
+        # selected execution backend, regardless of general fallback policy.
+        if wants_kv_policy and not resident:
+            raise RuntimeContractError(
+                "requested KV precision/budget not admitted on this device"
+            )
         if degraded and not policy.allow_fallback:
             raise RuntimeContractError(
                 "requested device unavailable and fallback is disabled"
             )
-        return DeviceReceipt(requested, actual, resident, degraded)
+        return DeviceReceipt(
+            requested, actual, resident, degraded,
+            policy.kv_dtype if resident else "fp32",
+            policy.kv_limit_bytes if resident else None,
+            policy.prefill_query_chunk if resident else None,
+        )
 
     def bind_device(self, policy: DevicePolicy) -> DeviceReceipt:
         if not isinstance(policy, DevicePolicy):
@@ -244,6 +292,10 @@ class NativeLLMRuntime:
         receipt = self._bind_device(policy)
         self.device_policy = policy
         self.device = receipt
+        self.model._strict_device_request = (
+            not policy.allow_fallback
+            and policy.requested in {"torch", "torch-cpu", "cuda", "gpu", "mps"}
+        )
         return receipt
 
     def _current_model_digest(self) -> str:
@@ -269,6 +321,31 @@ class NativeLLMRuntime:
             raise RuntimeContractError("mutated model context below runtime limit")
         if self.estimate_kv_bytes(self.limits.max_context) > self.limits.max_kv_bytes:
             raise RuntimeContractError("mutated model exceeds KV memory budget")
+        # Compute the digest before mutating admission state. An identity
+        # refresh is atomic: failed validation never partially commits it.
+        digest = snapshot_digest(snapshot)
+        accelerator = getattr(self.model, "_accel", None)
+        if accelerator is not None:
+            # Canonical Python weights may have been edited after the model
+            # was pinned. Invalidate stale GPU tensors and cached K/V before
+            # accepting a new model identity, not merely the new digest.
+            try:
+                accelerator.pin()
+                refreshed = portable_model_snapshot(self.model)
+                if not hmac.compare_digest(snapshot_digest(refreshed), digest):
+                    raise RuntimeContractError(
+                        "model changed while rebinding accelerator"
+                    )
+            except Exception as exc:
+                # Never serve a hybrid of new canonical weights and old GPU
+                # tensors. Keep prior admission identity so future inference
+                # continues to fail closed until explicitly recovered.
+                self.model._accel = None
+                self.model.resident = False
+                self.model.device = "cpu"
+                raise RuntimeContractError(
+                    "accelerator rebind failed during model identity refresh"
+                ) from exc
         self._model_snapshot = snapshot
         self._model_digest = digest
         self._model_bytes = size
@@ -299,7 +376,7 @@ class NativeLLMRuntime:
         try:
             return self.tokenizer.encode_sequence(text)
         except TokenizerContractError as exc:
-            raise RuntimeContractError("native tokenizer encode failed") from exc
+            raise RuntimeContractError("tokenizer encode failed: prompt tokenization failed admission") from exc
 
     def decode_ids(self, token_ids: Sequence[int]) -> str:
         try:
@@ -323,6 +400,11 @@ class NativeLLMRuntime:
             raise RuntimeContractError("TokenSequence required")
         if not isinstance(use_cache, bool):
             raise RuntimeContractError("use_cache must be boolean")
+        self.assert_model_unchanged()
+        try:
+            self.tokenizer.assert_unchanged()
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("tokenizer drift during inference: tokenizer mutated after admission") from exc
         if not hmac.compare_digest(sequence.tokenizer_digest, self.tokenizer.digest):
             raise RuntimeContractError("token sequence tokenizer identity mismatch")
         if not sequence.token_ids:
@@ -335,62 +417,7 @@ class NativeLLMRuntime:
         try:
             self.tokenizer.assert_unchanged()
         except TokenizerContractError as exc:
-            raise RuntimeContractError("native tokenizer drift during inference") from exc
-        if use_cache and self.estimate_kv_bytes(len(sequence.token_ids)) > self.limits.max_kv_bytes:
-            raise RuntimeContractError("inference exceeds KV memory budget")
-        window = sequence.token_ids[-self.limits.max_context:]
-        cache = KVCache(self.model.n_layers, self.limits.max_context) if use_cache else None
-        logits = tuple(float(value) for value in self.model._logits_window(window, cache))
-        if len(logits) != self.tokenizer.vocab_size:
-            raise RuntimeContractError("inference graph emitted invalid logits shape")
-        if any(value != value or value in (float("inf"), float("-inf")) for value in logits):
-            raise RuntimeContractError("inference graph emitted non-finite logits")
-        return InferenceResult(
-            prompt_sequence=sequence,
-            logits=logits,
-            cache_tokens=len(cache.tokens) if cache is not None else 0,
-            model_digest=self.model_digest,
-            architecture_digest=self.architecture.digest,
-        )
-
-    def infer_text(self, text: str, *, use_cache: bool = True) -> InferenceResult:
-        """Tokenize text and execute one next-token inference graph pass."""
-        return self.infer_sequence(self.encode(text), use_cache=use_cache)
-
-    def infer_sequence(
-        self,
-        sequence: TokenSequence,
-        *,
-        use_cache: bool = True,
-    ) -> InferenceResult:
-        """Run embeddings → position/RoPE → transformer blocks → LM head.
-
-        This exposes the executable inference graph independently of decoding so
-        loaders, portability checks, and samplers can validate identical model
-        state against a canonical pre-tokenized input.
-        """
-        if not isinstance(sequence, TokenSequence):
-            raise RuntimeContractError("TokenSequence required")
-        if not isinstance(use_cache, bool):
-            raise RuntimeContractError("use_cache must be boolean")
-        self.assert_model_unchanged()
-        try:
-            self.tokenizer.assert_unchanged()
-        except TokenizerContractError as exc:
-            raise RuntimeContractError("tokenizer mutated after admission") from exc
-        if not hmac.compare_digest(sequence.tokenizer_digest, self.tokenizer.digest):
-            raise RuntimeContractError("token sequence tokenizer identity mismatch")
-        if not sequence.token_ids:
-            raise RuntimeContractError("token sequence must not be empty")
-        if len(sequence.token_ids) > self.limits.max_context:
-            raise RuntimeContractError("prompt exceeds context budget")
-        if any(token_id >= self.tokenizer.vocab_size for token_id in sequence.token_ids):
-            raise RuntimeContractError("token sequence contains id outside vocabulary")
-        self.assert_model_unchanged()
-        try:
-            self.tokenizer.assert_unchanged()
-        except TokenizerContractError as exc:
-            raise RuntimeContractError("tokenizer mutated after admission") from exc
+            raise RuntimeContractError("tokenizer drift during inference: tokenizer mutated after admission") from exc
         if use_cache and self.estimate_kv_bytes(len(sequence.token_ids)) > self.limits.max_kv_bytes:
             raise RuntimeContractError("inference exceeds KV memory budget")
         window = sequence.token_ids[-self.limits.max_context:]
@@ -455,7 +482,7 @@ class NativeLLMRuntime:
         try:
             self.tokenizer.assert_unchanged()
         except TokenizerContractError as exc:
-            raise RuntimeContractError("tokenizer mutated after admission") from exc
+            raise RuntimeContractError("tokenizer drift during inference: tokenizer mutated after admission") from exc
         if not hmac.compare_digest(sequence.tokenizer_digest, self.tokenizer.digest):
             raise RuntimeContractError("token sequence tokenizer identity mismatch")
         prompt_tokens = len(sequence.token_ids)
@@ -480,7 +507,10 @@ class NativeLLMRuntime:
     ) -> tuple[TokenSequence, int]:
         if not isinstance(config, GenerationConfig):
             raise RuntimeContractError("GenerationConfig required")
-        sequence = self.encode(prompt)
+        try:
+            sequence = self.encode(prompt)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("prompt tokenization failed admission") from exc
         return sequence, self._admit_sequence(sequence, config)
 
     def stream(
@@ -500,7 +530,11 @@ class NativeLLMRuntime:
     ) -> Iterator[RuntimeEvent]:
         if not isinstance(config, GenerationConfig):
             raise RuntimeContractError("GenerationConfig required")
-        return (yield from self._stream_sequence_impl(self.encode(prompt), config))
+        try:
+            sequence = self.encode(prompt)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("prompt tokenization failed admission") from exc
+        return (yield from self._stream_sequence_impl(sequence, config))
 
     def stream_sequence(
         self,
@@ -787,7 +821,7 @@ class NativeLLMRuntime:
         try:
             self.tokenizer.assert_unchanged()
         except TokenizerContractError as exc:
-            raise RuntimeContractError("tokenizer mutated before checkpoint") from exc
+            raise RuntimeContractError("tokenizer changed before checkpoint: tokenizer mutated before checkpoint") from exc
         return make_checkpoint(
             model=self.model,
             model_digest=self.model_digest,
