@@ -153,8 +153,13 @@ def build_maze(request:MazeRequest=MazeRequest())->MazeCreation:
     clue_at={}
     # Select clues from early side chambers, which require physical travel
     # down a dead end and then reversing direction to rejoin the main spine.
-    early=sorted(side,key=lambda xy:
-                 (abs(xy[0]-backbone[0][0]),xy[0],xy[1]))
+    def secret_eligible(cell):
+        row,col=cell
+        neighbors=((row-1,col),(row+1,col),(row,col-1),(row,col+1))
+        indices=[indexed[x] for x in neighbors if x in indexed]
+        return indices and min(indices)<=len(backbone)-3
+    early=sorted((room for room in side if secret_eligible(room)),
+                 key=lambda xy:(xy[0],xy[1]))
     choices=early[:min(request.secret_count,len(early))]
     for number,cell in enumerate(choices):
         clue_at[cell]=f"maze_clue_{number}"
