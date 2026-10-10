@@ -71,7 +71,9 @@ static unsigned int score;
 /* Companion personality, graphics frames and real PSG audio are native. */
 static unsigned char companion_clock, companion_mood, companion_drawn, mood_hold;
 static unsigned char hero_pose;
+static unsigned char bond_collected, bond_rank;
 static unsigned char sound_frames, sound_phase;
+static const unsigned char bond_goal[7] = { 3, 7, 12, 18, 25, 33, 42 };
 __sfr __at (0x7F) PSG_PORT;
 #define VRAM_QUEUE_CAPACITY 16
 #define VRAM_WRITES_PER_FRAME 3
@@ -117,7 +119,7 @@ static void flush_pending(void) {
 static void psg_start(unsigned int period, unsigned char frames) {
     PSG_PORT=(unsigned char)(0x80 | (period & 15));
     PSG_PORT=(unsigned char)((period >> 4) & 63);
-    PSG_PORT=0x92; /* fixed, quiet volume; no sampled or proprietary audio */
+    PSG_PORT=0x9C; /* attenuated channel-0 volume, not a loud tone */
     sound_frames=frames;
     sound_phase=0;
 }
@@ -145,11 +147,25 @@ static void draw_hud(void) {
     SMS_setTileatXY(LEFT+8, HUD_Y, EXIT);
     SMS_setTileatXY(LEFT+9, HUD_Y, DIGIT_BASE+((level_index+1)/10));
     SMS_setTileatXY(LEFT+10, HUD_Y, DIGIT_BASE+((level_index+1)%10));
+    SMS_setTileatXY(LEFT+11, HUD_Y, HERO);
+    SMS_setTileatXY(LEFT+12, HUD_Y, DIGIT_BASE+bond_rank);
     SMS_setTileatXY(LEFT+14, HUD_Y, DIGIT_BASE+((score/100)%10));
     SMS_setTileatXY(LEFT+15, HUD_Y, DIGIT_BASE+((score/10)%10));
     SMS_setTileatXY(LEFT+16, HUD_Y, DIGIT_BASE+(score%10));
     SMS_setTileatXY(LEFT+18, HUD_Y, companion_mood);
     companion_drawn=companion_mood;
+}
+/* Friendly companion progression is cosmetic: never changes world collision,
+ * source game health, release rights or deterministic collectible scoring. */
+static void grant_companion_bond(void) {
+    if (bond_collected < 48) ++bond_collected;
+    if (bond_rank < 7 && bond_collected >= bond_goal[bond_rank]) {
+        ++bond_rank;
+        companion_mood=BUDDY_CHEER;
+        mood_hold=90;
+        psg_start(240, 22);
+        queue_tile(LEFT+12,HUD_Y,DIGIT_BASE+bond_rank);
+    }
 }
 static void queue_hud(unsigned char tile) {
     if (tile==GEM) {
@@ -241,6 +257,7 @@ static void advance(int dx, int dy) {
         companion_mood=BUDDY_HAPPY;
         mood_hold=45;
         psg_start(300, 12);
+        grant_companion_bond();
     } else if (tile==HAZARD) {
         companion_mood=BUDDY_SAD;
         mood_hold=45;
@@ -282,6 +299,7 @@ void main(void) {
     won=lost=move_cooldown=0;
     companion_clock=0;
     hero_pose=HERO;
+    bond_rank=bond_collected=0;
     companion_mood=BUDDY_IDLE;
     sound_frames=0;
     PSG_PORT=0x9F;
@@ -497,6 +515,14 @@ def compile_native_sega_8bit(
         "levels":len(world.levels),"width":world.intent.width,
         "height":world.intent.height,
         "title":world.intent.title,
+        "native_psg_reactive_audio":True,
+        "native_animated_companion":True,
+        "original_companion_pose_count":5,
+        "original_hero_pose_count":2,
+        "companion_bond_ranks":8,
+        "companion_progression_changes_core_gameplay":False,
+        "animation_vram_writes_per_frame":3,
+        "hardware_sprite_claim":False,
         "historical_sdk_downloaded":False,
         "third_party_game_or_firmware_redistributed":False,
         "binary_compiled":False,
