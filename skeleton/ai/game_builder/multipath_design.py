@@ -578,4 +578,23 @@ def route_exposure_score(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score"]
+def route_friction_ppm(
+    problem: RouteProblem, proof: RouteProof,
+    *, turn_weight: int = 100_000,
+    revisit_weight: int = 200_000,
+) -> int:
+    """Bounded navigation friction; not an unvalidated human fun predictor."""
+    if (type(turn_weight) is not int or type(revisit_weight) is not int
+            or not 0 <= turn_weight <= 1_000_000
+            or not 0 <= revisit_weight <= 1_000_000):
+        raise MultipathError("invalid friction weights")
+    if proof.problem_digest != problem.digest:
+        raise MultipathError("friction report needs current source world")
+    evaluate_route(problem, proof.actions, allow_hazards=proof.hazard_visits > 0)
+    denominator = max(1, proof.steps)
+    numerator = route_turns(proof) * turn_weight + route_revisits(proof) * revisit_weight
+    return min(1_000_000, numerator // denominator)
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm"]
