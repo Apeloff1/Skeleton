@@ -35,12 +35,12 @@ def _render(target:str):
         authorized=True,
     )
 
-def test_unique_platform_id_count_169_and_77_original_native_source_targets():
+def test_unique_platform_id_count_169_and_all_real_native_source_targets():
     assert len(SUPPLEMENTAL_TARGETS)==122
     assert len(EMITTERS)==80
     assert coverage_report()["catalog_count"]==169
-    assert coverage_report()["missing_native_source_count"]==92
-    assert coverage_report()["source_coverage_fraction"]==round(77/169,6)
+    assert coverage_report()["missing_native_source_count"] == (169-len(EMITTERS))
+    assert coverage_report()["source_coverage_fraction"]==round(len(EMITTERS)/169,6)
     assert {key for key in NEW if not readiness_for(key).source_emitter}==set()
 
 @pytest.mark.parametrize("target,extension",list(NEW.items()))

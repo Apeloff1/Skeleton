@@ -55,6 +55,13 @@ def test_native_emitters_make_platform_specific_source_not_html(target):
         assert "src/main.cpp" in p.files
         assert "board = arduboy" in p.files["platformio.ini"]
         assert "#include <Arduboy2.h>" in p.files["src/main.cpp"]
+    elif target=="thumby":
+        # TinyCircuits Thumby executes an on-device MicroPython application;
+        # requiring C or assembly would falsely reject a real hardware port.
+        assert "Games/DragonMicroQuest/DragonMicroQuest.py" in p.files
+        assert "Makefile" in p.files
+        assert "thumby.buttonU.pressed()" in p.files[
+            "Games/DragonMicroQuest/DragonMicroQuest.py"]
     else:
         assert "Makefile" in p.files or "CMakeLists.txt" in p.files
         assert ("src/main.c" in p.files or "src/main.asm" in p.files

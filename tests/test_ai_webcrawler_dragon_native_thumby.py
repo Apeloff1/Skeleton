@@ -59,7 +59,8 @@ def test_exact_thumby_source_is_real_device_application_and_hardware_ready_only_
     assert manifest["status"]=="source_generated"
     assert "thumby" in EMITTERS
     assert coverage_report()["native_source_count"]==80
-    assert coverage_report()["missing_native_source_count"]==92
+    assert coverage_report()["missing_native_source_count"] == (\
+        coverage_report()["catalog_count"] - len(EMITTERS))
     assert not readiness_for("thumby").compiler_verified
 
 
