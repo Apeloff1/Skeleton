@@ -105,7 +105,7 @@ static int frame_checked(SDL_Renderer*r,SDL_Window*w){
  free(pixels);
  return valid&&checksum!=0;
 }
-static int selftest(SDL_Renderer*r,SDL_Window*w){
+static int graphics_selftest(SDL_Renderer*r,SDL_Window*w){
  for(int level=0;level<LEVEL_COUNT;level++){
   if(!load_level(level)||!frame_checked(r,w))return 41;
   const char*solution=dragon_solutions[level];
@@ -137,7 +137,7 @@ int main(int argc,char**argv){
  }
  if(!load_level(0))return 34;
  int result=0;
- if(testing)result=selftest(r,w);
+ if(testing)result=graphics_selftest(r,w);
  else {
   int running=1;
   while(running){
