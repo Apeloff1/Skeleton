@@ -500,6 +500,81 @@ def native_world_maze_source_bundle(
             detail="Maze source must replay every location and weather proof before export") from None
 
 
+class NativeAtlasWorldRequest(BaseModel):
+    """Multi-region original world: bounded multi-maze compositional gameplay."""
+    model_config=ConfigDict(extra="forbid")
+    seed:StrictInt=Field(default=1977,ge=0,le=0xffffffff)
+    regions:StrictInt=Field(default=4,ge=2,le=12)
+    width:StrictInt=Field(default=6,ge=4,le=8)
+    height:StrictInt=Field(default=6,ge=4,le=6)
+    climate:str=Field(default="clear",
+        pattern=r"^(clear|rain|windy|storm|snow|high_tide)$")
+    challenge:str=Field(default="balanced",
+        pattern=r"^(gentle|balanced|challenging|spicy)$")
+    scenic_density:StrictInt=Field(default=60,ge=0,le=100)
+    detour_density:StrictInt=Field(default=70,ge=0,le=100)
+    secret_count:StrictInt=Field(default=2,ge=0,le=4)
+
+
+class NativeAtlasPlayRequest(NativeAtlasWorldRequest):
+    commands:list[str]=Field(default_factory=list,max_length=512)
+
+
+def _original_route_atlas(body:NativeAtlasWorldRequest):
+    from skeleton.ai.webcrawler.dragon_route_atlas import AtlasRequest,build_atlas
+    return build_atlas(AtlasRequest(
+        seed=body.seed,regions=body.regions,
+        width=body.width,height=body.height,
+        climate=body.climate,challenge=body.challenge,
+        scenic_density=body.scenic_density,
+        detour_density=body.detour_density,
+        secret_count=body.secret_count,
+    ))
+
+
+@router.post("/native/production/routes/atlas/preview")
+def native_world_atlas_preview(
+    body:NativeAtlasWorldRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_route_atlas import (
+        verify_atlas,atlas_report,play_atlas,
+    )
+    try:
+        atlas=_original_route_atlas(body)
+        result=verify_atlas(atlas)
+        if not result["status"]=="hierarchical_completion_verified":
+            raise ValueError("one original region failed world-scale game certification")
+        current=play_atlas(atlas)
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="World-scale original route maze failed constructive completion") from None
+    return {
+        "ok":True,
+        "schema":"skeleton.ai.dragon.original_world_atlas_preview.v1",
+        "review":result,
+        "atlas":atlas_report(atlas),
+        "player":current,
+        "native_claim":"independently native-source-capable regions, Python portal runtime",
+        "physical_claim":"no finished single-binary multi-region console runtime",
+    }
+
+
+@router.post("/native/production/routes/atlas/play")
+def native_world_atlas_play(
+    body:NativeAtlasPlayRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_route_atlas import play_atlas
+    try:
+        atlas=_original_route_atlas(body)
+        player=play_atlas(atlas,tuple(body.commands))
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original multi-region route action is invalid, locked or unfinishable") from None
+    return {"ok":True,**player}
+
+
 class NativePuzzleGridValidationRequest(BaseModel):
     """Small bounded original authored-grid validation; never compiles source."""
     model_config = ConfigDict(extra="forbid")
