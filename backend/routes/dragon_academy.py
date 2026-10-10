@@ -305,6 +305,7 @@ def native_world_route_preview(
     from skeleton.ai.webcrawler.dragon_route_world import (
         portfolio,route_dictionary,experience,
     )
+    from skeleton.ai.webcrawler.dragon_route_world_assurance import demand_viable_world
     try:
         world,traveller=make_frontier(
             seed=body.seed,weather=body.weather,hour=body.hour)
@@ -312,6 +313,7 @@ def native_world_route_preview(
                          expansion_cap=body.search_budget,
                          include_circuitous=body.include_long)
         summary=structural_report(world)
+        quality=demand_viable_world(world,traveller)
         current=experience(world,traveller)
     except ValueError:
         raise HTTPException(status_code=422,
@@ -321,6 +323,7 @@ def native_world_route_preview(
         "schema":"skeleton.ai.dragon.route_world_preview.v1",
         "world_digest":scenario_digest(world),
         "world":summary,
+        "assurance":quality,
         "routes":route_dictionary(routes),
         "player":current,
         "source_only":True,
