@@ -20,6 +20,22 @@ from .reviewed_knowledge import ReviewedKnowledgeStore, _integer, _text
 WORD = re.compile(r"[^\W_]+", re.UNICODE)
 
 
+def _document(source: dict, note: dict) -> dict:
+    """The sole canonical projection of a reviewed note into a routing pack."""
+    return {
+        "source_id": source["source_id"],
+        "revision": source["revision_digest"],
+        "source_url": source["source_url"],
+        "note_id": note["note_id"],
+        "mechanic": note["mechanic"],
+        "statement": note["statement"],
+        "stance": note["stance"],
+        "dependence_group": note["dependence_group"],
+        "confidence_ppm": note["confidence_ppm"],
+        "span": [note["start"], note["end"]],
+    }
+
+
 @dataclass(frozen=True, slots=True)
 class AlmanacWeightPack:
     owner: str
@@ -47,11 +63,7 @@ def build_weight_pack(library: ReviewedKnowledgeStore, owner: str, *, authorized
             if len(documents) >= max_notes:
                 raise ValueError("pack exceeds note budget; shard by scope first")
             number = len(documents)
-            documents.append({"source_id": source["source_id"], "revision": source["revision_digest"],
-                "source_url": source["source_url"], "note_id": note["note_id"],
-                "mechanic": note["mechanic"], "statement": note["statement"],
-                "stance": note["stance"], "dependence_group": note["dependence_group"],
-                "confidence_ppm": note["confidence_ppm"], "span": [note["start"], note["end"]]})
+            documents.append(_document(source, note))
             stances[note["mechanic"]].add(note["stance"])
             weights = Counter(WORD.findall(note["statement"].casefold()))
             for term in WORD.findall(note["mechanic"].casefold()):
@@ -83,8 +95,11 @@ def retrieve_weight_pack(pack: AlmanacWeightPack, library: ReviewedKnowledgeStor
         raise ValueError("pack integrity invalid")
     if library.snapshot_root(owner, authorized=True) != pack.knowledge_root:
         raise ValueError("stale pack: rebuild from current canonical evidence")
-    decoder = zlib.decompressobj()
-    raw = decoder.decompress(pack.payload, 32_000_001)
+    try:
+        decoder = zlib.decompressobj()
+        raw = decoder.decompress(pack.payload, 32_000_001)
+    except zlib.error as exc:
+        raise ValueError("pack compression stream invalid") from exc
     if len(raw) > 32_000_000 or not decoder.eof or decoder.unused_data or len(raw) != pack.raw_bytes:
         raise ValueError("pack size or compression stream invalid")
     try:
@@ -108,6 +123,15 @@ def retrieve_weight_pack(pack: AlmanacWeightPack, library: ReviewedKnowledgeStor
             or not isinstance(documents, list) or len(documents) != pack.documents
             or not isinstance(postings, dict)):
         raise ValueError("weight pack document index invalid")
+    canonical_rows = library._rows(owner)
+    expected_documents = [
+        _document(source, entry["note"])
+        for source in canonical_rows
+        if source["status"] == "active" and "design_reference" in source["allowed_scopes"]
+        for entry in source["notes"]
+    ]
+    if len(expected_documents) > 10_000 or documents != expected_documents:
+        raise ValueError("weight pack document sequence differs from canonical reviewed evidence")
     query_terms = sorted(set(WORD.findall(query.casefold())))
     scores = Counter()
     for term in query_terms:
@@ -127,7 +151,6 @@ def retrieve_weight_pack(pack: AlmanacWeightPack, library: ReviewedKnowledgeStor
     hits = [{**documents[n], "routing_weight": scores[n]} for n in selected]
     # A mutable local pack is not an authentication boundary. Verify selected
     # statements against the canonical notes; a recomputed hash grants nothing.
-    canonical_rows = library._rows(owner)
     source_urls = {r["source_id"]: r["source_url"] for r in canonical_rows}
     notes = {(r["source_id"], r["revision_digest"], e["note"]["note_id"]): e["note"]
              for r in canonical_rows if r["status"] == "active" and "design_reference" in r["allowed_scopes"]
@@ -165,6 +188,8 @@ def retrieve_weight_pack(pack: AlmanacWeightPack, library: ReviewedKnowledgeStor
             raise ValueError("pack citation differs from canonical evidence")
     actual_conflicts = {note["mechanic"] for note in notes.values() if note["stance"] == "challenges"}
     conflicts = sorted({h["mechanic"] for h in hits} & actual_conflicts)
+    if library.snapshot_root(owner, authorized=True) != pack.knowledge_root:
+        raise ValueError("knowledge changed during weight-pack retrieval")
     return {"hits": hits, "conflicting_mechanics": conflicts, "knowledge_root": pack.knowledge_root,
             "pack_digest": pack.payload_digest, "neural_weights": False,
             "memory_promotion_authorized": False, "training_authorized": False,
