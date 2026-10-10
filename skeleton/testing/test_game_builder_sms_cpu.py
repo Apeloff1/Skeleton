@@ -68,7 +68,7 @@ def test_sms_cpu_video_address_registers_palette_and_joypad_real_hardware_contra
 
 def test_sms_cpu_host_fails_closed_on_bad_vram_palette_mode_and_impossible_video():
     h=_mock_device()
-    with pytest.raises(SMSCPUAcceptanceError,match="hardware"):
+    with pytest.raises(SMSCPUAcceptanceError,match="Mode4 VDP"):
         h.assert_video()
     with pytest.raises(SMSCPUAcceptanceError,match="RGB222"):
         h.write_port(0xBF,0)
