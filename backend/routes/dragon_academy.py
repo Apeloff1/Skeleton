@@ -293,6 +293,57 @@ def native_production_puzzle_starter(
         raise HTTPException(status_code=422, detail="Unsupported starter game stage count") from None
 
 
+class NativeOriginalCampaignAnalysisRequest(BaseModel):
+    """Pure original-game topology/challenge research, not a deployed game."""
+    model_config=ConfigDict(extra="forbid")
+    levels: list[NativeOriginalGrid]=Field(min_length=1,max_length=8)
+    mode: str=Field(default="branching",pattern=r"^(linear|branching)$")
+    challenge_profile: str=Field(
+        default="balanced",pattern=r"^(gentle|balanced|challenging|spicy)$")
+    route_budget: StrictInt=Field(default=2500,ge=500,le=8000)
+
+
+@router.post("/native/production/puzzle/campaign/analyze")
+def native_production_analyze_campaign(
+    body: NativeOriginalCampaignAnalysisRequest,
+    owner: str=Depends(_native_source_editor),
+) -> dict:
+    from skeleton.ai.webcrawler.dragon_native_puzzle_authoring import validate_authored_levels
+    from skeleton.ai.webcrawler.dragon_native_multipath import analyse_routes,route_report
+    from skeleton.ai.webcrawler.dragon_native_campaign_paths import design_campaign,graph_report
+    from skeleton.ai.webcrawler.dragon_native_challenge_director import (
+        make_challenge_plan,challenge_report,
+    )
+    try:
+        campaign=validate_authored_levels(
+            tuple(tuple(line for line in board) for board in body.levels))
+        reports=tuple(route_report(analyse_routes(
+            original.rows,max_routes=4,expansion_cap=body.route_budget,
+        )) for original in campaign.levels)
+        chapters=design_campaign(
+            len(campaign.levels),mode=body.mode,
+            intensity=body.challenge_profile,
+            stage_difficulty=tuple(x["difficulty_estimate"] for x in reports),
+        )
+        director=make_challenge_plan(
+            reports,profile=body.challenge_profile,
+            branching=body.mode=="branching" and len(campaign.levels)>=3,
+        )
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original campaign routes, stages or challenge goals could not be proven") from None
+    return {
+        "ok":True,
+        "schema":"skeleton.ai.dragon.native_campaign_design_preview.v1",
+        "original_campaign_digest":campaign.digest,
+        "chapter_paths":graph_report(chapters),
+        "challenge":challenge_report(director),
+        "stages":[{"stage":index+1,"routes":document}
+                  for index,document in enumerate(reports)],
+        "claim":"solver-derived challenge and branching; no human player enjoyment certified",
+    }
+
+
 class NativePuzzleCurrentHintRequest(BaseModel):
     """Editor-only exact live hints: symbolic board data, never executable source."""
     model_config = ConfigDict(extra="forbid")
