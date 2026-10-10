@@ -183,3 +183,27 @@ def swept_aabb_hit(moving: object, obstacle: object, dx: int,
     if entry>departure or departure<=0:
         return None
     return entry
+
+def shelf_pack_rectangles(sizes: object, atlas_width: int) -> tuple[tuple[int,int,int,int],...]:
+    """Deterministic bounded shelf packing for original sprite atlases."""
+    width=_int(atlas_width,"atlas width",1,2048)
+    if not isinstance(sizes,(tuple,list)) or not 1<=len(sizes)<=256:
+        raise GeometryError("sprite atlas requires one to 256 tile sizes")
+    cursor_x=cursor_y=row_height=0
+    placed=[]
+    for size in sizes:
+        if not isinstance(size,(tuple,list)) or len(size)!=2:
+            raise GeometryError("sprite size requires width and height")
+        w=_int(size[0],"sprite width",1,512)
+        h=_int(size[1],"sprite height",1,512)
+        if w>width:
+            raise GeometryError("sprite exceeds atlas row width")
+        if cursor_x+w>width:
+            cursor_y+=row_height
+            cursor_x=row_height=0
+        if cursor_y+h>2048:
+            raise GeometryError("sprite atlas exceeds 2048-pixel height budget")
+        placed.append((cursor_x,cursor_y,w,h))
+        cursor_x+=w
+        row_height=max(row_height,h)
+    return tuple(placed)
