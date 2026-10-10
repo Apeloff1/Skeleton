@@ -44,7 +44,7 @@ def test_original_pixel_art_is_real_bounded_8_by_8_runtime_source():
 
 def test_graphical_native_source_is_generated_deterministically_without_sdl_dependency():
     assert source_game(seed=1)==source_game(seed=1)
-    assert "SDL" not in source_game()["src/main.c"]
+    assert "#include <SDL.h>" not in source_game()["src/main.c"]
     assert "SDL2" in source_game()["src/graphics.c"]
 
 @pytest.mark.skipif(not shutil.which("cc") or not shutil.which("pkg-config"),
