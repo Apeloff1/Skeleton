@@ -491,7 +491,7 @@ def take_action(world:LivingWorld,state:LivingState,action:str)->LivingState:
     rules=set(world.rules)
     next=replace(state,turn=state.turn+1,actions_played=state.actions_played+1)
     if action in {n for n,_,_ in DIRS}:
-        _,dx,dy=next(direction for direction in DIRS if direction[0]==action)
+        _,dx,dy=[direction for direction in DIRS if direction[0]==action][0]
         # The chosen gate is checked on OLD phase, after which the maze
         # immediately twists into the new phase for the next choice.
         next=replace(next,x=state.x+dx,y=state.y+dy,
