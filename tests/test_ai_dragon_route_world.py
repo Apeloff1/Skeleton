@@ -28,7 +28,7 @@ def test_route_taxonomy_has_actual_mode_classification_not_160k_fake_game_titles
         "taxi","bus","high_speed_rail","airplane","passenger_jet",
         "ferry","cargo_ship","submarine","wind_tunnel","rain_route",
         "glider","portal","teleporter","magic_gate","orbital_shuttle",
-        "deep_space_cruise","stargate","network_tunnel","dream_path",
+        "deep_space_cruise","stellar_gate","network_tunnel","dream_path",
         "wheelchair","elevator","horse","lava_bridge",
     ):
         assert name in MODES
