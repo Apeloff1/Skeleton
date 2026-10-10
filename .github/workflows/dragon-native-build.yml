@@ -93,6 +93,7 @@ jobs:
             tests/test_ai_dragon_native_puzzle_variants.py \
             tests/test_ai_dragon_native_puzzle_authoring.py \
             tests/test_ai_dragon_native_puzzle_challenge.py \
+            tests/test_ai_dragon_native_puzzle_graphics.py \
             tests/test_ai_webcrawler_dragon_native_projects.py \
             tests/test_ai_webcrawler_dragon_native_compile.py \
             tests/test_ai_webcrawler_dragon_native_cycles.py \
@@ -390,7 +391,8 @@ jobs:
             tests/test_ai_webcrawler_dragon_campaign_quests.py \
             tests/test_ai_webcrawler_dragon_native_sega_snes.py \
             tests/test_ai_webcrawler_dragon_chip_music.py \
-            tests/test_ai_webcrawler_dragon_native_variants.py
+            tests/test_ai_webcrawler_dragon_native_variants.py \
+            tests/test_ai_dragon_native_puzzle_graphics.py
 
 
   build-actual-original-windows-executable:
