@@ -75,6 +75,9 @@ def test_real_sdl2_game_compiles_renders_frames_and_executes_original_level_solu
                        env=environment,timeout=40)
     assert run.returncode==0,(run.stdout,run.stderr)
     assert run.stdout.count("DRAGON_SDL_STAGE_PASS level=")==stages
+    graph=json.loads(files["dragon-puzzle-proof.json"])["campaign_graph"]
+    actual_forks=sum(len(chapter["exits"]) for chapter in graph["chapters"])
+    assert run.stdout.count("DRAGON_SDL_BRANCH_PASS from=")==actual_forks
     assert run.stdout.strip().endswith(
         f"DRAGON_SDL_RENDER_GAMEPLAY_PASS stages={stages}")
 
