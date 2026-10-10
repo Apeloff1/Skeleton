@@ -445,3 +445,56 @@ jobs:
           path: /tmp/original-dragon-windows/dragon-original-win64-*.zip
           if-no-files-found: error
           retention-days: 7
+
+
+  build-actual-original-macos-game:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare native Apple C compiler and pytest
+        run: |
+          xcrun --find clang
+          cc --version
+          python -m pip install --disable-pip-version-check pytest
+      - name: Build and execute original macOS game with exact physics replay
+        run: |
+          set -euo pipefail
+          python -m pytest -q tests/test_ai_dragon_native_macos.py
+          python -m skeleton.ai.webcrawler.dragon_native_macos build \
+            --title "Original Dragon Mac Campaign" \
+            --seed 1977 --stages 4 --difficulty 6 \
+            --attest-original-rights --authorize-local-build \
+            --out /tmp/original-dragon-macos > /tmp/original-dragon-macos-result.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from io import BytesIO
+          from zipfile import ZipFile
+          from skeleton.ai.webcrawler.dragon_native_macos import (
+              verify_native_macos_game, macho64_format,
+          )
+          receipt=json.loads(Path("/tmp/original-dragon-macos-result.json").read_text())
+          assert receipt["status"]=="macos_host_game_built_and_tested"
+          assert receipt["evidence"]["actual_macos_host_executed"] is True
+          assert receipt["evidence"]["independent_replays"]==12
+          archive=(Path("/tmp/original-dragon-macos")/receipt["filename"]).read_bytes()
+          audit=verify_native_macos_game(archive)
+          assert audit["stages_replayed"]==4
+          with ZipFile(BytesIO(archive)) as package:
+              binary=package.read("binary/dragon_game")
+              assert "Mach-O" in macho64_format(binary)
+          print("ORIGINAL_NATIVE_MACOS_GAME_EXECUTED",audit["executable_sha256"])
+          PY
+      - name: Publish original macOS Mach-O game and runtime evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-original-macos-game
+          path: /tmp/original-dragon-macos/dragon-original-macos-*.zip
+          if-no-files-found: error
+          retention-days: 7
