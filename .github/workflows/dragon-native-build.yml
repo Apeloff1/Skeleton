@@ -392,8 +392,45 @@ jobs:
             tests/test_ai_webcrawler_dragon_native_sega_snes.py \
             tests/test_ai_webcrawler_dragon_chip_music.py \
             tests/test_ai_webcrawler_dragon_native_variants.py \
-            tests/test_ai_dragon_native_puzzle_graphics.py
+            tests/test_ai_dragon_native_puzzle_graphics.py \
+            tests/test_ai_dragon_native_capture_operator.py
 
+
+      - name: Record and audit genuine original game pixels from native SDL
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: |
+          set -euo pipefail
+          python -m skeleton.ai.webcrawler.dragon_native_capture_operator capture \
+            --title "Original Dragon Game Preview" \
+            --seed 1977 --stages 3 --difficulty 7 \
+            --attest-original-rights --authorize-local-capture \
+            --out /tmp/original-game-media > /tmp/dragon-media-report.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from zipfile import ZipFile
+          from io import BytesIO
+          from skeleton.ai.webcrawler.dragon_native_capture_operator import verify_original_capture
+          result=json.loads(Path("/tmp/dragon-media-report.json").read_text())
+          assert result["status"]=="original_native_gameplay_frames_captured"
+          assert result["frames"]==9
+          package=(Path("/tmp/original-game-media")/result["filename"]).read_bytes()
+          verification=verify_original_capture(package)
+          assert verification["frames_verified"]==9
+          with ZipFile(BytesIO(package)) as archive:
+              assert archive.read("frames/level-01-frame-00.bmp")[:2]==b"BM"
+              assert archive.read("frames/level-03-frame-02.bmp")[:2]==b"BM"
+          print("ORIGINAL_NATIVE_GAMEPLAY_PIXELS_VERIFIED",verification["binary_sha256"])
+          PY
+      - name: Publish original gameplay frame evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-original-gameplay-sdl-frames
+          path: /tmp/original-game-media/dragon-original-game-frames-*.zip
+          if-no-files-found: error
+          retention-days: 7
 
   build-actual-original-windows-executable:
     runs-on: ubuntu-24.04
