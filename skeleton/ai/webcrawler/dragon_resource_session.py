@@ -264,6 +264,9 @@ class DragonResourceSession:
                 return True
             if task_id in self._grants:
                 grant_id = self._grants[task_id]
-                return any(g.grant_id == grant_id and g.state == "revoking"
-                           for g in self._global.active_grants())
+                matches = [g for g in self._global.active_grants()
+                           if g.grant_id == grant_id]
+                # No surviving grant means NO authority to keep computing;
+                # fail closed and request a worker checkpoint/stop.
+                return len(matches) != 1 or matches[0].state != "active"
             return False
