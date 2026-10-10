@@ -177,3 +177,13 @@ def test_walkable_cell_catalog_distinguishes_hazard_cost():
     assert len(all_cells) == len(safe) + 1
     assert all(p.tile(point) != "#" for point in all_cells)
 
+
+def test_flood_fill_respects_hazards_and_real_connectivity():
+    p = RouteProblem.from_rows(HAZARD_LEVEL)
+    safe = flood_fill(p, p.start)
+    full = flood_fill(p, p.start, allow_hazards=True)
+    assert p.goal in safe
+    assert (3, 1) not in safe and (3, 1) in full
+    with pytest.raises(MultipathError):
+        flood_fill(p, (0, 0))
+
