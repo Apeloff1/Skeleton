@@ -386,3 +386,14 @@ def test_persisted_json_must_be_canonical():
     with pytest.raises(ValueError, match="not canonical"):
         store.sessions("alice", authorized=True)
 
+
+def test_persisted_game_label_tampering_invalidates_session_identity():
+    store = setup()
+    store.record(session(store), authorized=True)
+    store.db.execute("UPDATE dragon_game_sessions SET game_label=? WHERE owner=?",
+                     ("Replaced Title", "alice"))
+    with pytest.raises(ValueError, match="identity differs"):
+        store.sessions("alice", authorized=True)
+    with pytest.raises(ValueError, match="identity differs"):
+        store.distill("alice", authorized=True)
+
