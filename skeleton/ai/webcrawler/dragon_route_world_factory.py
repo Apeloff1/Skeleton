@@ -173,8 +173,14 @@ def make_frontier(*,seed:int=1,weather:str="clear",
     # Mountains and weather-specific routes: no fabricated access when dry.
     connect("cliff_access","forest","cliff","climb",40,fatigue=26,
             requires=("climbing_kit",),danger=16,shapes=("challenge",))
+    connect("cliff_rappel_return","cliff","forest","rappel",14,
+            fatigue=11,requires=("climbing_kit",),shapes=("return_only","recovery"))
     connect("cliff_to_peak","cliff","wind_peak","rope",32,fatigue=22,
             danger=20,shapes=("detour",))
+    connect("cable_down","wind_peak","cable_station","cable_car",15,
+            price=5,shapes=("recovery","return_only"))
+    connect("cable_backtrack","cable_station","crossroads","trail",18,
+            fatigue=5,shapes=("recovery","return_only"))
     connect("peak_view","wind_peak","observation_deck","walk",10,
             spectacle=85,shapes=("scenic","optional"))
     connect("deck_back","observation_deck","wind_peak","trail",11)
