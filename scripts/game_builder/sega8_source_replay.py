@@ -309,6 +309,12 @@ def run_host_replay(
         "host_executable_sha256": binary_digest,
         "original_controller_actions_verified": len(reference["steps"]),
         "original_levels_verified": manifest["levels"],
+        # Authored Python reference values are distinguished from the
+        # independently measured VDP pixels of the compiled guest Z80 game.
+        "original_reference_final_score": reference["steps"][-1]["score"],
+        "original_reference_final_companion_rank": reference["steps"][-1]["bond_rank"],
+        "original_reference_final_stage_index": reference["steps"][-1]["level"],
+        "original_reference_final_gems_remaining": reference["steps"][-1]["gems_remaining"],
         "all_level_completion_verified": True,
         "original_companion_rank_progression_verified": True,
         "original_score_and_screen_state_verified": True,
