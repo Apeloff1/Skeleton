@@ -113,8 +113,10 @@ static int run_probes(void){
  for(int p=0;p<DRAGON_PROBE_COUNT;p++){
   reset_world();
   const DragonProof*check=&dragon_probes[p];
+  if(check->check_step==0&&player.at!=check->check_place)return 52;
   for(int i=0;i<check->steps;i++){
    if(!step_world(check->edges[i]))return 50;
+   if(i+1==check->check_step&&player.at!=check->check_place)return 53;
   }
   if(player.at!=DRAGON_GOAL||player.hops!=check->steps ||
      player.elapsed!=check->minutes||player.spent!=check->spent ||
@@ -330,6 +332,22 @@ def emit_route_game(world:World,traveller:Traveller,*,authorized:bool,
         except ValueError:
             continue
         indices=tuple(edge_numbers[x] for x in route)
+        check_step=-1
+        check_place=-1
+        if name.startswith("room_") and maze_creation is not None:
+            room_number=int(name.removeprefix("room_"))
+            if not 0<=room_number<len(world.places):
+                raise ValueError("native maze room witness index out of bounds")
+            target=world.places[room_number].id
+            check_place=names[target]
+            if world.start==target:
+                check_step=0
+            for index,edge_id in enumerate(route,1):
+                if world.connections[edge_numbers[edge_id]].destination==target:
+                    check_step=index
+                    break
+            if check_step<0:
+                raise ValueError("native room certificate never actually visits room")
         probes.append({
             "name":name,
             "route":list(route),
@@ -341,22 +359,25 @@ def emit_route_game(world:World,traveller:Traveller,*,authorized:bool,
             "oxygen":verified.oxygen_used,
             "mana":verified.mana_used,
             "digest":verified.digest,
+            "checkpoint_step":check_step,
+            "checkpoint_place":check_place,
         })
-        proofs.append((name,indices,verified))
+        proofs.append((name,indices,verified,check_step,check_place))
     if len(proofs)<6:
         raise ValueError("original game route world lacks six truly playable witness routes")
     tests=[]
-    for index,(name,indices,result) in enumerate(proofs):
+    for index,(name,indices,result,step,place) in enumerate(proofs):
         tests.append(
             f"static const int dragon_probe_route_{index}[]={{"+
             ",".join(str(x) for x in indices)+"};"
         )
     proof_data=[]
-    for index,(name,indices,result) in enumerate(proofs):
+    for index,(name,indices,result,step,place) in enumerate(proofs):
         proof_data.append(
             f'  {{"{name}",{len(indices)},dragon_probe_route_{index},'
             f'{result.elapsed_minutes},{result.money_spent},{result.risk},'
-            f'{result.fuel_used},{result.oxygen_used},{result.mana_used}}},'
+            f'{result.fuel_used},{result.oxygen_used},{result.mana_used},'
+            f'{step},{place}}},'
         )
     header=(
         "#ifndef DRAGON_ORIGINAL_WORLD_ROUTE_H\n#define DRAGON_ORIGINAL_WORLD_ROUTE_H\n"
@@ -385,7 +406,8 @@ def emit_route_game(world:World,traveller:Traveller,*,authorized:bool,
         "weather_any,weather_none;"
         " int departure_count; int departures[24]; } DragonConnection;\n"
         "typedef struct { const char*name; int steps; const int*edges;"
-        " int minutes,spent,danger,fuel,oxygen,mana; } DragonProof;\n"
+        " int minutes,spent,danger,fuel,oxygen,mana,check_step,check_place;"
+        " } DragonProof;\n"
         "static const DragonPlace dragon_places[DRAGON_PLACE_COUNT]={\n"+
         "\n".join(places)+"\n};\n"
         "static const DragonConnection dragon_connections[DRAGON_EDGE_COUNT]={\n"+
