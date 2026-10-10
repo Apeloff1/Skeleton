@@ -283,6 +283,24 @@ def verify_original_z80_gameplay(
     left,hud=(0,0) if target=="sega_master_system" else (6,3)
     if _glyph(session.machine,left+18,hud) not in (19,21):
         raise Sega8NativeGameplayError("original Z80 companion did not respond to physical pet")
+    # Both physical pause controls must block a legitimate safe-path move,
+    # immediately silence native hardware audio and resume without a ghost step.
+    session.step_frame("pause")
+    session.step_frame(None)
+    if session.machine.last_psg_data != 0x9F:
+        raise Sega8NativeGameplayError("pausing native game left a PSG tone active")
+    session.step_frame(reference["steps"][0]["button"])
+    session.step_frame(None)
+    while_paused=observe_actual_gameplay(
+        session.machine,width=meta["width"],height=meta["height"],
+    )
+    _assert_state(while_paused,reference["initial"],0)
+    session.step_frame("pause")
+    session.step_frame(None)
+    after_resume=observe_actual_gameplay(
+        session.machine,width=meta["width"],height=meta["height"],
+    )
+    _assert_state(after_resume,reference["initial"],0)
     snapshots_checked = 1
     # Only observed native CPU/VDP state enters this content-addressed chain.
     seed = sha256(
