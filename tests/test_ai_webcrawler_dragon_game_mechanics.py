@@ -563,3 +563,18 @@ def test_selective_erasure_preserves_other_game_and_other_owner():
     assert not store.erase_session("alice", first.session_id, authorized=True)
     assert {x.session_id for x in store.sessions("alice", authorized=True)} == {second.session_id}
     assert {x.session_id for x in store.sessions("bob", authorized=True)} == {foreign.session_id}
+
+def test_game_observation_history_receipt_is_content_bound_without_raw_notes():
+    import json
+    store = setup()
+    first = session(store)
+    store.record(first, authorized=True)
+    receipt = store.history_receipt("alice", authorized=True)
+    assert receipt == store.history_receipt("alice", authorized=True)
+    assert receipt["session_count"] == 1
+    assert receipt["observation_count"] == 1
+    assert receipt["source_session_digests"] == [first.session_id]
+    assert receipt["memory_promotion_authorized"] is False
+    assert "Timing-based interaction" not in json.dumps(receipt)
+    store.erase_session("alice", first.session_id, authorized=True)
+    assert store.history_receipt("alice", authorized=True)["digest"] != receipt["digest"]
