@@ -168,6 +168,10 @@ def verify_ports(root: Path) -> dict[str, object]:
             or native_route.get("target") != target
             or native_route.get("original_source_game_verified_on_instruction_level_cpu") is not True
             or native_route.get("original_companion_rank_and_reward_verified") is not True
+            or native_route.get("native_companion_pet_verified_on_guest_z80") is not True
+            or native_route.get("native_pet_preserves_gameplay_verified") is not True
+            or native_route.get("native_pause_blocks_gameplay_and_mutes_psg_verified") is not True
+            or native_route.get("native_restart_restores_original_theme_verified") is not True
             or native_route.get("actual_victory_palette_verified") is not True
             or native_route.get("native_attract_demo_chord_started_from_victory") is not True
             or native_route.get("native_attract_demo_performed_first_original_move") is not True
