@@ -154,3 +154,46 @@ def test_native_puzzle_packaging_detects_altered_binary_and_fake_runtime(tmp_pat
     })
     with pytest.raises(ValueError, match="mismatch"):
         verify_native_puzzle_executable(forged)
+
+
+
+@pytest.mark.skipif(sys.platform != "linux" or not shutil.which("cc"),
+                    reason="requires native Linux C compiler")
+def test_user_authored_original_puzzles_are_real_compiled_playable_games():
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    authored=(BASE_LEVELS[0],BASE_LEVELS[3])
+    configuration=spec(
+        portable_design=PortableGameDesign(stages=2,difficulty=4),
+        authored_puzzles=authored,
+    )
+    binary,provenance=build_native_puzzle_executable(configuration,authorized=True)
+    assert provenance["runtime_stages_verified"]==2
+    assert provenance["independent_replays_verified"]==8
+    verified=verify_native_puzzle_executable(binary)
+    assert verified["source_level_proofs"]==2
+    with ZipFile(BytesIO(binary)) as archive:
+        nested=archive.read("source/native-source-release.zip")
+    with ZipFile(BytesIO(nested)) as original:
+        proof=json.loads(original.read("source/dragon-puzzle-proof.json"))
+        assert proof["authoring_mode"]=="authored"
+        assert proof["authored_level_rows"]==[list(g) for g in authored]
+        assert "static int simulate_native_inputs" in original.read("source/src/main.c").decode()
+
+
+@pytest.mark.skipif(sys.platform != "linux" or not shutil.which("cc"),
+                    reason="requires native Linux C compiler")
+def test_solver_proven_generated_new_levels_compile_and_replay_real_C99_game():
+    configuration=spec(
+        portable_design=PortableGameDesign(
+            stages=2,difficulty=8,procedural_levels=True,
+        ),
+    )
+    binary,evidence=build_native_puzzle_executable(configuration,authorized=True)
+    assert evidence["independent_replays_verified"]==8
+    assert verify_native_puzzle_executable(binary)["source_level_proofs"]==2
+    with ZipFile(BytesIO(binary)) as archive:
+        nested=archive.read("source/native-source-release.zip")
+    with ZipFile(BytesIO(nested)) as original:
+        proof=json.loads(original.read("source/dragon-puzzle-proof.json"))
+        assert proof["procedural"] is True
+        assert proof["authoring_mode"]=="generated"
