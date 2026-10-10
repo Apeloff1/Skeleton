@@ -26,6 +26,33 @@ class CanonicalPlanError(RuntimeError):
     """Raised when a studio cannot safely consume the canonical supervisor plan."""
 
 
+def canonical_queue_drained(supervisor: object, team: str) -> bool:
+    """Accept only an explicitly terminal canonical queue as a zero-work state.
+
+    This never admits execution. A missing plan, malformed terminal receipt,
+    wrong team or merely empty *loaded* queue must still fail closed.
+    """
+    if not isinstance(supervisor, Mapping) or team not in {"night", "idle"}:
+        return False
+    if (supervisor.get("source") != "canonical-plan-issue"
+            or supervisor.get("status") != "complete"
+            or supervisor.get("team") != team
+            or supervisor.get("generation_id") != ""
+            or supervisor.get("plan_items") != []
+            or supervisor.get("plan_digest_sha256") != hashlib.sha256(b"[]").hexdigest()):
+        return False
+    progress = supervisor.get("progress")
+    if (not isinstance(progress, Mapping)
+            or progress.get("team") != team
+            or progress.get("terminal") is not True):
+        return False
+    counts = progress.get("counts")
+    if not isinstance(counts, Mapping):
+        return False
+    return all(type(counts.get(key)) is int and counts[key] == 0
+               for key in ("queued", "blocked", "other"))
+
+
 def _parse_time(value: object) -> datetime | None:
     if not value:
         return None
