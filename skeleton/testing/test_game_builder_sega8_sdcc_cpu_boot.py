@@ -174,3 +174,26 @@ def test_real_z80_instruction_clock_advances_vcounter_without_polling(target):
     assert machine.vcounter_reads==0
     assert machine.vcounter==0
     assert machine.interrupts_issued==0
+
+
+
+@pytest.mark.parametrize("target",("sega_master_system","sega_game_gear"))
+def test_guest_joypad_reads_prove_actual_button_bus_sampling(target):
+    # No outside game bytes: this checks how the narrow guest I/O bus records
+    # active-low directions, not whether an original ROM has passed a route.
+    machine=Sega8Machine(bytes(32768),target=target)
+    assert machine.read_port(0xDC)==0xFF
+    assert machine.active_joypad_reads==0
+    machine.controller=0xFB  # left bit asserted (active-low)
+    assert machine.read_port(0xDC)==0xFB
+    assert machine.read_port(0xDC)==0xFB
+    assert machine.active_joypad_reads==2
+    assert machine.active_joypad_bits_observed==0x04
+    machine.controller=0xFE  # up bit asserted
+    assert machine.read_port(0xDC)==0xFE
+    assert machine.active_joypad_reads==3
+    assert machine.active_joypad_bits_observed==0x05
+    machine.controller=0xFF
+    machine.read_port(0xDC)
+    assert machine.active_joypad_reads==3
+    assert machine.active_joypad_bits_observed==0x05
