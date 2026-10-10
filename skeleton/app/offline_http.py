@@ -706,6 +706,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--port", type=int, default=0,
                         help="localhost TCP port, default: OS-assigned ephemeral port")
     args = parser.parse_args(argv)
+    token_path = args.token_file.expanduser()
     app = None
     token_created = False
     token_identity: tuple[int, int, int, int] | None = None
@@ -719,9 +720,9 @@ def main(argv: list[str] | None = None) -> int:
         # Bind before creating private credentials: a conflicting port must
         # not leave behind an unused secret file on the user's disk.
         with LocalOnlyHTTPServer(app, port=args.port) as server:
-            create_token_file(args.token_file, token=token)
+            create_token_file(token_path, token=token)
             token_created = True
-            created = args.token_file.lstat()
+            created = token_path.lstat()
             token_identity = (
                 created.st_dev, created.st_ino, created.st_size, created.st_mtime_ns,
             )
@@ -732,7 +733,7 @@ def main(argv: list[str] | None = None) -> int:
             # in the operator-selected new private file.
             if sys.stdout is not None:
                 print("Skeleton offline AI:", url)
-                print("Private bearer token file:", args.token_file)
+                print("Private bearer token file:", token_path)
                 print("Model digest:", app.model_digest)
                 sys.stdout.flush()
             else:
@@ -758,7 +759,7 @@ def main(argv: list[str] | None = None) -> int:
             # or symlink substituted at the original path. The containing
             # directory must still be protected from untrusted writers.
             try:
-                current = args.token_file.lstat()
+                current = token_path.lstat()
             except FileNotFoundError:
                 pass
             else:
@@ -766,7 +767,7 @@ def main(argv: list[str] | None = None) -> int:
                     current.st_dev, current.st_ino, current.st_size, current.st_mtime_ns,
                 )
                 if stat.S_ISREG(current.st_mode) and observed == token_identity:
-                    args.token_file.unlink(missing_ok=True)
+                    token_path.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
