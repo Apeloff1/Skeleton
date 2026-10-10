@@ -150,7 +150,7 @@ def test_native_cli_and_portfolio_registration_export_real_target(target,tmp_pat
     assert report["native_binary_built"] is False
     assert report["emulator_verified"] is False
     assert report["distribution_licensed"] is False
-    assert (tmp_path/target/"game.c").is_file()
+    assert (tmp_path/target/("game.asm" if target=="sega_master_system" else "game.c")).is_file()
 
 
 
@@ -183,7 +183,7 @@ def test_game_evolution_stages_emit_real_sms_and_gear_native_source(tmp_path):
     output = export_evolution_native_sources(pack,tmp_path/"authored-evolution",authorized=True)
     for i,target in enumerate(destinations,1):
         folder = output/f"stage-{i:02d}-{target}"
-        assert (folder/"game.c").is_file()
+        assert (folder/("game.asm" if target=="sega_master_system" else "game.c")).is_file()
         assert (folder/"manifest.json").is_file()
         assert json.loads((folder/"manifest.json").read_text())["platform"] == target
 
