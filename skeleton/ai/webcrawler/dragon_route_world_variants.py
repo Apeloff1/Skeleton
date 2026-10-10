@@ -92,6 +92,7 @@ def mutate_original_world(world:World,*,seed:int)->World:
             spectacle=scenery,requires=tuple(keys),
             weather_any=tuple(weather),
             secret_token="stargate_key" if secret else "",
+            mana=25 if mode=="wormhole" else 15 if mode=="magic_gate" else 0,
         ))
     changed=replace(world,connections=tuple(edges))
     validate_world(changed)
