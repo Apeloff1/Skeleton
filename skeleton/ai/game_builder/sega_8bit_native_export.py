@@ -29,6 +29,20 @@ _BASE = r"""/* Original independently-authored Z80 homebrew: __TARGET__.
  */
 #include "SMSlib.h"
 
+/* Author-designed color palettes for the game's original world theme.
+ * Game Gear uses 12-bit RGB, SMS uses its genuinely different RGB222 CRAM. */
+#ifdef TARGET_GG
+#define BASE_COLOR_0 __GG_COLOR_0__
+#define BASE_COLOR_1 __GG_COLOR_1__
+#define BASE_COLOR_2 __GG_COLOR_2__
+#define BASE_COLOR_3 __GG_COLOR_3__
+#else
+#define BASE_COLOR_0 __SMS_COLOR_0__
+#define BASE_COLOR_1 __SMS_COLOR_1__
+#define BASE_COLOR_2 __SMS_COLOR_2__
+#define BASE_COLOR_3 __SMS_COLOR_3__
+#endif
+
 #define WIDTH __WIDTH__
 #define HEIGHT __HEIGHT__
 #define LEVEL_COUNT __LEVELS__
@@ -300,23 +314,23 @@ void main(void) {
     SMS_loadTiles(original_tiles, 0, sizeof(original_tiles));
     SMS_useFirstHalfTilesforSprites(1);
 #ifdef TARGET_GG
-    GG_setBGPaletteColor(0, 0x000);
-    GG_setBGPaletteColor(1, 0xD94);
-    GG_setBGPaletteColor(2, 0x8DC);
-    GG_setBGPaletteColor(3, 0xFFF);
-    GG_setSpritePaletteColor(0, 0x000);
-    GG_setSpritePaletteColor(1, 0xD94);
-    GG_setSpritePaletteColor(2, 0x8DC);
-    GG_setSpritePaletteColor(3, 0xFFF);
+    GG_setBGPaletteColor(0, BASE_COLOR_0);
+    GG_setBGPaletteColor(1, BASE_COLOR_1);
+    GG_setBGPaletteColor(2, BASE_COLOR_2);
+    GG_setBGPaletteColor(3, BASE_COLOR_3);
+    GG_setSpritePaletteColor(0, BASE_COLOR_0);
+    GG_setSpritePaletteColor(1, BASE_COLOR_1);
+    GG_setSpritePaletteColor(2, BASE_COLOR_2);
+    GG_setSpritePaletteColor(3, BASE_COLOR_3);
 #else
-    SMS_setBGPaletteColor(0, RGB(0,0,0));
-    SMS_setBGPaletteColor(1, RGB(1,2,3));
-    SMS_setBGPaletteColor(2, RGB(0,3,2));
-    SMS_setBGPaletteColor(3, RGB(3,3,3));
-    SMS_setSpritePaletteColor(0, RGB(0,0,0));
-    SMS_setSpritePaletteColor(1, RGB(1,2,3));
-    SMS_setSpritePaletteColor(2, RGB(0,3,2));
-    SMS_setSpritePaletteColor(3, RGB(3,3,3));
+    SMS_setBGPaletteColor(0, BASE_COLOR_0);
+    SMS_setBGPaletteColor(1, BASE_COLOR_1);
+    SMS_setBGPaletteColor(2, BASE_COLOR_2);
+    SMS_setBGPaletteColor(3, BASE_COLOR_3);
+    SMS_setSpritePaletteColor(0, BASE_COLOR_0);
+    SMS_setSpritePaletteColor(1, BASE_COLOR_1);
+    SMS_setSpritePaletteColor(2, BASE_COLOR_2);
+    SMS_setSpritePaletteColor(3, BASE_COLOR_3);
 #endif
     level_index=0;
     health=INITIAL_HEALTH;
@@ -536,7 +550,28 @@ def compile_native_sega_8bit(
             )
             + "\n};"
         )
+    themes = {
+        "forest": ((0x000, 0x2A4, 0x5A8, 0xFFF),
+                   (0, 13, 29, 63)),
+        "space": ((0x000, 0xD94, 0x8DC, 0xFFF),
+                  (0, 53, 60, 63)),
+        "desert": ((0x000, 0xC74, 0xFC2, 0xFFF),
+                   (0, 11, 31, 63)),
+        "ocean": ((0x000, 0xD84, 0xFBC, 0xFFF),
+                  (0, 52, 60, 63)),
+        "arcade": ((0x000, 0xF2F, 0x6FF, 0xFFF),
+                   (0, 51, 60, 63)),
+    }
+    gg_colors, sms_colors = themes[world.intent.theme]
     substitutions = {
+        "__GG_COLOR_0__": hex(gg_colors[0]),
+        "__GG_COLOR_1__": hex(gg_colors[1]),
+        "__GG_COLOR_2__": hex(gg_colors[2]),
+        "__GG_COLOR_3__": hex(gg_colors[3]),
+        "__SMS_COLOR_0__": str(sms_colors[0]),
+        "__SMS_COLOR_1__": str(sms_colors[1]),
+        "__SMS_COLOR_2__": str(sms_colors[2]),
+        "__SMS_COLOR_3__": str(sms_colors[3]),
         "__TARGET__":target,"__WIDTH__":str(world.intent.width),
         "__HEIGHT__":str(world.intent.height),"__LEVELS__":str(len(world.levels)),
         "__GEMS__":str(world.intent.collectibles_per_level),
@@ -570,6 +605,9 @@ def compile_native_sega_8bit(
         "levels":len(world.levels),"width":world.intent.width,
         "height":world.intent.height,
         "title":world.intent.title,
+        "original_color_theme":world.intent.theme,
+        "game_gear_original_rgb12_palette":list(gg_colors),
+        "master_system_original_rgb222_palette":list(sms_colors),
         "native_psg_reactive_audio":True,
         "native_animated_companion":True,
         "default_audio_enabled":audio_enabled,
