@@ -480,7 +480,11 @@ void main(void) {
                 reset_original_run();
                 continue;
             }
-            action=original_demo_routes[level_index][demo_step];
+            /* Four LSB-first two-bit moves per cartridge ROM byte. */
+            action=(unsigned char)(
+                (original_demo_routes[level_index][demo_step >> 2] >>
+                    ((demo_step & 3U) * 2U)) & 3U
+            );
             if (action==0) advance(0,-1);
             else if (action==1) advance(0,1);
             else if (action==2) advance(-1,0);
@@ -673,16 +677,26 @@ def compile_native_sega_8bit(
     _original_actions = {"up": 0, "down": 1, "left": 2, "right": 3}
     demo_arrays = []
     demo_steps_total = 0
+    demo_bytes_total = 0
     for level in world.levels:
         moves = tuple(level.safe_solution)
         if not moves or len(moves) > 20000:
             raise Sega8BitNativeError("original demonstration route exceeds native input budget")
         demo_steps_total += len(moves)
+        actions = tuple(_original_actions[x] for x in moves)
+        # Z80 cartridge ROM is fixed at 32 KiB: 2-bit directional codes
+        # pack four independently verified inputs into each program byte.
+        # Lowest two bits store the earliest move (LSB-first ordering).
+        packed = tuple(
+            sum(actions[i+j] << (2*j) for j in range(min(4, len(actions)-i)))
+            for i in range(0, len(actions), 4)
+        )
+        demo_bytes_total += len(packed)
         demo_arrays.append(
             f"static const unsigned char demo_{level.index}[] = {{\n"
             + "\n".join(
-                "    " + ", ".join(str(_original_actions[x]) for x in moves[i:i+32]) + ","
-                for i in range(0, len(moves), 32)
+                "    " + ", ".join(str(value) for value in packed[i:i+32]) + ","
+                for i in range(0, len(packed), 32)
             )
             + "\n};"
         )
@@ -759,7 +773,8 @@ def compile_native_sega_8bit(
         "native_sound_toggle_controls":True,
         "original_native_solution_attract_mode":True,
         "original_demo_chord_frames":25,
-        "original_demo_direction_encoding":"0=up,1=down,2=left,3=right",
+        "original_demo_direction_encoding":"2bit_lsb_first:0=up,1=down,2=left,3=right",
+        "original_demo_compressed_rom_bytes":demo_bytes_total,
         "original_demo_playback_steps":demo_steps_total,
         "original_demo_solution_sha256":sha256(json.dumps(
             [list(stage.safe_solution) for stage in world.levels],
