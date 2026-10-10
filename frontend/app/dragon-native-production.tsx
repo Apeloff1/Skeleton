@@ -629,6 +629,8 @@ function NativeSourceEditor() {
             </TouchableOpacity>
             <DragonOriginalPuzzleEditor
               enabled={customGame} stages={stageCount}
+              campaignPathing={campaignPathing}
+              challengeProfile={challengeProfile}
               onApprovedLevels={handleApprovedBoards}
             />
           </>
