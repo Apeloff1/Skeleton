@@ -77,3 +77,11 @@ def test_sprite_atlas_packing_is_deterministic_and_nonoverlapping():
         shelf_pack_rectangles(((32,8),),16)
     with pytest.raises(GeometryError):
         shelf_pack_rectangles(((8,512),)*8,8)
+
+def test_camera_clamp_supports_large_world_and_small_viewports():
+    assert camera_clamp((50,40),(100,80),(20,10))==(40,35)
+    assert camera_clamp((99,79),(100,80),(20,10))==(80,70)
+    assert camera_clamp((0,0),(100,80),(20,10))==(0,0)
+    assert camera_clamp((5,5),(10,10),(20,20))==(0,0)
+    with pytest.raises(GeometryError):
+        camera_clamp((100,0),(100,80),(20,10))
