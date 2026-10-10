@@ -8,8 +8,10 @@ import { Ionicons } from '@expo/vector-icons';
 import DragonCompanion from './DragonCompanion';
 import DragonQuestBoard from './DragonQuestBoard';
 import DragonWisdomSquares from './DragonWisdomSquares';
+import DragonKnowledgePyramid from './DragonKnowledgePyramid';
 import { dragonWaitingBubble } from './dragonMagicEightBall';
 import type { DragonWisdomReview } from './dragonWisdomReview';
+import type { DragonKnowledgeView } from './dragonKnowledgePyramid';
 import type{NativeAttempt,NativeTarget,NativeCurriculum}from './dragonNativeTargets';
 import {type DragonPracticeProgress,type DragonPracticeAttempt,type DragonPracticeSubscription,validateDragonProgress} from './dragonProgression';
 import { companionForConversation, companionFromCrawler, type DragonEventKind } from './dragonCompanion';
@@ -24,6 +26,7 @@ export interface CompanionTelemetry {
 
 export interface CompanionAcademyInput {
   wisdomReview?: DragonWisdomReview | null;
+  knowledgeView?: DragonKnowledgeView | null;
   progress?:DragonPracticeProgress|null;
   attempts?:readonly DragonPracticeAttempt[];
   nativeAttempts?:readonly NativeAttempt[];
@@ -101,6 +104,7 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry, a
       onRevokePractice={academy?.onRevokePractice}
       busy={academy?.practiceBusy} />}
     {academy?.wisdomReview && <DragonWisdomSquares review={academy.wisdomReview} />}
+    {academy?.knowledgeView && <DragonKnowledgePyramid view={academy.knowledgeView} />}
     <Text style={s.note}>Petting and animation are just for fun. System reduced-motion settings take priority. These reactions never start research or change memory.</Text>
     <Text style={s.note}>Conversation creates interest signals. Only policy-compliant, provenance-preserved acquisitions may become distilled memory.</Text>
   </View>;
