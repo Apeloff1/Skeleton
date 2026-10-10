@@ -22,7 +22,7 @@ export type DesignReview = {
   model: string | null;
 };
 
-export const DESIGN_FOCUS: ReadonlyArray<{id: DesignFocus;title:string;instruction:string}> = [
+export const DESIGN_FOCUS: readonly {id: DesignFocus;title:string;instruction:string}[] = [
   {id:'gameplay',title:'Gameplay',instruction:'Review the core gameplay loop, agency, progression and failure states.'},
   {id:'world',title:'World building',instruction:'Review consistency of world geography, simulation rules, ecosystems and traversal.'},
   {id:'narrative',title:'Narrative',instruction:'Review player motivation, quests, pacing, characters and systemic narrative consistency.'},
