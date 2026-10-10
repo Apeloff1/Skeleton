@@ -392,6 +392,20 @@ class GameMechanicsMemory:
             not insights or any(not x.user_confirmed for x in insights) or conflicting, fingerprint,
         )
 
+    def erase_session(self, owner: str, session_id: str, *, authorized: bool) -> bool:
+        """Delete one owner's session; never erase a neighboring user's evidence."""
+        owner = self._owner(owner)
+        if authorized is not True:
+            raise PermissionError("selective observation erasure requires authorization")
+        if not isinstance(session_id, str) or re.fullmatch(r"[0-9a-f]{64}", session_id) is None:
+            raise ValueError("canonical session identifier required")
+        with self.db:
+            result = self.db.execute(
+                "DELETE FROM dragon_game_sessions WHERE owner=? AND session_id=?",
+                (owner, session_id),
+            )
+        return result.rowcount == 1
+
     def erase(self, owner: str, *, authorized: bool) -> int:
         owner = self._owner(owner)
         if authorized is not True:
