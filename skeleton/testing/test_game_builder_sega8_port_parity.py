@@ -243,7 +243,7 @@ def test_cross_port_refuses_duplicate_json_properties_in_game_reproducibility(tm
     path=files["sega_game_gear"]["reproducibility"]
     data=path.read_bytes()
     # Duplicate schema values are ambiguous across JSON parsers.
-    path.write_bytes(data.replace(b'{"schema":',b'{"schema":"fake", "schema":',1))
+    path.write_bytes(data.replace(b'{',b'{"schema":"fake",',1))
     with pytest.raises(Sega8PortParityError):
         verify_ports(tmp_path)
 
