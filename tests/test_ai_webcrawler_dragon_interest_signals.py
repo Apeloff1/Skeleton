@@ -111,3 +111,31 @@ def test_future_timestamp_is_rejected():
         now=1000.0,
     )
     assert profile.rejected_signals == 1
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"half_life_days": "30"},
+    {"half_life_days": True},
+    {"max_age_days": float("nan")},
+    {"max_signals": True},
+    {"max_signals": 1.2},
+    {"max_topics": False},
+    {"positive_ceiling": float("inf")},
+    {"negative_floor": "minus-ten"},
+])
+def test_interest_policy_rejects_type_confusion(kwargs):
+    with pytest.raises(ValueError, match="policy"):
+        build_interest_profile([], now=1000.0, policy=SignalPolicy(**kwargs))
+
+
+@pytest.mark.parametrize("clock", [True, "now", None, float("nan"), -1])
+def test_interest_profile_rejects_invalid_current_clock(clock):
+    with pytest.raises(ValueError, match="clock"):
+        build_interest_profile([], now=clock)
+
+
+@pytest.mark.parametrize("limit", [True, False, 0, 33, 2.4, None])
+def test_interest_search_budget_must_be_bounded_integer(limit):
+    profile = build_interest_profile([], now=1000.0)
+    with pytest.raises(ValueError, match="budget"):
+        signal_search_terms(profile, limit=limit)
