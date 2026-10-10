@@ -305,9 +305,12 @@ def _maze_door(world:LivingWorld,state:LivingState,dx:int,dy:int)->bool:
 
 
 def _discovery_key(world:LivingWorld,state:LivingState)->str:
-    # Bounded materialized discoveries. Exploration can be endless without
-    # storing millions of cell identities inside individual player state.
-    return f"r{state.realm}_x{state.x//8}_y{state.y//8}"
+    # Negative coordinates cannot appear verbatim in the strict original
+    # token registry. Encode both signs with safe distinct identifiers:
+    # north(-1) => m1, south(+1) => p1, never a hyphen or copied map.
+    def axis(value:int)->str:
+        return ("m"+str(-value)) if value<0 else ("p"+str(value))
+    return "r"+str(state.realm)+"_x"+axis(state.x//8)+"_y"+axis(state.y//8)
 
 
 def _add_unique(values:tuple[str,...],value:str,cap:int)->tuple[str,...]:
