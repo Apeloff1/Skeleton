@@ -103,3 +103,21 @@ def adsr_envelope(count: int, *, attack: int, decay: int,
             gain=level
         result.append(max(0,min(32767,gain)))
     return tuple(result)
+
+def resample_linear(samples: object, source_rate: int, target_rate: int) -> tuple[int,...]:
+    """Deterministic PCM16 rate adaptation with exact rational positions."""
+    data=_pcm(samples)
+    source=_integer(source_rate,"source sample rate",4000,96000)
+    target=_integer(target_rate,"target sample rate",4000,96000)
+    count=(len(data)*target+source-1)//source
+    if count>32768:
+        raise AudioKernelError("resampled PCM exceeds 32K sample budget")
+    output=[]
+    for i in range(count):
+        index,fraction=divmod(i*source,target)
+        if index>=len(data)-1:
+            output.append(data[-1])
+        else:
+            value=(data[index]*(target-fraction)+data[index+1]*fraction+target//2)//target
+            output.append(max(-32768,min(32767,value)))
+    return tuple(output)
