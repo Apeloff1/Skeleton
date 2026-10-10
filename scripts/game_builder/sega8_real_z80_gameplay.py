@@ -271,6 +271,18 @@ def verify_original_z80_gameplay(
     session = ActualZ80GameSession(rom, target)
     first = session.run_to_playable_boot(meta["width"], meta["height"])
     _assert_state(first, reference["initial"], 0)
+    # Verify actual Z80 companion interactions independently of the game's
+    # reference actions. A single chord frame pets without starting demo.
+    session.step_frame("attract")
+    for _ in range(3):
+        session.step_frame(None)
+    after_pet = observe_actual_gameplay(
+        session.machine, width=meta["width"], height=meta["height"],
+    )
+    _assert_state(after_pet, reference["initial"], 0)
+    left,hud=(0,0) if target=="sega_master_system" else (6,3)
+    if _glyph(session.machine,left+18,hud) not in (19,21):
+        raise Sega8NativeGameplayError("original Z80 companion did not respond to physical pet")
     snapshots_checked = 1
     # Only observed native CPU/VDP state enters this content-addressed chain.
     seed = sha256(
