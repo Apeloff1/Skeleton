@@ -30,6 +30,10 @@ LEVEL_LIMIT=8
 MAP_LIMIT=0x300
 _TILE={".":0,"S":0,"#":1,"C":2,"H":3,"G":4}
 
+_ORIGINAL_8X8_TILES = [[0,0,0,16,0,0,0,0], [255,129,165,165,165,165,129,255], [24,60,126,255,255,126,60,24], [129,66,36,24,24,36,66,129], [126,66,90,90,90,90,66,126], [36,126,219,255,165,231,102,60]]
+_ORIGINAL_COLOR_GROUPS = [225,81,177,129,49,161]
+
+
 _ASM=r"""; Entirely new ColecoVision Z80 32KB OS7 cartridge / no copied art.
 org 08000h
 
@@ -109,6 +113,7 @@ GameStart:
     ld (Life),a
     call CV_MODE1
     call CV_ASCII           ; BIOS renders ASCII patterns in VDP VRAM.
+    call InitOriginalArt    ; Original 8x8 graphics, colors and dragon hero.
     ld a,0E0h              ; VDP register 1: 16K/display/VBlank enabled.
     out (VDP_CTRL),a
     ld a,081h
@@ -299,6 +304,39 @@ LoadStage:
     call DrawWorld
     ret
 
+InitOriginalArt:
+    ; Mode-0 (Graphics I): one color entry per eight 8x8 characters.
+    ; Our original gameplay tiles use separate color groups: $80/$88/...
+    ld hl,00400h            ; tile #128 pattern data in VRAM.
+    ld de,OriginalArtBytes
+    ld b,6
+UploadTile:
+    push bc
+    push hl
+    call SetVRAM
+    pop hl
+    ld c,8
+UploadEightRows:
+    ld a,(de)
+    out (VDP_DATA),a
+    inc de
+    dec c
+    jr nz,UploadEightRows
+    ld bc,00040h           ; Next group of 8 glyphs = 8*8 bytes.
+    add hl,bc
+    pop bc
+    djnz UploadTile
+    ld hl,02010h           ; color group 16, pattern #128.
+    call SetVRAM
+    ld hl,OriginalGroupColors
+    ld b,6
+UploadColors:
+    ld a,(hl)
+    out (VDP_DATA),a
+    inc hl
+    djnz UploadColors
+    ret
+
 SetVRAM:
     ld a,l
     out (VDP_CTRL),a
@@ -411,7 +449,7 @@ AddHeroX:
     ld d,0
     add hl,de
     call SetVRAM
-    ld a,'@'
+    ld a,0A8h              ; Unique original baby dragon at tile #168.
     out (VDP_DATA),a
     in a,(VDP_CTRL)          ; Do not re-assert stale VBlank immediately.
     ld a,0E0h              ; R1: display ON and fresh NMI each frame.
@@ -448,7 +486,11 @@ HudChars: db "LEVEL:",0
 CrystalChars: db " GEMS:",0
 HPChars: db " HP:",0
 ScoreChars: db "SCORE:",0
-TileChars: db '.', '#', '*', '!', 'E'
+TileChars: db 080h,088h,090h,098h,0A0h
+OriginalArtBytes:
+__ORIGINAL_ART__
+OriginalGroupColors:
+__ORIGINAL_COLORS__
 LevelPointers:
 __POINTERS__
 StartX: db __START_X__
@@ -516,6 +558,11 @@ def compile_native_coleco(world:PlayableWorld,rights:HomebrewSource,*,authorized
         "__START_X__":", ".join(str(l.start[0]) for l in world.levels),
         "__START_Y__":", ".join(str(l.start[1]) for l in world.levels),
         "__MAPS__":"\n".join(maps),
+        "__ORIGINAL_ART__":"\n".join(
+            "    db "+", ".join(f"0{byte:02X}h" for byte in tile)
+            for tile in _ORIGINAL_8X8_TILES
+        ),
+        "__ORIGINAL_COLORS__":"    db "+", ".join(f"0{color:02X}h" for color in _ORIGINAL_COLOR_GROUPS),
     }
     program=_ASM
     for key,value in replacements.items():
@@ -549,6 +596,12 @@ def compile_native_coleco(world:PlayableWorld,rights:HomebrewSource,*,authorized
         "emulator_full_playthrough_verified":False,
         "physical_hardware_verified":False,
         "redistribution_licensed":False,
+        "original_8x8_tile_count":len(_ORIGINAL_8X8_TILES),
+        "original_tile_sha256":sha256(bytes(v for tile in _ORIGINAL_8X8_TILES for v in tile)).hexdigest(),
+        "color_table_base":"0x2000",
+        "graphics_pattern_base":"0x0000",
+        "distinct_background_color_groups":len(_ORIGINAL_COLOR_GROUPS),
+        "player_art":"original_companion_dragon_8x8",
         "third_party_firmware_included":False,
     },sort_keys=True,indent=2)+"\n"
     digest=sha256((program+"\0"+_MAKEFILE+"\0"+manifest).encode()).hexdigest()
