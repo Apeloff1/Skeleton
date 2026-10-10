@@ -198,6 +198,23 @@ class OriginalityReport:
     independent_human_signoff_complete: bool = False
 
     def __post_init__(self) -> None:
+        if (not isinstance(self.overlap_findings, tuple)
+                or not isinstance(self.media_overlap_findings, tuple)
+                or len(self.overlap_findings) > 4096
+                or len(self.media_overlap_findings) > 512
+                or any(not isinstance(x, ExpressiveOverlap) for x in self.overlap_findings)
+                or any(not isinstance(x, MediaMatchEvidence) for x in self.media_overlap_findings)):
+            raise OriginalityError("originality report requires bounded typed findings")
+        for name in ("blockers", "review_issues", "class_coverage",
+                     "unexamined_external_media"):
+            values = getattr(self, name)
+            if (not isinstance(values, tuple) or len(values) > 8192
+                    or any(not isinstance(value, str) or len(value) > 512
+                           for value in values)
+                    or len(values) != len(set(values))):
+                raise OriginalityError("originality report category/evidence lists are malformed")
+        if len(self.class_coverage) != len(_ASSET_CLASSES):
+            raise OriginalityError("originality report requires exact class coverage")
         if not isinstance(self.project_id, str) or not _ID.fullmatch(self.project_id):
             raise OriginalityError("invalid originality report project")
         if any(not isinstance(v, str) or not _SHA.fullmatch(v) for v in (
@@ -355,6 +372,8 @@ def find_expression_overlap(
     submission: ExpressionSample, reference: ExpressionSample,
 ) -> ExpressiveOverlap | None:
     """Heuristic review signal. Neither the threshold nor a pass is legal proof."""
+    if not isinstance(submission, ExpressionSample) or not isinstance(reference, ExpressionSample):
+        raise OriginalityError("typed, validated expression samples required")
     if submission.modality != reference.modality:
         return None
     original = _tokens(submission.text)
