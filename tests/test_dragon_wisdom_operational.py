@@ -39,7 +39,7 @@ def source(name):
             statement="Measured jump buffering merits new tests.",
             start=0, end=len("Jump buffering"), stance="supports",
             confidence_ppm=910000, dependence_group="publisher_"+name,
-            tags=("jump", "buffer"),
+            tags=("buffer", "jump"),
         ),),
     )
 
