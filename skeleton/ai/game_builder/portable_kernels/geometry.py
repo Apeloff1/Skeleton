@@ -42,3 +42,25 @@ def walkable_tile_neighbors(rows: object, position: object) -> tuple[tuple[int,i
     return tuple((cx,cy) for cx,cy in candidates
                  if 0<=cy<len(grid) and 0<=cx<len(grid[0])
                  and grid[cy][cx]!="#")
+
+def bresenham_line(start: object, end: object) -> tuple[tuple[int,int],...]:
+    """Integer raster ray for tile visibility, lasers and grid interaction."""
+    x0,y0=_point(start)
+    x1,y1=_point(end)
+    dx=abs(x1-x0)
+    dy=-abs(y1-y0)
+    step_x=1 if x0<x1 else -1
+    step_y=1 if y0<y1 else -1
+    error=dx+dy
+    points=[]
+    while True:
+        points.append((x0,y0))
+        if (x0,y0)==(x1,y1):
+            return tuple(points)
+        twice=2*error
+        if twice>=dy:
+            error+=dy
+            x0+=step_x
+        if twice<=dx:
+            error+=dx
+            y0+=step_y
