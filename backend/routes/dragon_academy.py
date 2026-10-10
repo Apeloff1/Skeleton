@@ -25,6 +25,7 @@ from skeleton.ai.game_builder.dragon_review_store import DragonReviewStore
 from skeleton.ai.game_builder.reviewed_knowledge import ReviewedKnowledgeStore, KnowledgeError
 from skeleton.ai.game_builder.dragon_wisdom_pyramid import DragonWisdomPyramid
 from skeleton.ai.game_builder.dragon_wisdom_custody import DragonCustodyAnchor
+from skeleton.ai.game_builder.dragon_wisdom_memory import DragonWisdomMemory
 from skeleton.ai.webcrawler.dragon_practice_lab import DragonPracticeLab
 from skeleton.ai.webcrawler.dragon_practice_cycles import DragonPracticeCycles
 from skeleton.ai.webcrawler.dragon_session_projection import DragonSessionProjection
@@ -197,6 +198,24 @@ def knowledge_recrawls(
             owner, now=int(time.time()), authorized=True, limit=32,
         )
         return {"ok": True, "orders": orders, "execution_authorized": False}
+
+
+@router.get("/knowledge/memory")
+def knowledge_memory(
+    response: Response,
+    mechanic: str | None = Query(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"),
+    owner: str = Depends(_principal),
+) -> dict:
+    # Distilled memory index is advisory, separately synchronized by trusted
+    # workers. Reads never reconcile/mint approvals or perform network I/O.
+    response.headers["Cache-Control"] = "private, no-store"
+    with _wisdom_library() as library:
+        _verify_wisdom_custody(library, owner)
+        memory = DragonWisdomMemory(DragonWisdomPyramid(library))
+        return {"ok": True, **memory.read_current(
+            owner, now=int(time.time()), authorized=True,
+            mechanic=mechanic, limit=32,
+        )}
 
 
 @router.get("/crawler/feed")
