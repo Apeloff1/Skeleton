@@ -56,6 +56,31 @@ def test_normalization_is_provenance_visible_in_sequence_digest(native_model):
     assert prepared.sequence.source_text_digest == prepared.normalized_text_digest
 
 
+def test_prepared_digest_binds_raw_provenance_even_when_normalized_tokens_match(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer
+
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    composed = pipeline.prepare("Caf\u00e9")
+    decomposed = pipeline.prepare("Cafe\u0301")
+    assert composed.normalized_text == decomposed.normalized_text
+    assert composed.sequence.digest == decomposed.sequence.digest
+    assert composed.digest != decomposed.digest
+    assert pipeline.stream(["Ca", "fe\u0301"]).digest == decomposed.digest
+
+
+def test_missing_padding_token_requires_explicit_admission(native_model):
+    from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
+    from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
+
+    pipeline = TextTokenPipeline(NativeTokenizer(native_model))
+    prepared = pipeline.prepare("alpha beta gamma")
+    with pytest.raises(TokenizerContractError, match="explicit pad_token_id required"):
+        pipeline.model_batches(prepared)
+    batches = pipeline.model_batches(prepared, pad_token_id=native_model.unk)
+    assert batches and all(batch.pad_token_id == native_model.unk for batch in batches)
+
+
 def test_pipeline_digest_binds_normalization_policy(native_model):
     from skeleton.ai.model_runtime.text_pipeline import TextTokenPipeline
     from skeleton.ai.model_runtime.tokenization import NativeTokenizer
