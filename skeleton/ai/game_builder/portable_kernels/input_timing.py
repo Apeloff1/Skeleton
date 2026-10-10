@@ -20,3 +20,11 @@ def frame_schedule(source_hz: int, target_hz: int, frames: int) -> tuple[int,...
     target=_int(target_hz,"target refresh Hz",24,240)
     count=_int(frames,"source frame count",1,10000)
     return tuple(((i+1)*target)//source - (i*target)//source for i in range(count))
+
+def source_frame_at(target_frame: int, source_hz: int, target_hz: int) -> int:
+    """Recover the original simulation frame for a destination display frame."""
+    index=_int(target_frame,"target frame ordinal",0,100000)
+    source=_int(source_hz,"source refresh Hz",24,240)
+    target=_int(target_hz,"target refresh Hz",24,240)
+    return (index*source)//target
+
