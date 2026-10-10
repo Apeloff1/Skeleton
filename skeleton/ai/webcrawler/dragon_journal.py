@@ -4,10 +4,29 @@ from dataclasses import dataclass
 import hashlib
 import json
 import math
+import re
 import sqlite3
+from urllib.parse import urlsplit
 from typing import Any, Mapping
 
 SCHEMA = "skeleton.ai.dragon_crawl.event.v1"
+_SESSION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\\Z")
+
+
+def _validate_source_url(url: object) -> str:
+    """Bound the journal's asserted HTTP origin; this does not grant fetch rights."""
+    if not isinstance(url, str) or len(url) > 4096 or any(ord(c) < 32 for c in url):
+        raise ValueError("invalid event URL")
+    try:
+        parsed = urlsplit(url)
+        if (parsed.scheme not in {"http", "https"} or not parsed.hostname
+                or parsed.username is not None or parsed.password is not None
+                or parsed.fragment):
+            raise ValueError("invalid event URL")
+        _ = parsed.port
+    except (ValueError, TypeError) as exc:
+        raise ValueError("invalid event URL") from exc
+    return url
 ALLOWED = frozenset(("frontier_discovered","dragon_travel","visual_probe","robots_check","fetch_started","fetch_received","policy_rejected","acquisition_accepted","burn_started","burn_chunk","burn_complete","retry_wait","crawl_complete"))
 
 def _canonical(value: Mapping[str, Any]) -> str:
@@ -46,10 +65,9 @@ class DragonEventJournal:
 
     def append(self, session_id: str, kind: str, url: str, *, at: float,
                payload: Mapping[str, Any] | None = None) -> StoredDragonEvent:
-        if not session_id or len(session_id) > 128 or kind not in ALLOWED:
+        if not isinstance(session_id, str) or not _SESSION_ID.fullmatch(session_id) or kind not in ALLOWED:
             raise ValueError("invalid session or event kind")
-        if not url.startswith(("https://", "http://")) or len(url) > 4096:
-            raise ValueError("invalid event URL")
+        _validate_source_url(url)
         if isinstance(at, bool) or not isinstance(at, (int, float)) or not math.isfinite(at) or at < 0:
             raise ValueError("event time must be finite")
         # SQLite REAL round trips integers as floats. Hash persisted semantics.
