@@ -166,3 +166,14 @@ def test_owner_identity_rejects_control_and_whitespace():
         with pytest.raises(ValueError, match="owner"):
             store.sessions(bad, authorized=True)
 
+
+def test_strict_explicit_capture_and_analysis_consent():
+    from dataclasses import replace
+    store = setup()
+    base = session(store)
+    for field in ("capture_consent", "analysis_consent"):
+        with pytest.raises(PermissionError, match="consent"):
+            store.record(replace(base, **{field: 1}), authorized=True)
+    with pytest.raises(PermissionError, match="consent"):
+        store.record(base, authorized=1)
+
