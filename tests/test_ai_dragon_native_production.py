@@ -265,3 +265,105 @@ def test_missing_release_fails_offline_audit(tmp_path):
     (tmp_path / result["artifacts"][0]["archive_name"]).unlink()
     with pytest.raises(ValueError, match="missing"):
         verify_published_production(tmp_path, result["index"])
+
+
+def test_archive_source_fingerprint_attacks_are_detected():
+    spec = request()
+    raw, _ = make_source_release(project_for(spec), spec)
+    with ZipFile(BytesIO(raw)) as archive:
+        receipt = json.loads(archive.read("release-receipt.json"))
+    receipt["source_fingerprint"] = "f" * 64
+    modified = rezip({"release-receipt.json": json.dumps(receipt).encode()}, raw)
+    with pytest.raises(ValueError, match="fingerprint"):
+        verify_source_release(modified)
+
+
+def test_archive_native_manifest_must_match_release_claim():
+    spec = request()
+    raw, _ = make_source_release(project_for(spec), spec)
+    with ZipFile(BytesIO(raw)) as archive:
+        receipt = json.loads(archive.read("release-receipt.json"))
+        native = json.loads(archive.read("source/dragon-native-manifest.json"))
+    native["target"] = "ps5"
+    payload = (json.dumps(native, sort_keys=True, indent=2) + "\n").encode()
+    receipt["source_files"]["dragon-native-manifest.json"] = __import__("hashlib").sha256(payload).hexdigest()
+    # The source fingerprint is recomputed from every member, not merely a file-hash table.
+    modified = rezip({
+        "source/dragon-native-manifest.json": payload,
+        "release-receipt.json": json.dumps(receipt).encode(),
+    }, raw)
+    with pytest.raises(ValueError, match="fingerprint"):
+        verify_source_release(modified)
+
+
+def test_existing_symlinked_archive_is_not_overwritten(tmp_path):
+    spec = request()
+    published = publish_production(spec, tmp_path, authorized=True)
+    name = published["artifacts"][0]["archive_name"]
+    outside = tmp_path.parent / "outside-not-touched.txt"
+    outside.write_text("sensitive")
+    (tmp_path / name).unlink()
+    (tmp_path / name).symlink_to(outside)
+    with pytest.raises(FileExistsError):
+        publish_production(spec, tmp_path, authorized=True)
+    assert outside.read_text() == "sensitive"
+
+
+def test_invalid_index_filename_and_modification_fails(tmp_path):
+    result = publish_production(request(), tmp_path, authorized=True)
+    with pytest.raises(ValueError, match="index filename"):
+        verify_published_production(tmp_path, "../outside.json")
+    index_file = tmp_path / result["index"]
+    document = json.loads(index_file.read_text())
+    document["entries"][0]["archive_sha256"] = "f" * 64
+    index_file.write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(ValueError, match="changed"):
+        verify_published_production(tmp_path, result["index"])
+
+
+def test_portfolio_budget_denied_before_file_writes(tmp_path):
+    tiny = request(max_portfolio_bytes=1024)
+    with pytest.raises(ValueError, match="budget"):
+        publish_production(tiny, tmp_path / "not-created", authorized=True)
+    assert not (tmp_path / "not-created").exists()
+
+
+def test_existing_native_cli_portfolio_entrypoint(tmp_path, monkeypatch, capsys):
+    from skeleton.ai.webcrawler.dragon_native_cli import main
+    import sys
+    args = [
+        "dragon_native_cli", "--portfolio-targets", "game_boy,nes",
+        "--title", "Original Moonrise", "--style", "arcade_score_attack",
+        "--out", str(tmp_path), "--attest-original-rights",
+        "--authorize-publication",
+    ]
+    monkeypatch.setattr(sys, "argv", args)
+    main()
+    output = json.loads(capsys.readouterr().out)
+    assert output["status"] == "published"
+    assert {row["target"] for row in output["artifacts"]} == {"game_boy", "nes"}
+    assert verify_published_production(tmp_path, output["index"])["archives_verified"] == 2
+
+
+def test_existing_cli_rejects_portfolio_only_flags(tmp_path, monkeypatch):
+    from skeleton.ai.webcrawler.dragon_native_cli import main
+    import sys
+    monkeypatch.setattr(sys, "argv", [
+        "dragon_native_cli", "--out", str(tmp_path), "--compile-roms"
+    ])
+    with pytest.raises(SystemExit) as exception:
+        main()
+    assert exception.value.code == 2
+    assert not list(tmp_path.iterdir())
+
+
+def test_product_is_still_source_not_fabricated_console_binary(tmp_path):
+    output = publish_production(
+        request(targets=("game_boy", "nes")), tmp_path, authorized=True
+    )
+    for row in output["artifacts"]:
+        blob = (tmp_path / row["archive_name"]).read_bytes()
+        with ZipFile(BytesIO(blob)) as packaged:
+            assert not any(x.startswith("binary/") for x in packaged.namelist())
+            assert packaged.read("release-receipt.json")
+    assert output["status"] == "published"
