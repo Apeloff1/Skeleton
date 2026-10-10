@@ -288,6 +288,24 @@ game mechanic is **not** automatically a training gain; any machine
 learning/memory promotion belongs to the separate evidence and approval
 planes.
 
+### Live original-pixel-art preview in the creator screen
+
+The authenticated application exposes
+\`POST /api/dragon-academy/native/production/art-preview\`.
+It returns exactly four generated 8×8 original source sprites:
+actor, blink pose, world collectible and enemy. Input is a strict
+allowlisted \`hero\`, \`quest_theme\`, \`palette\`, 32-bit seed and one
+supported cartridge target (Game Boy, Game Boy Color or NES). The endpoint
+uses the **same native original-art generator** that rewrites actual
+cartridge assembler tile tables; no third-party images, copyrighted
+characters, executable assets or gameplay binaries are involved.
+
+The Expo creator shows the four sprites as pixel tiles, with actual
+applied 2bpp tone choice and target noted. UI thumbnails illustrate
+color-index data, not exact DMG or NES calibrated display colors.
+Previews are cancellable if user controls change, and no placeholder
+sprite is falsely shown when the preview endpoint is unavailable.
+
 ### Release verification and index integrity
 
 A release index is **not trusted merely because its archive hashes match**.
