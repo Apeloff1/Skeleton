@@ -108,7 +108,7 @@ def verify(
         "rom_sha256": measured["sha256"],
         "rom_size": measured["bytes"],
         "toolchain_revision": toolchain_revision,
-        "native_rom_compiled": True,
+        "native_rom_compiled": False,  # The byte verifier did not itself witness SDCC.\n        "real_rom_structure_verified": True,
         "rom_header_checksum_verified": measured["native_rom_checksum_verified"],
         "emulator_playthrough_verified": False,
         "physical_hardware_verified": False,
