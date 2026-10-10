@@ -92,3 +92,9 @@ def encode_genesis_4bpp(tile: Sequence[Sequence[int]]) -> bytes:
     rows = _pixels(tile, 15)
     return bytes((row[x] << 4) | row[x+1] for row in rows for x in range(0,8,2))
 
+
+def decode_genesis_4bpp(data: bytes) -> tuple[tuple[int, ...], ...]:
+    """Decode 32 bytes of Genesis indexed tile data without nibble reversal."""
+    raw = _raw(data, 32)
+    return tuple(tuple((raw[y*4+x//2] >> (0 if x%2 else 4)) & 15
+                       for x in range(8)) for y in range(8))
