@@ -78,6 +78,24 @@ class ActionReceipt:
     after_digest: str
     prev_receipt_digest: str | None
 
+    def __post_init__(self) -> None:
+        if type(self.index) is not int or not 0 <= self.index < MAX_REPLAY_ACTIONS:
+            raise GameplayError("invalid action receipt index")
+        if type(self.action) is not str or self.action not in _MOVES:
+            raise GameplayError("invalid action receipt control")
+        for name in ("before_digest", "after_digest"):
+            value = getattr(self, name)
+            if type(value) is not str or len(value) != 64 or any(
+                ch not in "0123456789abcdef" for ch in value
+            ):
+                raise GameplayError(f"invalid receipt {name}")
+        if self.prev_receipt_digest is not None and (
+            type(self.prev_receipt_digest) is not str
+            or len(self.prev_receipt_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in self.prev_receipt_digest)
+        ):
+            raise GameplayError("invalid previous receipt digest")
+
     @property
     def digest(self) -> str:
         return canonical_digest({
