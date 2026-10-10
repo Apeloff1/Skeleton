@@ -651,7 +651,7 @@ const stylesUi = StyleSheet.create({
   preview: { backgroundColor: '#142834', borderWidth: 1, borderColor: '#345660',
     borderRadius: 14, padding: 14, gap: 10 },
   artSprites: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, justifyContent: 'space-around' },
-  pixelCanvas: { width: 120, height: 120, flexDirection: 'row', flexWrap: 'wrap',
+  pixelCanvas: { width: 122, height: 122, flexDirection: 'row', flexWrap: 'wrap',
     borderWidth: 1, borderColor: '#4e756e', backgroundColor: '#09131b' },
   counter: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
   counterButton: { backgroundColor: '#326f56', borderRadius: 10, minWidth: 42,
