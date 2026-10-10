@@ -29,7 +29,7 @@ _SHA = re.compile(r"^[0-9a-f]{64}$")
 _GIT_REVISION = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 
 
-def emit(target: str, output: Path, authorship_file: Path) -> dict[str, object]:
+def emit(target: str, output: Path, authorship_file: Path, *, reference_out: Path | None = None) -> dict[str, object]:
     if target not in _TARGETS:
         raise ValueError("unsupported real Z80 console target")
     try:
@@ -62,6 +62,9 @@ def emit(target: str, output: Path, authorship_file: Path) -> dict[str, object]:
     project = compile_native_sega_8bit(world, rights, target, authorized=True)
     folder = export_native_sega_8bit(project, output, authorized=True)
     replay = demonstrate_solvable(world, authorized=True)
+    if reference_out is not None:
+        from scripts.game_builder.sega8_source_replay import export_host_reference
+        export_host_reference(world, project.content_digest, reference_out)
     proof = {
         "schema": "skeleton.game_builder.native_sega8_original_source_receipt.v1",
         "target": target, "output_directory": str(folder),
@@ -198,11 +201,13 @@ def main() -> None:
     ap.add_argument("--expected-source-sha256")
     ap.add_argument("--expected-authorship-sha256")
     ap.add_argument("--receipt-out", type=Path)
+    ap.add_argument("--host-reference-out", type=Path)
     args = ap.parse_args()
     if args.emit is not None:
         if args.author_evidence is None:
             ap.error("--author-evidence required with --emit")
-        receipt = emit(args.target, args.emit, args.author_evidence)
+        receipt = emit(args.target, args.emit, args.author_evidence,
+                       reference_out=args.host_reference_out)
     else:
         if args.source_dir is None or args.toolchain_revision is None:
             ap.error("--source-dir and --toolchain-revision required with --verify-rom")
