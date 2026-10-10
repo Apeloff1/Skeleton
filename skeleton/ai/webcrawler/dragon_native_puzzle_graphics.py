@@ -77,7 +77,11 @@ static void keyboard(SDL_Keycode k){
  else if(k==SDLK_DOWN||k==SDLK_s)perform('s');
  else if(k==SDLK_u||k==SDLK_BACKSPACE)rollback();
  else if(k==SDLK_r)load_level(chapter);
- else if(k==SDLK_n&&level_done()&&chapter+1<LEVEL_COUNT)load_level(chapter+1);
+ else if(level_done()&&(k==SDLK_n||k==SDLK_1||k==SDLK_2)){
+  int route=k==SDLK_2?1:0;
+  if(route<dragon_branch_count[chapter])
+   load_level(dragon_branch_next[chapter][route]);
+ }
  else if(k==SDLK_F5||k==SDLK_k)write_local_original_save();
  else if(k==SDLK_F9||k==SDLK_l)read_local_original_save();
  else if(k==SDLK_h){
@@ -94,8 +98,12 @@ static void gamepad(uint8_t button){
  else if(button==SDL_CONTROLLER_BUTTON_X)load_level(chapter);
  else if(button==SDL_CONTROLLER_BUTTON_START)write_local_original_save();
  else if(button==SDL_CONTROLLER_BUTTON_BACK)read_local_original_save();
- else if(button==SDL_CONTROLLER_BUTTON_A&&level_done()&&chapter+1<LEVEL_COUNT)
-  load_level(chapter+1);
+ else if(level_done()&&
+         (button==SDL_CONTROLLER_BUTTON_A||button==SDL_CONTROLLER_BUTTON_Y)){
+  int option=button==SDL_CONTROLLER_BUTTON_Y?1:0;
+  if(option<dragon_branch_count[chapter])
+   load_level(dragon_branch_next[chapter][option]);
+ }
 }
 static int frame_checked(SDL_Renderer*r,SDL_Window*w){
  uint32_t*pixels=(uint32_t*)malloc(WINDOW_W*WINDOW_H*4);
