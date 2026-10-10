@@ -15,8 +15,8 @@ from skeleton.ai.webcrawler.dragon_native_puzzle import (
 def test_native_c_game_embeds_bounded_sokoban_shortest_solver():
     generated=emit_native_puzzle(seed=17,stages=5,difficulty=6)
     runtime=generated["src/main.c"]
-    assert "HINT_NODES 50000" in runtime
-    assert "HINT_BUCKETS 131071" in runtime
+    assert "HINT_NODES 120001" in runtime
+    assert "HINT_BUCKETS 262147" in runtime
     assert "shortest_hint()" in runtime
     assert "HintNode" in runtime
     assert "current position" in runtime
