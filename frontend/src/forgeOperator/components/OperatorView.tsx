@@ -13,6 +13,7 @@ import {
   type OperatorTab,
 } from '../operatorTabs';
 import BeatsPanel, { type BeatsPanelProps } from './BeatsPanel';
+import IntakePanel, { type IntakePanelProps } from './IntakePanel';
 import CockpitPanel, { type CockpitPanelProps } from './CockpitPanel';
 import ComposeRunPanel, { type ComposeRunPanelProps } from './ComposeRunPanel';
 import ErasPanel, { type ErasPanelProps } from './ErasPanel';
@@ -29,6 +30,7 @@ export interface OperatorViewProps {
   walk: WalkPanelProps;
   eras: ErasPanelProps;
   beats: BeatsPanelProps;
+  intake: IntakePanelProps;
   cockpit: CockpitPanelProps;
   report: RunReportPanelProps;
   recovery: RecoveryPanelProps;
@@ -82,6 +84,7 @@ export default function OperatorView(props: OperatorViewProps) {
         {tab === 'walk' ? <WalkPanel {...props.walk} /> : null}
         {tab === 'eras' ? <ErasPanel {...props.eras} /> : null}
         {tab === 'beats' ? <BeatsPanel {...props.beats} /> : null}
+        {tab === 'intake' ? <IntakePanel {...props.intake} /> : null}
         {tab === 'cockpit' ? <CockpitPanel {...props.cockpit} /> : null}
         {tab === 'report' ? <RunReportPanel {...props.report} /> : null}
         {tab === 'recovery' ? <RecoveryPanel {...props.recovery} /> : null}

@@ -13,6 +13,7 @@ import {
   walkPreview,
   runAppForge,
   engineRun,
+  engineIntake,
   sendAppCockpit,
   type SealHeaders,
 } from './client';
@@ -32,6 +33,7 @@ import type {
   ComposeResult,
   EngineRunPayload,
   EngineRunRequest,
+  EngineIntakeRequest,
   EraRow,
   MaterialiseTarget,
   PlaytestMode,
@@ -42,7 +44,7 @@ import type {
 import type { RunPayload, RunRequest } from '../skeletonForge/types';
 
 export type RunPhase = 'idle' | 'running' | 'done' | 'error';
-export type RunSource = 'app' | 'engine' | null;
+export type RunSource = 'app' | 'engine' | 'intake' | null;
 
 function errMessage(err: OperatorError | null): string | null {
   if (!err) return null;
@@ -153,6 +155,15 @@ export type EngineRunOpts = {
   playtest: PlaytestMode;
   repair_mode: RepairMode;
   answers?: Record<string, string>;
+  seal?: SealHeaders | null;
+};
+
+export type EngineIntakeOpts = {
+  answers: Record<string, string>;
+  archetype?: string;
+  target: MaterialiseTarget;
+  playtest: PlaytestMode;
+  repair_mode: RepairMode;
   seal?: SealHeaders | null;
 };
 
@@ -293,8 +304,66 @@ export function useOperatorRun() {
     }
   }, []);
 
+
+  const startIntake = React.useCallback(async (opts: EngineIntakeOpts) => {
+    ctrlRef.current?.abort();
+    const ctrl = new AbortController();
+    ctrlRef.current = ctrl;
+    const req: EngineIntakeRequest = {
+      answers: opts.answers && typeof opts.answers === 'object' ? opts.answers : {},
+      archetype: opts.archetype,
+      target: opts.target,
+      playtest: opts.playtest,
+      repair_mode: opts.repair_mode,
+    };
+    // Report panel reads playtest/repair from engineRequest; vision is synthesized by intake.
+    const engineRequest: EngineRunRequest = {
+      vision: '',
+      archetype: opts.archetype,
+      target: opts.target,
+      playtest: opts.playtest,
+      repair_mode: opts.repair_mode,
+      answers: req.answers,
+      include_files: false,
+    };
+    const seal = opts.seal ?? null;
+    const sealPresent = !!(seal?.seal && String(seal.seal).trim());
+    setState({
+      phase: 'running',
+      source: 'intake',
+      appPayload: null,
+      enginePayload: null,
+      appRequest: null,
+      engineRequest,
+      error: null,
+      operatorError: null,
+      startedAt: Date.now(),
+      finishedAt: null,
+    });
+    try {
+      const r = await engineIntake(req, seal, { signal: ctrl.signal });
+      if (ctrl.signal.aborted) return;
+      if (r.ok && r.data) {
+        setState((p) => ({ ...p, phase: 'done', enginePayload: r.data, finishedAt: Date.now() }));
+      } else {
+        const op = operatorErrorFromApi(r, { sealed: true, sealPresent });
+        setState((p) => ({
+          ...p,
+          phase: 'error',
+          error: errMessage(op) ?? `HTTP ${r.status}`,
+          operatorError: op,
+          finishedAt: Date.now(),
+        }));
+      }
+    } catch (e) {
+      if (ctrl.signal.aborted) return;
+      const op = operatorErrorFromException(e);
+      setState((p) => ({ ...p, phase: 'error', error: errMessage(op), operatorError: op, finishedAt: Date.now() }));
+    }
+  }, []);
+
   React.useEffect(() => () => ctrlRef.current?.abort(), []);
-  return { ...state, startApp, startEngine, cancel, reset };
+  return { ...state, startApp, startEngine, startIntake, cancel, reset };
 }
 
 export function useOperatorPlan() {

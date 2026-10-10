@@ -1,5 +1,5 @@
 /**
- * Live forge-operator screen: wires catalog, compose, app/engine run, plan,
+ * Live forge-operator screen: wires catalog, compose, app/engine/intake run, plan,
  * walk, cockpit, report and recovery into OperatorView.
  */
 import React from 'react';
@@ -22,6 +22,8 @@ export default function OperatorScreen({ initialTab = null }: OperatorScreenProp
   /** Caller-supplied seal — never hardcoded; lives only in component state. */
   const [seal, setSeal] = React.useState('');
   const [actorWeight, setActorWeight] = React.useState('');
+  /** Cleaned beat answers applied from Beats — fuel for GameForge intake. */
+  const [answers, setAnswers] = React.useState<Record<string, string>>({});
 
   const compose = useOperatorCompose(vision);
   const catalog = useOperatorCatalog();
@@ -52,8 +54,9 @@ export default function OperatorScreen({ initialTab = null }: OperatorScreenProp
       era: era.trim() || null,
       archetype: 'auto',
       target,
+      answers,
     });
-  }, [run.startApp, vision, era, target]);
+  }, [run.startApp, vision, era, target, answers]);
 
   const startEngine = React.useCallback(() => {
     void run.startEngine({
@@ -63,9 +66,21 @@ export default function OperatorScreen({ initialTab = null }: OperatorScreenProp
       target,
       playtest,
       repair_mode: repairMode,
+      answers,
       seal: sealHeaders,
     });
-  }, [run.startEngine, vision, era, target, playtest, repairMode, sealHeaders]);
+  }, [run.startEngine, vision, era, target, playtest, repairMode, answers, sealHeaders]);
+
+  const startIntake = React.useCallback(() => {
+    void run.startIntake({
+      answers,
+      archetype: 'auto',
+      target,
+      playtest,
+      repair_mode: repairMode,
+      seal: sealHeaders,
+    });
+  }, [run.startIntake, answers, target, playtest, repairMode, sealHeaders]);
 
   const resultEra = run.enginePayload?.era ?? run.appPayload?.era ?? null;
 
@@ -131,10 +146,35 @@ export default function OperatorScreen({ initialTab = null }: OperatorScreenProp
         error: catalog.error,
         onReload: catalog.reload,
         onApplyAnswers: (cleaned) => {
+          setAnswers(cleaned);
           const pinned = cleaned.era_explicit;
           if (pinned) setEra(pinned);
-          setTab('compose');
+          setTab('intake');
         },
+      }}
+      intake={{
+        beats: catalog.beats,
+        answers,
+        onClearAnswers: () => setAnswers({}),
+        onOpenBeats: () => setTab('beats'),
+        target,
+        onChangeTarget: setTarget,
+        playtest,
+        onChangePlaytest: setPlaytest,
+        repairMode,
+        onChangeRepairMode: setRepairMode,
+        seal,
+        onChangeSeal: setSeal,
+        actorWeight,
+        onChangeActorWeight: setActorWeight,
+        phase: run.phase,
+        source: run.source,
+        error: run.error,
+        operatorError: run.operatorError,
+        payload: run.enginePayload,
+        onIntake: startIntake,
+        onCancel: run.cancel,
+        onOpenReport: () => setTab('report'),
       }}
       cockpit={{
         snapshot: cockpit.snapshot,
@@ -168,4 +208,3 @@ export default function OperatorScreen({ initialTab = null }: OperatorScreenProp
     />
   );
 }
-

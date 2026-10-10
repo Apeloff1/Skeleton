@@ -113,12 +113,13 @@ test('historyA11yLabel includes status and change count', () => {
   assert.match(label, /SET AXIS risk 0\.9: ok, risk = 0\.90, 1 change/);
 });
 
-test('operatorTabs includes cockpit after beats', () => {
+test('operatorTabs includes cockpit after intake', () => {
   const T = load('src/forgeOperator/operatorTabs.ts');
   assert.ok(T.OPERATOR_TABS.includes('cockpit'));
-  const beatsIdx = T.OPERATOR_TABS.indexOf('beats');
+  const intakeIdx = T.OPERATOR_TABS.indexOf('intake');
   const cockpitIdx = T.OPERATOR_TABS.indexOf('cockpit');
-  assert.ok(cockpitIdx === beatsIdx + 1);
+  assert.ok(intakeIdx >= 0);
+  assert.ok(cockpitIdx === intakeIdx + 1);
   assert.equal(T.OPERATOR_TAB_LABELS.cockpit, 'Cockpit');
   assert.match(T.OPERATOR_TAB_HINTS.cockpit, /\/api\/skeleton\/cockpit/);
   assert.equal(T.parseOperatorTab('cockpit'), 'cockpit');
