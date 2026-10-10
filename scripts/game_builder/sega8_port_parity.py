@@ -405,6 +405,9 @@ def verify_ports(root: Path) -> dict[str, object]:
         records[target] = {
             "manifest": meta, "compile": compile_evidence, "host": host, "boot": boot,
             "reproducibility": reproducible, "native_route": native_route,
+            "eight_worlds": _check_eight_worlds(
+                root, target, author_digest=meta["source_rights_evidence_sha256"],
+            ),
         }
 
     sms = records["sega_master_system"]
@@ -442,6 +445,27 @@ def verify_ports(root: Path) -> dict[str, object]:
         != gg["host"]["original_demo_screen_trace_sha256"]
     ):
         raise Sega8PortParityError("original attract demonstrations disagree across hardware")
+    extended_sms=sms["eight_worlds"]
+    extended_gg=gg["eight_worlds"]
+    if (
+        extended_sms["source"]["world_digest"]
+           != extended_gg["source"]["world_digest"]
+        or extended_sms["source"]["winning_replay_digest"]
+           != extended_gg["source"]["winning_replay_digest"]
+        or extended_sms["source"]["world_digest"]
+           == sms["manifest"]["world_digest"]
+        or extended_sms["host"]["original_controller_actions_verified"]
+           != extended_gg["host"]["original_controller_actions_verified"]
+        or extended_sms["host"]["original_demo_screen_trace_sha256"]
+           != extended_gg["host"]["original_demo_screen_trace_sha256"]
+        or extended_sms["guest"]["semantic_controller_screen_trace_sha256"]
+           != extended_gg["guest"]["semantic_controller_screen_trace_sha256"]
+        or extended_sms["guest"]["rom_sha256"]
+           == extended_gg["guest"]["rom_sha256"]
+        or extended_sms["source"]["source_content_digest"]
+           == extended_gg["source"]["source_content_digest"]
+    ):
+        raise Sega8PortParityError("original extended Z80 campaigns disagree between consoles")
     if sms["manifest"].get("target_rom_suffix") == gg["manifest"].get("target_rom_suffix"):
         raise Sega8PortParityError("different native ports share incorrect ROM extension")
     result = {
@@ -461,6 +485,16 @@ def verify_ports(root: Path) -> dict[str, object]:
         "real_z80_startup_checked_per_platform": True,
         "original_on_cartridge_demo_equivalent_across_platforms": True,
         "original_stage_hardware_color_parity_verified": True,
+        "extended_eight_worlds_gameplay_parity_verified": True,
+        "extended_eight_worlds_original_world_digest":
+            extended_sms["source"]["world_digest"],
+        "extended_eight_worlds_winning_replay_digest":
+            extended_sms["source"]["winning_replay_digest"],
+        "extended_eight_worlds_native_z80_semantic_trace_sha256":
+            extended_sms["guest"]["semantic_controller_screen_trace_sha256"],
+        "extended_eight_worlds_native_controller_actions_verified_per_platform":
+            extended_sms["guest"]["controller_actions_replayed"],
+        "extended_eight_worlds_autonomous_replay_verified_on_both_platforms": True,
         "original_stage_color_accents_verified_per_console":
             sms["native_route"]["original_hardware_stage_accents_verified_per_move"],
         "native_attract_demo_entry_and_cancel_verified_on_both_platforms": True,
