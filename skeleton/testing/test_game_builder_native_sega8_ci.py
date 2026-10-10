@@ -118,3 +118,92 @@ def test_git_revision_cannot_be_ref_alias_or_partial_commit(tmp_path,bad):
     rom.write_bytes(_rom("sega_master_system"))
     with pytest.raises(ValueError,match="Git revision"):
         verify("sega_master_system",src,rom,toolchain_revision=bad)
+
+
+
+@pytest.mark.parametrize("unreviewed",[
+    "commercial-game.sms", "copied-sprites.png", "unlicensed-soundtrack.wav",
+    "secret-license.key", ".hidden-rights.json", "wrong-binary.exe",
+])
+def test_sega_source_package_cannot_hide_unreviewed_assets(tmp_path,unreviewed):
+    author=tmp_path/"authorship.txt"
+    author.write_text("Original artwork, movement and puzzle mechanics",encoding="utf-8")
+    source=tmp_path/"source"
+    emit("sega_master_system",source,author)
+    (source/unreviewed).write_bytes(b"independently-unreviewed-payload")
+    rom=tmp_path/"native.sms"
+    rom.write_bytes(_rom("sega_master_system"))
+    with pytest.raises(ValueError,match="unreviewed"):
+        verify("sega_master_system",source,rom,toolchain_revision=REVISION)
+
+
+def test_real_build_directory_is_accepted_without_adding_false_source_integrity(tmp_path):
+    author=tmp_path/"authorship.txt"
+    author.write_text("Original handheld game story and tiles",encoding="utf-8")
+    source=tmp_path/"source"
+    evidence=emit("sega_master_system",source,author)
+    (source/"build").mkdir()
+    (source/"build"/"compiler.o").write_bytes(b"assembler-intermediate")
+    rom=tmp_path/"native.sms"
+    rom.write_bytes(_rom("sega_master_system"))
+    receipt=verify(
+        "sega_master_system",source,rom,toolchain_revision=REVISION,
+        expected_source_sha256=evidence["source_content_digest"],
+    )
+    assert receipt["source_digest_independently_pinned"] is True
+    assert receipt["source_sha256"]==evidence["source_content_digest"]
+    assert receipt["native_rom_compiled"] is False
+
+
+def test_source_digest_without_independent_pin_is_not_reported_as_authenticated(tmp_path):
+    author=tmp_path/"authorship.txt"
+    author.write_text("Original fantasy adventure",encoding="utf-8")
+    source=tmp_path/"source"
+    emit("sega_master_system",source,author)
+    rom=tmp_path/"native.sms"
+    rom.write_bytes(_rom("sega_master_system"))
+    receipt=verify("sega_master_system",source,rom,toolchain_revision=REVISION)
+    assert receipt["source_digest_independently_pinned"] is False
+
+
+def test_sega_source_mutation_invalidates_external_prebuild_hash(tmp_path):
+    author=tmp_path/"authorship.txt"
+    author.write_text("Original game author evidence",encoding="utf-8")
+    source=tmp_path/"source"
+    evidence=emit("sega_master_system",source,author)
+    (source/"game.c").write_text((source/"game.c").read_text()+"\\n// unauthorized post-review edit",encoding="utf-8")
+    rom=tmp_path/"native.sms"
+    rom.write_bytes(_rom("sega_master_system"))
+    with pytest.raises(ValueError,match="changed"):
+        verify(
+            "sega_master_system",source,rom,toolchain_revision=REVISION,
+            expected_source_sha256=evidence["source_content_digest"],
+        )
+
+
+@pytest.mark.parametrize("malformed", ["master","f"*64,"E"*64])
+def test_invalid_external_source_pin_does_not_qualify_original_game(tmp_path,malformed):
+    author=tmp_path/"authorship.txt"
+    author.write_text("my authored game",encoding="utf-8")
+    source=tmp_path/"source"
+    emit("sega_master_system",source,author)
+    rom=tmp_path/"native.sms"
+    rom.write_bytes(_rom("sega_master_system"))
+    with pytest.raises(ValueError,match="digest|changed"):
+        verify(
+            "sega_master_system",source,rom,toolchain_revision=REVISION,
+            expected_source_sha256=malformed,
+        )
+
+
+def test_sega_source_ancestor_symlink_cannot_redirect_code_to_unreviewed_disk(tmp_path):
+    author=tmp_path/"authorship.txt"
+    author.write_text("Original game assets",encoding="utf-8")
+    source=tmp_path/"source"
+    emit("sega_master_system",source,author)
+    alias=tmp_path/"link"
+    alias.symlink_to(source,target_is_directory=True)
+    rom=tmp_path/"native.sms"
+    rom.write_bytes(_rom("sega_master_system"))
+    with pytest.raises(ValueError):
+        verify("sega_master_system",alias,rom,toolchain_revision=REVISION)
