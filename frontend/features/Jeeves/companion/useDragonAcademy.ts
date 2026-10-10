@@ -15,7 +15,7 @@ import {
  type DragonPracticeAttempt,type DragonPracticeProgress,type DragonPracticeSubscription,
  normalizeDragonAttempts,validateDragonProgress,
 } from './dragonProgression';
-import {normalizeDragonWisdomReview,type DragonWisdomReview} from './dragonWisdomReview';
+import {normalizeDragonWisdomSnapshot,type DragonWisdomReview} from './dragonWisdomReview';
 import type {CompanionAcademyInput,CompanionTelemetry} from './DragonCompanionPanel';
 import {type NativeAttempt,type NativeTarget,type NativeCurriculum,normalizeNativeAttempts,normalizeNativeTargets,normalizeNativeCurriculum} from './dragonNativeTargets';
 import {EMPTY_COMPANION_JOURNAL,reduceDragonJournal,type CompanionJournal,type WireDragonEvent} from './dragonJournal';
@@ -56,6 +56,7 @@ export function useDragonAcademy(){
  const journal=useRef<CompanionJournal>(EMPTY_COMPANION_JOURNAL);
  const sessionRef=useRef<string|null>(null);
  const feedBusy=useRef(false);
+ const wisdomBusy=useRef(false);
  const alive=useRef(true);
  const inFlight=useRef(false);
  const load=useCallback(async()=>{
@@ -79,14 +80,8 @@ export function useDragonAcademy(){
    const valid=validateDragonProgress(snapshot.progress);
    if(!valid||!subscriptionValid(snapshot.subscription))throw new Error(
     'Dragon Academy returned an invalid verified progression snapshot.');
-   const wisdom=snapshot.wisdom_review as {review?:unknown;issued_at?:unknown;expires_at?:unknown}|null;
-   const currentTime=Date.now()/1000;
-   const validWisdom=wisdom&&typeof wisdom.issued_at==='number'&&Number.isSafeInteger(wisdom.issued_at)
-    &&typeof wisdom.expires_at==='number'&&Number.isSafeInteger(wisdom.expires_at)
-    &&wisdom.issued_at<=currentTime&&currentTime<wisdom.expires_at
-    &&wisdom.expires_at-wisdom.issued_at<=86400;
-   setWisdomReview(validWisdom?normalizeDragonWisdomReview(wisdom.review):null);
-   setWisdomExpires(validWisdom?wisdom.expires_at as number:0);
+   const wisdom=normalizeDragonWisdomSnapshot(snapshot.wisdom_review,Date.now()/1000);
+   setWisdomReview(wisdom?.review??null);setWisdomExpires(wisdom?.expiresAt??0);
    setProgress(valid);setAttempts(normalizeDragonAttempts(snapshot.attempts));
    setNativeAttempts(normalizeNativeAttempts(snapshot.native_attempts));
    // Catalog is read-only. If unavailable, remain safely without platform choices.
@@ -148,15 +143,32 @@ export function useDragonAcademy(){
    // The visual feed must never fabricate fallback events on network failure.
   }finally{feedBusy.current=false;}
  },[]);
+ const pollWisdom=useCallback(async()=>{
+  const token=getAuthToken();
+  if(wisdomBusy.current||!token||!['active','unknown'].includes(AppState.currentState))return;
+  wisdomBusy.current=true;
+  try{
+   const response=await api.get<{ok:boolean;snapshot:unknown}>(PATH+'/wisdom',
+    {headers:authHeaders(),timeoutMs:8000,retries:0});
+   if(!alive.current)return;
+   if(getAuthToken()!==token){setWisdomReview(null);return;}
+   if(!response.ok||!response.data?.ok){setWisdomReview(null);return;}
+   const snapshot=normalizeDragonWisdomSnapshot(response.data.snapshot,Date.now()/1000);
+   setWisdomReview(snapshot?.review??null);setWisdomExpires(snapshot?.expiresAt??0);
+  }catch{
+   if(alive.current)setWisdomReview(null);
+  }finally{wisdomBusy.current=false;}
+ },[]);
  useEffect(()=>{
   alive.current=true;
   void load().then(pollCrawler);
   const interval=setInterval(()=>void pollCrawler(),12000);
+  const reviewInterval=setInterval(()=>void pollWisdom(),30000);
   const listener=AppState.addEventListener('change',next=>{
    if(next==='active')void load().then(pollCrawler);
   });
-  return()=>{alive.current=false;clearInterval(interval);listener.remove();};
- },[load,pollCrawler]);
+  return()=>{alive.current=false;clearInterval(interval);clearInterval(reviewInterval);listener.remove();};
+ },[load,pollCrawler,pollWisdom]);
  const mutate=useCallback(async(endpoint:string,body:object={})=>{
   if(inFlight.current||!authenticated||!getAuthToken())return;
   inFlight.current=true;setBusy(true);setError('');

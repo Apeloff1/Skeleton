@@ -69,14 +69,16 @@ rejects incomplete cycles, malformed cards and invented industry deltas.
 A trusted forge worker can publish a completed `SquareReview` through
 `DragonReviewStore` into the existing Academy SQLite database, using a dedicated
 `SKL_DRAGON_REVIEW_SIGNING_KEY_HEX` of at least 32 random bytes. Publication
-requires a bounded owner, exact completion budget and expiry within one day.
-The worker must choose an earlier expiry where underlying legal or empirical
-evidence requires it. No browser endpoint can publish a review.
+requires a bounded owner, exact completion budget and a review generated no
+more than 30 seconds earlier. The five-minute advisory window is capped by
+current legal-review, peer-measurement and monitored-source expiry. Publication
+cannot extend that evidence window. No browser endpoint can publish a review.
 
 The existing authenticated `/api/dragon-academy/status` route serves only the
 current owner's MAC-verified snapshot. Missing configuration means no card;
 corrupt configuration or evidence fails closed. The Academy hook parses the
-card, clears it at expiry and clears it on authentication failure. A real
+card, polls the read-only `/api/dragon-academy/wisdom` route every 30 seconds
+while active, clears it at expiry and clears it on authentication/network failure. A real
 FastAPI HTTP test covers authenticated delivery, tenant isolation, expiry,
 wrong-signing-key rejection, anonymous rejection and absence of browser writes.
 This is an executable product boundary, not a deployed live forge-worker
@@ -248,14 +250,17 @@ Validated locally:
   **102 passed, 2 subtests passed**; reviewed knowledge **24 passed, 6 subtests passed**.
   Three baseline knowledge tests were corrected for earlier span rejection, query-specific
   relevance and stronger integrity rejection; no custody check was weakened.
-- New wisdom and visual-play integration: **25 passed**, including 100 complete
+- New wisdom and visual-play integration: **27 passed**, including 100 complete
   governed forge rounds and real RGB-only play of original seeded worlds.
 - Historical timestamp evidence compatibility: **3 passed**.
 - Authenticated Academy route tests: **16 passed**, including HTTP review delivery.
 - Native C99 Linux executable: four-stage compiled selftest passed.
 - Frontend companion, canonical wire, progression and final wisdom contract tests passed.
   Syntax transpilation includes the Academy hook; full-app TypeScript acceptance
-  remains the hosted CI check, not a locally verified claim.
+  remains the hosted CI check, not a locally verified claim. The initial hosted
+  companion/wire/wisdom contracts passed; full TypeScript compilation exposed
+  an existing unescaped apostrophe in `src/product/journeyCatalog.ts`. That
+  game-journey syntax error is repaired here; updated-head CI remains pending.
 - Architecture map, AI construction, capability interfaces, provider bootstrap
   and enterprise-superiority validators passed; the 500-level builder validator passed.
 - The required implementation-notes validator fails on both untouched base and

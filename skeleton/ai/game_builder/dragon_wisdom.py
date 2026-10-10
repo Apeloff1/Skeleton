@@ -95,6 +95,8 @@ class SquareReview:
     comparator_evidence: tuple[str, ...]
     legal_evidence_root: str
     terminal: bool
+    reviewed_at: int
+    valid_until: int
 
     def to_payload(self) -> dict:
         body = {
@@ -106,7 +108,8 @@ class SquareReview:
             "squares": list(self.squares), "improvements": [r.to_payload() for r in self.improvements],
             "blockers": list(self.blockers), "comparator_evidence": list(self.comparator_evidence),
             "legal_evidence_root": self.legal_evidence_root,
-            "terminal": self.terminal, "release_authority": False,
+            "terminal": self.terminal, "reviewed_at": self.reviewed_at,
+            "valid_until": self.valid_until, "release_authority": False,
             "claim_boundary": "advisory quality projection; legal clearance and release remain independent",
         }
         return {**body, "review_digest": canonical_digest(body)}
@@ -215,7 +218,12 @@ def review_candidate(
             improvements.append(Improvement("trust", "rights_provenance_safety", target,
                 "critical", "resolve rights blockers with independent evidence; renaming or changing an era is not clearance",
                 (rights.snapshot()["digest"],)))
+    # A displayed snapshot cannot outlive a valid measured peer or legal
+    # receipt. Blocked advice remains short-lived and never grants release.
+    expiries = [now + 300] + [r.expires_at for r in legal_rows if r.expires_at > now]
+    expiries.extend(r.expires_at for r in usable)
+    expiries.extend(r.captured_at + 86400 for r in new_sources if r.captured_at + 86400 > now)
     return SquareReview(candidate.digest, candidate.artifact.artifact_digest, workload_digest,
         decision.decision_digest, rights.snapshot()["digest"], knowledge_root,
         forge.completed_rounds, forge.effort_mode.rounds, tuple(squares), tuple(improvements),
-        tuple(sorted(set(blockers))), tuple(r.evidence_digest for r in usable), legal_root, terminal)
+        tuple(sorted(set(blockers))), tuple(r.evidence_digest for r in usable), legal_root, terminal, now, min(expiries))

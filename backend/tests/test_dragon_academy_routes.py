@@ -282,7 +282,7 @@ def test_authenticated_companion_reads_only_signed_current_owner_review(tmp_path
         "industry_delta":None,"status":"improve","comparison_state":"unknown",
         "axes":list(axes)} for key,label,axes in SQUARES)
     review=SquareReview("a"*64,"b"*64,"c"*64,"d"*64,"e"*64,None,100,100,
-        squares,(),(),(),"f"*64,True)
+        squares,(),(),(),"f"*64,True,20,40)
     with sqlite3.connect(tmp_path/"reviews.sqlite") as db:
         DragonReviewStore(db,signing_key=b"s"*32).publish(identity(),review,
             now=20,expires_at=40,trusted_worker=True)
@@ -293,6 +293,8 @@ def test_authenticated_companion_reads_only_signed_current_owner_review(tmp_path
         response=client.get("/api/dragon-academy/status")
         assert response.status_code==200
         assert response.json()["wisdom_review"]["review"]==review.to_payload()
+        assert client.get("/api/dragon-academy/wisdom").json()["snapshot"]==response.json()["wisdom_review"]
+        assert client.post("/api/dragon-academy/wisdom",json={"review":{}}).status_code==405
         assert client.post("/api/dragon-academy/status",json={"wisdom_review":{}}).status_code==405
         app.dependency_overrides[route.get_current_user]=lambda: {
             "email":"bob@example.test","tenant_id":"tenant-a","role":"viewer"}

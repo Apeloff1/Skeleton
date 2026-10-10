@@ -122,6 +122,11 @@ def academy_status(owner: str = Depends(_principal)) -> dict:
     with _lab() as (lab,cycles):
         return _snapshot(lab,cycles,owner)
 
+@router.get("/wisdom")
+def academy_wisdom(owner: str = Depends(_principal)) -> dict:
+    with _lab() as (lab,_):
+        return {"ok": True, "snapshot": _wisdom_snapshot(lab.db, owner)}
+
 @router.get("/crawler/feed")
 def crawler_feed(
     after_sequence: int = Query(default=0,ge=0),

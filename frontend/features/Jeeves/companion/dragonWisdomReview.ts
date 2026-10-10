@@ -5,6 +5,8 @@ export interface DragonWisdomReview {
   review_digest: string;
   terminal: boolean;
   release_authority: false;
+  reviewed_at: number;
+  valid_until: number;
   completed_rounds: number;
   planned_rounds: number;
   squares: readonly {
@@ -33,6 +35,7 @@ export function normalizeDragonWisdomReview(value: unknown): DragonWisdomReview 
   if (value.schema !== 'skeleton.dragon.square_review.v1' || value.terminal !== true || value.release_authority !== false) return null;
   if (!digest(value.candidate_digest) || !digest(value.artifact_digest) || !digest(value.review_digest)) return null;
   if (typeof value.planned_rounds !== 'number' || ![100, 1000, 10000].includes(value.planned_rounds) || value.completed_rounds !== value.planned_rounds) return null;
+  if (typeof value.reviewed_at !== 'number' || !Number.isSafeInteger(value.reviewed_at) || value.reviewed_at < 0 || typeof value.valid_until !== 'number' || !Number.isSafeInteger(value.valid_until) || value.valid_until <= value.reviewed_at || value.valid_until > value.reviewed_at + 300) return null;
   if (!Array.isArray(value.squares) || value.squares.length !== 4) return null;
   const ids = ['play', 'craft', 'delivery', 'trust'];
   for (let i = 0; i < ids.length; i++) {
@@ -54,4 +57,17 @@ export function normalizeDragonWisdomReview(value: unknown): DragonWisdomReview 
         !text(item.instruction, 1024)) return null;
   }
   return value as unknown as DragonWisdomReview;
+}
+
+
+/** A server-authenticated card still needs a current evidence validity window. */
+export function normalizeDragonWisdomSnapshot(value: unknown, now: number): {review: DragonWisdomReview; expiresAt: number} | null {
+  if (!Number.isFinite(now) || now < 0 || !record(value)) return null;
+  const review = normalizeDragonWisdomReview(value.review);
+  if (!review || typeof value.issued_at !== 'number' || !Number.isSafeInteger(value.issued_at) ||
+      typeof value.expires_at !== 'number' || !Number.isSafeInteger(value.expires_at) ||
+      value.issued_at < review.reviewed_at || value.issued_at > review.reviewed_at + 30 ||
+      value.issued_at > now || value.expires_at <= now || value.expires_at > review.valid_until ||
+      value.expires_at <= value.issued_at) return null;
+  return {review, expiresAt: value.expires_at};
 }

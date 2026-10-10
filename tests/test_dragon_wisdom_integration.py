@@ -280,3 +280,25 @@ def test_cross_era_homebrew_port_keeps_style_and_adds_desktop_design_goals():
         memory_budget_bytes=2048, artifact_digest=ARTIFACT, jurisdictions=("NO",), reviews=(), now=20)
     assert not unsupported["source_emitter_available"]
     assert any("licensed SDK" in b for b in unsupported["release_blockers"])
+
+
+
+def test_review_snapshot_validity_is_bounded_by_current_evidence():
+    measure=IndustryMeasurement("peer", WORKLOAD, tuple((a,.8) for a in QUALITY_AXES),
+        10,25,EVIDENCE,provenance())
+    result=review(comparators=(measure,))
+    assert result.reviewed_at==20 and result.valid_until==25
+    assert result.to_payload()["valid_until"]==25
+    assert review(legal=()).valid_until==320
+
+
+def test_worker_cannot_republish_old_advice_as_fresh_or_extend_evidence_expiry():
+    import sqlite3
+    from skeleton.ai.game_builder.dragon_review_store import DragonReviewStore
+    # Trusted-boundary receipt fixture; actual governed completion is tested above.
+    result=replace(review(),terminal=True,completed_rounds=100)
+    store=DragonReviewStore(sqlite3.connect(":memory:"),signing_key=b"s"*32)
+    with pytest.raises(ValueError,match="fresh evidence"):
+        store.publish("alice",result,now=51,expires_at=60,trusted_worker=True)
+    with pytest.raises(ValueError,match="evidence validity"):
+        store.publish("alice",result,now=20,expires_at=101,trusted_worker=True)

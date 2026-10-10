@@ -43,8 +43,12 @@ class DragonReviewStore:
             raise PermissionError("review publication requires the trusted forge worker")
         if not isinstance(review, SquareReview) or not review.terminal or review.completed_rounds != review.planned_rounds or review.planned_rounds not in (100, 1000, 10000):
             raise ValueError("only completed refinement reviews may be published")
-        if type(expires_at) is not int or not now < expires_at <= now + 86400:
-            raise ValueError("snapshot expires within one day; policy may require earlier expiry")
+        if (type(review.reviewed_at) is not int or type(review.valid_until) is not int
+                or not 0 <= review.reviewed_at <= now <= review.reviewed_at + 30
+                or not review.reviewed_at < review.valid_until <= review.reviewed_at + 300):
+            raise ValueError("fresh evidence-bound review required for publication")
+        if type(expires_at) is not int or not now < expires_at <= review.valid_until:
+            raise ValueError("snapshot expiry must fit the review evidence validity")
         payload = review.to_payload()
         envelope = {"owner": owner, "issued_at": now, "expires_at": expires_at, "review": payload}
         body = json.dumps(envelope, sort_keys=True, separators=(",", ":"), allow_nan=False)
@@ -84,6 +88,10 @@ class DragonReviewStore:
             raise ValueError("companion snapshot scope was rebound")
         if payload.get("review_digest") != digest or canonical_digest({k: v for k, v in payload.items() if k != "review_digest"}) != digest:
             raise ValueError("companion review digest mismatch")
+        if (type(payload.get("reviewed_at")) is not int or type(payload.get("valid_until")) is not int
+                or not payload["reviewed_at"] <= issued <= payload["reviewed_at"] + 30
+                or not issued < expires <= payload["valid_until"] <= payload["reviewed_at"] + 300):
+            raise ValueError("companion snapshot evidence validity mismatch")
         if not issued <= now < expires:
             return None
         return {"review": payload, "issued_at": issued, "expires_at": expires}
