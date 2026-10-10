@@ -735,6 +735,70 @@ def native_living_world_checkpoint_inspect(
             detail="World checkpoint verification failed") from None
 
 
+class NativeTemporalMazeRequest(NativeLivingWorldRequest):
+    """Optional local waypoint: no fictitious mandatory victory condition."""
+    model_config=ConfigDict(extra="forbid")
+    moves:list[str]=Field(default_factory=list,max_length=192)
+    checkpoint_token:str|None=Field(default=None,strict=True,
+        min_length=100,max_length=12000,
+        pattern=r"^[A-Za-z0-9_.-]+$")
+    delta_x:StrictInt=Field(default=2,ge=-4,le=4)
+    delta_y:StrictInt=Field(default=2,ge=-4,le=4)
+    search_budget:StrictInt=Field(default=2500,ge=100,le=4000)
+    horizon:StrictInt=Field(default=32,ge=1,le=48)
+    radius:StrictInt=Field(default=2,ge=1,le=3)
+
+
+@router.post("/native/production/worlds/maze/analyze")
+def native_living_world_temporal_maze(
+    body:NativeTemporalMazeRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_living_world import (
+        initial_state,replay,describe,
+    )
+    from skeleton.ai.webcrawler.dragon_living_maze_solvers import (
+        compare_solvers,changing_doors,
+    )
+    try:
+        world=_dragon_living_world(body)
+        if not world.shifting_routes:
+            raise ValueError("only original mutable maze topologies have temporal planning")
+        if body.delta_x==0 and body.delta_y==0:
+            raise ValueError("optional moving-maze destination must require movement")
+        if body.checkpoint_token is None:
+            current=replay(world,tuple(body.moves))
+        else:
+            if body.moves:
+                raise ValueError("supply either a signed checkpoint or a replay history")
+            from skeleton.ai.webcrawler.dragon_living_world_checkpoint import open_checkpoint
+            current=open_checkpoint(world,body.checkpoint_token,owner)
+        goal=(current.realm,current.x+body.delta_x,current.y+body.delta_y)
+        if abs(goal[1])>1_000_000 or abs(goal[2])>1_000_000:
+            raise ValueError("original moving-maze search exceeds coordinates")
+        evidence=compare_solvers(world,goal,starting_state=current,
+                                 budget=body.search_budget,horizon=body.horizon)
+        geography=changing_doors(world,realm=current.realm,
+                                 x=current.x,y=current.y,radius=body.radius)
+    except RuntimeError:
+        raise HTTPException(status_code=503,
+            detail="Signed original maze continuation is not configured") from None
+    except PermissionError:
+        raise HTTPException(status_code=403,
+            detail="Changing-maze checkpoint is not owned by this user") from None
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Temporal maze goal, replay or route solver budget is invalid") from None
+    return {
+        "ok":True,"schema":"skeleton.ai.dragon.temporal_maze_analysis.v1",
+        "current":describe(world,current),
+        "target":{"realm":goal[0],"x":goal[1],"y":goal[2]},
+        "solvers":evidence,
+        "shifting_topology":geography,
+        "scope":"two real optional-waypoint path solvers, not forced whole-world victory",
+    }
+
+
 class NativeAtlasWorldRequest(BaseModel):
     """Multi-region original world: bounded multi-maze compositional gameplay."""
     model_config=ConfigDict(extra="forbid")
