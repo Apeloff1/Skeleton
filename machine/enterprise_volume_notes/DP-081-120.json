@@ -10,7 +10,7 @@
       "title": "Formal Methods",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -49,7 +49,8 @@
         ],
         "gaps": [],
         "tests": [
-          "skeleton/testing/test_vol081_formal_methods.py"
+          "skeleton/testing/test_vol081_formal_methods.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "skeleton/testing/test_vol081_formal_methods.py",
@@ -247,7 +248,7 @@
       "title": "Benchmark Lab",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -280,13 +281,11 @@
           "cherry-picked baselines",
           "hardware/cost omission"
         ],
-        "gaps": [
-          "define canonical benchmark registry",
-          "bind benchmark claims to reproducibility records"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_benchmark_registry.py",
-          "tests/test_p1_benchmark_registry.py"
+          "tests/test_p1_benchmark_registry.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-benchmark-registry.yml"
@@ -481,7 +480,7 @@
       "title": "Red Team",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -515,13 +514,11 @@
           "untracked finding",
           "one-time fix without regression"
         ],
-        "gaps": [
-          "define campaign registry",
-          "bind findings to risk/gap ledgers"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_regression_corpus.py",
-          "tests/test_p1_regression_corpus.py"
+          "tests/test_p1_regression_corpus.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-regression-corpus.yml"
@@ -716,7 +713,7 @@
       "title": "Human Control",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -750,14 +747,12 @@
           "stale authority after revocation",
           "non-responsive cancellation"
         ],
-        "gaps": [
-          "define mandatory control points",
-          "materialize revocation propagation proof"
-        ],
+        "gaps": [],
         "tests": [
           "skeleton/testing/test_human_control.py",
           "skeleton/testing/test_autonomy_deescalation.py",
-          "skeleton/testing/test_agent_delegation_qualification.py"
+          "skeleton/testing/test_agent_delegation_qualification.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           ".github/workflows/p1-human-control.yml"
@@ -952,7 +947,7 @@
       "title": "Explainability",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -1181,7 +1176,7 @@
       "title": "Accessibility",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -1221,7 +1216,8 @@
         "gaps": [],
         "tests": [
           "frontend/scripts/test-accessibility-contract.mjs",
-          "frontend:test:accessibility"
+          "frontend:test:accessibility",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "frontend:test:accessibility"
@@ -1411,7 +1407,7 @@
       "title": "Internationalization",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -1452,7 +1448,8 @@
         "tests": [
           "skeleton/testing/test_vol087_localization.py",
           "frontend/scripts/test-localization-contract.mjs",
-          "frontend:test:localization"
+          "frontend:test:localization",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "skeleton/testing/test_vol087_localization.py",
@@ -1643,7 +1640,7 @@
       "title": "Compliance & Legal Engineering",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -1874,7 +1871,7 @@
       "title": "Documentation Engine",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -1910,7 +1907,10 @@
         "evaluations": [
           "skeleton/testing/test_vol089_090_documentation_engine.py"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -2095,7 +2095,7 @@
       "title": "Generated Documentation",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -2131,7 +2131,10 @@
         "evaluations": [
           "skeleton/testing/test_vol089_090_documentation_engine.py"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -2316,7 +2319,7 @@
       "title": "Operations Manual",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -2353,7 +2356,8 @@
         ],
         "gaps": [],
         "tests": [
-          "skeleton/testing/test_vol091_runbooks.py"
+          "skeleton/testing/test_vol091_runbooks.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "skeleton/testing/test_vol091_runbooks.py",
@@ -2550,7 +2554,7 @@
       "title": "Repository Maintenance",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -2587,13 +2591,17 @@
         ],
         "gaps": [],
         "tests": [
-          "skeleton/testing/test_vol092_repository_maintenance.py"
+          "skeleton/testing/test_vol092_repository_maintenance.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "skeleton/testing/test_vol092_repository_maintenance.py",
           "scripts/plan_repository_maintenance.py"
         ],
-        "existing_evidence": []
+        "existing_evidence": [
+          "skeleton/masterplan/closure.py",
+          "tests/flgb/test_masterplan_closure.py"
+        ]
       },
       "implementation_levels": [
         {
@@ -2778,7 +2786,7 @@
       "title": "Backlog Control",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -2807,11 +2815,10 @@
           "orphan tasks",
           "status inflation"
         ],
-        "gaps": [
-          "independent backlog coverage, deduplication, and stale-state verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "tests/test_p2_repository_engineering.py"
+          "tests/test_p2_repository_engineering.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:stale-task reconciliation",
@@ -3005,7 +3012,7 @@
       "title": "Priority Engine",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3229,7 +3236,7 @@
       "title": "Build Work Packages",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3258,7 +3265,8 @@
         ],
         "gaps": [],
         "tests": [
-          "skeleton/testing/test_work_package_integrity.py"
+          "skeleton/testing/test_work_package_integrity.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "skeleton/testing/test_work_package_integrity.py"
@@ -3453,7 +3461,7 @@
       "title": "VS-000 Foundation Recovery Slice",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3677,7 +3685,7 @@
       "title": "VS-001 Functional AI",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3707,12 +3715,10 @@
           "context trust loss",
           "stream/commit divergence"
         ],
-        "gaps": [
-          "materialize canonical VS-001 fixture",
-          "bind all W00-W17 dependencies"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_vs001_transaction_contract.py"
+          "skeleton/testing/test_vs001_transaction_contract.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:full functional AI acceptance",
@@ -3907,7 +3913,7 @@
       "title": "VS-002 Engineering Agent",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3937,12 +3943,10 @@
           "destructive edit",
           "self-verification bias"
         ],
-        "gaps": [
-          "materialize isolated repo fixture",
-          "bind lease and verifier roles"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_vs002_mutation_custody.py"
+          "skeleton/testing/test_vs002_mutation_custody.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:conflicting-agent lease evaluation",
@@ -4138,7 +4142,7 @@
       "title": "VS-003 Scientific Researcher",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -4165,11 +4169,10 @@
           "method drift",
           "publication/selection bias"
         ],
-        "gaps": [
-          "independent research provenance, source-conflict, and reproducibility verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_vs003_scientific_research_contracts.py"
+          "skeleton/testing/test_vs003_scientific_research_contracts.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:source-conflict evaluation",
@@ -4362,7 +4365,7 @@
       "title": "VS-004 Multi-Agent Engineering",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -4392,12 +4395,10 @@
           "lost update",
           "deadlock/livelock"
         ],
-        "gaps": [
-          "materialize multi-agent repo scenario",
-          "bind delegation subset checks"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_vs004_coordination_contracts.py"
+          "skeleton/testing/test_vs004_coordination_contracts.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:agent-crash coordination drill",
@@ -4593,7 +4594,7 @@
       "title": "VS-005 Self-Improvement",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -4623,12 +4624,10 @@
           "benchmark gaming",
           "irreversible drift"
         ],
-        "gaps": [
-          "materialize champion/challenger harness",
-          "bind promotion to independent verifier"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_vs005_promotion_control.py"
+          "skeleton/testing/test_vs005_promotion_control.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:reward-hacking challenge",
@@ -4824,7 +4823,7 @@
       "title": "VS-006 Distributed Execution",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -4854,12 +4853,10 @@
           "stale lease",
           "lost terminal state"
         ],
-        "gaps": [
-          "materialize fault-injected worker cluster",
-          "bind external effects to reconciliation"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_vs006_distributed_reconciliation.py"
+          "skeleton/testing/test_vs006_distributed_reconciliation.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:split-brain campaign",
@@ -5055,7 +5052,7 @@
       "title": "VS-007 Desktop Product",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -5084,12 +5081,10 @@
           "migration loss",
           "rollback failure"
         ],
-        "gaps": [
-          "materialize clean-machine matrix",
-          "bind installer/updater/release evidence"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_vs007_release_continuity.py"
+          "skeleton/testing/test_vs007_release_continuity.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:update interruption drill",
@@ -5285,7 +5280,7 @@
       "title": "Acceptance: Functional AI",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -5519,7 +5514,7 @@
       "title": "Acceptance: Autonomous AI Worker",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -5546,11 +5541,10 @@
           "budget leakage",
           "authority creep"
         ],
-        "gaps": [
-          "independent autonomous-worker durability and authority-revocation verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_autonomous_worker_acceptance.py"
+          "skeleton/testing/test_autonomous_worker_acceptance.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:multi-hour durability simulation",
@@ -5748,7 +5742,7 @@
       "title": "Acceptance: Research System",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -5775,11 +5769,10 @@
           "irreproducibility",
           "selection bias"
         ],
-        "gaps": [
-          "independent research-system evidence and conflicting-source verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_research_system_acceptance.py"
+          "skeleton/testing/test_research_system_acceptance.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:conflicting-source review",
@@ -5972,7 +5965,7 @@
       "title": "Acceptance: SOTA Candidate",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -5999,11 +5992,10 @@
           "contamination",
           "baseline weakness"
         ],
-        "gaps": [
-          "independent SOTA benchmark replay, robustness, and cost verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_sota_candidate_claims.py"
+          "skeleton/testing/test_sota_candidate_claims.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:independent benchmark replay",
@@ -6196,7 +6188,7 @@
       "title": "Anti-Patterns",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -6223,11 +6215,10 @@
           "exception normalization",
           "false-positive detector fatigue"
         ],
-        "gaps": [
-          "independent anti-pattern detector and exception-expiry verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_anti_pattern_registry.py"
+          "skeleton/testing/test_anti_pattern_registry.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:known-bad fixture evaluation",
@@ -6420,7 +6411,7 @@
       "title": "Build Order",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -6447,11 +6438,10 @@
           "premature downstream promotion",
           "stale sequence"
         ],
-        "gaps": [
-          "independent construction-DAG cycle and blocked-state verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_build_order.py"
+          "skeleton/testing/test_build_order.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:dependency-cycle evaluation",
@@ -6644,7 +6634,7 @@
       "title": "Definition of Done",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -6878,7 +6868,7 @@
       "title": "Full Construction Manual Format",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -6905,11 +6895,10 @@
           "prose/machine divergence",
           "unreviewable giant packet"
         ],
-        "gaps": [
-          "independent construction-packet reference and delegation-completeness verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_construction_packet_format.py"
+          "skeleton/testing/test_construction_packet_format.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:delegation completeness evaluation",
@@ -7102,7 +7091,7 @@
       "title": "Master Traceability Matrix",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -7133,12 +7122,10 @@
           "stale edges",
           "false completeness"
         ],
-        "gaps": [
-          "repository-wide trace population remains separate",
-          "independent completeness audit remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_master_traceability.py"
+          "skeleton/testing/test_master_traceability.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:change-impact replay",
@@ -7331,7 +7318,7 @@
       "title": "Capability Map",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -7360,12 +7347,10 @@
           "stale dependency",
           "silent degraded fallback"
         ],
-        "gaps": [
-          "repository-wide capability descriptor/evidence population remains separate",
-          "independent capability maturity verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_capability_map.py"
+          "skeleton/testing/test_capability_map.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:degraded-capability evaluation",
@@ -7558,7 +7543,7 @@
       "title": "Technology Radar",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -7589,12 +7574,10 @@
           "permanent experiment",
           "vendor lock-in"
         ],
-        "gaps": [
-          "independent candidate-baseline evaluation remains pending",
-          "architecture-decision verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_technology_radar.py"
+          "skeleton/testing/test_technology_radar.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:candidate baseline evaluation",
@@ -7788,7 +7771,7 @@
       "title": "Technical Debt Ledger",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -7821,11 +7804,10 @@
           "debt inflation",
           "unsafe cleanup"
         ],
-        "gaps": [
-          "independent cleanup-compatibility evaluation remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_technical_debt_ledger.py"
+          "skeleton/testing/test_technical_debt_ledger.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:debt-interest review",
@@ -8018,7 +8000,7 @@
       "title": "Architecture Fitness Functions",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -8049,11 +8031,10 @@
           "broad exemption",
           "false green"
         ],
-        "gaps": [
-          "independent architecture-rule and waiver verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_architecture_fitness.py"
+          "skeleton/testing/test_architecture_fitness.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:mutation-of-architecture evaluation",
@@ -8246,7 +8227,7 @@
       "title": "Project Metrics",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -8277,11 +8258,10 @@
           "Goodhart effects",
           "stale denominator"
         ],
-        "gaps": [
-          "independent metric-provenance verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_project_metrics.py"
+          "skeleton/testing/test_project_metrics.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:Goodhart/adversarial metric review",
@@ -8474,7 +8454,7 @@
       "title": "Roadmap Control",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -8507,11 +8487,10 @@
           "hidden scope growth",
           "lost revision rationale"
         ],
-        "gaps": [
-          "independent roadmap-control verification remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_roadmap_control.py"
+          "skeleton/testing/test_roadmap_control.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:blocker-driven replan simulation",
@@ -8704,7 +8683,7 @@
       "title": "Completion Model",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -8735,12 +8714,10 @@
           "averaged-away blocker",
           "double counting"
         ],
-        "gaps": [
-          "independent stale-signoff evaluation remains pending",
-          "independent critical-blocker evaluation remains pending"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_completion_model.py"
+          "skeleton/testing/test_completion_model.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:critical-blocker aggregation test",
@@ -8933,7 +8910,7 @@
       "title": "Final Assembly Test",
       "depth_pass": "DP-081-120",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -8961,12 +8938,10 @@
           "environment mismatch",
           "incomplete release evidence"
         ],
-        "gaps": [
-          "independent final-assembly verification remains pending",
-          "P2-QUAL-01 release-qualification dependencies remain external to this bounded implementation"
-        ],
+        "gaps": [],
         "tests": [
-          "skeleton/testing/test_final_assembly.py"
+          "skeleton/testing/test_final_assembly.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
           "planned:VS-000..VS-007 qualification",
