@@ -476,6 +476,31 @@ function LivingWorldEditor(){
         caught instanceof Error?caught.message:'Saved world cannot be restored.');
     }finally{if(ticket===runId.current)setBusy(false);}
   };
+  const inspectIndexedDesign=async()=>{
+    const value=Number(designIndex);
+    const max=catalog?.compositional_lattice
+      ?.reversibly_addressable_original_world_configurations||0;
+    if(!editor||busy||!Number.isSafeInteger(value)||value<0||
+       value>=max||!/^\d{1,12}$/.test(designIndex))return;
+    const ticket=++runId.current;
+    setBusy(true);setFailure('');
+    try{
+      const result=await apiPost<{
+        ok:boolean;
+        design:{index:number;style:string;lifecycle:string;world_id:number;
+                variation:number;reviewed_finished_game:boolean};
+        route:{objective:string;actions:string[];original_endings:string[];
+               remains_playable:boolean;trace_digest:string};
+        verification:{verified:boolean};
+      }>('/indexed-design',{design_index:value,route_slot:0});
+      if(!result.ok||!result.verification.verified||result.design.index!==value)
+        throw new Error('Indexed universe did not produce a reproducible real route.');
+      if(ticket===runId.current)setIndexedReview(result);
+    }catch(caught){
+      if(ticket===runId.current)setFailure(
+        caught instanceof Error?caught.message:'Indexed original world cannot be materialized.');
+    }finally{if(ticket===runId.current)setBusy(false);}
+  };
   const saveDurably=async()=>{
     if(!preview||!game||!sessionToken||busy)return;
     const ticket=++runId.current;
@@ -555,6 +580,46 @@ function LivingWorldEditor(){
           {' '}possible lazily generated variation slots, not
           prebuilt games or independently reviewed original narratives.
         </Text>
+      </View>}
+      {catalog?.compositional_lattice&&<View style={s.panel}>
+        <Text style={s.heading}>Compositional universe capacity</Text>
+        <Text style={s.copy}>
+          {catalog.compositional_lattice.reversibly_addressable_original_world_configurations.toLocaleString()}
+          {' '}lazy style/lifecycle/seed configurations ·
+          {' '}{catalog.compositional_lattice.indexed_world_configuration_path_slots.toLocaleString()}
+          {' '}indexed gameplay-route slots.
+        </Text>
+        <Text style={s.hint}>
+          These are valid generator addresses, not billions of prebuilt,
+          playtested or independently reviewed finished games.
+        </Text>
+        <TextInput style={s.input} value={designIndex}
+          maxLength={12} keyboardType="number-pad"
+          accessibilityLabel="Original combinatorial world design index"
+          editable={editor&&!busy}
+          onChangeText={v=>{setDesignIndex(v);setIndexedReview(null);}}/>
+        <TouchableOpacity style={[s.action,busy&&s.disabled]}
+          disabled={busy||!editor} onPress={inspectIndexedDesign}>
+          <Text style={s.actionText}>
+            Materialize and replay one indexed world design
+          </Text>
+        </TouchableOpacity>
+        {indexedReview&&<>
+          <Text style={s.copy}>
+            World {indexedReview.design.world_id},
+            variation {indexedReview.design.variation+1} ·
+            {' '}{label(indexedReview.design.style)} ·
+            {' '}{label(indexedReview.design.lifecycle)}
+          </Text>
+          <Text style={s.hint}>
+            Real {indexedReview.route.actions.length}-action
+            {' '}{label(indexedReview.route.objective)} journey ·
+            {' '}{indexedReview.route.original_endings.length
+              ?'experienced: '+indexedReview.route.original_endings.map(label).join(', ')
+              :'no ending required'} · replay:
+            {' '}{indexedReview.verification.verified?'verified':'not verified'}.
+          </Text>
+        </>}
       </View>}
       <Text style={s.heading}>Original world address (0–1,599,999)</Text>
       <TextInput style={s.input} value={worldNumber} maxLength={7}
