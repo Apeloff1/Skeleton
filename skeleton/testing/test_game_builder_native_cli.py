@@ -15,6 +15,7 @@ from skeleton.ai.game_builder.native_game_cli import build_game
     ("sinclair_zx_spectrum", {"game.asm", "Makefile", "README.txt", "manifest.json", "make_tap.py"}),
     ("msx1", {"game.asm", "Makefile", "README.txt", "manifest.json", "make_rom.py"}),
     ("colecovision", {"game.asm", "Makefile", "manifest.json", "make_col.py"}),
+    ("vectrex", {"game.asm", "Makefile", "manifest.json"}),
     ("sega_master_system", {"game.asm", "Makefile", "README.txt", "manifest.json", "make_sms.py"}),
     ("sega_game_gear", {"game.c", "Makefile", "manifest.json"}),
     ("atari_400_800", {"game.c", "Makefile", "manifest.json"}),
