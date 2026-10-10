@@ -129,6 +129,74 @@ def native_targets(owner: str = Depends(_principal)) -> dict:
     return {"ok":True,"targets":target_catalog(),"styles":STYLES,
             "supported_matrix":practice_matrix()}
 
+
+class NativeProductionSourceRequest(BaseModel):
+    """Strict browser-only original source export, never privileged ROM compilation."""
+    title: str = Field(..., min_length=2, max_length=80)
+    style: str = Field(..., min_length=2, max_length=64)
+    targets: list[str] = Field(..., min_length=1, max_length=3)
+    seed: int = Field(default=1, ge=0, le=0xffffffff)
+    original_work_attested: bool = Field(default=False)
+    rights_basis: str = Field(default="original_homebrew", max_length=40)
+    rights_reference: str = Field(default="", max_length=240)
+    approved: bool = Field(default=False)
+
+
+def _native_source_editor(user: dict | None = Depends(get_current_user)) -> str:
+    # The native product endpoint is not anonymous, development-mode enabled,
+    # or accessible to viewer principals. Source bundles are consequential
+    # creator artifacts even when they do not execute compilers.
+    principal = _principal(user)
+    if not isinstance(user, dict) or user.get("role") not in ("editor", "admin"):
+        raise HTTPException(status_code=403, detail="Creator edit permission required")
+    return principal
+
+
+@router.get("/native/production/capabilities")
+def native_production_capabilities(owner: str = Depends(_principal)) -> dict:
+    from skeleton.ai.webcrawler.dragon_native_production import capability_matrix
+    return {
+        "ok": True,
+        "targets": capability_matrix(),
+        "claim_boundary": "source emitters and optional local ROM adapters; not device certification",
+    }
+
+
+@router.post("/native/production/source-bundle")
+def native_production_source_bundle(
+    body: NativeProductionSourceRequest,
+    owner: str = Depends(_native_source_editor),
+):
+    """Authenticated, size-limited original game-source export; entirely in memory."""
+    if not body.approved or not body.original_work_attested:
+        raise HTTPException(status_code=403,
+                            detail="Explicit publication and original rights attestation required")
+    from skeleton.ai.webcrawler.dragon_native_production import (
+        ProductionRequest, build_source_bundle,
+    )
+    try:
+        request = ProductionRequest(
+            title=body.title, style=body.style, targets=tuple(body.targets),
+            original_work_attested=body.original_work_attested,
+            rights_basis=body.rights_basis, rights_reference=body.rights_reference,
+            seed=body.seed, max_portfolio_bytes=3_000_000,
+        )
+        payload, index = build_source_bundle(request, authorized=True)
+    except (ValueError, PermissionError):
+        raise HTTPException(status_code=422,
+                            detail="Unsupported source target, rights evidence or resource budget") from None
+    return Response(
+        content=payload, media_type="application/zip",
+        headers={
+            "Content-Disposition": 'attachment; filename="dragon-original-native-sources.zip"',
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, no-store",
+            "X-Content-SHA256": sha256(payload).hexdigest(),
+            "X-Dragon-Request-Id": index["request_id"],
+            "X-Dragon-Claim": "source-only-not-a-compiled-game",
+        },
+    )
+
 def _build_signing_key() -> bytes:
     value=os.environ.get("SKL_DRAGON_BUILD_SIGNING_KEY_HEX","")
     try:
