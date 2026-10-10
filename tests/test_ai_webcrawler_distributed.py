@@ -32,6 +32,6 @@ def test_trap_guard_rejects_common_infinite_spaces():
 def test_store_records_latest_schema_version():
     with tempfile.TemporaryDirectory() as d:
         s=SqliteCrawlStore(d+"/c.db")
-        assert s.db.execute("SELECT version FROM schema_version").fetchone()[0] == 2
+        assert s.db.execute("SELECT version FROM schema_version").fetchone()[0] == SCHEMA_VERSION
         assert s.db.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_documents_fetched_at'").fetchone()
         s.close()
