@@ -206,6 +206,52 @@ class DragonWisdomMemory:
             "training_authorized": False, "release_authorized": False,
         }
 
+    def erase_local_owner(self, owner: str, *, confirm_owner: str,
+                          authorized: bool, trusted_worker: bool,
+                          human_approved: bool, worker_quiesced: bool,
+                          no_legal_hold: bool) -> dict:
+        """Atomic private SQLite erasure of source, Wiki and advisory records.
+
+        Callers MUST separately erase external signed anchors, other knowledge
+        planes and backups. This method cannot attest to a distributed worker
+        having stopped or to legal retention; those are trusted host duties.
+        """
+        if (authorized is not True or trusted_worker is not True
+                or human_approved is not True or worker_quiesced is not True
+                or no_legal_hold is not True):
+            raise PermissionError("separately authorized privacy erasure required")
+        _id(owner)
+        if confirm_owner != owner:
+            raise PermissionError("exact owner confirmation required")
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            # Detect stored history or source corruption before irreversible
+            # mutation; this does not grant permission to erase another tenant.
+            self._events(owner)
+            self._rows(owner)
+            self.pyramid._history(owner)
+            self.pyramid.library._rows(owner)
+            counts = {}
+            for table in (
+                "dragon_advisory_memory", "dragon_advisory_memory_events",
+                "dragon_wisdom_pyramid", "game_builder_knowledge",
+            ):
+                deleted = self.db.execute(
+                    "DELETE FROM " + table + " WHERE owner=?", (owner,)
+                )
+                counts[table] = deleted.rowcount
+            self.db.execute("COMMIT")
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
+        return {
+            "schema": "skeleton.dragon.local_owner_erasure.v1",
+            "owner": owner, "rows_deleted": counts,
+            "external_anchor_purge_required": True,
+            "other_plane_and_backup_erasure_required": True,
+            "full_erasure_certified": False,
+        }
+
     def retrieve(self, owner: str, mechanic: str, *, now: int,
                  authorized: bool, trusted_worker: bool, limit: int = 16) -> tuple[dict, ...]:
         _id(owner); _id(mechanic); _time(now)
