@@ -331,7 +331,12 @@ class GameMechanicsMemory:
                         ) for obs in items
                     ) / weight)
             score = sum(independent_scores) / len(independent_scores) if independent_scores else 0.0
-            confidence = sum(obs.confidence for obs, _ in observations) / len(observations)
+            confidence_by_session: dict[str, list[float]] = {}
+            for obs, sid in observations:
+                confidence_by_session.setdefault(sid, []).append(obs.confidence)
+            confidence = sum(
+                sum(values) / len(values) for values in confidence_by_session.values()
+            ) / len(confidence_by_session)
             examples = tuple(sorted({
                 obs.description for obs, _ in observations
             }))[:5]
