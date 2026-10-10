@@ -235,3 +235,12 @@ def test_observation_confirmation_rejects_numeric_truthiness():
     with pytest.raises(ValueError, match="confirmation must be boolean"):
         store.record(session(store, observations=(replace(item, user_confirmed=1),)), authorized=True)
 
+
+def test_observation_note_refuses_control_and_surrogate_text():
+    from dataclasses import replace
+    store = setup()
+    base = observation()
+    for bad in ("embedded" + chr(0) + "nul", "two" + chr(10) + "lines", "bad" + chr(0xd800)):
+        with pytest.raises(ValueError, match="observation note"):
+            store.record(session(store, observations=(replace(base, description=bad),)), authorized=True)
+
