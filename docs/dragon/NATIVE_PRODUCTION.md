@@ -123,6 +123,42 @@ The application obtains source ZIPs on demand and does not persist a phantom
 "completed ROM" or invent browser-side build history. A source bundle remains
 a preliminary project artifact, not a playable certified game.
 
+### Portable authored game design (new integrated delivery)
+
+Both the native production engine and the authenticated Studio editor now
+accept an **optional portable design**. It supplies original art direction
+and executable generator parameters without touching existing game providers:
+
+- \`palette\`: one of the known original style palettes.
+- \`hero\`: hatchling, knight, explorer, pilot, astronaut or robot.
+- \`quest_theme\`: original world themes including space, forest, ruins,
+  clockwork, volcano, ice and crystals.
+- \`difficulty\`: 1–10; \`stages\`: 1–8; \`candidates\`: 1–24.
+- \`seed\`: the request's same deterministic 32-bit value across targets.
+- \`project_notes\`: bounded data, never programmatic source, commands or
+  authority-granting instructions.
+
+The portfolio generator translates the same original specification into a
+canonical typed \`GameDesign\` for each hardware target and feeds it to the
+existing native emitter. For implemented desktop paths this influences actual
+campaign and source creation. For console cartridges whose generator only
+supports a single collectible-chase game, it enforces one stage/one
+candidate, adjusts unsupported palette classes, and **explicitly discloses**
+that hero/theme/difficulty may not be applied in the game runtime. Neither
+the UI nor the receipt claims a feature-equivalent port.
+
+A canonical \`port_plan\` accompanies every production archive with the
+portable design digest, actual target design digest, production title/seed,
+target constraints and adaptation list. The independent verifier
+reconstructs the exact typed adaptation and, when the desktop emitter
+provides \`dragon-game-design.json\`, matches it to the source-resident
+design manifest. Unapproved changes to degradations or source design
+invalidate verification.
+
+The legacy source-only requests without \`portable_design\` remain supported.
+No console or PC product can claim functionality it has not actually
+implemented.
+
 ### Release verification and index integrity
 
 A release index is **not trusted merely because its archive hashes match**.
