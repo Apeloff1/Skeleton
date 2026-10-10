@@ -73,6 +73,6 @@ def validate_rom_file(
         data = _read_bounded(Path(path), max_bytes=_LENGTH)
     except (NativeIntakeError, OSError, ValueError) as exc:
         raise Sega8BitROMError(
-            "ROM must be an unlinked, bounded, regular native cartridge file"
+            "ROM must be an ordinary unlinked, bounded, regular native cartridge file"
         ) from exc
     return validate_rom(data, target, expected_sha256=expected_sha256)
