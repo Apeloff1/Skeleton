@@ -244,7 +244,7 @@ native SDL probes skip when their required `pkg-config` is absent.
 
 Validated locally:
 
-- Full existing Dragon suite: **920 passed, 17 skipped**. Skips are unavailable
+- Full existing Dragon suite: **925 passed, 12 skipped**. Skips are unavailable
   toolchains/runtime dependencies, not successful platform certifications.
 - Isolated canonical forge, overengineering, governance and knowledge-rights suites:
   **102 passed, 2 subtests passed**; reviewed knowledge **24 passed, 6 subtests passed**.
@@ -254,13 +254,24 @@ Validated locally:
   governed forge rounds and real RGB-only play of original seeded worlds.
 - Historical timestamp evidence compatibility: **3 passed**.
 - Authenticated Academy route tests: **16 passed**, including HTTP review delivery.
-- Native C99 Linux executable: four-stage compiled selftest passed.
+- Native C99 Linux executable: four-stage compiled selftest passed locally.
+  Hosted Linux and macOS builds/selftests also passed on `256a762c`.
+- Official RGBDS v1.0.0 was downloaded from the maintainer release and checked
+  against its published SHA-256 before local use. Actual DMG, CGB and scrolling
+  platformer ROM compilation tests pass. cc65 built from maintainer commit
+  `555282497c3ecf8b313d87d5973093af19c35bd5` also passes actual NES compilation. The generated sources now avoid the
+  assembler's reserved `OAM`/`VRAM` keywords and explicitly define the platformer
+  goal constant. This is compiler/ROM evidence, not emulated gameplay or legal clearance.
+- Windows native CI initially failed before compilation because existing long
+  repository paths could not be checked out. The native workflow now uses the
+  repository's existing `core.longpaths` checkout preparation; acceptance remains pending.
+  Both native workflows use the repository's immutable action revisions.
 - Frontend companion, canonical wire, progression and final wisdom contract tests passed.
-  Syntax transpilation includes the Academy hook; full-app TypeScript acceptance
-  remains the hosted CI check, not a locally verified claim. The initial hosted
-  companion/wire/wisdom contracts passed; full TypeScript compilation exposed
-  an existing unescaped apostrophe in `src/product/journeyCatalog.ts`. That
-  game-journey syntax error is repaired here; updated-head CI remains pending.
+  Full-app TypeScript compilation passes locally and in hosted Dragon verification
+  on `256a762cf5ca0c6e021f04c4b0c8b294fd46c903`. The existing unescaped apostrophe
+  in `src/product/journeyCatalog.ts` was repaired. Both hosted Python and frontend
+  Dragon verification jobs pass on that revision; later native repairs still
+  require updated-head hosted acceptance.
 - Architecture map, AI construction, capability interfaces, provider bootstrap
   and enterprise-superiority validators passed; the 500-level builder validator passed.
 - The required implementation-notes validator fails on both untouched base and
