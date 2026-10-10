@@ -130,7 +130,9 @@ class GameMechanicsMemory:
 
     @staticmethod
     def _owner(owner: str) -> str:
-        if not isinstance(owner, str) or not 1 <= len(owner) <= 128:
+        if (not isinstance(owner, str) or not 1 <= len(owner) <= 128
+                or owner != owner.strip() or not owner.isprintable()
+                or len(owner.encode("utf-8")) > 256):
             raise ValueError("invalid owner")
         return owner
 
