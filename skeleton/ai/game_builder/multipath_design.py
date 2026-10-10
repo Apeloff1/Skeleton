@@ -442,4 +442,64 @@ def dead_end_cells(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells"]
+def _lowlink_report(problem: RouteProblem) -> tuple[tuple[Position, ...], tuple[Edge, ...]]:
+    """Find articulation vertices and bridges without recursion-depth risk."""
+    if not isinstance(problem, RouteProblem):
+        raise MultipathError("typed RouteProblem required")
+    discovery: dict[Position, int] = {}
+    low: dict[Position, int] = {}
+    parent: dict[Position, Position | None] = {}
+    child_counts: dict[Position, int] = {}
+    cuts: set[Position] = set()
+    bridges: set[Edge] = set()
+    tick = 0
+    for root in walkable_cells(problem):
+        if root in discovery:
+            continue
+        parent[root] = None
+        discovery[root] = low[root] = tick
+        tick += 1
+        child_counts[root] = 0
+        stack: list[tuple[Position, object]] = [
+            (root, iter(n for _, n in problem.neighbors(root, allow_hazards=False)))
+        ]
+        while stack:
+            here, iterator = stack[-1]
+            next_cell = next(iterator, None)
+            if next_cell is not None:
+                if next_cell not in discovery:
+                    parent[next_cell] = here
+                    child_counts[here] = child_counts.get(here, 0) + 1
+                    child_counts[next_cell] = 0
+                    discovery[next_cell] = low[next_cell] = tick
+                    tick += 1
+                    stack.append((
+                        next_cell, iter(n for _, n in problem.neighbors(next_cell, allow_hazards=False))
+                    ))
+                elif next_cell != parent[here]:
+                    low[here] = min(low[here], discovery[next_cell])
+                continue
+            stack.pop()
+            ancestor = parent[here]
+            if ancestor is None:
+                if child_counts[here] >= 2:
+                    cuts.add(here)
+            else:
+                low[ancestor] = min(low[ancestor], low[here])
+                if parent[ancestor] is not None and low[here] >= discovery[ancestor]:
+                    cuts.add(ancestor)
+                if low[here] > discovery[ancestor]:
+                    bridges.add(tuple(sorted((ancestor, here))))
+    return (
+        tuple(sorted(cuts, key=lambda p: (p[1], p[0]))),
+        tuple(sorted(bridges, key=lambda e: (e[0][1], e[0][0], e[1][1], e[1][0]))),
+    )
+
+
+def articulation_cells(problem: RouteProblem) -> tuple[Position, ...]:
+    """Identify tiles whose removal splits a safe connected region."""
+    return _lowlink_report(problem)[0]
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells"]
