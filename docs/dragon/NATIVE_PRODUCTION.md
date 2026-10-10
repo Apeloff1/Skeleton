@@ -65,6 +65,41 @@ unrelated placeholders or 20 new processes. The implementation must pass
 the focused tests and mandatory architecture gates before it is considered
 landable.
 
+## Application-native source export (additional completed integration)
+
+The existing authenticated Dragon Academy API now includes:
+
+- \`GET /api/dragon-academy/native/production/capabilities\` —
+  truthful native source emitter matrix, available to authenticated users.
+- \`POST /api/dragon-academy/native/production/source-bundle\` —
+  creates a deterministic multi-platform source bundle **in memory**, returns
+  a ZIP directly to an authenticated \`editor\` or \`admin\`.
+  Requires separate \`approved=true\` and \`original_work_attested=true\`.
+  Maximum 3 source targets, 3 MiB, no local toolchain execution, no
+  publication filesystem changes, no model invocation and no background work.
+
+Example request JSON:
+
+\`\`\`json
+{
+  "title": "Original Lunar Wanderer",
+  "style": "arcade_score_attack",
+  "targets": ["game_boy", "nes"],
+  "seed": 1,
+  "rights_basis": "original_homebrew",
+  "rights_reference": "",
+  "original_work_attested": true,
+  "approved": true
+}
+\`\`\`
+
+The response is \`application/zip\` with stable nested release ZIPs,
+\`production-index.json\`, a content digest header and an explicit
+\`source-only-not-a-compiled-game\` claim header. The app cannot request
+a ROM compiler, and viewer/dev/anonymous principals cannot obtain a new
+creator source release. The existing Dragon practice progress, XP, evidence
+signer and lessons are unaffected.
+
 ## What the outputs mean
 
 - `source_generated`: original platform source files were emitted, budget
