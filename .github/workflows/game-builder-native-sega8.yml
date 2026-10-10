@@ -107,5 +107,36 @@ jobs:
           assert r["toolchain_source_authenticated"] is False
           assert r["release_approved"] is False
           PY
-      # No ROM is published: linking requirements and legal review remain
-      # separate. This workflow does not assert emulator or hardware gameplay.
+      - name: Rebuild original machine code twice and prove identical cartridge bytes
+        env:
+          TARGET: ${{ matrix.platform }}
+        run: |
+          set -eu
+          case "$TARGET" in
+            sega_master_system) EXT=sms ;;
+            sega_game_gear) EXT=gg ;;
+            *) exit 3 ;;
+          esac
+          BEFORE="$(sha256sum "output/$TARGET/build/skeleton-original.$EXT" | cut -d' ' -f1)"
+          make -C "output/$TARGET" clean
+          make -C "output/$TARGET" \
+            SDCC=sdcc \
+            SMSLIB_DIR="$PWD/.external/devkitSMS/SMSlib" \
+            CRT0_SMS="$PWD/.external/devkitSMS/crt0/crt0_sms.rel" \
+            MAKESMS="$PWD/.external/devkitSMS/tools/makesms/src/makesms"
+          AFTER="$(sha256sum "output/$TARGET/build/skeleton-original.$EXT" | cut -d' ' -f1)"
+          test "$BEFORE" = "$AFTER"
+          printf 'target=%s\nfirst_sha256=%s\nrebuild_sha256=%s\nreproducible=true\n' \
+            "$TARGET" "$BEFORE" "$AFTER" > "/tmp/$TARGET-reproducibility.txt"
+      - name: Publish limited, non-distribution CI evidence only
+        uses: actions/upload-artifact@v4
+        with:
+          name: original-sega8-source-and-hash-evidence-${{ matrix.platform }}
+          path: |
+            output/${{ matrix.platform }}/manifest.json
+            /tmp/${{ matrix.platform }}-compilation-evidence.json
+            /tmp/${{ matrix.platform }}-reproducibility.txt
+          if-no-files-found: error
+          retention-days: 7
+      # No ROM is published: legal review and real emulator or hardware
+      # gameplay acceptance are separate and remain fail-closed.
