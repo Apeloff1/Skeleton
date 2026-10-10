@@ -266,6 +266,8 @@ class GameMechanicsMemory:
                 for t, m, d, c, p, u in recorded
             ):
                 raise ValueError("stored game observation cell validation failed")
+            if any(later[0] < earlier[0] for earlier, later in zip(recorded, recorded[1:])):
+                raise ValueError("stored game observation time order invalid")
             observations = tuple(
                 GameObservation(t, Mechanic(m), d, c, PreferenceSignal(p), u)
                 for t, m, d, c, p, u in recorded
