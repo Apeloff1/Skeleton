@@ -1,81 +1,63 @@
-from .chat_workspace import NativeChatWorkspace, WorkspaceRecord, WorkspaceEvent
-from .chat_engine import NativeChatEngine, ChatTurnResult
-from .chat_protocol import ChatMessage, ChatTranscript
-"""Provider-neutral FLGB-02 model-runtime and native execution contracts."""
-from .admission_scheduler import AdmissionDecision, AdmissionLimits, RuntimeAdmissionScheduler, ScheduledRequest
-from .runtime_signals import DEFAULT_RUNTIME_SIGNALS, RuntimeSignal, RuntimeSignalRegistry, SignalMaturity
-from .runtime_policy import DEFAULT_RUNTIME_POLICY_COMPILER, RuntimePolicy, RuntimePolicyCompiler
-from .runtime_epochs import DEFAULT_RUNTIME_EPOCHS, EpochStatus, RuntimeEpoch, RuntimeEpochRegistry
-from .temporal_policy import DEFAULT_TEMPORAL_RUNTIME_POLICY_COMPILER, TemporalRuntimePolicy, TemporalRuntimePolicyCompiler
-from .serving_policy import PolicyAwareServingPlanner, ServiceClass, ServingPlan, ServingRequest
-from .slo_planner import ResourcePlan, RuntimeEstimate, SLOResourcePlanner, SLOTarget
-from .serving_telemetry import RequestTelemetry, ServingTelemetryWindow
-from .runtime_feedback import DeterministicRuntimeEstimator, FeedbackLimits, FeedbackReceipt
-from .closed_loop_serving import ClosedLoopServingController, ControlDecision
-from .iteration_scheduler import InferencePhase, IterationPlan, IterationScheduler, IterationSlice, IterationWork
-from .execution_telemetry import ExecutionTiming
-from .admission_checkpoint import restore_admission_scheduler
-from .flgb_model_runtime import (
-    ALLOWED_TRANSITIONS,
-    BatchRequest,
-    DeviceDescriptor,
-    KVCacheEntry,
-    LocalModelReceipt,
-    LocalModelRequest,
-    ModelIdentity,
-    ModelLifecycle,
-    ModelRegistry,
-    ModelRuntimeError,
-    Placement,
-    QuantizationProfile,
-    Replica,
-    SpeculativeReceipt,
-    TokenSequence,
-    VocabularyManifest,
-    WeightLoadPlan,
-    WeightShard,
-    plan_continuous_batches,
-    plan_device_placement,
-    plan_kv_admission,
-    route_request,
-)
-from .conversation_persistence import DurableConversationCoordinator, PersistenceBinding
-from .conversation_store import ConversationStore, StoredConversation
-from .conversation_service import NativeConversationService, SessionRecord, ServingReceipt
-from .native_llm_runtime import (
-    BatchGenerationResult,
-    GenerationResult,
-    GenerationStream,
-    InferenceResult,
-    NativeLLMRuntime,
-    NativeConversationSession,
-)
-from .runtime_checkpoint import validate_model_snapshot
-from .runtime_service import (
-    CancellationToken,
-    NativeModelService,
-    NativeServiceError,
-    NativeServiceResult,
-)
-from .runtime_contracts import (
-    BatchGenerationRequest,
-    DevicePolicy,
-    DeviceReceipt,
-    GenerationConfig,
-    ReplayMismatch,
-    ReplayReceipt,
-    RuntimeArchitecture,
-    RuntimeContractError,
-    RuntimeEvent,
-    RuntimeLimits,
-    RuntimeUsage,
-)
+"""Provider-neutral FLGB-02 model-runtime and native execution contracts.
 
-# Delay optional native transformer / Cortex imports until explicitly requested.
-# Contract-only modules must load under the standard-library-only CI lane.
+Optional serving, persistence and native-transformer implementations load only
+when their exported names are requested. The base package must stay usable by
+standard-library-only contract clients without pydantic, Torch or a database.
+"""
+from __future__ import annotations
+
 from importlib import import_module
 
+# Keep all public contract names available without importing optional runtimes.
 _LAZY_EXPORTS = {
+    "ALLOWED_TRANSITIONS": ".flgb_model_runtime",
+    "BatchGenerationRequest": ".runtime_contracts",
+    "BatchRequest": ".flgb_model_runtime",
+    "ChatMessage": ".chat_protocol",
+    "ChatTranscript": ".chat_protocol",
+    "ChatTurnResult": ".chat_engine",
+    "ConversationStore": ".conversation_store",
+    "DeviceDescriptor": ".flgb_model_runtime",
+    "DevicePolicy": ".runtime_contracts",
+    "DeviceReceipt": ".runtime_contracts",
+    "DurableConversationCoordinator": ".conversation_persistence",
+    "GenerationConfig": ".runtime_contracts",
+    "KVCacheEntry": ".flgb_model_runtime",
+    "LocalModelReceipt": ".flgb_model_runtime",
+    "LocalModelRequest": ".flgb_model_runtime",
+    "ModelIdentity": ".flgb_model_runtime",
+    "ModelLifecycle": ".flgb_model_runtime",
+    "ModelRegistry": ".flgb_model_runtime",
+    "ModelRuntimeError": ".flgb_model_runtime",
+    "NativeChatEngine": ".chat_engine",
+    "NativeChatWorkspace": ".chat_workspace",
+    "NativeConversationService": ".conversation_service",
+    "NativeConversationSession": ".native_llm_runtime",
+    "PersistenceBinding": ".conversation_persistence",
+    "Placement": ".flgb_model_runtime",
+    "plan_continuous_batches": ".flgb_model_runtime",
+    "plan_device_placement": ".flgb_model_runtime",
+    "plan_kv_admission": ".flgb_model_runtime",
+    "QuantizationProfile": ".flgb_model_runtime",
+    "ReplayMismatch": ".runtime_contracts",
+    "ReplayReceipt": ".runtime_contracts",
+    "Replica": ".flgb_model_runtime",
+    "route_request": ".flgb_model_runtime",
+    "RuntimeArchitecture": ".runtime_contracts",
+    "RuntimeContractError": ".runtime_contracts",
+    "RuntimeEvent": ".runtime_contracts",
+    "RuntimeLimits": ".runtime_contracts",
+    "RuntimeUsage": ".runtime_contracts",
+    "ServingReceipt": ".conversation_service",
+    "SessionRecord": ".conversation_service",
+    "SpeculativeReceipt": ".flgb_model_runtime",
+    "StoredConversation": ".conversation_store",
+    "TokenSequence": ".flgb_model_runtime",
+    "VocabularyManifest": ".flgb_model_runtime",
+    "WeightLoadPlan": ".flgb_model_runtime",
+    "WeightShard": ".flgb_model_runtime",
+    "WorkspaceEvent": ".chat_workspace",
+    "WorkspaceRecord": ".chat_workspace",
     "BatchGenerationResult": ".native_llm_runtime",
     "GenerationResult": ".native_llm_runtime",
     "GenerationStream": ".native_llm_runtime",
