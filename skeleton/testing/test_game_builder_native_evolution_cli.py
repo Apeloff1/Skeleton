@@ -56,6 +56,19 @@ def test_handheld_evolution_now_emits_two_distinct_true_dmg_and_cgb_native_cartr
     assert all(stage["emulator_or_hardware_played"] is False for stage in receipt["stage_dispositions"])
 
 
+def test_native_evolution_refuses_symlinked_evidence_before_creating_any_game(tmp_path):
+    args = _options(tmp_path, "commodore_vic20", "commodore_64")
+    real = args["rights_evidence"]
+    alias = tmp_path / "shortcut.txt"
+    try:
+        alias.symlink_to(real)
+    except OSError:
+        pytest.skip("filesystem cannot create a symlink")
+    with pytest.raises(ValueError, match="bounded local regular file"):
+        build_native_evolution(**(args | {"rights_evidence": alias}), authorized=True)
+    assert not args["output"].exists()
+
+
 def test_native_evolution_rejects_unauthorized_cross_project_unknown_or_reused_output(tmp_path):
     args = _options(tmp_path, "commodore_vic20", "commodore_64")
     with pytest.raises(PermissionError):
@@ -63,7 +76,7 @@ def test_native_evolution_rejects_unauthorized_cross_project_unknown_or_reused_o
     assert not args["output"].exists()
     with pytest.raises(ValueError, match="validated catalogue"):
         build_native_evolution(**(args | {"destination": "fake_console"}), authorized=True)
-    with pytest.raises(ValueError, match="ordinary"):
+    with pytest.raises(ValueError, match="rights evidence"):
         build_native_evolution(**(args | {"rights_evidence": tmp_path / "missing"}), authorized=True)
     assert not args["output"].exists()
     build_native_evolution(**args, authorized=True)
