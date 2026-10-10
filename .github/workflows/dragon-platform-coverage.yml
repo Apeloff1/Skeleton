@@ -10,6 +10,7 @@ on:
       - 'skeleton/ai/webcrawler/dragon_cc65_release.py'
       - 'skeleton/ai/webcrawler/dragon_native_nintendo_ppc_3ds.py'
       - 'skeleton/ai/webcrawler/dragon_native_vector_maria.py'
+      - 'skeleton/ai/webcrawler/dragon_native_intellivision.py'
       - 'skeleton/ai/webcrawler/dragon_native_switch_wiiu.py'
       - 'skeleton/ai/webcrawler/dragon_native_dreamcast_ps2.py'
       - 'skeleton/ai/webcrawler/dragon_native_8bit_computers.py'
@@ -34,6 +35,7 @@ on:
       - 'tests/test_ai_webcrawler_dragon_cc65_release.py'
       - 'tests/test_ai_webcrawler_dragon_native_nintendo_ppc_3ds.py'
       - 'tests/test_ai_webcrawler_dragon_native_vector_maria.py'
+      - 'tests/test_ai_webcrawler_dragon_native_intellivision.py'
       - 'tests/test_ai_webcrawler_dragon_native_switch_wiiu.py'
       - 'tests/test_ai_webcrawler_dragon_native_dreamcast_ps2.py'
       - 'tests/test_ai_webcrawler_dragon_native_8bit_computers.py'
@@ -82,6 +84,7 @@ jobs:
             tests/test_ai_webcrawler_dragon_cc65_release.py \
             tests/test_ai_webcrawler_dragon_native_nintendo_ppc_3ds.py \
             tests/test_ai_webcrawler_dragon_native_vector_maria.py \
+            tests/test_ai_webcrawler_dragon_native_intellivision.py \
             tests/test_ai_webcrawler_dragon_native_switch_wiiu.py \
             tests/test_ai_webcrawler_dragon_native_dreamcast_ps2.py \
             tests/test_ai_webcrawler_dragon_native_8bit_computers.py \
@@ -152,7 +155,7 @@ jobs:
           assert result["coverage"]["catalog_count"]==169
           from skeleton.ai.webcrawler.dragon_native_projects import EMITTERS
           from skeleton.ai.webcrawler.dragon_native_targets import CATALOG
-          assert len(EMITTERS)>=86  # source capability grows without fixed stale quotas
+          assert len(EMITTERS)>=87  # source capability grows without fixed stale quotas
           assert result["coverage"]["native_source_count"]==len(EMITTERS)
           assert result["coverage"]["missing_native_source_count"]==(
               len(CATALOG)-len(EMITTERS))

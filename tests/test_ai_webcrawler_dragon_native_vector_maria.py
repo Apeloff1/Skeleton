@@ -38,7 +38,7 @@ def test_original_source_project_not_renamed_pc_game(target,extension):
     assert row["status"]=="native_source"
     assert row["supported_styles"]==("arcade_score_attack",)
     assert coverage_report()["native_source_count"]==len(EMITTERS)
-    assert len(EMITTERS)==86
+    assert len(EMITTERS)>=87
     with pytest.raises(ValueError):
         render_native_project(
             title="Original Dragon Hardware Quest",target_id=target,

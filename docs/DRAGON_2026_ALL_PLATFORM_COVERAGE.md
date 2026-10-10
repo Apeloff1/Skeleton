@@ -809,3 +809,37 @@ audio output on representative hardware, and independently pass
 license/provenance review before binary release. The machine-readable
 readiness registry remains source-only until receipts for those stages
 are independently validated.
+
+
+## October 10, 2026 — original Mattel Intellivision CP1610 game
+
+A distinct **87th native source producer** is now implemented for the
+Mattel Intellivision 1979 CP1610 processor. The complete curated
+baseline is **87 source-capable targets of 169 (51.5%)**, leaving **82**
+identified targets requiring actual source producers. These percentages
+do not measure hardware-compatible builds or finished releases.
+
+The homebrew program is written for the documented IntyBASIC v1.5.1
+compiler and jzIntv's AS1600 assembler (both externally installed).
+Unlike an Atari sprite shell or a renamed PC executable, the original
+game declares three custom 8x8 GRAM cards and uses STIC MOBs 0–2
+for the hero, collectible crystal and pursuing enemy. Its 16-way
+hand-controller disc provides direction; a keypad button restarts;
+a real AY-3-8914 PSG channel plays reward and damage chimes. The
+frame-based loop includes level advancement, bounded collisions,
+temporary invulnerability, health and retry behavior. The emitted
+source and Makefile target a genuine native CP1610 cartridge, not
+a fabricated binary or emulator screenshot.
+
+The source does not contain copyrighted Intellivision EXEC/GROM
+firmware. A console game built with IntyBASIC requires genuine
+IntyBASIC/as1600 cross-compiler execution, jzIntv video/audio/input
+replay using legally obtained firmware where required, and physical
+hand-controller validation before any device-ready claim.
+The branch CI conditionally invokes the toolchains when available
+and otherwise explicitly skips that verification.
+
+Official toolchain references:
+- IntyBASIC original guide: https://nanochess.org/intybasic.html
+- IntyBASIC source/manual: https://github.com/nanochess/IntyBASIC
+- jzIntv and AS1600: https://spatula-city.org/~im14u2c/intv/

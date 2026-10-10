@@ -94,6 +94,7 @@ SOURCE_RENDERERS.update({
     "vectrex":"Motorola 6809 real analog beam vector BIOS",
     "atari_7800":"Atari 7800 6502C MARIA DMA 160A sprites",
 })
+SOURCE_RENDERERS["intellivision"]="CP1610 / STIC 8 MOB sprites / AY-3-8914 PSG"
 assert set(SOURCE_RENDERERS)==EMITTERS
 
 @dataclass(frozen=True)

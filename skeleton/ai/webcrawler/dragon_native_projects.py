@@ -17,6 +17,7 @@ EMITTERS=EMITTERS|frozenset(COMPATIBILITY)|frozenset(("commodore_pet","commodore
 EMITTERS=EMITTERS|frozenset(("atari_5200","colecovision","zx81","msx2","thumby"))
 EMITTERS=EMITTERS|frozenset(("lynx","saturn","ps_vita","nintendo_switch","wii_u"))
 EMITTERS=EMITTERS|frozenset(("vectrex","atari_7800"))
+EMITTERS=EMITTERS|frozenset(("intellivision",))
 
 @dataclass(frozen=True)
 class NativeProject:
@@ -565,6 +566,9 @@ def render_native_project(*,title:str,target_id:str,style:str,
         )
         files=(gamecube_source(seed) if target_id=="gamecube" else
                wii_source(seed) if target_id=="wii" else three_ds_source(seed))
+    elif target_id=="intellivision":
+        from .dragon_native_intellivision import intellivision_source
+        files=intellivision_source(seed)
     elif target_id in ("vectrex","atari_7800"):
         from .dragon_native_vector_maria import native_vector_maria_source
         files=native_vector_maria_source(target_id,seed)
