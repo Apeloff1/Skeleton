@@ -60,6 +60,7 @@ extends Node2D
 
 var _elapsed_ms: float = 0.0
 var _playing: bool = false
+var _pending_hit_frame: int = -1
 
 
 func play_cue(cue_shape: String, duration: int, particles: int, cue_trauma: float,
@@ -70,11 +71,13 @@ func play_cue(cue_shape: String, duration: int, particles: int, cue_trauma: floa
     trauma = cue_trauma
     severity = cue_severity
     hit_frame = cue_hit_frame
+    _pending_hit_frame = cue_hit_frame
     _elapsed_ms = 0.0
-    _playing = true
-    visible = true
+    _playing = cue_hit_frame < 0
+    visible = _playing
     _apply_shape()
-    _emit_particles()
+    if _playing:
+        _emit_particles()
 
 
 func play_telegraph(damage: float, max_health: float, era_key: String = "modern",
@@ -94,11 +97,16 @@ func play_telegraph(damage: float, max_health: float, era_key: String = "modern"
         tier = "moderate"
         slots = 2
     var chosen := cue_shape if cue_shape != "" else shape
-    play_cue(chosen, lead, 16 * slots, 0.0, tier, cue_hit_frame)
+    # Telegraphs must be visible before impact; the separate hit burst
+    # remains armed until the animation timeline reaches its contact frame.
+    play_cue(chosen, lead, 16 * slots, 0.0, tier, -1)
+    hit_frame = cue_hit_frame
+    _pending_hit_frame = cue_hit_frame
 
 
 func notify_hit_frame(frame: int) -> void:
-    if hit_frame >= 0 and frame == hit_frame and not _playing:
+    if _pending_hit_frame >= 0 and frame == _pending_hit_frame:
+        _pending_hit_frame = -1
         _playing = true
         _elapsed_ms = 0.0
         visible = true
@@ -121,10 +129,15 @@ func _apply_shape() -> void:
 
 
 func _emit_particles() -> void:
+    # Shape nodes own the actual GPUParticles2D grandchildren. Emitting
+    # only direct children silently produced no particles at runtime.
     for child in get_children():
-        if child is GPUParticles2D:
-            child.amount = particle_count
-            child.emitting = true
+        if child is Node2D and child.visible:
+            for emitter in child.get_children():
+                if emitter is GPUParticles2D:
+                    emitter.amount = particle_count
+                    emitter.restart()
+                    emitter.emitting = true
 '''
 
 
