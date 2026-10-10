@@ -25,6 +25,11 @@ from .geometry import (
     GeometryError, walkable_tile_neighbors, bresenham_line, line_of_sight, flood_fill, distance_field, astar_path, rect_intersects, swept_aabb_hit, shelf_pack_rectangles, camera_clamp
 )
 
+from .asset_porting import (
+    PortableAssetError, PortableTileBundle, compile_original_tile_bundle,
+    verify_original_tile_roundtrip, emit_original_tile_source,
+)
+
 __all__ = [
     'PortableCodecError',
     'encode_gb_2bpp',
@@ -80,5 +85,10 @@ __all__ = [
     'rect_intersects',
     'swept_aabb_hit',
     'shelf_pack_rectangles',
-    'camera_clamp'
+    'camera_clamp',
+    'PortableAssetError',
+    'PortableTileBundle',
+    'compile_original_tile_bundle',
+    'verify_original_tile_roundtrip',
+    'emit_original_tile_source'
 ]
