@@ -57,11 +57,7 @@ def test_wrong_console_code_and_corruption_refused():
 def test_additive_checksum_cannot_substitute_for_content_sha256():
     original=_synthetic_header()
     modified=bytearray(original)
-    modified[15]=1
-    modified[16]=255  # 1 + 255 == 0 mod 256, not 0 mod 65536
-    # Compensate the additive checksum exactly with a same-valued swap.
-    modified[15]=ord("E")
-    modified[16]=ord("T")
+    # A byte swap changes executable bytes without changing the weak sum.
     modified[0],modified[1]=modified[1],modified[0]  # sum preserved
     forged=bytes(modified)
     assert validate_rom(forged,"sega_master_system")["native_rom_checksum_verified"]
