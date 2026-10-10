@@ -30,6 +30,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--all", action="store_true", help="Export the complete bounded library.")
     parser.add_argument("--output", type=Path, help="Destination directory (must exist).")
     args = parser.parse_args(argv)
+    if args.theme is not None and args.progression is None:
+        parser.error("--theme is valid only for a progression")
     discoveries = sum((args.list, args.catalog, args.verify,
                        args.progression is not None))
     if discoveries > 1:
@@ -37,8 +39,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.catalog or args.verify or args.progression is not None:
         if args.game or args.all or args.output:
             parser.error("discovery and verification actions cannot export files")
-        if args.theme and args.progression is None:
-            parser.error("--theme is valid only for a progression")
         if args.progression is not None:
             items = plan_practice_progression(
                 authorized=True, count=args.progression, theme=args.theme,
