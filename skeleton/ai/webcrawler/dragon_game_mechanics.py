@@ -392,6 +392,24 @@ class GameMechanicsMemory:
             not insights or any(not x.user_confirmed for x in insights) or conflicting, fingerprint,
         )
 
+    def history_receipt(self, owner: str, *, authorized: bool, limit: int = 100) -> dict:
+        """Produce a reproducible provenance receipt, never raw gameplay notes."""
+        sessions = self.sessions(owner, authorized=authorized, limit=limit)
+        payload = {
+            "schema": "skeleton.dragon.game_observation_history_receipt.v1",
+            "owner_digest": sha256(owner.encode("utf-8")).hexdigest(),
+            "source_session_digests": [s.session_id for s in sessions],
+            "session_count": len(sessions),
+            "observation_count": sum(len(s.observations) for s in sessions),
+            "raw_video_included": False,
+            "raw_notes_included": False,
+            "memory_promotion_authorized": False,
+        }
+        payload["digest"] = sha256(json.dumps(
+            payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+        ).encode()).hexdigest()
+        return payload
+
     def erase_session(self, owner: str, session_id: str, *, authorized: bool) -> bool:
         """Delete one owner's session; never erase a neighboring user's evidence."""
         owner = self._owner(owner)
