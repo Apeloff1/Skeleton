@@ -100,6 +100,9 @@ jobs:
             tests/test_ai_dragon_native_puzzle_authoring.py \
             tests/test_ai_dragon_native_puzzle_challenge.py \
             tests/test_ai_dragon_native_puzzle_save.py \
+            tests/test_ai_dragon_native_multipath.py \
+            tests/test_ai_dragon_native_campaign_paths.py \
+            tests/test_ai_dragon_native_challenge_director.py \
             tests/test_ai_dragon_native_puzzle_graphics.py \
             tests/test_ai_webcrawler_dragon_native_projects.py \
             tests/test_ai_webcrawler_dragon_native_compile.py \
@@ -322,6 +325,9 @@ jobs:
           assert receipt["source_level_proofs"] == 6
           assert receipt["runtime_stages_claimed_by_builder"] == 6
           assert result["evidence"]["native_hint_selftest"] == "current_position_bfs_all_stages_passed"
+          assert result["evidence"]["native_branch_selftest"] == "all_actual_branch_transitions_and_endings_replayed"
+          assert result["evidence"]["branch_endings_verified"] == 2
+          assert result["evidence"]["branch_transitions_verified"] >= 6
           assert result["evidence"]["independent_replays_verified"] == 24
           assert result["evidence"]["native_challenge_selftest"] == "optimal_route_three_stars_all_stages"
           with ZipFile(BytesIO(package)) as archive:
