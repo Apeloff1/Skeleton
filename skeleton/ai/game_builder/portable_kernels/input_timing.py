@@ -36,3 +36,11 @@ def edge_pressed(previous: int, current: int, mask: int=65535) -> int:
     include=_buttons(mask)
     return (~prior & present & include) & 65535
 
+
+def edge_released(previous: int, current: int, mask: int=65535) -> int:
+    """Edge-triggered release state, isolated from unrelated controller bits."""
+    prior=_buttons(previous)
+    present=_buttons(current)
+    include=_buttons(mask)
+    return (prior & ~present & include) & 65535
+
