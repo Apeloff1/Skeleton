@@ -26,16 +26,16 @@ def test_native_contract_export_overlay_is_declared_and_additive() -> None:
     assert _contract_export_mirror_valid(canonical, mirrored, manifest)
 
     appendix = (
-        b"\\nfrom .execution_authority import (\\n"
-        b"    ResourceBudget,\\n"
-        b")\\n\\n__all__ += [\\n"
-        b"    \\"ResourceBudget\\",\\n"
-        b"]\\n"
+        b"\nfrom .execution_authority import (\n"
+        b"    ResourceBudget,\n"
+        b")\n\n__all__ += [\n"
+        b"    \"ResourceBudget\",\n"
+        b"]\n"
     )
-    base = b"__all__ = []\\n"
+    base = b"__all__ = []\n"
     assert _contract_export_mirror_valid(base, base + appendix, manifest)
     assert not _contract_export_mirror_valid(
-        base, base + appendix + b"__import__('os').system('false')\\n", manifest
+        base, base + appendix + b"__import__('os').system('false')\n", manifest
     )
     assert not _contract_export_mirror_valid(
         base, base + appendix.replace(b'"ResourceBudget"', b'"UnboundSymbol"'), manifest
@@ -44,7 +44,7 @@ def test_native_contract_export_overlay_is_declared_and_additive() -> None:
         base, base + appendix.replace(b"ResourceBudget,", b"ResourceBudget as Unsafe,"), manifest
     )
     assert not _contract_export_mirror_valid(
-        b"__all__ = [1]\\n", base + appendix, manifest
+        b"__all__ = [1]\n", base + appendix, manifest
     )
     missing_owner = dict(manifest)
     missing_owner["native_ai_owners"] = [
