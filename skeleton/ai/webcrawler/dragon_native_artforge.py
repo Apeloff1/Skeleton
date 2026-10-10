@@ -113,7 +113,8 @@ def source_asm(tiles:dict[str,tuple[str,...]],style:str,target:str)->tuple[str,s
         original={name:compile_tile(name,tiles[name]).gb for name in NAMES}
         blank=bytes(16)
         brick=bytes([255,0]+[129,0]*6+[255,0])
-        data=(blank,brick,original["dragon"],original["star"],original["dragon_blink"])
+        data=(blank,brick,original["dragon"],original["star"],original["dragon_blink"],
+              original["dragon_walk"],original["dragon_flap"])
         lines=["PlatformTiles:"]
         for tile in data:
             for off in (0,8):
@@ -156,6 +157,46 @@ def make_art(*,hero:str,theme:str,palette:str,seed:int,target:str):
     return art,tiles
 
 
+
+
+GB_PLATFORMER_OLD="""    ld hl,AnimationClock
+    inc [hl]
+    ld a,[hl]
+    and $3F
+    jr nz,.normal
+    ld a,4
+    jr .tile
+.normal:
+    ld a,2
+.tile:
+    ld [OAM+2],a"""
+
+GB_PLATFORMER_NEW="""    ld hl,AnimationClock
+    inc [hl]
+    ld a,[Grounded]
+    and a
+    jr z,.heroInAir
+    ld a,[PlayerWorldX]
+    ld hl,PreviousWorldX
+    cp [hl]
+    jr nz,.heroWalking
+    ld a,[AnimationClock]
+    and $3F
+    jr nz,.heroIdle
+    ld a,4
+    jr .heroTile
+.heroIdle:
+    ld a,2
+    jr .heroTile
+.heroWalking:
+    ld a,5
+    jr .heroTile
+.heroInAir:
+    ld a,6
+.heroTile:
+    ld [OAM+2],a
+    ld a,[PlayerWorldX]
+    ld [PreviousWorldX],a"""
 
 
 GB_OLD_MOTION="""    ld hl, AnimFrame
@@ -235,6 +276,13 @@ DragonAnimationTick: .res 1
 
 def apply_moving_hero(source:str,*,target:str,style:str)->str:
     """Update REAL Game Boy/NES player animation tile by directional movement."""
+    if style=="side_scrolling_platformer" and target=="game_boy":
+        if (source.count(GB_PLATFORMER_OLD)!=1 or
+                source.count("AnimationClock: ds 1")!=1):
+            raise ValueError("original native scrolling animation anchor missing")
+        return (source.replace(GB_PLATFORMER_OLD,GB_PLATFORMER_NEW,1)
+                .replace("AnimationClock: ds 1",
+                         "AnimationClock: ds 1\nPreviousWorldX: ds 1",1))
     if style!="arcade_score_attack" or target not in TARGETS:
         return source
     if target in ("game_boy","game_boy_color"):
@@ -265,6 +313,11 @@ wait2:
 
 
 def verify_motion_source(source:str,*,target:str,style:str)->None:
+    if style=="side_scrolling_platformer" and target=="game_boy":
+        if (GB_PLATFORMER_NEW not in source or
+                "PreviousWorldX: ds 1" not in source):
+            raise ValueError("GB scrolling hero jump and walking animation missing")
+        return
     if style!="arcade_score_attack" or target not in TARGETS:
         return
     if target in ("game_boy","game_boy_color"):
