@@ -44,6 +44,19 @@ type OptionalGate={id:string;source_axis:string;source_domain:string;
 type OptionalAccessPreview={
   ok:boolean;optional_paths:OptionalGate[];world_must_have_an_ending:boolean;
 };
+type StoryView={ok:boolean;actual_decisions:string[];
+  original_story_world:{
+    original_world_bible:{setting:string;core_conflict:string;
+      perspective:string;timeline:string;staging:string;
+      delayed_revelation_steps:number;originality_boundary:string};
+    player:{chapters:number;observations:number;evidence:number;
+      commune_support:number;wilderness_support:number;
+      revelations:string[];endings:string[];scene_log:string[]};
+    choices:Record<string,{available:boolean;reason:string}>;
+    ended_a_story:boolean;ended_the_world:boolean;
+    playable_after_story:boolean;
+  };
+};
 type OptionalAccessProof={
   ok:boolean;gate:string;found_within_budget:boolean;
   actions:string[];actual_replay_digest?:string;
@@ -73,6 +86,8 @@ function Editor(){
   const [guide,setGuide]=React.useState<string[]>([]);
   const [platforms,setPlatforms]=React.useState<Platforms|null>(null);
   const [target,setTarget]=React.useState('game_boy');
+  const [story,setStory]=React.useState<StoryView|null>(null);
+  const [storyDecisions,setStoryDecisions]=React.useState<string[]>([]);
   const [access,setAccess]=React.useState<OptionalAccessPreview|null>(null);
   const [accessProof,setAccessProof]=React.useState<OptionalAccessProof|null>(null);
   const [pack,setPack]=React.useState<{
@@ -95,7 +110,8 @@ function Editor(){
   const reset=()=>{
     generation.current++;setOpened(null);setWorld(null);
     setHistory([]);setGuide([]);setPlatforms(null);setPack(null);
-    setAccess(null);setAccessProof(null);
+    setAccess(null);setAccessProof(null);setStory(null);
+    setStoryDecisions([]);
     setError('');setNotice('');
   };
   const load=async(index:string)=>{
@@ -187,6 +203,43 @@ function Editor(){
       }
     }catch(e){if(ticket===generation.current)setError(
       e instanceof Error?e.message:'Cannot prove this passage.');}
+    finally{if(ticket===generation.current)setBusy(false);}
+  };
+  const startStory=async()=>{
+    if(!opened||busy)return;
+    const ticket=++generation.current;setBusy(true);setError('');
+    try{
+      const opening=await api<StoryView>('/story',{
+        index:address,decisions:[],
+      });
+      if(!opening.ok||!opening.original_story_world.playable_after_story)
+        throw Error('Original narrative engine lacks actual continuing player choices.');
+      if(ticket===generation.current){
+        setStory(opening);setStoryDecisions([]);
+      }
+    }catch(e){if(ticket===generation.current)setError(
+      e instanceof Error?e.message:'Original story cannot be created.');}
+    finally{if(ticket===generation.current)setBusy(false);}
+  };
+  const decideStory=async(decision:string)=>{
+    if(!story||busy||!story.original_story_world.choices[decision]?.available||
+       storyDecisions.length>=96)return;
+    const next=[...storyDecisions,decision];
+    const ticket=++generation.current;setBusy(true);setError('');
+    try{
+      const played=await api<StoryView>('/story',{
+        index:address,decisions:next,
+      });
+      if(!played.ok||played.actual_decisions.join('|')!==next.join('|'))
+        throw Error('Original story history did not replay.');
+      if(ticket===generation.current){
+        setStory(played);setStoryDecisions(next);
+        setNotice(played.original_story_world.ended_a_story
+          ?'One story ended; the game world and other choices remain playable.'
+          :'Original relationship and narrative state changed.');
+      }
+    }catch(e){if(ticket===generation.current)setError(
+      e instanceof Error?e.message:'Story route is not yet earned.');}
     finally{if(ticket===generation.current)setBusy(false);}
   };
   const inspectOptionalAccess=async()=>{
@@ -408,6 +461,58 @@ function Editor(){
             instability {values.instability} · clock {values.clock}
           </Text>
         ))}
+      </View>
+      <View style={s.panel}>
+        <Text style={s.heading}>Original literary and cinematic world grammar</Text>
+        <Text style={s.copy}>
+          Experience original settings, point of view, interleaved eras,
+          delayed revelations, ethical uncertainty and branching
+          consequences. A narrative can end without ending this game.
+        </Text>
+        <TouchableOpacity style={s.action} disabled={busy}
+          onPress={startStory}>
+          <Text style={s.actionText}>Compose and play original story</Text>
+        </TouchableOpacity>
+        {story&&<>
+          <Text style={s.heading}>
+            {friendly(story.original_story_world.original_world_bible.setting)}
+          </Text>
+          <Text style={s.copy}>
+            Conflict: {friendly(story.original_story_world.original_world_bible.core_conflict)}
+            {' · '}POV {friendly(story.original_story_world.original_world_bible.perspective)}
+          </Text>
+          <Text style={s.hint}>
+            Timeline: {friendly(story.original_story_world.original_world_bible.timeline)}
+            {' · '}Presentation: {friendly(story.original_story_world.original_world_bible.staging)}
+            {' · '}revelation delay: {story.original_story_world.original_world_bible.delayed_revelation_steps} steps
+          </Text>
+          <Text style={s.copy}>
+            Evidence {story.original_story_world.player.evidence} ·
+            Commune support {story.original_story_world.player.commune_support} ·
+            Wilderness support {story.original_story_world.player.wilderness_support}
+          </Text>
+          <Text style={s.hint}>
+            Endings: {story.original_story_world.player.endings.length
+              ?story.original_story_world.player.endings.map(friendly).join(', ')
+              :'No ending required yet'}
+          </Text>
+          {Object.entries(story.original_story_world.choices).map(([name,choice])=>(
+            <TouchableOpacity key={name} style={[s.choice,
+              (!choice.available||busy)&&s.disabled]}
+              disabled={!choice.available||busy}
+              onPress={()=>decideStory(name)}>
+              <Text style={s.actionText}>{friendly(name)}</Text>
+              <Text style={s.hint}>
+                {choice.available?'A consequential real story decision':
+                  friendly(choice.reason)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+          <Text style={s.hint}>
+            Original abstract genre grammar only; no borrowed book scene,
+            film plot, dialogue, iconic character or protected game map.
+          </Text>
+        </>}
       </View>
       <View style={s.panel}>
         <Text style={s.heading}>Advanced conditional access matrix</Text>
