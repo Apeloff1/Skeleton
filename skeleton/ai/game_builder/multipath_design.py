@@ -349,4 +349,14 @@ def route_portfolio(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio"]
+def walkable_cells(problem: RouteProblem, *, include_hazards: bool = False) -> tuple[Position, ...]:
+    """Return all actual traversable coordinates in stable reading order."""
+    if not isinstance(problem, RouteProblem) or type(include_hazards) is not bool:
+        raise MultipathError("invalid walkable-cell query")
+    return tuple((x, y) for y, row in enumerate(problem.rows)
+                 for x, tile in enumerate(row)
+                 if tile != "#" and (include_hazards or tile != "H"))
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells"]
