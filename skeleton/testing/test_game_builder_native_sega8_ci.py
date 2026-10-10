@@ -13,7 +13,7 @@ import pytest
 from scripts.game_builder.native_sega_8bit_ci import emit, verify
 
 
-REVISION = sha256(b"test-only-pinned-sdcc-toolchain-source-identity").hexdigest()
+REVISION = "533ae572c897cf44f1da865013ebf690134301a3"  # actual pinned Git SHA-1
 
 
 def _rom(target: str) -> bytes:
@@ -48,6 +48,8 @@ def test_compilation_receipt_does_not_forge_build_or_legal_approval(
     assert evidence["rights_independently_verified"] is False
     assert evidence["release_approved"] is False
     assert evidence["source_sha256"]==emitted["source_content_digest"]
+    assert evidence["toolchain_revision_hash_algorithm"]=="git-sha1"
+    assert evidence["toolchain_source_authenticated"] is False
 
 
 def test_wrong_hardware_manifest_or_forged_claim_fails_closed(tmp_path):
@@ -85,3 +87,34 @@ def test_corrupt_rom_and_symlink_input_fail_even_with_matching_source(tmp_path):
     link.symlink_to(real)
     with pytest.raises(Exception):
         verify("sega_game_gear",source,link,toolchain_revision=REVISION)
+
+
+
+def test_supported_sha256_git_commit_identifier_does_not_assert_toolchain_authenticity(tmp_path):
+    author=tmp_path/"author.txt"
+    author.write_text("Newly authored interactive puzzles",encoding="utf-8")
+    src=tmp_path/"src"
+    emit("sega_master_system",src,author)
+    rom=tmp_path/"source.sms"
+    rom.write_bytes(_rom("sega_master_system"))
+    receipt=verify(
+        "sega_master_system",src,rom,
+        toolchain_revision=sha256(b"synthetic Git SHA-256 revision identifier").hexdigest(),
+    )
+    assert receipt["toolchain_revision_hash_algorithm"]=="git-sha256"
+    assert receipt["toolchain_source_authenticated"] is False
+
+
+@pytest.mark.parametrize("bad",[
+    "", "HEAD", "main", "5"*39, "5"*41, "5"*63, "5"*65,
+    "G"*40, "0x"+"0"*40, " "+"a"*40,
+])
+def test_git_revision_cannot_be_ref_alias_or_partial_commit(tmp_path,bad):
+    author=tmp_path/"author.txt"
+    author.write_text("Original homebrew",encoding="utf-8")
+    src=tmp_path/"src"
+    emit("sega_master_system",src,author)
+    rom=tmp_path/"original.sms"
+    rom.write_bytes(_rom("sega_master_system"))
+    with pytest.raises(ValueError,match="Git revision"):
+        verify("sega_master_system",src,rom,toolchain_revision=bad)
