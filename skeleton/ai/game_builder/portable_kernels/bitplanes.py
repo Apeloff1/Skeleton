@@ -41,3 +41,10 @@ def decode_gb_2bpp(data: bytes) -> tuple[tuple[int, ...], ...]:
                        (((raw[2*y+1] >> (7-x)) & 1) << 1)
                        for x in range(8)) for y in range(8))
 
+
+def encode_nes_2bpp(tile: Sequence[Sequence[int]]) -> bytes:
+    """Encode the NES CHR planar byte order: eight low rows, eight high rows."""
+    rows = _pixels(tile, 3)
+    return bytes(sum(((row[x] >> plane) & 1) << (7-x) for x in range(8))
+                 for plane in (0, 1) for row in rows)
+
