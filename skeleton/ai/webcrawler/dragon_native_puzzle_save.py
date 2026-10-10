@@ -26,6 +26,12 @@ static uint32_t game_map_fingerprint(void){
     h=(h^ch)*16777619u;
    }
  }
+ for(int level=0;level<LEVEL_COUNT;level++){
+  h=(h^(uint8_t)dragon_branch_count[level])*16777619u;
+  h=(h^(uint8_t)dragon_branch_ending[level])*16777619u;
+  for(int option=0;option<2;option++)
+   h=(h^(uint8_t)(dragon_branch_next[level][option]+1))*16777619u;
+ }
  return h;
 }
 static uint32_t save_state_digest(int level,State st,uint32_t game_id){
