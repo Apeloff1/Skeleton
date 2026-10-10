@@ -238,15 +238,34 @@ function LivingWorldEditor(){
     setBusy(true);setFailure('');
     const remaining=history.slice(0,-1);
     try{
-      const response=await apiPost<Play>('/play',{
-        ...config,moves:remaining,
-      });
-      if(!response.ok||
-         response.played_moves.join('|')!==remaining.join('|'))
-        throw new Error('Original choice replay did not match.');
+      let current:GameState;
+      let tiles:Tile[];
+      let priorToken:string|null=null;
+      if(sessionToken){
+        priorToken=previousTokens[previousTokens.length-1]||null;
+        if(!priorToken)throw new Error('Earlier checkpoint not available for safe undo.');
+        const verified=await apiPost<SignedInspect>('/checkpoint/inspect',{
+          ...config,token:priorToken,
+        });
+        if(!verified.ok||!verified.checkpoint_bound_to_authenticated_owner)
+          throw new Error('Previous original game checkpoint is no longer valid.');
+        current=verified.current;tiles=verified.surroundings;
+      }else{
+        const response=await apiPost<Play>('/play',{
+          ...config,moves:remaining,
+        });
+        if(!response.ok||
+           response.played_moves.join('|')!==remaining.join('|'))
+          throw new Error('Original choice replay did not match.');
+        current=response.current;tiles=response.surroundings;
+      }
       if(ticket===runId.current){
-        setHistory(remaining);setGame(response.current);
-        setTerrain(response.surroundings);setNotice('');
+        setHistory(remaining);setGame(current);
+        setTerrain(tiles);setNotice('');
+        if(priorToken){
+          setSessionToken(priorToken);
+          setPreviousTokens(v=>v.slice(0,-1));
+        }
       }
     }catch(caught){
       if(ticket===runId.current)setFailure(
