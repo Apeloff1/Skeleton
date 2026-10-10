@@ -445,3 +445,17 @@ def test_partial_confirmation_keeps_profile_under_review():
     assert profile.review_required
     assert not profile.insights[0].user_confirmed
 
+
+def test_one_long_session_cannot_outvote_an_independent_session():
+    store = setup()
+    many_positive = tuple(observation(preference=PreferenceSignal.ENJOYED,
+        confirmed=True, timestamp=1000 + n) for n in range(12))
+    negative = (observation(preference=PreferenceSignal.DISLIKED, confirmed=True),)
+    first = store.build_session("alice", "First", 20000, many_positive,
+                                capture_consent=True, analysis_consent=True)
+    second = store.build_session("alice", "Second", 20000, negative,
+                                 capture_consent=True, analysis_consent=True)
+    store.record(first, authorized=True)
+    store.record(second, authorized=True)
+    assert store.distill("alice", authorized=True).insights[0].preference_score == 0
+
