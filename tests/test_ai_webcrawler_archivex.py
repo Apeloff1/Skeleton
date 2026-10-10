@@ -118,3 +118,31 @@ def test_archive_rejects_non_finite_snapshot_identity_clock():
             store.capture("alice", source_url=URL, body=b"evidence",
                           observed_at=bad, now=100.0,
                           license_note="Authorized excerpt", authorized=True)
+
+
+def test_legacy_integer_timestamp_archive_can_still_be_verified():
+    import hashlib
+    import json
+    store = archive()
+    body = b"historical source evidence"
+    digest = hashlib.sha256(body).hexdigest()
+    from skeleton.ai.webcrawler.dragon_video_history import canonical_video_url
+    canonical_url = canonical_video_url(URL)
+    legacy_raw = json.dumps([canonical_url, 100, digest],
+                            separators=(",", ":"), ensure_ascii=True, allow_nan=False)
+    legacy_id = hashlib.sha256(legacy_raw.encode()).hexdigest()
+    store.db.execute(
+        """INSERT INTO archivex_snapshots
+        (owner,snapshot_id,source_url,observed_at,content_digest,
+         content_length,media_type,license_note,body) VALUES(?,?,?,?,?,?,?,?,?)""",
+        ("alice", legacy_id, canonical_url, 100.0, digest, len(body),
+         "text/plain", "Authorized historical excerpt", body),
+    )
+    store.db.commit()
+    assert store.read("alice", legacy_id, authorized=True)[1] == body
+    store.db.execute(
+        "UPDATE archivex_snapshots SET content_digest=? WHERE owner=? AND snapshot_id=?",
+        ("0"*64, "alice", legacy_id),
+    )
+    with pytest.raises(ValueError, match="integrity"):
+        store.read("alice", legacy_id, authorized=True)
