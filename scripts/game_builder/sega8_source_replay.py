@@ -158,6 +158,8 @@ def _parse_reference(raw: bytes) -> dict[str, Any]:
     for step in steps:
         if step.get("button") not in _MOVE_CODES:
             raise Sega8HostReplayError("unsupported original game input")
+    if initial["won"] != 0 or initial["lost"] != 0:
+        raise Sega8HostReplayError("original authored route cannot start already won or lost")
     if steps[-1]["won"] != 1 or steps[-1]["lost"] != 0:
         raise Sega8HostReplayError("reference does not finish successfully")
     return obj
