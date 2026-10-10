@@ -172,6 +172,22 @@ class PlayableWorldTests(unittest.TestCase):
                 with self.assertRaises(PlayableWorldError):
                     intent(**change)
 
+    def test_action_and_authorization_admission_rejects_type_confusion(self):
+        game = generate_playable_world(intent(levels=1), authorized=True)
+        state = initial_state(game, authorized=True)
+        for malformed in ([], {}, 2, None, ("right",), True):
+            with self.subTest(malformed=malformed):
+                with self.assertRaises(GameplayError):
+                    advance(game, state, malformed, authorized=True)
+        for untrusted in (1, "yes", [], None):
+            with self.subTest(authority=untrusted):
+                with self.assertRaises(PermissionError):
+                    initial_state(game, authorized=untrusted)
+                with self.assertRaises(PermissionError):
+                    advance(game, state, "left", authorized=untrusted)
+                with self.assertRaises(PermissionError):
+                    play_actions(game, (), authorized=untrusted)
+
     def test_unauthorized_generation_and_gameplay_are_rejected(self):
         with self.assertRaises(PermissionError):
             generate_playable_world(intent(), authorized=False)
