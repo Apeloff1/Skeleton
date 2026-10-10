@@ -9,6 +9,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from .shift_supervisor.consumer_plan import canonical_queue_drained
+
 SCHEMA = "autonomous-studio.completion-campaign.v1"
 TERMINAL_STATES = {"complete", "quarantined", "exhausted"}
 MAX_HISTORY = 64
@@ -325,6 +327,10 @@ def allocate_supervisor_state(
     limit: int = 8,
 ) -> dict[str, Any]:
     supervisor = repo_state.get("_shift_supervisor")
+    if canonical_queue_drained(supervisor, "night"):
+        # A completed producer has no work to allocate; do not issue a lease,
+        # forge a generation id, or alter the campaign's authority state.
+        return {"status": "canonical_queue_drained", "authorized_plan_ids": []}
     if not isinstance(supervisor, dict) or supervisor.get("status") != "loaded":
         raise ValueError("loaded canonical supervisor state is required for allocation")
     validate_lane_invariants(repo_state.get("_shift_supervisor_all_plan_items", []), str(supervisor.get("team", "")))
