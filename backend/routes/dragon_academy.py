@@ -269,7 +269,7 @@ class NativePuzzleGridValidationRequest(BaseModel):
 @router.post("/native/production/puzzle/validate")
 def native_production_validate_puzzle(
     body: NativePuzzleGridValidationRequest,
-    owner: str = Depends(_principal),
+    owner: str = Depends(_native_source_editor),
 ) -> dict:
     from skeleton.ai.webcrawler.dragon_native_puzzle_authoring import preview_authored_levels
     try:
@@ -282,7 +282,7 @@ def native_production_validate_puzzle(
 
 @router.get("/native/production/puzzle/starter")
 def native_production_puzzle_starter(
-    stages: int = 1, owner: str = Depends(_principal),
+    stages: int = 1, owner: str = Depends(_native_source_editor),
 ) -> dict:
     from skeleton.ai.webcrawler.dragon_native_puzzle_authoring import starter_authored_levels
     try:
