@@ -67,7 +67,7 @@ FAMILIES:dict[str,tuple[str,...]]={
   "orbital_transfer","lunar_rover","planetary_lander","asteroid_hop",
   "eva","airlock","station_corridor","docking_tube","space_taxi",
   "deep_space_cruise","solar_sail","ion_ship","hyperspace",
-  "interstellar_ship","stargate","gravity_assist","generation_ship",
+  "interstellar_ship","stellar_gate","gravity_assist","generation_ship",
   "rescue_pod","colony_transport",
  ),
  "digital":(
