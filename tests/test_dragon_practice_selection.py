@@ -63,3 +63,26 @@ def test_filter_rejects_untrusted_or_unbounded_requests(options):
         filter_practice_games(authorized=True, **options)
     with pytest.raises(PermissionError):
         filter_practice_games(authorized=1)
+
+
+@pytest.mark.parametrize("count", [1, 2, 5, 8, 20])
+def test_progression_chooses_nonrepeating_increasing_replay_difficulty(count):
+    first = plan_practice_progression(authorized=True, count=count)
+    second = plan_practice_progression(authorized=True, count=count)
+    assert first == second
+    assert len(first) == count
+    assert len({row.world_digest for row in first}) == count
+    assert list(first) == sorted(first, key=lambda row: (row.route_cost, row.game_id))
+    if count > 1:
+        assert first[0].route_cost < first[-1].route_cost
+
+
+def test_progression_respects_theme_and_refuses_insufficient_choices():
+    ocean = plan_practice_progression(authorized=True, count=20, theme="ocean")
+    assert len(ocean) == 20
+    assert all(game.theme == "ocean" for game in ocean)
+    for count in (0, -1, True, 21, 1.5):
+        with pytest.raises(PracticeSelectionError):
+            plan_practice_progression(authorized=True, count=count)
+    with pytest.raises(PermissionError):
+        plan_practice_progression(authorized="yes", count=3)
