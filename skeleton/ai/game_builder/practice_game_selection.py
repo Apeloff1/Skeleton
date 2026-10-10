@@ -152,3 +152,24 @@ def verified_practice_run(
         "training_authorized": False,
         "memory_promotion_authorized": False,
     }
+
+
+def practice_portfolio_receipt(*, authorized: bool) -> dict[str, object]:
+    """Content-addressed offline game portfolio, without a release signature."""
+    if authorized is not True:
+        raise PermissionError("practice portfolio receipt requires authorization")
+    items = [entry.to_payload() for entry in practice_game_catalog(authorized=True)]
+    payload = {
+        "schema": "skeleton.dragon.practice_portfolio.v1",
+        "game_count": len(items),
+        "games": items,
+        "gameplay_replay_verified": True,
+        "native_binary_build_verified": False,
+        "independent_hardware_verified": False,
+        "originality_independently_cleared": False,
+        "training_authorized": False,
+        "memory_promotion_authorized": False,
+        "release_authorized": False,
+    }
+    payload["digest"] = canonical_digest(payload)
+    return payload
