@@ -69,12 +69,15 @@ jobs:
             --rom native-coleco-cpu/build/original-coleco.col \
             --reference native-coleco-cpu/independent-guest-reference.json \
             --manifest native-coleco-cpu/manifest.json \
+            --source-bin native-coleco-cpu/build/original-coleco.bin \
             --out coleco-native-z80-cpu-attestation.json
           python - <<'PY'
           import json
           r=json.load(open("coleco-native-z80-cpu-attestation.json",encoding="utf-8"))
           assert r["actual_coleco_z80_cpu_gameplay_verified"] is True
           assert r["original_levels_completed"] == 3
+          assert r["native_binary_matches_source_exactly"] is True
+          assert len(r["independent_assembled_z80_sha256"]) == 64
           assert r["controller_actions_verified"] > 100
           assert r["final_1kb_mirrored_guest_ram"]["won"] == 1
           assert r["coleco_bios_stub_calls"]=={"MODE_1":1,"LOAD_ASCII":1}
@@ -88,6 +91,7 @@ jobs:
           name: skeleton-original-coleco-z80-cpu-hardware-evidence
           path: |
             native-coleco-cpu/build/original-coleco.col
+            native-coleco-cpu/build/original-coleco.bin
             native-coleco-cpu/manifest.json
             native-coleco-cpu/independent-guest-reference.json
             coleco-native-z80-cpu-attestation.json
