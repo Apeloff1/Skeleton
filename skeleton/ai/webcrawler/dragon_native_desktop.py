@@ -168,12 +168,29 @@ def _puzzle_proof(source_archive: bytes) -> tuple[dict, dict[str, str]]:
     if (type(expected_seed) is not int or not 0 <= expected_seed <= 0xffffffff or
             type(difficulty) is not int or not 1 <= difficulty <= 10):
         raise ValueError("invalid puzzle replay parameters")
+    from .dragon_native_level_curation import curate_level,curation_report
+    declared_curations=proof.get("level_curation")
+    if not isinstance(declared_curations,list) or len(declared_curations)!=len(rows):
+        raise ValueError("original challenge level-selection evidence incomplete")
+    actual_grids=[]
+    for number in range(len(rows)):
+        if authored is not None:
+            if declared_curations[number] is not None:
+                raise ValueError("user-authored game boards cannot be silently curated")
+            actual_grids.append(authored.levels[number].rows)
+        else:
+            grid,selected=curate_level(
+                stage=number,seed=expected_seed,difficulty=difficulty,
+                procedural=procedural,
+                profile=proof.get("challenge_profile", "balanced"),
+            )
+            if curation_report(selected)!=declared_curations[number]:
+                raise ValueError("generated game level challenge selection was changed")
+            actual_grids.append(grid)
     for number, row in enumerate(rows):
         if not isinstance(row, dict) or row.get("stage") != number:
             raise ValueError("puzzle stages are not canonical or contiguous")
-        layout=(authored.levels[number].rows if authored is not None else
-                transformed_level(number, expected_seed, difficulty,
-                                  procedural=procedural))
+        layout=actual_grids[number]
         solution, explored = solve_grid(layout)
         if row.get("solution") != solution or row.get("steps") != len(solution):
             raise ValueError("native puzzle solution does not replay")
@@ -197,9 +214,7 @@ def _puzzle_proof(source_archive: bytes) -> tuple[dict, dict[str, str]]:
     for index,route_entry in enumerate(routes):
         if not isinstance(route_entry,dict) or route_entry.get("stage")!=index:
             raise ValueError("native stage route evidence ordering changed")
-        board=(authored.levels[index].rows if authored is not None else
-               transformed_level(index,expected_seed,difficulty,
-                                 procedural=procedural))
+        board=actual_grids[index]
         verify_route_report(board,route_entry)
     plan=make_challenge_plan(
         tuple(routes),
@@ -370,12 +385,15 @@ def build_native_puzzle_executable(
         from .dragon_native_puzzle_trace import simulate_grid, parse_native_state_line
         transcripts = []
         for level in range(1, proof["stages"] + 1):
+            from .dragon_native_level_curation import curate_level
             puzzle=(tuple(proof["authored_level_rows"][level-1])
                     if proof.get("authoring_mode")=="authored" else
-                    transformed_level(
-                        level - 1, proof["seed"], proof["difficulty"],
-                        procedural=proof.get("procedural", False),
-                    ))
+                    curate_level(
+                        stage=level-1,seed=proof["seed"],
+                        difficulty=proof["difficulty"],
+                        procedural=proof.get("procedural",False),
+                        profile=proof.get("challenge_profile","balanced"),
+                    )[0])
             solution, _ = solve_grid(puzzle)
             for commands in (
                 solution, "r" + solution, solution[:4] + "r" + solution,
