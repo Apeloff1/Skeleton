@@ -103,6 +103,7 @@ jobs:
             tests/test_ai_dragon_native_multipath.py \
             tests/test_ai_dragon_native_campaign_paths.py \
             tests/test_ai_dragon_native_challenge_director.py \
+            tests/test_ai_dragon_native_level_curation.py \
             tests/test_ai_dragon_native_puzzle_graphics.py \
             tests/test_ai_webcrawler_dragon_native_projects.py \
             tests/test_ai_webcrawler_dragon_native_compile.py \
@@ -328,6 +329,7 @@ jobs:
           assert result["evidence"]["native_branch_selftest"] == "all_actual_branch_transitions_and_endings_replayed"
           assert result["evidence"]["branch_endings_verified"] == 2
           assert result["evidence"]["branch_transitions_verified"] >= 6
+          assert result["evidence"]["branch_endings_verified"] == 2
           assert result["evidence"]["independent_replays_verified"] == 24
           assert result["evidence"]["native_challenge_selftest"] == "optimal_route_three_stars_all_stages"
           with ZipFile(BytesIO(package)) as archive:
