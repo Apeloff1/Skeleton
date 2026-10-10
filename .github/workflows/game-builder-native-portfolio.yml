@@ -13,7 +13,9 @@ permissions:
 
 concurrency:
   group: game-builder-native-portfolio-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Preserve the executing actual-hardware source qualification despite rapid
+  # multi-agent PR pushes. GitHub keeps only the newest pending run per group.
+  cancel-in-progress: false
 
 jobs:
   ten-original-native-targets:
