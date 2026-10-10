@@ -477,14 +477,15 @@ void main(void) {
             if (demo_step>=original_demo_lengths[level_index]) {
                 /* Playback has diverged; never invent an input or advance. */
                 demo_active=0;
-                return;
+                reset_original_run();
+                continue;
             }
             action=original_demo_routes[level_index][demo_step];
             if (action==0) advance(0,-1);
             else if (action==1) advance(0,1);
             else if (action==2) advance(-1,0);
             else if (action==3) advance(1,0);
-            else { demo_active=0; return; }
+            else { demo_active=0; reset_original_run(); continue; }
             if (won || lost) demo_active=0;
             else if (level_index!=old_level) demo_step=0;
             else ++demo_step;
