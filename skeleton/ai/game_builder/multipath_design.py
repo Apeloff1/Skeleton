@@ -1037,4 +1037,24 @@ def enumerate_shortest_routes(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget", "pareto_hazard_routes", "enumerate_shortest_routes"]
+def route_progress_trace(
+    problem: RouteProblem, proof: RouteProof,
+) -> tuple[tuple[int, Position, int], ...]:
+    """Replay step-wise objective counts for tutorial pacing and quest cues."""
+    if proof.problem_digest != problem.digest:
+        raise MultipathError("progress trace requires current game world")
+    result = evaluate_route(problem, proof.actions,
+                            allow_hazards=proof.hazard_visits > 0)
+    if result.positions != proof.positions:
+        raise MultipathError("route progress does not replay")
+    seen: set[Position] = set()
+    out = []
+    for step, p in enumerate(proof.positions):
+        if p in problem.collectibles:
+            seen.add(p)
+        out.append((step, p, len(seen)))
+    return tuple(out)
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget", "pareto_hazard_routes", "enumerate_shortest_routes", "route_progress_trace"]
