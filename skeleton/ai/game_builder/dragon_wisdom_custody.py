@@ -162,3 +162,42 @@ class DragonCustodyAnchor:
         finally:
             os.close(directory_fd)
         return output
+
+    def purge_owner_anchors(self, owner: str, *, confirm_owner: str,
+                            authorized: bool, trusted_worker: bool,
+                            human_approved: bool, no_legal_hold: bool,
+                            local_erasure_verified: bool) -> dict:
+        """Destroy this owner's signed metadata after separately verified erasure.
+
+        Deleting anchor files invalidates historic external verification; only
+        a trusted privacy compliance flow with an independent retained receipt
+        may authorize this operation. Other replicas/backups are out of scope.
+        """
+        if (authorized is not True or trusted_worker is not True
+                or human_approved is not True or no_legal_hold is not True
+                or local_erasure_verified is not True or confirm_owner != owner):
+            raise PermissionError("fully approved independent anchor erasure required")
+        _id(owner)
+        # Validate all signatures and source owner identity before deletion.
+        records = self._anchors(owner)
+        directory = self._path(owner)
+        if directory.is_symlink():
+            raise ValueError("unsafe owner anchor directory")
+        for item in sorted(directory.iterdir()) if directory.exists() else ():
+            if item.is_symlink() or not item.is_file():
+                raise ValueError("unsafe child in signed anchor directory")
+            item.unlink()
+        if directory.exists():
+            directory.rmdir()
+            rootfd = os.open(self.root, os.O_RDONLY)
+            try:
+                os.fsync(rootfd)
+            finally:
+                os.close(rootfd)
+        return {
+            "schema": "skeleton.dragon.anchor_purge.v1",
+            "owner_hash": sha256(owner.encode()).hexdigest(),
+            "anchors_purged": len(records),
+            "replica_and_backup_purge_required": True,
+            "full_erasure_certified": False,
+        }
