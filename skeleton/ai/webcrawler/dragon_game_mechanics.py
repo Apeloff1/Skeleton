@@ -303,7 +303,7 @@ class GameMechanicsMemory:
 
     def erase(self, owner: str, *, authorized: bool) -> int:
         owner = self._owner(owner)
-        if not authorized:
+        if authorized is not True:
             raise PermissionError("game observation erasure requires authorization")
         with self.db:
             return self.db.execute(
