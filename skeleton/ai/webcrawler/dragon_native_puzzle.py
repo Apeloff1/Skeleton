@@ -343,7 +343,9 @@ clean:
        " Build/run status remains source_generated until an actual compiler"
        " and runner confirm it.\n"
     )
-    return {"src/main.c":C_SOURCE,"include/dragon_puzzle.h":header,
+    from .dragon_native_puzzle_hints import enable_live_hints
+    runtime=enable_live_hints(C_SOURCE)
+    return {"src/main.c":runtime,"include/dragon_puzzle.h":header,
             "CMakeLists.txt":cmake,"Makefile":make,
             "dragon-puzzle-proof.json":json.dumps(info,sort_keys=True,indent=2)+"\n",
             "README.puzzle.md":readme}
