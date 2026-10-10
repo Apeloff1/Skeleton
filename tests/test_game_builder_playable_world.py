@@ -12,7 +12,8 @@ from skeleton.ai.game_builder.playable_world import (
 )
 from skeleton.ai.game_builder.playable_simulation import (
     ActionReceipt, GameReplay, GameplayError, PlayState,
-    advance, demonstrate_solvable, initial_state, play_actions, verify_replay,
+    advance, demonstrate_solvable, fork_replay, initial_state, play_actions,
+    replay_prefix, resume_replay, verify_replay,
 )
 
 
@@ -171,6 +172,66 @@ class PlayableWorldTests(unittest.TestCase):
             with self.subTest(change=change):
                 with self.assertRaises(PlayableWorldError):
                     intent(**change)
+
+    def test_seek_to_replay_prefix_verifies_all_old_actions(self):
+        game = generate_playable_world(intent(levels=1), authorized=True)
+        original = play_actions(game, ("right", "down", "left", "up"), authorized=True)
+        for count in range(5):
+            with self.subTest(count=count):
+                prefix = replay_prefix(game, original, count, authorized=True)
+                verify_replay(game, prefix, authorized=True)
+                self.assertEqual(len(prefix.action_receipts), count)
+                self.assertEqual(prefix.action_receipts, original.action_receipts[:count])
+                self.assertEqual(prefix.final_state, play_actions(
+                    game, ("right", "down", "left", "up")[:count], authorized=True
+                ).final_state)
+        for invalid in (-1, 5, 3.0, True, None):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(GameplayError):
+                    replay_prefix(game, original, invalid, authorized=True)
+
+    def test_resumed_gameplay_equals_one_shot_chain_bit_for_bit(self):
+        game = generate_playable_world(intent(levels=1), authorized=True)
+        controls = ("right", "down", "left", "up", "right")
+        initial = play_actions(game, controls[:2], authorized=True)
+        resumed = resume_replay(game, initial, controls[2:], authorized=True)
+        direct = play_actions(game, controls, authorized=True)
+        self.assertEqual(resumed, direct)
+        self.assertEqual(resumed.digest, direct.digest)
+        verify_replay(game, resumed, authorized=True)
+        self.assertEqual(resume_replay(game, resumed, (), authorized=True), resumed)
+
+    def test_fork_changes_only_suffix_and_does_not_mutate_original(self):
+        game = generate_playable_world(intent(levels=1), authorized=True)
+        original = play_actions(game, ("right", "down", "left", "up"), authorized=True)
+        branched = fork_replay(
+            game, original, 2, ("up", "up", "right"), authorized=True,
+        )
+        self.assertEqual(branched.action_receipts[:2], original.action_receipts[:2])
+        self.assertNotEqual(branched.digest, original.digest)
+        self.assertEqual(branched, play_actions(
+            game, ("right", "down", "up", "up", "right"), authorized=True,
+        ))
+        verify_replay(game, original, authorized=True)
+        verify_replay(game, branched, authorized=True)
+
+    def test_replay_seek_fails_closed_on_tampered_history_and_foreign_world(self):
+        game = generate_playable_world(intent(levels=1), authorized=True)
+        replay = play_actions(game, ("right", "down", "left"), authorized=True)
+        bad = replace(replay, action_receipts=(
+            replay.action_receipts[0],
+            replace(replay.action_receipts[1], action="up"),
+            replay.action_receipts[2],
+        ))
+        with self.assertRaises(GameplayError):
+            fork_replay(game, bad, 1, ("up",), authorized=True)
+        foreign = generate_playable_world(intent(levels=1, seed=1043), authorized=True)
+        with self.assertRaises(GameplayError):
+            resume_replay(foreign, replay, (), authorized=True)
+        for denied in (1, "allowed", None):
+            with self.subTest(denied=denied):
+                with self.assertRaises(PermissionError):
+                    fork_replay(game, replay, 1, (), authorized=denied)
 
     def test_receipt_constructor_rejects_malformed_chain_inputs(self):
         game = generate_playable_world(intent(levels=1), authorized=True)
