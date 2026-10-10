@@ -334,12 +334,14 @@ DrawRow:
 DrawColumn:
     ld a,(hl)
     push hl
+    push de                  ; Preserve VRAM next-row pointer across glyph lookup.
     ld e,a
     ld d,0
     ld hl,TileChars
     add hl,de
     ld a,(hl)
     out (VDP_DATA),a
+    pop de
     pop hl
     inc hl
     djnz DrawColumn
