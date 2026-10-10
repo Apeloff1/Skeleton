@@ -78,9 +78,9 @@ def filter_practice_games(
     """Deterministic, bounded selectors for the companion/editor UI."""
     if authorized is not True:
         raise PermissionError("practice game discovery requires authorization")
-    if theme is not None and theme not in {
+    if theme is not None and (type(theme) is not str or theme not in {
         "forest", "space", "desert", "ocean", "arcade",
-    }:
+    }):
         raise PracticeSelectionError("unknown original game theme")
     if (type(min_solution_steps) is not int or type(max_solution_steps) is not int
             or not 0 <= min_solution_steps <= max_solution_steps <= 20000
