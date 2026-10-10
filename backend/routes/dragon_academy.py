@@ -24,6 +24,7 @@ from routes.gameforge_auth import get_current_user
 from skeleton.ai.game_builder.dragon_review_store import DragonReviewStore
 from skeleton.ai.game_builder.reviewed_knowledge import ReviewedKnowledgeStore, KnowledgeError
 from skeleton.ai.game_builder.dragon_wisdom_pyramid import DragonWisdomPyramid
+from skeleton.ai.game_builder.dragon_wisdom_custody import DragonCustodyAnchor
 from skeleton.ai.webcrawler.dragon_practice_lab import DragonPracticeLab
 from skeleton.ai.webcrawler.dragon_practice_cycles import DragonPracticeCycles
 from skeleton.ai.webcrawler.dragon_session_projection import DragonSessionProjection
@@ -146,6 +147,30 @@ def _wisdom_library() -> Iterator[ReviewedKnowledgeStore]:
         raise HTTPException(status_code=409, detail="Dragon knowledge verification unavailable") from None
 
 
+def _verify_wisdom_custody(library: ReviewedKnowledgeStore, owner: str) -> None:
+    # Production setting is opt-in during migration: once enabled, no
+    # unanchored, rolled-back or unverifiable snapshot may reach HOAG.
+    if os.environ.get("SKL_DRAGON_WISDOM_CUSTODY_REQUIRED") != "1":
+        return
+    raw = os.environ.get("SKL_DRAGON_WISDOM_ANCHOR_KEY_HEX", "")
+    directory = os.environ.get("SKL_DRAGON_WISDOM_ANCHOR_DIR", "")
+    try:
+        key = bytes.fromhex(raw)
+    except ValueError:
+        key = b""
+    if len(key) < 32 or not directory:
+        raise HTTPException(status_code=503, detail="Dragon independent custody signer unavailable")
+    try:
+        verified = DragonCustodyAnchor(directory, signing_key=key).verify(
+            DragonWisdomPyramid(library), owner,
+            authorized=True, require_current=True,
+        )
+        if not verified["anchored"]:
+            raise ValueError("unanchored source review")
+    except (ValueError, OSError, sqlite3.DatabaseError):
+        raise HTTPException(status_code=409, detail="Dragon signed custody verification failed") from None
+
+
 @router.get("/knowledge/hoag")
 def knowledge_hoag(
     response: Response, owner: str = Depends(_principal),
@@ -154,6 +179,7 @@ def knowledge_hoag(
     # advisory claims. No source text or raw transcript is returned.
     response.headers["Cache-Control"] = "private, no-store"
     with _wisdom_library() as library:
+        _verify_wisdom_custody(library, owner)
         return {"ok": True, **DragonWisdomPyramid(library).hoag_view(
             owner, now=int(time.time()), authorized=True,
         )}
@@ -166,6 +192,7 @@ def knowledge_recrawls(
     # Intents only. Browser has no research dispatch, approval or mint routes.
     response.headers["Cache-Control"] = "private, no-store"
     with _wisdom_library() as library:
+        _verify_wisdom_custody(library, owner)
         orders = DragonWisdomPyramid(library).recrawl_queue(
             owner, now=int(time.time()), authorized=True, limit=32,
         )
