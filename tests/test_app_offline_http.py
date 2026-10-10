@@ -602,6 +602,25 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertEqual(secret_path.read_text(encoding="utf-8"),
                          "existing-operator-file")
 
+    def test_home_expanded_token_is_cleaned_up_at_exact_created_path(self):
+        from skeleton.app.offline_http import main
+        target = self.folder / "home-expanded.secret"
+        arguments = [
+            "--native-checkpoint", str(self.folder / "model.json"),
+            "--database", str(self.folder / "home-expanded.sqlite3"),
+            "--token-file", "~/home-expanded.secret", "--port", "0",
+        ]
+        with (
+            patch.dict(os.environ, {"HOME": str(self.folder),
+                                    "USERPROFILE": str(self.folder)}),
+            patch("skeleton.app.offline_http.load_native_checkpoint",
+                  return_value=self.model),
+            patch("skeleton.app.offline_http.LocalOnlyHTTPServer.serve_forever",
+                  return_value=None),
+        ):
+            self.assertEqual(main(arguments), 0)
+        self.assertFalse(target.exists())
+
     def test_shutdown_keeps_operator_replacement_of_live_secret_file(self):
         from skeleton.app.offline_http import main
         secret_path = self.folder / "replacement.secret"
