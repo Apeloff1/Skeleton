@@ -453,3 +453,12 @@ def test_hazard_budget_exposes_explicit_shorter_risky_tradeoff():
     with pytest.raises(MultipathError):
         solve_hazard_budget(p, max_hazard_visits=13)
 
+
+def test_pareto_frontier_retains_genuine_speed_risk_choices():
+    p = RouteProblem.from_rows(HAZARD_LEVEL)
+    frontier = pareto_hazard_routes(p)
+    assert len(frontier) == 2
+    assert [(r.hazard_visits, r.steps) for r in frontier] == [(0, 8), (1, 6)]
+    assert all(verify_route_proof(p, r) for r in frontier)
+    assert pareto_hazard_routes(RouteProblem.from_rows(OPEN_LEVEL))[0].hazard_visits == 0
+
