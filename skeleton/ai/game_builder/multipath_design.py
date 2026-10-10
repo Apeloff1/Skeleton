@@ -266,4 +266,12 @@ def solve_route(
     return result
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route"]
+def route_edges(proof: RouteProof) -> tuple[Edge, ...]:
+    """Expose each actual move, preserving chronology and directed geometry."""
+    if not isinstance(proof, RouteProof) or len(proof.positions) != len(proof.actions) + 1:
+        raise MultipathError("invalid route proof structure")
+    return tuple(zip(proof.positions, proof.positions[1:]))
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges"]
