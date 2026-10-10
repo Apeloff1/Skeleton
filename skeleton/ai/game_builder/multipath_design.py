@@ -861,4 +861,54 @@ def solve_route_astar(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar"]
+def solve_avoid_cells(
+    problem: RouteProblem, forbidden: Sequence[Position],
+    *, max_expansions: int = _MAX_STATES,
+) -> RouteProof:
+    """Re-solve after excluding designer-controlled tiles; preserve source grid."""
+    if (not isinstance(problem, RouteProblem) or not isinstance(forbidden, (tuple, list))
+            or len(forbidden) > 128 or type(max_expansions) is not int
+            or not 1 <= max_expansions <= _MAX_STATES):
+        raise MultipathError("invalid bounded forbidden-tile constraints")
+    blocked = set()
+    objectives = {problem.start, problem.goal, *problem.collectibles}
+    for cell in forbidden:
+        if (not isinstance(cell, tuple) or len(cell) != 2
+                or any(type(c) is not int for c in cell)
+                or cell in objectives or problem.tile(cell) == "#"):
+            raise MultipathError("cannot forbid an objective or invalid tile")
+        blocked.add(cell)
+    bits = {p: 1 << i for i, p in enumerate(problem.collectibles)}
+    end_mask = (1 << len(bits)) - 1
+    initial: State = (*problem.start, 0)
+    queue = deque([initial])
+    parents: dict[State, tuple[State, str] | None] = {initial: None}
+    expanded = 0
+    terminal = None
+    while queue:
+        state = queue.popleft()
+        expanded += 1
+        if expanded > max_expansions:
+            raise MultipathError("restricted search expansion budget exceeded")
+        if state[:2] == problem.goal and state[2] == end_mask:
+            terminal = state
+            break
+        for action, pos in problem.neighbors(state[:2], allow_hazards=False):
+            if pos in blocked:
+                continue
+            nxt: State = (*pos, state[2] | bits.get(pos, 0))
+            if nxt not in parents:
+                parents[nxt] = (state, action)
+                queue.append(nxt)
+    if terminal is None:
+        raise MultipathError("blocked corridor makes objective route impossible")
+    actions: list[str] = []
+    while parents[terminal] is not None:
+        terminal, action = parents[terminal]
+        actions.append(action)
+    return evaluate_route(problem, tuple(reversed(actions)),
+                          solver="forbidden_cells", expanded_states=expanded)
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells"]
