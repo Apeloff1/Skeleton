@@ -544,5 +544,7 @@ def demonstrate_solvable(world: PlayableWorld, *, authorized: bool) -> GameRepla
 __all__ = [
     "GameplayError", "PlayState", "ActionReceipt", "GameReplay",
     "initial_state", "advance", "play_actions", "verify_replay",
-    "demonstrate_solvable", "MAX_REPLAY_ACTIONS",
+    "replay_prefix", "resume_replay", "fork_replay", "replay_divergence",
+    "serialize_replay", "deserialize_replay", "demonstrate_solvable",
+    "MAX_REPLAY_ACTIONS", "MAX_SERIALIZED_REPLAY_BYTES",
 ]
