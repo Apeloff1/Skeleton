@@ -93,6 +93,10 @@ def verify_original_nes_first_controller_move(
         if booted_at is None:
             if (bus.palette_writes>=32 and bus.nametable_writes>=960
                 and bus.oam_dma_count>=1 and bus.ppu_reads>=2):
+                if sha256(bus.nametable[:960]).hexdigest()!=manifest.get("original_stage_zero_bg_sha256"):
+                    raise NESControllerReplayError(
+                        "actual original-game 6502 PPU name table differs from world tilemap"
+                    )
                 first_sprite=(bus.oam[3],bus.oam[0])
                 expected_sprite=(initial[0]*8, (initial[1]*8-1)&255)
                 if first_sprite!=expected_sprite:
@@ -126,6 +130,8 @@ def verify_original_nes_first_controller_move(
                 "original_first_controller_action":action,
                 "authored_spawn":initial,
                 "authored_first_safe_target":target,
+                "original_stage_zero_bg_sha256":manifest["original_stage_zero_bg_sha256"],
+                "actual_ppu_stage_zero_bg_sha256":sha256(bus.nametable[:960]).hexdigest(),
                 "native_observed_sprite_before":list(first_sprite),
                 "native_observed_sprite_after":list(observed),
                 "native_input_port_reads":bus.reads_4016-read_4016_before,
