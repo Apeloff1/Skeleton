@@ -440,3 +440,16 @@ def test_temporary_corridor_closure_forces_replanning_without_editing_map():
     with pytest.raises(MultipathError):
         solve_avoid_cells(p, ((0, 0),))
 
+
+def test_hazard_budget_exposes_explicit_shorter_risky_tradeoff():
+    p = RouteProblem.from_rows(HAZARD_LEVEL)
+    clean = solve_hazard_budget(p, max_hazard_visits=0)
+    exposed = solve_hazard_budget(p, max_hazard_visits=1)
+    assert clean.hazard_visits == 0
+    assert exposed.hazard_visits == 1
+    assert exposed.steps < clean.steps
+    assert verify_route_proof(p, clean)
+    assert verify_route_proof(p, exposed)
+    with pytest.raises(MultipathError):
+        solve_hazard_budget(p, max_hazard_visits=13)
+
