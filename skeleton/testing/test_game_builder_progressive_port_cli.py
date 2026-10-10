@@ -79,3 +79,42 @@ def test_cli_refuses_duplicate_targets_and_cycles():
         with pytest.raises(SystemExit) as exc:
             preview_from_argv(arguments(*destinations))
         assert exc.value.code == 2
+
+
+def test_cli_derives_hash_from_operator_owned_evidence_file(tmp_path):
+    from hashlib import sha256
+    source = tmp_path / "authorship.txt"
+    source.write_bytes(b"Original authored console game; copyright owner notes.")
+    args = arguments("windows_modern")
+    i = args.index("--evidence-sha256")
+    args[i:i+2] = ["--rights-evidence-file", str(source)]
+    result = preview_from_argv(args)
+    assert result["original_evidence_sha256"] == sha256(source.read_bytes()).hexdigest()
+    assert result["rights_independently_verified"] is False
+    assert result["distribution_authorized"] is False
+
+
+def test_cli_rejects_symlinked_rights_document_before_preview(tmp_path):
+    original = tmp_path / "original.txt"
+    original.write_text("Owned game design", encoding="utf-8")
+    shortcut = tmp_path / "shortcut.txt"
+    try:
+        shortcut.symlink_to(original)
+    except OSError:
+        pytest.skip("symlink test requires symlink-capable filesystem")
+    args = arguments("windows_modern")
+    index = args.index("--evidence-sha256")
+    args[index:index+2] = ["--rights-evidence-file", str(shortcut)]
+    with pytest.raises(SystemExit) as exc:
+        preview_from_argv(args)
+    assert exc.value.code == 2
+
+
+def test_cli_refuses_competing_manual_and_file_evidence_claims(tmp_path):
+    file = tmp_path / "authored.txt"
+    file.write_bytes(b"own source")
+    args = arguments("windows_modern")
+    args.extend(("--rights-evidence-file", str(file)))
+    with pytest.raises(SystemExit) as exc:
+        preview_from_argv(args)
+    assert exc.value.code == 2
