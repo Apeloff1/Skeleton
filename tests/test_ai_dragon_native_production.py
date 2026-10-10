@@ -450,3 +450,49 @@ def test_memory_bundle_detects_adversarial_nested_mutation():
     compromised = rezip({}, raw, extras=[("releases/alien.zip", b"x")])
     with pytest.raises(ValueError, match="unrecognized"):
         verify_source_bundle(compromised)
+
+
+
+def test_license_reference_is_not_published_as_plaintext():
+    spec = request(
+        rights_basis="documented_license",
+        rights_reference="private-license-reference-ALWAYS-OPAQUE",
+    )
+    payload, _ = make_source_release(project_for(spec), spec)
+    receipt = verify_source_release(payload)
+    assert "rights_reference" not in receipt
+    assert receipt["rights_reference_sha256"] == __import__("hashlib").sha256(
+        spec.rights_reference.encode()
+    ).hexdigest()
+    assert "private-license-reference" not in json.dumps(receipt)
+
+
+def test_source_bundle_verifier_rejects_fake_compiled_claim():
+    from skeleton.ai.webcrawler.dragon_native_production import (
+        build_source_bundle, verify_source_bundle,
+    )
+    spec = request(max_portfolio_bytes=3_000_000)
+    data, _ = build_source_bundle(spec, authorized=True)
+    with ZipFile(BytesIO(data)) as outer:
+        filename = next(n for n in outer.namelist() if n.startswith("releases/"))
+        inner = outer.read(filename)
+    with ZipFile(BytesIO(inner)) as native:
+        receipt = json.loads(native.read("release-receipt.json"))
+    receipt["compiler_state"] = "compiled_native"
+    altered_inner = rezip(
+        {"release-receipt.json": json.dumps(receipt).encode()}, inner,
+    )
+    altered_outer = rezip({filename: altered_inner}, data)
+    with pytest.raises(ValueError):
+        verify_source_bundle(altered_outer)
+
+
+def test_creator_publisher_rejects_symlink_parent_before_writing(tmp_path):
+    base = tmp_path / "actual"
+    base.mkdir()
+    shadow = tmp_path / "linked"
+    shadow.symlink_to(base, target_is_directory=True)
+    path = shadow / "release"
+    with pytest.raises(ValueError, match="symlink"):
+        publish_production(request(), path, authorized=True)
+    assert not (base / "release").exists()
