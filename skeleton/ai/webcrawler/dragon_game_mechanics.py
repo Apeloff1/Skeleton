@@ -137,7 +137,8 @@ class GameMechanicsMemory:
         return owner
 
     def record(self, session: GameSession, *, authorized: bool) -> str:
-        if not authorized or not session.capture_consent or not session.analysis_consent:
+        if (not isinstance(session, GameSession) or authorized is not True
+                or session.capture_consent is not True or session.analysis_consent is not True):
             raise PermissionError("game observation storage requires explicit consent")
         owner = self._owner(session.owner)
         if session.raw_video_retained:
