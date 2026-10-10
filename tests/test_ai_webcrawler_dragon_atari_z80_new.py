@@ -86,12 +86,16 @@ def test_atari_5200_statically_linked_real_analog_controller_and_antic_console()
         "joy_install(joy_static_stddrv)", "joy_read(0)",
         "JOY_LEFT_MASK", "JOY_RIGHT_MASK", "JOY_UP_MASK",
         "JOY_DOWN_MASK", "JOY_BTN_1_MASK",
-        "waitvsync()", "OS.color0", "OS.color1", "OS.color2",
+        "dragon_wait_frame()", "OS.color0", "OS.color1", "OS.color2",
         "GTIA_WRITE.colpf0", "GTIA_WRITE.colpf1", "GTIA_WRITE.colpf2",
         "#ifdef OS", "dragon_palette(",
         "gotoxy(px,py)", "life--", "score++", "level=1+score/4",
     ):
         assert required in c
+    assert "volatile unsigned char* const vcount" in c
+    assert "(volatile unsigned char*)0xD40B" in c
+    assert "while(*vcount>8)" in c and "while(*vcount<=8)" in c
+    assert "waitvsync();" not in c
     assert "-t atari5200" in game["Makefile"]
     assert "build/dragon.bin" in game["Makefile"]
     assert "PC DOS" not in game["README.port.md"]

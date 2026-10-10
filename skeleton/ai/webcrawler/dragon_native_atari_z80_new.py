@@ -83,6 +83,15 @@ static void move(unsigned char key){
   life--;guard=12;fx=17;fy=19;
  }
 }
+/* Synchronize to the next ANTIC frame using its actual hardware
+   vertical-line counter ($D40B). cc65 2.19's atari5200 target does not
+   export the Atari 8-bit waitvsync runtime symbol. Read volatile on each
+   poll; never optimize the hardware register into a stale constant. */
+static void dragon_wait_frame(void){
+ volatile unsigned char* const vcount=(volatile unsigned char*)0xD40B;
+ while(*vcount>8){}
+ while(*vcount<=8){}
+}
 int main(void){
  unsigned char pad,previous=0;
  if(joy_install(joy_static_stddrv)!=JOY_ERR_OK)return 1;
@@ -93,7 +102,7 @@ int main(void){
   move(pad);
   if(pad!=previous||step%6==0||!life)draw();
   previous=pad;
-  waitvsync();
+  dragon_wait_frame();
  }
  return 0;
 }
