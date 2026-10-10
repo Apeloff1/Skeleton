@@ -478,6 +478,21 @@ def native_world_maze_play(
     return {"ok":True,**player}
 
 
+@router.post("/native/production/routes/maze/recovery")
+def native_world_maze_recovery(
+    body:NativeMazePlayRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_route_maze import recover_maze
+    try:
+        built=_construct_native_maze(body)
+        report=recover_maze(built,tuple(body.moves))
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original current maze world state cannot be independently replayed") from None
+    return {"ok":True,**report}
+
+
 @router.post("/native/production/routes/maze/source-bundle")
 def native_world_maze_source_bundle(
     body: NativeMazeSourceRequest,
