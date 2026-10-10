@@ -18,8 +18,7 @@ from skeleton.ai.webcrawler.dragon_living_maze_solvers import (
 ])
 @pytest.mark.parametrize("goal",[(0,2,0),(0,-2,1),(0,1,2)])
 def test_two_independent_solvers_find_actual_waypoints_in_changing_maze(style,goal):
-    world=create_world(world_id=2026,variation=0) if False else (
-        create_world(world_id=2026,variant=3,style=style))
+    world=create_world(world_id=2026,variant=3,style=style)
     evidence=compare_solvers(world,goal,budget=3000,horizon=24)
     assert evidence["schema"]==SCHEMA
     assert evidence["independent_solvers"]==[
