@@ -16,6 +16,7 @@ on:
       - "scripts/game_builder/emulate_sega8_sdcc_boot.py"
       - "scripts/game_builder/sega8_real_z80_gameplay.py"
       - "skeleton/testing/test_game_builder_sega8_real_z80_gameplay.py"
+      - "skeleton/testing/test_game_builder_sega8_route_security.py"
       - "scripts/game_builder/sega8_port_parity.py"
       - "skeleton/testing/test_game_builder_sega8_port_parity.py"
       - "skeleton/testing/test_game_builder_sega8_sdcc_cpu_boot.py"
@@ -328,7 +329,7 @@ jobs:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: |
           python -m pip install --disable-pip-version-check "pytest>=8.4,<9"
-          python -m pytest -q --noconftest skeleton/testing/test_game_builder_sega8_port_parity.py
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_sega8_port_parity.py skeleton/testing/test_game_builder_sega8_route_security.py
       - name: Verify identical game rules and independent ROM bytes
         run: |
           python -m scripts.game_builder.sega8_port_parity \
