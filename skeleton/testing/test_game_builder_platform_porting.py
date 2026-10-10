@@ -290,7 +290,7 @@ def test_editor_distinguishes_real_native_source_generation_from_certified_binar
     assert form["native_source_project_destinations"] == [
         "apple_ii", "atari_400_800", "commodore_64", "dos_vga", "linux_desktop", "macos_modern", "msx1", "nintendo_famicom", "nintendo_game_boy", "nintendo_game_boy_color", "sinclair_zx_spectrum", "windows_modern",
     ]
-    assert form["source_export_status"] == "three_desktop_three_rom_one_c64_one_dos_one_atari8_one_apple2_one_zx48_native_sources"
+    assert form["source_export_status"] == "three_desktop_three_rom_one_c64_one_dos_one_atari8_one_apple2_one_zx48_one_msx1_native_sources"
     assert form["export_status"] == "no_native_target_verified"
     native = {option["id"]: option for option in form["target_options"]}
     for target in form["native_source_project_destinations"]:
