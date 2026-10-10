@@ -221,3 +221,49 @@ Regression coverage includes 40-character real Git revision IDs,
 after generation, substituted authorship records, unreviewed extra files,
 allowed build intermediates, linked/sparse cartridge files and forged
 release booleans.
+
+
+## Differential execution of actual generated game logic
+
+A deterministic, independently generated reference now accompanies each
+original native SDCC console example:
+
+```bash
+python -m scripts.game_builder.native_sega_8bit_ci \
+  --target sega_game_gear --emit ./homebrew-gg \
+  --host-reference-out ./gameplay-reference.json \
+  --author-evidence ./my-authorship-proof.txt
+
+python -m scripts.game_builder.sega8_source_replay \
+  --source-dir ./homebrew-gg \
+  --reference ./gameplay-reference.json
+```
+
+The second command uses GCC to **compile and execute the very same emitted
+`game.c` gameplay implementation** with a deliberately narrow host-only
+SMSlib hardware stand-in. It is not a restatement of the gameplay rules in
+Python, nor an independent Game Gear or Z80 emulator. The input actions and
+every expected movement, health, score, objective, win/loss and cosmetic
+companion rank are computed beforehand from the authoritative independently
+maintained `playable_simulation` reference. The generated C must match each
+step exactly. The host stub also checks original VDP name-table writes,
+four-digit score glyphs, companion rank UI updates, palette writes and
+per-move follower sprite submission.
+
+A dedicated adversarial eight-stage case verifies the entire maximum
+world stack, a 1,280-point final score, seven bond unlocks, and terminal
+level-index safety. The native engine was repaired after discovering an
+incorrect final-level increment and missing 100-point exit rewards.
+
+The CI workflow now requires **both** this host-executed gameplay
+differential **and** independent real SDCC cartridge builds with bounded ROM
+integrity evidence. The two checks are complementary: neither a valid
+cartridge header nor host C execution alone proves machine-code playability.
+Neither constitutes an independent license review or permission to
+redistribute a ROM, a proprietary firmware component, or external artwork.
+
+Required remaining gates before claiming a fully playable native cartridge:
+independent Z80/VDP input-driven emulation of the **compiled** SMS/GG ROM
+with a complete winning replay, external emulator confirmation,
+and targeted physical hardware tests. Each status is separately represented
+in the evidence and remains false until that test actually occurs.
