@@ -407,3 +407,40 @@ Both targets are original homebrew. Hardware compatibility headers,
 recognizable genre conventions and independent reimplementation are not
 treated as permission to extract commercial assets, distribute proprietary
 firmware or plagiarize a protected game's audiovisual presentation.
+
+
+## Cross-port verification requires reproducibility receipts (October 10, 2026)
+
+The final Master System/Game Gear parity stage now **refuses** to conclude
+the ports are equivalent unless it can inspect *both* console-specific
+`skeleton.game_builder.sega_reproducibility.v1` receipts alongside each
+native source manifest, host-executed original C replay and the bounded
+real-Z80 startup evidence.
+
+Every reproducibility receipt must match its own console's exact world,
+source, signed-scope author declaration, safe route, 32 KiB ROM SHA-256,
+full Git toolchain commit and independently compared source/tree identities.
+The comparison digest is recomputed from the complete immutable JSON
+representation. Duplicate JSON fields, unknown data fields, fake legal or
+full-hardware success booleans, altered compilation metadata and missing
+second-build reports are rejected.
+
+The final parity receipt contains a separate SHA-256 digest for each
+console's native rebuild report. Different machine ROM binaries remain
+distinct, while their original authored world and solved route remain
+the same. The final report writer uses create-only/no-follow file handles:
+the cross-port output cannot silently overwrite an old approved receipt.
+
+**The cross-platform outcome can establish agreement of existing source,
+ROM and host-replay reports; it cannot independently establish that two
+compiler processes ran, that the Z80 emulator is cycle-accurate, or that
+copyright clearance or publication permission exists.** These remain
+explicitly separate fail-closed gates.
+
+An independently executed 8-bit CPU startup smoke test has also exposed
+a current integration failure: the compiled Z80 interpreter has been
+exhausting its bounded instruction budget without the expected video or
+audio I/O writes. The branch must NOT be marked hardware-playable until
+the startup trace, selected CPU core, real ROM mapper and device callbacks
+produce validated hardware-facing results in exact-head CI. Successful
+source-host gameplay tests do not substitute for real ROM CPU execution.
