@@ -53,3 +53,11 @@ def encode_rgb332(pixel: object) -> int:
     r,g,b=_rgb(pixel)
     return ((r*7+127)//255)<<5 | ((g*7+127)//255)<<2 | ((b*3+127)//255)
 
+
+def decode_rgb332(word: object) -> tuple[int,int,int]:
+    """Expand 8-bit RGB332 into working RGB with deterministic rounding."""
+    n=_packed(word,255)
+    return ((((n>>5)&7)*255+3)//7,
+            (((n>>2)&7)*255+3)//7,
+            ((n&3)*255+1)//3)
+
