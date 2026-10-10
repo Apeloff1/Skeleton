@@ -82,3 +82,26 @@ def index_image(rows: object, colors: object) -> tuple[tuple[int,...],...]:
     return tuple(tuple(nearest_palette_index(pixel,palette) for pixel in row)
                  for row in rows)
 
+
+def ordered_luma_dither(rows: object, *, levels: int=4) -> tuple[tuple[int,...],...]:
+    """Bayer 4×4 ordered luminance quantization without random flicker."""
+    if type(levels) is not int or not 2<=levels<=16:
+        raise PaletteError("dither levels must be 2..16")
+    if (not isinstance(rows,(tuple,list)) or not 1<=len(rows)<=64
+            or not isinstance(rows[0],(tuple,list)) or not 1<=len(rows[0])<=64
+            or any(not isinstance(row,(tuple,list)) or len(row)!=len(rows[0])
+                   or any(type(v) is not int or not 0<=v<=255 for v in row)
+                   for row in rows)):
+        raise PaletteError("grayscale framebuffer must be bounded rectangular 8-bit")
+    bayer=((0,8,2,10),(12,4,14,6),(3,11,1,9),(15,7,13,5))
+    output=[]
+    for y,row in enumerate(rows):
+        result=[]
+        for x,value in enumerate(row):
+            scaled=value*(levels-1)
+            low,rem=divmod(scaled,255)
+            raised=int(low<levels-1 and rem*16 > (bayer[y%4][x%4]*255+127))
+            result.append(low+raised)
+        output.append(tuple(result))
+    return tuple(output)
+
