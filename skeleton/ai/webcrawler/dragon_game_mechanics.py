@@ -187,7 +187,9 @@ class GameMechanicsMemory:
             [owner, session.game_label, session.duration_ms, rows],
             separators=(",", ":"), ensure_ascii=True,
         ).encode()).hexdigest()
-        if session.session_id != expected:
+        if (not isinstance(session.session_id, str)
+                or re.fullmatch(r"[0-9a-f]{64}", session.session_id) is None
+                or not hmac.compare_digest(session.session_id, expected)):
             raise ValueError("session identifier does not match observations")
         with self.db:
             count = self.db.execute(
