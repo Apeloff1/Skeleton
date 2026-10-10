@@ -133,3 +133,15 @@ def test_turn_metric_distinguishes_direct_route_from_detour():
     assert route_turns(detour) == 2
     assert detour.steps == 8
 
+
+def test_corridor_overlap_is_symmetric_and_identity_exact():
+    p = RouteProblem.from_rows(OPEN_LEVEL)
+    a = solve_route(p)
+    b = solve_route(p, algorithm="dijkstra",
+                    edge_penalties={((1, 1), (2, 1)): 100})
+    assert route_overlap_ppm(a, a) == 1_000_000
+    assert 0 <= route_overlap_ppm(a, b) < 1_000_000
+    assert route_overlap_ppm(a, b) == route_overlap_ppm(b, a)
+    with pytest.raises(MultipathError, match="same verified world"):
+        route_overlap_ppm(a, solve_route(RouteProblem.from_rows(HAZARD_LEVEL)))
+
