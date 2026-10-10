@@ -266,3 +266,14 @@ def test_cycle_rank_distinguishes_tree_world_from_open_alternatives():
     assert cycle_rank(line) == 0
     assert cycle_rank(RouteProblem.from_rows(OPEN_LEVEL)) > 0
 
+
+def test_exact_tile_distances_match_single_corridor_ground_truth():
+    p = RouteProblem.from_rows((
+        "#########", "#S.C...G#", "#########", "#########",
+        "#########", "#########", "#########", "#########", "#########",
+    ))
+    distances = tile_distances(p, p.start)
+    assert distances[p.goal] == 6
+    assert distances[p.collectibles[0]] == 2
+    assert len(distances) == 7
+
