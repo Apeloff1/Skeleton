@@ -518,7 +518,7 @@ export default function DragonOriginalPuzzleEditor({
         setStatus(error instanceof Error ? error.message :
                   'Original campaign review failed.');
     } finally {
-      if (epoch===routeEpoch.current) setCampaignBusy(false);
+      setCampaignBusy(false);
     }
   };
 
@@ -561,7 +561,7 @@ export default function DragonOriginalPuzzleEditor({
       if (generation===routeEpoch.current)
         setStatus(error instanceof Error ? error.message : 'Alternate game route search failed.');
     } finally {
-      if (generation===routeEpoch.current) setRouteBusy(false);
+      setRouteBusy(false);
     }
   };
 
