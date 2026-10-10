@@ -26,3 +26,9 @@ def gameboy_pulse_frequency(period: int) -> float:
     """Recover an actual Game Boy pulse tone's frequency from 11-bit period."""
     return round(131072/(2048-_integer(period,"Game Boy tone period",0,2047)),6)
 
+
+def nes_pulse_timer(hertz: int) -> int:
+    """NTSC 2A03 APU pulse timer with CPU divider 16 and 11-bit range."""
+    hz=_integer(hertz,"NES pulse Hz",55,111860)
+    return max(0,min(2047,(1789773+8*hz)//(16*hz)-1))
+
