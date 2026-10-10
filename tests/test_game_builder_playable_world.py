@@ -172,6 +172,37 @@ class PlayableWorldTests(unittest.TestCase):
                 with self.assertRaises(PlayableWorldError):
                     intent(**change)
 
+    def test_receipt_constructor_rejects_malformed_chain_inputs(self):
+        game = generate_playable_world(intent(levels=1), authorized=True)
+        replay = play_actions(game, ("up", "right"), authorized=True)
+        receipt = replay.action_receipts[0]
+        for changes in (
+            {"index": True}, {"index": -1},
+            {"index": 20000}, {"action": ["left"]},
+            {"action": "teleport"}, {"before_digest": "F" * 64},
+            {"after_digest": None}, {"prev_receipt_digest": "a" * 63},
+        ):
+            with self.subTest(changes=changes):
+                with self.assertRaises(GameplayError):
+                    replace(receipt, **changes)
+        for changes in (
+            {"world_digest": "!" * 64},
+            {"initial_state_digest": None},
+            {"action_receipts": []},
+            {"final_state": object()},
+        ):
+            with self.subTest(changes=changes):
+                with self.assertRaises(GameplayError):
+                    replace(replay, **changes)
+
+    def test_replay_constructor_checks_causal_start_and_final_boundaries(self):
+        game = generate_playable_world(intent(levels=1), authorized=True)
+        replay = play_actions(game, ("up", "right"), authorized=True)
+        with self.assertRaisesRegex(GameplayError, "boundary receipts"):
+            replace(replay, initial_state_digest="a" * 64)
+        with self.assertRaisesRegex(GameplayError, "boundary receipts"):
+            replace(replay, final_state=initial_state(game, authorized=True))
+
     def test_action_and_authorization_admission_rejects_type_confusion(self):
         game = generate_playable_world(intent(levels=1), authorized=True)
         state = initial_state(game, authorized=True)
