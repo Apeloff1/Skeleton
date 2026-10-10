@@ -9,6 +9,8 @@ from hashlib import sha256
 from pathlib import Path
 import re
 
+from .native_release_intake import _read_bounded, NativeIntakeError
+
 _HEADER_AT = 0x7FF0
 _LENGTH = 32 * 1024
 _REGIONS = {"sega_master_system": 0x4, "sega_game_gear": 0x7}
@@ -64,11 +66,13 @@ def validate_rom(
 def validate_rom_file(
     path: str | Path, target: str, *, expected_sha256: str | None = None,
 ) -> dict[str,object]:
-    target_path=Path(path)
-    if target_path.is_symlink() or not target_path.is_file():
-        raise Sega8BitROMError("native cartridge must be an ordinary local file")
-    if target_path.stat().st_size!=_LENGTH:
-        raise Sega8BitROMError("wrong native cartridge byte length")
-    # A file-based verification is local intake, not a secure multi-process
-    # attestation; byte binding is only claimed for the bytes actually read.
-    return validate_rom(target_path.read_bytes(),target,expected_sha256=expected_sha256)
+    # Opening with Path.is_file()/read_bytes() allows symlink swaps after
+    # inspection. The bounded native intake opens every ancestor and final
+    # inode with no-follow descriptors; it also rejects hardlinks and pipes.
+    try:
+        data = _read_bounded(Path(path), max_bytes=_LENGTH)
+    except (NativeIntakeError, OSError, ValueError) as exc:
+        raise Sega8BitROMError(
+            "ROM must be an unlinked, bounded, regular native cartridge file"
+        ) from exc
+    return validate_rom(data, target, expected_sha256=expected_sha256)
