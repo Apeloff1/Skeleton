@@ -547,3 +547,38 @@ Target tests:
 All are now in the focused historical archive checks; the native
 Sega CI also runs original source replay and compiled native guest
 execution for both consoles.
+
+## Native original-game demonstration and exhibition controls
+
+Both **Master System** and **Game Gear** cartridges now embed each generated
+world's own independently verified safe solution as a compact native
+direction table, with no commercial video-game data or proprietary assets.
+
+Hold both face buttons **1 + 2 together for 25 video frames** to start
+an optional original-game exhibition. The cartridge resets the score,
+health, collectible counters and cosmetic companion rank to an unplayed
+level 1, restores the original theme palette, and then performs the
+solution movements using exactly the same native `advance()` gameplay
+routine used for human-controlled play. Each level hands off to its own
+verified route. Actual game collision, score, collectible and victory
+rules are never bypassed by the demonstration.
+
+Press any **new** button during playback to cancel; the game restores a
+new human-controlled run. Playback never starts automatically. The
+two-button chord takes precedence over individual pause/sound toggles
+while held, preventing accidental state changes. The demonstration
+can be invoked after a finished game as well as before the first move.
+
+The original authored paths are generated into *different* native ROM
+source files for each destination console. The CI host compiler executes
+the real emitted C tables separately and must reproduce every state of
+the source-game replay. An additional instruction-level Z80 gate presses
+the real face-button combination against the compiled cartridge, checks
+that the opening original move is performed without input, then cancels
+and verifies the original starting game is restored.
+
+Cross-console acceptance rejects a missing/modified demonstration
+fingerprint, unequal gameplay traces, absence of real Z80 demonstration
+activation or a cancelled exhibition that fails to restore user control.
+The receipts still never claim physical hardware testing or legal
+publication approval without independent verification.
