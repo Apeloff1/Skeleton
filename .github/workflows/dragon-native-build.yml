@@ -109,7 +109,8 @@ jobs:
             tests/test_ai_dragon_route_native_integration.py \
             tests/test_ai_dragon_route_world_assurance.py \
             tests/test_ai_dragon_route_world_batch.py \
-            tests/test_ai_dragon_route_world_batch.py \
+            tests/test_ai_dragon_route_maze.py \
+            tests/test_ai_dragon_route_maze_native.py \
             tests/test_ai_dragon_route_world_assurance.py \
             tests/test_ai_dragon_native_puzzle_graphics.py \
             tests/test_ai_webcrawler_dragon_native_projects.py \
@@ -504,7 +505,8 @@ jobs:
             skeleton/ai/webcrawler/dragon_route_world.py \
             skeleton/ai/webcrawler/dragon_route_world_factory.py \
             skeleton/ai/webcrawler/dragon_route_world_variants.py \
-            skeleton/ai/webcrawler/dragon_route_native_game.py
+            skeleton/ai/webcrawler/dragon_route_native_game.py \
+            skeleton/ai/webcrawler/dragon_route_maze.py
       - name: Install strictly local Python testing dependencies
         run: python -m pip install --disable-pip-version-check pytest
       - name: Compile and replay true weather/secret/free-roam C99 games
@@ -513,7 +515,34 @@ jobs:
           python -m pytest -q \
             tests/test_ai_dragon_route_world.py \
             tests/test_ai_dragon_route_native_game.py \
-            tests/test_ai_dragon_route_native_integration.py
+            tests/test_ai_dragon_route_native_integration.py \
+            tests/test_ai_dragon_route_maze.py \
+            tests/test_ai_dragon_route_maze_native.py
+      - name: Require every-room, all-climate and secret C99 maze gameplay
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from skeleton.ai.webcrawler.dragon_route_maze import MazeRequest,build_maze,verify_maze
+          from skeleton.ai.webcrawler.dragon_route_native_game import emit_route_game
+          creation=build_maze(MazeRequest(width=6,height=6,seed=1977,
+              challenge="spicy",scenic_density=90,secret_count=3))
+          assert verify_maze(creation)["rooms"]==36
+          source=emit_route_game(creation.world,creation.traveller,
+                                 authorized=True,maze_creation=creation)
+          root=Path("/tmp/dragon-certified-maze")
+          for name,text in source.items():
+              file=root/name
+              file.parent.mkdir(parents=True,exist_ok=True)
+              file.write_text(text,encoding="utf-8")
+          PY
+          make -C /tmp/dragon-certified-maze
+          /tmp/dragon-certified-maze/dragon_route_game --selftest \
+            | tee /tmp/dragon-certified-maze-proof.txt
+          grep 'DRAGON_ORIGINAL_ROUTE_PASS name=maze_spine' /tmp/dragon-certified-maze-proof.txt
+          grep 'DRAGON_ORIGINAL_ROUTE_PASS name=room_35' /tmp/dragon-certified-maze-proof.txt
+          grep 'DRAGON_ORIGINAL_ROUTE_PASS name=secret_' /tmp/dragon-certified-maze-proof.txt
+          grep 'DRAGON_ORIGINAL_ROUTE_PASS name=doubleback_' /tmp/dragon-certified-maze-proof.txt
       - name: Build a playable original rainy game source distribution
         run: |
           set -euo pipefail
