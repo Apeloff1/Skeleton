@@ -225,7 +225,7 @@ class GameMechanicsMemory:
     def sessions(self, owner: str, *, authorized: bool, limit: int = 100
                  ) -> tuple[GameSession, ...]:
         owner = self._owner(owner)
-        if not authorized:
+        if authorized is not True:
             raise PermissionError("game history requires authorization")
         if type(limit) is not int or not 1 <= limit <= 1000:
             raise ValueError("invalid history limit")
