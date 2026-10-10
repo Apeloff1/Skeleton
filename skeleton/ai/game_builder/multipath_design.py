@@ -274,4 +274,18 @@ def route_edges(proof: RouteProof) -> tuple[Edge, ...]:
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges"]
+def route_revisits(proof: RouteProof) -> int:
+    """Count revisited tiles, including deliberate collectible backtracks."""
+    if not isinstance(proof, RouteProof):
+        raise MultipathError("typed RouteProof required")
+    seen: set[Position] = set()
+    repeated = 0
+    for position in proof.positions:
+        if position in seen:
+            repeated += 1
+        seen.add(position)
+    return repeated
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits"]
