@@ -32,7 +32,7 @@ ENTRY_MODES=(
 TRAVERSAL=(
     "walk","swim","float","fly","sail","climb","crawl","glide",
     "portal","jump","ride","teleport","swing","dig","orbit",
-    "phase","scale","reverse_walk","echo_step","drift",
+    "phase","scale","reverse_walk","echo_step","drift","slide",
 )
 CONSEQUENCES=(
     "none","collect_knowledge","upgrade_item","affect_parent",
