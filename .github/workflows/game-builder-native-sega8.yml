@@ -1,0 +1,100 @@
+name: Game Builder Native Sega 8-bit Cartridge
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/game-builder-native-sega8.yml"
+      - "skeleton/ai/game_builder/sega_8bit_native_export.py"
+      - "skeleton/ai/game_builder/sega_8bit_rom.py"
+      - "skeleton/ai/game_builder/native_game_cli.py"
+      - "skeleton/ai/game_builder/native_portfolio_cli.py"
+      - "skeleton/ai/game_builder/playable_world.py"
+      - "skeleton/ai/game_builder/port_planner.py"
+      - "scripts/game_builder/native_sega_8bit_ci.py"
+      - "skeleton/testing/test_game_builder_sega_8bit_native.py"
+      - "skeleton/testing/test_game_builder_sega_8bit_rom.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: game-native-sega8-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-original-cartridge:
+    name: Real Z80 ROM build (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [sega_master_system, sega_game_gear]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout original homebrew source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout reviewed public-domain devkitSMS toolchain assets
+        uses: actions/checkout@v4
+        with:
+          repository: sverx/devkitSMS
+          ref: 533ae572c897cf44f1da865013ebf690134301a3
+          path: .external/devkitSMS
+          persist-credentials: false
+      - name: Install real Z80 C toolchain and host compiler
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends sdcc gcc make
+          sdcc --version
+      - name: Check pinned public toolchain and source licenses
+        run: |
+          test "$(git -C .external/devkitSMS rev-parse HEAD)" = 533ae572c897cf44f1da865013ebf690134301a3
+          test -s .external/devkitSMS/LICENSES.txt
+          test -s .external/devkitSMS/crt0/crt0_sms.rel
+          test -s .external/devkitSMS/SMSlib/SMSlib.lib
+          test -s .external/devkitSMS/SMSlib/SMSlib_GG.lib
+          test -s .external/devkitSMS/SMSlib/src/SMSlib.h
+          grep -q 'special exception' .external/devkitSMS/LICENSES.txt
+      - name: Compile actual opensource IHX-to-ROM converter
+        run: |
+          make -C .external/devkitSMS/tools/makesms/src
+          test -x .external/devkitSMS/tools/makesms/src/makesms
+      - name: Create deterministic independent authorship receipt
+        run: |
+          printf '%s\n' 'Skeleton independently authored maze, glyphs and safe replay; CI demonstration, not legal certification.' > /tmp/original-sega-authorship.txt
+      - name: Generate distinct game source for the selected real console
+        env:
+          TARGET: ${{ matrix.platform }}
+        run: |
+          python -m scripts.game_builder.native_sega_8bit_ci \
+            --target "$TARGET" --emit "output/$TARGET" \
+            --author-evidence /tmp/original-sega-authorship.txt
+      - name: Build actual original cartridge with SDCC and devkitSMS
+        env:
+          TARGET: ${{ matrix.platform }}
+        run: |
+          make -C "output/$TARGET" \
+            SDCC=sdcc \
+            SMSLIB_DIR="$PWD/.external/devkitSMS/SMSlib" \
+            CRT0_SMS="$PWD/.external/devkitSMS/crt0/crt0_sms.rel" \
+            MAKESMS="$PWD/.external/devkitSMS/tools/makesms/src/makesms"
+      - name: Verify binary bytes and bind exact source/target/commit evidence
+        env:
+          TARGET: ${{ matrix.platform }}
+        run: |
+          case "$TARGET" in
+            sega_master_system) EXT=sms ;;
+            sega_game_gear) EXT=gg ;;
+            *) exit 3 ;;
+          esac
+          python -m scripts.game_builder.native_sega_8bit_ci \
+            --verify-rom "output/$TARGET/build/skeleton-original.$EXT" \
+            --source-dir "output/$TARGET" --target "$TARGET" \
+            --toolchain-revision 533ae572c897cf44f1da865013ebf690134301a3 \
+            --receipt-out "/tmp/$TARGET-compilation-evidence.json"
+          python -m json.tool "/tmp/$TARGET-compilation-evidence.json" >/dev/null
+      # No ROM is published: linking requirements and legal review remain
+      # separate. This workflow does not assert emulator or hardware gameplay.
