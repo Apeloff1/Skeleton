@@ -253,6 +253,17 @@ def verify_ports(root: Path) -> dict[str, object]:
         ):
             raise Sega8PortParityError("native Z80 replay not bound to every expected game action")
         _sha(native_route.get("semantic_controller_screen_trace_sha256"), "actual Z80 semantic trace")
+        if (
+            meta.get("original_native_solution_attract_mode") is not True
+            or meta.get("original_demo_uses_identical_game_rules") is not True
+            or meta.get("original_demo_autostart") is not False
+            or meta.get("original_demo_external_content") is not False
+            or type(meta.get("original_demo_playback_steps")) is not int
+            or meta["original_demo_playback_steps"]
+               != host["original_controller_actions_verified"]
+        ):
+            raise Sega8PortParityError("original native demonstration not bound to game replay")
+        _sha(meta.get("original_demo_solution_sha256"), "original demo solution")
         _sha(meta.get("world_digest"), "world")
         _sha(meta.get("reference_safe_replay_digest"), "safe replay")
         _sha(meta.get("source_rights_evidence_sha256"), "rights evidence")
@@ -265,6 +276,7 @@ def verify_ports(root: Path) -> dict[str, object]:
     gg = records["sega_game_gear"]
     identity = ("project_id", "world_digest", "reference_safe_replay_digest",
                 "source_rights_evidence_sha256", "original_color_theme",
+                "original_demo_solution_sha256",
                 "levels", "width", "height", "title")
     for key in identity:
         if sms["manifest"].get(key) != gg["manifest"].get(key):
@@ -314,6 +326,8 @@ def verify_ports(root: Path) -> dict[str, object]:
         "native_attract_demo_entry_and_cancel_verified_on_both_platforms": True,
         "original_demo_controller_actions_verified_per_platform":
             sms["host"]["original_demo_controller_actions_verified"],
+        "original_demo_solution_sha256":
+            sms["manifest"]["original_demo_solution_sha256"],
         "native_cartridge_rebuild_byte_equality_checked_per_platform": True,
         "native_rebuild_provenance_sha256_by_platform": {
             target: records[target]["reproducibility"]["comparison_sha256"]
