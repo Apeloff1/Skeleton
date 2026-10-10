@@ -46,3 +46,13 @@ def test_rgb332_pack_three_three_two_layout():
     with pytest.raises(PaletteError):
         encode_rgb332((1,2))
 
+
+def test_rgb332_roundtrip_and_component_range():
+    assert decode_rgb332(255)==(255,255,255)
+    for c in ((16,39,103),(200,211,222)):
+        got=decode_rgb332(encode_rgb332(c))
+        assert all(0<=v<=255 for v in got)
+        assert max(abs(a-b) for a,b in zip(c,got))<=43
+    with pytest.raises(PaletteError):
+        decode_rgb332(True)
+
