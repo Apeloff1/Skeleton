@@ -117,6 +117,18 @@ def _puzzle_proof(source_archive: bytes) -> tuple[dict, dict[str, str]]:
             proof.get("stages") != len(rows) or
             receipt["campaign_stages"] != len(rows)):
         raise ValueError("native puzzle proof does not match source release")
+    from .dragon_native_campaign_paths import (
+        design_campaign,verify_graph_report,graph_report,
+    )
+    campaign=verify_graph_report(proof.get("campaign_graph"))
+    if (len(campaign.chapters)!=len(rows) or
+            proof.get("campaign_mode")!=campaign.mode or
+            graph_report(design_campaign(
+                len(rows),seed=proof["seed"],
+                mode=proof["campaign_mode"],
+                intensity=proof.get("challenge_profile", "balanced"),
+            ))!=proof["campaign_graph"]):
+        raise ValueError("native campaign graph routes or ending receipt altered")
     # Recheck every level with the existing exact bounded BFS solver, rather
     # than just accepting a plausible-looking declared solution string.
     from .dragon_native_puzzle import transformed_level, solve_grid
@@ -195,6 +207,8 @@ def _puzzle_proof(source_archive: bytes) -> tuple[dict, dict[str, str]]:
         hero=design.hero if design is not None else "hatchling",
         theme=design.quest_theme if design is not None else "ancient_ruins",
         palette=design.palette if design is not None else "dmg_green",
+        campaign_mode=proof["campaign_mode"],
+        challenge_profile=proof.get("challenge_profile", "balanced"),
     )
     for name in REQUIRED_SOURCE_FILES:
         if canonical[name] != inventory[name]:
