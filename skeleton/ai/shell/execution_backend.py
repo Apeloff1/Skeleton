@@ -1,47 +1,12 @@
-"""Plan-level execution backend abstraction for AI orchestration.
+"""Compatibility shim — re-exports `skeleton.shells.ai.execution_backend`.
 
-Backends receive an already compiled ExecutionPlan. They never receive raw model
-text and cannot widen the reviewed plan.
-"""
+This shim exists so callers of `skeleton.ai.shell.execution_backend` keep working while `skeleton.shells.ai.execution_backend` remains the implementation owner. It delegates into the canonical owner and must not grow a second implementation. See issue #80 and docs/CANONICAL_MODULE_BOUNDARIES.md."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
+from skeleton.shells.ai.execution_backend import (
+    AIPlanExecutionBackend,
+    ShellServiceExecutionBackend,
+)
 
-from skeleton.shells.execution_context import ExecutionContext
-from skeleton.shells.execution_plan import ExecutionPlan
-from skeleton.shells.plan_executor import PlanExecutionReport
-from skeleton.shells.shell_service import ShellService
-
-
-@runtime_checkable
-class AIPlanExecutionBackend(Protocol):
-    @property
-    def backend_id(self) -> str: ...
-
-    def execute_plan(
-        self,
-        plan: ExecutionPlan,
-        *,
-        context: ExecutionContext,
-    ) -> PlanExecutionReport: ...
-
-    def receipt_root(self) -> str: ...
-
-
-@dataclass
-class ShellServiceExecutionBackend:
-    shell_service: ShellService
-    backend_id: str = "shell-service-host"
-
-    def execute_plan(
-        self,
-        plan: ExecutionPlan,
-        *,
-        context: ExecutionContext,
-    ) -> PlanExecutionReport:
-        return self.shell_service.execute_plan(plan, context=context)
-
-    def receipt_root(self) -> str:
-        return self.shell_service.receipts.root_hash()
+__all__ = ['AIPlanExecutionBackend', 'ShellServiceExecutionBackend']
