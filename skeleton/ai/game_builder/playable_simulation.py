@@ -427,6 +427,103 @@ def serialize_replay(
     return raw
 
 
+
+def deserialize_replay(
+    world: PlayableWorld, data: bytes, *, authorized: bool,
+) -> GameReplay:
+    """Reconstruct an offline-save replay without accepting ambiguous JSON.
+
+    The archived action chain is never trusted: every move is executed again
+    against the supplied, digest-matched original game world.
+    """
+    if authorized is not True:
+        raise PermissionError("offline replay restore requires authorization")
+    if (type(data) is not bytes or not 0 < len(data) <= MAX_SERIALIZED_REPLAY_BYTES):
+        raise GameplayError("offline replay save has invalid byte budget")
+
+    def _unique(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        value: dict[str, object] = {}
+        for name, item in pairs:
+            if name in value:
+                raise GameplayError("duplicate offline replay JSON key")
+            value[name] = item
+        return value
+
+    def _finite(value: str) -> None:
+        raise GameplayError("nonfinite offline replay JSON number")
+
+    try:
+        payload = json.loads(
+            data.decode("utf-8", "strict"),
+            object_pairs_hook=_unique,
+            parse_constant=_finite,
+        )
+        if type(payload) is not dict or canonical_json(payload).encode("ascii") != data:
+            raise GameplayError("offline replay JSON not canonical")
+    except (UnicodeError, TypeError, ValueError, RecursionError, OverflowError) as exc:
+        raise GameplayError("invalid offline replay JSON") from exc
+
+    if (
+        set(payload) != {"schema", "world_digest", "replay", "replay_digest"}
+        or payload["schema"] != "skeleton.game_builder.offline-replay-save.v1"
+        or payload["world_digest"] != world.digest
+    ):
+        raise GameplayError("offline replay save world or schema mismatch")
+    document = payload["replay"]
+    if (
+        type(document) is not dict
+        or set(document) != {
+            "schema", "world_digest", "initial_state_digest", "actions", "final_state",
+        }
+        or document["schema"] != "skeleton.game_builder.game_replay.v1"
+        or type(document["actions"]) is not list
+        or len(document["actions"]) > MAX_REPLAY_ACTIONS
+    ):
+        raise GameplayError("offline replay document shape invalid")
+    state = document["final_state"]
+    if (
+        type(state) is not dict
+        or set(state) != {
+            "world_digest", "level_index", "x", "y", "collected",
+            "health", "steps", "score", "status",
+        }
+        or type(state["collected"]) is not list
+        or len(state["collected"]) > MAX_COLLECTIBLES
+        or any(type(pair) is not list or len(pair) != 2 for pair in state["collected"])
+    ):
+        raise GameplayError("offline replay state shape invalid")
+    try:
+        restored = PlayState(
+            state["world_digest"], state["level_index"], state["x"], state["y"],
+            tuple(tuple(point) for point in state["collected"]),
+            state["health"], state["steps"], state["score"], state["status"],
+        )
+        receipts: list[ActionReceipt] = []
+        for entry in document["actions"]:
+            if type(entry) is not dict or set(entry) != {
+                "index", "action", "before_digest", "after_digest",
+                "prev_receipt_digest", "digest",
+            }:
+                raise GameplayError("offline replay receipt shape invalid")
+            row = ActionReceipt(
+                entry["index"], entry["action"], entry["before_digest"],
+                entry["after_digest"], entry["prev_receipt_digest"],
+            )
+            if entry["digest"] != row.digest:
+                raise GameplayError("offline replay receipt digest mismatch")
+            receipts.append(row)
+        replay = GameReplay(
+            document["world_digest"], tuple(receipts), restored,
+            document["initial_state_digest"],
+        )
+    except (TypeError, ValueError, KeyError, IndexError, AttributeError) as exc:
+        raise GameplayError("offline replay fields invalid") from exc
+    if replay.digest != payload["replay_digest"]:
+        raise GameplayError("offline replay root identity mismatch")
+    verify_replay(world, replay, authorized=True)
+    return replay
+
+
 def demonstrate_solvable(world: PlayableWorld, *, authorized: bool) -> GameReplay:
     """Execute each level's hazard-free proof with the real transition engine."""
     if authorized is not True:
