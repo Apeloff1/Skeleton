@@ -74,6 +74,12 @@ SOURCE_RENDERERS.update({
     "bbc_micro":"6502 BBC Micro MOS native conio VDU",
     "oric_atmos":"6502 Oric Atmos ULA native cc65 text VDU",
 })
+SOURCE_RENDERERS.update({
+    "atari_5200":"6502 ANTIC mode-6 cc65 console with real 5200 joy driver",
+    "colecovision":"Z80 Coleco TMS9928A VDP gamepad CRT via z88dk",
+    "zx81":"Z80 16K ZX81 ULA text and real keyboard game",
+    "msx2":"Z80 MSX2 V9938 BIOS text + native MSX joystick",
+})
 assert set(SOURCE_RENDERERS)==EMITTERS
 
 @dataclass(frozen=True)

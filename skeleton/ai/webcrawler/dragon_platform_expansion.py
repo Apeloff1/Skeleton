@@ -33,9 +33,10 @@ magnavox_odyssey|Magnavox|first generation|1972|discrete logic|analog overlays|n
 fairchild_channel_f|Fairchild|second generation|1976|Fairchild F8|2K video RAM|mono oscillator|hand controller|F8 cross assembler|bin|toolchain_adapter
 rca_studio_ii|RCA|second generation|1977|COSMAC 1802|monochrome grid|tone|keypad|1802 assembler|bin|toolchain_adapter
 bally_astrocade|Bally|second generation|1977|Z80|160x102 bitmap|3 voices|joystick|Z80 assembler|bin|toolchain_adapter
-atari_5200|Atari|second generation|1982|6502|ANTIC GTIA|POKEY|analog controller|cc65 atari5200|bin|toolchain_adapter
+atari_5200|Atari|second generation|1982|6502|ANTIC GTIA|POKEY|analog controller|cc65 atari5200|bin|native_source
 atari_7800|Atari|third generation|1984|6502C|MARIA|TIA|joystick|cc65 atari7800|a78|toolchain_adapter
 vectrex|GCE|second generation|1982|6809|vector CRT|AY-3-8912|analog stick|6809 assembler|bin|toolchain_adapter
+colecovision|Coleco|third generation|1982|Z80|TMS9928A VDP|SN76489|joystick keypad|z88dk +coleco|rom|native_source
 sega_sg1000|Sega|third generation|1983|Z80|TMS9918|SN76489|2-button pad|SDCC / z88dk|sg|toolchain_adapter
 sega_mark_iii|Sega|third generation|1985|Z80|Sega VDP|SN76489|2-button pad|SDCC / devkitSMS|sms|native_source
 famicom_disk_system|Nintendo|8-bit disk add-on|1986|2A03|NES PPU|2C33|Famicom controller|ca65 FDS homebrew|fds|toolchain_adapter
@@ -58,13 +59,13 @@ arduboy|Arduboy|micro handheld|2016|ATmega32u4|128x64 OLED|piezo|buttons|Arduino
 thumby|TinyCircuits|micro handheld|2021|RP2040|monochrome OLED|piezo|buttons|MicroPython SDK|py|toolchain_adapter
 analogue_pocket|Analogue|FPGA handheld|2021|FPGA|FPGA display|FPGA audio|buttons|openFPGA core|rbf|toolchain_adapter
 evercade|Blaze|emulation handheld|2020|ARM|LCD|PCM|buttons|authorized SDK / emulator|elf|toolchain_adapter
-zx81|Sinclair|8-bit home computer|1981|Z80|monochrome ULA|beeper|keyboard|z88dk +zx81|p|toolchain_adapter
+zx81|Sinclair|8-bit home computer|1981|Z80|monochrome ULA|beeper|keyboard|z88dk +zx81|p|native_source
 zx_spectrum_next|Sinclair lineage|enhanced Z80 home computer|2017|Z80N|Layer 2 / sprites|AY|keyboard/gamepad|z88dk +zxn|nex|toolchain_adapter
 bbc_micro|Acorn|8-bit home computer|1981|6502|6845 CRTC|SN76489|keyboard|cc65 bbc|bin|native_source
 acorn_electron|Acorn|8-bit home computer|1983|6502|ULA|SN76489|keyboard|cc65 / BeebAsm|uef|toolchain_adapter
 amstrad_cpc|Amstrad|8-bit home computer|1984|Z80|6845 gate array|AY-3-8912|keyboard|z88dk +cpc|bin|native_source
 msx1|MSX|8-bit home computer|1983|Z80|TMS9918|AY-3-8910|keyboard|z88dk +msx|bin|native_source
-msx2|MSX|8-bit home computer|1985|Z80|V9938|AY-3-8910|keyboard|z88dk / SDCC|rom|toolchain_adapter
+msx2|MSX|8-bit home computer|1985|Z80|V9938|AY-3-8910|MSX joystick|z88dk +msx MSX-DOS|com|native_source
 msx_turbo_r|MSX|16-bit home computer|1990|R800|V9958|YM2413|keyboard|z88dk +msx|rom|toolchain_adapter
 commodore_vic20|Commodore|8-bit home computer|1980|6502|VIC|VIC audio|keyboard|cc65 vic20|prg|native_source
 commodore_128|Commodore|8-bit home computer|1985|8502 / Z80|VIC-II|SID|keyboard|cc65 c128|prg|native_source

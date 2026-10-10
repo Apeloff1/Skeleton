@@ -471,3 +471,39 @@ No platform identity, file extension, or reused source compatibility
 automatically upgrades the proof stage. This is concrete compilation
 and artifact custody for four previously unsupported home computers,
 while the global ledger still reads 72/169 source-capable targets.
+
+## October 2026: original Atari 5200, ColecoVision, ZX81 and MSX2 source targets
+
+This increment adds one newly catalogued system (ColecoVision) and converts
+three already identified but source-incomplete systems to genuine original
+native source generation. **The latest scope is 170 catalog identities,
+76 source-capable targets, 94 without original native source (44.7% source
+coverage).** All previous historical figures in this file are superseded by
+this latest value, and none should be interpreted as a completed game count.
+
+* **Atari 5200**: cc65 6502 target atari5200 and conio backed by ANTIC
+  mode-6 display. Original rules include analog controller via cc65's linked
+  5200 joystick driver, shadow colour feedback, enemy pursuit, lives,
+  crystals and restart, with waitvsync input timing. Exports a source
+  project targeting a raw .bin cartridge. Exact code generation/compiler
+  build is a CI requirement; emulator and hardware analog-axis validation
+  remain separately outstanding.
+* **ColecoVision**: zcc +coleco -create-app original Z80 code with
+  VDP-bound native console and Coleco-controller games.h joystick support,
+  not a copied NES cartridge. Intended ROM output requires z88dk and
+  per-ROM loader/emulator verification.
+* **ZX81**: zcc +zx81 with a true keyboard-controlled original black/white
+  dragon game on 16 KiB expansion, preserving ULA text character limits and
+  .p Sinclair program packaging. It makes no false analog joystick or
+  sound-generator claims.
+* **MSX2**: original Z80 game using the MSX BIOS text VDP and real MSX
+  joystick/trigger (msx_get_stick / msx_get_trigger), explicit 8-way
+  direction decoding, and an MSX-DOS .COM output target. It does not
+  claim a cartridge ROM, V9938 graphical effects, or mandatory MSX-DOS
+  provision on machines where DOS is absent.
+
+These are independently programmed games, but CI/emulator/physical-device
+validation stages remain separate. The new tests exercise deterministic
+source, intentional style refusal, target-specific hardware APIs and exact
+output types. The CI cross-compiles the Atari 5200 source on its installed
+cc65 and optionally cross-compiles z88dk targets if their toolchain exists.

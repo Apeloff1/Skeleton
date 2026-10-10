@@ -14,6 +14,7 @@ EMITTERS=EMITTERS|DESKTOP_NATIVE|frozenset(("gamecube","wii","nintendo_3ds","dre
 EMITTERS=EMITTERS|frozenset(("playdate","arduboy"))
 from .dragon_compatible_revisions import COMPATIBILITY
 EMITTERS=EMITTERS|frozenset(COMPATIBILITY)|frozenset(("commodore_pet","commodore_plus4","bbc_micro","oric_atmos"))
+EMITTERS=EMITTERS|frozenset(("atari_5200","colecovision","zx81","msx2"))
 
 @dataclass(frozen=True)
 class NativeProject:
@@ -560,6 +561,9 @@ def render_native_project(*,title:str,target_id:str,style:str,
     elif target_id in ("dreamcast","ps2"):
         from .dragon_native_dreamcast_ps2 import dreamcast_source,ps2_source
         files=dreamcast_source(seed) if target_id=="dreamcast" else ps2_source(seed)
+    elif target_id in ("atari_5200","colecovision","zx81","msx2"):
+        from .dragon_native_atari_z80_new import native_machine_source
+        files=native_machine_source(target_id,seed)
     elif target_id in ("commodore_vic20","commodore_128","atari_400_800","msx1","amstrad_cpc"):
         from .dragon_native_8bit_computers import computer_source
         files=computer_source(target_id,seed)
