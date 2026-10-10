@@ -172,6 +172,8 @@ def verify_separate_authoring_runs(
         finally:
             os.close(rootfd)
         digest=sha256(b"\0".join(content)).hexdigest()
+        _require(digest==expected_source_sha256,
+                 "independent source-generation runs differ from reviewed game bytes")
         roots.append((digest,content))
         manifest=_json(content[2],"originally generated Sega source")
         _require(
