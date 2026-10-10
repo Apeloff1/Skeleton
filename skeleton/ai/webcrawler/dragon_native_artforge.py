@@ -156,6 +156,127 @@ def make_art(*,hero:str,theme:str,palette:str,seed:int,target:str):
     return art,tiles
 
 
+
+
+GB_OLD_MOTION="""    ld hl, AnimFrame
+    inc [hl]
+    ld a, [hl]
+    and $3F
+    jr nz, .idle
+    ld a, 1
+    jr .paint
+.idle:
+    xor a
+.paint:
+    ld [OAM+2], a
+    xor a
+    ld [OAM+3], a"""
+
+GB_NEW_MOTION="""    ld hl, AnimFrame
+    inc [hl]
+    ld a, [PlayerX]
+    ld hl, PreviousPlayerX
+    cp [hl]
+    jr nz, .playerMoving
+    ld a, [PlayerY]
+    ld hl, PreviousPlayerY
+    cp [hl]
+    jr nz, .playerMoving
+    ld a, [AnimFrame]
+    and $1F
+    jr nz, .notBlinking
+    ld a, 1
+    jr .drawHeroFrame
+.notBlinking:
+    xor a
+    jr .drawHeroFrame
+.playerMoving:
+    ld a, 2
+.drawHeroFrame:
+    ld [OAM+2], a
+    ld a, [PlayerX]
+    ld [PreviousPlayerX], a
+    ld a, [PlayerY]
+    ld [PreviousPlayerY], a
+    xor a
+    ld [OAM+3], a"""
+
+NES_MOTION="""    inc DragonAnimationTick
+    lda $0203
+    cmp DragonPreviousX
+    bne DragonMoving
+    lda $0200
+    cmp DragonPreviousY
+    bne DragonMoving
+    lda DragonAnimationTick
+    and #$1F
+    bne DragonIdle
+    lda #1
+    jmp DragonPaint
+DragonIdle:
+    lda #0
+    jmp DragonPaint
+DragonMoving:
+    lda #2
+DragonPaint:
+    sta $0201
+    lda $0203
+    sta DragonPreviousX
+    lda $0200
+    sta DragonPreviousY
+"""
+
+NES_MOTION_MEMORY=""".segment "ZEROPAGE"
+DragonPreviousX: .res 1
+DragonPreviousY: .res 1
+DragonAnimationTick: .res 1
+"""
+
+
+def apply_moving_hero(source:str,*,target:str,style:str)->str:
+    """Update REAL Game Boy/NES player animation tile by directional movement."""
+    if style!="arcade_score_attack" or target not in TARGETS:
+        return source
+    if target in ("game_boy","game_boy_color"):
+        if source.count(GB_OLD_MOTION)!=1 or source.count("AnimFrame: ds 1")!=1:
+            raise ValueError("GB motion animation insertion anchor unavailable")
+        return (source.replace(GB_OLD_MOTION,GB_NEW_MOTION,1)
+                .replace("AnimFrame: ds 1",
+                         "AnimFrame: ds 1\nPreviousPlayerX: ds 1\nPreviousPlayerY: ds 1",1))
+    if source.count("    jsr PollPad\n")!=1 or source.count('.segment "CHARS"')!=1:
+        raise ValueError("NES motion animation insertion anchor missing")
+    if source.count("wait2:\n")!=1:
+        raise ValueError("NES reset animation initialization anchor missing")
+    source=source.replace(
+        "wait2:\n",
+        """    lda $0200
+    sta DragonPreviousY
+    lda $0203
+    sta DragonPreviousX
+    lda #0
+    sta DragonAnimationTick
+wait2:
+""",1)
+    source=source.replace("    jsr PollPad\n",
+                          "    jsr PollPad\n"+NES_MOTION,1)
+    source=source.replace('.segment "CHARS"\n',
+                          NES_MOTION_MEMORY+'.segment "CHARS"\n',1)
+    return source
+
+
+def verify_motion_source(source:str,*,target:str,style:str)->None:
+    if style!="arcade_score_attack" or target not in TARGETS:
+        return
+    if target in ("game_boy","game_boy_color"):
+        if (GB_NEW_MOTION not in source or
+                "PreviousPlayerX: ds 1" not in source or
+                "PreviousPlayerY: ds 1" not in source):
+            raise ValueError("native GB motion-controlled animation source missing")
+    elif NES_MOTION not in source or NES_MOTION_MEMORY not in source:
+        raise ValueError("native NES motion-controlled animation source missing")
+
+
+
 def apply_original_art(files:dict[str,str],*,art:TileArt,tiles:dict,style:str)->dict[str,str]:
     """Rewrite precisely the video tile section; retain game logic and tile IDs."""
     filename,pattern,replacement=source_asm(tiles,style,art.target)
@@ -164,6 +285,7 @@ def apply_original_art(files:dict[str,str],*,art:TileArt,tiles:dict,style:str)->
     updated=dict(files)
     updated[filename],matches=re.subn(pattern,lambda _:replacement,files[filename],count=1)
     if matches!=1:raise ValueError("native original-art video section absent")
+    updated[filename]=apply_moving_hero(updated[filename],target=art.target,style=style)
     # The legacy tile inventory also becomes an honest record of the
     # rewritten runtime pixels; do not leave stale pre-port sprite hashes.
     if "dragon-pixel-art.json" in updated:
@@ -209,6 +331,7 @@ def verify_original_art(files:dict[str,str],port_plan:dict|None,style:str)->dict
         observed=re.search(pattern,files[source_file])
         if observed is None or observed.group() != replacement:
             raise ValueError("cartridge runtime tile bytes are not original artwork")
+        verify_motion_source(files[source_file],target=target,style=style)
     except (KeyError,ValueError,TypeError) as exc:
         raise ValueError("native art source cannot be independently reconstructed") from exc
     return {"schema":SCHEMA,"target":target,"sprites_verified":len(NAMES),
