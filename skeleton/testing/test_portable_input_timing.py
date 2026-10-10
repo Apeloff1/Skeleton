@@ -79,3 +79,12 @@ def test_key_repeat_has_one_shot_then_periodic_held_events():
     with pytest.raises(InputTimingError):
         button_auto_repeat((1,0))
 
+
+def test_injective_button_remap_preserves_actions_and_refuses_loss():
+    assert remap_buttons(0b0101,{1:8,2:4,4:1})==0b1001
+    with pytest.raises(InputTimingError):
+        remap_buttons(1,{1:2,4:2})
+    with pytest.raises(InputTimingError):
+        remap_buttons(2,{1:8})
+    with pytest.raises(InputTimingError):
+        remap_buttons(1,{3:8})
