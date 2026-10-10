@@ -212,6 +212,7 @@ class NativeProductionSourceRequest(BaseModel):
     rights_reference: str = Field(default="", max_length=240)
     approved: StrictBool = Field(default=False)
     portable_design: NativeProductionDesignBody | None = Field(default=None)
+    authored_puzzles: list[list[str]] | None = Field(default=None, max_length=8)
 
 
 def _native_source_editor(user: dict | None = Depends(get_current_user)) -> str:
@@ -245,7 +246,41 @@ def _make_native_production_request(body: NativeProductionSourceRequest):
         seed=body.seed, max_portfolio_bytes=3_000_000,
         portable_design=(PortableGameDesign(**body.portable_design.model_dump())
                          if body.portable_design is not None else None),
+        authored_puzzles=(tuple(tuple(row for row in board)
+                                for board in body.authored_puzzles)
+                          if body.authored_puzzles is not None else None),
     )
+
+
+class NativePuzzleGridValidationRequest(BaseModel):
+    """Small bounded original authored-grid validation; never compiles source."""
+    model_config = ConfigDict(extra="forbid")
+    levels: list[list[str]] = Field(min_length=1, max_length=8)
+
+
+@router.post("/native/production/puzzle/validate")
+def native_production_validate_puzzle(
+    body: NativePuzzleGridValidationRequest,
+    owner: str = Depends(_principal),
+) -> dict:
+    from skeleton.ai.webcrawler.dragon_native_puzzle_authoring import preview_authored_levels
+    try:
+        games = tuple(tuple(row for row in level) for level in body.levels)
+        return preview_authored_levels(games)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=422,
+                            detail="Original authored grid must be 12x10, safe and solver-proven") from None
+
+
+@router.get("/native/production/puzzle/starter")
+def native_production_puzzle_starter(
+    stages: int = 1, owner: str = Depends(_principal),
+) -> dict:
+    from skeleton.ai.webcrawler.dragon_native_puzzle_authoring import starter_authored_levels
+    try:
+        return {"ok": True, **starter_authored_levels(stages)}
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Unsupported starter game stage count") from None
 
 
 @router.post("/native/production/preview")
