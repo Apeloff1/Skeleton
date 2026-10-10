@@ -113,7 +113,7 @@ def verify(
         ]
     finally:
         os.close(rootfd)
-    source_digest = sha256(b"\\0".join(parts)).hexdigest()
+    source_digest = sha256(b"\0".join(parts)).hexdigest()
     if expected_source_sha256 is not None and source_digest != expected_source_sha256:
         raise ValueError("generated source has changed since independently pinned evidence")
     manifest = _json(parts[2], "native Sega source")
