@@ -13,7 +13,7 @@ import pytest
 from scripts.game_builder.native_sega_8bit_ci import emit, verify
 
 
-REVISION = "533ae572c897cf44f1da865013ebf690134301a3"
+REVISION = sha256(b"test-only-pinned-sdcc-toolchain-source-identity").hexdigest()
 
 
 def _rom(target: str) -> bytes:
