@@ -308,3 +308,98 @@ def test_authenticated_companion_reads_only_signed_current_owner_review(tmp_path
         assert client.get("/api/dragon-academy/status").status_code==409
         app.dependency_overrides[route.get_current_user]=lambda: None
         assert client.get("/api/dragon-academy/status").status_code==401
+
+
+
+def test_authenticated_hoag_and_recrawl_read_only_routes(tmp_path, monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from skeleton.ai.game_builder.reviewed_knowledge import (
+        ReviewedDocument, ReviewedKnowledgeStore, ReviewedNote,
+    )
+    from skeleton.ai.game_builder.dragon_wisdom_pyramid import DragonWisdomPyramid
+
+    db_path = tmp_path / "knowledge.sqlite"
+    monkeypatch.delenv("SKL_DRAGON_KNOWLEDGE_DB_PATH", raising=False)
+    app = FastAPI()
+    app.include_router(route.router)
+    app.dependency_overrides[route.get_current_user] = lambda: {
+        "email": "alice@example.test", "tenant_id": "tenant-a", "role": "viewer",
+    }
+    with TestClient(app) as client:
+        assert client.get("/api/dragon-academy/knowledge/hoag").status_code == 503
+        assert client.get("/api/dragon-academy/knowledge/recrawls").status_code == 503
+
+    owner = identity()
+    now = 1_791_638_400
+    with ReviewedKnowledgeStore(db_path) as library:
+        wiki = DragonWisdomPyramid(library)
+        revisions = {}
+        for label in ("a", "b"):
+            source_id = "source-" + label
+            text = "Jump timing should be predictable."
+            document = ReviewedDocument(
+                owner=owner, source_id=source_id,
+                source_url="https://example.org/" + source_id,
+                title="Original game design study", text=text,
+                observed_at="2026-10-10T12:00:00Z",
+                license_id="design-reference-license",
+                allowed_scopes=("design_reference",),
+                reviewer_id="research-reviewer-" + label,
+                approved=True,
+                notes=(ReviewedNote(
+                    note_id="note-" + label, mechanic="platforming",
+                    statement=text, start=0, end=len(text),
+                    stance="supports", confidence_ppm=880_000,
+                    dependence_group="publisher-" + label,
+                    tags=("jump",),
+                ),),
+            )
+            revisions[label] = library.import_document(
+                document, expected_parent_digest=None, authorized=True,
+            )
+        brief = library.build_brief(
+            owner, "jump", authorized=True, min_independent_groups=2,
+        )
+        decision = wiki.wiki_review(
+            owner, brief, mechanic="platforming", disposition="accepted",
+            independent_reviewer_id="independent-wiki-reviewer",
+            review_evidence_digest="a" * 64, now=now, expires_at=now + 3600,
+            authorized=True, trusted_worker=True,
+        )
+        wiki.promote(
+            owner, decision["digest"], now=now + 1,
+            authorized=True, trusted_worker=True, human_approved=True,
+        )
+    monkeypatch.setenv("SKL_DRAGON_KNOWLEDGE_DB_PATH", str(db_path))
+    monkeypatch.setattr(route.time, "time", lambda: now + 5)
+    with TestClient(app) as client:
+        result = client.get("/api/dragon-academy/knowledge/hoag")
+        assert result.status_code == 200
+        assert result.headers["cache-control"] == "private, no-store"
+        assert result.json()["items"][0]["mechanic"] == "platforming"
+        assert result.json()["items"][0]["training_authorized"] is False
+        assert "Jump timing" not in result.text
+        assert client.post("/api/dragon-academy/knowledge/hoag", json={}).status_code == 405
+        assert client.post("/api/dragon-academy/knowledge/recrawls", json={}).status_code == 405
+        app.dependency_overrides[route.get_current_user] = lambda: {
+            "email": "bob@example.test", "tenant_id": "tenant-a", "role": "viewer",
+        }
+        assert client.get("/api/dragon-academy/knowledge/hoag").json()["items"] == []
+        app.dependency_overrides[route.get_current_user] = lambda: None
+        assert client.get("/api/dragon-academy/knowledge/hoag").status_code == 401
+        app.dependency_overrides[route.get_current_user] = lambda: {
+            "email": "alice@example.test", "tenant_id": "tenant-a", "role": "viewer",
+        }
+        with ReviewedKnowledgeStore(db_path) as library:
+            DragonWisdomPyramid(library).recrawl(
+                owner, "source-a", reason="changed_source",
+                expected_revision=revisions["a"].revision_digest,
+                now=now + 6, authorized=True, trusted_worker=True,
+            )
+        monkeypatch.setattr(route.time, "time", lambda: now + 7)
+        result = client.get("/api/dragon-academy/knowledge/recrawls")
+        assert result.status_code == 200
+        assert result.json()["orders"][0]["source_id"] == "source-a"
+        assert result.json()["orders"][0]["execution_authorized"] is False
+        assert client.get("/api/dragon-academy/knowledge/hoag").json()["items"] == []
