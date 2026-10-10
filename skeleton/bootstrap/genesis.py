@@ -2,12 +2,21 @@
 
 Boot phases: foundation, kernel, memory, intelligence, swarm,
 resilience, interface, forge, galaxy, contexts, support, cortex.
+
+Every phase is timed with :func:`time.perf_counter`. After boot one structured
+summary line is logged on ``skeleton.bootstrap.genesis`` with total and
+per-phase milliseconds, checked against the boot budget adopted in
+``docs/engineering/PERFORMANCE_BUDGETS.md``. Going over budget is logged, never
+raised: boot semantics are unchanged.
 """
 
 from __future__ import annotations
 
+import logging
+import os
+import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
 from skeleton.kernel.entropy import EntropyPool
 from skeleton.kernel.events import DomainEvent, EventBus
@@ -15,12 +24,162 @@ from skeleton.kernel.ids import UserId
 from skeleton.kernel.invariants import Invariant, InvariantLattice
 from skeleton.kernel.clocks import VectorClock
 
+logger = logging.getLogger(__name__)
+
+#: Canonical boot order. ``Genesis.boot`` runs exactly these phases, in order.
+BOOT_PHASES: Tuple[str, ...] = (
+    "foundation",
+    "kernel",
+    "memory",
+    "intelligence",
+    "swarm",
+    "resilience",
+    "interface",
+    "forge",
+    "galaxy",
+    "contexts",
+    "support",
+    "cortex",
+)
+
+#: Cold ``Genesis(seed=42).boot()`` budget (docs/engineering/PERFORMANCE_BUDGETS.md
+#: section 2, Boot). Over this, the summary is logged at WARNING.
+BOOT_BUDGET_MS: float = 2_000.0
+#: Critical ceiling: the whole API startup-to-``mark_ready`` budget. If genesis
+#: alone exceeds it, the summary is logged at ERROR. Still fail-soft.
+BOOT_CRITICAL_MS: float = 5_000.0
+
+_BUDGET_ENV = "SKL_BOOT_BUDGET_MS"
+_CRITICAL_ENV = "SKL_BOOT_CRITICAL_MS"
+
+
+def _env_ms(name: str, default: float) -> float:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        logger.warning("ignoring invalid %s=%r; using %.0f ms", name, raw, default)
+        return default
+    if value <= 0:
+        logger.warning("ignoring non-positive %s=%r; using %.0f ms", name, raw, default)
+        return default
+    return value
+
+
+def boot_budget_ms() -> Tuple[float, float]:
+    """Return ``(budget_ms, critical_ms)``, honouring env overrides.
+
+    ``critical_ms`` is never allowed below ``budget_ms``.
+    """
+
+    budget = _env_ms(_BUDGET_ENV, BOOT_BUDGET_MS)
+    critical = _env_ms(_CRITICAL_ENV, BOOT_CRITICAL_MS)
+    return budget, max(critical, budget)
+
+
+def evaluate_boot_budget(
+    phase_ms: Mapping[str, float],
+    *,
+    total_ms: Optional[float] = None,
+    budget_ms: Optional[float] = None,
+    critical_ms: Optional[float] = None,
+) -> Dict[str, Any]:
+    """Pure budget check over measured phase timings.
+
+    Returns a JSON-safe summary: ``status`` is ``"ok"`` (total <= budget),
+    ``"over_budget"`` (budget < total <= critical) or ``"critical"``
+    (total > critical). ``total_ms`` defaults to the sum of phases.
+    """
+
+    default_budget, default_critical = boot_budget_ms()
+    budget = default_budget if budget_ms is None else float(budget_ms)
+    critical = default_critical if critical_ms is None else float(critical_ms)
+    critical = max(critical, budget)
+    phases = {name: round(float(ms), 3) for name, ms in phase_ms.items()}
+    total = round(float(sum(phases.values()) if total_ms is None else total_ms), 3)
+    slowest = max(phases.items(), key=lambda kv: kv[1]) if phases else (None, 0.0)
+    if total > critical:
+        status = "critical"
+    elif total > budget:
+        status = "over_budget"
+    else:
+        status = "ok"
+    return {
+        "status": status,
+        "total_ms": total,
+        "budget_ms": budget,
+        "critical_ms": critical,
+        "phase_ms": phases,
+        "slowest_phase": slowest[0],
+        "slowest_phase_ms": slowest[1],
+    }
+
+
+def log_boot_summary(summary: Mapping[str, Any], *, log: Optional[logging.Logger] = None) -> int:
+    """Emit the single boot summary line; return the logging level used."""
+
+    log = log or logger
+    level = {
+        "ok": logging.INFO,
+        "over_budget": logging.WARNING,
+        "critical": logging.ERROR,
+    }.get(str(summary.get("status")), logging.WARNING)
+    breakdown = " ".join(
+        f"{name}={ms:.1f}" for name, ms in summary.get("phase_ms", {}).items()
+    )
+    log.log(
+        level,
+        "genesis boot %s total_ms=%.1f budget_ms=%.0f critical_ms=%.0f "
+        "slowest=%s:%.1f phases_ms[%s]",
+        summary.get("status"),
+        summary.get("total_ms", 0.0),
+        summary.get("budget_ms", 0.0),
+        summary.get("critical_ms", 0.0),
+        summary.get("slowest_phase"),
+        summary.get("slowest_phase_ms", 0.0),
+        breakdown,
+        extra={"boot_timing": dict(summary)},
+    )
+    return level
+
+
+def record_boot_metrics(metrics: Any, report: Any) -> bool:
+    """Publish measured boot timings into a ``MetricsCollector``-like sink.
+
+    Emits ``genesis_boot_phase_ms`` (histogram, ``phase`` label),
+    ``genesis_boot_total_ms`` (gauge) and, when over budget,
+    ``genesis_boot_budget_exceeded_total`` (counter, ``status`` label).
+    Returns ``False`` (and records nothing) when the report was never timed.
+    """
+
+    phase_ms = getattr(report, "phase_ms", None)
+    total_ms = getattr(report, "total_ms", None)
+    if metrics is None or not phase_ms or total_ms is None:
+        return False
+    for phase, ms in phase_ms.items():
+        metrics.histogram("genesis_boot_phase_ms", float(ms), {"phase": str(phase)})
+    metrics.gauge("genesis_boot_total_ms", float(total_ms))
+    status = (getattr(report, "timing", None) or {}).get("status")
+    if status and status != "ok":
+        metrics.increment(
+            "genesis_boot_budget_exceeded_total", 1.0, {"status": str(status)},
+        )
+    return True
+
 
 @dataclass
 class GenesisReport:
     phases: List[str] = field(default_factory=list)
     wired: Dict[str, List[str]] = field(default_factory=dict)
     invariants_registered: int = 0
+    # Wall-clock timings are kept OUT of ``to_dict`` on purpose: that payload is
+    # published on the journaled bus, and nondeterministic numbers there would
+    # break replay/hash determinism. Read them via ``timing``.
+    phase_ms: Dict[str, float] = field(default_factory=dict, compare=False, repr=False)
+    total_ms: Optional[float] = field(default=None, compare=False, repr=False)
+    timing: Dict[str, Any] = field(default_factory=dict, compare=False, repr=False)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -41,19 +200,23 @@ class Genesis:
         self.lattice: InvariantLattice | None = None
         self.journal: Optional[Any] = None
 
+    def _boot_steps(self) -> Tuple[Tuple[str, Callable[[], None]], ...]:
+        return tuple(
+            (name, getattr(self, f"_phase_{name}")) for name in BOOT_PHASES
+        )
+
     def boot(self) -> "Genesis":
-        self._phase_foundation()
-        self._phase_kernel()
-        self._phase_memory()
-        self._phase_intelligence()
-        self._phase_swarm()
-        self._phase_resilience()
-        self._phase_interface()
-        self._phase_forge()
-        self._phase_galaxy()
-        self._phase_contexts()
-        self._phase_support()
-        self._phase_cortex()
+        clock = time.perf_counter
+        boot_started = clock()
+        for name, step in self._boot_steps():
+            started = clock()
+            step()
+            self.report.phase_ms[name] = round((clock() - started) * 1000.0, 3)
+        self.report.total_ms = round((clock() - boot_started) * 1000.0, 3)
+        self.report.timing = evaluate_boot_budget(
+            self.report.phase_ms, total_ms=self.report.total_ms,
+        )
+        log_boot_summary(self.report.timing)
         self.bus.publish(
             DomainEvent(
                 topic="kernel.genesis.booted",
