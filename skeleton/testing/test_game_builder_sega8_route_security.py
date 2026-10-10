@@ -58,7 +58,6 @@ def test_exact_typed_original_reference_can_be_verified():
 
 @pytest.mark.parametrize("where,key,value",[
     ("root","extra_evidence",{"legally_owned":True}),
-    ("root","route_sha256","f"*64),
     ("root","host_c_executed",True),
     ("root","release_approved","false"),
     ("root","physical_hardware_verified",None),
@@ -127,3 +126,14 @@ def test_empty_route_and_overflow_in_original_controller_route_rejected():
     resign(payload)
     with pytest.raises(Sega8HostReplayError):
         _parse_reference(encoded(payload))
+
+
+
+def test_original_route_sha256_rejects_modified_or_missing_hash():
+    valid=reference()
+    valid["route_sha256"]="f"*64
+    with pytest.raises(Sega8HostReplayError,match="modified"):
+        _parse_reference(encoded(valid))
+    valid.pop("route_sha256")
+    with pytest.raises(Sega8HostReplayError):
+        _parse_reference(encoded(valid))
