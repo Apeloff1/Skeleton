@@ -31,7 +31,10 @@ MAX_BOOT_FRAMES = 120
 MAX_INPUT_FRAMES = 16
 MAX_SETTLE_FRAMES = 9
 MAX_INSTRUCTION_FRAMES = DEFAULT_FRAME_INSTRUCTIONS
-MAX_TOTAL_GAMEPLAY_FRAMES = 9000
+# Eight fully authored levels and two separately executed winning runs may
+# require thousands more VBlank frames than the basic three-level route.
+# Still a strict global bound, not a deadline controlled by the guest ROM.
+MAX_TOTAL_GAMEPLAY_FRAMES = 30000
 MAX_TOTAL_GAMEPLAY_INSTRUCTIONS = MAX_TOTAL_GAMEPLAY_FRAMES * MAX_INSTRUCTION_FRAMES
 _STATE_KEYS = (
     "level", "x", "y", "health", "score",
