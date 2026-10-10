@@ -9,6 +9,7 @@ on:
       - 'skeleton/ai/webcrawler/dragon_native_cc65_classics.py'
       - 'skeleton/ai/webcrawler/dragon_cc65_release.py'
       - 'skeleton/ai/webcrawler/dragon_native_nintendo_ppc_3ds.py'
+      - 'skeleton/ai/webcrawler/dragon_native_switch_wiiu.py'
       - 'skeleton/ai/webcrawler/dragon_native_dreamcast_ps2.py'
       - 'skeleton/ai/webcrawler/dragon_native_8bit_computers.py'
       - 'skeleton/ai/webcrawler/dragon_native_atari_z80_new.py'
@@ -31,6 +32,7 @@ on:
       - 'tests/test_ai_webcrawler_dragon_native_cc65_classics.py'
       - 'tests/test_ai_webcrawler_dragon_cc65_release.py'
       - 'tests/test_ai_webcrawler_dragon_native_nintendo_ppc_3ds.py'
+      - 'tests/test_ai_webcrawler_dragon_native_switch_wiiu.py'
       - 'tests/test_ai_webcrawler_dragon_native_dreamcast_ps2.py'
       - 'tests/test_ai_webcrawler_dragon_native_8bit_computers.py'
       - 'tests/test_ai_webcrawler_dragon_atari_z80_new.py'
@@ -77,6 +79,7 @@ jobs:
             tests/test_ai_webcrawler_dragon_native_cc65_classics.py \
             tests/test_ai_webcrawler_dragon_cc65_release.py \
             tests/test_ai_webcrawler_dragon_native_nintendo_ppc_3ds.py \
+            tests/test_ai_webcrawler_dragon_native_switch_wiiu.py \
             tests/test_ai_webcrawler_dragon_native_dreamcast_ps2.py \
             tests/test_ai_webcrawler_dragon_native_8bit_computers.py \
             tests/test_ai_webcrawler_dragon_atari_z80_new.py \
@@ -146,7 +149,7 @@ jobs:
           assert result["coverage"]["catalog_count"]==169
           from skeleton.ai.webcrawler.dragon_native_projects import EMITTERS
           from skeleton.ai.webcrawler.dragon_native_targets import CATALOG
-          assert len(EMITTERS)==80  # reviewed exact-head source milestone
+          assert len(EMITTERS)==84  # two new games, two ABI-compatible Switch variants
           assert result["coverage"]["native_source_count"]==len(EMITTERS)
           assert result["coverage"]["missing_native_source_count"]==(
               len(CATALOG)-len(EMITTERS))

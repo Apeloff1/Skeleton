@@ -20,9 +20,9 @@ def _game(target,style="arcade_score_attack"):
         mechanics=(Mechanic.MOVEMENT,Mechanic.EXPLORATION),
         authorized=True)
 
-def test_all_11_revisions_have_same_cartridge_abi_and_external_checks():
-    assert len(REVISIONS)==len(COMPATIBILITY)==11
-    assert len(EMITTERS)==80
+def test_all_13_revisions_have_same_cartridge_abi_and_external_checks():
+    assert len(REVISIONS)==len(COMPATIBILITY)==13
+    assert len(EMITTERS)==84
     assert len({r.target for r in REVISIONS})==11
     for r in REVISIONS:
         assert CATALOG[r.target].output==CATALOG[r.parent].output==r.output
@@ -104,7 +104,7 @@ def test_dmg_screen_revisions_preserve_real_platform_gameplay_but_gba_does_not()
 
 def test_unsupported_or_licensed_families_are_never_auto_aliased():
     for target in ("famicom_disk_system","sega_32x","amiga_cd32",
-                   "nintendo_switch_lite","nintendo_switch_2",
+                   "nintendo_switch_2",
                    "ps5_pro","philips_cdi","apple_iigs"):
         assert target not in COMPATIBILITY
         with pytest.raises((ValueError,PermissionError)):

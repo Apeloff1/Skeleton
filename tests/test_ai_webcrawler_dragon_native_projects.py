@@ -43,7 +43,7 @@ def test_platform_matrix_covers_actual_console_and_computer_history():
 def test_native_emitters_make_platform_specific_source_not_html(target):
     p=make(target)
     assert p.status=="source_generated" and p.output in (
-        "gb","gbc","nes","tap","prg","xex","dol","3dsx","sms","gg","sfc","z64","nds","pbp","exe","elf","app","bin","gba","xbe","hex","pdx","rom","com","p","py","lnx","iso","vpk")
+        "gb","gbc","nes","tap","prg","xex","dol","3dsx","sms","gg","sfc","z64","nds","pbp","exe","elf","app","bin","gba","xbe","hex","pdx","rom","com","p","py","lnx","iso","vpk","nro","rpx")
     assert len(p.files)>=3 and p.target_id==target
     assert p.digest==sha(p.files)
     assert p==make(target)
@@ -65,7 +65,7 @@ def test_native_emitters_make_platform_specific_source_not_html(target):
     else:
         assert "Makefile" in p.files or "CMakeLists.txt" in p.files
         assert ("src/main.c" in p.files or "src/main.asm" in p.files
-                or "src/main.s" in p.files)
+                or "src/main.s" in p.files or "source/main.c" in p.files)
     assert "source_generated" in p.files["dragon-native-manifest.json"]
     assert "physics" in p.deferred_mechanics if target in ("game_boy","nes","dos_vga") else True
 

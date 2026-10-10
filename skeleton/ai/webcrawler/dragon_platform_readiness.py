@@ -86,6 +86,10 @@ SOURCE_RENDERERS.update({
     "saturn":"dual SH-2 Sega Saturn Jo Engine VDP2 text/pad",
     "ps_vita":"ARM Cortex-A9 VitaSDK vita2d GPU/SceCtrl/touch",
 })
+SOURCE_RENDERERS.update({
+    "wii_u":"PowerPC wut OSScreen TV+DRC with native VPAD GamePad input",
+    "nintendo_switch":"ARM64 libnx handheld/docked console and Npad",
+})
 assert set(SOURCE_RENDERERS)==EMITTERS
 
 @dataclass(frozen=True)

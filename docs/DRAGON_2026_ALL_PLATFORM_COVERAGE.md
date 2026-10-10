@@ -3,9 +3,9 @@
 ## Current reviewed status — 10 October 2026
 
 The curated hardware/OS inventory contains **169 unique target IDs**. The
-authoritative native source registry has **80 source-producing targets**;
-**89 still lack a native source producer**. The source coverage ratio is
-**80/169 = 47.3%**. These are source identities, not 80 distinct engines or
+authoritative native source registry has **84 source-producing targets**;
+**85 still lack a native source producer**. The source coverage ratio is
+**84/169 = 49.7%**. These are source identities, not 84 distinct engines or
 80 working console games. Some records use ABI-specific and hardware-revision
 overlays on an existing original native game.
 
@@ -26,7 +26,7 @@ built by those workflows. No global emulator/gamepad/physical hardware pass,
 copyright clearance or licensed-SDK entitlement is inferred from them.
 
 The dated sections below preserve earlier engineering milestones, but their
-historic 24/45/48/55/57/68/72/77 counts do not supersede this 80-target
+historic 24/45/48/55/57/68/72/77 counts do not supersede this 84-target
 snapshot. The machine-readable
 `dragon_platform_readiness.coverage_report()` is authoritative and
 produces an auditable source inventory and gap list.
@@ -37,7 +37,7 @@ The game academy previously mapped **47** major platform targets and implemented
 **19 original native source backends**. This change adds 122 concrete historic,
 consumer, handheld, computer OS/ABI and modern mobile targets, bringing the
 curated inventory to **169 distinct target identities**. It additionally implements
-additional native game emitters and ABI-compatible source variants; the current declared source inventory is **80/169**, not a claim of 80 compiled games.
+additional native game emitters and ABI-compatible source variants; the current declared source inventory is **84/169**, not a claim of 84 compiled games.
 
 This is not every model or board ever manufactured, and 169 catalog entries
 do NOT mean 169 working console games. No compiler/emulator or device test is
@@ -60,7 +60,7 @@ listed system.
 | Gate | Meaning | What this change demonstrates |
 | --- | --- | --- |
 | Hardware identified | CPU/graphics/sound/inputs/SDK/ABI recorded | 169 targets |
-| Original native source | Per-hardware implementation and build recipe exist | 80 targets (compiler status independent) |
+| Original native source | Per-hardware implementation and build recipe exist | 84 targets (compiler status independent) |
 | Compiler passed | Exact source built by target-specific toolchain | Not inferred |
 | Emulator passed | Repeated native input, video, audio and state trace | Not inferred |
 | Physical device passed | Hardware-verified timing and controls | Not inferred |
@@ -136,7 +136,7 @@ PS/Xbox/Nintendo releases remain blocked without legitimate developer SDK
 authorization. No proprietary system firmware, ROMs, game assets, DRM keys
 or unlicensed SDKs are included.
 
-CI: dragon-platform-coverage.yml validates all 169 target records and the 80 source backends; earlier revisions began with 24
+CI: dragon-platform-coverage.yml validates all 169 target records and the 84 source targets; earlier revisions began with 24
 source generators, disallowed target/style pairs, and performs a genuine
 Apple II cc65 build. Other cross compilers are tested if they are installed.
 CI only proves outcomes of checks that actually pass on the exact head.
@@ -699,3 +699,39 @@ as **not verified**. Windows 95 compatibility is not certified by
 producing modern i386 PE32 bytes; this requires Win95 runtime testing.
 Atari 2600 TIA scanline timing and Apple II ProDOS execution also require
 representative emulator/device validation before release.
+
+
+## Current native Nintendo milestone — Switch, Switch Lite/OLED and Wii U
+
+The reviewed all-era source catalog advances to **84/169 (49.7%)**
+hardware/OS/ABI identities: **two new native engines** and **two compatible
+Switch hardware revisions**, with **85 source-producer gaps** remaining.
+
+- **Switch**: original four-chapter deterministic C99 game with three
+  collectibles per stage, enemy pursuit, HP, energy-limited ranged attacks,
+  victory/retry, Npad Joy-Con/Pro controller input, real libnx console
+  rendering, and native NRO project using the independently installed
+  devkitA64/libnx SDK. Switch Lite and OLED variants receive distinct
+  source-custody receipts only; they are not separately certified.
+- **Wii U**: genuinely native wut PowerPC application using VPAD GamePad
+  input, WHBProc lifecycle and two OSScreen outputs for TV and GamePad,
+  real cache flushing/screen flipping, and RPX CMake target packaging.
+  WUHB bundling is a different, unimplemented release step.
+
+Both implementations share an original pure-C99 game model whose
+four-chapter deterministic playthrough is compiled and executed under
+the ordinary host C compiler as a regression check. That is NOT proof
+the libnx/wut application has compiled, booted in an emulator, or
+played correctly on Nintendo hardware. Those require separate SDK
+toolchain, graphics/input/audio, device and legal release checks.
+
+Switch 2 remains licensed-SDK gated; no source alias or unlicensed
+proprietary SDK, commercial game, BIOS, firmware or signing keys are
+provided.
+
+Earlier exact-head runs in this PR lineage passed all-era source
+coverage, Windows/Linux/macOS native executable replay and three real
+retro game compiler checks. One external Copilot security-automation
+failure arose from HTTP 402 monthly quota exhaustion, not a detected
+Dragon vulnerability. This new code still requires independent
+latest-head CI before any verification sign-off.

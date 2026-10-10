@@ -73,6 +73,8 @@ LIMITS={
     "ps2":("Sony PlayStation","MIPS R5900",33554432,4194304,33554432,65536,256,256,8192),
     "gamecube":("Nintendo","PowerPC Gekko",25165824,8388608,25165824,65536,256,256,4096),
     "wii":("Nintendo","PowerPC Broadway",67108864,8388608,67108864,65536,256,256,8192),
+    "wii_u":("Nintendo","PowerPC Espresso",33554432,33554432,33554432,65536,256,256,8192),
+    "nintendo_switch":("Nintendo","ARMv8 Cortex-A57",268435456,33554432,268435456,65536,256,256,8192),
     "nintendo_3ds":("Nintendo","ARM11",6291456,1048576,67108864,65536,256,256,8192),
     "playdate":("Panic","STM32F7",1600000,12000,81920,32768,64,64,512),
     "arduboy":("Arduboy","ATmega32u4",1024,1024,2560,28672,8,8,128),

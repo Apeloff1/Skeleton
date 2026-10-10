@@ -96,8 +96,8 @@ sega_atom_iswave|Sammy|arcade SH-4 board|2003|SH-4|PowerVR2|AICA|arcade I/O|Kall
 nintendo_dsi|Nintendo|dual-screen DSi|2008|ARM9 / ARM7|DSi display|DSi audio|touch/buttons|devkitARM libnds|nds|native_source
 nintendo_2ds|Nintendo|3DS family|2013|ARM11|PICA200|DSP|touch/circle|devkitARM libctru|3dsx|native_source
 new_nintendo_3ds|Nintendo|enhanced 3DS|2014|ARM11 enhanced|PICA200|DSP|touch/circle|devkitARM libctru|3dsx|native_source
-nintendo_switch_lite|Nintendo|Switch handheld|2019|Tegra X1|Maxwell|audio|Joy-Con built-in|devkitA64 libnx|nro|toolchain_adapter
-nintendo_switch_oled|Nintendo|Switch OLED revision|2021|Tegra X1|Maxwell|audio|Joy-Con|devkitA64 libnx|nro|toolchain_adapter
+nintendo_switch_lite|Nintendo|Switch handheld|2019|Tegra X1|Maxwell|audio|Joy-Con built-in|devkitA64 libnx|nro|native_source
+nintendo_switch_oled|Nintendo|Switch OLED revision|2021|Tegra X1|Maxwell|audio|Joy-Con|devkitA64 libnx|nro|native_source
 nintendo_switch_2|Nintendo|hybrid 9th generation|2025|custom Nvidia ARM|Nvidia GPU|system audio|Joy-Con 2|licensed dev SDK|nso|licensed_sdk
 psp_go|Sony PlayStation|PSP revision|2009|Allegrex|GU|PSP audio|sliding controls|PSPSDK|pbp|native_source
 psp_street|Sony PlayStation|PSP revision|2011|Allegrex|GU|PSP audio|buttons|PSPSDK|pbp|native_source
