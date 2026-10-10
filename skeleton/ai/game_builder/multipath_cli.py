@@ -57,10 +57,21 @@ def _read_rows(path: Path) -> tuple[str, ...]:
             os.close(fd)
     if len(raw) > _MAX_FILE_BYTES:
         raise MultipathError("input byte budget exceeded")
+    def reject_duplicate_keys(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise MultipathError("ambiguous repeated JSON input field")
+            result[key] = value
+        return result
+
     try:
-        data = json.loads(raw.decode("utf-8", errors="strict"),
-                          parse_constant=lambda _: (_ for _ in ()).throw(
-                              MultipathError("nonfinite JSON input denied")))
+        data = json.loads(
+            raw.decode("utf-8", errors="strict"),
+            object_pairs_hook=reject_duplicate_keys,
+            parse_constant=lambda _: (_ for _ in ()).throw(
+                MultipathError("nonfinite JSON input denied")),
+        )
     except (UnicodeError, json.JSONDecodeError, RecursionError) as exc:
         raise MultipathError("invalid UTF-8 JSON grid") from exc
     if not isinstance(data, dict) or set(data) != {"rows"}:
