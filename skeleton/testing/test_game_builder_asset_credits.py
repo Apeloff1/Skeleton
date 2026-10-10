@@ -204,3 +204,35 @@ def test_attribution_notices_are_immutable_and_cannot_fake_license_clearance():
         replace(original, licensed_material_independently_cleared=True)
     with pytest.raises(CreditsError):
         replace(original, target_platform_id="sega_dreamcast")
+
+
+
+@pytest.mark.parametrize("unsafe", [
+    "Author\\u202eexe.txt", "Author\\u200bHidden", "Artist\\u2066text\\u2069",
+    "License\\u2028new line", "Hacker\\u0000spoof",
+])
+def test_hidden_unicode_formatting_cannot_spoof_game_creator_or_license_notice(unsafe):
+    # Backslash escape sequences are decoded here to ensure the fixture
+    # contains the actual bidi/invisible Unicode control characters.
+    displayed = unsafe.encode("utf-8").decode("unicode_escape")
+    with pytest.raises(CreditsError):
+        replace(credit(), original_author=displayed)
+    with pytest.raises(CreditsError):
+        replace(credit(), license_id=displayed)
+    with pytest.raises(CreditsError):
+        replace(credit(), attribution_text=displayed)
+    with pytest.raises(CreditsError):
+        compile_game_credits(
+            "original-game","windows_modern",materials=(own(),),
+            third_party=(),original_authors=(displayed,),
+        )
+
+
+def test_normal_international_game_author_names_remain_legal_notice_text():
+    authored = "Søren – 東京 絵師"
+    result = compile_game_credits(
+        "original-game","windows_modern",materials=(own(),),third_party=(),
+        original_authors=(authored,),
+    )
+    assert authored in result.credits_md
+    assert result.release_authorized is False
