@@ -53,6 +53,18 @@ type WorldPreview={
 };
 
 function label(text:string){return text.replace(/_/g,' ');}
+function duration(minutes:number):string{
+  if(!Number.isFinite(minutes)||minutes<0)return 'unverified duration';
+  if(minutes>=525600){
+    const years=Math.floor(minutes/525600);
+    const days=Math.floor((minutes%525600)/1440);
+    return years+' years'+(days?' '+days+' days':'');
+  }
+  if(minutes>=1440)return Math.floor(minutes/1440)+' days '+
+    Math.floor((minutes%1440)/60)+' hours';
+  if(minutes>=60)return Math.floor(minutes/60)+'h '+(minutes%60)+'m';
+  return minutes+' min';
+}
 async function post<T>(route:string,body:object):Promise<T>{
   const response=await fetch(API+route,{
     method:'POST',
@@ -278,7 +290,7 @@ function RouteWorldEditor(){
               {game.completed?'Goal reached!':'Explore '+label(game.world_position)}
             </Text>
             <Text style={s.copy}>
-              {game.elapsed_minutes} min elapsed · {game.remaining_cash} currency ·
+              {duration(game.elapsed_minutes)} elapsed · {game.remaining_cash} currency ·
               {' '}{game.remaining_energy} stamina · {game.remaining_fuel} fuel ·
               {' '}{game.remaining_oxygen} oxygen · {game.remaining_mana} mana
             </Text>
@@ -295,7 +307,7 @@ function RouteWorldEditor(){
                 style={[s.route,(!option.available||working)&&s.disabled]}>
                 <Text style={s.actionText}>{label(option.mode)} → {label(option.to)}</Text>
                 <Text style={s.copy}>
-                  {option.time_minutes} min + {option.waiting_minutes} wait ·
+                  {duration(option.time_minutes)} + {duration(option.waiting_minutes)} wait ·
                   {' '}{option.price} fare · {option.fatigue} fatigue ·
                   {' '}{option.fuel} fuel · {option.oxygen} O₂ · {option.mana} mana
                 </Text>
@@ -333,7 +345,7 @@ function RouteWorldEditor(){
                 style={s.route} disabled={working}
                 onPress={()=>replayRecommended(route)}>
                 <Text style={s.actionText}>
-                  {index+1}. {label(route.objective)} · {route.elapsed_minutes} min
+                  {index+1}. {label(route.objective)} · {duration(route.elapsed_minutes)}
                 </Text>
                 <Text style={s.copy}>
                   {route.edges.length} segments · {route.money_spent} fare ·
