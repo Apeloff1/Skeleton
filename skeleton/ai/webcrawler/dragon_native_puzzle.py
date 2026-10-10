@@ -309,7 +309,9 @@ def emit_native_puzzle(*,seed:int,stages:int=4,difficulty:int=4,
                        procedural:bool=False,
                        authored_levels:tuple[tuple[str,...],...]|None=None,
                        hero:str="hatchling",theme:str="ancient_ruins",
-                       palette:str="dmg_green")->dict[str,str]:
+                       palette:str="dmg_green",
+                       campaign_mode:str="branching",
+                       challenge_profile:str="balanced")->dict[str,str]:
     if isinstance(stages,bool) or not isinstance(stages,int) or not 1<=stages<=MAX_LEVELS:
         raise ValueError("native puzzle stages must be 1..8")
     if type(procedural) is not bool:
@@ -322,6 +324,10 @@ def emit_native_puzzle(*,seed:int,stages:int=4,difficulty:int=4,
         original_pack=validate_authored_levels(authored_levels)
         if stages!=len(original_pack.levels):
             raise ValueError("authored game stage count must match emitted campaign")
+    from .dragon_native_campaign_paths import design_campaign, graph_header, graph_report
+    campaign=design_campaign(
+        stages,seed=seed,mode=campaign_mode,intensity=challenge_profile,
+    )
     layouts=[];solutions=[];proofs=[]
     for index in range(stages):
         grid=(original_pack.levels[index].rows if original_pack is not None
@@ -344,6 +350,7 @@ def emit_native_puzzle(*,seed:int,stages:int=4,difficulty:int=4,
        ", ".join('"'+x+'"' for x in solutions)+"};\n"+
        "static const int dragon_solution_length[LEVEL_COUNT]={"+
        ", ".join(str(len(p)) for p in solutions)+"};\n"
+       graph_header(campaign)+
        "#endif\n"
     )
     cmake="""\
@@ -375,6 +382,9 @@ clean:
       "search":"exact bounded BFS over player location and crate set",
       "seed":seed,"stages":stages,"difficulty":difficulty,
       "procedural":procedural,
+      "campaign_mode":campaign_mode,
+      "challenge_profile":challenge_profile,
+      "campaign_graph":graph_report(campaign),
       "authoring_mode":"authored" if original_pack is not None else "generated",
       "authoring_digest":original_pack.digest if original_pack is not None else None,
       "authored_level_rows":[list(level.rows) for level in original_pack.levels]
@@ -403,6 +413,8 @@ clean:
     runtime=enable_native_save(
         enable_native_challenge(enable_native_trace(enable_live_hints(C_SOURCE)))
     )
+    from .dragon_native_campaign_runtime import enable_native_branches
+    runtime=enable_native_branches(runtime)
     from .dragon_native_puzzle_graphics import enable_puzzle_graphics
     native={"src/main.c":runtime,"include/dragon_puzzle.h":header,
             "CMakeLists.txt":cmake,"Makefile":make,
