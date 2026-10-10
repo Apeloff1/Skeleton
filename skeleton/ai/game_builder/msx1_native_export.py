@@ -93,6 +93,7 @@ GameStart:
     call MSX_INITXT       ; Real BIOS 40-column text VDP mode 0.
     call MSX_CHGCLR
     call LoadLevel
+    ei                   ; BIOS cartridge init may enter with interrupts masked.
 MainLoop:
     halt                  ; Hardware VBlank interrupt, bounded keyboard poll.
     ld a, (Won)
