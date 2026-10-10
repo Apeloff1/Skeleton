@@ -183,6 +183,9 @@ def knowledge_hoag(
         _verify_wisdom_custody(library, owner)
         return {"ok": True, **DragonWisdomPyramid(library).hoag_view(
             owner, now=int(time.time()), authorized=True,
+            require_signed_approval=(
+                os.environ.get("SKL_DRAGON_WISDOM_CUSTODY_REQUIRED") == "1"
+            ),
         )}
 
 
