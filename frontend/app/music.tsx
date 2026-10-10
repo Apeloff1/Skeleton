@@ -13,9 +13,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { jeevesSpeak } from '../features/Academy/jeevesTts';
 
 const BACKEND = CANONICAL_API_BASE || '';
-const GENRES = ['orchestral', 'electronic', 'ambient', 'rock', 'jazz', 'lofi', 'chiptune', 'cinematic'];
-const MOODS = ['epic', 'mysterious', 'energetic', 'calm', 'sad', 'tense', 'triumphant', 'eerie'];
-const DURATIONS = [30, 60, 90, 180];
+// Must stay a subset of MusicGenerationRequest in backend/routes/music_pipeline.py.
+// Values outside the backend Literal sets return HTTP 422.
+const GENRES = ['orchestral', 'electronic', 'ambient', 'rock', 'jazz', 'lofi', 'chiptune', 'synthwave', 'epic', 'horror'];
+const MOODS = ['epic', 'mysterious', 'energetic', 'calm', 'sad', 'tense', 'heroic', 'dark'];
+const DURATIONS: { value: 'short' | 'medium' | 'long'; label: string }[] = [
+  { value: 'short', label: '15–20' },
+  { value: 'medium', label: '30–45' },
+  { value: 'long', label: '60–90' },
+];
+const TEMPO_MIN = 40;
+const TEMPO_MAX = 200;
 
 export default function MusicScreen() {
   const router = useRouter();
@@ -23,7 +31,7 @@ export default function MusicScreen() {
   const [genre, setGenre] = useState('orchestral');
   const [mood, setMood] = useState('epic');
   const [tempo, setTempo] = useState(120);
-  const [duration, setDuration] = useState(60);
+  const [duration, setDuration] = useState<'short' | 'medium' | 'long'>('medium');
   const [loopable, setLoopable] = useState(true);
   const [description, setDescription] = useState('A grand orchestral overture for a fantasy castle');
   const [busy, setBusy] = useState(false);
@@ -42,15 +50,22 @@ export default function MusicScreen() {
   const run = useCallback(async () => {
     setBusy(true); setErr(''); setResult(null);
     try {
+      const bpm = Number.isFinite(tempo) ? Math.min(TEMPO_MAX, Math.max(TEMPO_MIN, tempo)) : undefined;
       const r = await fetch(`${BACKEND}/api/music/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description, genre, mood, tempo, duration_seconds: duration, loopable }),
+        body: JSON.stringify({ description, genre, mood, tempo: bpm, duration, loopable }),
       });
       const j = await r.json();
+      if (!r.ok) {
+        const detail = Array.isArray(j?.detail)
+          ? j.detail.map((d: any) => d?.msg).filter(Boolean).join('; ')
+          : j?.detail || j?.error || `HTTP ${r.status}`;
+        setErr(String(detail).slice(0, 200));
+        return;
+      }
       setResult(j);
-      if (j?.error) setErr(String(j.error).slice(0, 200));
-      else jeevesSpeak('Composition complete.', { context: 'celebration', prependCatchphrase: false });
+      jeevesSpeak('Composition complete.', { context: 'celebration', prependCatchphrase: false });
     } catch (e: any) {
       setErr(String(e?.message || e).slice(0, 200));
     } finally { setBusy(false); }
@@ -109,16 +124,17 @@ export default function MusicScreen() {
               <TextInput
                 value={String(tempo)}
                 onChangeText={t => setTempo(parseInt(t || '0', 10))}
+                onBlur={() => setTempo(v => Math.min(TEMPO_MAX, Math.max(TEMPO_MIN, v || 120)))}
                 keyboardType="numeric"
                 style={s.numInput}
               />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.label}>Duration (s)</Text>
+              <Text style={s.label}>Duration</Text>
               <View style={s.chipRow}>
                 {DURATIONS.map(d => (
-                  <TouchableOpacity key={d} style={[s.chip, duration === d && s.chipActive]} onPress={() => setDuration(d)}>
-                    <Text style={[s.chipText, duration === d && s.chipTextActive]}>{d}</Text>
+                  <TouchableOpacity key={d.value} style={[s.chip, duration === d.value && s.chipActive]} onPress={() => setDuration(d.value)}>
+                    <Text style={[s.chipText, duration === d.value && s.chipTextActive]}>{d.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -159,7 +175,7 @@ export default function MusicScreen() {
             <View style={s.resultBox}>
               <View style={s.resultHead}>
                 <Ionicons name="musical-note" size={16} color="#3B82F6" />
-                <Text style={s.resultHeadText}>{genre} · {mood} · {tempo} BPM · {duration}s</Text>
+                <Text style={s.resultHeadText}>{genre} · {mood} · {result?.parameters?.tempo ?? tempo} BPM · {duration}</Text>
               </View>
               {!!result.composition && (
                 <Text style={s.resultText}>{String(result.composition).slice(0, 2000)}</Text>
