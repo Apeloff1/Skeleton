@@ -33,6 +33,7 @@ class Campaign:
     complete_routes:tuple[tuple[int,...],...]
     ending_count:int
     choice_nodes:int
+    measured_difficulty:tuple[int,...]
     digest:str
     claim:str
 
@@ -55,8 +56,9 @@ def _enumerate(chapters:tuple[Chapter,...])->tuple[tuple[int,...],...]:
     visit(0,())
     return tuple(paths)
 
-def _digest(chapters):
-    material=[asdict(chapter) for chapter in chapters]
+def _digest(chapters,measured_difficulty):
+    material={"chapters":[asdict(chapter) for chapter in chapters],
+              "measured_difficulty":measured_difficulty}
     return sha256(json.dumps(material,sort_keys=True,separators=(",",":"),
                              ensure_ascii=True).encode("ascii")).hexdigest()
 
@@ -68,6 +70,11 @@ def validate_campaign(campaign:Campaign)->Campaign:
         raise ValueError("original game chapter count outside bounds")
     if campaign.mode not in ("linear","branching"):
         raise ValueError("unrecognized original game progression mode")
+    if (not isinstance(campaign.measured_difficulty,tuple) or
+            len(campaign.measured_difficulty)!=len(nodes) or
+            any(type(x) is not int or not 0<=x<=100
+                for x in campaign.measured_difficulty)):
+        raise ValueError("native branch tension is not measured in valid bounds")
     endings=set()
     choices=0
     for index,chapter in enumerate(nodes):
@@ -99,7 +106,7 @@ def validate_campaign(campaign:Campaign)->Campaign:
     if (campaign.complete_routes!=routes or
             campaign.ending_count!=len(endings) or
             campaign.choice_nodes!=choices or
-            campaign.digest!=_digest(nodes)):
+            campaign.digest!=_digest(nodes,campaign.measured_difficulty)):
         raise ValueError("native branching game progression receipt forged")
     return campaign
 
@@ -154,12 +161,14 @@ def design_campaign(stages:int,*,seed:int=0,
               "fork" if len(targets)>1 else "connector")
         chapters.append(Chapter(n,targets,ending,role,names))
     nodes=tuple(chapters)
+    ratings=stage_difficulty if stage_difficulty is not None else (0,)*stages
     routes=_enumerate(nodes)
     result=Campaign(
         schema=SCHEMA,mode=mode,chapters=nodes,complete_routes=routes,
         ending_count=sum(not chapter.exits for chapter in nodes),
         choice_nodes=sum(len(chapter.exits)>1 for chapter in nodes),
-        digest=_digest(nodes),
+        measured_difficulty=ratings,
+        digest=_digest(nodes,ratings),
         claim=("original branching level progression; player enjoyment and "
                "relative shortcut challenge not certified by human playtests"),
     )
@@ -174,12 +183,14 @@ def graph_header(graph:Campaign)->str:
         for chapter in graph.chapters
     )
     terminal=",".join(str(int(not chapter.exits)) for chapter in graph.chapters)
+    complexity=",".join(str(x) for x in graph.measured_difficulty)
     return (
         "/* Original game campaign graph: zero-based stage destinations. */\n"
         "static const int dragon_branch_count[LEVEL_COUNT]={"+counts+"};\n"
         "static const int dragon_branch_next[LEVEL_COUNT][2]={\n"+
         destinations+"\n};\n"
         "static const int dragon_branch_ending[LEVEL_COUNT]={"+terminal+"};\n"
+        "static const int dragon_stage_tension[LEVEL_COUNT]={"+complexity+"};\n"
     )
 
 def graph_report(graph:Campaign)->dict:
@@ -202,6 +213,7 @@ def verify_graph_report(doc:dict)->Campaign:
             schema=doc["schema"],mode=doc["mode"],chapters=chapters,
             complete_routes=tuple(tuple(x) for x in doc["complete_routes"]),
             ending_count=doc["ending_count"],choice_nodes=doc["choice_nodes"],
+            measured_difficulty=tuple(doc["measured_difficulty"]),
             digest=doc["digest"],claim=doc["claim"],
         )
     except (TypeError,KeyError,ValueError) as exc:
