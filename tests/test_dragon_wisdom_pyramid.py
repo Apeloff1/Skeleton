@@ -60,18 +60,18 @@ class DragonWisdomPyramidTests(unittest.TestCase):
             min_independent_groups=2,
         )
 
-    def review(self, *, disposition="accepted"):
+    def review(self, *, disposition="accepted", at=NOW):
         return self.wiki.wiki_review(
             OWNER, self.brief(), mechanic="platforming",
             disposition=disposition, independent_reviewer_id="wiki-reviewer",
             review_evidence_digest="a" * 64,
-            now=NOW, expires_at=NOW + 86400,
+            now=at, expires_at=at + 86400,
             authorized=True, trusted_worker=True,
         )
 
-    def promote(self, review):
+    def promote(self, review, *, at=NOW + 1):
         return self.wiki.promote(
-            OWNER, review["digest"], now=NOW + 1, authorized=True,
+            OWNER, review["digest"], now=at, authorized=True,
             trusted_worker=True, human_approved=True,
         )
 
@@ -92,7 +92,7 @@ class DragonWisdomPyramidTests(unittest.TestCase):
         self.assertEqual(self.wiki.hoag_view(OWNER, now=NOW + 86400, authorized=True)["items"], [])
 
     def test_two_dependent_sources_cannot_count_as_independent(self):
-        doc = replace(source("source-b", "publisher-a"), observed_at="2026-10-11T12:00:00Z")
+        doc = replace(source("source-b", "publisher-a"), observed_at="2026-10-10T13:00:00Z")
         self.lib.import_document(doc, expected_parent_digest=self.b.revision_digest,
                                  authorized=True)
         with self.assertRaisesRegex(ValueError, "independent"):
@@ -100,7 +100,7 @@ class DragonWisdomPyramidTests(unittest.TestCase):
 
     def test_challenge_blocks_acceptance_and_requires_review(self):
         challenger = replace(source("source-b", "publisher-b", stance="challenges"),
-                             observed_at="2026-10-11T12:00:00Z")
+                             observed_at="2026-10-10T13:00:00Z")
         self.lib.import_document(challenger, expected_parent_digest=self.b.revision_digest,
                                  authorized=True)
         with self.assertRaisesRegex(ValueError, "supporting"):
@@ -130,7 +130,7 @@ class DragonWisdomPyramidTests(unittest.TestCase):
                                        new_revision=self.a.revision_digest, now=NOW + 3,
                                        authorized=True, trusted_worker=True)
         new = self.lib.import_document(
-            source("source-a", "publisher-a", when="2026-10-11T12:00:00Z"),
+            source("source-a", "publisher-a", when="2026-10-10T13:00:00Z"),
             expected_parent_digest=self.a.revision_digest, authorized=True,
         )
         self.wiki.complete_recrawl(OWNER, "source-a", request_digest=order["digest"],
@@ -138,16 +138,16 @@ class DragonWisdomPyramidTests(unittest.TestCase):
                                    authorized=True, trusted_worker=True)
         self.assertEqual(self.wiki.recrawl_queue(OWNER, now=NOW + 4, authorized=True), ())
         with self.assertRaisesRegex(ValueError, "revisions changed"):
-            self.promote(review)
-        updated = self.review()
-        self.promote(updated)
-        self.assertEqual(len(self.wiki.hoag_view(OWNER, now=NOW + 4, authorized=True)["items"]), 1)
+            self.promote(review, at=NOW + 4)
+        updated = self.review(at=NOW + 5)
+        self.promote(updated, at=NOW + 6)
+        self.assertEqual(len(self.wiki.hoag_view(OWNER, now=NOW + 7, authorized=True)["items"]), 1)
 
     def test_retraction_fails_closed_after_publication(self):
         review = self.review()
         self.promote(review)
         self.lib.import_document(
-            source("source-a", "publisher-a", when="2026-10-11T12:00:00Z",
+            source("source-a", "publisher-a", when="2026-10-10T13:00:00Z",
                    status="retracted"),
             expected_parent_digest=self.a.revision_digest, authorized=True,
         )
@@ -174,8 +174,8 @@ class DragonWisdomPyramidTests(unittest.TestCase):
         self.assertEqual(self.wiki.hoag_view("studio-b", now=NOW, authorized=True)["items"], [])
         with self.assertRaises(ValueError):
             self.wiki.promote("studio-b", self.wiki.hoag_view(
-                OWNER, now=NOW, authorized=True)["items"][0]["review_digest"],
-                now=NOW, authorized=True, trusted_worker=True, human_approved=True)
+                OWNER, now=NOW + 1, authorized=True)["items"][0]["review_digest"],
+                now=NOW + 1, authorized=True, trusted_worker=True, human_approved=True)
 
     def test_tampered_journal_halts_all_views_and_mutation(self):
         review = self.review()
@@ -194,7 +194,7 @@ class DragonWisdomPyramidTests(unittest.TestCase):
     def test_stale_brief_cannot_be_relabelled_as_new_evidence(self):
         brief = self.brief()
         new = self.lib.import_document(
-            source("source-a", "publisher-a", when="2026-10-11T12:00:00Z"),
+            source("source-a", "publisher-a", when="2026-10-10T13:00:00Z"),
             expected_parent_digest=self.a.revision_digest, authorized=True,
         )
         self.assertNotEqual(new.revision_digest, self.a.revision_digest)
