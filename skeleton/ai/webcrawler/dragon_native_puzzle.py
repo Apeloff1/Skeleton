@@ -59,8 +59,34 @@ def _parse(rows:tuple[str,...]):
         raise ValueError("crate or player overlaps wall")
     return starts[0],boxes,goals,walls
 
-def solve_grid(rows:tuple[str,...])->tuple[str,int]:
+def solve_grid(
+    rows:tuple[str,...], *,
+    current_player:int|None=None,
+    current_crates:tuple[int,...]|None=None,
+)->tuple[str,int]:
+    """Exact BFS from initial or explicitly supplied current original game state.
+
+    This is useful for active-game hints after the player deviates from the
+    canonical opening. The same bounded solver, tile collisions, movement
+    order and unique-state search are reused for both admissions.
+    """
     start,boxes,goals,walls=_parse(rows)
+    if current_player is not None or current_crates is not None:
+        if (type(current_player) is not int or
+                not isinstance(current_crates,tuple) or
+                len(current_crates)!=len(boxes) or
+                any(type(index) is not int or index<0 or index>=WIDTH*HEIGHT
+                    for index in current_crates)):
+            raise ValueError("bounded live puzzle hint state invalid")
+        if (current_player<0 or current_player>=WIDTH*HEIGHT or
+                current_player in walls or current_player in current_crates or
+                len(set(current_crates))!=len(current_crates) or
+                any(box in walls for box in current_crates)):
+            raise ValueError("live puzzle hint overlaps walls, crates or bounds")
+        start=current_player
+        boxes=tuple(sorted(current_crates))
+        if set(boxes)==goals:
+            return "",1
     initial=(start,boxes)
     parents={initial:None}
     pending=deque((initial,))
