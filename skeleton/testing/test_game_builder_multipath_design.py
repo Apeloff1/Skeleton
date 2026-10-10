@@ -257,3 +257,12 @@ def test_bridges_enumerate_each_critical_corridor_edge_once():
     }
     assert len(bridge_corridors(RouteProblem.from_rows(OPEN_LEVEL))) < 6
 
+
+def test_cycle_rank_distinguishes_tree_world_from_open_alternatives():
+    line = RouteProblem.from_rows((
+        "#########", "#S.C...G#", "#########", "#########",
+        "#########", "#########", "#########", "#########", "#########",
+    ))
+    assert cycle_rank(line) == 0
+    assert cycle_rank(RouteProblem.from_rows(OPEN_LEVEL)) > 0
+
