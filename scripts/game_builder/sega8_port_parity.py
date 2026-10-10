@@ -126,6 +126,7 @@ def verify_ports(root: Path) -> dict[str, object]:
         compile_evidence = _select(root, target, target+"-compilation-evidence.json")
         host = _select(root, target, target+"-host-gameplay-receipt.json")
         boot = _select(root, target, target+"-real-z80-boot.json")
+        native_route = _select(root, target, target+"-native-z80-gameplay.json")
         reproducible = _select(root, target, target+"-reproducibility.json")
         if (meta.get("schema") != "skeleton.game_builder.native_sega8_source.v1"
             or meta.get("platform") != target or meta.get("target_rom_suffix") != ext):
@@ -156,6 +157,14 @@ def verify_ports(root: Path) -> dict[str, object]:
             or boot.get("zero_score_hud_verified") is not True
         ):
             raise Sega8PortParityError("actual compiled cartridge startup was not observed")
+        if (
+            native_route.get("schema") != "skeleton.game_builder.sega8_actual_z80_gameplay_replay.v1"
+            or native_route.get("target") != target
+            or native_route.get("original_source_game_verified_on_instruction_level_cpu") is not True
+            or native_route.get("original_companion_rank_and_reward_verified") is not True
+            or native_route.get("actual_victory_palette_verified") is not True
+        ):
+            raise Sega8PortParityError("compiled native Z80 ROM never completed authored winning replay")
         # Each source has different typed false-claim envelopes. Missing,
         # non-boolean, or truthful-looking string fields are not acceptable:
         # a forged release gate must fail closed, not merely reject JSON true.
@@ -174,6 +183,10 @@ def verify_ports(root: Path) -> dict[str, object]:
                     "independent_cycle_exact_emulator_verified",
                     "physical_hardware_verified", "distribution_licensed",
                     "release_approved")),
+            (native_route, ("independent_cycle_exact_full_console_emulator_verified",
+                            "physical_hardware_verified",
+                            "rights_independently_verified",
+                            "distribution_licensed", "release_approved")),
         )
         for receipt, fields in unapproved:
             for key in fields:
@@ -193,6 +206,11 @@ def verify_ports(root: Path) -> dict[str, object]:
             or host.get("source_content_digest") != source
             or host.get("world_digest") != meta.get("world_digest")
             or boot.get("rom_sha256") != rom
+            or native_route.get("rom_sha256") != rom
+            or native_route.get("source_content_digest") != source
+            or native_route.get("original_world_digest") != meta.get("world_digest")
+            or native_route.get("original_route_sha256")
+               != host.get("authoritative_reference_sha256")
         ):
             raise Sega8PortParityError("source, replay, rights or ROM hash chain mismatch")
         if (
@@ -202,12 +220,25 @@ def verify_ports(root: Path) -> dict[str, object]:
             or host["original_controller_actions_verified"] <= 0
         ):
             raise Sega8PortParityError("gameplay acceptance proof has invalid action counts")
+        if (
+            type(native_route.get("controller_actions_replayed")) is not int
+            or type(native_route.get("original_levels_replayed")) is not int
+            or type(native_route.get("hardware_screen_states_verified")) is not int
+            or type(native_route.get("real_z80_instruction_count")) is not int
+            or native_route["controller_actions_replayed"]
+               != host["original_controller_actions_verified"]
+            or native_route["original_levels_replayed"] != meta["levels"]
+            or native_route["hardware_screen_states_verified"]
+               != native_route["controller_actions_replayed"] + 1
+            or native_route["real_z80_instruction_count"] <= 0
+        ):
+            raise Sega8PortParityError("native Z80 replay not bound to every expected game action")
         _sha(meta.get("world_digest"), "world")
         _sha(meta.get("reference_safe_replay_digest"), "safe replay")
         _sha(meta.get("source_rights_evidence_sha256"), "rights evidence")
         records[target] = {
             "manifest": meta, "compile": compile_evidence, "host": host, "boot": boot,
-            "reproducibility": reproducible,
+            "reproducibility": reproducible, "native_route": native_route,
         }
 
     sms = records["sega_master_system"]
@@ -225,6 +256,15 @@ def verify_ports(root: Path) -> dict[str, object]:
     ):
         if sms["host"].get(field) != gg["host"].get(field):
             raise Sega8PortParityError("different hardware ports accepted different gameplay")
+    if (
+        sms["native_route"]["controller_actions_replayed"]
+        != gg["native_route"]["controller_actions_replayed"]
+        or sms["native_route"]["original_levels_replayed"]
+        != gg["native_route"]["original_levels_replayed"]
+        or sms["native_route"]["hardware_screen_states_verified"]
+        != gg["native_route"]["hardware_screen_states_verified"]
+    ):
+        raise Sega8PortParityError("original Z80 cartridge gameplay differs between hardware ports")
     if sms["manifest"].get("target_rom_suffix") == gg["manifest"].get("target_rom_suffix"):
         raise Sega8PortParityError("different native ports share incorrect ROM extension")
     result = {
@@ -247,7 +287,14 @@ def verify_ports(root: Path) -> dict[str, object]:
             target: records[target]["reproducibility"]["comparison_sha256"]
             for target in sorted(_TARGETS)
         },
-        "full_native_z80_gameplay_replay_verified": False,
+        "full_native_z80_gameplay_replay_verified": True,
+        "native_z80_controller_actions_verified_per_platform":
+            sms["native_route"]["controller_actions_replayed"],
+        "guest_z80_gameplay_receipt_sha256_by_platform": {
+            target: _sha(records[target]["native_route"].get("original_route_sha256"),
+                         target+" actual Z80 route")
+            for target in sorted(_TARGETS)
+        },
         "physical_hardware_verified": False,
         "rights_independently_verified": False,
         "release_approved": False,
