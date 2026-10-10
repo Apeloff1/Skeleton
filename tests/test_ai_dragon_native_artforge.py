@@ -68,6 +68,10 @@ def test_original_art_changes_actual_native_console_runtime_source(target,style)
     assert claimed["hero"]=="robot"
     assert claimed["quest_theme"]=="clockwork"
     assert claimed["runtime_applied"] is True
+    if "dragon-pixel-art.json" in native.files:
+        older_catalog=json.loads(native.files["dragon-pixel-art.json"])
+        assert older_catalog["runtime_tiles_replaced_by_original_design"]
+        assert [x["fingerprint"] for x in older_catalog["sprites"]]==claimed["pixel_digests"]
 
     baseline=make_request(target,style,
         portable_design=PortableGameDesign(
