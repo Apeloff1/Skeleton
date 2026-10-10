@@ -9,7 +9,7 @@ from skeleton.ai.webcrawler.dragon_living_world import (
     SCHEMA, STYLE_NAMES, STYLE_RULES, LIFECYCLES, WORLD_ADDRESS_COUNT,
     VARIANTS_PER_ADDRESS,ADDRESSABLE_VARIATION_SLOTS,MAX_HISTORY,MAX_ABS_COORD,
     create_world,validate_world,catalog,initial_state,terrain,atmosphere,
-    options,replay,take_action,describe,journal,LivingState,
+    options,replay,take_action,describe,journal,LivingState,terrain_for_state,
 )
 
 
@@ -325,3 +325,67 @@ def test_survival_endurance_can_be_continued_without_forced_ending():
     assert state.food>0
     assert not state.endings_seen
     assert describe(world,state)["playable"]
+
+
+
+def test_original_world_builder_actions_change_actual_visible_terrain_not_only_metadata():
+    world=create_world(world_id=112,style="creative_sandbox")
+    first=initial_state(world)
+    plain=terrain_for_state(world,first,0,0,0)
+    assert plain["built_local_structures"]==[]
+    built=take_action(world,first,"build")
+    transformed=terrain_for_state(world,built,0,0,0)
+    assert transformed["player_caused_terrain_change"]
+    assert transformed["landmark"]=="original_settlement"
+    assert "original_settlement" in transformed["built_local_structures"]
+    assert "shelter_r0_xp0_yp0" in built.world_changes
+    ore=take_action(world,built,"mine")
+    reclaim=take_action(world,ore,"terraform")
+    planted=terrain_for_state(world,reclaim,0,0,0)
+    assert planted["biome"]=="garden"
+    assert planted["original_biome"]==plain["biome"]
+    assert "reclaimed_garden" in planted["built_local_structures"]
+    assert not terrain_for_state(world,reclaim,0,40,40)[
+        "player_caused_terrain_change"]
+
+
+def test_postgame_world_unlocks_new_real_quests_memorials_outposts_and_expeditions():
+    world=create_world(world_id=76,style="open_world_story")
+    before=initial_state(world)
+    assert "postgame_outpost" not in choices(world,before)
+    ended=replay(world,("help_settlers","help_settlers","ending_civic_union"))
+    menu=choices(world,ended)
+    assert "postgame_outpost" in menu
+    assert menu["postgame_outpost"]["available"]
+    assert menu["postgame_expedition"]["available"]
+    outpost=take_action(world,ended,"postgame_outpost")
+    assert outpost.chapter==ended.chapter+1
+    assert outpost.settlement_level==ended.settlement_level+1
+    assert terrain_for_state(world,outpost,0,0,0)[
+        "landmark"]=="postgame_frontier_outpost"
+    resources=take_action(world,ended,"mine")
+    assert resources.ore>=2
+    grown=take_action(world,resources,"postgame_rebuild")
+    assert terrain_for_state(world,grown,0,0,0)["biome"]=="garden"
+    memoir=take_action(world,resources,"postgame_memorial")
+    assert terrain_for_state(world,memoir,0,0,0)[
+        "landmark"]=="postgame_story_memorial"
+    explorer=take_action(world,ended,"postgame_expedition")
+    assert (explorer.x,explorer.y)==(3,1)
+    assert explorer.chapter==ended.chapter+2
+    assert explorer.era==1
+    assert explorer.endings_seen==("civic_union",)
+    assert describe(world,explorer)["postgame_active"]
+
+
+def test_two_postgame_choice_branches_change_future_world_tiles_and_replay_evidence():
+    world=create_world(world_id=221,style="post_story_wasteland")
+    story=replay(world,("help_settlers","help_settlers","ending_civic_union"))
+    first=take_action(world,story,"postgame_outpost")
+    second=take_action(world,story,"postgame_expedition")
+    assert first.history_digest!=second.history_digest
+    assert (first.x,first.y)!=(second.x,second.y)
+    assert terrain_for_state(world,first,0,0,0)["player_caused_terrain_change"]
+    assert not terrain_for_state(world,second,0,0,0)[
+        "player_caused_terrain_change"]
+    assert first.era==second.era==1
