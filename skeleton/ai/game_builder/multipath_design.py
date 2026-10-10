@@ -985,4 +985,56 @@ def pareto_hazard_routes(problem: RouteProblem) -> tuple[RouteProof, ...]:
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget", "pareto_hazard_routes"]
+def enumerate_shortest_routes(
+    problem: RouteProblem, *, limit: int = 8,
+    max_expansions: int = _MAX_STATES,
+) -> tuple[RouteProof, ...]:
+    """Walk the shortest-path DAG; do not substitute longer diversity detours."""
+    if (not isinstance(problem, RouteProblem) or type(limit) is not int
+            or not 1 <= limit <= 32 or type(max_expansions) is not int
+            or not 1 <= max_expansions <= _MAX_STATES):
+        raise MultipathError("invalid shortest-path enumeration bounds")
+    bits = {p: 1 << i for i, p in enumerate(problem.collectibles)}
+    full = (1 << len(bits)) - 1
+    origin: State = (*problem.start, 0)
+    queue = deque([origin])
+    distance = {origin: 0}
+    parents: dict[State, list[tuple[State, str]]] = {origin: []}
+    endpoint = None
+    expanded = 0
+    while queue:
+        state = queue.popleft()
+        expanded += 1
+        if expanded > max_expansions:
+            raise MultipathError("shortest-path enumeration expansion budget exceeded")
+        if endpoint is not None and distance[state] > distance[endpoint]:
+            break
+        if state[:2] == problem.goal and state[2] == full:
+            endpoint = state
+            continue
+        for action, p in problem.neighbors(state[:2], allow_hazards=False):
+            nxt: State = (*p, state[2] | bits.get(p, 0))
+            proposed = distance[state] + 1
+            if nxt not in distance:
+                distance[nxt] = proposed
+                parents[nxt] = [(state, action)]
+                queue.append(nxt)
+            elif distance[nxt] == proposed:
+                parents[nxt].append((state, action))
+    if endpoint is None:
+        raise MultipathError("no shortest collectible-complete route")
+    results: list[RouteProof] = []
+    stack: list[tuple[State, tuple[str, ...]]] = [(endpoint, ())]
+    while stack and len(results) < limit:
+        state, suffix = stack.pop()
+        if state == origin:
+            results.append(evaluate_route(problem, suffix, solver="shortest_dag",
+                                          expanded_states=expanded))
+            continue
+        for previous, action in reversed(parents[state]):
+            stack.append((previous, (action,) + suffix))
+    return tuple(results)
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget", "pareto_hazard_routes", "enumerate_shortest_routes"]
