@@ -220,3 +220,10 @@ def test_recorded_observations_require_real_monotone_timestamps():
         with pytest.raises(ValueError, match=reason):
             store.record(replace(base, observations=items), authorized=True)
 
+
+def test_observation_confidence_rejects_boolean_nonfinite_and_string():
+    store = setup()
+    for bad in (True, float("nan"), float("inf"), "0.9", -0.1, 1.1):
+        with pytest.raises(ValueError, match="confidence"):
+            store.record(session(store, observations=(observation(confidence=bad),)), authorized=True)
+
