@@ -159,7 +159,7 @@ def test_export_master_system_native_header_checksum_and_hardware_vectors_fail_c
     ):
         with pytest.raises(SMSROMError):
             verify_sms(damage,expected_program=program)
-    with pytest.raises(SMSROMError,match="differs"):
+    with pytest.raises(SMSROMError,match="no longer matches"):
         verify_sms(rom,expected_program=program[:-1]+b"\xFE")
     with pytest.raises(SMSROMError):
         make_sms(b"\0"*32768)
