@@ -197,6 +197,7 @@ class NativeProductionDesignBody(BaseModel):
     stages: StrictInt = Field(default=4, ge=1, le=8)
     candidates: StrictInt = Field(default=8, ge=1, le=24)
     project_notes: str = Field(default="Original native homebrew; platform-scaled design", max_length=200)
+    procedural_levels: StrictBool = Field(default=False)
 
 
 class NativeProductionSourceRequest(BaseModel):
