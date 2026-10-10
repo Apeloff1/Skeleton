@@ -22,6 +22,8 @@ on:
       - "skeleton/ai/game_builder/plagiarism_guard.py"
       - "skeleton/ai/game_builder/media_similarity.py"
       - "skeleton/ai/game_builder/release_assurance.py"
+      - "skeleton/ai/game_builder/release_trust_anchor.py"
+      - "skeleton/testing/test_game_builder_release_trust_anchor.py"
       - "skeleton/ai/game_builder/asset_credits.py"
       - "skeleton/ai/game_builder/native_release_intake.py"
       - "skeleton/ai/game_builder/release_pipeline.py"
@@ -65,10 +67,10 @@ jobs:
         run: python -m pip install "pytest>=8,<10" "Pillow>=11,<13" "cryptography>=50,<60"
       - name: Compile archival module syntax
         run: |
-          python -m compileall -q skeleton/ai/game_builder/platform_registry.py skeleton/ai/game_builder/port_planner.py skeleton/ai/game_builder/editor_platforms.py skeleton/ai/game_builder/archive_import.py skeleton/ai/game_builder/evolution_archive.py skeleton/ai/game_builder/evolution_practice.py skeleton/ai/game_builder/desktop_native_export.py skeleton/ai/game_builder/archive_cli.py skeleton/ai/game_builder/legal_paths.py skeleton/ai/game_builder/legal_port_bridge.py skeleton/ai/game_builder/legal_census.py skeleton/ai/game_builder/legal_native_export.py skeleton/ai/game_builder/plagiarism_guard.py skeleton/ai/game_builder/plagiarism_cli.py skeleton/ai/game_builder/media_similarity.py skeleton/ai/game_builder/release_assurance.py skeleton/ai/game_builder/asset_credits.py skeleton/ai/game_builder/native_release_intake.py skeleton/ai/game_builder/release_pipeline.py
+          python -m compileall -q skeleton/ai/game_builder/platform_registry.py skeleton/ai/game_builder/port_planner.py skeleton/ai/game_builder/editor_platforms.py skeleton/ai/game_builder/archive_import.py skeleton/ai/game_builder/evolution_archive.py skeleton/ai/game_builder/evolution_practice.py skeleton/ai/game_builder/desktop_native_export.py skeleton/ai/game_builder/archive_cli.py skeleton/ai/game_builder/legal_paths.py skeleton/ai/game_builder/legal_port_bridge.py skeleton/ai/game_builder/legal_census.py skeleton/ai/game_builder/legal_native_export.py skeleton/ai/game_builder/plagiarism_guard.py skeleton/ai/game_builder/plagiarism_cli.py skeleton/ai/game_builder/media_similarity.py skeleton/ai/game_builder/release_assurance.py skeleton/ai/game_builder/release_trust_anchor.py skeleton/ai/game_builder/asset_credits.py skeleton/ai/game_builder/native_release_intake.py skeleton/ai/game_builder/release_pipeline.py
       - name: Run focused historical archive and homebrew output regressions
         run: |
-          python -m pytest -q skeleton/testing/test_game_builder_platform_porting.py skeleton/testing/test_game_builder_archive_evolution.py skeleton/testing/test_game_builder_legal_paths.py skeleton/testing/test_game_builder_plagiarism_guard.py skeleton/testing/test_game_builder_media_similarity.py skeleton/testing/test_game_builder_release_assurance.py skeleton/testing/test_game_builder_asset_credits.py skeleton/testing/test_game_builder_native_release_intake.py
+          python -m pytest -q skeleton/testing/test_game_builder_platform_porting.py skeleton/testing/test_game_builder_archive_evolution.py skeleton/testing/test_game_builder_legal_paths.py skeleton/testing/test_game_builder_plagiarism_guard.py skeleton/testing/test_game_builder_media_similarity.py skeleton/testing/test_game_builder_release_assurance.py skeleton/testing/test_game_builder_release_trust_anchor.py skeleton/testing/test_game_builder_asset_credits.py skeleton/testing/test_game_builder_native_release_intake.py
       - name: Confirm packaged platform archive is executable offline
         run: |
           python -m skeleton.ai.game_builder.archive_cli summary > /tmp/game_archive_summary.json
