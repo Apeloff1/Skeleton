@@ -92,3 +92,20 @@ def flood_fill(rows: object, origin: object) -> tuple[tuple[int,int],...]:
                 seen.add(neighbor)
                 queue.append(neighbor)
     return tuple(sorted(seen,key=lambda point:(point[1],point[0])))
+
+def distance_field(rows: object, origin: object) -> tuple[tuple[int,...],...]:
+    """Exact breadth-first traversal distance, with -1 for walls/unreachable."""
+    grid=_grid(rows)
+    start=_point(origin)
+    if start[1]>=len(grid) or start[0]>=len(grid[0]) or grid[start[1]][start[0]]=="#":
+        raise GeometryError("distance source must be traversable")
+    costs=[[-1 for _ in row] for row in grid]
+    costs[start[1]][start[0]]=0
+    queue=deque((start,))
+    while queue:
+        x,y=queue.popleft()
+        for nx,ny in walkable_tile_neighbors(grid,(x,y)):
+            if costs[ny][nx]==-1:
+                costs[ny][nx]=costs[y][x]+1
+                queue.append((nx,ny))
+    return tuple(tuple(row) for row in costs)
