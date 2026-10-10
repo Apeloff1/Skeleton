@@ -276,3 +276,52 @@ def test_game_engine_refuses_forged_worlds_unavailable_actions_and_raw_state():
         terrain(world,0,MAX_ABS_COORD+1,0)
     with pytest.raises(ValueError):
         take_action(world,replace(state,health=-1),"wait")
+
+
+
+def test_hardcore_survival_world_can_end_player_run_without_ending_game_universe():
+    world=create_world(world_id=404,style="hardcore_roguelike")
+    assert world.lifecycle=="permadeath"
+    journey=replay(world,("wait",)*70)
+    assert not journey.alive
+    assert journey.health==0
+    assert not describe(world,journey)["playable"]
+    assert set(x["name"] for x in options(world,journey))=={"restart_run"}
+    recovered=take_action(world,journey,"restart_run")
+    assert recovered.alive
+    assert recovered.run==1
+    assert recovered.legacy==1
+    assert recovered.history_digest!=initial_state(world).history_digest
+
+
+def test_original_negative_coordinate_discovery_is_encoded_safely_and_replays():
+    world=create_world(world_id=1977,style="mutable_labyrinth")
+    north=replay(world,("north","observe"))
+    assert north.y==-1
+    assert north.discoveries
+    assert all("-" not in key and key.startswith("r0_")
+               for key in north.discoveries)
+    assert "m1" in north.discoveries[0]
+    assert north==replay(world,("north","observe"))
+
+
+def test_changing_world_climate_and_time_do_not_require_a_final_victory():
+    world=create_world(world_id=1937,style="living_ecosystem")
+    before=initial_state(world)
+    early=atmosphere(world,before)
+    late=replay(world,("wait",)*33)
+    later=atmosphere(world,late)
+    assert early["season"]!=later["season"]
+    assert early["maze_phase"]!=later["maze_phase"]
+    assert later["epoch"]>early["epoch"]
+    assert describe(world,late)["playable"]
+    assert not world.includes_goal
+
+
+def test_survival_endurance_can_be_continued_without_forced_ending():
+    world=create_world(world_id=93,style="persistent_survival")
+    state=replay(world,("forage","wait","rest")*40)
+    assert state.alive and state.turn==120
+    assert state.food>0
+    assert not state.endings_seen
+    assert describe(world,state)["playable"]
