@@ -485,6 +485,8 @@ solver, on-screen optimality-derived star grading, and a small local
 \`dragon-save-v1.dat\` save/resume slot (interactive K/L, native SDL F5/F9
 or supported gamepad controls). A save is bound to the exact generated
 campaign geometry and rejects malformed, mismatched or corrupt state.
+Repeated saves use same-volume replacement on POSIX and the native Windows
+file-replacement API, without relying on Windows `rename()` overwrite behavior.
 This is a local user game save, not cloud identity, user tracking or
 permission to rewrite Jeeves memory.
 

@@ -11,6 +11,10 @@ SCHEMA="skeleton.ai.dragon.original_native_save_v1"
 SOURCE='''/* Bounded local puzzle save slot: never loads code or remote data.
    This state fingerprint detects accidents/foreign saves; not authentication.
    The game itself does not grant AI memory or learning XP. */
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
 #define DRAGON_SAVE_NAME "dragon-save-v1.dat"
 #define DRAGON_TEMP_NAME "dragon-save-v1.tmp"
 static uint32_t game_map_fingerprint(void){
@@ -34,6 +38,16 @@ static uint32_t save_state_digest(int level,State st,uint32_t game_id){
  h=trace_word(h,(uint32_t)st.moves);
  return trace_word(h,(uint32_t)st.pushes);
 }
+static int replace_local_original_save(const char*temp,const char*target){
+#ifdef _WIN32
+ /* Windows C runtime rename() cannot reliably overwrite a previous file.
+    MoveFileExA replaces the bounded fixed-name slot on the same volume. */
+ return MoveFileExA(temp,target,MOVEFILE_REPLACE_EXISTING|
+                               MOVEFILE_WRITE_THROUGH)!=0;
+#else
+ return rename(temp,target)==0;
+#endif
+}
 static int write_local_original_save(void){
  FILE*handle=fopen(DRAGON_TEMP_NAME,"wb");
  if(!handle)return 0;
@@ -47,9 +61,9 @@ static int write_local_original_save(void){
  int fine=bytes>0&&bytes<160&&fflush(handle)==0&&!ferror(handle);
  if(fclose(handle)!=0)fine=0;
  if(!fine){remove(DRAGON_TEMP_NAME);return 0;}
- /* POSIX rename is atomic within the same directory; Windows host APIs may
-    not replace a preexisting destination. We do not promise crash durability. */
- if(rename(DRAGON_TEMP_NAME,DRAGON_SAVE_NAME)!=0){
+ /* Move only the fixed-name bounded local save slot into place after
+    flushing. Filesystem crash durability is not independently certified. */
+ if(!replace_local_original_save(DRAGON_TEMP_NAME,DRAGON_SAVE_NAME)){
   remove(DRAGON_TEMP_NAME);return 0;
  }
  return 1;

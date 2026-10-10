@@ -70,3 +70,13 @@ def test_in_game_save_and_resume_controls_operate_on_original_interactive_game(t
     assert "Local original game saved: yes" in result.stdout
     assert "Local original game resumed: yes" in result.stdout
     assert (tmp_path/"dragon-save-v1.dat").is_file()
+
+
+
+def test_second_native_game_save_uses_platform_safe_replacement():
+    from skeleton.ai.webcrawler.dragon_native_puzzle_save import SOURCE
+    assert "MoveFileExA(temp,target,MOVEFILE_REPLACE_EXISTING" in SOURCE
+    assert "MOVEFILE_WRITE_THROUGH" in SOURCE
+    assert "#ifdef _WIN32" in SOURCE
+    assert "return rename(temp,target)==0;" in SOURCE
+    assert "replace_local_original_save(DRAGON_TEMP_NAME,DRAGON_SAVE_NAME)" in SOURCE
