@@ -36,11 +36,14 @@ class HardwareSample:
         _integer(self.available_memory_bytes, 0, 2**50, "memory")
         _integer(self.cpu_units, 1, 1024, "cpu")
         for value in (self.pressure, self.battery_fraction):
-            if isinstance(value, bool) or not isfinite(value) or not 0 <= value <= 1:
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not isfinite(value) or not 0 <= value <= 1):
                 raise ValueError("invalid hardware fraction")
         if not isinstance(self.charging, bool) or not isinstance(self.thermal_limited, bool):
             raise ValueError("invalid hardware flag")
-        if isinstance(self.sampled_at, bool) or not isfinite(self.sampled_at):
+        if (isinstance(self.sampled_at, bool)
+                or not isinstance(self.sampled_at, (int, float))
+                or not isfinite(self.sampled_at) or self.sampled_at < 0):
             raise ValueError("invalid hardware timestamp")
 
 
@@ -58,8 +61,10 @@ class ResourcePlan:
 
 
 def plan_resources(sample: HardwareSample, *, now: float, foreground: bool) -> ResourcePlan:
-    if not isinstance(foreground, bool) or isinstance(now, bool) or not isfinite(now):
-        raise ValueError("invalid resource request")
+    if (not isinstance(sample, HardwareSample) or type(foreground) is not bool
+            or isinstance(now, bool) or not isinstance(now, (int, float))
+            or not isfinite(now) or now < 0):
+        raise ValueError("invalid hardware resource request")
     age = now - sample.sampled_at
     if age < 0 or age > 5:
         return ResourcePlan(foreground, 0, 0, 1024, 0, 0, "defer", False, "stale_telemetry")
