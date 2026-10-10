@@ -8,6 +8,7 @@ on:
       - "backend/routes/dragon_academy.py"
       - "backend/tests/test_dragon_academy_routes.py"
       - "tests/test_dragon_*.py"
+      - "tests/test_game_niche_research.py"
       - "frontend/features/Jeeves/companion/**"
       - "frontend/scripts/test-dragon-wisdom.cjs"
       - "tests/test_ai*dragon*.py"
@@ -26,6 +27,7 @@ on:
       - "backend/routes/dragon_academy.py"
       - "backend/tests/test_dragon_academy_routes.py"
       - "tests/test_dragon_*.py"
+      - "tests/test_game_niche_research.py"
       - "frontend/features/Jeeves/companion/**"
       - "frontend/scripts/test-dragon-wisdom.cjs"
       - "tests/test_ai*dragon*.py"
@@ -82,6 +84,7 @@ jobs:
             tests/test_game_builder_knowledge_rights_bridge.py \
             tests/test_game_builder_reviewed_knowledge.py \
             tests/test_game_research_foundation.py \
+            tests/test_game_niche_research.py \
             tests/test_dragon_wisdom_pyramid.py \
             tests/test_dragon_wisdom_refresh_bridge.py \
             tests/test_dragon_recrawl_dispatch.py \
