@@ -83,7 +83,7 @@ def make_frontier(*,seed:int=1,weather:str="clear",
     place("spaceport",biome="industrial",gifts=("launch_pass","space_suit",),
           scenery=18)
     place("orbit",region="space",biome="vacuum",scenery=100)
-    place("moon_outpost",region="space",biome="lunar",gifts=("stargate_key",),
+    place("moon_outpost",region="space",biome="lunar",gifts=("stellar_gate_key",),
           scenery=95)
     place("asteroid",region="space",biome="vacuum",scenery=100)
     place("orbital_gate",region="space",biome="vacuum",scenery=100)
@@ -266,15 +266,15 @@ def make_frontier(*,seed:int=1,weather:str="clear",
             fuel=20,price=40,requires=("space_suit",),shapes=("impractical","detour"))
     connect("moon_to_gate","moon_outpost","orbital_gate","space_taxi",90,
             fuel=15,price=20,requires=("space_suit",),shapes=("detour","alternate"))
-    connect("stargate_to_goal","orbital_gate","citadel","stargate",3,
-            mana=20,requires=("stargate_key",),shapes=("shortcut","unlockable",
+    connect("stellar_gate_to_goal","orbital_gate","citadel","stellar_gate",3,
+            mana=20,requires=("stellar_gate_key",),shapes=("shortcut","unlockable",
                                                "world_transition"))
     connect("asteroid_visit","orbit","asteroid","eva",60,fatigue=12,
             requires=("space_suit",),shapes=("scenic","dead_end"))
     connect("asteroid_return","asteroid","orbit","orbital_transfer",65,
             requires=("space_suit",),shapes=("return_only",))
     connect("moon_to_citadel","moon_outpost","citadel","wormhole",19,
-            mana=15,requires=("stargate_key",),shapes=("shortcut","world_transition"))
+            mana=15,requires=("stellar_gate_key",),shapes=("shortcut","world_transition"))
 
     # Synthetic seed changes costs on *some* genuinely traversable edges.
     # This is original variation, not a copied map reordering.
