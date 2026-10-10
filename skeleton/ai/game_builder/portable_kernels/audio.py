@@ -32,3 +32,10 @@ def nes_pulse_timer(hertz: int) -> int:
     hz=_integer(hertz,"NES pulse Hz",55,111860)
     return max(0,min(2047,(1789773+8*hz)//(16*hz)-1))
 
+
+def sn76489_tone_period(hertz: int, *, master_clock: int=3579545) -> int:
+    """SN76489 Sega TI PSG 10-bit tone divider, never a zero divider."""
+    hz=_integer(hertz,"SN tone Hz",110,125000)
+    clock=_integer(master_clock,"PSG clock",1000000,8000000)
+    return max(1,min(1023,(clock+16*hz)//(32*hz)))
+
