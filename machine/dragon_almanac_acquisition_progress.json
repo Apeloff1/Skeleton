@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.dragon.almanac_acquisition_progress.v1",
+  "registry_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
+  "ordering": "source_id_ascending",
+  "next_source_offset": 0,
+  "reviewed_candidate_count": 0,
+  "entries": [],
+  "whole_web_complete": false,
+  "notes": "Discovery snapshot only. Scheduled runs append real observations and preserve unresolved policy and access gaps."
+}

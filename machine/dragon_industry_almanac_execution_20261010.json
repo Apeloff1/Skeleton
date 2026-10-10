@@ -1,0 +1,64 @@
+{
+  "schema": "skeleton.dragon.industry_almanac_execution.v1",
+  "recorded_at": "2026-10-10T16:13:07Z",
+  "implementation_author": "Codex",
+  "independent_verification": false,
+  "production_deployed": false,
+  "canonical_owner": "skeleton/ai/game_builder/reviewed_knowledge.py",
+  "registry_path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010",
+  "catalog_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
+  "discovered_urls": 4405,
+  "hostnames": 1359,
+  "video_candidates": 631,
+  "retrieved_discovery_catalogs": 8,
+  "bootstrap_almanac_nodes": 3695,
+  "industry_domains": 36,
+  "industry_headers": 216,
+  "niches": 84,
+  "linked_corpus_individually_fetched": 0,
+  "approved_corpus_sources": 0,
+  "spot_check": {
+    "attempts": 6,
+    "web_pages_returned": 5,
+    "retrieval_errors": 1,
+    "representative_sample": false
+  },
+  "local_queue": {
+    "pending": 4405,
+    "deployed_network_executor_attached": false
+  },
+  "original_experiment": {
+    "path": "docs/ai/evidence/dragon-original-grid-20261010.json",
+    "samples": 160,
+    "train_samples": 128,
+    "holdout_samples": 32,
+    "independent_replication": false,
+    "machine_finding_state": "unreviewed"
+  },
+  "compression": {
+    "implemented": "sparse_integer_lexical_retrieval_pack",
+    "neural_corpus_training_executed": false,
+    "latency_claim_validated": false
+  },
+  "validation": {
+    "tests_passed": 121,
+    "subtests_passed": 2,
+    "architecture_checks_passed": 4,
+    "implementation_notes": "existing_VOL-000_stale_evidence_failure",
+    "provider_bootstrap": "timeout_90_seconds"
+  },
+  "next_actions": [
+    "individually_check_availability_and_permissions",
+    "authenticate_network_and_analysis_workers",
+    "acquire_permitted_source_bodies",
+    "independent_source_and_empirical_review",
+    "connect_entity_provider_adapters",
+    "train_only_explicitly_approved_datasets",
+    "benchmark_consumer_hardware",
+    "validate_original_products_per_target_and_jurisdiction"
+  ],
+  "training_authorized": false,
+  "release_authorized": false,
+  "signoff_scope": "implementation_and_local_observations_only",
+  "report_digest": "6827e4890a5f7888019f5d38d42f993df2caacaea2dfc7fdabd5c711311f57e1"
+}
