@@ -485,3 +485,10 @@ def test_conflicting_confirmed_tastes_cannot_self_approve():
     assert profile.review_required
     assert profile.design_directives == ()
 
+
+def test_fully_confirmed_unopposed_taste_is_reviewed():
+    store = setup()
+    positive = observation(preference=PreferenceSignal.ENJOYED, confirmed=True)
+    store.record(session(store, observations=(positive,)), authorized=True)
+    assert store.distill("alice", authorized=True).review_required is False
+
