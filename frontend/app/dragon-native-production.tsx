@@ -135,11 +135,13 @@ function NativeSourceEditor() {
         const valid = data.targets.filter((item) =>
           item && typeof item.id === 'string' &&
           item.id.length < 70 && typeof item.family === 'string' &&
-          item.family.length < 90 && Array.isArray(item.supported_styles));
+          item.family.length < 90 && Array.isArray(item.supported_styles) &&
+          item.supported_styles.length <= 40 && item.supported_styles.every(
+            (value: unknown) => typeof value === 'string' && value.length <= 64));
         if (!controller.signal.aborted) {
           setCatalog(valid);
           setTargets(previous => previous.filter(
-            id => valid.some(item => item.id === id && supported(item, style)),
+            id => valid.some(item => item.id === id && supported(item, 'arcade_score_attack')),
           ));
         }
       } catch {
@@ -150,6 +152,8 @@ function NativeSourceEditor() {
     })();
     return () => controller.abort();
   }, []);
+
+  React.useEffect(() => () => { active.current?.abort(); }, []);
 
   const styles = React.useMemo(() => Array.from(new Set(
     catalog.filter(item => item.native_source_emitter &&
