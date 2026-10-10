@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from hashlib import sha256
+from functools import lru_cache
 from heapq import heappop,heappush
 from itertools import permutations
 from math import log2
@@ -207,6 +208,7 @@ def _walk(rows,path,*,solver,variation):
                  tuple(pushes),tuple(sorted(footprint)),risky,deadlocked,
                  variation),frozenset(edges)
 
+@lru_cache(maxsize=128)
 def analyse_routes(rows:tuple[str,...],*,max_routes:int=6,
                    expansion_cap:int=20000)->RoutePortfolio:
     """Bounded multi-solver route portfolio, refusing unverifiable alternatives.
@@ -214,6 +216,9 @@ def analyse_routes(rows:tuple[str,...],*,max_routes:int=6,
     This is evidence about one authored *level*, not a claim the full game
     story branches. Campaign-level routes require the companion DAG adapter.
     """
+    if not isinstance(rows,tuple) or len(rows)!=10 or any(
+            not isinstance(row,str) or len(row)!=12 for row in rows):
+        raise ValueError("route analysis needs an immutable bounded original map")
     if type(max_routes) is not int or not 1<=max_routes<=MAX_ALTERNATIVES:
         raise ValueError("original route portfolio size must be 1..8")
     if type(expansion_cap) is not int or not 500<=expansion_cap<=MAX_EXPANSIONS:
