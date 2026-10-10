@@ -51,6 +51,7 @@ class Sega8Machine:
         self.vdp_writes = 0
         self.cram_writes = 0
         self.psg_writes = 0
+        self.last_psg_data: int | None = None
         self.vdp_read_status = 0
         self.vdp_register_updates = 0
         self.unexpected_port_reads = 0
@@ -135,6 +136,7 @@ class Sega8Machine:
         value &= 0xFF
         if low in (0x7E, 0x7F):
             self.psg_writes += 1
+            self.last_psg_data = value
             return
         if low in (0x3E, 0x3F):
             self.io_control_writes += 1
