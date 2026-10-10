@@ -32,6 +32,20 @@ def test_native_game_includes_actual_source_verified_route_for_every_room(
     assert len(witnesses)>=width*height+1
     assert {f"room_{i}" for i in range(width*height)}<={
         witness["name"] for witness in witnesses}
+    for probe in witnesses:
+        if probe["name"].startswith("room_"):
+            room=int(probe["name"].removeprefix("room_"))
+            assert probe["checkpoint_place"]==room
+            assert probe["checkpoint_step"]>=0
+            if probe["checkpoint_step"]==0:
+                assert maze.world.places[room].id==maze.world.start
+            else:
+                visited_edge=probe["route"][probe["checkpoint_step"]-1]
+                traversed=next(x for x in maze.world.connections
+                               if x.id==visited_edge)
+                assert traversed.destination==maze.world.places[room].id
+        else:
+            assert probe["checkpoint_step"]==-1
     assert "maze_spine" in {w["name"] for w in witnesses}
     assert any(w["name"].startswith("scenic_") for w in witnesses)
     assert any(w["name"].startswith("doubleback_") for w in witnesses)
