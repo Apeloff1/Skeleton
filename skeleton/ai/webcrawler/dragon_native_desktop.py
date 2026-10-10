@@ -127,7 +127,7 @@ def _puzzle_proof(source_archive: bytes) -> tuple[dict, dict[str, str]]:
                 len(rows),seed=proof["seed"],
                 mode=proof["campaign_mode"],
                 intensity=proof.get("challenge_profile", "balanced"),
-            ),sort_keys=True)!=json.dumps(proof["campaign_graph"],sort_keys=True)):
+            )),sort_keys=True)!=json.dumps(proof["campaign_graph"],sort_keys=True)):
         raise ValueError("native campaign graph routes or ending receipt altered")
     # Recheck every level with the existing exact bounded BFS solver, rather
     # than just accepting a plausible-looking declared solution string.
