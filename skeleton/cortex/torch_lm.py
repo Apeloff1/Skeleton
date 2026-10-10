@@ -358,7 +358,9 @@ class TorchAccel:
             output = torch.softmax(scores.masked_fill(mask, float("-inf")), dim=-1) @ vh
         return output.squeeze(0).transpose(0, 1).contiguous().reshape(length, heads * head_dim)
 
-    def _forward_ids(self, ids: Sequence[int], *, fill_cache: bool = False):
+    def _forward_ids(
+        self, ids: Sequence[int], *, fill_cache: bool = False, all_positions: bool = False
+    ):
         torch = self.torch
         lm = self.lm
         if not self.resident:
@@ -401,7 +403,8 @@ class TorchAccel:
         if fill_cache:
             self._cached_ids = list(ids)
             self._cached_next_position = len(ids)
-        return X[-1] @ self._Wout.T + self._bout, X[-1]
+        hidden = X if all_positions else X[-1]
+        return hidden @ self._Wout.T + self._bout, hidden
 
     def _rope(self, X, *, position_offset: int = 0):
         """Match attn.apply_rope, including absolute offsets for cached decode."""
@@ -608,18 +611,51 @@ class TorchAccel:
             or not math.isfinite(float(lr)) or not 0 <= lr <= 1
         ):
             raise ValueError("SGD learning rate must be finite and within [0, 1]")
+        self._prepare_sgd()
+        logits, _ = self._forward_ids(ids)
+        tgt = self.torch.tensor([target], dtype=self.torch.long, device=self.device)
+        loss = self.torch.nn.functional.cross_entropy(logits.unsqueeze(0), tgt)
+        return self._apply_sgd(loss, lr)
+
+    def sgd_sequence(self, ids: Sequence[int], lr: float) -> float:
+        """One token-mean SGD update from every next-token pair in a sequence.
+
+        Input has 2..context+1 IDs; its final ID is a target, never a query.
+        A single causal forward predicts ids[1:] from ids[:-1], avoiding
+        repeated prefix forwards. This changes the optimization schedule:
+        steps increments once per sequence, not once per predicted token.
+        No CPU fallback or corpus/tokenizer mutation occurs here.
+        """
+        with self._state_lock:
+            self._assert_training_integrity()
+            if not isinstance(ids, (list, tuple)) or not 2 <= len(ids) <= self.lm.ctx + 1:
+                raise ValueError("SGD sequence needs 2..context+1 token IDs")
+            if any(type(i) is not int or not 0 <= i < self.lm.V for i in ids):
+                raise ValueError("SGD sequence token ID outside vocabulary")
+            if (
+                isinstance(lr, bool) or not isinstance(lr, (int, float))
+                or not math.isfinite(float(lr)) or not 0 <= lr <= 1
+            ):
+                raise ValueError("SGD learning rate must be finite and within [0, 1]")
+            self._prepare_sgd()
+            logits, _ = self._forward_ids(ids[:-1], all_positions=True)
+            targets = self.torch.tensor(ids[1:], dtype=self.torch.long, device=self.device)
+            loss = self.torch.nn.functional.cross_entropy(logits, targets, reduction="mean")
+            return self._apply_sgd(loss, lr)
+
+    def _prepare_sgd(self) -> None:
         self.reset_decode_cache()
         self.last_grad_norm = None
-        torch = self.torch
         if not self.resident:
             self.pin()
+        for parameter in self._params():
+            if parameter.grad is not None:
+                parameter.grad.zero_()
+
+    def _apply_sgd(self, loss, lr: float) -> float:
+        """Shared finite-gradient gate and poisoned-state recovery contract."""
+        torch = self.torch
         params = tuple(self._params())
-        for p in params:
-            if p.grad is not None:
-                p.grad.zero_()
-        logits, _ = self._forward_ids(ids)
-        tgt = torch.tensor([target], dtype=torch.long, device=self.device)
-        loss = torch.nn.functional.cross_entropy(logits.unsqueeze(0), tgt)
         loss_value = float(loss.detach().cpu())
         if not math.isfinite(loss_value):
             raise ValueError("SGD non-finite loss rejected before any weight update")

@@ -137,3 +137,42 @@ smoke tests. Actual CUDA/MPS validation requires matching physical runners.
 
 No hardware-specific speedup or production readiness is asserted without
 passing the exact-head CI gates and measurements on the target equipment.
+
+## Opt-in sequence training
+
+`TorchAccel.sgd_sequence(ids, lr)` trains every next-token pair in one causal
+forward and one optimizer update. For `[a, b, c]`, it predicts `b` from `a`
+and `c` from `[a, b]`, then averages the two cross-entropies. The final ID is
+only a target, so input length may be `context + 1`. All IDs must be real
+integers inside the existing vocabulary; no tokenizer or vocabulary changes
+are made. This is an explicit API on the existing accelerator owner:
+
+```python
+from skeleton.cortex.torch_lm import TorchAccel
+
+accel = TorchAccel(model, device="cpu", prefill_query_chunk=16,
+                   max_grad_norm=1.0).pin()
+loss = accel.sgd_sequence([1, 2, 3, 1], lr=0.02)
+accel.sync()  # publish trained device weights to canonical CPU state
+```
+
+Choose a chunk no larger than the model's context. PyTorch remains optional.
+This avoids repeated prefix forward passes; it does not promise a speedup on
+an unmeasured device. A sequence update differs from sequential token SGD,
+because all losses use the same pre-update weights. Existing `fit()` and
+single-target `sgd()` keep their schedules. The `steps` counter increments
+once per sequence optimizer update, rather than per target token.
+
+The token-mean loss and complete parameter update are checked against the
+mean of individual causal prefix losses, including tied embeddings and
+chunked SDPA. The shared finite loss/gradient checks, clipping, decode-cache
+invalidation, exclusive state lock, partial-update poisoning and staged
+checkpoint sync apply to both SGD APIs. There is no automatic CPU replay
+after a training failure; restore a trusted checkpoint to recover a poisoned
+graph. Rollback is retaining that checkpoint and using the existing SGD API.
+
+This is a local arithmetic/training improvement in the existing model plane.
+It grants no training-data rights, tenant consent, artifact promotion or
+enterprise qualification. Dataset admission and held-out evaluation remain
+caller responsibilities. CUDA/MPS arithmetic and throughput require separate
+physical runner measurements.

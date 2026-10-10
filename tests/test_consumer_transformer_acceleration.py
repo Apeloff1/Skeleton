@@ -1372,3 +1372,88 @@ def test_gradient_clip_config_is_rejected_before_device_transition(bad):
         model.to("torch", max_grad_norm=bad)
     assert model._accel is None
     assert not model.resident
+
+
+@pytest.mark.parametrize("tied,chunk", [(False, None), (True, 2)])
+def test_sequence_sgd_matches_mean_prefix_loss_and_gradients(tied, chunk, monkeypatch):
+    torch = pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    torch.set_num_threads(1)
+    model = _model(norm="rms", ffn_kind="swiglu", tied=tied)
+    snapshot = model.snapshot()
+    expected = TorchAccel(TinyTransformer.from_snapshot(snapshot)).pin()
+    actual = TorchAccel(model, prefill_query_chunk=chunk).pin()
+    ids = [1, 2, 3, 1, 2, 3, 1]  # context+1: final target isn't queried
+    losses = []
+    for stop in range(1, len(ids)):
+        logits, _ = expected._forward_ids(ids[:stop])
+        losses.append(torch.nn.functional.cross_entropy(
+            logits.unsqueeze(0), torch.tensor([ids[stop]]),
+        ))
+    mean_loss = torch.stack(losses).mean()
+    mean_loss.backward()
+    with torch.no_grad():
+        for p in expected._params():
+            if p.grad is not None:
+                p.add_(p.grad, alpha=-0.02)
+    calls = []
+    forward = actual._forward_ids
+
+    def counted(*args, **kwargs):
+        calls.append((args, kwargs))
+        return forward(*args, **kwargs)
+
+    monkeypatch.setattr(actual, "_forward_ids", counted)
+    measured = actual.sgd_sequence(ids, 0.02)
+    assert measured == pytest.approx(float(mean_loss.detach()), abs=2e-6)
+    assert len(calls) == 1
+    assert calls[0][1]["all_positions"] is True
+    assert model.steps == 1
+    for a, e in zip(actual._params(), expected._params()):
+        torch.testing.assert_close(a, e, atol=2e-6, rtol=2e-5)
+    actual.sync()
+    restored = TinyTransformer.from_snapshot(model.snapshot())
+    assert restored._logits([1, 2, 3]) == pytest.approx(actual.logits([1, 2, 3]), abs=2e-5)
+
+
+@pytest.mark.parametrize("ids,lr", [
+    ([], 0.02), ([1], 0.02), ([1] * 8, 0.02),
+    ([1, True], 0.02), ([1, -1], 0.02), ([1, 4], 0.02),
+    ([1, 2], float("nan")), ([1, 2], True),
+])
+def test_sequence_sgd_rejects_invalid_inputs_without_mutation(ids, lr):
+    pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = _model()
+    accel = TorchAccel(model).pin()
+    accel.logits_window([1, 2])
+    before = model.snapshot()
+    with pytest.raises(ValueError):
+        accel.sgd_sequence(ids, lr)
+    assert model.snapshot() == before
+    assert accel.cached_tokens == (1, 2)
+
+
+def test_sequence_sgd_uses_shared_nonfinite_and_clipping_gate(monkeypatch):
+    torch = pytest.importorskip("torch")
+    from skeleton.cortex.torch_lm import TorchAccel
+
+    model = _model()
+    accel = TorchAccel(model, max_grad_norm=0.05).pin()
+    before = [p.detach().clone() for p in accel._params()]
+    original = torch.nn.functional.cross_entropy
+    monkeypatch.setattr(torch.nn.functional, "cross_entropy", lambda *a, **kw: torch.tensor(float("nan")))
+    with pytest.raises(ValueError, match="non-finite loss"):
+        accel.sgd_sequence([1, 2, 3], 0.02)
+    for p, old in zip(accel._params(), before):
+        assert torch.equal(p, old)
+    assert model.steps == 0
+    monkeypatch.setattr(torch.nn.functional, "cross_entropy", original)
+    accel.sgd_sequence([1, 2, 3], 0.02)
+    assert accel.last_grad_norm is not None
+    assert accel.last_grad_norm > 0.05
+    delta = sum(float((p.detach() - old).square().sum()) for p, old in zip(accel._params(), before)) ** 0.5
+    assert delta <= 0.02 * 0.05 + 2e-6
+    assert accel.cached_tokens == ()
