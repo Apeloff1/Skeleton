@@ -127,12 +127,12 @@ def _puzzle_proof(source_archive: bytes) -> tuple[dict, dict[str, str]]:
     authored=None
     if authoring_mode=="authored":
         from .dragon_native_puzzle_authoring import validate_authored_levels
-        rows=proof.get("authored_level_rows")
-        if (not isinstance(rows,list) or
-                any(not isinstance(x,list) for x in rows)):
+        authored_rows=proof.get("authored_level_rows")
+        if (not isinstance(authored_rows,list) or
+                any(not isinstance(x,list) for x in authored_rows)):
             raise ValueError("authored source level rows missing")
         authored=validate_authored_levels(
-            tuple(tuple(line for line in level) for level in rows)
+            tuple(tuple(line for line in level) for level in authored_rows)
         )
         if (procedural or authored.digest!=proof.get("authoring_digest") or
                 len(authored.levels)!=proof["stages"]):
@@ -166,10 +166,31 @@ def _puzzle_proof(source_archive: bytes) -> tuple[dict, dict[str, str]]:
     # A recomputed ZIP SHA alone could otherwise conceal modified native code
     # or a mismatched map after the index was forged.
     from .dragon_native_puzzle import emit_native_puzzle
+    from .dragon_game_design import parse_design
+    # The original typed design, when emitted, is itself part of the
+    # source-hashed bundle. Its art controls must be replayed exactly.
+    with ZipFile(BytesIO(source_archive)) as archive:
+        try:
+            raw_design=archive.read("source/dragon-game-design.json")
+        except KeyError:
+            raw_design=None
+    design=None
+    if raw_design is not None:
+        candidate=json.loads(raw_design)
+        from .dragon_game_design import FIELDS
+        design=parse_design({key:candidate[key] for key in FIELDS})
+        if candidate.get("digest")!=design.digest or
+                design.genre!="fixed_screen_puzzle" or
+                design.target!=receipt["target"] or
+                design.seed!=expected_seed):
+            raise ValueError("native visual game design disagrees with source")
     canonical=emit_native_puzzle(
         seed=expected_seed,stages=len(rows),difficulty=difficulty,
         procedural=procedural,
         authored_levels=authored.rows if authored is not None else None,
+        hero=design.hero if design is not None else "hatchling",
+        theme=design.quest_theme if design is not None else "ancient_ruins",
+        palette=design.palette if design is not None else "dmg_green",
     )
     for name in REQUIRED_SOURCE_FILES:
         if canonical[name] != inventory[name]:
