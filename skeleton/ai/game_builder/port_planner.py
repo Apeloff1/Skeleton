@@ -39,17 +39,23 @@ class HomebrewSource:
     creative_identity: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        if not isinstance(self.project_id, str) or not self.project_id.strip():
-            raise PortPlanningError("source project must be identified")
-        if self.rights_basis not in _VALID_RIGHTS:
+        if (not isinstance(self.project_id, str) or not self.project_id.strip()
+                or len(self.project_id) > 128
+                or any(ord(ch) < 32 or 0xD800 <= ord(ch) <= 0xDFFF for ch in self.project_id)):
+            raise PortPlanningError("source project must be a bounded identifier")
+        if not isinstance(self.rights_basis, str) or self.rights_basis not in _VALID_RIGHTS:
             raise PortPlanningError("non-homebrew or unknown-rights source refused")
         if not isinstance(self.evidence_sha256, str) or not _SHA256.fullmatch(self.evidence_sha256):
             raise PortPlanningError("source must have content-specific SHA256 rights evidence")
-        if (
-            not isinstance(self.creative_identity, tuple) or not self.creative_identity
-            or any(not isinstance(v, str) or not v.strip() for v in self.creative_identity)
-        ):
-            raise PortPlanningError("creative identity must be explicit")
+        if (not isinstance(self.creative_identity, tuple)
+                or not 1 <= len(self.creative_identity) <= 16
+                or any(
+                    not isinstance(v, str) or not v.strip()
+                    or len(v.encode("utf-8", errors="surrogatepass")) > 240
+                    or any(ord(c) < 32 or 0xD800 <= ord(c) <= 0xDFFF for c in v)
+                    for v in self.creative_identity
+                )):
+            raise PortPlanningError("creative identity must contain 1–16 bounded UTF-8 invariants")
         if len(set(self.creative_identity)) != len(self.creative_identity):
             raise PortPlanningError("duplicate creative identity invariants")
 
@@ -70,8 +76,10 @@ class PortRequest:
             raise PortPlanningError("cross-hybrid needs two independently cleared homebrew sources; other modes need one")
         if len({s.project_id for s in self.sources}) != len(self.sources):
             raise PortPlanningError("hybrid sources must be distinct projects")
-        if not isinstance(self.target_platform_id, str) or not self.target_platform_id:
-            raise PortPlanningError("target platform is required")
+        if (not isinstance(self.target_platform_id, str)
+                or not 1 <= len(self.target_platform_id) <= 128
+                or not re.fullmatch(r"[a-z0-9][a-z0-9_]*", self.target_platform_id)):
+            raise PortPlanningError("target platform must be a canonical bounded identifier")
 
 
 @dataclass(frozen=True, slots=True)
