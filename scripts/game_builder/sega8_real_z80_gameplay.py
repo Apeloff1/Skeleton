@@ -187,15 +187,20 @@ class ActualZ80GameSession:
         self.tstates = 0
 
     def step_frame(self, button: str | None) -> None:
-        if button is not None and button not in _ACTION_BITS:
+        if button is not None and button not in (*_ACTION_BITS, "attract", "cancel"):
             raise Sega8NativeGameplayError("unrecognized game controller action")
         if self.frames >= MAX_TOTAL_GAMEPLAY_FRAMES:
             raise Sega8NativeGameplayError("native Z80 controller frame cap exceeded")
         if self.instructions + MAX_INSTRUCTION_FRAMES > MAX_TOTAL_GAMEPLAY_INSTRUCTIONS:
             raise Sega8NativeGameplayError("native game exceeded total CPU instruction budget")
-        self.machine.controller = (
-            0xFF if button is None else (0xFF ^ (1 << _ACTION_BITS[button]))
-        )
+        if button == "attract":
+            self.machine.controller = 0xCF  # native face buttons 1+2
+        elif button == "cancel":
+            self.machine.controller = 0xEF  # distinct new button-1 press
+        else:
+            self.machine.controller = (
+                0xFF if button is None else (0xFF ^ (1 << _ACTION_BITS[button]))
+            )
         self.machine.frame_ready = True
         self.cpu.request_maskable_interrupt()
         self.machine.interrupts_issued += 1
@@ -331,6 +336,42 @@ def verify_original_z80_gameplay(
         raise Sega8NativeGameplayError("native game bypassed real input port reads")
     if machine.vdp_writes < 1500 or machine.psg_writes < 4:
         raise Sega8NativeGameplayError("native Z80 did not perform expected video/audio hardware I/O")
+
+    # This is a SECOND actual-cartridge execution path, not a host simulation.
+    # Invoke the same optional 25-frame dual-face-button chord that a human
+    # uses after victory, then let the native ROM play its own authored path.
+    if meta.get("original_native_solution_attract_mode") is not True:
+        raise Sega8NativeGameplayError("original native demonstration missing from shipped cartridge")
+    if meta.get("original_demo_chord_frames") != 25:
+        raise Sega8NativeGameplayError("original hardware attract entry chord changed")
+    for _ in range(25):
+        session.step_frame("attract")
+    after_chord = observe_actual_gameplay(machine,width=meta["width"],height=meta["height"])
+    _assert_state(after_chord,reference["initial"],0)
+    attract_first_step_verified = False
+    for _ in range(16):
+        session.step_frame(None)
+        try:
+            observed = observe_actual_gameplay(
+                machine,width=meta["width"],height=meta["height"],
+            )
+        except Sega8NativeGameplayError:
+            continue
+        if all(observed[k] == reference["steps"][0][k] for k in _STATE_KEYS):
+            attract_first_step_verified = True
+            break
+    if not attract_first_step_verified:
+        raise Sega8NativeGameplayError(
+            "actual Z80 game did not autonomously play its original demonstration"
+        )
+    # A fresh face-button press must cancel the exhibition and restore the
+    # pristine level; otherwise a surprise autoplay could hijack player input.
+    session.step_frame("cancel")
+    after_cancel = observe_actual_gameplay(
+        machine,width=meta["width"],height=meta["height"],
+    )
+    _assert_state(after_cancel,reference["initial"],0)
+
     return {
         "schema": "skeleton.game_builder.sega8_actual_z80_gameplay_replay.v1",
         "target": target,
@@ -353,6 +394,9 @@ def verify_original_z80_gameplay(
         "real_z80_directions_seen_as_active_low_buttons":
             machine.active_joypad_bits_observed,
         "original_companion_rank_and_reward_verified": True,
+        "native_attract_demo_chord_started_from_victory": True,
+        "native_attract_demo_performed_first_original_move": True,
+        "native_attract_demo_user_cancel_restored_game": True,
         "actual_victory_palette_verified": True,
         "original_source_game_verified_on_instruction_level_cpu": True,
         "independent_cycle_exact_full_console_emulator_verified": False,
