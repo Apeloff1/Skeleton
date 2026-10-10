@@ -149,6 +149,7 @@
         "VOL-116",
         "VOL-117",
         "VOL-118",
+        "VOL-129",
         "VOL-168",
         "VOL-170",
         "VOL-200",
@@ -200,7 +201,8 @@
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_persistence_tree_with_governed_core_overlay",
       "source_exclusions": [
-        "core"
+        "core",
+        "scatter10240"
       ],
       "volume_refs": [
         "VOL-004",
@@ -212,15 +214,33 @@
         "VOL-075",
         "VOL-076",
         "VOL-096",
+        "VOL-132",
+        "VOL-134",
         "VOL-177",
+        "VOL-246",
         "VOL-247",
         "VOL-260",
         "VOL-295",
+        "VOL-305",
+        "VOL-310",
+        "VOL-329",
+        "VOL-330",
+        "VOL-331",
+        "VOL-333",
+        "VOL-344",
+        "VOL-345",
+        "VOL-351",
+        "VOL-352",
         "VOL-361",
         "VOL-364",
         "VOL-365",
+        "VOL-378",
+        "VOL-380",
         "VOL-404"
-      ]
+      ],
+      "source_exclusion_notes": {
+        "scatter10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-CONTEXT",
@@ -281,11 +301,27 @@
         "VOL-010",
         "VOL-011",
         "VOL-012",
+        "VOL-212",
         "VOL-251",
+        "VOL-350",
+        "VOL-351",
+        "VOL-352",
+        "VOL-353",
+        "VOL-354",
+        "VOL-355",
+        "VOL-356",
+        "VOL-357",
+        "VOL-358",
         "VOL-361",
         "VOL-362",
         "VOL-363"
-      ]
+      ],
+      "source_exclusions": [
+        "scatter10240"
+      ],
+      "source_exclusion_notes": {
+        "scatter10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-MEMORY",
@@ -312,6 +348,7 @@
         "VOL-010",
         "VOL-011",
         "VOL-012",
+        "VOL-033",
         "VOL-361",
         "VOL-362",
         "VOL-363",
@@ -398,8 +435,10 @@
         "VOL-042",
         "VOL-044",
         "VOL-045",
+        "VOL-134",
         "VOL-288",
-        "VOL-295"
+        "VOL-295",
+        "VOL-345"
       ]
     },
     {
@@ -574,7 +613,13 @@
         "VOL-027",
         "VOL-028",
         "VOL-174"
-      ]
+      ],
+      "source_exclusions": [
+        "scatter10240"
+      ],
+      "source_exclusion_notes": {
+        "scatter10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-AGENTS",
@@ -744,7 +789,8 @@
         "VOL-119",
         "VOL-121",
         "VOL-290",
-        "VOL-294"
+        "VOL-294",
+        "VOL-314"
       ]
     },
     {
@@ -814,6 +860,7 @@
       "move_batch": "B1-core-runtime",
       "source_disposition": "retain_until_import_inversion_and_regression_gates",
       "volume_refs": [
+        "VOL-033",
         "VOL-034",
         "VOL-066",
         "VOL-068",
@@ -837,12 +884,21 @@
         "VOL-280",
         "VOL-282",
         "VOL-325",
+        "VOL-349",
+        "VOL-368",
+        "VOL-375",
         "VOL-390",
         "VOL-403",
         "VOL-404",
         "VOL-405",
         "VOL-406"
-      ]
+      ],
+      "source_exclusions": [
+        "scatter10240"
+      ],
+      "source_exclusion_notes": {
+        "scatter10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-CONTEXTS",
@@ -948,9 +1004,16 @@
         "VOL-277",
         "VOL-283",
         "VOL-318",
+        "VOL-319",
         "VOL-320",
         "VOL-321",
-        "VOL-399"
+        "VOL-327",
+        "VOL-354",
+        "VOL-376",
+        "VOL-377",
+        "VOL-399",
+        "VOL-408",
+        "VOL-416"
       ]
     },
     {
@@ -1006,23 +1069,48 @@
         "VOL-206",
         "VOL-207",
         "VOL-208",
+        "VOL-214",
+        "VOL-215",
+        "VOL-216",
+        "VOL-217",
+        "VOL-219",
+        "VOL-220",
         "VOL-242",
         "VOL-248",
         "VOL-252",
         "VOL-296",
+        "VOL-302",
+        "VOL-304",
+        "VOL-312",
+        "VOL-316",
         "VOL-323",
         "VOL-324",
+        "VOL-328",
+        "VOL-337",
+        "VOL-346",
+        "VOL-347",
+        "VOL-355",
+        "VOL-359",
         "VOL-362",
         "VOL-363",
         "VOL-365",
+        "VOL-367",
         "VOL-369",
         "VOL-391",
+        "VOL-401",
         "VOL-405",
         "VOL-406",
+        "VOL-413",
         "VOL-414",
         "VOL-415",
         "VOL-419"
-      ]
+      ],
+      "source_exclusions": [
+        "scatter10240"
+      ],
+      "source_exclusion_notes": {
+        "scatter10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-KERNEL",
@@ -1103,8 +1191,15 @@
         "VOL-291",
         "VOL-292",
         "VOL-293",
-        "VOL-294"
-      ]
+        "VOL-294",
+        "VOL-379"
+      ],
+      "source_exclusions": [
+        "scatter10240"
+      ],
+      "source_exclusion_notes": {
+        "scatter10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-LEARNING",
@@ -1179,7 +1274,13 @@
       "volume_refs": [
         "VOL-189",
         "VOL-193"
-      ]
+      ],
+      "source_exclusions": [
+        "scatter10240"
+      ],
+      "source_exclusion_notes": {
+        "scatter10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-COGNITION",
@@ -1211,7 +1312,13 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "source_exclusions": [
+        "facet10240"
+      ],
+      "source_exclusion_notes": {
+        "facet10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-PRIMITIVES",
@@ -1243,7 +1350,13 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "source_exclusions": [
+        "facet10240"
+      ],
+      "source_exclusion_notes": {
+        "facet10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-REPO-INTELLIGENCE",
@@ -1297,9 +1410,12 @@
       ],
       "volume_refs": [
         "VOL-019",
+        "VOL-033",
         "VOL-073",
         "VOL-197",
-        "VOL-284"
+        "VOL-284",
+        "VOL-316",
+        "VOL-372"
       ],
       "move_tags": [
         "ai-tree:mapped",
@@ -1307,7 +1423,13 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "canonical_simulation_tree_exactly_mirrored"
+      "source_disposition": "canonical_simulation_tree_exactly_mirrored",
+      "source_exclusions": [
+        "scatter10240"
+      ],
+      "source_exclusion_notes": {
+        "scatter10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-FORGE",
@@ -1353,7 +1475,12 @@
         "forge_100_cycle.py",
         "promotion_arbitration.py",
         "quality_delta.py",
-        "rights_fingerprint.py"
+        "rights_fingerprint.py",
+        "rival_challenger.py",
+        "rival_proposer.py",
+        "rival_verifier.py",
+        "source_provenance.py",
+        "stop_policy.py"
       ]
     },
     {
@@ -1364,7 +1491,8 @@
       "source_git_object_sha": "8c6a214853800c1be14884becffd7a13bab17803",
       "role": "high-performance native capability registry, ABI boundary and accelerated kernels",
       "volume_refs": [
-        "VOL-032"
+        "VOL-032",
+        "VOL-033"
       ],
       "work_package_refs": [
         "WP-W02",
@@ -1621,7 +1749,11 @@
         "VOL-139",
         "VOL-140",
         "VOL-141",
-        "VOL-142"
+        "VOL-142",
+        "VOL-348",
+        "VOL-349",
+        "VOL-396",
+        "VOL-408"
       ],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
@@ -1653,6 +1785,7 @@
       ],
       "volume_refs": [
         "VOL-194",
+        "VOL-195",
         "VOL-281"
       ],
       "migration_action": "mirror_then_cutover",
@@ -1694,7 +1827,8 @@
         "VOL-038",
         "VOL-297",
         "VOL-298",
-        "VOL-299"
+        "VOL-299",
+        "VOL-332"
       ],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
@@ -1836,7 +1970,9 @@
       "volume_refs": [
         "VOL-007",
         "VOL-029",
-        "VOL-031"
+        "VOL-031",
+        "VOL-387",
+        "VOL-388"
       ],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
@@ -2034,7 +2170,10 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B2-domain-build",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "overlay_children": [
+        "event_schema_fence.py"
+      ]
     },
     {
       "id": "AIFT-QUALITY",
@@ -2067,7 +2206,13 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "source_exclusions": [
+        "scatter10240"
+      ],
+      "source_exclusion_notes": {
+        "scatter10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-REPO-MACHINE",
@@ -2291,7 +2436,13 @@
         "cutover:owner-sensitive"
       ],
       "move_batch": "B3-owner-sensitive",
-      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover",
+      "source_exclusions": [
+        "scatter10240"
+      ],
+      "source_exclusion_notes": {
+        "scatter10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-SOCIAL",
@@ -2358,7 +2509,13 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "source_exclusions": [
+        "scatter10240"
+      ],
+      "source_exclusion_notes": {
+        "scatter10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-ACQUIRED-LEARNING",
@@ -2851,7 +3008,13 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_until_characterized_and_verified"
+      "source_disposition": "retain_until_characterized_and_verified",
+      "source_exclusions": [
+        "facet10240"
+      ],
+      "source_exclusion_notes": {
+        "facet10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-PERSIST-LEGACY",
@@ -2922,7 +3085,7 @@
       "destination": "skeleton/ai/research/historical/sheaf",
       "kind": "tree",
       "source_git_object_sha": "d9164c7fee370ad9680b0cabe39253f56e0c3b68",
-      "role": "Sheaf/\u010cech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
+      "role": "Sheaf/Čech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
       "work_package_refs": [
         "WP-W09",
         "WP-W26"
@@ -2950,7 +3113,13 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_until_characterized_and_verified"
+      "source_disposition": "retain_until_characterized_and_verified",
+      "source_exclusions": [
+        "facet10240"
+      ],
+      "source_exclusion_notes": {
+        "facet10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-SPINE",
@@ -2986,7 +3155,13 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_until_characterized_and_verified"
+      "source_disposition": "retain_until_characterized_and_verified",
+      "source_exclusions": [
+        "facet10240"
+      ],
+      "source_exclusion_notes": {
+        "facet10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-VISCERA",
@@ -3023,7 +3198,13 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_until_characterized_and_verified"
+      "source_disposition": "retain_until_characterized_and_verified",
+      "source_exclusions": [
+        "facet10240"
+      ],
+      "source_exclusion_notes": {
+        "facet10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-CONFIG",
@@ -3130,7 +3311,13 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_characterized_merged_and_callers_inverted"
+      "source_disposition": "retain_until_characterized_merged_and_callers_inverted",
+      "source_exclusions": [
+        "facet10240"
+      ],
+      "source_exclusion_notes": {
+        "facet10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-TELEMETRY-COMPAT",
@@ -3161,7 +3348,13 @@
         "cutover:merge-required"
       ],
       "move_batch": "B3-compat-convergence",
-      "source_disposition": "retain_until_characterized_merged_and_callers_inverted"
+      "source_disposition": "retain_until_characterized_merged_and_callers_inverted",
+      "source_exclusions": [
+        "scatter10240"
+      ],
+      "source_exclusion_notes": {
+        "scatter10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-ARCHITECTURE-LEGACY",
@@ -5085,8 +5278,12 @@
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_provenance_parent_with_governed_chronicle_overlay",
       "source_exclusions": [
-        "chronicle"
-      ]
+        "chronicle",
+        "scatter10240"
+      ],
+      "source_exclusion_notes": {
+        "scatter10240": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-KNOWLEDGE",
@@ -5136,7 +5333,8 @@
       ],
       "volume_refs": [
         "VOL-015",
-        "VOL-026"
+        "VOL-026",
+        "VOL-373"
       ],
       "overlay_children": [
         "integrations"
@@ -5263,6 +5461,30 @@
       "kind": "file",
       "source_git_object_sha": "4441277ceba8e76c1c75c5e442d62fb8f49e9842",
       "role": "Canonical research source-lineage and evidence tracking surface mirrored exactly into governed AI research quarantine.",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "research_lineage_quarantine_mirror_pending_independent_cutover_validation",
+      "volume_refs": [
+        "VOL-001"
+      ]
+    },
+    {
+      "id": "AIFT-RESEARCH-EVIDENCE-CONTRACTS",
+      "source": "skeleton/research/evidence_contracts.py",
+      "destination": "skeleton/ai/research/evidence_contracts.py",
+      "kind": "file",
+      "source_git_object_sha": "6e40a0ee022988baf04a498caaabcbec4d448093",
+      "role": "Research evidence-graph, reproduction and conclusion contracts exported by the research package, mirrored exactly into governed AI research quarantine.",
       "work_package_refs": [
         "WP-W11"
       ],
@@ -5451,7 +5673,45 @@
         "contracts/promotion_gate.schema.json",
         "contracts/training_manifest.schema.json",
         "dataset_lineage.py",
-        "dataset_rights.py"
+        "dataset_rights.py",
+        "deduplication.py",
+        "distillation.py",
+        "flgb_training_runtime.py",
+        "lifecycle_proof.py",
+        "mirror_room_evaluation.py",
+        "project_learning.py",
+        "project_learning_run.py",
+        "promotion_gate.py",
+        "promotion_lifecycle.py",
+        "temporal_abstention.py",
+        "temporal_admission.py",
+        "temporal_benchmark.py",
+        "temporal_budget.py",
+        "temporal_causality.py",
+        "temporal_certificate.py",
+        "temporal_certificate_registry.py",
+        "temporal_consistency.py",
+        "temporal_counterfactual.py",
+        "temporal_custody.py",
+        "temporal_drift.py",
+        "temporal_editing.py",
+        "temporal_ensemble.py",
+        "temporal_facts.py",
+        "temporal_freshness.py",
+        "temporal_intelligence.py",
+        "temporal_intervals.py",
+        "temporal_invariants.py",
+        "temporal_learning_control.py",
+        "temporal_promotion.py",
+        "temporal_provenance.py",
+        "temporal_quarantine.py",
+        "temporal_replay.py",
+        "temporal_research_authority.py",
+        "temporal_retrieval.py",
+        "temporal_revocation.py",
+        "temporal_signals.py",
+        "temporal_uncertainty.py",
+        "training_manifest.py"
       ]
     },
     {
@@ -5581,7 +5841,13 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "source_exclusions": [
+        "vol155"
+      ],
+      "source_exclusion_notes": {
+        "vol155": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-AUDIO",
@@ -5613,7 +5879,15 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "source_exclusions": [
+        "eras",
+        "vol156"
+      ],
+      "source_exclusion_notes": {
+        "eras": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover",
+        "vol156": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-SPEECH",
@@ -5677,7 +5951,13 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "source_exclusions": [
+        "vol158"
+      ],
+      "source_exclusion_notes": {
+        "vol158": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-CONNECTORS",
@@ -5777,7 +6057,13 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "source_exclusions": [
+        "vol178"
+      ],
+      "source_exclusion_notes": {
+        "vol178": "generated capability organ pack; remains canonical at the legacy source and is excluded from staged-mirror parity until explicit cutover"
+      }
     },
     {
       "id": "AIFT-MULTIMODAL",
@@ -5863,7 +6149,7 @@
     "signed_at_utc": null,
     "git_sha": null,
     "evidence_refs": [],
-    "statement": "Pending fresh implementation signoff for the reconciled 178-mapping current-main payload after exact-head CI and full object/parity audit.",
+    "statement": "Pending fresh implementation signoff for the reconciled 179-mapping current-main payload after exact-head CI and full object/parity audit.",
     "signature_method": null
   },
   "verification_signoff": {
@@ -6165,7 +6451,9 @@
       "skeleton/workers"
     ],
     "non_engine_root_exclusions": [
-      "skeleton/__init__.py"
+      "skeleton/__init__.py",
+      "skeleton/masterplan",
+      "skeleton/volumes"
     ]
   },
   "provenance_refresh": {
@@ -6181,7 +6469,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "178_mapping_plus_24_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "179_mapping_plus_24_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -6741,12 +7029,172 @@
       "path": "skeleton/verification",
       "owner": "verification and assurance infrastructure",
       "reason": "Repository verification/evidence infrastructure remains outside canonical AI runtime ownership; it validates AI and non-AI surfaces without becoming product runtime authority."
+    },
+    {
+      "path": "skeleton/persistence/scatter10240",
+      "owner": "AIFT-PERSISTENCE generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/retrieval/scatter10240",
+      "owner": "AIFT-RETRIEVAL generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/vault/scatter10240",
+      "owner": "AIFT-VAULT generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/observability/scatter10240",
+      "owner": "AIFT-OBSERVABILITY generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/eval/scatter10240",
+      "owner": "AIFT-EVALUATION generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/reliability/scatter10240",
+      "owner": "AIFT-RELIABILITY generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/resilience/scatter10240",
+      "owner": "AIFT-RESILIENCE generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/cognition/facet10240",
+      "owner": "AIFT-COGNITION generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/primitives/facet10240",
+      "owner": "AIFT-PRIMITIVES generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/simulation/scatter10240",
+      "owner": "AIFT-SIMULATION generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/quality/scatter10240",
+      "owner": "AIFT-QUALITY generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/inventory/scatter10240",
+      "owner": "AIFT-INVENTORY generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/support/scatter10240",
+      "owner": "AIFT-SUPPORT generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/motive/facet10240",
+      "owner": "AIFT-MOTIVE generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/sheaf/facet10240",
+      "owner": "AIFT-SHEAF generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/spine/facet10240",
+      "owner": "AIFT-SPINE generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/viscera/facet10240",
+      "owner": "AIFT-VISCERA generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/turn/facet10240",
+      "owner": "AIFT-TURN-COMPAT generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/telemetry/scatter10240",
+      "owner": "AIFT-TELEMETRY-COMPAT generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/provenance/scatter10240",
+      "owner": "AIFT-PROVENANCE generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/document_vision/vol155",
+      "owner": "AIFT-DOCUMENT-VISION generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/audio/eras",
+      "owner": "AIFT-AUDIO generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/audio/vol156",
+      "owner": "AIFT-AUDIO generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/video/vol158",
+      "owner": "AIFT-VIDEO generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/supply_chain/vol178",
+      "owner": "AIFT-SUPPLY-CHAIN generated capability organ pack",
+      "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
+    },
+    {
+      "path": "skeleton/cs300",
+      "owner": "CS-300 ladder curriculum surface",
+      "reason": "CS-300 capability ladder and paired-learning evidence; governed by machine/cs300 ladder contracts, not AI runtime ownership."
+    },
+    {
+      "path": "skeleton/domains",
+      "owner": "domain registry surface",
+      "reason": "domain packs governed by machine/ai_domain_registry.json; AI runtime context domains are already excluded from AIFT-CONTEXT."
+    },
+    {
+      "path": "skeleton/masterplan",
+      "owner": "masterplan volume authority",
+      "reason": "executable masterplan/volume evidence surface; authority is machine/ai_master_plan.json, not an AI runtime mirror."
+    },
+    {
+      "path": "skeleton/p3",
+      "owner": "P3 engineering closure",
+      "reason": "phase-3 engineering closure deliverables governed by machine/ai_p3_* contracts."
+    },
+    {
+      "path": "skeleton/p4",
+      "owner": "P4 engineering closure",
+      "reason": "phase-4 engineering closure deliverables governed by the masterplan phase contracts."
+    },
+    {
+      "path": "skeleton/p5",
+      "owner": "P5 engineering closure",
+      "reason": "phase-5 engineering closure deliverables governed by the masterplan phase contracts."
+    },
+    {
+      "path": "skeleton/volumes",
+      "owner": "masterplan volume organs",
+      "reason": "per-volume construction organs referenced by masterplan implementation_paths; retained outside the AI tree pending explicit per-volume cutover."
     }
   ],
   "classification_coverage": {
     "status": "closed_after_completed_work_fill",
     "rule": "Every first-level skeleton/* path is either a governed mapping source, a pending assignment source, an architecture-approved external path, an explicit exclusion, or retained_outside_ai_tree.",
-    "source_head": "3f80b3d303aa2bdd99d70375b2ea3162f1f70921"
+    "source_head": "40e81412e995a9b153a02ff39f3ae1aec187de25"
   },
   "priority_one_migration": {
     "status": "mirrored_governed_cutover_pending",
@@ -6822,7 +7270,7 @@
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
     "note": "TREE-030 canonicalized School under skeleton/learning/school, retained skeleton/school as an explicitly classified compatibility boundary, preserved exact AI School parity, and left acquired.py as the only AIFT-LEARNING overlay.",
-    "current_mapping_count": 178,
+    "current_mapping_count": 179,
     "audit_scope_status": "validated historical line extended_to_177_requires_full_exact_head_refresh",
     "pending_mapping_ids": [
       "AIFT-V2B-GAMEFORGE-AGENTS",
@@ -6972,14 +7420,14 @@
   },
   "pre_move_readiness": {
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
-    "governed_mapping_count": 178,
+    "governed_mapping_count": 179,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 86,
+    "retained_outside_ai_tree_count": 123,
     "batch_counts": {
       "B3-owner-sensitive": 9,
       "B1-core-runtime": 72,
       "B2-domain-build": 14,
-      "B4-research-quarantine": 55,
+      "B4-research-quarantine": 56,
       "B3-compat-convergence": 28
     },
     "fresh_object_audit_required": true,
@@ -7534,7 +7982,12 @@
         "VOL-263",
         "VOL-264",
         "VOL-265",
-        "VOL-266"
+        "VOL-266",
+        "VOL-336",
+        "VOL-337",
+        "VOL-338",
+        "VOL-339",
+        "VOL-400"
       ]
     },
     {
@@ -7564,6 +8017,9 @@
         "VOL-205",
         "VOL-206",
         "VOL-207",
+        "VOL-210",
+        "VOL-217",
+        "VOL-218",
         "VOL-237"
       ]
     },
@@ -7606,9 +8062,19 @@
         "VOL-192",
         "VOL-193",
         "VOL-194",
+        "VOL-195",
         "VOL-196",
         "VOL-197",
-        "VOL-198"
+        "VOL-198",
+        "VOL-407",
+        "VOL-408",
+        "VOL-410",
+        "VOL-411",
+        "VOL-412",
+        "VOL-413",
+        "VOL-416",
+        "VOL-417",
+        "VOL-418"
       ]
     },
     {
@@ -7695,7 +8161,12 @@
         "VOL-228",
         "VOL-229",
         "VOL-239",
-        "VOL-240"
+        "VOL-240",
+        "VOL-243",
+        "VOL-343",
+        "VOL-411",
+        "VOL-412",
+        "VOL-413"
       ]
     },
     {
@@ -7718,7 +8189,7 @@
       "kind": "tree",
       "ownership_mode": "canonical_native",
       "residual_only": true,
-      "role": "Residual canonical AI-native runtime surfaces\u2014including autonomous engineering, effects, local inference, learning foundation, training, functional AI, provider runtime, and system completion\u2014not claimed by more-specific mappings or native owners.",
+      "role": "Residual canonical AI-native runtime surfaces—including autonomous engineering, effects, local inference, learning foundation, training, functional AI, provider runtime, and system completion—not claimed by more-specific mappings or native owners.",
       "volume_refs": [
         "VOL-006",
         "VOL-007",
@@ -7777,6 +8248,7 @@
         "VOL-101",
         "VOL-102",
         "VOL-113",
+        "VOL-131",
         "VOL-164",
         "VOL-197",
         "VOL-201",
@@ -7788,6 +8260,8 @@
         "VOL-207",
         "VOL-209",
         "VOL-210",
+        "VOL-211",
+        "VOL-212",
         "VOL-217",
         "VOL-218",
         "VOL-237",
@@ -7796,6 +8270,9 @@
         "VOL-240",
         "VOL-241",
         "VOL-243",
+        "VOL-244",
+        "VOL-245",
+        "VOL-246",
         "VOL-247",
         "VOL-248",
         "VOL-249",
@@ -7812,25 +8289,70 @@
         "VOL-285",
         "VOL-286",
         "VOL-287",
+        "VOL-300",
+        "VOL-301",
+        "VOL-302",
+        "VOL-303",
+        "VOL-304",
+        "VOL-306",
+        "VOL-307",
+        "VOL-308",
+        "VOL-309",
+        "VOL-310",
+        "VOL-311",
+        "VOL-312",
+        "VOL-313",
+        "VOL-314",
+        "VOL-315",
+        "VOL-317",
+        "VOL-319",
         "VOL-320",
         "VOL-321",
         "VOL-322",
         "VOL-323",
         "VOL-325",
+        "VOL-329",
+        "VOL-330",
+        "VOL-333",
         "VOL-336",
         "VOL-337",
         "VOL-338",
         "VOL-339",
+        "VOL-342",
         "VOL-343",
+        "VOL-344",
+        "VOL-353",
+        "VOL-356",
+        "VOL-357",
+        "VOL-358",
+        "VOL-359",
+        "VOL-360",
         "VOL-361",
         "VOL-362",
         "VOL-363",
         "VOL-364",
         "VOL-365",
+        "VOL-366",
+        "VOL-367",
+        "VOL-368",
+        "VOL-371",
+        "VOL-372",
+        "VOL-373",
+        "VOL-374",
+        "VOL-375",
+        "VOL-376",
+        "VOL-377",
+        "VOL-378",
+        "VOL-379",
+        "VOL-380",
         "VOL-381",
         "VOL-382",
+        "VOL-383",
+        "VOL-384",
         "VOL-385",
         "VOL-386",
+        "VOL-388",
+        "VOL-389",
         "VOL-398",
         "VOL-400",
         "VOL-411",
