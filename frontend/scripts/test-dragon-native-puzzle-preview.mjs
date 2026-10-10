@@ -51,10 +51,11 @@ test('native original editor uses real push collision and completion rules', () 
 
 test('blocked walls, boundaries and crates cannot move into occupied tiles', () => {
   const baseline = parseNativeBoard(FIRST);
-  let state = baseline;
-  for (let i = 0; i < 5; i++) state = stepNativePreview(state, 'a');
-  assert.equal(state.player, baseline.player);
-  assert.equal(state.moves, 0);
+  let state = stepNativePreview(baseline, 'w');
+  assert.equal(state.moves, 1);
+  const stopped = stepNativePreview(state, 'w');
+  assert.equal(stopped.player, state.player);
+  assert.equal(stopped.moves, 1);
   assert.equal(state.pushes, 0);
   const second = parseNativeBoard(TWO_CRATE);
   assert.equal(second.crates.length, 2);
