@@ -361,7 +361,10 @@ def test_ai_file_tree_canonical_migration_sources_are_current() -> None:
         "swarm",
     ]
     assert mappings["AIFT-FOUNDATION"]["source_exclusions"] == ["architecture"]
-    assert mappings["AIFT-PROVENANCE"]["source_exclusions"] == ["chronicle"]
+    provenance = mappings["AIFT-PROVENANCE"]
+    assert provenance["source_exclusions"] == ["chronicle", "scatter10240"]
+    retained = {item["path"]: item for item in manifest["retained_outside_ai_tree"]}
+    assert f"{provenance['source']}/scatter10240" in retained
     assert mappings["AIFT-KNOWLEDGE"]["source_exclusions"] == ["graphs"]
     assert mappings["AIFT-TOOLS"]["source_exclusions"] == ["integrations"]
     assert mappings["AIFT-DISTRIBUTED"]["source_exclusions"] == [
