@@ -260,3 +260,14 @@ def test_read_limit_requires_integer_not_boolean():
         with pytest.raises(ValueError, match="history limit"):
             store.sessions("alice", authorized=True, limit=value)
 
+
+def test_session_id_must_have_canonical_lowercase_content_digest():
+    from dataclasses import replace
+    store = setup()
+    good = session(store)
+    for forged in (good.session_id.upper(), good.session_id[:-1] + "Z", "0" * 64):
+        if forged == good.session_id:
+            continue
+        with pytest.raises(ValueError, match="session identifier"):
+            store.record(replace(good, session_id=forged), authorized=True)
+
