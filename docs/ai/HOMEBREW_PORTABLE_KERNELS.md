@@ -172,3 +172,56 @@ Known limitations: no built binaries, no proprietary console firmware, no
 non-original asset import, no certified device performance, no licensed-game
 migration, no current independent hardware benchmarking, and no independently
 approved release status.
+
+
+## Multi-route level generation and challenge analysis
+
+The canonical game builder now offers an executable objective-aware route
+laboratory at `skeleton.ai.game_builder.multipath_design`. It accepts **original**
+sealed tile maps, 9–41 cells per dimension, one start/exit and 1–6 collectibles.
+All algorithms are deterministic, offline and bound to explicit state budgets.
+
+- **Multiple solvers:** replayable BFS, Dijkstra, admissible A*, weighted A*,
+  hazard-budgeted BFS and bounded enumeration of genuinely shortest routes.
+  Weighted A* may be suboptimal and is never labelled optimal.
+- **Tradeoffs:** hazard-versus-speed Pareto frontiers, weighted corridor
+  diversity searches and independent shortest-path enumerations. Diversity
+  search penalties are not charged as player traversal costs.
+- **Topology:** true loop rank, disconnected regions, articulation vertices,
+  critical bridge corridors, dead ends, degree distributions, and unreachable
+  collectibles, rather than mistaking backtracking for multiple physical paths.
+- **Challenges:** objective dispersion, input turns, revisits, exposure,
+  exploration coverage, route overrun, chokepoint reliance and challenge dossiers.
+  Metrics are deterministic *signals*, not evidence of human enjoyment.
+- **Editable levels:** authorized corridor carving/sealing, moving spawn, exit
+  and objectives, hazard placement/removal/movement, and bounded level evolution.
+  Every mutation re-proves a hazard-free route through every collectible.
+- **Executable integration:** custody-verified edits can be materialized back
+  into the canonical `TileLevel` and `PlayableWorld`, with freshly computed
+  solutions checked by the existing gameplay simulation.
+
+### Offline operator examples
+
+Create a personally authored local `my-original-level.json`:
+
+```json
+{"rows":["#########","#S..C..G#","#.......#","#.#.#.#.#","#...H...#","#.#.#.#.#","#.......#","#.......#","#########"]}
+```
+
+```bash
+python -m skeleton.ai.game_builder.multipath_cli --input my-original-level.json --mode inspect
+python -m skeleton.ai.game_builder.multipath_cli --input my-original-level.json --mode solve --portfolio-size 5
+python -m skeleton.ai.game_builder.multipath_cli --input my-original-level.json --mode evolve --min-loops 4 --add-hazards 1 --max-changes 4 --authorize-edit
+```
+
+The CLI reads one bounded local regular UTF-8 file, refuses symlinks and
+mid-read substitutions, emits JSON to stdout and never silently overwrites
+the source. Mutation requires explicit `--authorize-edit` and produces new
+rows, content-addressed edit receipts and a challenge report.
+
+**Not verified:** independent rights clearance, game release, native console
+compilation, hardware acceptance, or human fun/difficulty calibration.
+Run the targeted `skeleton/testing/test_game_builder_multipath_design.py` and
+`skeleton/testing/test_game_builder_multipath_cli.py` suites alongside all
+canonical construction, functional game-builder, architecture and app-assembly
+gates before merging or promoting capabilities.
