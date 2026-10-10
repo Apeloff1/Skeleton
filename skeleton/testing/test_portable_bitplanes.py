@@ -57,3 +57,10 @@ def test_encode_sms_4bpp_row_planes_are_contiguous():
     assert encode_sms_4bpp((row,)*8) == bytes([0x88,0x48,0x28,0x18]*8)
     assert encode_sms_4bpp((row,)*8) != encode_snes_4bpp((row,)*8)
 
+
+def test_decode_sms_4bpp_roundtrip_and_reject_nonbytes():
+    tile = tuple(tuple((2*x+y) % 16 for x in range(8)) for y in range(8))
+    assert decode_sms_4bpp(encode_sms_4bpp(tile)) == tile
+    with pytest.raises(PortableCodecError):
+        decode_sms_4bpp(memoryview(b"\x00"*32))
+
