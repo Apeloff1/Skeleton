@@ -366,3 +366,53 @@ def test_native_creator_request_rejects_coerced_authority_and_extra_fields(chang
     payload.update(changes)
     with pytest.raises(ValidationError):
         route.NativeProductionSourceRequest(**payload)
+
+
+
+def test_native_creator_portable_design_is_downloaded_as_original_native_source():
+    from zipfile import ZipFile
+    from io import BytesIO
+    import json
+    from skeleton.ai.webcrawler.dragon_native_production import verify_source_bundle
+
+    approved = route.NativeProductionSourceRequest(
+        title="Original Galaxy Puzzle", style="arcade_score_attack",
+        targets=["game_boy", "pc_linux"],
+        original_work_attested=True, approved=True, seed=337,
+        portable_design=route.NativeProductionDesignBody(
+            palette="modern_neon", hero="astronaut", quest_theme="space",
+            difficulty=8, stages=6, candidates=13,
+        ),
+    )
+    response = route.native_production_source_bundle(approved, owner=identity())
+    assert verify_source_bundle(response.body)["target_count"] == 2
+    with ZipFile(BytesIO(response.body)) as archive:
+        manifest = json.loads(archive.read("production-index.json"))
+        assert manifest["target_count"] == 2
+        assert all(item["port_profile_digest"] for item in manifest["entries"])
+        for zip_name in archive.namelist():
+            if not zip_name.startswith("releases/"):
+                continue
+            with ZipFile(BytesIO(archive.read(zip_name))) as nested:
+                receipt = json.loads(nested.read("release-receipt.json"))
+                assert receipt["port_plan"]["production_seed"] == 337
+                assert receipt["port_plan"]["portable_profile"]["hero"] == "astronaut"
+                assert receipt["evidence"] == "source_generated"
+
+
+@pytest.mark.parametrize("fields", [
+    {"portable_design": {"difficulty": 11}},
+    {"portable_design": {"difficulty": True}},
+    {"portable_design": {"stages": "4"}},
+    {"portable_design": {"candidates": 25}},
+    {"portable_design": {"hero": "hatchling", "private_script": "import os"}},
+])
+def test_portable_creator_api_does_not_coerce_or_execute_design(fields):
+    from pydantic import ValidationError
+    data = {
+        "title": "Original Homebrew", "style": "arcade_score_attack",
+        "targets": ["game_boy"], "approved": True, "original_work_attested": True,
+    }
+    data.update(fields)
+    with pytest.raises(ValidationError):
+        route.NativeProductionSourceRequest(**data)
