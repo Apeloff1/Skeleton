@@ -586,6 +586,36 @@ branches and input bounds. CI runs it together with the real original game
 preview physics test. The native compiler tests cover modified-position
 optimality, malformed action sequences and solved-state response semantics.
 
+### Real multi-path games, different endings and calibrated challenge
+
+The fixed-screen original puzzle builder has progressed beyond a single
+canonical solution. **See [Multi-path and Challenge](MULTIPATH_AND_CHALLENGE.md)**
+for the independent solvers, actual playable fork topology, opt-in challenge
+director, limited but genuine frustration spikes, fair recovery, human
+playtest evidence boundaries and remaining genre-specific work.
+
+Every 3–8-chapter branching game now provides distinct playable route
+choices in the actual C99 console and SDL2 game. Chapter destination
+tables are derived from measured solver difficulty, bound into save
+fingerprints and independently replayed by the native branch selftest.
+The source-only artifact includes solver alternatives, original chapter DAG,
+two ending paths, curve warnings and per-stage deterministic level-selection
+receipts. A 1–2-level game correctly reports only one ending.
+
+The operator can request a linear release or deliberately select gentle,
+balanced, challenging and spicy generation. For non-default profiles,
+up to five original geometry variants are attempted and every selected
+world must pass exact finite Sokoban search. Spicy deliberately concentrates
+harder worlds in occasional peaks with exploration/relief chapters rather
+than applying maximum difficulty everywhere. Original user-authored boards
+are never silently replaced.
+
+The editor can examine and step through several winning strategies,
+measure whole-game branching and challenge, and report warnings before
+approving original game source export. This is not an assertion that a
+particular player will enjoy those worlds. Human-rated frustration and
+enjoyment remain unverified until consenting playtests supply evidence.
+
 ### Release verification and index integrity
 
 A release index is **not trusted merely because its archive hashes match**.
