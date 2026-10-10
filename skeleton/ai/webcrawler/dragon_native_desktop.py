@@ -184,7 +184,9 @@ def _puzzle_proof(source_archive: bytes) -> tuple[dict, dict[str, str]]:
         if (candidate.get("digest")!=design.digest or
                 design.genre!="fixed_screen_puzzle" or
                 design.target!=receipt["target"] or
-                design.seed!=expected_seed):
+                design.seed!=expected_seed or
+                design.stages!=len(rows) or
+                design.difficulty!=difficulty):
             raise ValueError("native visual game design disagrees with source")
     canonical=emit_native_puzzle(
         seed=expected_seed,stages=len(rows),difficulty=difficulty,
