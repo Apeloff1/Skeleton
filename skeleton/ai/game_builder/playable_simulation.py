@@ -362,6 +362,21 @@ def resume_replay(
     return output
 
 
+def fork_replay(
+    world: PlayableWorld, replay: GameReplay, at_step: int,
+    alternative_actions: Sequence[str], *, authorized: bool,
+) -> GameReplay:
+    """Create a reversible alternative playthrough from a validated prefix.
+
+    Never mutate the original replay and never import a foreign-world
+    checkpoint. The committed prefix receipts remain byte-identical.
+    """
+    if authorized is not True:
+        raise PermissionError("replay branching requires authorization")
+    prefix = replay_prefix(world, replay, at_step, authorized=True)
+    return resume_replay(world, prefix, alternative_actions, authorized=True)
+
+
 def demonstrate_solvable(world: PlayableWorld, *, authorized: bool) -> GameReplay:
     """Execute each level's hazard-free proof with the real transition engine."""
     if authorized is not True:
