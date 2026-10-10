@@ -1,0 +1,84 @@
+name: Game Builder Native Vectrex Motorola 6809
+
+on:
+  pull_request:
+    paths:
+      - 'skeleton/ai/game_builder/**'
+      - 'scripts/game_builder/native_vectrex_ci.py'
+      - 'skeleton/testing/test_game_builder_vectrex_native.py'
+      - '.github/workflows/game-builder-native-vectrex.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-vectrex-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  original-6809-vector-console:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /skeleton/__init__.py
+            /skeleton/ai/__init__.py
+            /skeleton/ai/capability_map.py
+            /skeleton/ai/game_builder/
+            /scripts/game_builder/native_vectrex_ci.py
+            /skeleton/testing/test_game_builder_vectrex_native.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build pinned LGPL/GPL 6809 cross-assembler without bundling Vectrex BIOS
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential bison flex libgmp-dev make
+          git clone https://github.com/robert-belleman/lwtools.git /tmp/skeleton-lwtools
+          git -C /tmp/skeleton-lwtools checkout --detach f8a5aecb8c76246c450f71b0afd7ea1a87113514
+          make -C /tmp/skeleton-lwtools -j2 lwasm
+          test -x /tmp/skeleton-lwtools/lwasm/lwasm
+      - name: Assemble original three-level real 6809 vector dragon cartridge
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          python scripts/game_builder/native_vectrex_ci.py --emit original-6809-vectrex > original-vectrex-source-evidence.json
+          make -C original-6809-vectrex LWASM=/tmp/skeleton-lwtools/lwasm/lwasm
+          test -s original-6809-vectrex/build/original-vectrex.bin
+          python scripts/game_builder/native_vectrex_ci.py \
+            --verify original-6809-vectrex/build/original-vectrex.bin > real-vectrex-6809-cartridge-evidence.json
+          python - <<'PY'
+          import json
+          j=json.load(open("real-vectrex-6809-cartridge-evidence.json",encoding="utf-8"))
+          assert j["authentic_vectrex_cartridge_header"] is True
+          assert j["motorola_6809_machine_code_verified"] is True
+          assert j["unexpanded_physical_game_ram_bytes"]==1024
+          assert j["independent_vectrex_emulator_playthrough"] is False
+          assert j["third_party_firmware_bundled"] is False
+          print("AUTHENTIC_VECTREX_6809_VECTOR_ROM_COMPILED",j["rom_sha256"])
+          PY
+      - name: Test original joystick, vector display and author provenance contracts
+        env:
+          PYTHONPATH: .
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+        run: |
+          python -m pip install --disable-pip-version-check 'pytest>=8.4,<9'
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_vectrex_native.py
+      - name: Preserve authentic vector-console homebrew source and compiled ROM
+        uses: actions/upload-artifact@v4
+        with:
+          name: skeleton-original-vectrex-6809-vector-dragon-cartridge
+          path: |
+            original-6809-vectrex/build/original-vectrex.bin
+            original-6809-vectrex/manifest.json
+            real-vectrex-6809-cartridge-evidence.json
+            original-vectrex-source-evidence.json
+          if-no-files-found: error
+          retention-days: 7
