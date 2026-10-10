@@ -734,4 +734,27 @@ def portfolio_profile(problem: RouteProblem, routes: Sequence[RouteProof]) -> di
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile"]
+def rank_routes(
+    problem: RouteProblem, routes: Sequence[RouteProof],
+    *, preference: str = "shortest",
+) -> tuple[RouteProof, ...]:
+    """Choose understandable route rankings without equating length with fun."""
+    if preference not in {"shortest", "exploration", "low_friction", "low_exposure"}:
+        raise MultipathError("unknown route ranking preference")
+    if not isinstance(routes, (list, tuple)) or len(routes) > 16:
+        raise MultipathError("invalid route ranking portfolio")
+    for p in routes:
+        verify_route_proof(problem, p)
+    if preference == "shortest":
+        key = lambda p: (p.steps, p.hazard_visits, p.digest)
+    elif preference == "exploration":
+        key = lambda p: (-route_coverage_ppm(problem, p), p.steps, p.digest)
+    elif preference == "low_friction":
+        key = lambda p: (route_friction_ppm(problem, p), p.steps, p.digest)
+    else:
+        key = lambda p: (route_exposure_score(problem, p), p.steps, p.digest)
+    return tuple(sorted(routes, key=key))
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes"]
