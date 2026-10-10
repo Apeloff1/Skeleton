@@ -92,6 +92,7 @@ jobs:
             tests/test_ai_dragon_native_puzzle_trace.py \
             tests/test_ai_dragon_native_puzzle_variants.py \
             tests/test_ai_dragon_native_puzzle_authoring.py \
+            tests/test_ai_dragon_native_puzzle_challenge.py \
             tests/test_ai_webcrawler_dragon_native_projects.py \
             tests/test_ai_webcrawler_dragon_native_compile.py \
             tests/test_ai_webcrawler_dragon_native_cycles.py \
@@ -314,6 +315,7 @@ jobs:
           assert receipt["runtime_stages_claimed_by_builder"] == 6
           assert result["evidence"]["native_hint_selftest"] == "current_position_bfs_all_stages_passed"
           assert result["evidence"]["independent_replays_verified"] == 24
+          assert result["evidence"]["native_challenge_selftest"] == "optimal_route_three_stars_all_stages"
           with ZipFile(BytesIO(package)) as archive:
               executable = archive.read("binary/dragon_game")
           assert executable[:4] == b"\x7fELF"
