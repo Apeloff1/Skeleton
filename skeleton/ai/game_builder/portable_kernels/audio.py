@@ -39,3 +39,10 @@ def sn76489_tone_period(hertz: int, *, master_clock: int=3579545) -> int:
     clock=_integer(master_clock,"PSG clock",1000000,8000000)
     return max(1,min(1023,(clock+16*hz)//(32*hz)))
 
+
+def ay38910_tone_period(hertz: int, *, master_clock: int=1773400) -> int:
+    """AY-3-8910/YM2149 12-bit square-wave period."""
+    hz=_integer(hertz,"AY tone Hz",27,110837)
+    clock=_integer(master_clock,"AY clock",1000000,8000000)
+    return max(1,min(4095,(clock+8*hz)//(16*hz)))
+
