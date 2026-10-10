@@ -49,6 +49,22 @@ def test_invalid_design_is_not_rendered_as_executable_source(field,bad):
         parse_design(fields)
 
 
+@pytest.mark.parametrize("notes", [
+    "; rm -rf /", "note; curl https://untrusted.example", "story; python script.py",
+])
+def test_project_notes_refuse_command_shaped_text(notes):
+    fields = starter_design()
+    fields["project_notes"] = notes
+    with pytest.raises(ValueError, match="command-shaped"):
+        parse_design(fields)
+
+
+def test_project_notes_can_include_ordinary_semicolon_prose():
+    fields = starter_design()
+    fields["project_notes"] = "Original maze; designed and reviewed locally"
+    assert parse_design(fields).project_notes == fields["project_notes"]
+
+
 def test_unknown_schema_fields_and_duplicate_keys_rejected(tmp_path):
     data=starter_design()
     data["command"]="curl attacker"
