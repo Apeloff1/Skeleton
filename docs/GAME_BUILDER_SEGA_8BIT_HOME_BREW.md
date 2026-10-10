@@ -133,3 +133,32 @@ sound capability and non-authoritative cosmetic status. It deliberately keeps
 `release_approved` false. Exact cartridge generation, gameplay replay,
 audio timing and physical console compatibility remain separately gated.
 
+
+## In-game controls and accessibility
+
+The generated original ROM contains keyboard-free, real-device input handling:
+
+| Input | Master System | Game Gear |
+| --- | --- | --- |
+| D-pad | Navigate the playable maze | Navigate the playable maze |
+| Button 1 | Toggle original PSG sound on/off | Toggle original PSG sound on/off |
+| Button 2 | Pause/unpause game physics and controls | Toggle reduced-motion effects |
+| Start | Not available as a standard dedicated hardware key | Pause/unpause |
+
+No menu uses a proprietary logo, commercial character, game soundtrack or
+platform BIOS resource. The pause mode freezes movement, but still maintains a
+visible familiar and frame-synchronized VDP display. Reduced-motion settings
+suppress cosmetic blinking and breathing; the follower keeps a fixed offset
+rather than bouncing. Companion improvements are cosmetic, never a reason to
+make a formerly playable world unwinnable.
+
+Builders can also set `reduced_motion=True` and `audio_enabled=False` via the
+low-level `compile_native_sega_8bit` function. Those defaults are encoded into
+the generated Z80 game's own C source and manifest, producing a distinct,
+content-hashed artifact without changing the original world digest or safe
+replay identity. The consumer may override defaults with the inputs above
+where the console's hardware supports those keys.
+
+These are authored implementation capabilities. Verified ROM execution,
+accessibility acceptance by disabled players and physical console testing are
+still separately pending.
