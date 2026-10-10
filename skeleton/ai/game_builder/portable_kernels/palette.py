@@ -70,3 +70,15 @@ def nearest_palette_index(pixel: object, colors: object) -> int:
                (3*(r-palette[i][0])**2 + 4*(g-palette[i][1])**2 +
                 2*(b-palette[i][2])**2,i))
 
+
+def index_image(rows: object, colors: object) -> tuple[tuple[int,...],...]:
+    """Palettize a bounded RGB framebuffer; no implicit lossy resize or crop."""
+    palette=_palette(colors)
+    if (not isinstance(rows,(tuple,list)) or not 1<=len(rows)<=64
+            or not isinstance(rows[0],(tuple,list)) or not 1<=len(rows[0])<=64
+            or any(not isinstance(row,(tuple,list)) or len(row)!=len(rows[0])
+                   for row in rows)):
+        raise PaletteError("indexed framebuffer must be rectangular within 64x64")
+    return tuple(tuple(nearest_palette_index(pixel,palette) for pixel in row)
+                 for row in rows)
+
