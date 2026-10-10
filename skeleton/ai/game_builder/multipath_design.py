@@ -958,4 +958,31 @@ def solve_hazard_budget(
 
 
 
-__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget"]
+def pareto_hazard_routes(problem: RouteProblem) -> tuple[RouteProof, ...]:
+    """Return actual nondominated (steps, hazard visits) replay paths."""
+    if not isinstance(problem, RouteProblem):
+        raise MultipathError("typed RouteProblem required")
+    candidates = []
+    for budget in range(min(12, len(problem.hazards)) + 1):
+        try:
+            candidate = solve_hazard_budget(problem, max_hazard_visits=budget)
+        except MultipathError as exc:
+            if "no route satisfies" in str(exc):
+                continue
+            raise
+        if (candidate.steps, candidate.hazard_visits) not in {
+            (r.steps, r.hazard_visits) for r in candidates
+        }:
+            candidates.append(candidate)
+    frontier = [
+        p for p in candidates
+        if not any(q is not p
+                   and q.steps <= p.steps and q.hazard_visits <= p.hazard_visits
+                   and (q.steps < p.steps or q.hazard_visits < p.hazard_visits)
+                   for q in candidates)
+    ]
+    return tuple(sorted(frontier, key=lambda p: (p.hazard_visits, p.steps, p.digest)))
+
+
+
+__all__ = ["MultipathError", "RouteProblem", "RouteProof", "solve_route", "evaluate_route", "route_edges", "route_revisits", "route_turns", "route_overlap_ppm", "route_diversity_ppm", "route_portfolio", "walkable_cells", "flood_fill", "connected_regions", "objective_reachability", "degree_histogram", "dead_end_cells", "articulation_cells", "bridge_corridors", "cycle_rank", "tile_distances", "route_branch_choices", "hazard_proximity", "route_exposure_score", "route_friction_ppm", "route_coverage_ppm", "objective_dispersion", "route_chokepoint_ppm", "route_overrun_ppm", "verify_route_proof", "portfolio_diversity_ppm", "route_exclusive_edges", "portfolio_profile", "rank_routes", "challenge_route_selection", "solve_route_astar", "solve_avoid_cells", "solve_hazard_budget", "pareto_hazard_routes"]
