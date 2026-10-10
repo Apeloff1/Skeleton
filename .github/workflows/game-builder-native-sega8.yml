@@ -307,6 +307,73 @@ jobs:
           assert evidence["publication_licensed"] is False
           print("SEGA_NATIVE_REBUILD_FINGERPRINT_MATCH", evidence["cartridge_sha256"])
           PY
+      - name: Compile full original eight-level campaign, 48 collectibles and all ranks
+        env:
+          TARGET: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          case "$TARGET" in
+            sega_master_system) EXT=sms ;;
+            sega_game_gear) EXT=gg ;;
+            *) exit 3 ;;
+          esac
+          CAMPAIGN="/tmp/original-$TARGET-eight-worlds"
+          python -m scripts.game_builder.native_sega_8bit_ci \
+            --target "$TARGET" --profile full_campaign \
+            --emit "$CAMPAIGN" \
+            --author-evidence /tmp/original-sega-authorship.txt \
+            --host-reference-out "/tmp/$TARGET-eight-worlds-route.json" \
+            > "/tmp/$TARGET-eight-worlds-source.json"
+          python -m scripts.game_builder.sega8_source_replay \
+            --source-dir "$CAMPAIGN" \
+            --reference "/tmp/$TARGET-eight-worlds-route.json" \
+            --receipt-out "/tmp/$TARGET-eight-worlds-host-replay.json"
+          make -C "$CAMPAIGN" \
+            SDCC=sdcc \
+            SMSLIB_DIR="$PWD/.external/devkitSMS/SMSlib" \
+            CRT0_SMS="$PWD/.external/devkitSMS/crt0/crt0_sms.rel" \
+            MAKESMS="$PWD/.external/devkitSMS/tools/makesms/src/makesms"
+          python -m scripts.game_builder.emulate_sega8_sdcc_boot \
+            --rom "$CAMPAIGN/build/skeleton-original.$EXT" \
+            --target "$TARGET" \
+            --receipt-out "/tmp/$TARGET-eight-worlds-z80-boot.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from scripts.game_builder.native_sega_8bit_ci import verify
+          target=os.environ["TARGET"]
+          root=Path("/tmp/original-"+target+"-eight-worlds")
+          suffix="sms" if target=="sega_master_system" else "gg"
+          project=json.loads(Path("/tmp/"+target+"-eight-worlds-source.json").read_text())
+          route=json.loads(Path("/tmp/"+target+"-eight-worlds-route.json").read_text())
+          host=json.loads(Path("/tmp/"+target+"-eight-worlds-host-replay.json").read_text())
+          boot=json.loads(Path("/tmp/"+target+"-eight-worlds-z80-boot.json").read_text())
+          manifest=json.loads((root/"manifest.json").read_text())
+          native=verify(
+              target,root,root/"build"/("skeleton-original."+suffix),
+              toolchain_revision="533ae572c897cf44f1da865013ebf690134301a3",
+              expected_source_sha256=project["source_content_digest"],
+              expected_authorship_sha256=project["rights_evidence_sha256"],
+          )
+          assert project["original_campaign_profile"]=="full_campaign"
+          assert manifest["levels"]==8
+          assert manifest["original_demo_playback_steps"]==len(route["steps"])
+          assert manifest["companion_bond_ranks"]==8
+          assert route["steps"][-1]["score"]==1280
+          assert route["steps"][-1]["bond_rank"]==7
+          assert route["steps"][-1]["won"]==1
+          assert host["original_levels_verified"]==8
+          assert host["original_native_solution_attract_mode_host_verified"] is True
+          assert host["original_demo_controller_actions_verified"]==len(route["steps"])
+          assert boot["hardware_boot_smoke_verified"] is True
+          assert boot["rom_sha256"]==native["rom_sha256"]
+          assert native["rom_size"]==32768
+          assert native["real_rom_structure_verified"] is True
+          assert native["rom_header_checksum_verified"] is True
+          assert native["distribution_licensed"] is False
+          assert native["release_approved"] is False
+          print("EIGHT_STAGE_NATIVE_CARTRIDGE_VERIFIED",target,len(route["steps"]),native["rom_sha256"])
+          PY
       - name: Publish limited, non-distribution CI evidence only
         uses: actions/upload-artifact@v4
         with:
