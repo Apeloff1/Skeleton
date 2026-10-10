@@ -19,6 +19,7 @@ from typing import Sequence
 
 from .editor_platforms import editor_progressive_route_preview
 from .port_planner import HomebrewSource, PortMode, PortPlanningError
+from .rights_evidence import RightsEvidenceError, read_rights_evidence
 
 
 def preview_from_argv(argv: Sequence[str] | None = None) -> dict[str, object]:
@@ -30,7 +31,9 @@ def preview_from_argv(argv: Sequence[str] | None = None) -> dict[str, object]:
     parser.add_argument("--rights-basis", required=True, choices=(
         "project_owned", "licensed_homebrew", "public_domain_homebrew",
     ))
-    parser.add_argument("--evidence-sha256", required=True)
+    rights_input = parser.add_mutually_exclusive_group(required=True)
+    rights_input.add_argument("--evidence-sha256")
+    rights_input.add_argument("--rights-evidence-file")
     parser.add_argument("--identity", action="append", required=True)
     parser.add_argument("--mode", choices=(
         PortMode.FAITHFUL.value, PortMode.ENHANCED.value,
@@ -38,15 +41,19 @@ def preview_from_argv(argv: Sequence[str] | None = None) -> dict[str, object]:
     ), default=PortMode.ENHANCED.value)
     args = parser.parse_args(argv)
     try:
+        document_digest = (
+            read_rights_evidence(args.rights_evidence_file).document_sha256
+            if args.rights_evidence_file is not None else args.evidence_sha256
+        )
         source = HomebrewSource(
             project_id=args.project_id, platform_id=args.source,
-            rights_basis=args.rights_basis, evidence_sha256=args.evidence_sha256,
+            rights_basis=args.rights_basis, evidence_sha256=document_digest,
             creative_identity=tuple(args.identity),
         )
         result = editor_progressive_route_preview(
             source, tuple(args.destination), mode=PortMode(args.mode),
         )
-    except PortPlanningError as exc:
+    except (PortPlanningError, RightsEvidenceError) as exc:
         parser.error(str(exc))
     return result
 
