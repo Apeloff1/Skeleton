@@ -277,7 +277,8 @@ def verify_ports(root: Path) -> dict[str, object]:
             or meta["original_demo_playback_steps"]
                != host["original_controller_actions_verified"]
             or type(meta.get("original_demo_compressed_rom_bytes")) is not int
-            or not 1 <= meta["original_demo_compressed_rom_bytes"]
+            or not (meta["original_demo_playback_steps"] + 3)//4
+               <= meta["original_demo_compressed_rom_bytes"]
                <= (meta["original_demo_playback_steps"] + 3)//4
                      + (meta["levels"] - 1)
             or not isinstance(meta.get("original_demo_direction_encoding"), str)
