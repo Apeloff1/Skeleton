@@ -117,6 +117,97 @@ def _check_rebuilt_provenance(
         raise Sega8PortParityError("unreviewed additional field in ROM comparison evidence")
 
 
+def _check_eight_worlds(
+    root: Path, target: str, *, author_digest: str,
+) -> dict[str, dict[str, Any]]:
+    """Independently reconcile the full campaign, not the 3-level smoke world.
+
+    These are recorded execution receipts, not instructions to publish the
+    compiled cartridge. The cross-console comparison occurs in verify_ports.
+    """
+    source = _select(root, target, target+"-eight-worlds-source.json")
+    host = _select(root, target, target+"-eight-worlds-host-replay.json")
+    boot = _select(root, target, target+"-eight-worlds-z80-boot.json")
+    guest = _select(root, target, target+"-eight-worlds-z80-gameplay.json")
+    if (
+        source.get("schema") != "skeleton.game_builder.native_sega8_original_source_receipt.v1"
+        or source.get("target") != target
+        or source.get("original_campaign_profile") != "full_campaign"
+        or source.get("rights_evidence_sha256") != author_digest
+    ):
+        raise Sega8PortParityError("eight-stage cartridge original source identity invalid")
+    _sha(source.get("world_digest"), "eight-stage world")
+    _sha(source.get("source_content_digest"), "eight-stage source")
+    for key in ("native_binary_built", "emulator_verified", "physical_hardware_verified",
+                "rights_independently_verified", "distribution_licensed"):
+        if source.get(key) is not False:
+            raise Sega8PortParityError("eight-stage source attempted unreviewed certification")
+    if (
+        host.get("schema") != "skeleton.game_builder.sega8_c_gameplay_differential.v1"
+        or host.get("target") != target
+        or host.get("source_content_digest") != source["source_content_digest"]
+        or host.get("world_digest") != source["world_digest"]
+        or host.get("original_levels_verified") != 8
+        or host.get("all_level_completion_verified") is not True
+        or host.get("original_native_solution_attract_mode_host_verified") is not True
+        or type(host.get("original_controller_actions_verified")) is not int
+        or host["original_controller_actions_verified"] <= 100
+        or host.get("original_demo_controller_actions_verified")
+           != host["original_controller_actions_verified"]
+    ):
+        raise Sega8PortParityError("eight-stage native source/gameplay host replay failed")
+    if (
+        boot.get("schema") != "skeleton.game_builder.sega8_real_z80_boot_smoke.v1"
+        or boot.get("target") != target
+        or boot.get("hardware_boot_smoke_verified") is not True
+        or boot.get("game_hero_rendered") is not True
+        or boot.get("original_companion_rendered") is not True
+    ):
+        raise Sega8PortParityError("extended cartridge Z80 boot evidence missing")
+    if (
+        guest.get("schema") != "skeleton.game_builder.sega8_actual_z80_gameplay_replay.v1"
+        or guest.get("target") != target
+        or guest.get("original_world_digest") != source["world_digest"]
+        or guest.get("source_content_digest") != source["source_content_digest"]
+        or guest.get("rom_sha256") != boot.get("rom_sha256")
+        or guest.get("original_route_sha256") != host.get("authoritative_reference_sha256")
+        or guest.get("original_levels_replayed") != 8
+        or guest.get("controller_actions_replayed")
+           != host["original_controller_actions_verified"]
+        or guest.get("hardware_screen_states_verified")
+           != host["original_controller_actions_verified"] + 1
+        or guest.get("original_hardware_stage_color_accents_verified") is not True
+        or guest.get("original_companion_rank_and_reward_verified") is not True
+        or guest.get("native_attract_demo_full_solution_verified_on_guest_z80") is not True
+        or guest.get("native_attract_demo_controller_free_actions_verified")
+           != host["original_controller_actions_verified"]
+        or guest.get("semantic_controller_screen_trace_sha256")
+           != guest.get("native_attract_demo_semantic_trace_sha256")
+    ):
+        raise Sega8PortParityError("full eight-stage Z80 gameplay and attract demo not proven")
+    for receipt, fields in (
+        (host, ("native_z80_rom_executed", "physical_hardware_verified",
+                "full_console_emulator_playthrough_verified", "release_approved",
+                "rights_independently_verified")),
+        (boot, ("entire_game_playthrough_verified", "physical_hardware_verified",
+                "independent_cycle_exact_emulator_verified", "release_approved")),
+        (guest, ("independent_cycle_exact_full_console_emulator_verified",
+                 "physical_hardware_verified", "rights_independently_verified",
+                 "distribution_licensed", "release_approved")),
+    ):
+        if any(receipt.get(field) is not False for field in fields):
+            raise Sega8PortParityError("eight-stage gameplay evidence forged rights or hardware status")
+    for proof, field in (
+        (boot, "rom_sha256"), (guest, "rom_sha256"),
+        (guest, "semantic_controller_screen_trace_sha256"),
+        (guest, "native_attract_demo_semantic_trace_sha256"),
+        (host, "original_demo_screen_trace_sha256"),
+        (source, "winning_replay_digest"),
+    ):
+        _sha(proof.get(field), "extended console campaign integrity")
+    return {"source": source, "host": host, "boot": boot, "guest": guest}
+
+
 def verify_ports(root: Path) -> dict[str, object]:
     if root.is_symlink() or not root.is_dir():
         raise Sega8PortParityError("existing ordinary evidence root required")
