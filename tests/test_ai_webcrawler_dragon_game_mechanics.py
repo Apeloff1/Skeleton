@@ -140,3 +140,9 @@ def test_policy_strict_observation_resource_budget():
         with pytest.raises(ValueError):
             GameMechanicsMemory(sqlite3.connect(":memory:"), policy=CapturePolicy(**options))
 
+
+def test_policy_note_budget_zero_is_rejected():
+    from skeleton.ai.webcrawler.dragon_game_mechanics import CapturePolicy
+    with pytest.raises(ValueError, match="note budget"):
+        GameMechanicsMemory(sqlite3.connect(":memory:"), policy=CapturePolicy(max_note_chars=0))
+
