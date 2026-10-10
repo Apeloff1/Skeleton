@@ -29,7 +29,7 @@ def test_incomplete_original_game_never_earns_trophies_or_AI_XP():
     (0,1,0,True),(400,401,0,True),(10,5,6,True),
     (10,-1,0,False),(10,3,0,"yes"),(True,5,0,True),
 ])
-def test_original_scoring_refuses_unproved_or_unbounded_gameplay(*inputs):
+def test_original_scoring_refuses_unproved_or_unbounded_gameplay(inputs):
     with pytest.raises(ValueError):
         grade(inputs[0],inputs[1],inputs[2],solved=inputs[3])
 
