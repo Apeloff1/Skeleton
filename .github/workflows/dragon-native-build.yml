@@ -432,6 +432,29 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  native-game-creator-editor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Exercise actual native original puzzle editor physics and export constraints
+        run: |
+          set -euo pipefail
+          cd frontend
+          node --test scripts/test-dragon-native-puzzle-preview.mjs
+      - name: Verify original puzzle editor route and API implementation
+        run: |
+          set -euo pipefail
+          test -s frontend/src/components/DragonOriginalPuzzleEditor.tsx
+          test -s frontend/src/product/dragonPuzzlePreview.ts
+          test -s frontend/app/dragon-native-production.tsx
+          test -s backend/routes/dragon_academy.py
+
   build-actual-original-windows-executable:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
