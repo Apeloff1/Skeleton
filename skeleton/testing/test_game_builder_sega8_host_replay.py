@@ -44,6 +44,9 @@ def test_real_original_native_game_c_matches_every_source_game_action(
     assert report["native_game_c_compiled_and_executed_on_host"] is True
     assert report["original_score_and_screen_state_verified"] is True
     assert report["original_companion_rank_progression_verified"] is True
+    assert report["original_native_solution_attract_mode_host_verified"] is True
+    assert report["original_demo_controller_actions_verified"] == report["original_controller_actions_verified"]
+    assert len(report["original_demo_screen_trace_sha256"]) == 64
     assert report["full_console_emulator_playthrough_verified"] is False
     assert report["native_z80_rom_executed"] is False
     assert report["physical_hardware_verified"] is False
@@ -81,6 +84,8 @@ def test_eight_levels_cross_999_score_and_seven_bond_thresholds_on_actual_c(tmp_
     assert receipt["original_levels_verified"]==8
     assert receipt["original_companion_rank_progression_verified"] is True
     assert receipt["original_score_and_screen_state_verified"] is True
+    assert receipt["original_native_solution_attract_mode_host_verified"] is True
+    assert receipt["original_demo_controller_actions_verified"] == len(plan["steps"])
 
 
 @pytest.mark.skipif(not shutil.which("gcc"), reason="real host C compiler required")
