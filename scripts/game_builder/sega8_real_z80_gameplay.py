@@ -516,6 +516,13 @@ def verify_original_z80_gameplay(
         "source_content_digest": project["source_digest"],
         "original_route_sha256": reference["route_sha256"],
         "original_levels_replayed": meta["levels"],
+        # Measured from the actual compiled cartridge's VDP name table
+        # on the final human-driven winning frame, before restarting demo.
+        "native_z80_vdp_final_score": stable["score"],
+        "native_z80_vdp_final_companion_rank": stable["bond_rank"],
+        "native_z80_vdp_final_stage_index": stable["level"],
+        "native_z80_vdp_final_gems_remaining": stable["gems_remaining"],
+        "native_z80_vdp_final_health": stable["health"],
         "controller_actions_replayed": len(reference["steps"]),
         "hardware_screen_states_verified": snapshots_checked,
         "semantic_controller_screen_trace_sha256": trace.hex(),
