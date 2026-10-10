@@ -61,3 +61,12 @@ def decode_rgb332(word: object) -> tuple[int,int,int]:
             (((n>>2)&7)*255+3)//7,
             ((n&3)*255+1)//3)
 
+
+def nearest_palette_index(pixel: object, colors: object) -> int:
+    """Deterministic weighted RGB nearest-neighbor with stable tie breaking."""
+    r,g,b=_rgb(pixel)
+    palette=_palette(colors)
+    return min(range(len(palette)),key=lambda i:
+               (3*(r-palette[i][0])**2 + 4*(g-palette[i][1])**2 +
+                2*(b-palette[i][2])**2,i))
+
