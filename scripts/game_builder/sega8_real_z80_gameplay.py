@@ -187,7 +187,7 @@ class ActualZ80GameSession:
         self.tstates = 0
 
     def step_frame(self, button: str | None) -> None:
-        if button is not None and button not in (*_ACTION_BITS, "attract", "cancel"):
+        if button is not None and button not in (*_ACTION_BITS, "attract", "cancel", "pause"):
             raise Sega8NativeGameplayError("unrecognized game controller action")
         if self.frames >= MAX_TOTAL_GAMEPLAY_FRAMES:
             raise Sega8NativeGameplayError("native Z80 controller frame cap exceeded")
@@ -197,10 +197,13 @@ class ActualZ80GameSession:
             self.machine.controller = 0xCF  # native face buttons 1+2
         elif button == "cancel":
             self.machine.controller = 0xEF  # distinct new button-1 press
+        elif button == "pause":
+            self.machine.controller = 0xDF if self.machine.target=="sega_master_system" else 0xFF
         else:
             self.machine.controller = (
                 0xFF if button is None else (0xFF ^ (1 << _ACTION_BITS[button]))
             )
+        self.machine.gg_start = 0x7F if button=="pause" and self.machine.target=="sega_game_gear" else 0xFF
         self.machine.frame_ready = True
         self.cpu.request_maskable_interrupt()
         self.machine.interrupts_issued += 1
