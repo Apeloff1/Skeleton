@@ -268,3 +268,301 @@ def test_adaptive_practice_subscriptions_preserve_opt_in_and_finite_ticks(
     assert len(created)==1
     assert created[0].target_id=="game_boy"
     assert route.academy_status(owner=owner)["native_attempts"]
+
+
+
+def test_creator_source_bundle_auth_requires_editor_and_no_dev_bypass():
+    for user in (
+        None,
+        {"email": "a@example.test", "role": "editor", "dev_mode": True},
+        {"email": "a@example.test", "role": "viewer"},
+    ):
+        with pytest.raises(HTTPException) as denied:
+            route._native_source_editor(user)
+        assert denied.value.status_code in (401, 403)
+    good = {"email": "maker@example.test", "tenant_id": "studio-x", "role": "editor"}
+    assert route._native_source_editor(good) == route._principal(good)
+
+
+def test_creator_bundle_emits_real_native_source_without_build_or_database():
+    from io import BytesIO
+    from zipfile import ZipFile
+    from skeleton.ai.webcrawler.dragon_native_production import verify_source_bundle
+
+    owner = identity()
+    catalog = route.native_production_capabilities(owner=owner)
+    assert catalog["ok"]
+    assert any(x["id"] == "game_boy" and x["native_source_emitter"]
+               for x in catalog["targets"])
+    assert all("certificate" not in str(x.get("claims", "")).lower()
+               for x in catalog["targets"])
+
+    body = route.NativeProductionSourceRequest(
+        title="Original Lunar Drifter",
+        style="arcade_score_attack", targets=["game_boy", "nes"],
+        original_work_attested=True, approved=True,
+    )
+    response = route.native_production_source_bundle(body, owner=owner)
+    assert response.media_type == "application/zip"
+    assert response.headers["cache-control"] == "private, no-store"
+    assert response.headers["x-dragon-claim"] == "source-only-not-a-compiled-game"
+    assert hashlib.sha256(response.body).hexdigest() == response.headers["x-content-sha256"]
+    audit = verify_source_bundle(response.body)
+    assert audit["status"] == "verified_source_bundle"
+    assert audit["target_count"] == 2
+    with ZipFile(BytesIO(response.body)) as payload:
+        assert "production-index.json" in payload.namelist()
+        assert sum(x.startswith("releases/dragon-") for x in payload.namelist()) == 2
+
+
+def test_creator_bundle_fail_closed_on_rights_and_unimplemented_platform():
+    owner = identity()
+    no_rights = route.NativeProductionSourceRequest(
+        title="Original Lantern", style="arcade_score_attack",
+        targets=["game_boy"], original_work_attested=False, approved=True,
+    )
+    with pytest.raises(HTTPException) as denied:
+        route.native_production_source_bundle(no_rights, owner=owner)
+    assert denied.value.status_code == 403
+
+    unsupported = route.NativeProductionSourceRequest(
+        title="Original Lantern", style="arcade_score_attack",
+        targets=["ps5"], original_work_attested=True, approved=True,
+    )
+    with pytest.raises(HTTPException) as denied:
+        route.native_production_source_bundle(unsupported, owner=owner)
+    assert denied.value.status_code == 422
+
+    no_publication = route.NativeProductionSourceRequest(
+        title="Original Lantern", style="arcade_score_attack",
+        targets=["game_boy"], original_work_attested=True, approved=False,
+    )
+    with pytest.raises(HTTPException) as denied:
+        route.native_production_source_bundle(no_publication, owner=owner)
+    assert denied.value.status_code == 403
+
+
+
+@pytest.mark.parametrize("changes", [
+    {"approved": 1},
+    {"approved": "true"},
+    {"original_work_attested": 1},
+    {"original_work_attested": "yes"},
+    {"seed": True},
+    {"seed": "1"},
+    {"compile_roms": True},
+    {"allow_licensed_sdk": True},
+    {"targets": ["game_boy"] * 4},
+])
+def test_native_creator_request_rejects_coerced_authority_and_extra_fields(changes):
+    from pydantic import ValidationError
+    payload = {
+        "title": "Original River Quest",
+        "style": "arcade_score_attack",
+        "targets": ["game_boy"],
+        "original_work_attested": True,
+        "approved": True,
+    }
+    payload.update(changes)
+    with pytest.raises(ValidationError):
+        route.NativeProductionSourceRequest(**payload)
+
+
+
+def test_native_creator_portable_design_is_downloaded_as_original_native_source():
+    from zipfile import ZipFile
+    from io import BytesIO
+    import json
+    from skeleton.ai.webcrawler.dragon_native_production import verify_source_bundle
+
+    approved = route.NativeProductionSourceRequest(
+        title="Original Galaxy Puzzle", style="arcade_score_attack",
+        targets=["game_boy", "pc_linux"],
+        original_work_attested=True, approved=True, seed=337,
+        portable_design=route.NativeProductionDesignBody(
+            palette="modern_neon", hero="astronaut", quest_theme="space",
+            difficulty=8, stages=6, candidates=13,
+        ),
+    )
+    response = route.native_production_source_bundle(approved, owner=identity())
+    assert verify_source_bundle(response.body)["target_count"] == 2
+    with ZipFile(BytesIO(response.body)) as archive:
+        manifest = json.loads(archive.read("production-index.json"))
+        assert manifest["target_count"] == 2
+        assert all(item["port_profile_digest"] for item in manifest["entries"])
+        for zip_name in archive.namelist():
+            if not zip_name.startswith("releases/"):
+                continue
+            with ZipFile(BytesIO(archive.read(zip_name))) as nested:
+                receipt = json.loads(nested.read("release-receipt.json"))
+                assert receipt["port_plan"]["production_seed"] == 337
+                assert receipt["port_plan"]["portable_profile"]["hero"] == "astronaut"
+                assert receipt["evidence"] == "source_generated"
+
+
+@pytest.mark.parametrize("fields", [
+    {"portable_design": {"difficulty": 11}},
+    {"portable_design": {"difficulty": True}},
+    {"portable_design": {"stages": "4"}},
+    {"portable_design": {"candidates": 25}},
+    {"portable_design": {"hero": "hatchling", "private_script": "import os"}},
+])
+def test_portable_creator_api_does_not_coerce_or_execute_design(fields):
+    from pydantic import ValidationError
+    data = {
+        "title": "Original Homebrew", "style": "arcade_score_attack",
+        "targets": ["game_boy"], "approved": True, "original_work_attested": True,
+    }
+    data.update(fields)
+    with pytest.raises(ValidationError):
+        route.NativeProductionSourceRequest(**data)
+
+
+
+def test_authenticated_creator_preview_is_read_only_and_exposes_hardware_degradations(
+    monkeypatch,
+):
+    from skeleton.ai.webcrawler import dragon_native_production as production
+    def fail_if_emitted(**kwargs):
+        raise AssertionError("source emitter must never execute during preview")
+    monkeypatch.setattr(production, "render_native_project", fail_if_emitted)
+    body = route.NativeProductionSourceRequest(
+        title="Original Trail Quest", style="arcade_score_attack",
+        targets=["game_boy", "pc_linux"], approved=False,
+        original_work_attested=True,
+        portable_design=route.NativeProductionDesignBody(
+            palette="modern_neon", hero="explorer",
+            stages=6, candidates=12, difficulty=7,
+        ),
+    )
+    result = route.native_production_preview(body, owner=identity())
+    assert result["ok"]
+    assert result["status"] == "source_ready"
+    assert result["can_export_sources"]
+    assert result["evidence"] == "none"
+    assert result["candidate_count"] == 2
+    rows = {item["target"]: item for item in result["targets"]}
+    assert rows["game_boy"]["target_stages"] == 1
+    assert rows["game_boy"]["target_palette"] == "handheld"
+    assert rows["pc_linux"]["target_stages"] == 6
+    assert not rows["pc_linux"]["adaptations"]
+
+
+def test_native_creator_preview_cannot_bypass_original_rights_declaration():
+    body = route.NativeProductionSourceRequest(
+        title="Original Trail Quest", style="arcade_score_attack",
+        targets=["game_boy"], approved=False, original_work_attested=False,
+    )
+    with pytest.raises(HTTPException) as denied:
+        route.native_production_preview(body, owner=identity())
+    assert denied.value.status_code == 403
+
+
+def test_native_creator_preview_discloses_blocked_licensed_sdk():
+    body = route.NativeProductionSourceRequest(
+        title="Original Trail Quest", style="arcade_score_attack",
+        targets=["game_boy", "ps5"], approved=False,
+        original_work_attested=True,
+    )
+    report = route.native_production_preview(body, owner=identity())
+    assert not report["can_export_sources"]
+    assert {t["target"]: t["state"] for t in report["targets"]} == {
+        "game_boy": "source_ready",
+        "ps5": "blocked",
+    }
+    assert "no generated code" in report["claim_boundary"]
+
+
+
+@pytest.mark.parametrize("hero,theme,palette", [
+    ("hatchling", "crystals", "dmg_green"),
+    ("robot", "clockwork", "modern_neon"),
+    ("astronaut", "space", "vga_dusk"),
+    ("pilot", "volcano", "handheld"),
+    ("explorer", "forest", "cga"),
+    ("knight", "ice", "crt_arcade"),
+])
+def test_original_native_2bpp_pixel_preview_matches_real_emitter(hero, theme, palette):
+    from skeleton.ai.webcrawler.dragon_native_artforge import original_tiles
+    req = route.NativeProductionPixelArtPreview(
+        hero=hero, quest_theme=theme, palette=palette,
+        seed=41, target="game_boy",
+    )
+    result = route.native_production_art_preview(req, owner=identity())
+    assert result["ok"] and result["hero"] == hero
+    assert result["target"] == "game_boy"
+    assert len(result["frames"]) == 4
+    expected = original_tiles(
+        hero=hero, theme=theme, seed=41,
+        palette=result["applied_palette"],
+    )
+    assert result["frames"]["hero"] == expected["dragon"]
+    assert result["frames"]["collectible"] == expected["star"]
+    assert len(result["gb_tiles_sha256"]) == 64
+    assert all(set("".join(frame)) <= set("0123")
+               for frame in result["frames"].values())
+    assert "not certified" in result["claim_boundary"]
+
+
+@pytest.mark.parametrize("changes", [
+    {"target": "ps5"},
+    {"target": "../../local"},
+    {"hero": "third_party_famous_character"},
+    {"quest_theme": "game_franchise"},
+    {"palette": "unknown_video_palette"},
+])
+def test_original_pixel_preview_denies_nonexistent_or_unlicensed_assets(changes):
+    req = route.NativeProductionPixelArtPreview(**changes)
+    with pytest.raises(HTTPException) as denied:
+        route.native_production_art_preview(req, owner=identity())
+    assert denied.value.status_code == 422
+
+
+@pytest.mark.parametrize("fields", [
+    {"seed": True},
+    {"seed": "42"},
+    {"seed": -1},
+    {"hero": "robot", "custom_rom_path": "third_party.gb"},
+])
+def test_original_pixel_preview_is_strictly_typed_and_has_no_unsafe_inputs(fields):
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        route.NativeProductionPixelArtPreview(**fields)
+
+
+
+def test_original_puzzle_creator_can_explicitly_request_solver_proven_new_stages():
+    from zipfile import ZipFile
+    from io import BytesIO
+    import json
+    from skeleton.ai.webcrawler.dragon_native_production import verify_source_bundle
+    spec = route.NativeProductionSourceRequest(
+        title="Original Clockwork Crate Labyrinth",
+        style="fixed_screen_puzzle", targets=["pc_linux"],
+        seed=1977, original_work_attested=True, approved=True,
+        portable_design=route.NativeProductionDesignBody(
+            palette="vga_dusk", hero="explorer",
+            quest_theme="clockwork", stages=2,
+            candidates=4, difficulty=7, procedural_levels=True,
+        ),
+    )
+    preview = route.native_production_preview(spec, owner=identity())
+    assert preview["can_export_sources"]
+    released = route.native_production_source_bundle(spec, owner=identity())
+    assert verify_source_bundle(released.body)["target_count"] == 1
+    with ZipFile(BytesIO(released.body)) as archive:
+        inner = next(name for name in archive.namelist() if name.startswith("releases/"))
+        with ZipFile(BytesIO(archive.read(inner))) as project:
+            proof = json.loads(project.read("source/dragon-puzzle-proof.json"))
+            assert proof["stages"] == 2 and proof["procedural"] is True
+
+
+@pytest.mark.parametrize("bad", [
+    {"procedural_levels": "true"},
+    {"procedural_levels": 1},
+    {"procedural_levels": []},
+])
+def test_original_creator_procedural_option_rejects_coerced_input(bad):
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        route.NativeProductionDesignBody(**bad)

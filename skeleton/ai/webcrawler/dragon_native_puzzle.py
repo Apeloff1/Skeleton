@@ -101,7 +101,7 @@ def solve_grid(rows:tuple[str,...])->tuple[str,int]:
         raise ValueError("native puzzle solution exceeds bounded input sequence")
     return solution,len(parents)
 
-def transformed_level(stage:int,seed:int,difficulty:int=4)->tuple[str,...]:
+def transformed_level(stage:int,seed:int,difficulty:int=4,*,procedural:bool=False)->tuple[str,...]:
     if isinstance(stage,bool) or not isinstance(stage,int) or not 0<=stage<MAX_LEVELS:
         raise ValueError("native puzzle level index out of bounds")
     if isinstance(seed,bool) or not isinstance(seed,int) or not 0<=seed<2**32:
@@ -114,6 +114,13 @@ def transformed_level(stage:int,seed:int,difficulty:int=4)->tuple[str,...]:
     if flags&1:rows=tuple(r[::-1] for r in rows)
     if flags&2:rows=tuple(reversed(rows))
     _parse(rows)
+    if type(procedural) is not bool:
+        raise ValueError("procedural native puzzle mode must be a boolean")
+    if procedural:
+        from .dragon_native_puzzle_variants import vary_original_level
+        rows,_=vary_original_level(
+            rows,seed=seed,stage=stage,difficulty=difficulty,solve=solve_grid,
+        )
     return rows
 
 C_SOURCE=r'''/* Dragon Native Sokoban: pure C99, ANSI terminal, no SDL/no WebView.
@@ -272,12 +279,25 @@ int main(int argc,char**argv){
 }
 '''
 
-def emit_native_puzzle(*,seed:int,stages:int=4,difficulty:int=4)->dict[str,str]:
+def emit_native_puzzle(*,seed:int,stages:int=4,difficulty:int=4,
+                       procedural:bool=False,
+                       authored_levels:tuple[tuple[str,...],...]|None=None)->dict[str,str]:
     if isinstance(stages,bool) or not isinstance(stages,int) or not 1<=stages<=MAX_LEVELS:
         raise ValueError("native puzzle stages must be 1..8")
+    if type(procedural) is not bool:
+        raise ValueError("procedural native puzzle flag must be a boolean")
+    original_pack=None
+    if authored_levels is not None:
+        if procedural:
+            raise ValueError("custom authored campaign and procedural mode are exclusive")
+        from .dragon_native_puzzle_authoring import validate_authored_levels
+        original_pack=validate_authored_levels(authored_levels)
+        if stages!=len(original_pack.levels):
+            raise ValueError("authored game stage count must match emitted campaign")
     layouts=[];solutions=[];proofs=[]
     for index in range(stages):
-        grid=transformed_level(index,seed,difficulty)
+        grid=(original_pack.levels[index].rows if original_pack is not None
+              else transformed_level(index,seed,difficulty,procedural=procedural))
         path,states=solve_grid(grid)
         start,boxes,goals,walls=_parse(grid)
         layouts.append(grid);solutions.append(path)
@@ -326,6 +346,11 @@ clean:
       "mode":"original_native_sokoban",
       "search":"exact bounded BFS over player location and crate set",
       "seed":seed,"stages":stages,"difficulty":difficulty,
+      "procedural":procedural,
+      "authoring_mode":"authored" if original_pack is not None else "generated",
+      "authoring_digest":original_pack.digest if original_pack is not None else None,
+      "authored_level_rows":[list(level.rows) for level in original_pack.levels]
+                             if original_pack is not None else None,
       "level_proofs":[asdict(p) for p in proofs],
       "native_runtime_test_required":True,
       "proof_scope":"optimal abstract grid moves, not C executable verification",
@@ -343,7 +368,10 @@ clean:
        " Build/run status remains source_generated until an actual compiler"
        " and runner confirm it.\n"
     )
-    return {"src/main.c":C_SOURCE,"include/dragon_puzzle.h":header,
+    from .dragon_native_puzzle_hints import enable_live_hints
+    from .dragon_native_puzzle_trace import enable_native_trace
+    runtime=enable_native_trace(enable_live_hints(C_SOURCE))
+    return {"src/main.c":runtime,"include/dragon_puzzle.h":header,
             "CMakeLists.txt":cmake,"Makefile":make,
             "dragon-puzzle-proof.json":json.dumps(info,sort_keys=True,indent=2)+"\n",
             "README.puzzle.md":readme}

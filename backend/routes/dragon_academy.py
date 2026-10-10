@@ -18,7 +18,7 @@ import time
 from typing import Iterator
 
 from fastapi import APIRouter, Depends, HTTPException, Path as URLPath, Query, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 
 from routes.gameforge_auth import get_current_user
 from skeleton.ai.webcrawler.dragon_practice_lab import DragonPracticeLab
@@ -128,6 +128,169 @@ def native_targets(owner: str = Depends(_principal)) -> dict:
     # Catalog metadata does not imply working native compilation.
     return {"ok":True,"targets":target_catalog(),"styles":STYLES,
             "supported_matrix":practice_matrix()}
+
+
+class NativeProductionPixelArtPreview(BaseModel):
+    """Strictly original 8x8 source sprite preview, no external images or ROMs."""
+    model_config = ConfigDict(extra="forbid")
+    hero: str = Field(default="hatchling", max_length=32)
+    quest_theme: str = Field(default="ancient_ruins", max_length=32)
+    palette: str = Field(default="dmg_green", max_length=30)
+    seed: StrictInt = Field(default=1, ge=0, le=0xffffffff)
+    target: str = Field(default="game_boy", max_length=32)
+
+
+@router.post("/native/production/art-preview")
+def native_production_art_preview(
+    body: NativeProductionPixelArtPreview,
+    owner: str = Depends(_principal),
+) -> dict:
+    """Pixel-perfect intended original 2bpp source tiles, NOT device rendering."""
+    from skeleton.ai.webcrawler.dragon_native_artforge import (
+        TARGETS, make_art,
+    )
+    if body.target not in TARGETS:
+        raise HTTPException(status_code=422,
+                            detail="Original sprite tile preview adapter unavailable")
+    # Cartridge video asset palette classes are intentionally bounded: other
+    # UI themes map into a compatible handheld 2bpp tone class.
+    actual_palette = (body.palette if body.palette in
+                      ("dmg_green", "handheld", "vga_dusk") else "handheld")
+    try:
+        art, tiles = make_art(
+            hero=body.hero, theme=body.quest_theme,
+            palette=actual_palette, seed=body.seed, target=body.target,
+        )
+    except ValueError:
+        raise HTTPException(status_code=422,
+                            detail="Unsupported original sprite design") from None
+    return {
+        "ok": True,
+        "schema": art.schema,
+        "target": body.target,
+        "requested_palette": body.palette,
+        "applied_palette": actual_palette,
+        "hero": body.hero,
+        "quest_theme": body.quest_theme,
+        "frames": {
+            "hero": tiles["dragon"],
+            "hero_blink": tiles["dragon_blink"],
+            "collectible": tiles["star"],
+            "enemy": tiles["enemy"],
+        },
+        "gb_tiles_sha256": art.gb_source_digest,
+        "nes_tiles_sha256": art.nes_source_digest,
+        "claim_boundary": (
+            "actual original 2bpp sprite source values only; "
+            "screen colors and hardware rendering not certified"
+        ),
+    }
+
+
+class NativeProductionDesignBody(BaseModel):
+    """Optional original game controls; never interpreted as executable source."""
+    model_config = ConfigDict(extra="forbid")
+    palette: str = Field(default="vga_dusk", max_length=30)
+    hero: str = Field(default="hatchling", max_length=32)
+    quest_theme: str = Field(default="ancient_ruins", max_length=32)
+    difficulty: StrictInt = Field(default=4, ge=1, le=10)
+    stages: StrictInt = Field(default=4, ge=1, le=8)
+    candidates: StrictInt = Field(default=8, ge=1, le=24)
+    project_notes: str = Field(default="Original native homebrew; platform-scaled design", max_length=200)
+    procedural_levels: StrictBool = Field(default=False)
+
+
+class NativeProductionSourceRequest(BaseModel):
+    """Strict browser-only original source export, never privileged ROM compilation."""
+    model_config = ConfigDict(extra="forbid")
+    title: str = Field(..., min_length=2, max_length=80)
+    style: str = Field(..., min_length=2, max_length=64)
+    targets: list[str] = Field(..., min_length=1, max_length=3)
+    seed: StrictInt = Field(default=1, ge=0, le=0xffffffff)
+    original_work_attested: StrictBool = Field(default=False)
+    rights_basis: str = Field(default="original_homebrew", max_length=40)
+    rights_reference: str = Field(default="", max_length=240)
+    approved: StrictBool = Field(default=False)
+    portable_design: NativeProductionDesignBody | None = Field(default=None)
+
+
+def _native_source_editor(user: dict | None = Depends(get_current_user)) -> str:
+    # The native product endpoint is not anonymous, development-mode enabled,
+    # or accessible to viewer principals. Source bundles are consequential
+    # creator artifacts even when they do not execute compilers.
+    principal = _principal(user)
+    if not isinstance(user, dict) or user.get("role") not in ("editor", "admin"):
+        raise HTTPException(status_code=403, detail="Creator edit permission required")
+    return principal
+
+
+@router.get("/native/production/capabilities")
+def native_production_capabilities(owner: str = Depends(_principal)) -> dict:
+    from skeleton.ai.webcrawler.dragon_native_production import capability_matrix
+    return {
+        "ok": True,
+        "targets": capability_matrix(),
+        "claim_boundary": "source emitters and optional local ROM adapters; not device certification",
+    }
+
+
+def _make_native_production_request(body: NativeProductionSourceRequest):
+    from skeleton.ai.webcrawler.dragon_native_production import (
+        PortableGameDesign, ProductionRequest,
+    )
+    return ProductionRequest(
+        title=body.title, style=body.style, targets=tuple(body.targets),
+        original_work_attested=body.original_work_attested,
+        rights_basis=body.rights_basis, rights_reference=body.rights_reference,
+        seed=body.seed, max_portfolio_bytes=3_000_000,
+        portable_design=(PortableGameDesign(**body.portable_design.model_dump())
+                         if body.portable_design is not None else None),
+    )
+
+
+@router.post("/native/production/preview")
+def native_production_preview(
+    body: NativeProductionSourceRequest,
+    owner: str = Depends(_native_source_editor),
+) -> dict:
+    """No build, rights approval, storage mutation, compiler or knowledge promotion."""
+    if not body.original_work_attested:
+        raise HTTPException(status_code=403, detail="Original rights declaration required")
+    from skeleton.ai.webcrawler.dragon_native_production import preview_native_portfolio
+    try:
+        return {"ok": True, **preview_native_portfolio(_make_native_production_request(body))}
+    except (ValueError, PermissionError):
+        raise HTTPException(status_code=422,
+                            detail="Unsupported target, genre or portable game controls") from None
+
+
+@router.post("/native/production/source-bundle")
+def native_production_source_bundle(
+    body: NativeProductionSourceRequest,
+    owner: str = Depends(_native_source_editor),
+):
+    """Authenticated, size-limited original game-source export; entirely in memory."""
+    if not body.approved or not body.original_work_attested:
+        raise HTTPException(status_code=403,
+                            detail="Explicit publication and original rights attestation required")
+    from skeleton.ai.webcrawler.dragon_native_production import build_source_bundle
+    try:
+        request = _make_native_production_request(body)
+        payload, index = build_source_bundle(request, authorized=True)
+    except (ValueError, PermissionError):
+        raise HTTPException(status_code=422,
+                            detail="Unsupported source target, rights evidence or resource budget") from None
+    return Response(
+        content=payload, media_type="application/zip",
+        headers={
+            "Content-Disposition": 'attachment; filename="dragon-original-native-sources.zip"',
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, no-store",
+            "X-Content-SHA256": sha256(payload).hexdigest(),
+            "X-Dragon-Request-Id": index["request_id"],
+            "X-Dragon-Claim": "source-only-not-a-compiled-game",
+        },
+    )
 
 def _build_signing_key() -> bytes:
     value=os.environ.get("SKL_DRAGON_BUILD_SIGNING_KEY_HEX","")

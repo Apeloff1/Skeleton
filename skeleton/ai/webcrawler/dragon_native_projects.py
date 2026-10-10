@@ -488,8 +488,18 @@ endif()
 
 def render_native_project(*,title:str,target_id:str,style:str,
                           candidate_id:str,mechanics:tuple[Mechanic,...],
-                          authorized:bool,design=None)->NativeProject:
+                          authorized:bool,design=None,
+                          procedural_puzzles:bool=False,
+                          authored_puzzles:tuple[tuple[str,...],...]|None=None)->NativeProject:
     if not authorized:raise PermissionError("native game build requires authorization")
+    if type(procedural_puzzles) is not bool:
+        raise ValueError("procedural puzzle control must be strict boolean")
+    if procedural_puzzles and style!="fixed_screen_puzzle":
+        raise ValueError("procedural puzzles require original fixed-screen gameplay")
+    if authored_puzzles is not None and style!="fixed_screen_puzzle":
+        raise ValueError("authored native levels require fixed-screen puzzle gameplay")
+    if authored_puzzles is not None and procedural_puzzles:
+        raise ValueError("user-authored and generated procedural levels cannot be combined")
     target=demand_target(target_id)
     if target_id not in EMITTERS:
         if target.status=="licensed_sdk":
@@ -558,7 +568,9 @@ def render_native_project(*,title:str,target_id:str,style:str,
             from .dragon_native_puzzle import emit_native_puzzle
             files=emit_native_puzzle(
                 seed=seed,stages=design.stages if design is not None else 4,
-                difficulty=design.difficulty if design is not None else 4)
+                difficulty=design.difficulty if design is not None else 4,
+                procedural=procedural_puzzles,
+                authored_levels=authored_puzzles)
             if design is not None:
                 from .dragon_game_design import design_manifest
                 files["dragon-game-design.json"]=json.dumps(
@@ -679,6 +691,16 @@ def render_native_project(*,title:str,target_id:str,style:str,
         files["src/main.asm"]=enrich_native_gb_sound(
             files["src/main.asm"],
             scrolling=(target_id=="game_boy" and style=="side_scrolling_platformer"))
+    # Physically install original 2bpp actor/theme sprite tiles into the
+    # ROM source before canonical hardware budgeting. Existing frame/tile
+    # IDs and game logic remain stable; no proprietary assets are involved.
+    if design is not None and target_id in ("game_boy", "game_boy_color", "nes"):
+        from .dragon_native_artforge import make_art, apply_original_art
+        art, tiles = make_art(
+            hero=design.hero, theme=design.quest_theme,
+            palette=design.palette, seed=design.seed, target=target_id,
+        )
+        files = apply_original_art(files, art=art, tiles=tiles, style=style)
     if any(PurePosixPath(p).is_absolute() or ".." in PurePosixPath(p).parts for p in files):
         raise ValueError("unsafe generated path")
     if any(len(v.encode())>120_000 for v in files.values()):
