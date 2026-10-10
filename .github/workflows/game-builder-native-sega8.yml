@@ -102,6 +102,31 @@ jobs:
           assert r["physical_hardware_verified"] is False
           assert r["release_approved"] is False
           PY
+      - name: Independently regenerate original game source before native toolchain use
+        env:
+          TARGET: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          python -m scripts.game_builder.native_sega_8bit_ci \
+            --target "$TARGET" --emit "/tmp/$TARGET-independently-regenerated" \
+            --author-evidence /tmp/original-sega-authorship.txt > "/tmp/$TARGET-second-source.json"
+          python - <<'PY'
+          import json, os
+          from skeleton.ai.game_builder.sega_reproducibility import verify_separate_authoring_runs
+          target=os.environ["TARGET"]
+          with open("/tmp/"+target+"-generated-source.json",encoding="utf-8") as first:
+              original=json.load(first)
+          with open("/tmp/"+target+"-second-source.json",encoding="utf-8") as second:
+              regenerated=json.load(second)
+          assert regenerated["rights_evidence_sha256"]==original["rights_evidence_sha256"]
+          proof=verify_separate_authoring_runs(
+              "output/"+target, "/tmp/"+target+"-independently-regenerated",
+              target=target,expected_source_sha256=original["source_content_digest"],
+          )
+          assert proof["identical_source_bytes"] is True
+          assert proof["release_authorized"] is False
+          print("SEGA_AUTHORING_REGENERATION_MATCH",target,original["source_content_digest"])
+          PY
       - name: Build actual original cartridge with SDCC and devkitSMS
         env:
           TARGET: ${{ matrix.platform }}
