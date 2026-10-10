@@ -162,3 +162,22 @@ where the console's hardware supports those keys.
 These are authored implementation capabilities. Verified ROM execution,
 accessibility acceptance by disabled players and physical console testing are
 still separately pending.
+
+
+## Hardware-native art direction
+
+Five original visual themes are supported in actual cartridge C source:
+`forest`, `space`, `desert`, `ocean` and `arcade`. They are not CSS,
+external image themes or a desktop-only preview. Each selects distinct
+full-color Game Gear 12-bit RGB444 palette bytes and a separately constrained
+Master System 6-bit RGB222 CRAM palette, shared between backgrounds and the
+animated native familiar's hardware sprite. Each palette is written through
+the relevant devkitSMS hardware API at initialization.
+
+Each generated source manifest includes both hardware palette vectors, the
+original game's requested art direction, and an exact content digest. The
+theme is part of the authored `PlayableWorld` identity; changing it is a new
+generation that requires rechecking and re-signing release evidence, rather
+than silently reusing a previous build certificate. No sample artwork or
+platform-exclusive commercial textures are copied.
+
