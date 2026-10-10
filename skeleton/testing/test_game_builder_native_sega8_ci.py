@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from hashlib import sha256
+import os
 import json
 
 import pytest
@@ -249,3 +250,31 @@ def test_malformed_author_provenance_refused(tmp_path,not_a_hash):
             "sega_master_system",src,rom,toolchain_revision=REVISION,
             expected_authorship_sha256=not_a_hash,
         )
+
+
+
+@pytest.mark.parametrize("fixture",[
+    "symlink-file", "symlink-ancestor", "hardlink", "empty", "sparse-oversize",
+])
+def test_original_authorship_evidence_refuses_unsafe_filesystem_sources(tmp_path,fixture):
+    evidence=tmp_path/"authorship.txt"
+    evidence.write_bytes(b"Independent authored original maze, story and sound.")
+    chosen=evidence
+    if fixture=="symlink-file":
+        chosen=tmp_path/"linked.txt"
+        chosen.symlink_to(evidence)
+    elif fixture=="symlink-ancestor":
+        anchor=tmp_path/"linked-ancestor"
+        anchor.symlink_to(tmp_path,target_is_directory=True)
+        chosen=anchor/"authorship.txt"
+    elif fixture=="hardlink":
+        chosen=tmp_path/"copied-inode.txt"
+        os.link(evidence,chosen)
+    elif fixture=="empty":
+        evidence.write_bytes(b"")
+    elif fixture=="sparse-oversize":
+        with evidence.open("wb") as stream:
+            stream.truncate(8*1024*1024+1)
+    with pytest.raises(ValueError,match="original author evidence"):
+        emit("sega_master_system",tmp_path/"not-created",chosen)
+    assert not (tmp_path/"not-created").exists()
