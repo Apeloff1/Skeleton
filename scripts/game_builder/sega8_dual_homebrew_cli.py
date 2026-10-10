@@ -67,7 +67,7 @@ def _configuration(path: Path | None, profile: str) -> dict[str, Any] | None:
     details.update(config)
     try:
         intent = GameBuildIntent(**details)
-    except ValueError as exc:
+    except (ValueError, TypeError) as exc:
         raise Sega8DualPortError("original game configuration violates world limits") from exc
     if intent.width > 19 or intent.height > 15:
         raise Sega8DualPortError("original game exceeds shared SMS/GG hardware viewport")
