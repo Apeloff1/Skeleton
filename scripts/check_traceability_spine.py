@@ -61,6 +61,96 @@ def _load(root: Path, relative: Path) -> dict[str, Any]:
     return data
 
 
+
+def _contract_export_mirror_valid(
+    canonical: bytes, mirror: bytes, manifest: dict[str, Any],
+) -> bool:
+    """Allow only a declared, additive AI-native contract export facade.
+
+    The canonical legacy package remains the byte-for-byte prefix; only one
+    owner-governed local module import and the matching `__all__` extension
+    are permitted. Any other AST node or unregistered overlay is drift.
+    """
+    if mirror == canonical:
+        return True
+    try:
+        original = canonical.decode("utf-8", errors="strict")
+        extended = mirror.decode("utf-8", errors="strict")
+    except UnicodeDecodeError:
+        return False
+    if not extended.startswith(original):
+        return False
+    mappings = manifest.get("mappings", [])
+    owners = manifest.get("native_ai_owners", [])
+    if not isinstance(mappings, list) or not isinstance(owners, list):
+        return False
+    matching = [
+        row for row in mappings
+        if isinstance(row, dict) and row.get("id") == "AIFT-CONTRACTS"
+        and row.get("source") == "skeleton/contracts"
+        and row.get("destination") == "skeleton/ai/runtime/contracts"
+    ]
+    if len(matching) != 1:
+        return False
+    declaration = matching[0]
+    exceptions = declaration.get("parity_exceptions", [])
+    declared = (
+        isinstance(exceptions, list)
+        and any(
+            isinstance(row, dict)
+            and row.get("path") == "__init__.py"
+            and row.get("mode") == "compatibility_facade"
+            and row.get("facade_required_import") == "from .execution_authority import ("
+            for row in exceptions
+        )
+        and "execution_authority.py" in declaration.get("overlay_children", [])
+        and any(
+            isinstance(row, dict)
+            and row.get("path") == "skeleton/ai/runtime/contracts/execution_authority.py"
+            and row.get("kind") == "file"
+            and row.get("ownership_mode") == "canonical_native"
+            and row.get("residual_only") is False
+            for row in owners
+        )
+    )
+    if not declared:
+        return False
+    appendix = extended[len(original):]
+    if not appendix.startswith("\nfrom .execution_authority import ("):
+        return False
+    try:
+        nodes = ast.parse(appendix).body
+    except (SyntaxError, ValueError):
+        return False
+    if len(nodes) != 2:
+        return False
+    imported, exported = nodes
+    if (
+        not isinstance(imported, ast.ImportFrom)
+        or imported.module != "execution_authority"
+        or imported.level != 1
+        or not imported.names
+        or any(alias.asname is not None or alias.name == "*" for alias in imported.names)
+    ):
+        return False
+    names = [alias.name for alias in imported.names]
+    if len(set(names)) != len(names):
+        return False
+    if (
+        not isinstance(exported, ast.AugAssign)
+        or not isinstance(exported.target, ast.Name)
+        or exported.target.id != "__all__"
+        or not isinstance(exported.op, ast.Add)
+        or not isinstance(exported.value, (ast.List, ast.Tuple))
+    ):
+        return False
+    values = exported.value.elts
+    if not all(isinstance(item, ast.Constant) and isinstance(item.value, str)
+               for item in values):
+        return False
+    return [item.value for item in values] == names
+
+
 def _repo_path(value: object) -> str:
     if not isinstance(value, str) or not value or "\x00" in value or "\\" in value:
         raise TraceSpineError(f"invalid repository path: {value!r}")
@@ -766,7 +856,11 @@ def _validate_protocols(
         root / "skeleton/contracts/__init__.py",
         root / "skeleton/ai/runtime/contracts/__init__.py",
     ]
-    if export_paths[0].read_bytes() != export_paths[1].read_bytes():
+    if not _contract_export_mirror_valid(
+        export_paths[0].read_bytes(),
+        export_paths[1].read_bytes(),
+        _load(root, Path("machine/ai_file_tree.json")),
+    ):
         raise TraceSpineError("contract package export mirror drift")
     exports = export_paths[0].read_text(encoding="utf-8")
     for symbol in (
