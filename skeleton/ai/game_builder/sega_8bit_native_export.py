@@ -51,10 +51,28 @@ def _authored_stage_accents(
         if brighten:
             channels = [min(mask, channel + brighten) for channel in channels]
         return sum(channel << (bits * n) for n, channel in enumerate(channels))
-    return tuple(
-        (recolor(palette[1], index), recolor(palette[2], index))
-        for index in range(levels)
-    )
+    minimum_delta = 2 if bits == 2 else 4
+    accents: list[tuple[int, int]] = []
+    for index in range(levels):
+        first = recolor(palette[1], index)
+        second = recolor(palette[2], index)
+        # Quantization and channel saturation can collapse two different
+        # artwork accents into the same hardware color (especially RGB222).
+        # Keep a meaningful difference without touching collision/gameplay.
+        channels_a = [(first >> (bits*n)) & mask for n in range(3)]
+        channels_b = [(second >> (bits*n)) & mask for n in range(3)]
+        distance = sum(abs(a - b) for a, b in zip(channels_a, channels_b))
+        if distance < minimum_delta:
+            channel = index % 3
+            value = channels_b[channel]
+            channels_b[channel] = (
+                min(mask, value + minimum_delta)
+                if value <= mask - minimum_delta
+                else max(0, value - minimum_delta)
+            )
+            second = sum(v << (bits*n) for n, v in enumerate(channels_b))
+        accents.append((first, second))
+    return tuple(accents)
 
 
 _BASE = r"""/* Original independently-authored Z80 homebrew: __TARGET__.
