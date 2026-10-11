@@ -19,6 +19,9 @@ from .game_workspace_ui import render_workspace_html
 from .game_prompt_router import route_game_prompt,ingest_ai_draft
 from .system_editors import catalog as system_editor_catalog, editor_source, editor_path, preview_editor
 from .system_editor_assembly import assemble_workspace_systems
+from .advanced_gameplay_runtime import (
+    run_advanced_session, verify_advanced_session, ACTION_HELP,
+)
 
 
 class StudioServerError(ValueError):
@@ -175,6 +178,18 @@ class _StudioHandler(BaseHTTPRequestHandler):
         path=urlsplit(self.path).path
         values=self._body()
         studio=self.server.workspace
+        if path=="/api/advanced-play":
+            result=run_advanced_session(
+                values["editor"], values.get("settings"),
+                values.get("actions", []), seed=values.get("seed", 0))
+            return self._json(200, {"session":result,
+                                    "available_actions":list(ACTION_HELP[result["editor"]]),
+                                    "server_mutated_game_files":False})
+        if path=="/api/advanced-verify":
+            verified=verify_advanced_session(
+                values["session"],values.get("settings"))
+            return self._json(200,{"verified":verified,
+                                   "publication_certified":False})
         if path=="/api/editor-preview":
             editor=values["editor"]
             config=values.get("settings")
