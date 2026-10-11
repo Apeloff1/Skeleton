@@ -116,7 +116,7 @@ def plan_competitive_campaign(plan: PlannedTitle,report: ConvergenceReport,
                 expected_evidence=details,priority=order.priority,
                 source_report_digest=report.digest,
                 protected_identity_digest=plan.distinctive_signature_digest)
-            task_id=canonical_digest(task_body)[:32]
+            task_id=canonical_digest(task_body)
             tasks.append(CompetitiveTask(
                 task_id=task_id,order_id=order.order_id,
                 project_id=plan.project_id,competitor_id=report.competitor_id,
