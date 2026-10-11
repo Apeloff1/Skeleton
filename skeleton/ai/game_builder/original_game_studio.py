@@ -150,8 +150,12 @@ def _practice_intents(base: GameBuildIntent, count: int) -> tuple[GameBuildInten
             "practice_parent": base.to_payload(), "index": i,
             "algorithm": "skeleton.original_practice.v1",
         })[:15], 16)
+        # Preserve identity uniqueness even for a maximum-length project ID.
+        # The digest also prevents truncation collisions across parent games.
+        parent_prefix = base.project_id[:100].rstrip("._:-")
+        derived_id = f"{parent_prefix}.p-{canonical_digest(base.to_payload())[:12]}-{i + 1}"
         samples.append(replace(
-            base, project_id=f"{base.project_id}.practice.{i + 1}",
+            base, project_id=derived_id,
             title=f"Practice {i + 1}: {base.title}"[:120],
             seed=seed,
             hazards_per_level=min(base.hazards_per_level + i % 3, 24),
