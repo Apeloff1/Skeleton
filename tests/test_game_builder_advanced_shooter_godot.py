@@ -66,7 +66,8 @@ class NativeArenaShooterProofTests(unittest.TestCase):
         cfg={"enemy_count":3,"player_health":100,"weapon_damage":10}
         base=make_advanced_scene("shooter",cfg,seed=4)
         layout=deepcopy(base["layout"])
-        layout["player_spawn"]=[6,4]
+        layout["player_spawn"]=[8,4]
+        layout["enemy_spawns"]=[[8,2],[10,4],[8,6]]
         scene=make_advanced_scene("shooter",cfg,seed=4,layout=layout)
         game=run_advanced_session("shooter",cfg,["fire","fire"],seed=4,scene=scene)
         self.assertGreater(game["state"]["defeated"],0)
