@@ -65,4 +65,4 @@ jobs:
       - name: Run actual Godot native winning replays
         run: |
           set -euo pipefail
-          python -m unittest             tests.test_game_builder_dual_runtime             tests.test_game_builder_authored_tiles -v
+          python -m unittest             tests.test_game_builder_dual_runtime             tests.test_game_builder_authored_tiles             tests.test_game_builder_tile_editor -v
