@@ -93,6 +93,9 @@ class FaultProbe:
     source_replay_digest: str
     corrupted_digest: str
     detected: bool
+    changed_field: str
+    original_fragment: object
+    mutated_fragment: object
 
     def payload(self):
         return dict(persona=self.persona,family=self.family,
@@ -100,6 +103,9 @@ class FaultProbe:
                     source_replay_digest=self.source_replay_digest,
                     corrupted_digest=self.corrupted_digest,
                     detected=self.detected,
+                    changed_field=self.changed_field,
+                    original_fragment=self.original_fragment,
+                    mutated_fragment=self.mutated_fragment,
                     evidence="canonical_replay_independently_reexecuted")
 
 
@@ -218,6 +224,42 @@ def director_initial_digest_spoof(state):
     return replace(state,scene="rewritten_scene",turn=0)
 
 
+def _mutation_excerpt(before: DirectorReplay,after: DirectorReplay):
+    """A small genuine before/after proof fragment instead of a guessed bug
+    description. Retains material data for learning and reproduction.
+    """
+    original=before.payload()
+    altered=after.payload()
+    for field in ("world_digest","initial_digest","state_digests","actions","final"):
+        if original[field]==altered[field]:
+            continue
+        if field=="final":
+            for key in sorted(original["final"]):
+                if original["final"][key]!=altered["final"][key]:
+                    before_value=original["final"][key]
+                    after_value=altered["final"][key]
+                    if key=="results":
+                        changes=[
+                            i for i,(a,b) in enumerate(zip(before_value,after_value))
+                            if a!=b
+                        ]
+                        if changes:
+                            index=changes[0]
+                            return ("final.results."+str(index),
+                                    before_value[index],after_value[index])
+                    return "final."+key,before_value,after_value
+        if field in {"actions","state_digests"}:
+            values_before=original[field];values_after=altered[field]
+            difference=next(
+                (i for i in range(min(len(values_before),len(values_after)))
+                 if values_before[i]!=values_after[i]),None)
+            if difference is None:
+                return field+".length",len(values_before),len(values_after)
+            return field+"."+str(difference),values_before[difference],values_after[difference]
+        return field,original[field],altered[field]
+    raise PlaytestError("adversarial mutation has no observable evidence change")
+
+
 def test_game_personas(world: DirectorWorld, quest_key: str,*,
                        authorized: bool,max_personas: int=5,
                        mutation_families: tuple[str,...]=TEST_FAMILIES) -> GameTesterAlmanac:
@@ -280,9 +322,12 @@ def test_game_personas(world: DirectorWorld, quest_key: str,*,
                 caught=False
             except (DirectorError,ValueError,TypeError):
                 caught=True
-            probes.append(FaultProbe(persona,family,SEVERITY[family],
-                                     replay.digest,canonical_digest(changed.payload()),
-                                     caught))
+            field,original_value,mutated_value=_mutation_excerpt(replay,changed)
+            probes.append(FaultProbe(
+                persona,family,SEVERITY[family],replay.digest,
+                canonical_digest(changed.payload()),caught,
+                field,original_value,mutated_value,
+            ))
     gaps=[]
     if len(set(observed))<len(world.scenes):
         gaps.append("not_all_authored_scenes_exercised")
