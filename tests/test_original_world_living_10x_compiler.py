@@ -169,11 +169,13 @@ def test_all_120_genre_progression_pairs_support_nested_play_with_living_systems
     for genre in PLAY_FORMS:
         for arc in PROGRESSION_LAWS:
             system = SYSTEMS[(len(genre.form_id) + len(arc.arc_id)) % 10]
-            state = choose(system.system_id, genre="puzzle", arc=arc.arc_id)
-            state = use(state, "mode", "toggle", target=0)
+            state = choose(system.system_id, genre=genre.form_id, arc=arc.arc_id)
+            genre_verb, target = FORM_ACTIONS[genre.form_id]
+            state = use(state, "mode", genre_verb, target=target)
             state = use(state, "living", system.commands[0])
             state = turn(state)
-            assert state.spatial.game.mode.switches == 1
+            assert state.spatial.game.mode.actions == 1
+            assert state.spatial.game.causal.tick == 1
             assert state.events == 3
             validate_living(state)
 
