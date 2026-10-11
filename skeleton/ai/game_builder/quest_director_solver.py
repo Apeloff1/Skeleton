@@ -114,7 +114,12 @@ def _resolve(
         live = quest.stages[progress]
         if live.key != stage.key:
             continue
-        if method == "fast":
+        if method == "balanced":
+            middle = sorted(live.solutions, key=lambda s: s.creativity)
+            ranked = sorted(middle, key=lambda s: (
+                abs(s.creativity - middle[len(middle)//2].creativity), s.key,
+            ))
+        elif method == "fast":
             ranked = sorted(live.solutions, key=lambda s: (
                 len(s.required), sum(p.count for p in s.required),
                 -s.creativity,
@@ -159,7 +164,7 @@ def solve_quest(
         raise PermissionError("full quest proof requires operator authority")
     if not isinstance(world, DirectorWorld):
         raise DirectorError("typed original director world required")
-    if strategy not in {"ordinary", "fast", "creative"} or type(optional) is not bool:
+    if strategy not in {"ordinary", "fast", "creative", "balanced"} or type(optional) is not bool:
         raise DirectorError("unsupported quest strategy or optional scoring policy")
     trace: list[DirectorAction] = []
     state = _resolve(
