@@ -8,7 +8,7 @@ barrier, or declared inferior without independently signed observations.
 
 ## 1. Deeper than titles, tags and superficial similarities
 
-For every genuinely verified enemy, the system builds a **complete 51-facet
+For every genuinely verified enemy, the system builds a **complete 102-facet
 analysis script plan**, split across four gameplay production domains. Each
 script has a controlled positive stimulus, adversarial/negative control,
 target platform and player cohort, typed observable, a benchmark protocol
@@ -16,12 +16,12 @@ digest and an original-game source-ownership commitment.
 
 | Area | Facets | Specific evaluated dimensions |
 |---|---:|---|
-| Gameplay | 14 | Input latency, control precision, combat clarity, tactical depth, progression, encounter variety, difficulty fairness, exploration payoff, world persistence, NPC agency, quest consequence, replayability, tutorial friction, accessible controls |
-| Graphics | 12 | Independent art direction, silhouettes, animation weight, lighting legibility, scene composition, motion comfort, texture readability, color language, FX budget, LOD/pop-in, UI hierarchy, actual platform fidelity |
-| Sound | 11 | Spatial placement/occlusion, mixing, original music identity, state-responsive music, action feedback, dialogue delivery, dynamic range, audio latency, silence, hearing accessibility, target-hardware audio |
-| Storyline | 14 | Causality, player agency, character consistency, pacing, lore, subtext, witnessed incidents as quests, branch completeness, long-term consequence memory, mystery fairness, theme expression, endless/postgame mode, emotional payoff, localization |
+| Gameplay | 28 | Input latency, control precision, combat clarity, tactical depth, progression, encounter variety, difficulty fairness, exploration payoff, world persistence, NPC agency, quest consequence, replayability, tutorial friction, accessible controls |
+| Graphics | 24 | Independent art direction, silhouettes, animation weight, lighting legibility, scene composition, motion comfort, texture readability, color language, FX budget, LOD/pop-in, UI hierarchy, actual platform fidelity |
+| Sound | 22 | Spatial placement/occlusion, mixing, original music identity, state-responsive music, action feedback, dialogue delivery, dynamic range, audio latency, silence, hearing accessibility, target-hardware audio |
+| Storyline | 28 | Causality, player agency, character consistency, pacing, lore, subtext, witnessed incidents as quests, branch completeness, long-term consequence memory, mystery fairness, theme expression, endless/postgame mode, emotional payoff, localization |
 
-Total: **51** controlled probes, no first-N truncation. Each contains eight
+Total: **102** controlled probes, no first-N truncation. Each contains eight
 ordered analysis steps: freeze build and cohort, obtain authorized gameplay
 observation, execute seeded nominal replay, execute fault permutation, collect
 time-aligned evidence, blind same-protocol scoring, seek counterexamples, and
@@ -119,7 +119,7 @@ original_game_conservative_lower_bound
 
 A missing predecessor, missing signed measurement, divergent scoring protocol,
 incomplete genre chain or metric that cannot support the margin blocks
-the claim. The frontier calculates one independent 51-facet record
+the claim. The frontier calculates one independent 102-facet record
 per enemy, never picking only its weakest era. It preserves enemy/source
 identity without copying reference gameplay data into training weights.
 
@@ -174,9 +174,9 @@ discovery is not, by itself, evidence of visual/narrative/audio performance
 or proven historical influence.
 
 Each enemy obtains:
-- 51 per-facet scripts and measured verdicts;
+- 102 per-facet scripts and measured verdicts;
 - historical title graph, verified/comparable edge evidence, remaining gaps;
-- 51-facet strongest-predecessor frontier;
+- 102-facet strongest-predecessor frontier;
 - original design counterproposals for every unmet measured standard;
 - comprehensive missing-evidence agenda.
 
@@ -189,7 +189,7 @@ and Wiki/rights admission.
 
 ## 8. Versioned deep almanacs and operator visibility
 
-\`competitive_deep_archive.py\` stores a complete 51-facet + ancestry
+\`competitive_deep_archive.py\` stores a complete 102-facet + ancestry
 \`DeepCompetitorPortfolio\` under the real local \`GameWorkspace\`, bound
 to the exact original competitor watch event, current reviewed Wiki state,
 legally cleared source revisions and the original-design source root.
@@ -217,7 +217,7 @@ error. It never modifies the game or downloads a rival's assets.
 
 ## 8. Testing, rollout and standards
 
-\`tests/test_game_builder_competitive_deep.py\` validates the entire 51-script
+\`tests/test_game_builder_competitive_deep.py\` validates the entire 102-script
 catalog, 3-generation corroborated graph, disconnected predecessor handling,
 future/forged measurements, actual signed industry-cohort weakness,
 prototype priorities, originality preservation, gains after replays and
