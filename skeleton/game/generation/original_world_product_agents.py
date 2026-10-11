@@ -304,7 +304,7 @@ def npc_tick(
             "after": [asdict(p) for p in inhabitants],
             "terrain": world.event_head, "stock": {
                 k: getattr(world, k) for k in
-                ("lumber", "masonry", "provisions", "freshwater"),
+                ("lumber", "masonry", "provisions", "freshwater")
             },
             "actions": [asdict(receipt) for receipt in receipts],
         }),
