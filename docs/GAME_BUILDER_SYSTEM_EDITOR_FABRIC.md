@@ -152,6 +152,46 @@ engines. It never equates successful reference simulation with a certified
 Godot export or native executable. Integration of the actual other 40
 game engines and producer-grade scene/node editors remains outstanding.
 
+## Sixth independent native adapter: original Godot 4 tower defense
+
+The `advanced_defense_godot.py` native game now executes the **actual**
+source-approved finite-wave rules of the advanced `tower_defense` reference,
+rather than animating a Python state. Authored `build_slots` and a strict
+1–12 `waves` count are respected in independent GDScript gameplay. Systems
+include integer-tick enemy spawning/movement, finite construction credits,
+three possible tower positions, level-one-to-three upgrades, sells and
+refunds, first/strongest targeting, authored tower range, armor mitigation,
+higher-level slow effects, kill rewards, resolved waves, enemy escapes and
+base-HP damage, objective win and terminal base destruction. The player
+controls the simulation with 1–3 (build), Q/W/E (upgrade), Z/X/C (sell),
+F/S (target priority), Space (advance a tick), Enter (four ticks), R (reset)
+and gamepad actions.
+
+A typed, reviewed Godot source package carries the exact scene, settings,
+source hashes, independent Python session action log and final proof state.
+The native `--verify-defense` mode starts from its *own* original game
+world, executes the same bounded commands through GDScript and compares all
+**17** top-level final gameplay fields, including nested tower/enemy states,
+finite resources, target policy, wave accounting, event order and outcomes.
+Godot's JSON integer/float representation is normalized in proof values,
+not substituted into the independent simulation.
+
+The authorized offline `system_editor_cli.py godot-export` and the local
+token-gated visual studio now export a sixth native source-family under a
+distinct stable `original-godot-tower_defense/` ZIP root. Replay tampering,
+stale settings, unsupported games, unauthorized writes and destination
+overwrites are rejected. Creating the portable project does **not** claim
+it has executed on any platform; published releases need separate rights,
+game-quality and hardware reviews.
+
+Dedicated exact-head CI `game-builder-advanced-defense-native.yml` runs
+**eight original, authored defense scenarios** on Windows and Linux:
+basic waves, upgrades, sell/rebuild, target-priority switching, completed
+short wave, long lane, enemy escape and destroyed base. The gate also
+exports and independently executes real Windows and Linux desktop
+executables. Report six of eight native reference engines as complete
+**only when these exact-head native checks pass**, not when source exists.
+
 ## Fourth independent native engine: authored original Godot 4 arena shooter
 
 The `advanced_shooter_godot.py` adapter executes a playable, offline, original
