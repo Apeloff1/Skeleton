@@ -36,6 +36,7 @@ jobs:
           sparse-checkout: |
             skeleton/__init__.py
             skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
             skeleton/ai/game_builder/
             skeleton/ai/webcrawler/
             tests/__init__.py
