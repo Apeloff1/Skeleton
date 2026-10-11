@@ -89,3 +89,72 @@ def test_cli_prints_only_current_replayable_simulation_facts(capsys):
     assert data["population_retained"] == 4
     assert data["scenario"] == "food-shortage"
     assert "quality_caveat" in data
+
+
+def test_starving_citizen_consumes_owned_carried_food_before_public_stores():
+    from dataclasses import replace
+    from skeleton.game.generation.original_world_product_terrain import create_terrain
+    from skeleton.game.generation.original_world_product_agents import create_society
+    from skeleton.game.generation.original_world_npc_cognition_v2 import (
+        make_intelligence, smart_npc_tick,
+    )
+    world = create_terrain("e" * 64)
+    citizens = create_society(world, 1)
+    agent = replace(citizens.inhabitants[0], hunger=12,
+                    cargo_kind="food", cargo=1)
+    citizens = replace(citizens, inhabitants=(agent,))
+    minds = make_intelligence(world, citizens)
+    stock = world.provisions
+    world, citizens, minds, receipts, _ = smart_npc_tick(world, citizens, minds)
+    assert receipts[0].operation == "consume-owned-carried-food"
+    assert world.provisions == stock
+    assert citizens.inhabitants[0].cargo == 0
+    assert citizens.inhabitants[0].cargo_kind == ""
+    assert citizens.inhabitants[0].hunger < 12
+
+
+def test_zero_depot_supply_requires_real_local_foraged_food_for_emergency_meal():
+    from dataclasses import replace
+    from skeleton.game.generation.original_world_product_terrain import create_terrain, cell_at
+    from skeleton.game.generation.original_world_product_agents import create_society
+    from skeleton.game.generation.original_world_npc_cognition_v2 import (
+        make_intelligence, smart_npc_tick,
+    )
+    world = replace(create_terrain("f" * 64), provisions=0)
+    citizens = create_society(world, 1)
+    citizen = replace(citizens.inhabitants[0], hunger=11)
+    citizens = replace(citizens, inhabitants=(citizen,))
+    minds = make_intelligence(world, citizens)
+    initial = cell_at(world, 0, 0).food
+    world, citizens, minds, receipts, _ = smart_npc_tick(world, citizens, minds)
+    assert receipts[0].operation == "eat-actual-wild-harvest"
+    assert cell_at(world, 0, 0).food == initial - 1
+    assert world.provisions == 0
+    assert citizens.inhabitants[0].hunger < 11
+
+
+def test_injured_resident_receives_physically_present_healer_funded_by_real_water():
+    from dataclasses import replace
+    from skeleton.game.generation.original_world_product_terrain import create_terrain
+    from skeleton.game.generation.original_world_product_agents import create_society
+    from skeleton.game.generation.original_world_npc_cognition_v2 import (
+        make_intelligence, smart_npc_tick,
+    )
+    world = create_terrain("a" * 64)
+    citizens = create_society(world, 2)
+    a, b = citizens.inhabitants
+    citizens = replace(citizens, inhabitants=(
+        replace(a, x=0, y=0, health=8, profession="guardian"),
+        replace(b, x=0, y=0, profession="healer"),
+    ))
+    minds = make_intelligence(world, citizens)
+    patient, medic = minds.minds
+    minds = replace(minds, minds=(
+        patient, replace(medic, empathy=10, curiosity=1, loneliness=0),
+    ))
+    water = world.freshwater
+    world, citizens, minds, receipts, _ = smart_npc_tick(world, citizens, minds)
+    assert world.freshwater == water - 1
+    assert citizens.inhabitants[0].health >= 10
+    assert receipts[1].operation == "healed-named-patient"
+    assert minds.bonds[0].reciprocated_aid >= 1
