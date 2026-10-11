@@ -17,7 +17,8 @@ def test_real_candidate_batch_persists_actual_dual_gameplay_receipts_and_replays
             db,start=200,count=4,routes=2,steps=12,branch_seed=1977)
         assert result["schema"]==SCHEMA
         assert result["requested"]==4
-        assert result["new_original_playable_prototypes"]==4
+        assert result["new_original_source_candidates"]==4
+        assert result["new_original_playable_prototypes"]+result["new_underbuilt_drafts"]==4
         assert result["independently_verified_existing_prototypes"]==0
         assert result["database_total_materialized"]==4
         assert result["genuinely_finished_licensed_games"]==0
@@ -30,6 +31,7 @@ def test_real_candidate_batch_persists_actual_dual_gameplay_receipts_and_replays
         repeated=materialize_batch(
             again,start=200,count=4,routes=2,steps=12,branch_seed=1977)
         assert repeated["new_original_playable_prototypes"]==0
+        assert repeated["new_original_source_candidates"]==0
         assert repeated["independently_verified_existing_prototypes"]==4
         assert repeated["database_total_materialized"]==4
         assert repeated["content_chain_sha256"]==result["content_chain_sha256"]
@@ -39,8 +41,8 @@ def test_atomic_spooling_keeps_original_game_addresses_non_overlapping():
     with sqlite3.connect(":memory:") as db:
         first=materialize_batch(db,start=31,count=3,routes=1,steps=12)
         second=materialize_batch(db,start=34,count=3,routes=1,steps=12)
-        assert first["new_original_playable_prototypes"]==3
-        assert second["new_original_playable_prototypes"]==3
+        assert first["new_original_source_candidates"]==3
+        assert second["new_original_source_candidates"]==3
         assert second["database_total_materialized"]==6
         row=db.execute(
             "SELECT original_nucleus FROM dragon_original_candidate_v1 "
@@ -112,7 +114,7 @@ def test_source_candidates_are_unpublished_even_when_they_are_playable():
             "SELECT candidate_status,source_receipt FROM "
             "dragon_original_candidate_v1 WHERE original_nucleus=0"
         ).fetchone()
-        assert row[0]=="source_playable_only"
+        assert row[0]=="underbuilt_source_draft"
         parsed=json.loads(row[1])
         assert not parsed["native_binary_built"]
         assert not parsed["independently_published"]
