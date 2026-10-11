@@ -120,6 +120,34 @@ class _StudioHandler(BaseHTTPRequestHandler):
                               "text/html; charset=utf-8")
         self._allowed()
         params=self._params()
+        if path=="/api/model-status":
+            # Read-only surface: never exposes private candidate weights or
+            # grants authority to promote from a browser status request.
+            from .game_reviewer_registry import ReviewerRegistry
+            work=self.server.workspace.root
+            previous=work/"training"/"review_models"/"state.json"
+            if not previous.is_file():
+                return self._json(200,{
+                    "schema":"skeleton.game_builder.review_ladder_ui.v1",
+                    "phase":"unconfigured","revision":0,
+                    "active":False,"candidate":False,
+                    "usage_checked":False,"idle_checked":False,
+                    "signed_roles":[],"model_training_or_deployment_running":False,
+                })
+            state=ReviewerRegistry(work).read_state()
+            return self._json(200,{
+                "schema":"skeleton.game_builder.review_ladder_ui.v1",
+                "phase":state["phase"],"revision":state["revision"],
+                "active":bool(state["active"]),
+                "candidate":bool(state["candidate"]),
+                "usage_checked":"usage" in state["observations"],
+                "idle_checked":"idle" in state["observations"],
+                "signed_roles":[row["role"] for row in state["attestations"]],
+                "source_project_count":len(state["source_projects"]),
+                "last_incident":state["last_incident"]["reason"] if state["last_incident"] else None,
+                "model_training_or_deployment_running":False,
+                "core_llm_weights_changed":False,
+            })
         if path=="/api/tree":
             return self._json(200,self.server.workspace.tree())
         if path=="/api/files":
