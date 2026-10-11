@@ -68,6 +68,7 @@ def test_blueprint_exact_replay_and_invariants(index: int) -> None:
     bp = blueprint_at(index)
     assert bp.as_dict() == blueprint_at(index).as_dict()
     assert bp.variant_index == index
+    assert bp.as_dict()["variant_index"] == str(index)
     assert bp.atlas_version == ATLAS_VERSION
     assert len(bp.mechanics) == MECHANICS_PER_WORLD == 12
     assert len({m.mechanic_id for m in bp.mechanics}) == 12
