@@ -304,7 +304,7 @@ def _complete_metamorphic_evaluation(rows: tuple[TrainingCandidate,...],
         raise PromotionError("all independent adversarial counterfactuals must be evaluated")
     return dict(schema="skeleton.game_builder.complete_metamorphic_qualification.v1",
                 expected_cases=len(rows),covered_cases=covered,
-                attempted=attempted,passed=passed,
+                attempted=attempted,passed=passed,failed=attempted-passed,
                 accuracy=round(passed/attempted,6),
                 complete_coverage=True,shards=receipts,
                 model_weights_changed=False,
