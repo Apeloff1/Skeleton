@@ -3,7 +3,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
-      - "skeleton/ai/game_builder/advanced_platformer_godot.py skeleton/ai/game_builder/advanced_deck_godot.py skeleton/ai/game_builder/advanced_genre_engines.pyeton/ai/game_builder/advanced_gameplay_runtime.py"
+      - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
       - "skeleton/ai/game_builder/advanced_godot_export.py"
       - "skeleton/ai/game_builder/advanced_platformer_godot.py"
       - "skeleton/ai/game_builder/advanced_deck_godot.py"
@@ -70,7 +70,7 @@ jobs:
         shell: bash
         run: |
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
-          python -m py_compile  skeleton/ai/game_builder/advanced_gameplay_runtime.py skeleton/ai/game_builder/advanced_godot_export.py skel skeleton/ai/game_builder/advanced_puzzle_solver.py skeleton/ai/game_builder/advanced_level_scenes.py skeleton/ai/game_builder/advanced_gameplay_save.py skeleton/ai/game_builder/system_editors.py skeleton/ai/game_builder/system_editor_assembly.py skeleton/ai/game_builder/system_editor_cli.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_workspace_ui.py tests/test_game_builder_advanced_runtime.py tests/test_game_builder_advanced_scenes.py tests/test_game_builder_advanced_genres.py tests/test_game_builder_advanced_godot.py tests/test_game_builder_advanced_platformer_godot.py tests/test_game_builder_advanced_deck_godot.py tests/test_game_builder_system_editors.py
+          python -m py_compile  skeleton/ai/game_builder/advanced_gameplay_runtime.py skeleton/ai/game_builder/advanced_godot_export.py skeleton/ai/game_builder/advanced_platformer_godot.py skeleton/ai/game_builder/advanced_deck_godot.py skeleton/ai/game_builder/advanced_genre_engines.py skeleton/ai/game_builder/advanced_puzzle_solver.py skeleton/ai/game_builder/advanced_level_scenes.py skeleton/ai/game_builder/advanced_gameplay_save.py skeleton/ai/game_builder/system_editors.py skeleton/ai/game_builder/system_editor_assembly.py skeleton/ai/game_builder/system_editor_cli.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_workspace_ui.py tests/test_game_builder_advanced_runtime.py tests/test_game_builder_advanced_scenes.py tests/test_game_builder_advanced_genres.py tests/test_game_builder_advanced_godot.py tests/test_game_builder_advanced_platformer_godot.py tests/test_game_builder_advanced_deck_godot.py tests/test_game_builder_system_editors.py
       - name: Parse original-game visual authoring JavaScript
         shell: bash
         run: |
