@@ -150,7 +150,7 @@ class EighteenRoundCases(unittest.TestCase):
         self.assertFalse(state.user_model_activation_granted)
         self.assertFalse(state.shadow_approved_for_stage)
         with self.assertRaises(ThreatRadarError):
-            accept_round(state,self.receipt(state,"research_recorded"),
+            accept_round(state,state.rounds[-1],
                          self.key,authorized=True)
 
     def test_idle_rounds_fail_closed_when_active_unsafe_or_probe_crashes(self):
