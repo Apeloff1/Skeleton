@@ -31,7 +31,8 @@ GOALS = frozenset(("work", "eat", "recover", "deliver", "scout", "care",
 STOCK = ("food", "wood", "stone", "water")
 WAREHOUSE = {"food": "provisions", "wood": "lumber",
              "stone": "masonry", "water": "freshwater"}
-MAX_MEMORY = 8
+MAX_MEMORY = 16
+MAX_TESTIMONIES = 256
 MAX_BONDS = 64
 MAX_ORDERS = 24
 MAX_PROJECTS = 12
@@ -102,6 +103,17 @@ class CivicProject:
 
 
 @dataclass(frozen=True)
+class Testimony:
+    citizen: int
+    subject: str
+    x: int
+    y: int
+    observation_turn: int
+    value: int
+    confidence: int
+
+
+@dataclass(frozen=True)
 class CitizenIntelligence:
     world_id: str
     minds: tuple[Mind, ...]
@@ -110,6 +122,7 @@ class CitizenIntelligence:
     next_order: int = 0
     projects: tuple[CivicProject, ...] = ()
     next_project: int = 0
+    testimonies: tuple[Testimony, ...] = ()
     day: int = 0
     meetings: int = 0
     interventions: int = 0
@@ -271,6 +284,23 @@ def validate_intelligence(
             project_locations.add((project.x, project.y))
     if project_ids and max(project_ids) >= state.next_project:
         raise FoundationError("reused public construction identity")
+    if not isinstance(state.testimonies, tuple) or len(state.testimonies) > MAX_TESTIMONIES:
+        raise FoundationError("unbounded personal oral-history evidence")
+    seen_evidence = set()
+    for statement in state.testimonies:
+        if not isinstance(statement, Testimony) or statement.subject not in STOCK:
+            raise FoundationError("invalid independent NPC statement")
+        _bounded(statement.citizen, 0, len(people.inhabitants)-1, "speaker")
+        _bounded(statement.observation_turn, 0, state.day, "testimony time")
+        _bounded(statement.value, 1, 1000, "testified observed stock")
+        _bounded(statement.confidence, 70, 100, "corroboration confidence")
+        for coordinate in (statement.x, statement.y):
+            _bounded(coordinate, -(1 << 20), 1 << 20, "reported location")
+        key = (statement.citizen, statement.subject, statement.x,
+               statement.y, statement.observation_turn)
+        if key in seen_evidence:
+            raise FoundationError("duplicated testimony cannot mint game evidence")
+        seen_evidence.add(key)
     for name in ("day", "meetings", "interventions", "event_count"):
         _bounded(getattr(state, name), 0, MAX_HISTORY, name)
     _bounded(state.next_order, 0, 100000, "next contract ID")
@@ -364,6 +394,82 @@ def cancel_order(
                    for o in state.orders)
     return replace(state, orders=orders,
                    interventions=state.interventions + 1)
+
+
+def interview_citizen(
+    state: CitizenIntelligence, people: PhysicalSociety,
+    world: TerrainState, *, citizen: int, subject: str = "",
+) -> tuple[CitizenIntelligence, Testimony]:
+    """Citizen can testify only to a witnessed, recent, positive observation.
+
+    Player proximity and AP/evidence credit are enforced in the product
+    transaction. Duplicate interviews do not create unlimited evidence.
+    """
+    validate_intelligence(state, people, world)
+    _bounded(citizen, 0, len(people.inhabitants) - 1, "interviewed person")
+    if subject and subject not in STOCK:
+        raise FoundationError("interview topic must correspond to a real observed stock")
+    records = sorted(
+        (m for m in state.minds[citizen].memories
+         if m.subject in STOCK and (not subject or m.subject == subject)
+         and m.value > 0 and m.confidence >= 70
+         and m.witness == citizen and state.day - m.turn <= 8),
+        key=lambda m: (-m.confidence, -m.turn, -m.value,
+                       m.subject, m.position),
+    )
+    archived = {
+        (t.citizen, t.subject, t.x, t.y, t.observation_turn)
+        for t in state.testimonies
+    }
+    for memory in records:
+        claim = Testimony(
+            citizen, memory.subject, *memory.position,
+            memory.turn, memory.value, memory.confidence,
+        )
+        key = (claim.citizen, claim.subject, claim.x, claim.y,
+               claim.observation_turn)
+        if key not in archived:
+            if len(state.testimonies) >= MAX_TESTIMONIES:
+                raise FoundationError("public witnessed-testimony ledger is full")
+            result = replace(
+                state, testimonies=state.testimonies + (claim,),
+                interventions=state.interventions + 1,
+            )
+            validate_intelligence(result, people, world)
+            return result, claim
+    raise FoundationError("person has no fresh, previously untold first-hand evidence")
+
+
+def _teach_while_present(
+    minds: list[Mind], giver: Person, recipient: Person,
+    day: int,
+) -> bool:
+    """Trusted, co-located people transmit actual observations at lower certainty.
+
+    Each transfer preserves ORIGINAL observation time and witnessing citizen,
+    preventing rumor propagation from becoming a fake new eyewitness claim.
+    """
+    donor = minds[giver.id]
+    receiver = minds[recipient.id]
+    candidates = sorted(
+        (m for m in donor.memories if m.subject in STOCK
+         and m.value > 0 and m.confidence > 35),
+        key=lambda m: (-m.confidence, -m.turn, -m.value,
+                       m.subject, m.position),
+    )
+    for item in candidates:
+        existing = next(
+            (m for m in receiver.memories
+             if m.subject == item.subject and m.position == item.position),
+            None,
+        )
+        transmitted = max(1, item.confidence - 20)
+        if existing is not None and existing.confidence >= transmitted:
+            continue
+        minds[recipient.id] = _remember(receiver, replace(
+            item, confidence=transmitted))
+        return True
+    return False
 
 
 def commission_project(
@@ -785,6 +891,13 @@ def smart_npc_tick(
             ):
                 continue
             bonds = _bond_change(bonds, a.id, b.id, affinity=1, trust=1)
+            trusted = next(
+                (edge.trust for edge in bonds.bonds
+                 if edge.left == min(a.id, b.id)
+                 and edge.right == max(a.id, b.id)), 0)
+            if trusted >= 2:
+                _teach_while_present(updated_minds, a, b, thinking.day + 1)
+                _teach_while_present(updated_minds, b, a, thinking.day + 1)
             for friend, witness in ((a, b), (b, a)):
                 remembered = updated_minds[friend.id]
                 updated_minds[friend.id] = _remember(
@@ -855,9 +968,11 @@ def cognition_restore(data: dict, people: PhysicalSociety,
         projects = tuple(CivicProject(
             **{**p, "contributors": tuple(p["contributors"])}
         ) for p in raw["projects"])
+        testimonies = tuple(Testimony(**statement) for statement in raw["testimonies"])
         state = CitizenIntelligence(
             **{**raw, "minds": minds, "bonds": relationships,
-               "orders": orders, "projects": projects}
+               "orders": orders, "projects": projects,
+               "testimonies": testimonies}
         )
         validate_intelligence(state, people, world)
         return state
@@ -875,6 +990,11 @@ def cognition_report(state: CitizenIntelligence, people: PhysicalSociety,
         "verified_world_observations": sum(len(m.memories) for m in state.minds),
         "contracts": [asdict(o) for o in state.orders],
         "civic_projects": [asdict(p) for p in state.projects],
+        "first_hand_testimonies": [asdict(t) for t in state.testimonies],
+        "socially_learned_material_observations": sum(
+            m.subject in STOCK and m.witness != mind.person_id
+            for mind in state.minds for m in mind.memories
+        ),
         "completed_constructed_projects": sum(p.status == "completed"
                                               for p in state.projects),
         "active_goals": {m.person_id: m.goal for m in state.minds},
