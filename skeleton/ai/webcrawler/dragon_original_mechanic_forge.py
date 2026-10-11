@@ -27,6 +27,7 @@ MECHANIC_LEVELS=4
 MECHANIC_COUNT=32
 PROGRAM_COUNT=MECHANIC_LEVELS**MECHANIC_COUNT
 MILLION_DISTINCT_ENABLE_PROFILES=2**24
+FULL_BINARY_PROFILE_COUNT=2**MECHANIC_COUNT
 DIRECTED_MECHANIC_FUSIONS=MECHANIC_COUNT**2
 MAX_ACTIONS=128
 MAX_STATE=1_000_000
@@ -492,12 +493,27 @@ def binary_nucleus(number:int)->OriginalProgram:
     return program_from_levels(levels)
 
 
+def full_binary_nucleus(number:int)->OriginalProgram:
+    """Full set of 4,294,967,296 uniquely enabled 32-mechanic programs.
+
+    Legacy binary_nucleus indexes the original 24-bit tier; this expanded
+    mode activates all 32 categories including story ending, ecology,
+    postgame, survival, world eras and high-level environment systems.
+    """
+    if type(number) is not int or not 0<=number<FULL_BINARY_PROFILE_COUNT:
+        raise ValueError("32-bit original game nucleus outside complete range")
+    levels=tuple((number>>(MECHANIC_COUNT-1-i))&1
+                 for i in range(MECHANIC_COUNT))
+    return program_from_levels(levels)
+
+
 def capabilities()->dict:
     return {
         "schema":SCHEMA,"actual_mechanic_verbs":MECHANIC_COUNT,
         "levels_per_mechanic":MECHANIC_LEVELS,
         "exact_original_rule_program_address_count":str(PROGRAM_COUNT),
         "mechanically_separable_binary_nuclei":MILLION_DISTINCT_ENABLE_PROFILES,
+        "full_original_32_mechanic_binary_nuclei":FULL_BINARY_PROFILE_COUNT,
         "semantics":"each level changes executable action availability, actual "
                     "resource cost/reward, world mutation and replay hash",
         "parent_environment":"optionally uses verified 128-axis World Codex",
