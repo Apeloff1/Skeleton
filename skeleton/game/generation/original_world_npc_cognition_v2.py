@@ -28,6 +28,7 @@ from .original_world_product_agents import (
 VERSION = "original-npc-cognition.v2"
 GOALS = frozenset(("work", "eat", "recover", "deliver", "scout", "care",
                    "socialize", "construct", "guard", "investigate"))
+GOAL_ORDER = tuple(sorted(GOALS))
 STOCK = ("food", "wood", "stone", "water")
 WAREHOUSE = {"food": "provisions", "wood": "lumber",
              "stone": "masonry", "water": "freshwater"}
@@ -66,6 +67,7 @@ class Mind:
     morale: int = 10
     stress: int = 0
     loneliness: int = 0
+    learned: tuple[int, ...] = (0,) * 10
     memories: tuple[Memory, ...] = ()
     decisions: int = 0
 
@@ -196,6 +198,11 @@ def validate_intelligence(
             ("decisions", 0, MAX_HISTORY),
         ):
             _bounded(getattr(mind, name), low, high, name)
+        if (not isinstance(mind.learned, tuple)
+                or len(mind.learned) != len(GOAL_ORDER)):
+            raise FoundationError("individual learned utility policy is malformed")
+        for preference in mind.learned:
+            _bounded(preference, -12, 12, "learned behavioral policy")
         if not isinstance(mind.memories, tuple) or len(mind.memories) > MAX_MEMORY:
             raise FoundationError("unbounded individual NPC autobiographical memory")
         for memory in mind.memories:
@@ -556,6 +563,10 @@ def _plan(person: Person, mind: Mind, state: CitizenIntelligence,
         "guard": 4 + mind.prudence * 2,
         "investigate": 2 + mind.curiosity * 2,
     }
+    # Deterministic lightweight reinforcement, earned only after measurable
+    # prior outcomes. No external provider weights and no subjective labels.
+    for index, key in enumerate(GOAL_ORDER):
+        scores[key] += mind.learned[index]
     if person.hunger >= 7:
         scores["eat"] += 60
     if person.energy <= 2:
@@ -850,6 +861,32 @@ def smart_npc_tick(
                 thinking.day + 1, kind, (p.x, p.y),
                 _resource(observed, kind), 100, p.id,
             ))
+        delivered_or_helped = {
+            "gather", "deliver", "healed-named-patient",
+            "verified-distinct-citizen-construction-labor",
+            "cooperatively-completed-funded-civic-project",
+            "build-real-hearth", "spend-real-time-in-conversation",
+            "eat-supplied-food", "follow-individual-resource-memory",
+            "move-to-observed-stock", "inspect-real-local-geography",
+        }
+        failed_experiments = {
+            "no-reachable-visible-or-remembered-material",
+            "public-worksite-route-inaccessible",
+            "construction-blocked-by-materials",
+            "cannot-reach-food", "patient-inaccessible",
+            "social-route-blocked", "depot-stock-full",
+        }
+        # Pay feedback only for an actual embodied result; idle thought
+        # cycles cannot be misinterpreted as model-training success.
+        reinforcement = (
+            2 if operation in delivered_or_helped
+            else -2 if operation in failed_experiments else 0
+        )
+        policy = list(memory.learned)
+        policy_index = GOAL_ORDER.index(goal)
+        policy[policy_index] = max(
+            -12, min(12, policy[policy_index] + reinforcement))
+        memory = replace(memory, learned=tuple(policy))
         if goal == mind.goal:
             age = min(MAX_HISTORY, mind.goal_age + 1)
         else:
@@ -1004,6 +1041,9 @@ def cognition_report(state: CitizenIntelligence, people: PhysicalSociety,
                 "hunger": people.inhabitants[m.person_id].hunger,
                 "morale": m.morale, "stress": m.stress,
                 "loneliness": m.loneliness, "active_goal": m.goal,
+                "earned_behavior_preferences": {
+                    label: m.learned[i] for i, label in enumerate(GOAL_ORDER)
+                },
             } for m in state.minds
         },
         "report_not_an_llm": True,
