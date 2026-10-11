@@ -62,6 +62,17 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
           python -m py_compile  skeleton/ai/game_builder/advanced_gameplay_runtime.py skeleton/ai/game_builder/advanced_genre_engines.py skeleton/ai/game_builder/advanced_puzzle_solver.py skeleton/ai/game_builder/advanced_level_scenes.py skeleton/ai/game_builder/advanced_gameplay_save.py skeleton/ai/game_builder/system_editors.py skeleton/ai/game_builder/system_editor_assembly.py skeleton/ai/game_builder/system_editor_cli.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_workspace_ui.py tests/test_game_builder_advanced_runtime.py tests/test_game_builder_advanced_scenes.py tests/test_game_builder_advanced_genres.py tests/test_game_builder_system_editors.py
-      - name: Execute advanced-floor authoring, three engines and replay attacks
+      - name: Parse original-game visual authoring JavaScript
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from skeleton.ai.game_builder.game_workspace_ui import SCRIPT
+          target=Path(os.environ["RUNNER_TEMP"])/"original_game_studio_check.js"
+          target.write_text(SCRIPT.replace("__TOKEN__",'"validated-ci-token"'),encoding="utf-8")
+          PY
+          node --check "$RUNNER_TEMP/original_game_studio_check.js"
+      - name: Execute advanced-floor authoring, eight engines and replay attacks
         shell: bash
         run: python -m unittest tests.test_game_builder_advanced_runtime tests.test_game_builder_advanced_scenes tests.test_game_builder_advanced_genres tests.test_game_builder_system_editors -v
