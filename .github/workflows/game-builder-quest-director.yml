@@ -48,6 +48,7 @@ jobs:
             tests/test_game_builder_quest_scene_export.py
             tests/test_game_builder_quest_director_studio.py
             tests/test_game_builder_quest_encounters.py
+            tests/test_game_builder_quest_scene_endings.py
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
@@ -60,4 +61,4 @@ jobs:
       - name: Execute actual nonlinear quests, cutscenes and consumer source
         shell: bash
         run: |
-          python -m unittest tests.test_game_builder_quest_scene_engine tests.test_game_builder_quest_scene_export tests.test_game_builder_quest_director_studio tests.test_game_builder_quest_encounters -v
+          python -m unittest tests.test_game_builder_quest_scene_engine tests.test_game_builder_quest_scene_export tests.test_game_builder_quest_director_studio tests.test_game_builder_quest_encounters tests.test_game_builder_quest_scene_endings -v
