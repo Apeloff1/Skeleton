@@ -310,7 +310,7 @@ def step_product(
             new = replace(new, terrain=terrain, society=society,
                           cognition=cognition)
             deliveries = sum(rec.quantity for rec in residents if rec.operation == "deliver")
-            info += (f"Cognitive citizens: {len(residents)} decisions, "
+            info += (f"Autonomous citizens: {len(residents)} cognitive decisions, "
                      f"{deliveries} physically delivered resources; "
                      f"{len(cognition.bonds)} tracked social relationships",)
     event_hash = _hash({
