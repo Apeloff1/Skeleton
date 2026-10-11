@@ -165,8 +165,8 @@ class DeepEnemyCases(CompetitorRadarCases):
 
     def test_deep_gameplay_graphics_sound_storyline_are_all_explicitly_scripted(self):
         scripts=self.scripts()
-        self.assertEqual(len(scripts),51)
-        self.assertEqual(len({x.digest for x in scripts}),51)
+        self.assertEqual(len(scripts),102)
+        self.assertEqual(len({x.digest for x in scripts}),102)
         self.assertEqual({x.axis for x in scripts},set(FACETS))
         self.assertTrue(all(len(s.steps)>=8 and s.adverse_controls for s in scripts))
         self.assertTrue(all(s.measurement_is_verified is False for s in scripts))
@@ -209,7 +209,7 @@ class DeepEnemyCases(CompetitorRadarCases):
         self.assertEqual(known.status,"verified_weakspot")
         self.assertEqual(known.rival_conservative_upper_bp,6200)
         self.assertEqual(known.gap_to_outperform_bp,1350)
-        self.assertEqual(sum(v.status=="insufficient_evidence" for v in verdicts),50)
+        self.assertEqual(sum(v.status=="insufficient_evidence" for v in verdicts),101)
         missing=score_deep_scripts(
             scripts,self.threat.rival_id,self.original.title_id,
             measured,self.judges,as_of=T0,authorized=True)
@@ -253,7 +253,7 @@ class DeepEnemyCases(CompetitorRadarCases):
             self.original,self.threat,self.chain(),scripts,verdicts,
             authorized=True)
         self.assertEqual(len(tasks),len(scripts))
-        self.assertEqual(len({x.facet for x in tasks}),51)
+        self.assertEqual(len({x.facet for x in tasks}),102)
         self.assertEqual(sum(not t.needs_new_evidence for t in tasks),1)
         focus=next(t for t in tasks if t.facet=="npc_agency")
         self.assertEqual(focus.target_lower_bp,6350)
@@ -344,7 +344,7 @@ class DeepEnemyCases(CompetitorRadarCases):
         self.assertTrue(next(x for x in greater.studies
                              if x.facet=="npc_agency").proved_outclassing)
         self.assertFalse(greater.complete_ancestry_outclassed)
-        self.assertEqual(len(greater.studies),51)
+        self.assertEqual(len(greater.studies),102)
 
     def test_missing_ancestor_or_forged_ancestry_score_cannot_be_winning(self):
         scripts,verdicts,_,_=self.scoring()
@@ -386,8 +386,8 @@ class DeepEnemyCases(CompetitorRadarCases):
             self.assertEqual(dossier.pending_analyzes,())
             self.assertEqual(len(dossier.enemy_dossiers),1)
             first=dossier.enemy_dossiers[0]
-            self.assertEqual(len(first.analysis_scripts),51)
-            self.assertEqual(len(first.counterproposals),51)
+            self.assertEqual(len(first.analysis_scripts),102)
+            self.assertEqual(len(first.counterproposals),102)
             self.assertEqual(first.evolution.verified_generations,3)
             self.assertEqual(
                 next(v.status for v in first.facet_verdicts if v.facet=="npc_agency"),
