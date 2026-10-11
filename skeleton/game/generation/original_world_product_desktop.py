@@ -93,8 +93,12 @@ def launch_desktop(state: ProductSession, *, save_path: str | None = None) -> No
         if current.population is not None:
             for sprite in ambient_impressions(
                 current.population, landscape, radius=VIEW_RADIUS,
-                max_visible=min(24, tuning(
-                    current.population.era, current.population.fidelity)[1]),
+                max_visible=min(
+                    24, tuning(
+                        current.population.era, current.population.fidelity)[1],
+                    current.population.profile.visual_proxy_limit
+                    if current.population.profile else 64,
+                ),
             ):
                 dx, dy = sprite["x"]-px, sprite["y"]-py
                 x0 = (dx + VIEW_RADIUS)*TILE_SIZE
