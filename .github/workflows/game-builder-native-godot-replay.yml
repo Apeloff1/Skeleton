@@ -237,3 +237,20 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Real Windows consumer executable diverged from Python proof" }
           Get-FileHash $binary -Algorithm SHA256 | Format-List
           Get-FileHash $wrapper.FullName -Algorithm SHA256 | Format-List
+          $hashes = @($binary, $wrapper.FullName) | ForEach-Object {
+            $item = $_
+            $hash = (Get-FileHash -LiteralPath $item -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $(Split-Path -Leaf $item)"
+          }
+          [IO.File]::WriteAllLines((Join-Path $root 'SHA256SUMS'), [string[]]$hashes)
+      - name: Upload Windows-executed original game and companion source
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: original-windows-native-homebrew-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/original-studio/original-homebrew.exe
+            ${{ runner.temp }}/original-studio/original-homebrew.console.exe
+            ${{ runner.temp }}/original-studio/SHA256SUMS
+            ${{ runner.temp }}/original-studio/project/
+          retention-days: 7
+          if-no-files-found: error
