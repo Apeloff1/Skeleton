@@ -56,6 +56,8 @@ def parser():
             p.add_argument("--per-project-cap",type=int,default=256)
             p.add_argument("--minimum-balanced-accuracy",type=float,default=0.94)
             p.add_argument("--minimum-evidence-per-class",type=int,default=8)
+            p.add_argument("--minimum-counterfactual-accuracy",type=float,default=0.98,
+                           help="Strict default: prevent metadata-shortcut reviewer promotion; override only in an explicitly limited lab")
         elif name=="approve":
             p.add_argument("--reviewers-file",required=True)
         elif name in {"usage","idle-pass"}:
@@ -96,7 +98,8 @@ def main(argv=None):
                 plan,epochs=args.epochs,authorized=True)
             standard=PromotionStandard(
                 min_balanced_accuracy=args.minimum_balanced_accuracy,
-                min_per_class=args.minimum_evidence_per_class)
+                min_per_class=args.minimum_evidence_per_class,
+                min_counterfactual_accuracy=args.minimum_counterfactual_accuracy)
             active=registry.read_state()["active"]
             champion=(registry._candidate(active)["policy"]
                       if active is not None else None)
