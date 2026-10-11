@@ -391,6 +391,11 @@ def evaluate_fresh_cohort(rows: tuple[TrainingCandidate,...],policy: dict,*,
         raise PromotionError("live feedback is not independent of training/heldout worlds")
     if len({x.example_id for x in rows})!=len(rows):
         raise PromotionError("duplicate observed source examples")
+    replay_sources={canonical_digest({
+        "project":x.project_digest,"input":x.input,"expected":x.expected,
+    }) for x in rows}
+    if len(replay_sources)!=len(rows):
+        raise PromotionError("duplicate gameplay evidence cannot inflate independent results")
     if len({x.project_digest for x in rows})<2:
         raise PromotionError("real deployment verification requires two fresh games")
     quality=_metric(rows,policy)
