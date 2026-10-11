@@ -18,6 +18,7 @@ from skeleton.ai.game_builder.game_wisdom_report_archive import (
     publish_secondary_wisdom_report,verify_secondary_wisdom_report,
 )
 from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
+from skeleton.ai.game_builder.game_model_cli import parser as game_model_parser
 from skeleton.ai.game_builder.game_second_train_replay_custody import (
     OriginalReplayTrainingAttestation,sign_train_replay,
     qualify_second_original_game_replays,
@@ -153,6 +154,15 @@ class SecondaryWisdomIntegrationTests(ActualPeerWisdomTests):
             second_original_games=second_games,
             replay_attestations=replay_receipts,replay_reviewers=replay_keys,
             authorized=True,standard=self.standard,schedule=self.schedule)
+
+    def test_operational_local_model_audit_is_not_an_install_command(self):
+        args=game_model_parser().parse_args([
+            "optimize-audit","--root","studio",
+            "--trusted-local-operator","--learning-rates","0.12",
+            "--epoch-candidates","10"])
+        self.assertEqual(args.action,"optimize-audit")
+        self.assertEqual(args.learning_rates,[0.12])
+        self.assertEqual(args.epoch_candidates,[10])
 
     def test_actual_sgd_post_weight_report_and_source_safe_dragon_repeat(self):
         result=self.post
