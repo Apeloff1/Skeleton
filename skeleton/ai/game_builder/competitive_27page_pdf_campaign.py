@@ -309,10 +309,12 @@ def publish_27page_campaign(
     manifest_bytes=(canonical_json(manifest)+"\n").encode()
     digest=sha256(manifest_bytes).hexdigest()
     workspace=GameWorkspace(root)
-    parent=workspace.root/"competitive_intelligence"/"battle_pdf_27"
+    research_dir=workspace.root/"competitive_intelligence"
+    parent=research_dir/"battle_pdf_27"
     folder=parent/digest
-    if parent.is_symlink() or folder.is_symlink():
+    if research_dir.is_symlink() or parent.is_symlink() or folder.is_symlink():
         raise ThreatRadarError("symlinked archive not allowed")
+    research_dir.mkdir(exist_ok=True)
     parent.mkdir(exist_ok=True)
     folder.mkdir(exist_ok=True)
     archive=BytesIO()
