@@ -14,6 +14,11 @@ from typing import Sequence, Mapping
 
 from .contracts import canonical_digest
 from .tiled_map_import import TiledConversion, import_tiled_levels
+from .living_story_runtime import (
+    StoryIntent, StoryWorld, StoryReplay, original_story_world, demonstrate_story,
+)
+from .living_story_export import StoryPackage, render_story_package
+from .living_story_mirror import StoryMirrorReport, review_living_story
 from .companion_curriculum import (
     PracticeInsight, measure_original_practice, validate_practice_cohort,
 )
@@ -39,6 +44,7 @@ class ExecutionPlaneError(ValueError):
 EXECUTABLE_TOOLS = frozenset({
     "world.generate", "world.authored", "world.tiled", "game.simulate", "game.browser",
     "game.godot", "game.editor", "mirror.fuzz", "release.assess",
+    "story.generate", "story.simulate", "story.native", "story.mirror",
     "package.source", "companion.practice",
 })
 MAX_EXECUTION_STEPS = 32
@@ -88,6 +94,10 @@ class ExecutionOutcome:
     practice_insights: tuple[PracticeInsight, ...]
     practice_mirror_reports: tuple[MirrorReport, ...]
     tiled_conversion: TiledConversion | None
+    story_world: StoryWorld | None
+    story_replay: StoryReplay | None
+    story_package: StoryPackage | None
+    story_mirror: StoryMirrorReport | None
     exported_path: Path | None
 
     @property
@@ -114,6 +124,10 @@ class ExecutionOutcome:
             "tiled_import_digest": (
                 self.tiled_conversion.digest if self.tiled_conversion else None
             ),
+            "living_story_world_digest": self.story_world.digest if self.story_world else None,
+            "living_story_proof_digest": self.story_replay.digest if self.story_replay else None,
+            "living_story_package_digest": self.story_package.digest if self.story_package else None,
+            "living_story_mirror_digest": self.story_mirror.digest if self.story_mirror else None,
             "exported": self.exported_path is not None,
             "external_code_executed": False,
             "trained_model": False,
@@ -134,6 +148,8 @@ def execute_local_tool_plan(
     destination: Path | None = None,
     mirror_attempts: int = 128,
     companion_games: int = 2,
+    story_intent: StoryIntent | None = None,
+    story_ending: str = "stewardship",
 ) -> ExecutionOutcome:
     """Execute authorized plan in order, not arbitrary agent-supplied Python.
 
@@ -150,6 +166,10 @@ def execute_local_tool_plan(
         raise ExecutionPlaneError("mirror-room execution budget must be 64 to 512")
     if type(companion_games) is not int or not 0 <= companion_games <= 8:
         raise ExecutionPlaneError("companion batch must be bounded to 0 to 8 playable games")
+    if story_intent is not None and not isinstance(story_intent, StoryIntent):
+        raise ExecutionPlaneError("typed original narrative intent required")
+    if story_ending not in {"stewardship", "discovery", "independence"}:
+        raise ExecutionPlaneError("narrative ending must be an original supported path")
     if fabric is None:
         fabric = ToolFabric()
     if not isinstance(fabric, ToolFabric):
@@ -196,12 +216,24 @@ def execute_local_tool_plan(
             "release.assess": ("mirror.fuzz",),
             "package.source": ("mirror.fuzz",),
             "companion.practice": (),
+            "story.generate": (),
+            "story.simulate": ("story.generate",),
+            "story.native": ("story.simulate",),
+            "story.mirror": ("story.native",),
         }[name]
         if deps and not any(dep in seen for dep in deps):
             raise ExecutionPlaneError(f"{name} lacks prior prerequisite {deps}")
         if name.startswith("world.") and any(x.startswith("world.") for x in seen):
             raise ExecutionPlaneError("one original world source per execution")
         seen.add(name)
+    story_tools = tuple(x for x in ids if x.startswith("story."))
+    if story_tools:
+        if story_intent is None or story_tools != (
+            "story.generate", "story.simulate", "story.native", "story.mirror",
+        ):
+            raise ExecutionPlaneError("story execution requires all four ordered capabilities and intent")
+    elif story_intent is not None:
+        raise ExecutionPlaneError("unplanned living-world engine work is not authorized")
     writes = any(row.tool_id == "package.source" for row in plan.requests)
     if writes and (not plan.write_authorized or not isinstance(destination, Path)):
         raise ExecutionPlaneError("package export requires explicit write grant and destination")
@@ -227,6 +259,10 @@ def execute_local_tool_plan(
     practice_mirrors: list[MirrorReport] = []
     exported: Path | None = None
     tiled_conversion: TiledConversion | None = None
+    narrative: StoryWorld | None = None
+    narrative_proof: StoryReplay | None = None
+    narrative_package: StoryPackage | None = None
+    narrative_mirror: StoryMirrorReport | None = None
     receipts: list[ExecutedToolReceipt] = []
     consumed = set()
     for index, row in enumerate(plan.requests):
@@ -241,7 +277,34 @@ def execute_local_tool_plan(
             raise ExecutionPlaneError("tool disappeared before execution")
         before = (package.manifest["manifest_digest"] if package else
                   project.proof.digest if project else world.digest if world else anchored)
-        if row.tool_id == "world.generate":
+        if row.tool_id == "story.generate":
+            narrative = original_story_world(story_intent, authorized=True)
+            artifact_digest = narrative.digest
+        elif row.tool_id == "story.simulate":
+            if narrative is None:
+                raise ExecutionPlaneError("story simulation needs an original narrative world")
+            narrative_proof = demonstrate_story(
+                narrative, authorized=True, ending=story_ending,
+            )
+            artifact_digest = narrative_proof.digest
+        elif row.tool_id == "story.native":
+            if narrative is None or narrative_proof is None:
+                raise ExecutionPlaneError("story export requires real winning choices")
+            narrative_package = render_story_package(
+                narrative, narrative_proof, authorized=True,
+            )
+            artifact_digest = narrative_package.digest
+        elif row.tool_id == "story.mirror":
+            if narrative is None or narrative_proof is None or narrative_package is None:
+                raise ExecutionPlaneError("story mirror requires compiled source and actual proof")
+            narrative_mirror = review_living_story(
+                narrative, narrative_proof, narrative_package,
+                authorized=True, attempts=128,
+            )
+            if not narrative_mirror.passed:
+                raise ExecutionPlaneError("narrative mirror room refused the original game")
+            artifact_digest = narrative_mirror.digest
+        elif row.tool_id == "world.generate":
             if world is not None or project is not None:
                 raise ExecutionPlaneError("original world already exists")
             world = generate_playable_world(intent, authorized=True)
@@ -365,7 +428,9 @@ def execute_local_tool_plan(
     return ExecutionOutcome(
         anchored, plan.digest, tuple(receipts), world, project,
         package, mirror, tuple(practice), tuple(practice_insights),
-        tuple(practice_mirrors), tiled_conversion, exported,
+        tuple(practice_mirrors), tiled_conversion,
+        narrative, narrative_proof, narrative_package, narrative_mirror,
+        exported,
     )
 
 
