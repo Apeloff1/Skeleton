@@ -11,6 +11,7 @@ on:
       - "tests/test_original_foundation*.py"
       - "docs/ORIGINAL_WORLD_MECHANIC_ATLAS.md"
       - "docs/ORIGINAL_WORLD_FOUNDATIONS_10K.md"
+      - "docs/ORIGINAL_WORLD_MILLION_FORGE.md"
       - ".github/workflows/original-world-atlas.yml"
   push:
     branches: [main]
@@ -21,6 +22,7 @@ on:
       - "tests/test_original_foundation*.py"
       - "docs/ORIGINAL_WORLD_MECHANIC_ATLAS.md"
       - "docs/ORIGINAL_WORLD_FOUNDATIONS_10K.md"
+      - "docs/ORIGINAL_WORLD_MILLION_FORGE.md"
       - ".github/workflows/original-world-atlas.yml"
   workflow_dispatch:
 
