@@ -164,6 +164,18 @@ class ExecutableStudioTests(unittest.TestCase):
         self.assertTrue(all(p.winning_steps > 0 for p in run.practice))
         self.assertEqual(len(set(p.world_digest for p in run.practice)), 2)
         self.assertGreater(sum(p.capability_xp for p in run.practice), 0)
+        for practice_game in run.practice:
+            prefix = practice_game.package_path
+            self.assertIn(prefix + "/index.html", run.package.files)
+            self.assertIn(prefix + "/godot/scripts/main.gd", run.package.files)
+            self.assertIn(prefix + "/godot/proof.json", run.package.files)
+            self.assertIn(prefix + "/tile-editor.html", run.package.files)
+            nested = json.loads(run.package.files[prefix + "/release.json"])
+            self.assertEqual(nested["manifest_digest"], practice_game.package_manifest_digest)
+            self.assertEqual(nested["world_digest"], practice_game.world_digest)
+            self.assertEqual(nested["proof_digest"], practice_game.proof_digest)
+            for name, digest in nested["files"].items():
+                self.assertEqual(sha256(run.package.files[prefix + "/" + name]).hexdigest(), digest)
         self.assertNotEqual(run.practice[0].world_digest, run.project.world.digest)
         self.assertIn("release-blocked", run.consumer.to_payload()["status"])
         self.assertIn("platform_hardware_tested", run.consumer.blockers)
