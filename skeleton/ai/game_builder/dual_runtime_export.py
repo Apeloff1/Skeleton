@@ -456,6 +456,55 @@ window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 """
 
+_EXPORT_PRESETS = """[preset.0]
+
+name="Linux"
+platform="Linux"
+runnable=true
+dedicated_server=false
+custom_features=""
+export_filter="all_resources"
+include_filter="*.json"
+exclude_filter=""
+export_path=""
+patches=PackedStringArray()
+encrypt_pck=false
+encrypt_directory=false
+
+[preset.0.options]
+
+custom_template/debug=""
+custom_template/release=""
+binary_format/architecture="x86_64"
+binary_format/embed_pck=true
+debug/export_console_wrapper=0
+
+[preset.1]
+
+name="Windows Desktop"
+platform="Windows Desktop"
+runnable=true
+dedicated_server=false
+custom_features=""
+export_filter="all_resources"
+include_filter="*.json"
+exclude_filter=""
+export_path=""
+patches=PackedStringArray()
+encrypt_pck=false
+encrypt_directory=false
+
+[preset.1.options]
+
+custom_template/debug=""
+custom_template/release=""
+binary_format/architecture="x86_64"
+binary_format/embed_pck=true
+debug/export_console_wrapper=0
+codesign/enable=false
+"""
+
+
 _SCENE = """[gd_scene load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1"]
@@ -483,6 +532,13 @@ route preview, import/export bounded original authored-world JSON. Rebuild
 with dual_runtime_cli --authored-world and --human-reviewed to run the
 canonical Python solver before distributing a modified game.
 Godot: open godot/project.godot in Godot 4.2+ and press F6/F5 to run.
+With Godot 4 export templates installed you can produce standalone desktop
+binaries from the same project using the bundled open-source export presets:
+  godot --headless --path godot --import
+  godot --headless --path godot --export-release Linux game.x86_64
+  godot --headless --path godot --export-release "Windows Desktop" game.exe
+The Windows build requires separate Windows execution/hardware validation.
+Local export builds are not an automatic right to publish to commercial stores.
 
 Godot controls: arrows/WASD/gamepad D-pad/touch swipe movement, Z or gamepad B undo (256 moves), R or Start restart,
 F5 local save, F9 local load. Local save stores actions rather than
@@ -562,6 +618,7 @@ def render_dual_runtime_package(
         "index.html": project.playable.html.encode("utf-8"),
         "tile-editor.html": editor.content,
         "godot/project.godot": _PROJECT.encode("utf-8"),
+        "godot/export_presets.cfg": _EXPORT_PRESETS.encode("utf-8"),
         "godot/scenes/main.tscn": _SCENE.encode("utf-8"),
         "godot/scripts/main.gd": _GODOT_SCRIPT.encode("utf-8"),
         "godot/world.json": _json_bytes(native_world),
