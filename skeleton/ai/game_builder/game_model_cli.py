@@ -18,6 +18,7 @@ from .game_project_workspace import GameWorkspace
 from .game_training_flow import (
     TrainingFlowError,load_quarantined_batches,plan_training_flow,
     train_isolated_review_ranker,materialize_training_flow,
+from .game_reviewer_v2 import train_robust_game_reviewer
 )
 from .game_model_promotion import (
     PromotionError,PromotionStandard,evaluate_candidate,
@@ -53,6 +54,9 @@ def parser():
             p.add_argument("--trusted-local-operator",action="store_true")
         if name in {"evaluate","stage"}:
             p.add_argument("--epochs",type=int,default=75)
+            p.add_argument("--feature-version",
+                           choices=("robust_v2","baseline_v1"),default="robust_v2",
+                           help="V2 normalized, adversarially augmented model by default")
             p.add_argument("--per-project-cap",type=int,default=256)
             p.add_argument("--minimum-balanced-accuracy",type=float,default=0.94)
             p.add_argument("--minimum-evidence-per-class",type=int,default=8)
@@ -94,8 +98,11 @@ def main(argv=None):
             batches=load_quarantined_batches(studio.root,authorized=True)
             plan=plan_training_flow(
                 batches,per_project_cap=args.per_project_cap,authorized=True)
-            fit=train_isolated_review_ranker(
+            fit=(train_robust_game_reviewer(
                 plan,epochs=args.epochs,authorized=True)
+                if args.feature_version=="robust_v2" else
+                train_isolated_review_ranker(
+                    plan,epochs=args.epochs,authorized=True))
             standard=PromotionStandard(
                 min_balanced_accuracy=args.minimum_balanced_accuracy,
                 min_per_class=args.minimum_evidence_per_class,
