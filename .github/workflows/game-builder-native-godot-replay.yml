@@ -12,6 +12,7 @@ on:
       - "tests/test_game_builder_studio_research.py"
       - "tests/test_game_builder_consumer_release_assurance.py"
       - "tests/test_game_builder_studio_execution.py"
+      - "tests/test_game_builder_companion_curriculum.py"
       - ".github/workflows/game-builder-native-godot-replay.yml"
   push:
     branches: [main]
@@ -23,6 +24,7 @@ on:
       - "tests/test_game_builder_studio_research.py"
       - "tests/test_game_builder_consumer_release_assurance.py"
       - "tests/test_game_builder_studio_execution.py"
+      - "tests/test_game_builder_companion_curriculum.py"
       - ".github/workflows/game-builder-native-godot-replay.yml"
   workflow_dispatch:
 
@@ -81,10 +83,12 @@ jobs:
           tests/test_game_builder_consumer_release_assurance.py
           skeleton/ai/game_builder/studio_execution_plane.py
           tests/test_game_builder_studio_execution.py
+          skeleton/ai/game_builder/companion_curriculum.py
+          tests/test_game_builder_companion_curriculum.py
       - name: Run actual Godot native winning replays
         run: |
           set -euo pipefail
-          python -m unittest             tests.test_game_builder_dual_runtime             tests.test_game_builder_authored_tiles             tests.test_game_builder_tile_editor             tests.test_game_builder_studio_pipeline             tests.test_game_builder_studio_research             tests.test_game_builder_consumer_release_assurance             tests.test_game_builder_studio_execution -v
+          python -m unittest             tests.test_game_builder_dual_runtime             tests.test_game_builder_authored_tiles             tests.test_game_builder_tile_editor             tests.test_game_builder_studio_pipeline             tests.test_game_builder_studio_research             tests.test_game_builder_consumer_release_assurance             tests.test_game_builder_studio_execution             tests.test_game_builder_companion_curriculum -v
       - name: Create reproducible native desktop release fixture
         run: |
           set -euo pipefail
@@ -161,6 +165,7 @@ jobs:
             tests/test_game_builder_studio_pipeline.py
             tests/test_game_builder_consumer_release_assurance.py
             tests/test_game_builder_studio_execution.py
+            tests/test_game_builder_companion_curriculum.py
             tests/test_game_builder_dual_runtime.py
             tests/test_game_builder_authored_tiles.py
       - name: Set up Python
@@ -185,7 +190,7 @@ jobs:
       - name: Exercise Python, authored and mirror studio contracts on Windows
         shell: pwsh
         run: |
-          python -m unittest tests.test_game_builder_studio_pipeline tests.test_game_builder_consumer_release_assurance tests.test_game_builder_dual_runtime tests.test_game_builder_authored_tiles tests.test_game_builder_studio_execution -v
+          python -m unittest tests.test_game_builder_studio_pipeline tests.test_game_builder_consumer_release_assurance tests.test_game_builder_dual_runtime tests.test_game_builder_authored_tiles tests.test_game_builder_studio_execution tests.test_game_builder_companion_curriculum -v
           if ($LASTEXITCODE -ne 0) { throw "Windows game studio tests failed" }
       - name: Build original consumer source on Windows
         shell: pwsh
