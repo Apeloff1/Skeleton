@@ -1,0 +1,110 @@
+# Original Game Studio — System Editor Fabric
+
+## What this PR actually builds
+
+This release extends the local supervised editor in
+`skeleton.ai.game_builder.game_workspace_ui` with **43 domain-specific original
+game system editors** spanning 215 typed design controls. It is a real
+configuration editor, not 43 new retail-ready engines. Existing proven maze
+and living RPG/NPC work remains owned by the legacy runtimes; this extension
+adds a broader authoring surface without pretending those runtimes have been
+replaced.
+
+The local design UI opens with **Platformer Physics**, and a grouped selector
+allows designers to switch to any family. Each selected editor provides its
+own bounded settings (no arbitrary source execution), validation, deterministic
+configuration identity and one-click staging into the **existing exact-file
+proposal/diff/human-commit pipeline**. Prior and demo trees remain immutable.
+
+## 43 authoring families
+
+| Category | Editors |
+| --- | --- |
+| World | maze, rpg, metroidvania, procedural_world, voxel, puzzle, roguelike, sandbox, quest_director, npc_society |
+| Action | platformer, shooter, fighting, stealth, physics, parkour |
+| Strategy | tactics, rts, tower_defense, city_builder, colony, factory, farming |
+| Vehicle | racing, flight, sailing |
+| Simulation | survival, ecosystem, economy, sports |
+| Creative | rhythm, deck_battler, narrative, dialogue, cinematics, audio, animation |
+| Product | ui_hud, accessibility, localization, networking, save_system, platform_profile |
+
+A designer can create a genuine project and stage **systems/platformer.json**,
+**systems/racing.json**, **systems/tactics.json**, etc., then inspect the exact
+change and approve it. Every file has schema `skeleton.game_builder.system_editor.v1`
+and a canonical settings digest. The source workspace validates those semantics
+again at proposal and commit, rejecting unknown keys, invalid numbers, wrong
+field types, unsupported enum choices, settings outside budgets, stale hashes,
+document tampering, cross-system filename confusion and unauthorized commits.
+
+## Executable mechanics previews (eight, not 43)
+
+`preview_editor(...)` runs deterministic, finite Python reference slices,
+with every action included in the evidence digest:
+
+- Platformer — lateral movement, gravity integration, jumping, floor landing,
+  edge clamping and an optional double jump.
+- Circuit racing — bounded acceleration, braking/coasting, fixed-step distance,
+  lap counting and finish state.
+- Tactics — board movement, action points, attack-range checks, damage, turns.
+- Tower defense — tower purchasing, enemy waves, range-limited tower damage,
+  kills, leaks and credits.
+- Shooter — ammo, reload, attacks, dodges, enemy defeat and player health.
+- Survival — gathering, drinking, consumables, campfire crafting, hunger,
+  thirst, rest and mortality.
+- Rhythm — bounded timing offsets, perfect/standard windows, misses, combos,
+  accuracy-based scoring and beat-period telemetry.
+- Deck battler — attack, block, energy, enemy health, turns and victory.
+
+Previews are *mechanics proofs only*. They do not render finished playable
+games, certify physical correctness or demonstrate execution on target hardware.
+
+All other families return `authoring_only`, explicitly with
+`simulation_executed: false`. The prior independent maze and RPG engines are
+not mislabeled as new implementations merely because their settings are
+available in the selector.
+
+## Operating procedure
+
+```bash
+python -m skeleton.ai.game_builder.game_workspace_cli init \
+  --root /tmp/original-studio --trusted-local-operator
+python -m skeleton.ai.game_builder.game_workspace_cli create \
+  --root /tmp/original-studio --project new_hybrid --genre hybrid \
+  --trusted-local-operator
+python -m skeleton.ai.game_builder.game_workspace_cli serve \
+  --root /tmp/original-studio --port 8765 --open-browser
+```
+
+Within the loopback UI:
+
+1. Select an active current project and a system-editor family.
+2. Adjust system-specific controls.
+3. Select **Validate and simulate preview** for a read-only local evaluation.
+4. Select **Stage system into source review** to stage a canonical JSON document.
+5. Inspect the source and diff, propose the exact change, then explicitly approve
+   the human commit. Only this last stage changes the project.
+6. Archive the project or freeze a demo if needed.
+
+The same restricted loopback/CSRF-token protocol exposes `GET /api/editors`
+and `POST /api/editor-preview`. No action accepts arbitrary scripts or invokes
+a network provider; the server does not itself write a project during preview.
+
+## Unfinished implementation work — factual release blockers
+
+- Connect each of the 35 authoring-only editors to real genre mechanics,
+  renderers, game-state save/load, playtesting and export adapters.
+- Integrate editor JSON configurations into the existing
+  `GameBuildIntent` and authored living-story/compiler contracts, rather
+  than making broad genre support a pretend replacement for the proven maze
+  and RPG paths.
+- Add playable genre-specific UI canvases, in-game simulation and visual
+  node/timeline editors for complex systems; present controls are structured
+  settings editors and eight headless mechanics previews.
+- Verify full visual performance/accessibility; execute on physical hardware
+  and validate the selected platform SDK/homebrew/legal release requirements.
+- Reconcile separate open PR #3641 world/NPC material through a reviewed merge
+  rather than copying its unmerged source or losing either history.
+
+The existing exact-head **AI Game Builder 500 Levels** gate now includes
+`tests.test_game_builder_system_editors`. The proposed code is not considered
+shippable simply because its configuration hashes or previews validate.
