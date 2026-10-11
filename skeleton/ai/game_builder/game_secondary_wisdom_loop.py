@@ -36,6 +36,9 @@ from .game_integrated_learning import (
 from .game_reviewer_optimizer import OptimizerSchedule,OptimizationResult
 from .game_model_promotion import PromotionError,PromotionStandard
 from .game_training_flow import FlowPlan
+from .game_second_train_replay_custody import (
+    OriginalReplayTrainingAttestation,qualify_second_original_game_replays,
+)
 from .competitive_delivery_gate import TrustedCompetitionJudge,_mac
 from .reviewed_knowledge import ReviewedKnowledgeStore,KnowledgeBrief
 from .knowledge_rights_bridge import (
@@ -179,6 +182,7 @@ class SecondaryWisdomCycle:
     second_training: IntegratedLearningCycle|None
     post_second_weights: PostWeightReport|None
     blockers: tuple[str,...]
+    second_gameplay_custody_digest: str|None=None
 
     @property
     def digest(self):
@@ -201,6 +205,7 @@ class SecondaryWisdomCycle:
             post_second_weights=self.post_second_weights.payload()
                 if self.post_second_weights else None,
             blockers=list(self.blockers),
+            second_gameplay_custody_digest=self.second_gameplay_custody_digest,
             real_second_reviewer_sgd_executed=(
                 self.second_training is not None and
                 self.second_training.optimization is not None),
@@ -247,6 +252,8 @@ def run_secondary_wisdom_cycle(
     reviewer_keys: tuple[tuple[str,TrustedCompetitionJudge],...],
     second_original_games: FlowPlan|None,
     authorized: bool,
+    replay_attestations: tuple[OriginalReplayTrainingAttestation,...]=(),
+    replay_reviewers: tuple[tuple[str,TrustedCompetitionJudge],...]=(),
     standard: PromotionStandard=PromotionStandard(),
     schedule: OptimizerSchedule=OptimizerSchedule(),
     minimum_quality_bp: int=8500,
@@ -342,6 +349,7 @@ def run_secondary_wisdom_cycle(
     # previous train, validation AND test game. No sealed TEST source may
     # be recycled as 'fresh' training or used to select a new checkpoint.
     independent=False
+    custody_digest=None
     if second_original_games is not None:
         if not isinstance(second_original_games,FlowPlan):
             raise PromotionError("new original games must pass existing split and custody planner")
@@ -349,6 +357,13 @@ def run_secondary_wisdom_cycle(
                          &set(second_original_games.source_projects))
         if not independent:
             raise PromotionError("first protected TRAIN/VAL/TEST worlds reused as second-gradient evidence")
+        if not replay_attestations or not replay_reviewers:
+            blockers.append("missing_two_independent_game_replay_attestations_for_every_train_example")
+        else:
+            custody=qualify_second_original_game_replays(
+                second_original_games,replay_attestations,
+                trusted_reviewers=replay_reviewers,authorized=True)
+            custody_digest=canonical_digest(custody.payload())
     else:
         blockers.append("new_original_train_validation_test_worlds_not_present")
     learning=None
@@ -374,7 +389,7 @@ def run_secondary_wisdom_cycle(
         tuple(sorted(canonical_digest(x.payload()) for x in reviews)),
         True,not any("comprehension" in x or "evidence" in x
                      or "objection" in x for x in blockers),
-        independent,learning,after,tuple(sorted(set(blockers))))
+        independent,learning,after,tuple(sorted(set(blockers))),custody_digest)
 
 
 __all__=["ROLES","ANGLES","DigestionTask","WisdomPassAttestation",
