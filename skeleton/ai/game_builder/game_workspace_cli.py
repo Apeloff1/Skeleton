@@ -35,7 +35,7 @@ def parser():
     init.add_argument("--root",required=True)
     init.add_argument("--trusted-local-operator",action="store_true")
     for name in ("create","tree","files","read","propose","commit",
-                 "archive","demo","autoload","select","serve","review-game"):
+                 "archive","demo","autoload","fork-demo","select","serve","review-game"):
         p=cmd.add_parser(name)
         p.add_argument("--root",required=True)
         if name not in {"tree","files","read","serve"}:
@@ -70,6 +70,9 @@ def parser():
         elif name in {"archive","demo"}:
             p.add_argument("--project",required=True)
             p.add_argument("--genre")
+        elif name=="fork-demo":
+            p.add_argument("--reference",required=True)
+            p.add_argument("--project",required=True)
         elif name=="autoload":
             p.add_argument("--genre",required=True)
             p.add_argument("--project",required=True,
@@ -138,6 +141,11 @@ def main(argv=None):
                 output=ws.archive(
                     args.project,genre=args.genre,
                     demo=args.command=="demo",
+                    authorized=args.trusted_local_operator,
+                )
+            elif args.command=="fork-demo":
+                output=ws.fork_demo(
+                    args.reference,args.project,
                     authorized=args.trusted_local_operator,
                 )
             elif args.command=="autoload":
