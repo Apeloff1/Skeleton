@@ -22,6 +22,7 @@ from skeleton.ai.game_builder.competitive_ancestry_frontier import evaluate_ance
 from skeleton.ai.game_builder.competitive_deep_service import (
     examine_enemy_genre_portfolio,
 )
+from skeleton.ai.game_builder.contracts import canonical_digest
 from skeleton.ai.game_builder.competitive_title_radar import (
     ThreatRadarError,RivalSourceLink,
 )
