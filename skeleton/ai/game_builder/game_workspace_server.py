@@ -23,6 +23,7 @@ from .advanced_gameplay_runtime import (
     run_advanced_session, verify_advanced_session, ACTION_HELP,
 )
 from .advanced_level_scenes import make_advanced_scene, scene_path
+from .advanced_puzzle_solver import solve_advanced_puzzle
 from .advanced_gameplay_save import (
     export_advanced_savegame, import_advanced_savegame, continue_advanced_savegame,
 )
@@ -182,6 +183,13 @@ class _StudioHandler(BaseHTTPRequestHandler):
         path=urlsplit(self.path).path
         values=self._body()
         studio=self.server.workspace
+        if path=="/api/advanced-puzzle-solve":
+            proof=solve_advanced_puzzle(
+                values["scene"],values.get("settings"),
+                max_states=values.get("max_states",12000),
+                max_depth=values.get("max_depth",96))
+            return self._json(200,{"proof":proof,"source_mutated":False,
+                                   "native_release_verified":False})
         if path=="/api/advanced-save":
             result=export_advanced_savegame(values["session"],values.get("settings"))
             return self._json(200,{"savegame":result,
