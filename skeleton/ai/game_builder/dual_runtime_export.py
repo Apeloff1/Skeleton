@@ -500,7 +500,7 @@ custom_template/debug=""
 custom_template/release=""
 binary_format/architecture="x86_64"
 binary_format/embed_pck=true
-debug/export_console_wrapper=0
+debug/export_console_wrapper=1
 codesign/enable=false
 """
 
