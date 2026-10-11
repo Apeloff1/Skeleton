@@ -10,6 +10,16 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Mapping
 
+from .original_world_catalog import WORLDS
+from .original_mechanics_history import ROWS as HISTORY_MECHANICS
+from .original_mechanics_theology import ROWS as THEOLOGY_MECHANICS
+from .original_mechanics_social import ROWS as SOCIAL_MECHANICS
+from .original_mechanics_environment import ROWS as ENVIRONMENT_MECHANICS
+from .original_mechanics_life import ROWS as LIFE_MECHANICS
+from .original_mechanics_technology import ROWS as TECHNOLOGY_MECHANICS
+from .original_mechanics_gameplay import ROWS as GAMEPLAY_MECHANICS
+from .original_mechanics_experience import ROWS as EXPERIENCE_MECHANICS
+
 
 @dataclass(frozen=True)
 class OriginalMechanic:
@@ -19,6 +29,8 @@ class OriginalMechanic:
     trigger: str
     state_change: str
     drawback: str
+    design_origin: str = "standalone"
+    cost_specified: bool = True
 
 
 _MECHANIC_ROWS = {
@@ -250,20 +262,74 @@ _MECHANIC_ROWS = {
 
 
 def _load() -> Mapping[str, OriginalMechanic]:
-    mechanics: dict[str, OriginalMechanic] = {}
-    names: set[str] = set()
-    for domain, rows in sorted(_MECHANIC_ROWS.items()):
-        for index, row in enumerate(rows, start=1):
-            title, trigger, state_change, drawback = row.split("|")
-            if title.casefold() in names:
-                raise ValueError(f"repeated mechanic name: {title}")
-            names.add(title.casefold())
-            identifier = f"{domain}-{index:02d}"
-            mechanics[identifier] = OriginalMechanic(
-                identifier, title, domain, trigger, state_change, drawback,
-            )
-    return MappingProxyType(mechanics)
+    """Use explicit mechanics and original-world levers, never invented defaults.
 
+    Every one of the 81 domains offers 24 actions to the recipe compiler:
+    * original domains: 12 independent mechanics + 12 world levers;
+    * new domains: 8 independent mechanics + 16 world levers.
+    The latter levers require a verified runtime adapter and are deliberately
+    distinguished from independently cost-specified mechanic designs.
+    """
+    mechanics: dict[str, OriginalMechanic] = {}
+    standalone_names: set[str] = set()
+    original_domains = set(_MECHANIC_ROWS)
+    expansions = (
+        HISTORY_MECHANICS, THEOLOGY_MECHANICS, SOCIAL_MECHANICS,
+        ENVIRONMENT_MECHANICS, LIFE_MECHANICS, TECHNOLOGY_MECHANICS,
+        GAMEPLAY_MECHANICS, EXPERIENCE_MECHANICS,
+    )
+    expanded: dict[str, list[str]] = {}
+    for shard in expansions:
+        for domain, rows in shard.items():
+            if domain in expanded or domain in original_domains or len(rows) != 8:
+                raise ValueError(f"invalid expanded mechanic domain: {domain}")
+            expanded[domain] = list(rows)
+    world_domains = {world.domain for world in WORLDS.values()}
+    if len(original_domains) != 16 or len(expanded) != 65:
+        raise ValueError("mechanic domain inventory mismatch")
+    if original_domains | set(expanded) != world_domains:
+        raise ValueError("mechanic domains do not cover authored world domains")
+    for domain, rows in sorted({**_MECHANIC_ROWS, **expanded}.items()):
+        if len(rows) not in (8, 12):
+            raise ValueError("invalid independent mechanic cardinality")
+        for idx, row in enumerate(rows, start=1):
+            title, trigger, effect, drawback = row.split("|")
+            if title.casefold() in standalone_names:
+                raise ValueError(f"duplicate standalone mechanic: {title}")
+            standalone_names.add(title.casefold())
+            identifier = f"{domain}-m{idx:02d}"
+            mechanics[identifier] = OriginalMechanic(
+                identifier, title, domain, trigger, effect, drawback,
+            )
+    domain_worlds: dict[str, list] = {}
+    for world in WORLDS.values():
+        domain_worlds.setdefault(world.domain, []).append(world)
+    for domain, worlds in sorted(domain_worlds.items()):
+        if len(worlds) != 16:
+            raise ValueError(f"unexpected original world count in {domain}")
+        selected = (sorted(worlds, key=lambda w: w.world_id)[:12]
+                    if domain in original_domains else
+                    sorted(worlds, key=lambda w: w.world_id))
+        for world in selected:
+            identifier = f"law-{world.world_id}"
+            mechanics[identifier] = OriginalMechanic(
+                identifier,
+                f"World Lever: {world.title}",
+                domain,
+                f"When the native rule of {world.title} is activated",
+                world.player_lever,
+                f"Rule consequence must be modeled and validated: {world.invariant}",
+                design_origin="world-lever",
+                cost_specified=False,
+            )
+    counts: dict[str, int] = {}
+    for mechanic in mechanics.values():
+        counts[mechanic.domain] = counts.get(mechanic.domain, 0) + 1
+    if len(counts) != 81 or any(n != 24 for n in counts.values()):
+        raise ValueError("mechanics must be 24 per world domain")
+    if len(mechanics) != 1944:
+        raise ValueError("mechanic inventory differs from 1944 concepts")
+    return MappingProxyType(mechanics)
 
 MECHANICS = _load()
 
