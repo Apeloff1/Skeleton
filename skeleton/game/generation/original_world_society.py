@@ -218,6 +218,7 @@ def society_action(world: CampaignState, society: SocietyState,
     _require_int(action.amount, 1, 3, "social amount")
     if world.action_points <= 0:
         raise CampaignError("out of player action points")
+    previous_society = society
     resident = society.residents[action.resident]
     if resident.location != world.position:
         raise CampaignError("resident is not in the same sector")
@@ -335,10 +336,8 @@ def society_action(world: CampaignState, society: SocietyState,
     else:
         raise CampaignError("unimplemented social operation")
 
-    next_society, receipt = _social_receipt(society if False else society, society, action,
-                                            tuple(outcome))
-    # Receipt's predecessor must be the actual pre-event society, not the
-    # updated society. This is overwritten below by the captured input.
+    next_society, receipt = _social_receipt(
+        previous_society, society, action, tuple(outcome))
     validate_society(next_society, world)
     return world, next_society, receipt
 
