@@ -16,6 +16,7 @@ on:
       - "docs/ORIGINAL_WORLD_LIVING_122M.md"
       - "docs/ORIGINAL_WORLD_PRODUCT_DELIVERY.md"
       - "docs/ORIGINAL_WORLD_NPC_CIVIC_EDUCATION_GENERATIONS.md"
+      - "docs/ORIGINAL_WORLD_NPC_ERA_FIDELITY.md"
       - "docs/ORIGINAL_WORLD_NPC_COGNITION_V2.md"
       - ".github/workflows/original-world-atlas.yml"
   push:
@@ -32,6 +33,7 @@ on:
       - "docs/ORIGINAL_WORLD_LIVING_122M.md"
       - "docs/ORIGINAL_WORLD_PRODUCT_DELIVERY.md"
       - "docs/ORIGINAL_WORLD_NPC_CIVIC_EDUCATION_GENERATIONS.md"
+      - "docs/ORIGINAL_WORLD_NPC_ERA_FIDELITY.md"
       - "docs/ORIGINAL_WORLD_NPC_COGNITION_V2.md"
       - ".github/workflows/original-world-atlas.yml"
   workflow_dispatch:
