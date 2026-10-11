@@ -49,12 +49,12 @@ def parser():
     )
     commands=cmd.add_subparsers(dest="action",required=True)
     for name in ("evaluate","stage","approve","usage","idle-pass",
-                 "activate","status","rollback","recover","predict","next-standard","optimize"):
+                 "activate","status","rollback","recover","predict","next-standard","optimize","optimize-stage"):
         p=commands.add_parser(name)
         p.add_argument("--root",required=True)
         if name!="status":
             p.add_argument("--trusted-local-operator",action="store_true")
-        if name in {"evaluate","stage","optimize"}:
+        if name in {"evaluate","stage","optimize","optimize-stage"}:
             if name in {"evaluate","stage"}:
                 p.add_argument("--epochs",type=int,default=75)
                 p.add_argument("--feature-version",
@@ -102,7 +102,7 @@ def main(argv=None):
                         review_roles=[row["role"] for row in state["attestations"]],
                         no_remote_llm_deployment=True,
                         no_hidden_hardware_activation=True)
-        elif args.action in {"evaluate","stage","optimize"}:
+        elif args.action in {"evaluate","stage","optimize","optimize-stage"}:
             batches=load_quarantined_batches(studio.root,authorized=True)
             plan=plan_training_flow(
                 batches,per_project_cap=args.per_project_cap,authorized=True)
@@ -113,13 +113,27 @@ def main(argv=None):
             active=registry.read_state()["active"]
             champion=(registry._candidate(active)["policy"]
                       if active is not None else None)
-            if args.action=="optimize":
+            if args.action in {"optimize","optimize-stage"}:
                 schedule=OptimizerSchedule(
                     learning_rates=tuple(args.learning_rates),
                     epochs=tuple(args.epoch_candidates))
-                result=optimize_review_weights(
+                trial=optimize_review_weights(
                     plan,schedule=schedule,standard=standard,
-                    champion=champion,authorized=True).payload()
+                    champion=champion,authorized=True)
+                result=trial.payload()
+                if args.action=="optimize-stage":
+                    # Deploying the selected fit is still disallowed. This
+                    # only enters the existing independently reviewed
+                    # staged/shadow/usage/idle operator control plane.
+                    if trial.promotion_evaluation.passed:
+                        stage=registry.stage(
+                            plan,trial.selected_fit,standard=standard,
+                            champion=champion,authorized=True)
+                        result=dict(result,stage=stage)
+                    else:
+                        result=dict(result,stage={"status":"blocked",
+                           "blockers":list(trial.promotion_evaluation.blockers),
+                           "model_installed":False})
             else:
                 fit=(train_robust_game_reviewer(
                     plan,epochs=args.epochs,authorized=True)
