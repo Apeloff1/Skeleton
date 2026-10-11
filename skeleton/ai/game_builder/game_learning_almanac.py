@@ -89,6 +89,88 @@ def build_curriculum(report: CompetitionReport,campaign: WitnessCampaign,*,
                       len(negatives),len(positives))
 
 
+def build_game_tester_curriculum(almanac,*,authorized: bool)->Curriculum:
+    """Produce grounded positive and negative examples from actual playtesting.
+
+    All examples remain quarantined. The source includes the *minimum real
+    before/after replay fragment*, never a fabricated account of an attack.
+    """
+    if not authorized:
+        raise PermissionError("gameplay learning requires operator authority")
+    from .game_tester_almanac import GameTesterAlmanac
+    from .competitive_mirror_training import TrainingCandidate,split_project,training_jsonl
+    if not isinstance(almanac,GameTesterAlmanac) or not almanac.passed:
+        raise AlmanacError("gameplay curriculum requires actual passing replay and controls")
+    split=split_project(almanac.world_digest)
+    cases=[]
+    for probe in almanac.probes:
+        if not probe.detected:
+            raise AlmanacError("missed attack may not be mislabeled as rejected")
+        cases.append(TrainingCandidate(
+            project_digest=almanac.world_digest,split=split,
+            example_id=canonical_digest({
+                "almanac":almanac.digest,"family":probe.family,
+                "persona":probe.persona,"corruption":probe.corrupted_digest,
+            }),
+            instruction=(
+                "Scrutinize actual game-state evidence. Identify how and why "
+                "this altered original gameplay replay violates canonical "
+                "mission, narrative or timing invariants."
+            ),
+            input=dict(
+                attack_family=probe.family,persona=probe.persona,
+                changed_field=probe.changed_field,
+                before=probe.original_fragment,
+                after=probe.mutated_fragment,
+                canonical_replay_digest=probe.source_replay_digest,
+                altered_replay_digest=probe.corrupted_digest,
+            ),
+            expected=dict(decision="reject",reason=probe.family,
+                          required_defense="independent_canonical_gameplay_replay"),
+            evidence=dict(game_world_digest=almanac.world_digest,
+                          game_tester_digest=almanac.digest,
+                          replay_digest=probe.source_replay_digest,
+                          severity=probe.severity,
+                          verified_adversarial_rejection=True),
+        ))
+    for test in almanac.testers:
+        cases.append(TrainingCandidate(
+            project_digest=almanac.world_digest,split=split,
+            example_id=canonical_digest({
+                "almanac":almanac.digest,"persona":test.persona,
+                "control":test.replay_digest,
+            }),
+            instruction=(
+                "Verify an original game's legitimate action replay, "
+                "quest victory methods and immutable main-story continuity."
+            ),
+            input=dict(canonical_witness={
+                "persona":test.persona,
+                "verified_replay_digest":test.replay_digest,
+                "completed_quests":list(test.completed_quests),
+                "methods":list(test.alternate_methods),
+                "actions":test.action_count,
+                "source_goal":test.source_story_goal,
+            }),
+            expected=dict(
+                decision="accept_witnessed_incident_only",
+                replay_valid=True,
+                requires_human_quality_review=True,
+            ),
+            evidence=dict(game_world_digest=almanac.world_digest,
+                          game_tester_digest=almanac.digest,
+                          verified_control=True,severity=2),
+        ))
+    samples=tuple(cases)
+    if len(samples)>512:
+        raise AlmanacError("gameplay almanac training set exceeds project budget")
+    training_jsonl(samples,authorized=True)
+    return Curriculum(
+        almanac.world_digest,split,almanac.digest,samples,
+        len(almanac.probes),len(almanac.testers),
+    )
+
+
 @dataclass(frozen=True,slots=True)
 class ReviewDecision:
     curriculum_digest: str
@@ -229,6 +311,6 @@ def quarantine_curriculum(curriculum: Curriculum,workspace_root: str|Path,*,
 
 __all__=[
     "AlmanacError","Curriculum","ReviewDecision","DistilledKnowledge",
-    "build_curriculum","promote_curriculum","multi_project_index",
+    "build_curriculum","build_game_tester_curriculum","promote_curriculum","multi_project_index",
     "quarantine_curriculum",
 ]
