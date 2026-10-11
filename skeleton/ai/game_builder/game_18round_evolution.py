@@ -146,6 +146,7 @@ def accept_round(
     thermal_safe:Callable[[],bool]|None=None,
     host_consented:bool=False,
     shadow_proof:SandboxVerification|None=None,
+    shadow_verifier:TrustedCompetitionJudge|None=None,
 )->EvolutionRun:
     if not authorized:raise PermissionError("no involuntary background AI game learning")
     if (not isinstance(state,EvolutionRun)
@@ -185,6 +186,12 @@ def accept_round(
                     or not shadow_proof.permission_to_stage or
                     shadow_proof.blockers or not shadow_proof.strict_measured_gain
                     or shadow_proof.model_activation_performed
+                    or not isinstance(shadow_verifier,TrustedCompetitionJudge)
+                    or shadow_verifier.judge_id==signer.judge_id
+                    or shadow_proof.verifier_id!=shadow_verifier.judge_id
+                    or not hmac.compare_digest(
+                        shadow_proof.signature,
+                        _mac(shadow_proof.signed_body(),shadow_verifier.key))
                     or shadow_proof.digest!=receipt.report_digest):
                 raise ThreatRadarError("only actual verified shadow sandbox is eligible for a stage")
         elif receipt.status not in {"shadow_queued","blocked","reviewed"}:
