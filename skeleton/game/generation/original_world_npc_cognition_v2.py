@@ -872,13 +872,13 @@ def smart_npc_tick(
                         operation = "seek-patient" if moved else "patient-inaccessible"
                 else:
                     operation = "no-patient"
-            elif goal in ("scout", "investigate", "guard"):
-                moves = tuple(_neighbors(current_world, p.x, p.y))
-                if moves:
-                    dest = moves[(thinking.day + p.id * 3 + mind.curiosity) % len(moves)]
-                    p = replace(p, x=dest[0], y=dest[1], energy=max(0, p.energy - 1),
-                                discoveries=min(1000, p.discoveries + 1))
-                    operation = "inspect-real-local-geography"
+        elif goal in ("scout", "investigate", "guard"):
+            moves = tuple(_neighbors(current_world, p.x, p.y))
+            if moves:
+                dest = moves[(thinking.day + p.id * 3 + mind.curiosity) % len(moves)]
+                p = replace(p, x=dest[0], y=dest[1], energy=max(0, p.energy - 1),
+                            discoveries=min(1000, p.discoveries + 1))
+                operation = "inspect-real-local-geography"
         elif goal == "socialize":
             company = sorted(
                 (x for x in people.inhabitants if x.id != p.id and x.health > 0),
