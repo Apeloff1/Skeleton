@@ -16,6 +16,7 @@ import secrets
 
 from .game_project_workspace import GameWorkspace, WorkspaceError
 from .game_workspace_ui import render_workspace_html
+from .game_prompt_router import route_game_prompt,ingest_ai_draft
 
 
 class StudioServerError(ValueError):
@@ -137,7 +138,17 @@ class _StudioHandler(BaseHTTPRequestHandler):
         path=urlsplit(self.path).path
         values=self._body()
         studio=self.server.workspace
-        if path=="/api/create":
+        if path=="/api/plan":
+            output=route_game_prompt(studio,values["prompt"],
+                                     project=values["project"],
+                                     authorized=True).payload()
+        elif path=="/api/ai-propose":
+            plan=route_game_prompt(studio,values["prompt"],
+                                   project=values["project"],authorized=True)
+            if values["plan_digest"]!=plan.digest:
+                raise WorkspaceError("AI source proposal is not bound to this plan")
+            output=ingest_ai_draft(studio,plan,values["draft"],authorized=True)
+        elif path=="/api/create":
             output=studio.create_project(values["project"],values["genre"],
                                          authorized=True)
         elif path=="/api/select":
