@@ -10,6 +10,8 @@ on:
       - "tests/test_game_builder_npc_society.py"
       - "tests/test_game_builder_modular_synergy.py"
       - "tests/test_game_builder_pareto_planner.py"
+      - "tests/test_game_builder_npc_social_economy.py"
+      - "skeleton/ai/game_builder/npc_social_economy.py"
       - "skeleton/ai/game_builder/quest_pareto_planner.py"
       - ".github/workflows/game-builder-modular-society.yml"
   workflow_dispatch:
@@ -51,6 +53,7 @@ jobs:
             tests/test_game_builder_npc_society.py
             tests/test_game_builder_modular_synergy.py
             tests/test_game_builder_pareto_planner.py
+            tests/test_game_builder_npc_social_economy.py
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
@@ -63,4 +66,4 @@ jobs:
       - name: Replay actual NPC societies and modular missions
         shell: bash
         run: |
-          python -m unittest tests.test_game_builder_npc_society tests.test_game_builder_modular_synergy tests.test_game_builder_pareto_planner -v
+          python -m unittest tests.test_game_builder_npc_society tests.test_game_builder_modular_synergy tests.test_game_builder_pareto_planner tests.test_game_builder_npc_social_economy -v
