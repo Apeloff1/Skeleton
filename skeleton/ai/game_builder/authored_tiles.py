@@ -76,8 +76,6 @@ def _scan_level(
     if any(not isinstance(row, str) or len(row) != intent.width
            or set(row) - ALLOWED_TILES for row in rows):
         raise AuthoredGameError("authored map contains unknown or uneven tiles")
-    if len(set(rows)) == 0:
-        raise AuthoredGameError("empty authored map")
     markers: dict[str, list[tuple[int, int]]] = {"S": [], "G": [], "C": [], "H": []}
     for y, row in enumerate(rows):
         for x, tile in enumerate(row):
