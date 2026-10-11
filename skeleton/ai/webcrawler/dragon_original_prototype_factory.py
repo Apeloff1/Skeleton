@@ -275,6 +275,43 @@ def distinguish_prototypes(left:int,right:int)->dict:
     }
 
 
+def structurally_qualified_capacity()->dict:
+    """Exact combinatorial lower filter WITHOUT enumerating billions of worlds.
+
+    Count binary full-width rulebooks with at least four active mechanics
+    spanning at least three mechanically independent domains. Does not
+    assert player-enjoyment, path variety, visual expression or publication.
+    """
+    from collections import Counter
+    from math import comb
+    sizes=Counter(item[1] for item in MECHANICS)
+    dp=[[0]*5 for _ in range(4)]
+    dp[0][0]=1
+    for size in sizes.values():
+        following=[[0]*5 for _ in range(4)]
+        for old_domains in range(4):
+            for old_active in range(5):
+                ways=dp[old_domains][old_active]
+                if not ways:continue
+                following[old_domains][old_active]+=ways
+                for count in range(1,size+1):
+                    following[min(3,old_domains+1)][min(4,old_active+count)]+=( 
+                        ways*comb(size,count)
+                    )
+        dp=following
+    acceptable=dp[3][4]
+    return {
+        "schema":SCHEMA,
+        "full_binary_rulebook_addresses":FULL_BINARY_PROFILE_COUNT,
+        "min_active_mechanics":4,
+        "min_independent_domains":3,
+        "exact_structurally_multi_domain_rulebooks":acceptable,
+        "thin_rulebooks_filtered":FULL_BINARY_PROFILE_COUNT-acceptable,
+        "executable_journey_and_release_review_still_required":True,
+        "finished_and_published_games_from_count":0,
+    }
+
+
 def sample_prototypes(*,start:int,count:int,
                       branch_seed:int=0,
                       routes:int=2,steps:int=12)->dict:
