@@ -723,6 +723,7 @@ def smart_npc_tick(
     # Healing is scheduled against stable citizen identities and settled once
     # after all actors act, independent of job/identity iteration order.
     healing: dict[int, int] = {}
+    dependent_meals: dict[int, int] = {}
     bonds = thinking
     for person, mind in zip(people.inhabitants, thinking.minds):
         start = (person.x, person.y)
@@ -730,12 +731,26 @@ def smart_npc_tick(
         if thinking.households.ages[person.id] < CHILDCARE_TURNS:
             goal, utility, reason = (
                 "recover", 100, "dependent child prioritizes physical care and safety")
+        else:
+            need = next((family for family in thinking.households.families
+                         if family.status == "established"
+                         and person.id in (family.caregiver_a, family.caregiver_b)
+                         and thinking.households.ages[family.child_id] < CHILDCARE_TURNS
+                         and people.inhabitants[family.child_id].hunger >= 5), None)
+            if need is not None and person.hunger < 7 and person.energy >= 2:
+                goal, utility, reason = (
+                    "care", 160, "respond to an actual hungry dependent household member")
         p = replace(person, hunger=min(20, person.hunger + 1))
         operation, resource, quantity = "idle", "", 0
         if p.health == 0:
             operation = "incapacitated"
         elif thinking.households.ages[p.id] < CHILDCARE_TURNS:
-            if p.hunger >= 6 and (p.x, p.y) == (0, 0) and current_world.provisions >= 1:
+            if p.id in dependent_meals:
+                p = replace(p, hunger=max(0, p.hunger - dependent_meals[p.id]),
+                            energy=min(20, p.energy + 1),
+                            health=min(20, p.health + 1))
+                operation, resource, quantity = "receive-actual-parental-meal", "food", 1
+            elif p.hunger >= 6 and (p.x, p.y) == (0, 0) and current_world.provisions >= 1:
                 current_world = replace(
                     current_world, provisions=current_world.provisions - 1)
                 p = replace(p, hunger=max(0, p.hunger - 6),
@@ -805,36 +820,65 @@ def smart_npc_tick(
             else:
                 operation = "no-assigned-harvest"
         elif goal == "care":
-            others = [x for x in people.inhabitants if x.id != p.id
-                      and (x.health < 20 or x.hunger >= 7)]
-            others.sort(key=lambda x: (x.health, -x.hunger, x.id))
-            if others:
-                target = others[0]
-                distance = abs(target.x - p.x) + abs(target.y - p.y)
-                if distance <= 1 and current_world.freshwater >= 1 and target.health < 20:
-                    current_world = replace(
-                        current_world, freshwater=current_world.freshwater - 1)
-                    # Target may not have acted yet: apply care into a stable
-                    # previously recorded delta and settle it by target ID.
-                    healing[target.id] = healing.get(target.id, 0) + 2
-                    bonds = _bond_change(bonds, p.id, target.id,
-                                         affinity=1, trust=1, aid=1)
-                    operation, resource, quantity = "healed-named-patient", "water", 1
+            child = next((house.child_id for house in thinking.households.families
+                          if house.status == "established"
+                          and p.id in (house.caregiver_a, house.caregiver_b)
+                          and thinking.households.ages[house.child_id] < CHILDCARE_TURNS
+                          and people.inhabitants[house.child_id].hunger >= 5
+                          and house.child_id not in dependent_meals), None)
+            if child is not None and p.health > 0:
+                dependent = people.inhabitants[child]
+                if abs(dependent.x - p.x) + abs(dependent.y - p.y) <= 1:
+                    if p.cargo_kind == "food" and p.cargo > 0:
+                        p = replace(p, cargo=p.cargo - 1,
+                                    cargo_kind="" if p.cargo == 1 else "food",
+                                    energy=max(0, p.energy - 1))
+                        dependent_meals[child] = 6
+                        operation, resource, quantity = "feed-dependent-from-carried-stock", "food", 1
+                    elif current_world.provisions > 0 and (p.x, p.y) == (0, 0):
+                        current_world = replace(current_world,
+                                                provisions=current_world.provisions - 1)
+                        p = replace(p, energy=max(0, p.energy - 1))
+                        dependent_meals[child] = 6
+                        operation, resource, quantity = "feed-dependent-from-real-depot", "food", 1
+                    else:
+                        operation = "dependent-meal-not-funded"
                 else:
                     p, moved = _physically_move(
-                        current_world, p,
-                        lambda x, y: abs(x - target.x) + abs(y - target.y) <= 1,
-                    )
-                    operation = "seek-patient" if moved else "patient-inaccessible"
+                        current_world, p, lambda x, y, target=dependent:
+                        abs(x-target.x)+abs(y-target.y) <= 1)
+                    operation = "seek-dependent-for-in-person-care" if moved else "dependent-inaccessible"
             else:
-                operation = "no-patient"
-        elif goal in ("scout", "investigate", "guard"):
-            moves = tuple(_neighbors(current_world, p.x, p.y))
-            if moves:
-                dest = moves[(thinking.day + p.id * 3 + mind.curiosity) % len(moves)]
-                p = replace(p, x=dest[0], y=dest[1], energy=max(0, p.energy - 1),
-                            discoveries=min(1000, p.discoveries + 1))
-                operation = "inspect-real-local-geography"
+                others = [x for x in people.inhabitants if x.id != p.id
+                          and (x.health < 20 or x.hunger >= 7)]
+                others.sort(key=lambda x: (x.health, -x.hunger, x.id))
+                if others:
+                    target = others[0]
+                    distance = abs(target.x - p.x) + abs(target.y - p.y)
+                    if distance <= 1 and current_world.freshwater >= 1 and target.health < 20:
+                        current_world = replace(
+                            current_world, freshwater=current_world.freshwater - 1)
+                        # Target may not have acted yet: apply care into a stable
+                        # previously recorded delta and settle it by target ID.
+                        healing[target.id] = healing.get(target.id, 0) + 2
+                        bonds = _bond_change(bonds, p.id, target.id,
+                                             affinity=1, trust=1, aid=1)
+                        operation, resource, quantity = "healed-named-patient", "water", 1
+                    else:
+                        p, moved = _physically_move(
+                            current_world, p,
+                            lambda x, y: abs(x - target.x) + abs(y - target.y) <= 1,
+                        )
+                        operation = "seek-patient" if moved else "patient-inaccessible"
+                else:
+                    operation = "no-patient"
+            elif goal in ("scout", "investigate", "guard"):
+                moves = tuple(_neighbors(current_world, p.x, p.y))
+                if moves:
+                    dest = moves[(thinking.day + p.id * 3 + mind.curiosity) % len(moves)]
+                    p = replace(p, x=dest[0], y=dest[1], energy=max(0, p.energy - 1),
+                                discoveries=min(1000, p.discoveries + 1))
+                    operation = "inspect-real-local-geography"
         elif goal == "socialize":
             company = sorted(
                 (x for x in people.inhabitants if x.id != p.id and x.health > 0),
@@ -1239,9 +1283,9 @@ def npc_profile(
         ],
         "age_in_world_turns": state.households.ages[person_id],
         "dependent_caregivers": [
-            a.caregiver_a if a.caregiver_b != person_id else a.caregiver_b
-            for a in state.households.families
+            parent for a in state.households.families
             if a.status == "established" and a.child_id == person_id
+            for parent in (a.caregiver_a, a.caregiver_b)
         ],
         "construction_contributions": [
             asdict(p) for p in state.projects if person_id in p.contributors
