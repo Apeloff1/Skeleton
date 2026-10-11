@@ -29,6 +29,7 @@ from .dragon_original_mechanic_forge import (
 from .dragon_original_campaign_forge import (
     compose_journey,verify_journey,
 )
+from .dragon_living_world_routes import materialize_route,verify_route
 
 SCHEMA="skeleton.ai.dragon.original_game_prototype.v1"
 MAX_PREVIEW=12
@@ -87,6 +88,10 @@ class OriginalPrototype:
     start_action_count:int
     replayed_journeys:tuple[dict,...]
     compared_unique_action_sequences:int
+    living_world_actual_route_actions:tuple[str,...]
+    living_world_route_digest:str
+    living_world_endings:tuple[str,...]
+    living_world_remains_playable:bool
     originality_scope:str
     release_blockers:tuple[str,...]
     ready_for_individual_experiments:bool
@@ -170,6 +175,12 @@ def materialize(nucleus:int,*,branch_seed:int=0,
             "resources_changed":result.actual_resource_changes,
             "actually_replayed":True,
         })
+    world_walk=materialize_route(
+        world,slot=(nucleus+branch_seed)%10,
+        steps=max(12,steps),
+    )
+    if not verify_route(world,world_walk)["verified"]:
+        raise ValueError("original prototype world lifecycle failed real play replay")
     candidate={
         "schema":SCHEMA,"original_nucleus":nucleus,"title":title,
         "source_digest":program.source_digest,
@@ -188,6 +199,10 @@ def materialize(nucleus:int,*,branch_seed:int=0,
         "replayed_journeys":tuple(journey),
         "compared_unique_action_sequences":len({
             tuple(row["actions"]) for row in journey}),
+        "living_world_actual_route_actions":world_walk.actions,
+        "living_world_route_digest":world_walk.trace_digest,
+        "living_world_endings":world_walk.original_endings,
+        "living_world_remains_playable":world_walk.remains_playable,
         "originality_scope":"distinct original rule-action signature; "
             "narrative/editorial uniqueness not established",
         "release_blockers":AUDIT_REQUIREMENTS,
