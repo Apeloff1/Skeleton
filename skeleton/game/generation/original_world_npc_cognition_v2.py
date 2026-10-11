@@ -383,6 +383,65 @@ def _physically_move(
     return person, False
 
 
+def _gather_from_known_world(
+    world: TerrainState, person: Person, mind: Mind, kind: str,
+) -> tuple[TerrainState, Person, str, str, int]:
+    """Bounded perception-and-memory plan, not omniscient harvest search.
+
+    Perceive the present cell and physically adjacent traversable cells.
+    Otherwise follow an explicit individual observation that may be stale.
+    After finding an exhausted remembered location, discover new terrain
+    instead of minting stock from prior knowledge.
+    """
+    if kind not in STOCK or person.cargo:
+        raise FoundationError("invalid autonomous known-stock gathering")
+    x, y = person.x, person.y
+    current = cell_at(world, x, y)
+    if _resource(current, kind) > 0:
+        return _acquire(world, person, kind)
+    visible = [(nx, ny) for nx, ny in _neighbors(world, x, y)
+               if _resource(cell_at(world, nx, ny), kind) > 0]
+    visible.sort(key=lambda c: (
+        -_resource(cell_at(world, *c), kind), c[0], c[1]))
+    if visible and person.energy > 0:
+        nx, ny = visible[0]
+        return world, replace(
+            person, x=nx, y=ny, energy=person.energy - 1,
+        ), "move-to-observed-stock", "", 0
+    remembered = sorted(
+        (o for o in mind.memories if o.subject == kind and o.value > 0
+         and o.position != (x, y)),
+        key=lambda o: (
+            -(o.value * o.confidence) + (mind.decisions - o.turn) * 2,
+            abs(o.position[0] - x) + abs(o.position[1] - y),
+            o.position,
+        ),
+    )
+    for known in remembered[:MAX_MEMORY]:
+        path = _path(
+            world, (x, y),
+            lambda px, py, point=known.position: (px, py) == point,
+        )
+        if len(path) > 1 and person.energy > 0:
+            nx, ny = path[1]
+            return world, replace(
+                person, x=nx, y=ny, energy=person.energy - 1,
+            ), "follow-individual-resource-memory", "", 0
+    frontier = tuple(_neighbors(world, x, y))
+    if frontier and person.energy > 0:
+        # Explore a bounded new physical tile. Experience changes the
+        # preferred edge so that identical stalled choices do not lock
+        # citizens in place forever.
+        nx, ny = frontier[
+            (person.id * 3 + mind.decisions + mind.curiosity) % len(frontier)
+        ]
+        return world, replace(
+            person, x=nx, y=ny, energy=person.energy - 1,
+            discoveries=min(1000, person.discoveries + 1),
+        ), "survey-unfamiliar-material-source", "", 0
+    return world, person, "no-reachable-visible-or-remembered-material", "", 0
+
+
 def smart_npc_tick(
     world: TerrainState,
     people: PhysicalSociety,
@@ -444,8 +503,8 @@ def smart_npc_tick(
                            if o.citizen == p.id and o.status == "open"), None)
             kind = active.kind if active else _specialty(p)
             if kind:
-                current_world, p, operation, resource, quantity = _acquire(
-                    current_world, p, kind,
+                current_world, p, operation, resource, quantity = (
+                    _gather_from_known_world(current_world, p, mind, kind)
                 )
             else:
                 operation = "no-assigned-harvest"
@@ -501,12 +560,15 @@ def smart_npc_tick(
         if p.energy < 0 or abs(p.x - start[0]) + abs(p.y - start[1]) > 1:
             raise FoundationError("NPC cognitive decision teleported or overspent energy")
         observed = cell_at(current_world, p.x, p.y)
-        memory = _remember(mind, Memory(
-            thinking.day + 1,
-            max(STOCK, key=lambda kind: (_resource(observed, kind), kind)),
-            (p.x, p.y), max(_resource(observed, kind) for kind in STOCK),
-            100, p.id,
-        ))
+        # Up to four truthful stock observations per tile, retained in a
+        # bounded eight-entry autobiographical memory. These impressions
+        # drive the next journey and update stale/depleted locations.
+        memory = mind
+        for kind in STOCK:
+            memory = _remember(memory, Memory(
+                thinking.day + 1, kind, (p.x, p.y),
+                _resource(observed, kind), 100, p.id,
+            ))
         if goal == mind.goal:
             age = min(MAX_HISTORY, mind.goal_age + 1)
         else:
