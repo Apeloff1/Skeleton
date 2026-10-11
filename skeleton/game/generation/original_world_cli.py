@@ -17,6 +17,9 @@ from .original_foundation_compiler import (
 from .original_world_million_compiler import (
     advanced_at, advanced_from_seed, advanced_inventory, mode_at,
 )
+from .original_world_tenfold_compiler import (
+    tenfold_at, tenfold_from_seed, tenfold_inventory, spatial_at,
+)
 from .original_world_simulator import (
     WorldRuleAction, replay_rules, route_edges,
 )
@@ -41,6 +44,12 @@ def _parser() -> argparse.ArgumentParser:
                           help="Exact million-world game configuration [0,1228799]")
     selector.add_argument("--advanced-seed",
                           help="Deterministic gameplay and progression configuration")
+    selector.add_argument("--spatial-index", type=int,
+                          help="One of 1,024,000 mechanical world-space foundations")
+    selector.add_argument("--tenfold-index", type=int,
+                          help="One of 12,288,000 world-space/genre/arc configurations")
+    selector.add_argument("--tenfold-seed",
+                          help="Deterministically sample actual spatial world rules")
     parser.add_argument("--era", default="near-future")
     parser.add_argument("--chronology", default="fictional-history")
     parser.add_argument("--theology", default="none")
@@ -72,6 +81,40 @@ def main(argv: Sequence[str] | None = None) -> int:
             realism=args.realism,
             hardware_target=args.hardware_target,
         )
+        if args.spatial_index is not None:
+            space = spatial_at(args.spatial_index)
+            print(json.dumps({
+                "catalog": "world-space-genre-foundations",
+                "foundation": space.as_dict(),
+                "inventory": tenfold_inventory(),
+                "styling_request_only": styling.as_dict(),
+                "warning": "A verified bounded spatial adapter exists, not a finished "
+                           "native game, bespoke art or independently hand-written premise.",
+            }, sort_keys=True, indent=2, ensure_ascii=False))
+            return 0
+        if args.tenfold_index is not None or args.tenfold_seed is not None:
+            law = (tenfold_at(args.tenfold_index)
+                   if args.tenfold_index is not None
+                   else tenfold_from_seed(args.tenfold_seed))
+            print(json.dumps({
+                "catalog": "tenfold-spatial-game-configurations",
+                "configuration": law.as_dict() if not args.brief else {
+                    "index": str(law.index),
+                    "world_id": law.tenfold_id,
+                    "design_id": law.design_id,
+                    "architecture": law.spatial.architecture.architecture_id,
+                    "form": law.advanced.mode.form.form_id,
+                    "arc": law.advanced.arc.arc_id,
+                    "provenance": law.provenance,
+                },
+                "inventory": tenfold_inventory(),
+                "styling_request_only": styling.as_dict(),
+                "play_command": "python -m skeleton.game.generation.original_world_tenfold_cli --index "
+                                + str(law.index) + " --interactive",
+                "warning": "A twelve-million-index compositional atlas is not "
+                           "twelve million individually authored native games.",
+            }, sort_keys=True, indent=2, ensure_ascii=False))
+            return 0
         if args.mode_index is not None:
             selected = mode_at(args.mode_index)
             print(json.dumps({
