@@ -15,7 +15,7 @@ from .original_world_product_missions import mission_report
 from .original_world_npc_cognition_v2 import cognition_report, npc_profile
 from .original_world_npc_era_population import population_report
 from .original_world_npc_era_population import (
-    ambient_impressions, population_report, active_brain_budget,
+    ambient_impressions, population_report, active_brain_budget, tuning,
 )
 from .original_world_product_session import (
     ProductAction, ProductSession, product_save, step_product, validate_product,
