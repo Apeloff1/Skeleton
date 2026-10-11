@@ -19,6 +19,7 @@ from .original_world_million_compiler import (
     AdvancedWorld, advanced_at, advanced_from_id, ADVANCED_VERSION,
 )
 from .original_world_play_forms import FORM_BY_ID, ARC_BY_ID
+from .original_world_million_synergy import evaluate_pressure
 
 RUNTIME_VERSION = "original-million-world-game.v1"
 MAX_ACTIONS = 1000
@@ -498,6 +499,23 @@ def _arc_operation(
     return causal, mode, arc, ("Advanced a mechanically gated authored continuation contract",)
 
 
+def _genre_stress(mode: ModeState, form: str) -> int:
+    """Physical player-facing stress, not difficulty labels or visual style."""
+    raw = {
+        "platform": mode.damage + (3 if mode.course % 5 == 4 and mode.height == 0 else 0),
+        "puzzle": (0 if mode.gates else (2 if mode.switches != 5 else 1)),
+        "tactics": mode.damage * 2 + max(0, mode.enemy - mode.shield),
+        "survival": mode.thirst + max(0, 8 - mode.warmth),
+        "colony": max(0, mode.population * 2 - mode.colony_food) + mode.damage,
+        "racing": max(0, 12 - mode.vehicle_integrity) * 2 + max(0, mode.vehicle_speed - 3),
+        "stealth": mode.alert + mode.damage,
+        "commerce": max(0, 8 - mode.wallet) + max(0, 2 - mode.goods),
+        "exploration": max(0, 6 - len(mode.revealed)),
+        "rhythm": (3 if mode.beat > 0 and mode.combo == 0 else 0),
+    }[form]
+    return min(100, max(0, raw))
+
+
 def _advance_world(
     law: AdvancedWorld, causal: CausalState, mode: ModeState,
     arc: ArcState,
@@ -578,6 +596,33 @@ def _advance_world(
             else:
                 causal = replace(causal, hazard=min(100, causal.hazard + 1))
             messages.append("The past irrevocable choice continued to shape the future")
+    pressure = evaluate_pressure(
+        law.mode.base.domain, form, name, _genre_stress(mode, form),
+        tick, law.arc.checkpoint_interval,
+    )
+    if pressure.triggered:
+        n = pressure.amount
+        if pressure.consequence == "hazard":
+            causal = replace(causal, hazard=min(100, causal.hazard + n))
+        elif pressure.consequence == "duty":
+            causal = replace(causal, duty=min(1000, causal.duty + n))
+        elif pressure.consequence == "trust":
+            causal = replace(causal, trust=max(0, causal.trust - n))
+        elif pressure.consequence == "reserve":
+            causal = replace(causal, reserve=max(0, causal.reserve - n))
+        elif pressure.consequence == "legacy":
+            arc = replace(arc, legacy=min(100, arc.legacy + n))
+        elif pressure.consequence == "outstanding":
+            arc = replace(arc, outstanding=min(100, arc.outstanding + n))
+        elif pressure.consequence == "uncertainty":
+            arc = replace(arc, uncertainty=min(100, arc.uncertainty + n))
+        elif pressure.consequence == "civic":
+            arc = replace(arc, civic=max(0, arc.civic - n))
+        elif pressure.consequence == "warmth":
+            mode = replace(mode, warmth=max(0, mode.warmth - n))
+        else:
+            raise FoundationError("unsupported cross-layer consequence")
+        messages.append("World-law, gameplay and continuation strain: " + pressure.explanation)
     return causal, mode, arc, tuple(messages)
 
 
