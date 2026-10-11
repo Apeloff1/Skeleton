@@ -523,6 +523,35 @@ function drawAdvancedGame(session){
   }
   c.fillStyle="#d8eef0";c.fillText("Credits "+state.credits+" · Base "+state.base_hp,15,H-42);
   c.fillText("Defeated "+state.defeated+" · Escaped "+state.escaped,15,H-18);
+ }else if(editor==="racing"){
+  const progress=state.distance/(state.track_length*state.laps);
+  c.fillStyle="#315569";c.fillRect(16,58,W-32,25);
+  c.fillStyle="#77d7b5";c.fillRect(16,58,(W-32)*progress,25);
+  c.fillStyle="#dceff0";c.fillText(
+   "Lap "+state.lap+"/"+state.laps+" · "+state.weather+" circuit",16,46);
+  c.fillText("Speed "+state.speed+" · lane "+state.lane,16,119);
+  c.fillText("Fuel "+state.fuel+" · tires "+state.tire_condition,16,147);
+  c.fillText("Engine "+state.engine_integrity+" · boosts "+state.boost_charges,16,175);
+  c.fillText("Pit crews "+state.pit_crews+" · score "+state.championship_points,16,205);
+ }else if(editor==="survival"){
+  const region=state.regions[state.region];
+  c.fillStyle="#78d6bd";c.fillText("Day "+state.day+" · "+
+    region.biome+" · "+state.weather,16,50);
+  const resources=[
+   ["Health",state.health],["Energy",state.energy],
+   ["Food",state.food],["Water",state.water],
+   ["Wood",state.wood],["Stone",state.stone],
+   ["Shelter",state.shelter_level],["Tools",state.tools],
+  ];
+  for(let i=0;i<resources.length;i++){
+   const x=16+(i%2)*225,y=79+Math.floor(i/2)*34;
+   c.fillStyle=i<2?"#92e4a7":"#e8cb82";
+   c.fillRect(x,y-12,8,14);
+   c.fillStyle="#e3edf1";
+   c.fillText(resources[i][0]+": "+resources[i][1],x+16,y);
+  }
+  c.fillStyle="#e2edf0";c.fillText(
+   "Milestones: "+(state.milestones.join(", ")||"open-ended"),16,H-18);
  }
  if(state.finished||state.failed){
   c.fillStyle=state.finished?"#a2f5cb":"#ffaba6";
@@ -646,7 +675,7 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
  aria-label="Validated genre-system mechanics preview"></canvas>
 <pre id="system-preview" role="status" aria-live="polite"></pre>
 <fieldset><legend>Advanced playable scenario · reference engine</legend>
-<p><small>Actual command-driven gameplay for platformer, tactics and tower defense.
+<p><small>Actual command-driven gameplay for platformer, tactics, tower defense, racing and survival.
 Other editor families remain authoring-only, not falsely certified engines.</small></p>
 <label>Scenario seed<input id="advanced-seed" type="number" min="0" max="2147483647" value="0"></label>
 <button id="advanced-start" type="button">Start advanced scenario</button>
