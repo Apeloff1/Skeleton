@@ -232,7 +232,10 @@ def step_terrain(state: TerrainState, action: TerrainAction) -> tuple[TerrainSta
     if action.verb in ("walk", "jump"):
         if tile.blocking and action.verb != "jump":
             raise FoundationError("solid cliff or unbridged flooded tile prevents walking")
-        climb = max(0, tile.elevation - cell_at(state, *current).elevation)
+        # A material-backed bridge doubles as a safe ramp across steep cliffs.
+        # Unbridged terrain still obeys ordinary jump-height limitations.
+        climb = (0 if tile.bridge else max(
+            0, tile.elevation - cell_at(state, *current).elevation))
         if action.verb == "walk" and climb > 1:
             raise FoundationError("elevation requires jump")
         cost = 2 if action.verb == "jump" else 1
