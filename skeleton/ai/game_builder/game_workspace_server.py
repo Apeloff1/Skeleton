@@ -28,6 +28,7 @@ from .advanced_godot_export import (
     render_advanced_godot_package, archive_advanced_godot_package,
 )
 from .advanced_platformer_godot import render_platformer_godot_package
+from .advanced_deck_godot import render_deck_godot_package
 from .advanced_gameplay_save import (
     export_advanced_savegame, import_advanced_savegame, continue_advanced_savegame,
 )
@@ -192,6 +193,8 @@ class _StudioHandler(BaseHTTPRequestHandler):
             session=values["session"]
             renderer=(render_platformer_godot_package
                       if type(session) is dict and session.get("editor")=="platformer"
+                      else render_deck_godot_package
+                      if type(session) is dict and session.get("editor")=="deck_battler"
                       else render_advanced_godot_package)
             package=renderer(session,values.get("settings"),authorized=True)
             compressed=archive_advanced_godot_package(package)
