@@ -119,6 +119,38 @@ function diff(){
  }
  $("diff").textContent=out.length?out.join("\n"):"No change to this file.";
 }
+$("new-file").addEventListener("click",()=>{
+ if(selectedTree!=="current"||selectedProject!==model.active){
+  status("Only the active original project permits source creation.");return;
+ }
+ const path=$("new-path").value.trim();
+ if(!path){status("Enter one exact path within the current project.");return;}
+ selectedFile=path;proposal=null;
+ const hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+ loaded={content:"",version:{tree:"current",project:selectedProject,
+   path,sha256:hash,bytes:0,editable:true}};
+ $("editor").value="";
+ $("editor").readOnly=false;$("propose").disabled=false;
+ $("file-name").textContent="NEW: current/"+selectedProject+"/"+path;
+ $("hash").textContent="SHA-256 "+hash;
+ $("diff").textContent="New source file: enter content, review, then commit.";
+ status("New exact path staged without writing disk.");
+});
+$("plan").addEventListener("click",async()=>{
+ try{
+  if(!model.active)throw Error("Open or create a current original game");
+  const result=await api("/api/plan",{project:model.active,
+                                    prompt:$("user-prompt").value});
+  const text="Axes: "+result.axes.map(x=>x.key).join(", ")+
+   "\\nSuggested source targets:\\n"+result.files.map(x=>
+    x.path+" · "+(x.exists?"existing":"new")+" · "+x.axis).join("\\n")+
+   "\\n"+result.guidance.join("\\n");
+  $("plan-results").textContent=text;
+  $("reason").value="User prompt: "+$("user-prompt").value.slice(0,800);
+  status("Prompt routing complete. This does not secretly run a model. "+
+         "Choose a target and submit an explicit source proposal.");
+ }catch(error){status("Prompt routing failed: "+error.message);}
+});
 $("editor").addEventListener("input",diff);
 $("tree").addEventListener("change",()=>{
  selectedTree=$("tree").value;selectedProject=null;selectedFile=null;refresh();
@@ -222,6 +254,13 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <button id="autoload">Fork prior genre to current</button></fieldset>
 <p id="readonly" class="readonly"></p></section>
 <section><h2>2. Precise file and folder targeting</h2>
+<label>Natural-language original game design prompt
+<textarea id="user-prompt" rows="4" placeholder="Create a branching escort storyline with eyewitness reactions, alternative endings, NPC memories and cinematic staging..."></textarea></label>
+<button id="plan">Plan affected modules and targets</button>
+<pre id="plan-results"></pre>
+<label>New exact source path (including subfolder)
+<input id="new-path" placeholder="missions/original_rival_arc.json"></label>
+<button id="new-file">Stage new source file</button>
 <p><small>Choose exact relative file location. Previous and demo entries stay read-only.</small></p>
 <div id="files" aria-label="Project file tree"></div>
 <p class="status" id="status" role="status"></p></section>
