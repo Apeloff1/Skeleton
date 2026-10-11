@@ -101,6 +101,26 @@ func _ready() -> void:
         _verify_advanced_proof()
 
 
+func _point(raw: Array) -> Array:
+    # Godot JSON may load every number as a floating-point Variant; convert
+    # original integer-grid coordinates before membership and tuple equality.
+    return [int(raw[0]), int(raw[1])]
+
+
+func _points(raw: Array) -> Array:
+    var result: Array = []
+    for item in raw:
+        result.append(_point(item))
+    return result
+
+
+func _links(raw: Array) -> Array:
+    var result: Array = []
+    for link in raw:
+        result.append([_point(link[0]), _point(link[1])])
+    return result
+
+
 func _reset_game() -> void:
     tick = 0
     move_count = 0
@@ -110,16 +130,16 @@ func _reset_game() -> void:
     failed = false
     undo_available = mini(int(config["undo_depth"]), MAX_STEPS)
     phase = int(scene["seed"]) % 2
-    player = layout["spawn"].duplicate(true)
-    exit_tile = layout["exit"].duplicate(true)
-    walls = layout["walls"].duplicate(true)
-    doors = layout["doors"].duplicate(true)
-    switches = layout["switches"].duplicate(true)
-    crates = layout["crates"].duplicate(true)
-    targets = layout["targets"].duplicate(true)
-    nodes = layout["nodes"].duplicate(true)
-    portals = layout["portals"].duplicate(true)
-    phase_gates = layout["phase_gates"].duplicate(true)
+    player = _point(layout["spawn"])
+    exit_tile = _point(layout["exit"])
+    walls = _points(layout["walls"])
+    doors = _points(layout["doors"])
+    switches = _points(layout["switches"])
+    crates = _points(layout["crates"])
+    targets = _points(layout["targets"])
+    nodes = _points(layout["nodes"])
+    portals = _links(layout["portals"])
+    phase_gates = _points(layout["phase_gates"])
     switches_on = []
     powered_nodes = []
     portal_visited = false
@@ -300,10 +320,16 @@ func _verify_advanced_proof() -> void:
         "finished": finished,
         "failed": failed
     }
+    var reference: Dictionary = expected.duplicate(true)
+    if reference.has("player"):
+        reference["player"] = _point(reference["player"])
+    for field in ["crates", "switches_on", "powered_nodes"]:
+        if reference.has(field):
+            reference[field] = _points(reference[field])
     for field in actual:
-        if not expected.has(field) or actual[field] != expected[field]:
+        if not reference.has(field) or actual[field] != reference[field]:
             push_error("NATIVE_ADVANCED_PUZZLE_ERROR: " + field + " mismatch: native=" +
-                str(actual[field]) + " python=" + str(expected.get(field, "<missing>")))
+                str(actual[field]) + " python=" + str(reference.get(field, "<missing>")))
             get_tree().quit(1)
             return
     if expected.size() != actual.size():
