@@ -11,6 +11,7 @@ from __future__ import annotations
 from .original_foundation_compiler import FoundationError
 from .original_world_product_render import COLORS, BUILDING_COLORS
 from .original_world_product_terrain import cell_at
+from .original_world_product_missions import mission_report
 from .original_world_product_session import (
     ProductAction, ProductSession, product_save, step_product, validate_product,
 )
@@ -56,6 +57,7 @@ def launch_desktop(state: ProductSession, *, save_path: str | None = None) -> No
         current = session[0]
         law = validate_product(current)
         landscape = current.terrain
+        quest = mission_report(current)
         px, py = landscape.position
         canvas.delete("all")
         for dy in range(-VIEW_RADIUS, VIEW_RADIUS + 1):
@@ -104,7 +106,9 @@ def launch_desktop(state: ProductSession, *, save_path: str | None = None) -> No
             f"Lumber {landscape.lumber} / Masonry {landscape.masonry}",
             f"Citizens: {len(current.society.inhabitants)}",
             f"World action points: {current.living.spatial.game.causal.action_points}",
-            "Original game laws remain visible in the saved manifest.",
+            f"Original root: {quest['authored_root_id']}",
+            f"Story proofs: {quest['verified_local_milestones']}/3",
+            "Native Tk · physics · resident AI · authored world rules.",
         )))
 
     def perform(action: ProductAction) -> None:
@@ -162,6 +166,29 @@ def launch_desktop(state: ProductSession, *, save_path: str | None = None) -> No
     button("Advance whole world + NPC clock", lambda: perform(
         ProductAction("causal", "end_turn")))
     button("Save current world", save)
+    for verb in rule.foundation.system.commands:
+        button("Living-system: " + verb, lambda cmd=verb: perform(
+            ProductAction("living", cmd)))
+
+    # Real in-app command palette exposes all source genre, arc, spatial and
+    # player/NPC agency actions, rather than only the simple tile shortcuts.
+    tk.Label(panel, text="Complete game action", fg="#e8efec",
+             bg="#16222a").pack(anchor="w", pady=(10, 3))
+    command_input = tk.Entry(panel, width=32, bg="#f0f7f5", fg="#12343a")
+    command_input.pack(anchor="w", pady=(0, 4))
+    command_input.insert(0, "mode " + rule.source.advanced.mode.form.mechanics[0])
+
+    def submit_command(_event=None) -> None:
+        from .original_world_product_cli import parse_command
+        text = command_input.get().strip()
+        try:
+            action = parse_command(text, session[0].terrain.position)
+            perform(action)
+        except FoundationError as exc:
+            status.set("Command rejected: " + str(exc))
+
+    command_input.bind("<Return>", submit_command)
+    button("Execute complete-world command", submit_command)
 
     for key, dx, dy in (
         ("<Up>", 0, -1), ("<Down>", 0, 1),
