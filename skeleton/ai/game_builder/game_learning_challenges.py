@@ -81,6 +81,12 @@ def _variants(case: TrainingCandidate):
             ("spurious_attack_marker",dict(source,attack_family="synthetic_noise")),
             ("irrelevant_fields",dict(source,review_display_hint="warning")),
             ("schema_order",dict(reversed(list(source.items())))),
+            # Preserve every source fact verbatim, but carry it in a
+            # semantically transparent nested envelope. Both good and
+            # malicious cases use *identical* top-level keys, so a classifier
+            # that only recognizes input-field names must abstain or fail.
+            ("wrapped_evidence",{"evidence_bundle":{"raw_gameplay":source},
+                                  "representation":"source_preserving_envelope_v1"}),
         )
     # A genuine corrupted replay is still corrupted when red-team labels or
     # display hints are masked. A robust model should not approve it.
@@ -89,6 +95,8 @@ def _variants(case: TrainingCandidate):
                                   if k!="attack_family"}),
         ("renamed_attack_family",dict(source,attack_family="unseen_new_attack")),
         ("irrelevant_fields",dict(source,review_display_hint="benign")),
+        ("wrapped_evidence",{"evidence_bundle":{"raw_gameplay":source},
+                              "representation":"source_preserving_envelope_v1"}),
     )
 
 
