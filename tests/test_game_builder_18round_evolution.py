@@ -4,6 +4,8 @@ from dataclasses import replace
 from datetime import datetime,timedelta,timezone
 from hashlib import sha256
 from unittest.mock import patch
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 
 from skeleton.ai.game_builder.contracts import canonical_digest
@@ -19,6 +21,8 @@ from skeleton.ai.game_builder.game_18round_shadow_sandbox import (
     SandboxVerification,ModularShadowTicket,prepare_shadow_tickets,
     verify_shadow_in_sandbox,sign_sandbox_verification,order_verified_hyperweights,
 )
+from skeleton.ai.game_builder.game_18round_journal import GameEvolutionJournal
+from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
 from skeleton.ai.game_builder.game_18round_evolution import (
     ROUND_DESCRIPTIONS,EvolutionRoundReceipt,sign_round_receipt,
     begin_18round_evolution,accept_round,report_remaining_rounds,
@@ -239,6 +243,32 @@ class EighteenRoundCases(unittest.TestCase):
             next_dragon_adjacency_mission(
                 self.task,(),("http://127.0.0.1/private",),
                 authorized=True,consent=True)
+
+    def test_custody_persists_stale_head_and_tampered_sqlite_are_rejected(self):
+        with TemporaryDirectory() as folder:
+            ws=GameWorkspace.create(Path(folder)/"studio",authorized=True)
+            before=begin_18round_evolution(self.task,authorized=True)
+            with GameEvolutionJournal(ws.root,task=self.task) as journal:
+                self.assertEqual(journal.read(signers=(self.key,),authorized=True).digest,
+                                 before.digest)
+                receipt=self.receipt(before,"research_recorded")
+                after=accept_round(before,receipt,self.key,authorized=True)
+                journal.append(before,after,signers=(self.key,),authorized=True)
+                self.assertEqual(journal.read(
+                    signers=(self.key,),authorized=True).digest,after.digest)
+                with self.assertRaises(ThreatRadarError):
+                    journal.append(before,after,signers=(self.key,),authorized=True)
+                r4=self.receipt(after,"shadow_queued")
+                next_state=accept_round(after,r4,self.key,authorized=True)
+                journal.append(after,next_state,signers=(self.key,),authorized=True)
+                self.assertEqual(journal.read(
+                    signers=(self.key,),authorized=True).digest,next_state.digest)
+                journal.db.execute(
+                    "UPDATE ai_evolution_rounds SET receipt_json=? WHERE sequence=1",
+                    ('{}',))
+                with self.assertRaises(ThreatRadarError):
+                    journal.read(signers=(self.key,),authorized=True)
+
 
 
 if __name__=="__main__":
