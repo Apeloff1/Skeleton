@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from contextlib import redirect_stdout, redirect_stderr
+import io
 import http.client
 import json
 from pathlib import Path
@@ -16,6 +18,7 @@ from skeleton.ai.game_builder.advanced_gameplay_runtime import (
 from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
 from skeleton.ai.game_builder.game_workspace_server import create_workspace_server
 from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html
+from skeleton.ai.game_builder.system_editor_cli import main as editor_cli
 from skeleton.ai.game_builder.system_editors import catalog
 
 
@@ -154,6 +157,29 @@ class AdvancedProofTests(unittest.TestCase):
             run_advanced_session("rpg")
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("nonexistent")
+
+
+class AdvancedCliTests(unittest.TestCase):
+    def test_cli_can_run_and_independently_verify_real_gameplay(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            script=Path(tmp)/"moves.json"
+            script.write_text(json.dumps(["build:0","tick:4"]),encoding="utf-8")
+            output=io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(editor_cli(["play","--editor","tower_defense",
+                                             "--actions",str(script),"--seed","3"]),0)
+            session=json.loads(output.getvalue())
+            self.assertEqual(session["quality_floor"],"advanced")
+            trace=Path(tmp)/"receipt.json"
+            trace.write_text(json.dumps(session),encoding="utf-8")
+            output=io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(editor_cli(["verify-play","--session",str(trace)]),0)
+            self.assertTrue(json.loads(output.getvalue())["verified"])
+            session["state"]["credits"]=9999
+            trace.write_text(json.dumps(session),encoding="utf-8")
+            with redirect_stderr(io.StringIO()):
+                self.assertEqual(editor_cli(["verify-play","--session",str(trace)]),2)
 
 
 class AdvancedStudioAPITests(unittest.TestCase):
