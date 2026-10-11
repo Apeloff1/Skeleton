@@ -204,8 +204,11 @@ def test_cli_era_npc_profile_and_portable_save_roundtrip(capsys, tmp_path):
     printed = json.loads(capsys.readouterr().out)
     report = printed["product"]["regional_population"]
     assert report["detail_mode"] == "vivid"
-    assert report["regional_aggregated_residents"] == 16384
-    assert report["full_local_brain_budget_per_turn"] == 16
+    # Newly created worlds default to a restrained, genre-aware
+    # population, unlike the explicit legacy 16k simulation fixture.
+    assert report["regional_aggregated_residents"] <= 144
+    assert report["full_local_brain_budget_per_turn"] <= 7
+    assert report["platform_genre_profile"]["genre"] == "puzzle"
     assert main(["--load", str(path), "--population-report"]) == 0
     loaded = json.loads(capsys.readouterr().out)
     assert loaded["product"]["regional_population"]["detail_mode"] == "vivid"
