@@ -254,7 +254,7 @@ class CompetitiveDeliveryCases(CompetitorRadarCases):
         self.assertIn("lost_originality_pillars",outcome.identity_blockers)
         self.assertFalse(outcome.qualified_to_claim_superiority)
         stale=replace(self.original,design_digest="d"*64)
-        with self.assertRaises(ThreatRadarError):
+        with self.assertRaises(PermissionError):
             compare_competitive_delivery(
                 stale,self.threat,self.samples(),self.rights,
                 as_of=T0,authorized=False)
