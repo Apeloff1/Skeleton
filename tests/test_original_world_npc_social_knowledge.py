@@ -90,8 +90,16 @@ def test_socially_transmitted_memory_cannot_masquerade_as_direct_eyewitness():
     assert shared[-1].turn == 0
     assert cognition_report(minds, residents, world)[
         "socially_learned_material_observations"] >= 1
+    # A citizen may genuinely have other personal stone observations.
+    # Isolate just the third-party report to prove that its original witness
+    # cannot masquerade as a new eyewitness after social retelling.
+    shared_only = replace(minds, minds=(
+        minds.minds[0],
+        replace(minds.minds[1], memories=tuple(shared)),
+    ))
     with pytest.raises(FoundationError):
-        interview_citizen(minds, residents, world, citizen=1, subject="stone")
+        interview_citizen(shared_only, residents, world,
+                          citizen=1, subject="stone")
     assert cognition_restore(cognition_save(minds), residents, world) == minds
 
 
