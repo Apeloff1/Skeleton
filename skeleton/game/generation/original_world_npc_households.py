@@ -172,11 +172,41 @@ def establish_household(
     return resources, updated
 
 
+def cancel_household(
+    state: HouseholdState, people: PhysicalSociety, world: TerrainState,
+    household_id: int,
+) -> tuple[TerrainState, HouseholdState]:
+    validate_households(state, people, world)
+    family = next((f for f in state.families
+                   if f.family_id == household_id and f.status == "awaiting"), None)
+    if family is None:
+        raise FoundationError("only an unfinished dependent plan can be cancelled")
+    if (world.provisions + family.food_reserved > 1000
+            or world.freshwater + family.water_reserved > 1000):
+        raise FoundationError("warehouse cannot accept returned family escrow")
+    returned = replace(
+        world, provisions=world.provisions + family.food_reserved,
+        freshwater=world.freshwater + family.water_reserved,
+    )
+    result = _seal(state, replace(
+        state, families=tuple(
+            replace(f, status="cancelled") if f.family_id == household_id else f
+            for f in state.families
+        )), "return-family-escrow")
+    validate_households(result, people, returned)
+    return returned, result
+
+
 def settle_households(
     state: HouseholdState, people: PhysicalSociety, world: TerrainState,
 ) -> tuple[TerrainState, PhysicalSociety, HouseholdState,
            tuple[Household, ...]]:
-    validate_households(state, people, world)
+    # The bodies have already acted and advanced by exactly one day.
+    # Validate the incoming family ledger against the immediately previous
+    # world clock before deriving new ages or births.
+    if people.tick != state.day + 1:
+        raise FoundationError("generational settlement must advance exactly one real world day")
+    validate_households(state, replace(people, tick=state.day), world)
     aged = tuple(min(1000, n + 1) for n in state.ages)
     residents = list(people.inhabitants)
     families = list(state.families)
