@@ -16,7 +16,7 @@ from typing import Mapping, Sequence
 from .system_editors import make_editor_document, SystemEditorError
 
 SCHEMA = "skeleton.game_builder.advanced_session.v1"
-ENGINES = ("platformer", "tactics", "tower_defense")
+ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival")
 MAX_TURNS = 128
 MAX_SEED = 2**31 - 1
 
@@ -28,6 +28,11 @@ ACTION_HELP = {
     "tower_defense": ("tick", "tick:4", "build:0", "build:1", "build:2",
                       "upgrade:0", "upgrade:1", "upgrade:2", "sell:0",
                       "sell:1", "sell:2", "priority:first", "priority:strong"),
+    "racing": ("accelerate", "brake", "coast", "steer_left", "steer_right",
+               "boost", "pit"),
+    "survival": ("forage", "gather_wood", "mine_stone", "drink", "hunt",
+                 "cook", "craft_tool", "light_fire", "build_shelter",
+                 "trade", "travel", "rest"),
 }
 
 
@@ -385,6 +390,225 @@ def _defense_step(state, config, action):
     return events
 
 
+def _racing_start(config, seed):
+    length=config["track_length"]
+    return {
+        "tick":0,"distance":0,"position":0,"lap":0,"laps":config["laps"],
+        "track_length":length,"speed":0,"lane":0,
+        "fuel":max(20, (length*config["laps"])//5),
+        "fuel_capacity":max(20, (length*config["laps"])//5),
+        "tire_condition":100,"engine_integrity":100,
+        "boost_charges":3,"pit_stops":0,"pit_crews":3,
+        "weather":("dry","wet","storm")[seed % 3],
+        "corners":sorted(set([max(2,length//4),max(3,length//2),
+                             max(4,3*length//4)])),
+        "track_obstacle":max(5,length//3)+(seed % 3),
+        "events":[],"finished":False,"failed":False,"championship_points":0,
+    }
+
+
+def _racing_step(state,config,action):
+    if action not in ACTION_HELP["racing"]:
+        raise AdvancedRuntimeError("unrecognized advanced driving command")
+    events=[]
+    state["tick"]+=1
+    weather=state["weather"]
+    grip=max(2,config["max_speed"]-(0 if weather=="dry" else
+                                   max(1,config["max_speed"]//4) if weather=="wet"
+                                   else max(2,config["max_speed"]//3)))
+    position=state["position"]
+    if action=="pit":
+        if position > min(10,config["track_length"]//5) or state["speed"]>max(3,config["brake_force"]):
+            raise AdvancedRuntimeError("pit entry requires slow speed near start line")
+        if state["pit_crews"]==0:
+            raise AdvancedRuntimeError("all service stops have been spent")
+        state["pit_crews"]-=1;state["pit_stops"]+=1
+        state["fuel"]=state["fuel_capacity"]
+        state["tire_condition"]=100
+        state["engine_integrity"]=min(100,state["engine_integrity"]+30)
+        state["speed"]=0
+        events.append("pit_service")
+        return events
+    if action=="accelerate":
+        state["speed"]=min(config["max_speed"],state["speed"]+config["acceleration"])
+    elif action=="brake":
+        state["speed"]=max(0,state["speed"]-config["brake_force"])
+    elif action=="coast":
+        state["speed"]=max(0,state["speed"]-1)
+    elif action.startswith("steer_"):
+        delta=-1 if action=="steer_left" else 1
+        state["lane"]=max(-1,min(1,state["lane"]+delta))
+        state["speed"]=max(0,state["speed"]-1)
+        events.append("lane_changed")
+    elif action=="boost":
+        if state["boost_charges"]<=0:
+            raise AdvancedRuntimeError("nitro charge exhausted")
+        state["boost_charges"]-=1
+        state["speed"]=min(config["max_speed"],
+                           state["speed"]+config["acceleration"]*2)
+        events.append("boost_consumed")
+    if state["fuel"]<=0:
+        state["speed"]=0
+        events.append("fuel_empty")
+    else:
+        state["fuel"]=max(0,state["fuel"]-1-state["speed"]//15)
+    # An engine or tire failure reduces feasible speed; running on worn tires
+    # without maintenance is a real, stateful handicap.
+    if state["tire_condition"]<25 or state["engine_integrity"]<30:
+        state["speed"]=min(state["speed"],max(1,grip//2))
+        events.append("mechanical_limp_mode")
+    travel=state["speed"]
+    old_distance=state["distance"]
+    next_distance=min(config["track_length"]*config["laps"],
+                      old_distance+travel)
+    lap0=old_distance//config["track_length"]
+    lap1=next_distance//config["track_length"]
+    for lap in range(lap0,lap1+1):
+        segment_start=max(old_distance,lap*config["track_length"])
+        segment_end=min(next_distance,(lap+1)*config["track_length"])
+        for corner in state["corners"]:
+            absolute=lap*config["track_length"]+corner
+            if segment_start<=absolute<=segment_end and state["speed"]>grip:
+                state["tire_condition"]=max(0,state["tire_condition"]-12)
+                state["engine_integrity"]=max(0,state["engine_integrity"]-6)
+                events.append("corner_understeer_damage")
+        obstacle=lap*config["track_length"]+state["track_obstacle"]
+        if segment_start<=obstacle<=segment_end and state["lane"]==0:
+            state["engine_integrity"]=max(0,state["engine_integrity"]-12)
+            events.append("centerline_obstacle_hit")
+    state["tire_condition"]=max(0,state["tire_condition"]-1)
+    state["distance"]=next_distance
+    state["position"]=next_distance%config["track_length"]
+    state["lap"]=min(config["laps"],next_distance//config["track_length"])
+    if lap1>lap0:
+        events.append("lap_completed")
+    if state["engine_integrity"]==0:
+        state["failed"]=True
+        events.append("engine_destroyed")
+    if next_distance>=config["track_length"]*config["laps"] and not state["failed"]:
+        state["finished"]=True
+        state["championship_points"]=max(1,1000-state["tick"]*4-
+                                        (100-state["engine_integrity"])*3)
+        events.append("race_completed")
+    return events
+
+
+def _survival_start(config,seed):
+    regions=[]
+    for index in range(4):
+        profile=(index+seed)%4
+        regions.append({
+            "id":index,"biome":("forest","plains","wetland","highland")[profile],
+            "food_stock":(12,8,6,4)[profile],
+            "wood_stock":(16,7,5,4)[profile],
+            "water_stock":(10,4,16,5)[profile],
+            "stone_stock":(7,4,2,18)[profile],
+            "game_stock":(5,7,4,2)[profile],
+        })
+    return {
+        "tick":0,"day":1,"region":0,"regions":regions,
+        "health":config["max_health"],"max_health":config["max_health"],
+        "food":config["starting_food"],"water":config["starting_water"],
+        "wood":config["initial_wood"],"stone":0,"raw_meat":0,
+        "tools":0,"fire_ticks":0,"shelter_level":0,"energy":10,
+        "trade_tokens":2,"milestones":[],
+        "weather":("clear","rain","cold","heat")[seed%4],
+        "events":[],"finished":False,"failed":False,
+    }
+
+
+def _survival_step(state,config,action):
+    if action not in ACTION_HELP["survival"]:
+        raise AdvancedRuntimeError("unrecognized survival command")
+    events=[]
+    state["tick"]+=1
+    local=state["regions"][state["region"]]
+    if action=="travel":
+        if state["energy"]<3:
+            raise AdvancedRuntimeError("player is too exhausted to travel")
+        state["energy"]-=3
+        state["region"]=(state["region"]+1)%len(state["regions"])
+        events.append("region_discovered")
+    elif action in ("forage","gather_wood","mine_stone","hunt","drink"):
+        stock_field={
+            "forage":"food_stock","gather_wood":"wood_stock",
+            "mine_stone":"stone_stock","hunt":"game_stock","drink":"water_stock",
+        }[action]
+        if local[stock_field]<=0:
+            raise AdvancedRuntimeError("finite local resource has been depleted")
+        if state["energy"]<=0:
+            raise AdvancedRuntimeError("not enough energy to harvest")
+        amount=min(local[stock_field],2+(1 if state["tools"] else 0))
+        local[stock_field]-=amount
+        if action=="forage":state["food"]+=amount
+        elif action=="gather_wood":state["wood"]+=amount
+        elif action=="mine_stone":state["stone"]+=amount
+        elif action=="hunt":state["raw_meat"]+=amount
+        elif action=="drink":state["water"]+=amount
+        state["energy"]-=1
+        events.append("finite_resource_harvested")
+    elif action=="craft_tool":
+        if state["wood"]<2 or state["stone"]<2:
+            raise AdvancedRuntimeError("crafting requires two wood and two stone")
+        state["wood"]-=2;state["stone"]-=2;state["tools"]+=1
+        events.append("tool_crafted")
+    elif action=="light_fire":
+        if state["wood"]<2:
+            raise AdvancedRuntimeError("lighting fire requires two real wood")
+        state["wood"]-=2;state["fire_ticks"]=4
+        events.append("fire_lit")
+    elif action=="cook":
+        if state["fire_ticks"]<=0 or state["raw_meat"]<=0:
+            raise AdvancedRuntimeError("cooking needs fire and raw meat")
+        state["raw_meat"]-=1;state["food"]+=3
+        events.append("meal_cooked")
+    elif action=="build_shelter":
+        needed_wood=3+state["shelter_level"]
+        if state["wood"]<needed_wood or state["stone"]<2 or state["shelter_level"]>=3:
+            raise AdvancedRuntimeError("shelter requires finite construction resources")
+        state["wood"]-=needed_wood;state["stone"]-=2
+        state["shelter_level"]+=1
+        events.append("shelter_built")
+        if "permanent_camp" not in state["milestones"]:
+            state["milestones"].append("permanent_camp")
+    elif action=="trade":
+        if state["trade_tokens"]<=0:
+            raise AdvancedRuntimeError("trade credits are exhausted")
+        state["trade_tokens"]-=1;state["food"]+=2;state["water"]+=2
+        events.append("market_trade")
+    elif action=="rest":
+        state["energy"]=min(10,state["energy"]+5+state["shelter_level"])
+        state["health"]=min(config["max_health"],state["health"]+
+                            (2 if state["shelter_level"] else 1))
+        events.append("rested")
+    if state["fire_ticks"]>0:state["fire_ticks"]-=1
+    # Explicit finite consumption; no hidden infinite replenishment. Weather
+    # changes every six turns and shelter/fire dampen its effects.
+    if state["tick"]%2==0:
+        if state["food"]>0:state["food"]-=1
+        if state["water"]>0:state["water"]-=1
+        if (state["food"]==0 or state["water"]==0):
+            state["health"]=max(0,state["health"]-config["hunger_rate"])
+            events.append("dehydration_or_hunger")
+    if state["tick"]%6==0:
+        state["day"]+=1
+        state["weather"]=("clear","rain","cold","heat")[
+            (state["day"]+state["region"])%4]
+        if state["weather"] in ("cold","heat") and not state["shelter_level"]:
+            state["health"]=max(0,state["health"]-1)
+            events.append("weather_exposure")
+    if state["shelter_level"]>=2 and state["tools"]>=1:
+        if "self_sufficient_outpost" not in state["milestones"]:
+            state["milestones"].append("self_sufficient_outpost")
+            events.append("original_world_milestone")
+    if state["health"]==0:
+        state["failed"]=True
+        events.append("survivor_lost")
+    # Open-ended world: achieving a settlement milestone does NOT force a
+    # victory screen; user can continue until finite resources run out.
+    return events
+
+
 def run_advanced_session(editor: str, settings: Mapping[str, object] | None = None,
                          actions: Sequence[str] = (), *, seed: int = 0) -> dict:
     if editor not in ENGINES:
@@ -392,9 +616,14 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
     _bounded(seed, actions)
     config = make_editor_document(editor, settings)
     rules = config["settings"]
-    state = ( _platform_start(rules,seed) if editor=="platformer" else
-              _tactics_start(rules,seed) if editor=="tactics" else
-              _defense_start(rules,seed) )
+    starts = {
+        "platformer":_platform_start,
+        "tactics":_tactics_start,
+        "tower_defense":_defense_start,
+        "racing":_racing_start,
+        "survival":_survival_start,
+    }
+    state=starts[editor](rules,seed)
     baseline=_digest({"editor":editor,"configuration":config["digest"],"seed":seed,
                       "quality_floor":"advanced"})
     previous=baseline
@@ -404,12 +633,12 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             raise AdvancedRuntimeError("action not registered for advanced runtime")
         if state["finished"] or state["failed"]:
             raise AdvancedRuntimeError("gameplay cannot advance after terminal outcome")
-        if editor=="platformer":
-            events=_platform_step(state,rules,action)
-        elif editor=="tactics":
-            events=_tactics_step(state,rules,action)
-        else:
-            events=_defense_step(state,rules,action)
+        steps = {
+            "platformer":_platform_step,"tactics":_tactics_step,
+            "tower_defense":_defense_step,"racing":_racing_step,
+            "survival":_survival_step,
+        }
+        events=steps[editor](state,rules,action)
         state["events"]=events
         receipt={"index":index,"action":action,"events":events,
                  "state_digest":_digest(state),"previous":previous}
