@@ -180,8 +180,7 @@ function render(message){
    "Completed: "+(state.completed.join(", ")||"none"),
    "Citizens: "+WORLD.citizens.length+" · Regions: "+WORLD.regions.length,
    "Turn history: "+events.slice(-24).join(" → ")];
- nodes.journal.textContent=log.join("
-");
+ nodes.journal.textContent=log.join("\n");
 }
 function reset(){state=initial();history=[];events=[];render("A new original world begins.");}
 function undo(){if(!history.length)return;state=history.pop();events.pop();render("Undid the previous action.");}
