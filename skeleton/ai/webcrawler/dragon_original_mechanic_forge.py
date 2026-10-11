@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from dataclasses import asdict,dataclass,replace
 from hashlib import sha256
+from functools import lru_cache
 import json,re
 
 SCHEMA="skeleton.ai.dragon.original_mechanic_program.v1"
@@ -127,10 +128,16 @@ def decode_levels(index:int)->tuple[int,...]:
     return tuple(result)
 
 
+@lru_cache(maxsize=32)
+def _parent_values(index:str)->tuple[tuple[int,...],str]:
+    from .dragon_world_codex import unrank,validate
+    _,codex=validate(unrank(index))
+    return codex.values,codex.digest()
+
+
 def _parent(index:str|None)->str|None:
     if index is None:return None
-    from .dragon_world_codex import unrank,validate
-    return validate(unrank(index))[1].digest()
+    return _parent_values(index)[1]
 
 
 def make_program(index:str,*,parent_codex_index:str|None=None)->OriginalProgram:
@@ -207,19 +214,28 @@ def _action(program:OriginalProgram,state:OriginalPlay,index:int)->dict:
     name,domain,spend,earn=MECHANICS[index]
     spend_index=RESOURCE_INDEX[spend]
     earn_index=RESOURCE_INDEX[earn]
-    expense=level
+    environment=(0,0,0,0)
+    if program.parent_codex_index is not None:
+        environment=_parent_values(program.parent_codex_index)[0][
+            index*4:index*4+4]
+    # All 128 prior Codex axes actively influence the new 32-mechanic
+    # implementation: 4 environment values per mechanic. Changing its
+    # environmental genome changes real required resources, emitted yield
+    # and route displacement, never only a source hash.
+    expense=level+environment[0]//86
     if spend=="energy":
-        expense=2*level
+        expense=2*level+environment[0]//86
     open_=level>0 and state.resources[spend_index]>=expense
-    delta=(level*(2+index%5))
-    dx=(index%5)-2
-    dy=(index//5)%5-2
+    delta=(level*(2+index%5))+environment[1]//64
+    dx=(index%5)-2+(environment[2]//86)
+    dy=(index//5)%5-2+(environment[3]//86)
     return {
         "id":"practice_"+name,"mechanic":name,"domain":domain,
         "level":level,"available":open_,
         "cost_resource":spend,"cost":expense,
         "gain_resource":earn,"gain":delta,
         "world_effect":"original_"+name,
+        "parent_codex_environment":list(environment),
         "physical_position_delta":[dx,dy],
         "reason":"not_in_design" if level==0 else
                  "insufficient_"+spend if not open_ else "available",
