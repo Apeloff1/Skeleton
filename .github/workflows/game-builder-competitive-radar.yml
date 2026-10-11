@@ -12,6 +12,7 @@ on:
       - "skeleton/ai/game_builder/competitive_evolution_chain.py"
       - "skeleton/ai/game_builder/competitive_counterproposals.py"
       - "skeleton/ai/game_builder/competitive_deep_service.py"
+      - "skeleton/ai/game_builder/competitive_ancestry_frontier.py"
       - "tests/test_game_builder_competitive_deep.py"
       - "skeleton/ai/webcrawler/dragon_mission_scheduler.py"
       - "tests/test_game_builder_competitive_radar.py"
