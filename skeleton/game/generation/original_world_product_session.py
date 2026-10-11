@@ -29,6 +29,7 @@ from .original_world_npc_cognition_v2 import (
     CitizenIntelligence, make_intelligence, validate_intelligence,
     smart_npc_tick, cognition_save, cognition_restore,
     register_player_care, commission, cancel_order, _bond_change,
+    commission_project, cancel_project,
 )
 
 SCHEMA = "original-world-playable-product-session.v2"
@@ -243,6 +244,25 @@ def _npc_operation(
         thinking = cancel_order(thinking, society, world, action.target)
         living = session.living
         message = f"Open work contract {action.target} cancelled without fabricating goods"
+    elif action.verb == "project":
+        if world.position != (0, 0) and world.position != (action.x, action.y):
+            raise FoundationError("civic plan needs posting at depot or physical worksite")
+        world, thinking = commission_project(
+            thinking, society, world, kind=action.option, x=action.x, y=action.y)
+        previous = session.living.spatial
+        if previous.game.causal.trust < 1:
+            raise FoundationError("public construction requires real civic trust")
+        living = replace(session.living, spatial=replace(
+            previous, game=replace(previous.game, causal=replace(
+                previous.game.causal, trust=previous.game.causal.trust - 1))))
+        message = ("Reserved finite construction materials for "
+                   + action.option + f" at ({action.x},{action.y})"
+                   + "; skilled NPCs must physically assemble it")
+    elif action.verb == "cancel_project":
+        world, thinking = cancel_project(
+            thinking, society, world, action.target)
+        living = session.living
+        message = "Unspent public construction escrow returned to the real depot"
     elif action.verb == "council":
         if world.position != (0, 0) or world.provisions < 1:
             raise FoundationError("public council requires depot and one food offering")
