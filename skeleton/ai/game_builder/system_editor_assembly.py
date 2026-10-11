@@ -142,6 +142,9 @@ def compile_system_assembly(project_id: str,
         "tower_defense": ("build:0", "tick:4"),
         "racing": ("accelerate", "accelerate", "coast"),
         "survival": ("forage", "drink", "rest"),
+        "shooter": ("wait",),
+        "deck_battler": ("end_turn",),
+        "puzzle": ("wait",),
     }
     advanced_evidence = [
         {"editor": name,
@@ -175,6 +178,8 @@ def compile_system_assembly(project_id: str,
             "platformer":("wait",),"tactics":("end_turn",),
             "tower_defense":("tick",),"racing":("coast",),
             "survival":("rest",),
+            "shooter":("wait",),"deck_battler":("end_turn",),
+            "puzzle":("wait",),
         }
         proof=run_advanced_session(editor,configs[editor]["settings"],
                                    scene_smoke[editor],
