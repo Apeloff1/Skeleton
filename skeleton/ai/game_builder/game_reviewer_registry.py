@@ -277,6 +277,9 @@ class ReviewerRegistry:
         if not evaluation.passed:
             return dict(status="blocked",evaluation=evaluation.payload(),
                         improvement_ledger=feedback.payload())
+        if (previous["active"] is not None and
+                evaluation.candidate_digest==previous["active"]):
+            raise PromotionError("active reviewer cannot be restaged as a new model")
         historic_train,historic_protected=self._historic_source_roles(
             excluding_candidate=evaluation.candidate_digest)
         incoming={key:set(ids) for key,ids in plan.split_projects}
