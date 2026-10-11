@@ -14,6 +14,8 @@ on:
       - "tests/test_game_builder_studio_execution.py"
       - "tests/test_game_builder_companion_curriculum.py"
       - "tests/test_game_builder_tiled_map_import.py"
+      - "tests/test_game_builder_living_story.py"
+      - "tests/test_game_builder_studio_living_world.py"
       - ".github/workflows/game-builder-native-godot-replay.yml"
   push:
     branches: [main]
@@ -27,6 +29,8 @@ on:
       - "tests/test_game_builder_studio_execution.py"
       - "tests/test_game_builder_companion_curriculum.py"
       - "tests/test_game_builder_tiled_map_import.py"
+      - "tests/test_game_builder_living_story.py"
+      - "tests/test_game_builder_studio_living_world.py"
       - ".github/workflows/game-builder-native-godot-replay.yml"
   workflow_dispatch:
 
@@ -90,10 +94,15 @@ jobs:
           skeleton/ai/game_builder/tiled_map_import.py
           skeleton/ai/game_builder/tiled_map_cli.py
           tests/test_game_builder_tiled_map_import.py
+          skeleton/ai/game_builder/living_story_runtime.py
+          skeleton/ai/game_builder/living_story_export.py
+          skeleton/ai/game_builder/living_story_mirror.py
+          tests/test_game_builder_living_story.py
+          tests/test_game_builder_studio_living_world.py
       - name: Run actual Godot native winning replays
         run: |
           set -euo pipefail
-          python -m unittest             tests.test_game_builder_dual_runtime             tests.test_game_builder_authored_tiles             tests.test_game_builder_tile_editor             tests.test_game_builder_studio_pipeline             tests.test_game_builder_studio_research             tests.test_game_builder_consumer_release_assurance             tests.test_game_builder_studio_execution             tests.test_game_builder_companion_curriculum             tests.test_game_builder_tiled_map_import -v
+          python -m unittest             tests.test_game_builder_dual_runtime             tests.test_game_builder_authored_tiles             tests.test_game_builder_tile_editor             tests.test_game_builder_studio_pipeline             tests.test_game_builder_studio_research             tests.test_game_builder_consumer_release_assurance             tests.test_game_builder_studio_execution             tests.test_game_builder_companion_curriculum             tests.test_game_builder_tiled_map_import             tests.test_game_builder_living_story             tests.test_game_builder_studio_living_world -v
       - name: Create reproducible native desktop release fixture
         run: |
           set -euo pipefail
@@ -185,6 +194,8 @@ jobs:
             tests/test_game_builder_studio_execution.py
             tests/test_game_builder_companion_curriculum.py
             tests/test_game_builder_tiled_map_import.py
+            tests/test_game_builder_living_story.py
+            tests/test_game_builder_studio_living_world.py
             tests/test_game_builder_dual_runtime.py
             tests/test_game_builder_authored_tiles.py
       - name: Set up Python
@@ -209,7 +220,7 @@ jobs:
       - name: Exercise Python, authored and mirror studio contracts on Windows
         shell: pwsh
         run: |
-          python -m unittest tests.test_game_builder_studio_pipeline tests.test_game_builder_consumer_release_assurance tests.test_game_builder_dual_runtime tests.test_game_builder_authored_tiles tests.test_game_builder_studio_execution tests.test_game_builder_companion_curriculum tests.test_game_builder_tiled_map_import -v
+          python -m unittest tests.test_game_builder_studio_pipeline tests.test_game_builder_consumer_release_assurance tests.test_game_builder_dual_runtime tests.test_game_builder_authored_tiles tests.test_game_builder_studio_execution tests.test_game_builder_companion_curriculum tests.test_game_builder_tiled_map_import tests.test_game_builder_living_story tests.test_game_builder_studio_living_world -v
           if ($LASTEXITCODE -ne 0) { throw "Windows game studio tests failed" }
       - name: Build original consumer source on Windows
         shell: pwsh
