@@ -220,3 +220,39 @@ def test_world_source_digest_and_actions_must_be_exact_to_prevent_forged_output(
         replay(design,("not_a_real_gameplay_verb",))
     with pytest.raises(ValueError):
         replay(design,("rest_world",)*129)
+
+
+
+def test_all_128_existing_codex_axes_change_actual_original_gameplay_not_only_hashes():
+    from skeleton.ai.webcrawler.dragon_world_codex import (
+        AXIS_NAMES,edit,
+    )
+    baseline=make_program(str(PROGRAM_COUNT-1),parent_codex_index="0")
+    first=choices(baseline,initial(baseline))
+    assert len(AXIS_NAMES)==128
+    assert len(first)>=32
+    for axis_number,name in enumerate(AXIS_NAMES):
+        changed=edit("0",{name:255})
+        program=make_program(
+            str(PROGRAM_COUNT-1),
+            parent_codex_index=changed.decimal_index,
+        )
+        option=choices(program,initial(program))[axis_number//4]
+        old=first[axis_number//4]
+        assert option["id"]==old["id"]
+        assert option["available"] and old["available"]
+        assert option["world_effect"]==old["world_effect"]
+        assert program.source_digest!=baseline.source_digest
+        slot=axis_number%4
+        if slot==0:
+            assert option["cost"]>old["cost"]
+        elif slot==1:
+            assert option["gain"]>old["gain"]
+        elif slot==2:
+            assert (option["physical_position_delta"][0]>
+                    old["physical_position_delta"][0])
+        else:
+            assert (option["physical_position_delta"][1]>
+                    old["physical_position_delta"][1])
+        assert replay(program,(option["id"],))!=replay(
+            baseline,(old["id"],))
