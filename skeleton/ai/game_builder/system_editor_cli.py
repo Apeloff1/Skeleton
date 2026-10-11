@@ -24,6 +24,7 @@ from .advanced_puzzle_solver import solve_advanced_puzzle
 from .advanced_godot_export import (
     render_advanced_godot_package, write_advanced_godot_package,
 )
+from .advanced_platformer_godot import render_platformer_godot_package
 from .advanced_gameplay_save import (
     export_advanced_savegame, import_advanced_savegame, continue_advanced_savegame,
 )
@@ -121,9 +122,11 @@ def main(argv=None) -> int:
                 _load(args.settings) if args.settings else None,
                 max_states=args.max_states,max_depth=args.max_depth)
         elif args.operation == "godot-export":
-            artifact=render_advanced_godot_package(
-                _load(args.session),_load(args.settings) if args.settings else None,
-                authorized=args.trusted_local_operator)
+            receipt=_load(args.session)
+            settings=_load(args.settings) if args.settings else None
+            renderer=(render_platformer_godot_package if receipt.get("editor")=="platformer"
+                      else render_advanced_godot_package)
+            artifact=renderer(receipt,settings,authorized=args.trusted_local_operator)
             destination=write_advanced_godot_package(
                 artifact,args.output,authorized=args.trusted_local_operator)
             output={**artifact.manifest,"local_output_path":str(destination)}
