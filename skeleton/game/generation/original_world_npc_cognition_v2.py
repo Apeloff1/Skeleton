@@ -736,7 +736,8 @@ def smart_npc_tick(
                          if family.status == "established"
                          and person.id in (family.caregiver_a, family.caregiver_b)
                          and thinking.households.ages[family.child_id] < CHILDCARE_TURNS
-                         and people.inhabitants[family.child_id].hunger >= 5), None)
+                         and people.inhabitants[family.child_id].hunger >= 5
+                         and family.child_id not in dependent_meals), None)
             if need is not None and person.hunger < 7 and person.energy >= 2:
                 goal, utility, reason = (
                     "care", 160, "respond to an actual hungry dependent household member")
