@@ -104,7 +104,7 @@ does not count as a completed advanced engine. Editor maturity is one of:
 - `advanced_reference_runtime`: a real replayable, command-driven game engine
   prototype with explicit evidence, not native hardware certification.
 
-Five engine families currently meet the second level:
+Eight engine families currently meet the second level:
 
 1. **Platformer**: swept tile traversal, integer jump physics, optional
    double jump, finite dash cooldown, spike damage, checkpoint respawn,
@@ -122,6 +122,12 @@ Five engine families currently meet the second level:
 5. **Survival**: multi-biome travel, explicit depleting resource nodes, energy,
    hunger and thirst, weather exposure, resource-dependent craft/shelter/fire,
    tools and finite trading; open-ended play continues after building a camp.
+6. **Shooter**: spatial projectile targeting, line-of-sight blockers, enemies
+   with authored spawn positions and waves, finite ammo, movement and extraction.
+7. **Deck battler**: finite hands, card costs and unique effects, poisoning,
+   shields, deterministic shuffling, boss intents and item consumables.
+8. **Puzzle**: five distinct logic families, interactive puzzles, finite
+   rewinds and bounded independent search proofs.
 
 Run `Start advanced scenario` in the studio after selecting one of these
 three systems. Visible gameplay action buttons replay a **fully submitted
@@ -145,6 +151,69 @@ The assembly graph includes reference-playable proof digests for these three
 engines. It never equates successful reference simulation with a certified
 Godot export or native executable. Integration of the actual other 40
 game engines and producer-grade scene/node editors remains outstanding.
+
+## Advanced multi-genre expansion — 8 real reference engines
+
+The minimum **Advanced** design contract now has eight fully command-executing
+reference families. In addition to platformer, tactical squad combat, tower
+defense, racing and survival, this batch implements the following distinct
+playable mechanics:
+
+- **Arena shooter:** authored 2D arena cover/line of sight, positional enemy
+  behavior, bounded reinforcement waves, ammo/reloading, dodging, healing,
+  scored defeats and extraction-based victory. Shooter maps author enemy
+  spawns, medical supply locations and a reachability-checked exit.
+- **Deck battler:** finite authored card decks (strike, guard, pierce, drain,
+  rally, scry, ward and spark), seeded deterministic shuffle, card energy,
+  hand draw/discard and reshuffle, armor, damage, defense, poison,
+  enemy intent rotation, potions and boss defeat. Card decks must contain a
+  payable damaging option, and their opponents have reviewed intent cycles.
+- **Puzzle:** independent gameplay for switch-and-door layouts, Sokoban-like
+  crate pushing, circuit-node activation, timed phase gates and non-Euclidean
+  paired portals, plus bounded rewind/history and customizable conditions for
+  playable-but-not-necessarily-solvable worlds.
+
+All eight accept exact-checksummed scene documents, replay signed action chains
+through stateless local authority, and support resumable save files. These are
+reference simulators, not yet retail-ready Godot/native engines; 35 other
+editors continue to have distinct, explicit maturity labels rather than a
+fabricated completed-game status.
+
+### Real graphical authoring and proof search
+
+The local studio now has a **cell-based graphical scene painting surface**
+for shooter, tactics and puzzle boards, alongside their full structured source.
+Selecting a paint tool and a map tile changes the local draft only. The user
+must run canonical server validation, inspect the exact-source diff, and
+explicitly approve a project-file commit. Incomplete paint actions or a stale
+digest cannot bypass the scene or game-source validators. Other systems
+retain their typed structured editors without falsely presenting a full
+graphical terrain editor.
+
+The new `advanced_puzzle_solver` runs bounded graph search over real puzzle
+rules. It returns one of three non-interchangeable statuses:
+`solved` (an action path independently replayed through the gameplay engine),
+`unsatisfiable_exhaustive` (the reachable bounded state graph was fully
+explored without a solution), or `unproven_search_budget` (search limits
+prevented a conclusion). This is more rigorous than treating static map
+connectivity as evidence of puzzle completion. It does not certify aesthetic
+quality, contest difficulty or native hardware play.
+
+Example offline proof command:
+
+```bash
+python -m skeleton.ai.game_builder.system_editor_cli scene-template \
+  --editor puzzle --settings puzzle-settings.json > original-puzzle.json
+python -m skeleton.ai.game_builder.system_editor_cli solve-puzzle \
+  --scene original-puzzle.json --settings puzzle-settings.json \
+  --max-states 12000 --max-depth 96
+```
+
+The scene editor also exposes **Prove puzzle solution / detect impossible
+state**. User-selectable open-ended/non-solvable puzzles remain legal and
+expressible through the `solution_required=false` control; proof status is
+never silently altered to claim completion. Every solver result includes a
+source/setting digest and explicitly leaves publication certification false.
 
 ## Authored advanced levels, survival regions and real savegames
 
