@@ -330,6 +330,8 @@ def _check_state(world: StoryWorld, state: StoryState) -> None:
         raise StoryError("unrecognized story ending")
     if state.ending is not None and len(state.completed) < world.intent.quests_to_finish:
         raise StoryError("ending claimed before required quests completed")
+    if state.ending is not None and state.faction_trust[ENDING_IDS.index(state.ending)] < 25:
+        raise StoryError("story ending was claimed without earning its faction support")
     expected_status = (
         "playing" if state.ending is None else
         "won" if world.intent.mode == "campaign" else
@@ -370,7 +372,10 @@ def story_choices(world: StoryWorld, state: StoryState) -> tuple[str, ...]:
                         and quest.item in state.inventory and quest.key not in state.completed):
                     choices.append("resolve:" + quest.key)
     if state.ending is None and len(state.completed) >= world.intent.quests_to_finish:
-        choices.extend("choose:" + x for x in ENDING_IDS)
+        choices.extend(
+            "choose:" + ending for i, ending in enumerate(ENDING_IDS)
+            if state.faction_trust[i] >= 25
+        )
     return tuple(choices)
 
 
@@ -555,7 +560,16 @@ def demonstrate_story(
             perform("wait")
         raise StoryError("scheduled NPC missed a full day at home")
 
-    for quest in world.quests[:world.intent.quests_to_finish]:
+    # The three endings are *causally earned*, never three renamed buttons.
+    # A player must have resolved at least one real faction quest matching
+    # the selected outcome, in addition to the global progression budget.
+    required_faction = FACTIONS[ENDING_IDS.index(ending)]
+    signature_quest = next(
+        q for q in world.quests if q.faction == required_faction
+    )
+    selected = [signature_quest]
+    selected.extend(q for q in world.quests if q.key != signature_quest.key)
+    for quest in selected[:world.intent.quests_to_finish]:
         npc = next(c for c in world.citizens if c.key == quest.giver)
         meet(npc)
         perform("talk:" + npc.key)
