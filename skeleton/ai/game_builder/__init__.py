@@ -321,6 +321,10 @@ _KNOWLEDGE_EXPORTS = {
     "EvidenceKind": ".consumer_release_assurance",
     "ReviewerRole": ".consumer_release_assurance",
     "assess_consumer_release": ".consumer_release_assurance",
+    "ExecutionPlaneError": ".studio_execution_plane",
+    "ExecutedToolReceipt": ".studio_execution_plane",
+    "ExecutionOutcome": ".studio_execution_plane",
+    "execute_local_tool_plan": ".studio_execution_plane",
 }
 
 
