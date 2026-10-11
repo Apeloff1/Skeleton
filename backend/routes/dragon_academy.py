@@ -1393,6 +1393,32 @@ class NativeOriginalMechanicPlayRequest(NativeOriginalMechanicRequest):
     moves:list[str]=Field(default_factory=list,max_length=128)
 
 
+class NativeOriginalMechanicFusionRequest(NativeOriginalMechanicPlayRequest):
+    """One bounded original-gameplay interaction page, at real current state."""
+    offset:StrictInt=Field(default=0,ge=0,lt=1024)
+    limit:StrictInt=Field(default=32,ge=1,le=64)
+
+
+@router.post("/native/production/worlds/originals/interactions")
+def native_original_mechanics_interactions(
+    body:NativeOriginalMechanicFusionRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_original_mechanic_forge import (
+        replay,interaction_catalog,
+    )
+    try:
+        program=_original_mechanic_program(body)
+        state=replay(program,tuple(body.moves))
+        result=interaction_catalog(
+            program,state,offset=body.offset,limit=body.limit)
+        return {"ok":True,**result,
+                "current_gameplay_digest":state.history_digest}
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original cross-mechanic synthesis needs earned, valid game-state actions") from None
+
+
 class NativeOriginalMechanicCompareRequest(BaseModel):
     model_config=ConfigDict(extra="forbid")
     first:str=Field(min_length=1,max_length=20,
