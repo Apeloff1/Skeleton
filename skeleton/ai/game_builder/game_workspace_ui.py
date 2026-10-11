@@ -23,6 +23,11 @@ small{color:#b9d0d3}.status{background:#254653;padding:.6rem;margin:.8rem 0;whit
 #diff{background:#0b2331;color:#d7f7df;white-space:pre-wrap;overflow:auto;max-height:270px;font:12px/1.5 ui-monospace,monospace}
 #revision{font-family:ui-monospace,monospace}
 .readonly{border:1px solid #dbbd88;padding:.7rem}
+#system-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.4rem}
+#system-fields label{margin:0}
+#system-fields input[type=checkbox]{width:auto;min-height:auto}
+#system-preview{max-height:170px;overflow:auto;white-space:pre-wrap;font:12px/1.4 ui-monospace,monospace}
+#system-description{display:block;min-height:2.5rem}
 @media(max-width:940px){main{grid-template-columns:1fr}section{min-height:0}}
 """
 SCRIPT=r"""
@@ -256,6 +261,113 @@ $("download").addEventListener("click",()=>{
  document.body.append(a);a.click();a.remove();
  setTimeout(()=>URL.revokeObjectURL(url),0);
 });
+// System editor family controls are generated from the locally verified
+// catalog. No generic string-to-code evaluation or remote plugin execution.
+let systemCatalog=[];
+function systemEditor(){
+ return systemCatalog.find(x=>x.id===$("system-kind").value);
+}
+function renderSystemControls(){
+ const spec=systemEditor(),target=$("system-fields");target.replaceChildren();
+ $("system-preview").textContent="";
+ if(!spec)return;
+ $("system-description").textContent=spec.description+
+  (spec.preview?" · deterministic prototype available":" · typed authoring; runtime not yet integrated");
+ for(const field of spec.fields){
+  const label=document.createElement("label");label.textContent=field.key.replaceAll("_"," ");
+  let element;
+  if(field.kind==="enum"){
+   element=document.createElement("select");
+   for(const choice of field.options){
+    const option=document.createElement("option");
+    option.value=choice;option.textContent=choice;element.append(option);
+   }
+   element.value=field.default;
+  }else{
+   element=document.createElement("input");
+   element.type=field.kind==="bool"?"checkbox":field.kind==="int"?"number":"text";
+   if(field.kind==="bool")element.checked=field.default;
+   else element.value=String(field.default);
+   if(field.kind==="int"){
+    element.min=field.minimum;element.max=field.maximum;element.step="1";
+   }
+  }
+  element.dataset.systemField=field.key;
+  element.dataset.systemKind=field.kind;
+  label.append(element);target.append(label);
+ }
+}
+function systemSettings(){
+ const spec=systemEditor();
+ if(!spec)throw Error("Choose a system-editor family");
+ const values={};
+ for(const field of spec.fields){
+  const input=[...$("system-fields").querySelectorAll("[data-system-field]")]
+   .find(x=>x.dataset.systemField===field.key);
+  if(!input)throw Error("Missing system setting: "+field.key);
+  if(field.kind==="bool")values[field.key]=input.checked;
+  else if(field.kind==="int"){
+   if(!/^-?[0-9]+$/.test(input.value))throw Error("Invalid integer: "+field.key);
+   values[field.key]=Number(input.value);
+  }else values[field.key]=input.value;
+ }
+ return values;
+}
+async function loadSystemEditors(){
+ try{
+  const reply=await api("/api/editors");systemCatalog=reply.editors;
+  const select=$("system-kind");select.replaceChildren();
+  const groups=[...new Set(systemCatalog.map(x=>x.group))];
+  for(const group of groups){
+   const optgroup=document.createElement("optgroup");optgroup.label=group;
+   for(const spec of systemCatalog.filter(x=>x.group===group)){
+    const option=document.createElement("option");option.value=spec.id;
+    option.textContent=spec.title;optgroup.append(option);
+   }
+   select.append(optgroup);
+  }
+  select.value="platformer";renderSystemControls();
+  $("system-count").textContent=systemCatalog.length+" system editors ready";
+ }catch(error){status("System editor catalog unavailable: "+error.message);}
+}
+$("system-kind").addEventListener("change",renderSystemControls);
+$("system-try").addEventListener("click",async()=>{
+ try{
+  const result=await api("/api/editor-preview",{
+   editor:systemEditor().id,settings:systemSettings()});
+  $("system-preview").textContent=JSON.stringify(result.preview,null,2);
+  status("Validated "+result.editor+" settings without writing files.");
+ }catch(error){status("System preview blocked: "+error.message);}
+});
+$("system-stage").addEventListener("click",async()=>{
+ try{
+  if(!model||selectedTree!=="current"||selectedProject!==model.active)
+   throw Error("Select the active current project before staging a system");
+  const result=await api("/api/editor-preview",{
+   editor:systemEditor().id,settings:systemSettings()});
+  let prior={content:"",version:{
+   tree:"current",project:selectedProject,path:result.path,
+   sha256:"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   editable:true}};
+  const list=await api("/api/files?tree=current&project="+encodeURIComponent(selectedProject));
+  if(list.files.some(x=>x.path===result.path)){
+   prior=await api("/api/file?tree=current&project="+
+    encodeURIComponent(selectedProject)+"&path="+encodeURIComponent(result.path));
+  }
+  loaded=prior;selectedFile=result.path;proposal=null;
+  $("editor").value=result.content;$("editor").readOnly=false;
+  $("file-name").textContent="SYSTEM: current/"+selectedProject+"/"+result.path;
+  $("hash").textContent="SHA-256 "+prior.version.sha256;
+  $("reason").value="Configure original "+systemEditor().title+
+    " system with reviewed typed authoring parameters";
+  $("propose").disabled=false;$("commit").disabled=true;
+  $("proposal").textContent="";
+  $("system-preview").textContent=JSON.stringify(result.preview,null,2);
+  diff();
+  status("System staged in source review. Use Review proposed edit, inspect diff, then explicitly approve commit.");
+ }catch(error){status("System staging rejected: "+error.message);}
+});
+loadSystemEditors();
 refresh();
 """
 TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -302,6 +414,17 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <p><small>Read-only model custody. Promotion requires separately reviewed CLI gates.</small></p>
 <pre id="model-progress" role="status" aria-live="polite"></pre>
 <button id="model-refresh" type="button">Refresh reviewer status</button>
+</fieldset>
+<fieldset><legend>Genre and system editors</legend>
+<p id="system-count">Loading typed system catalog</p>
+<label>Authoring system<select id="system-kind"></select></label>
+<small id="system-description"></small>
+<div id="system-fields" aria-label="System-specific design settings"></div>
+<button id="system-try" type="button">Validate and simulate preview</button>
+<button id="system-stage" type="button">Stage system into source review</button>
+<pre id="system-preview" role="status" aria-live="polite"></pre>
+<p><small>Playable preview where implemented; other editors validate authored system settings.
+All writes still require exact-file review and human approval.</small></p>
 </fieldset>
 <p><small>Choose exact relative file location. Previous and demo entries stay read-only.</small></p>
 <div id="files" aria-label="Project file tree"></div>
