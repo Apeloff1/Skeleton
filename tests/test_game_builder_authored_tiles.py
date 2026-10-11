@@ -156,7 +156,7 @@ class AuthoredWorldTests(unittest.TestCase):
                 json.loads((output / "godot/world.json").read_text())
                 ["levels"][0]["rows"], ROWS,
             )
-            self.assertNotIn("Cave </script>", (output / "index.html").read_text())
+            self.assertNotIn("Cave </script>", (output / "index.html").read_text(encoding="utf-8"))
             with self.assertRaises(AuthoredGameError):
                 compile_authored_document(
                     {**self.document, "schema": "wrong"},
