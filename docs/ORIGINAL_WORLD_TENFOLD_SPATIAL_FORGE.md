@@ -1,6 +1,6 @@
 # Original 10× Spatial World Forge — 12,288,000 indexed configurations
 
-**Implementation:** `skeleton/game/generation/original_world_tenfold_*.py`  
+**Implementation:** `skeleton/game/generation/original_world_tenfold_*.py`
 **Status:** Dedicated abstract Python reference runtime and offline game CLI. A
 finished native game, procedural voxel engine, platform-certified binary,
 audio-visual production, or independently authored story is **not** implied
