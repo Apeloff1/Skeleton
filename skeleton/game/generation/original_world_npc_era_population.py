@@ -21,7 +21,9 @@ import json
 
 from .original_foundation_compiler import FoundationError
 from .original_world_era_runtime import ERA_LEVELS
-from .original_world_product_agents import PhysicalSociety, MAX_AGENTS, validate_society
+from .original_world_product_agents import (
+    Person, PhysicalSociety, MAX_AGENTS, validate_society,
+)
 from .original_world_product_terrain import (
     TerrainState, cell_at, validate_terrain,
 )
@@ -102,11 +104,20 @@ class Caravan:
 
 
 @dataclass(frozen=True)
+class Migration:
+    district: int
+    citizen: int
+    day: int
+
+
+@dataclass(frozen=True)
 class EraPopulation:
     era: str
     world_id: str
     districts: tuple[District, ...]
     caravans: tuple[Caravan, ...] = ()
+    migrations: tuple[Migration, ...] = ()
+    fidelity: str = "balanced"
     day: int = 0
     cursor: int = 0
     caravan_seq: int = 0
@@ -163,6 +174,23 @@ def _site(world: TerrainState, index: int) -> tuple[int, int]:
             if not tile.blocking:
                 return x, y
     raise FoundationError("could not find a real traversable district anchor")
+
+
+def tuning(era: str, mode: str) -> tuple[int, int]:
+    b = era_budget(era)
+    if mode == "eco":
+        return min(1, b.district_updates), min(4, b.render_budget)
+    if mode == "balanced":
+        return b.district_updates, b.render_budget
+    if mode == "rich":
+        return min(b.district_limit, 8), min(64, b.render_budget * 2)
+    raise FoundationError("NPC detail mode must be eco, balanced or rich")
+
+
+def adjust_fidelity(state: EraPopulation, mode: str) -> EraPopulation:
+    tuning(state.era, mode)
+    return _seal(state, replace(state, fidelity=mode),
+                 "resource-budget-" + mode)
 
 
 def _allocation(people: int, count: int) -> tuple[int, ...]:
@@ -227,6 +255,21 @@ def validate_population(
         raise FoundationError("era detailed and background budgets disagree")
     if state.day != people.tick:
         raise FoundationError("era population tick is not the NPC world clock")
+    tuning(state.era, state.fidelity)
+    if not isinstance(state.migrations, tuple) or len(state.migrations) > MAX_AGENTS:
+        raise FoundationError("unbounded documented citizen migration")
+    moved = set()
+    for migration in state.migrations:
+        if not isinstance(migration, Migration):
+            raise FoundationError("invalid census-to-individual transfer")
+        _check_int(migration.district, 0, max(0, len(state.districts)-1),
+                   "migration origin")
+        _check_int(migration.citizen, 0, len(people.inhabitants)-1,
+                   "promoted physical identity")
+        _check_int(migration.day, 0, state.day, "migration time")
+        if migration.citizen in moved:
+            raise FoundationError("one remote person cannot be promoted twice")
+        moved.add(migration.citizen)
     for label, value, maximum in (
         ("clock", state.day, MAX_HISTORY),
         ("cursor", state.cursor, MAX_HISTORY * MAX_DISTRICTS),
@@ -264,7 +307,7 @@ def validate_population(
         deaths += d.deaths
         if d.days_simulated != d.last_day:
             raise FoundationError("district cannot conceal deferred simulated days")
-    if count != budget.background_limit or deaths != state.total_deaths:
+    if count + len(state.migrations) != budget.background_limit or deaths != state.total_deaths:
         raise FoundationError("background census illegally creates or loses residents")
     if (not isinstance(state.caravans, tuple)
             or len(state.caravans) > MAX_CARAVANS):
@@ -295,6 +338,44 @@ def _seal(before: EraPopulation, after: EraPopulation, action: str) -> EraPopula
         "schema": SCHEMA, "previous": before.event_head, "action": action,
         "before": asdict(before), "after": asdict(after),
     }))
+
+
+def embody_regional_citizen(
+    state: EraPopulation, people: PhysicalSociety, world: TerrainState,
+    *, district: int,
+) -> tuple[EraPopulation, PhysicalSociety]:
+    """Transition one *real counted* remote resident into a stable NPC body.
+
+    This is deliberately not instant free population creation: the census
+    decreases, the selected nonblocking site becomes a physical coordinate,
+    and a unique migration receipt records where the new resident came from.
+    The caller installs a matching Mind and age in the same game transaction.
+    """
+    validate_population(state, people, world)
+    if type(district) is not int or not 0 <= district < len(state.districts):
+        raise FoundationError("missing district for individual embodiment")
+    if len(people.inhabitants) >= min(MAX_AGENTS, era_budget(state.era).full_npc_limit):
+        raise FoundationError("no free high-fidelity NPC memory slot")
+    place = state.districts[district]
+    if place.population < 1:
+        raise FoundationError("remote district is empty")
+    if abs(place.x - world.position[0]) + abs(place.y - world.position[1]) > 1:
+        raise FoundationError("player must physically visit the active remote settlement")
+    roles = permitted_roles(state.era)
+    identity = len(people.inhabitants)
+    seed = sha256(f"{state.world_id}:migrant:{district}:{identity}".encode()).digest()
+    migrant = Person(identity, roles[seed[0] % len(roles)], place.x, place.y,
+                     energy=12, health=max(1, 20 - place.hardship // 50),
+                     hunger=min(18, place.hardship // 20))
+    roster = replace(people, inhabitants=people.inhabitants + (migrant,))
+    d = list(state.districts)
+    d[district] = replace(place, population=place.population - 1)
+    change = Migration(district, identity, state.day)
+    result = _seal(state, replace(state, districts=tuple(d),
+                                  migrations=state.migrations + (change,)),
+                   "embody-region-citizen-" + str(identity))
+    validate_population(result, roster, world)
+    return result, roster
 
 
 def dispatch_food(
@@ -369,7 +450,7 @@ def tick_population(
     deaths = state.total_deaths
     updated_count = 0
     if districts:
-        slots = min(budget.district_updates, len(districts))
+        slots = min(tuning(state.era, state.fidelity)[0], len(districts))
         for i in range(slots):
             index = (state.cursor + i) % len(districts)
             district = districts[index]
@@ -434,8 +515,10 @@ def population_restore(
             raise FoundationError("unexpected population archive")
         districts = tuple(District(**d) for d in raw["districts"])
         caravans = tuple(Caravan(**c) for c in raw["caravans"])
+        migrations = tuple(Migration(**m) for m in raw["migrations"])
         result = EraPopulation(**{**raw, "districts": districts,
-                                  "caravans": caravans})
+                                  "caravans": caravans,
+                                  "migrations": migrations})
         validate_population(result, people, world)
         return result
     except (TypeError, KeyError, ValueError, AttributeError) as exc:
@@ -456,8 +539,11 @@ def population_report(state: EraPopulation, local: int) -> dict:
         "total_census": local + count,
         "background_loss_of_life": state.total_deaths,
         "districts": len(state.districts),
-        "limited_district_updates_per_turn": b.district_updates,
-        "visible_proxy_budget": b.render_budget,
+        "limited_district_updates_per_turn": tuning(state.era, state.fidelity)[0],
+        "visible_proxy_budget": tuning(state.era, state.fidelity)[1],
+        "detail_mode": state.fidelity,
+        "promoted_to_full_cognition": len(state.migrations),
+        "migrations": [asdict(record) for record in state.migrations],
         "render_radius": b.visibility_radius,
         "remote_food_consumed": state.food_consumed,
         "caravans": [asdict(c) for c in state.caravans],
