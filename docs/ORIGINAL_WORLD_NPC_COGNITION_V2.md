@@ -1,6 +1,6 @@
 # Original Worlds — Cognitive NPC Society (actual implemented v2)
 
-**Status:** Real offline player-facing NPC engine in draft PR #3641.  
+**Status:** Real offline player-facing NPC engine in draft PR #3641.
 **Scope:** One authored original-world product session; bounded 1–32 locally
 simulated individuals per turn. Not an LLM, human-equivalent personality,
 large-language dialogue synthesis, commercial crowd engine or 100,000
