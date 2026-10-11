@@ -129,6 +129,8 @@ jobs:
     env:
       PYTHONPATH: "."
       EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
     steps:
       - name: Enable long-path Git support
         shell: pwsh
