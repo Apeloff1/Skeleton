@@ -113,8 +113,10 @@ class NativeGameToolExecutionTests(unittest.TestCase):
         with self.assertRaisesRegex(ExecutionPlaneError, "human-reviewed"):
             execute_local_tool_plan(self.intent, plan, authorized=True)
         with self.assertRaisesRegex(ExecutionPlaneError, "without"):
-            execute_local_tool_plan(self.intent, self.plan(seq[1:]), authorized=True,
-                                    authored_levels=authored, human_reviewed=True)
+            execute_local_tool_plan(
+                self.intent,
+                self.plan(((Actor.JEEVES, Phase.ORIGINAL, "world.generate"),)),
+                authorized=True, authored_levels=authored, human_reviewed=True)
 
     def test_editing_uses_real_content_hash_and_operator_scopes(self):
         seq = (
