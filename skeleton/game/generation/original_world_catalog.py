@@ -11,6 +11,16 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Mapping
 
+from .original_worlds_legacy_expansion import ROWS as LEGACY_EXPANSION
+from .original_worlds_history import ROWS as HISTORY_WORLDS
+from .original_worlds_theology import ROWS as THEOLOGY_WORLDS
+from .original_worlds_social import ROWS as SOCIAL_WORLDS
+from .original_worlds_environment import ROWS as ENVIRONMENT_WORLDS
+from .original_worlds_life import ROWS as LIFE_WORLDS
+from .original_worlds_technology import ROWS as TECHNOLOGY_WORLDS
+from .original_worlds_gameplay import ROWS as GAMEPLAY_WORLDS
+from .original_worlds_experience import ROWS as EXPERIENCE_WORLDS
+
 
 @dataclass(frozen=True)
 class OriginalWorld:
@@ -193,7 +203,19 @@ _WORLD_ROWS = {
 def _load() -> Mapping[str, OriginalWorld]:
     worlds: dict[str, OriginalWorld] = {}
     signatures: set[str] = set()
-    for domain, rows in sorted(_WORLD_ROWS.items()):
+    all_rows = {domain: list(rows) for domain, rows in _WORLD_ROWS.items()}
+    for expansion in (
+        LEGACY_EXPANSION, HISTORY_WORLDS, THEOLOGY_WORLDS,
+        SOCIAL_WORLDS, ENVIRONMENT_WORLDS, LIFE_WORLDS,
+        TECHNOLOGY_WORLDS, GAMEPLAY_WORLDS, EXPERIENCE_WORLDS,
+    ):
+        for domain, rows in expansion.items():
+            all_rows.setdefault(domain, []).extend(rows)
+    if len(all_rows) != 81 or any(len(rows) != 16 for rows in all_rows.values()):
+        raise ValueError("world atlas inventory must contain 81 domains of 16 originals")
+    if sum(map(len, all_rows.values())) != 1296:
+        raise ValueError("world atlas inventory differs from 1296 originals")
+    for domain, rows in sorted(all_rows.items()):
         for index, row in enumerate(rows, start=1):
             title, invariant, lever, ending = row.split("|")
             if ending not in ENDING_POLICIES:
