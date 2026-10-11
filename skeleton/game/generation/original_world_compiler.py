@@ -98,10 +98,14 @@ _BRIDGES = {frozenset(key): value for key, value in _CROSS_DOMAIN_BRIDGES.items(
 
 
 def _verify_uniform_atlas() -> None:
-    if len(DOMAINS) != 16 or len(WORLDS) != 128 or len(MECHANICS) != 192:
+    if len(DOMAINS) != 81 or len(WORLDS) != 1296 or len(MECHANICS) != 1944:
         raise OriginalAtlasError("atlas inventory changed: explicitly revise index schema")
-    if any(len(MECHANICS_BY_DOMAIN[domain]) != 12 for domain in DOMAINS):
-        raise OriginalAtlasError("domain mechanic cardinality changed: reversion required")
+    if any(len(MECHANICS_BY_DOMAIN[domain]) != 24 for domain in DOMAINS):
+        raise OriginalAtlasError("domain mechanic cardinality changed: revision required")
+    if sum(item.cost_specified for item in MECHANICS.values()) != 712:
+        raise OriginalAtlasError("independently specified mechanics cardinality changed")
+    if sum(not item.cost_specified for item in MECHANICS.values()) != 1232:
+        raise OriginalAtlasError("derived world lever cardinality changed")
     if set(MECHANICS_BY_DOMAIN) != set(DOMAINS):
         raise OriginalAtlasError("world/mechanic domains diverged")
     if len(_BRIDGES) != len(_CROSS_DOMAIN_BRIDGES):
@@ -116,12 +120,12 @@ _verify_uniform_atlas()
 PRIMARY_PICKS = 2
 FOREIGN_DOMAINS = 10
 MECHANICS_PER_WORLD = PRIMARY_PICKS + FOREIGN_DOMAINS
-PRIMARY_CHOICES = comb(12, PRIMARY_PICKS)
-FOREIGN_DOMAIN_CHOICES = comb(15, FOREIGN_DOMAINS)
-FOREIGN_MECHANIC_CHOICES = 12 ** FOREIGN_DOMAINS
+PRIMARY_CHOICES = comb(24, PRIMARY_PICKS)
+FOREIGN_DOMAIN_CHOICES = comb(80, FOREIGN_DOMAINS)
+FOREIGN_MECHANIC_CHOICES = 24 ** FOREIGN_DOMAINS
 VARIANTS_PER_WORLD = PRIMARY_CHOICES * FOREIGN_DOMAIN_CHOICES * FOREIGN_MECHANIC_CHOICES
 TOTAL_VARIANTS = len(WORLD_IDS) * VARIANTS_PER_WORLD
-ATLAS_VERSION = "original-world-atlas.v1"
+ATLAS_VERSION = "original-world-atlas.v2"
 
 
 def _unrank(n: int, k: int, rank: int) -> tuple[int, ...]:
@@ -149,6 +153,7 @@ class RuleBridge:
     from_mechanic: str
     to_mechanic: str
     consequence: str
+    origin: str = "inferred"
 
 
 @dataclass(frozen=True)
@@ -164,6 +169,18 @@ class OriginalWorldBlueprint:
     bridges: tuple[RuleBridge, ...]
     realization_status: str = "design-only"
 
+    @property
+    def specified_mechanic_count(self) -> int:
+        return sum(item.cost_specified for item in self.mechanics)
+
+    @property
+    def unresolved_lever_count(self) -> int:
+        return len(self.mechanics) - self.specified_mechanic_count
+
+    @property
+    def authored_bridge_count(self) -> int:
+        return sum(bridge.origin == "authored" for bridge in self.bridges)
+
     def as_dict(self) -> dict:
         return {
             "atlas_version": self.atlas_version,
@@ -176,6 +193,9 @@ class OriginalWorldBlueprint:
             "ending_policy": self.ending_policy,
             "bridges": [bridge.__dict__.copy() for bridge in self.bridges],
             "realization_status": self.realization_status,
+            "specified_mechanic_count": self.specified_mechanic_count,
+            "unresolved_lever_count": self.unresolved_lever_count,
+            "authored_bridge_count": self.authored_bridge_count,
         }
 
 
@@ -185,7 +205,7 @@ def _digest(value: dict) -> str:
 
 
 def blueprint_at(index: int) -> OriginalWorldBlueprint:
-    """Map an exact integer index to one of 1.57 quintillion distinct recipes.
+    """Map an exact integer index to one of the complete atlas's recipes.
 
     Recipe uniqueness refers to world identifier + ordered mechanic *set*,
     not evidence that the generated worlds are independently playable or fun.
@@ -202,12 +222,12 @@ def blueprint_at(index: int) -> OriginalWorldBlueprint:
     secondary_per_primary = FOREIGN_DOMAIN_CHOICES * FOREIGN_MECHANIC_CHOICES
     primary_rank, local = divmod(local, secondary_per_primary)
     domain_rank, mechanic_rank = divmod(local, FOREIGN_MECHANIC_CHOICES)
-    primary_indices = _unrank(12, PRIMARY_PICKS, primary_rank)
-    secondary_indices = _unrank(15, FOREIGN_DOMAINS, domain_rank)
+    primary_indices = _unrank(24, PRIMARY_PICKS, primary_rank)
+    secondary_indices = _unrank(80, FOREIGN_DOMAINS, domain_rank)
 
     chosen = [MECHANICS_BY_DOMAIN[world.domain][i] for i in primary_indices]
     for domain_index in secondary_indices:
-        power = 12 ** (FOREIGN_DOMAINS - 1 - len(chosen) + PRIMARY_PICKS)
+        power = 24 ** (FOREIGN_DOMAINS - 1 - len(chosen) + PRIMARY_PICKS)
         digit, mechanic_rank = divmod(mechanic_rank, power)
         chosen.append(MECHANICS_BY_DOMAIN[foreign_options[domain_index]][digit])
 
@@ -218,16 +238,27 @@ def blueprint_at(index: int) -> OriginalWorldBlueprint:
     if len(unique_domains) != FOREIGN_DOMAINS + 1:
         raise OriginalAtlasError("cross-domain diversity requirement failed")
 
-    # All co-designed pairings are explicit. Only one bridge per selected
-    # domain pair is materialized to avoid quadratic rule explosion.
-    representative = {domain: next(item.mechanic_id for item in selected
-                                   if item.domain == domain)
-                      for domain in sorted(unique_domains)}
-    bridges = tuple(
-        RuleBridge(representative[first], representative[second], value)
-        for first, second in combinations(sorted(unique_domains), 2)
-        if (value := _BRIDGES.get(frozenset((first, second)))) is not None
-    )
+    # Preserve 52 curated relationships. For previously unpaired domains,
+    # use transparent mechanic-specific bridge hypotheses, NEVER claim the
+    # inferred relationships have been manually authored or implemented.
+    representative = {
+        domain: next(item for item in selected if item.domain == domain)
+        for domain in sorted(unique_domains)
+    }
+    bridges = []
+    for first, second in combinations(sorted(unique_domains), 2):
+        left, right = representative[first], representative[second]
+        authored = _BRIDGES.get(frozenset((first, second)))
+        consequence = authored or (
+            f"Interaction hypothesis: after [{left.title}] causes "
+            f"[{left.state_change}], evaluate whether [{right.title}] "
+            f"can trigger [{right.trigger}]; preserve both stated costs."
+        )
+        bridges.append(RuleBridge(
+            left.mechanic_id, right.mechanic_id, consequence,
+            "authored" if authored else "inferred",
+        ))
+    bridges = tuple(bridges)
     signature = {
         "atlas_version": ATLAS_VERSION,
         "world_id": world.world_id,
