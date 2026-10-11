@@ -21,9 +21,12 @@ from skeleton.ai.game_builder.game_model_promotion import (
 )
 from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
 from skeleton.ai.game_builder.game_reviewer_registry import (
-    PromotionAttestation,ReviewerRegistry,ROLES,
+    PromotionAttestation,ReviewerRegistry,ROLES,ReviewPreempted,
 )
 from skeleton.ai.game_builder.quest_scene_forge import forge_director
+from skeleton.ai.game_builder.game_idle_review_scheduler import (
+    IdleEvaluationBudget,qualify_when_idle,
+)
 
 
 def promotion_corpus():
@@ -239,6 +242,45 @@ class ReviewerPromotionTests(unittest.TestCase):
         with self.assertRaises(PromotionError):
             self.registry.observe(self._worlds("usage"),mode="idle",
                                   authorized=True)
+
+    def test_opt_in_idle_budget_and_safe_foreground_preemption(self):
+        self._stage()
+        self.registry.authorize_shadow(self._attest(),authorized=True)
+        worlds=self._worlds("idle")
+        budget=IdleEvaluationBudget(max_wall_seconds=300,max_worlds=2)
+        before=self.registry.read_state()
+        deferred=qualify_when_idle(
+            self.registry,worlds,authorized=True,consent=True,
+            host_is_idle=lambda:False,hardware_is_safe=lambda:True,
+            budget=budget)
+        self.assertEqual(deferred["status"],"deferred")
+        self.assertFalse(deferred["model_state_mutated"])
+        self.assertEqual(self.registry.read_state(),before)
+        with self.assertRaises(PermissionError):
+            qualify_when_idle(
+                self.registry,worlds,authorized=True,consent=False,
+                host_is_idle=lambda:True,hardware_is_safe=lambda:True,
+                budget=budget)
+        calls=[0]
+        def still_idle():
+            calls[0]+=1
+            return calls[0]<10
+        interrupted=qualify_when_idle(
+            self.registry,worlds,authorized=True,consent=True,
+            host_is_idle=still_idle,hardware_is_safe=lambda:True,
+            budget=budget)
+        self.assertEqual(interrupted["status"],"deferred")
+        self.assertEqual(interrupted["reason"],"preempted_before_publishing")
+        self.assertGreaterEqual(calls[0],10)
+        self.assertEqual(self.registry.read_state(),before)
+        successful=qualify_when_idle(
+            self.registry,worlds,authorized=True,consent=True,
+            host_is_idle=lambda:True,hardware_is_safe=lambda:True,
+            budget=budget)
+        self.assertEqual(successful["status"],"shadow")
+        self.assertTrue(successful["evaluation"]["cohort"]["passed"])
+        self.assertFalse(successful["automatic_promotion_performed"])
+        self.assertNotEqual(self.registry.read_state(),before)
 
     def test_abort_incomplete_candidates_leaves_canonical_review_unchanged(self):
         staged=self._stage()
