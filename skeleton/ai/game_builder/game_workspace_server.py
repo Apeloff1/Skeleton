@@ -23,6 +23,9 @@ from .advanced_gameplay_runtime import (
     run_advanced_session, verify_advanced_session, ACTION_HELP,
 )
 from .advanced_level_scenes import make_advanced_scene, scene_path
+from .advanced_gameplay_save import (
+    export_advanced_savegame, import_advanced_savegame, continue_advanced_savegame,
+)
 
 
 class StudioServerError(ValueError):
@@ -179,6 +182,17 @@ class _StudioHandler(BaseHTTPRequestHandler):
         path=urlsplit(self.path).path
         values=self._body()
         studio=self.server.workspace
+        if path=="/api/advanced-save":
+            result=export_advanced_savegame(values["session"],values.get("settings"))
+            return self._json(200,{"savegame":result,
+                                    "source_project_mutated":False})
+        if path=="/api/advanced-load":
+            return self._json(200,import_advanced_savegame(values["savegame"]))
+        if path=="/api/advanced-continue":
+            result=continue_advanced_savegame(
+                values["savegame"],values["new_actions"])
+            return self._json(200,{"savegame":result,
+                                    "source_project_mutated":False})
         if path=="/api/advanced-scene-template":
             scene=make_advanced_scene(
                 values["editor"],values.get("settings"),
