@@ -21,6 +21,7 @@ on:
       - "skeleton/ai/game_builder/competitive_pdf_pack.py"
       - "skeleton/ai/game_builder/competitive_research_missions.py"
       - "skeleton/ai/game_builder/competitive_battle_approval.py"
+      - "skeleton/ai/game_builder/competitive_battle_review_cli.py"
       - "skeleton/ai/webcrawler/dragon_research_missions.py"
       - "skeleton/ai/webcrawler/dragon_research_discovery.py"
       - "tests/test_game_builder_competitive_council_pdfs.py"
