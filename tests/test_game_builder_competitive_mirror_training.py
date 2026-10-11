@@ -34,14 +34,14 @@ class CompetitiveWitnessMirrorTests(unittest.TestCase):
             authorized=True,
         )
 
-    def test_real_18_family_red_team_blue_team_and_critic(self):
+    def test_real_36_family_red_team_blue_team_and_critic(self):
         report=run_mirror_competition(
             self.world,self.replay,self.campaign,
             population=24,active_budget=12,ambient_budget=12,
             maximum_witnesses=16,attempts=36,authorized=True,
         )
         self.assertTrue(report.passed)
-        self.assertEqual(report.payload()["attack_family_count"],18)
+        self.assertEqual(report.payload()["attack_family_count"],36)
         self.assertEqual(report.payload()["detected"],36)
         self.assertEqual(report.payload()["missed"],0)
         self.assertEqual({p.family for p in report.probes},set(ATTACK_FAMILIES))
