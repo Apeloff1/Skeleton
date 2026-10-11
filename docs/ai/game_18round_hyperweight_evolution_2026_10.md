@@ -89,6 +89,24 @@ Crawl failures must be retained as failures, not relabeled as novel sources. Rou
 
 **Current production limits:** This implementation includes the 16-round sequencing/control plane, probabilistic priority heuristic, trained local shadow sandbox, safe crawler mission and destination/log handoffs, modular load plans, journal and tests. It does **not** start an always-on network crawler, infer actual era-by-era commercial relevance without a verified game dataset, generate genuine foundation-model shadow tensors, or automatically activate Dragon/Jeeves parameters. Native game builders, model-serving adapters, user-visible research queues and external expert evaluation require further separately authorized integration.
 
+## Executable live workflow and genuine evidence pathways
+
+The typed action implementations go beyond a list of round labels:
+
+- \`game_18round_runtime.execute_round3_relevance\` independently rebuilds the Dragon almanac from the **current canonical Wiki brief and RightsLedger clearance**, then measures each topic's signed historical-original-game utility. It binds the exact report digest to the R3 signed append.
+- \`execute_round4_shadow_backlog\` accepts ONLY that exact R3 report and uses the frozen \`FlowPlan\` and original code-quality receipt. Research-only media are excluded from shadow weights; queued does not imply trained.
+- \`game_18round_executor_extensions.execute_idle_round\` evaluates explicit, callable host-idle and thermal-safety probes before admitting the R5/R6 record, with consent, bounded memory, bounded wall time, no imaginary completed games and no background daemon. The general-knowledge lane remains distinct from user task weights.
+- \`execute_round7_era_profile\` and \`execute_round8_engineering_gate\` turn the actual task + shadow modules into separately recorded era/genre/theme and professional-code requirements. A defined gate is not a quality certification.
+- \`execute_round9_project_research\` calls the existing native Dragon post-weight research adapter for the **same original project**. \`execute_round10_crawler_brief\` binds a specific mission fingerprint, original task, objectives and source-use constraints; new network acquisition still needs its own host executor.
+- \`execute_round11_destinations\` regenerates HTTPS destinations from actual up-to-date reviewed Wiki source URLs, source revisions and rights bindings and refuses cross-project rights or mismatched R10 target digests. \`execute_round12_crawler_log_ingestion\` verifies independently signed **sanitized** crawl receipts against the exact R11 destination set. Only proven training permission survives the source metadata filter; Wiki still must re-approve the observation before model use.
+- \`execute_round13_sandbox\` only evaluates a ticket from the **signed original R4 queue**, recomputes new local reviewer SGD from real original game TRAIN worlds, verifies legal code review, frozen holdout, actual champion gain, new usage/idle game cohorts and **nonregressing fresh evidence with observed positive uplift**. A positive report requires a second independent configured shadow-signing actor; failed evidence remains blocked.
+- \`execute_round14_weight_forensics\` replays the actual candidate's original source-plan qualification and preserves per-parameter, calibration, attack and per-project gain/regression evidence. R15 and R16 accept only the exact R4 topic set and independent signed sandbox proof for positive module structure or warm-load decisions. R17 reports actual receipts and remaining blockers, never a fictitious foundation-model victory.
+- \`execute_round18_adjacent_recrawl\` opens a native, bounded and consented Dragon mission with novel safe subject terms, keeping all user-defined unfinished product and provenance gaps visible.
+
+The **full simulated progression regression** exercises all R3..R18 stages in strict order with real R5/R6 host callbacks, typed R7/R8 profile and coding quality constraints, authentic R10 native research brief, blocked R13 no-champion sandbox, conservative R15/R16 load order, honest R17 incomplete weight report and a real R18 Dragon query plan. Separate integration tests exercise current Wiki/RightsLedger source admission and R11/R12 log transfer. These synthetic fixtures validate software behavior, not a real release-quality external competitor benchmark.
+
+Shadow reviewer signatures are independent of round reviewer signatures. For positive decisions, both the signer and exact frozen game plan/actual fresh cohorts must match. This prevents simply writing an optimistic status bit into an on-disk journal. Model weight activation still requires a separate and explicit authoritative registry operation, unaffected by these stages.
+
 ## Relevant source modules
 
 - \`game_18round_relevance.py\` — original-game task focus, signed usefulness, predecessor comparison and conservative priority.
@@ -97,3 +115,5 @@ Crawl failures must be retained as failures, not relabeled as novel sources. Rou
 - \`game_18round_journal.py\` — exact-head signed SQLite replay and compare-and-append recovery.
 - \`game_post_weight_forensics.py\`, \`game_post_weight_dragon.py\`, \`game_secondary_wisdom_loop.py\` — preexisting post-weight controls and actual independently reviewed source-research loop.
 - \`game_model_promotion.py\`, \`game_reviewer_optimizer.py\`, \`game_reviewer_registry.py\` — real local model trainer, conservative test qualification and separate activation authority.
+
+- `game_18round_runtime.py`, `game_18round_executor_extensions.py` — concrete authority-bound stage actions, source provenance, sandbox, idle and professional code-quality gates.
