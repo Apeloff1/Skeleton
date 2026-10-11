@@ -232,6 +232,7 @@ def verify_shadow_in_sandbox(
         blockers.extend(forensic.safety_objections)
         blockers.append("no_qualified_heldout_model_improvement")
     cohort_reports=[]
+    observed_fresh_gain=False
     for mode,rows in (("usage",usage),("idle",idle)):
         out=evaluate_fresh_cohort(
             rows,selected.selected_fit["symbolic_policy"],standard=standard,
@@ -248,6 +249,12 @@ def verify_shadow_in_sandbox(
                 prev["balanced_accuracy"] or
                 curr["brier"]>prev["brier"]+1e-8):
             blockers.append(mode+":actual_model_quality_regression")
+        if prev is not None and (
+            curr["balanced_accuracy"]>prev["balanced_accuracy"]+1e-6 or
+            curr["brier"]<prev["brier"]-1e-7):
+            observed_fresh_gain=True
+    if not observed_fresh_gain:
+        blockers.append("no_measured_fresh_original_gameplay_uplift")
     verified=not blockers
     return SandboxVerification(
         ticket.ticket_id,selected.selected_fit["fitted_policy_digest"],
@@ -321,6 +328,8 @@ def order_verified_hyperweights(
     for row in sorted(tickets,key=lambda x:(-x.priority_bp,x.requested_memory_mb,x.ticket_id)):
         if row.task_digest!=task.task_digest:raise PromotionError("cross-game hyperweight reference")
         witness=receipts.get(row.ticket_id)
+        if witness is not None and witness.source_plan_digest!=row.original_game_plan_digest:
+            raise PromotionError("shadow sandbox source cohort differs from original queued training plan")
         if not witness or not witness.permission_to_stage or witness.blockers:
             waiting.append(row.ticket_id);continue
         if used+row.requested_memory_mb>task.budget_mb//4:
