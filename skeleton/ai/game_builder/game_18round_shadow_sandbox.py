@@ -278,13 +278,43 @@ class HyperweightLoadOrder:
                     weights_actually_installed=False,
                     task_relevance_queue_not_foundation_model_gradients=True)
 
+def verify_independent_sandbox_receipts(
+    verified:tuple[SandboxVerification,...],
+    verifiers:tuple[TrustedCompetitionJudge,...],*,authorized:bool,
+)->None:
+    if not authorized:
+        raise PermissionError("shadow weight proof inspection requires operator")
+    if (type(verified) is not tuple or type(verifiers) is not tuple or
+            any(not isinstance(v,TrustedCompetitionJudge) for v in verifiers)
+            or len({x.judge_id for x in verifiers})!=len(verifiers)):
+        raise PromotionError("typed separately credentialed shadow validators required")
+    keys={x.judge_id:x for x in verifiers}
+    for proof in verified:
+        if not isinstance(proof,SandboxVerification):
+            raise PromotionError("typed original-game sandbox proof required")
+        if not proof.permission_to_stage:
+            continue
+        key=keys.get(proof.verifier_id)
+        if (key is None or proof.signature=="0"*64 or
+                not hmac.compare_digest(
+                    proof.signature,_mac(proof.signed_body(),key.key))
+                or not proof.strict_measured_gain or proof.blockers
+                or not proof.model_digest or not proof.first_weight_forensic_digest
+                or not proof.code_quality_reviewed or
+                len(proof.verified_cohorts)!=2
+                or proof.model_activation_performed):
+            raise PromotionError("unqualified or forged positive shadow weight report")
+
+
 def order_verified_hyperweights(
     task:OriginalTaskFocus,tickets:tuple[ModularShadowTicket,...],
     verified:tuple[SandboxVerification,...],*,authorized:bool,
+    verifiers:tuple[TrustedCompetitionJudge,...]=(),
 )->HyperweightLoadOrder:
     if not authorized:raise PermissionError("load ordering needs authorized task")
     if not isinstance(task,OriginalTaskFocus) or type(tickets) is not tuple or type(verified) is not tuple:
         raise PromotionError("typed task and qualified original-game policy references required")
+    verify_independent_sandbox_receipts(verified,verifiers,authorized=True)
     receipts={x.ticket_id:x for x in verified}
     if len(receipts)!=len(verified):raise PromotionError("duplicate sandbox verdict")
     selected=[];waiting=[];used=0
@@ -300,5 +330,6 @@ def order_verified_hyperweights(
                                 used,task.budget_mb//4,len(selected),
                                 tuple(row.digest for row in tickets))
 __all__=["ModularShadowTicket","prepare_shadow_tickets","FreshSandboxEvidence",
-         "SandboxVerification","sign_sandbox_verification","verify_shadow_in_sandbox",
+         "SandboxVerification","sign_sandbox_verification",
+         "verify_independent_sandbox_receipts","verify_shadow_in_sandbox",
          "HyperweightLoadOrder","order_verified_hyperweights"]
