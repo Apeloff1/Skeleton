@@ -22,7 +22,8 @@ from skeleton.ai.game_builder.game_18round_shadow_sandbox import (
     verify_shadow_in_sandbox,sign_sandbox_verification,order_verified_hyperweights,
 )
 from skeleton.ai.game_builder.game_18round_executor_extensions import (
-    execute_idle_round,execute_round7_era_profile,
+    execute_idle_round,execute_round5_actual_idle_gameplay,
+    execute_round7_era_profile,
     execute_round8_engineering_gate,execute_round10_crawler_brief,
     execute_round13_sandbox,execute_round15_structure,
     execute_round16_load_order,execute_round17_report,
@@ -42,6 +43,8 @@ from skeleton.ai.game_builder.game_dragon_peer_wisdom import (
 from tests.test_game_builder_optimizer_and_wisdom import ActualPeerWisdomTests
 from skeleton.ai.game_builder.game_18round_journal import GameEvolutionJournal
 from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
+from skeleton.ai.game_builder.game_reviewer_registry import ReviewerRegistry
+from skeleton.ai.game_builder.quest_scene_forge import forge_director
 from skeleton.ai.game_builder.game_18round_evolution import (
     ROUND_DESCRIPTIONS,EvolutionRoundReceipt,sign_round_receipt,
     begin_18round_evolution,accept_round,report_remaining_rounds,
@@ -269,6 +272,33 @@ class EighteenRoundCases(unittest.TestCase):
             next_dragon_adjacency_mission(
                 self.task,(),("http://127.0.0.1/private",),
                 authorized=True,consent=True)
+
+    def test_real_existing_idle_replay_qualifier_defers_without_touching_active_user(self):
+        state=begin_18round_evolution(self.task,authorized=True)
+        state=accept_round(state,self.receipt(state,"research_recorded"),self.key,
+                           authorized=True)
+        state=accept_round(state,self.receipt(state,"shadow_queued"),self.key,
+                           authorized=True)
+        worlds=tuple(forge_director(
+            f"original_idle_{i}",seed=881000+i,
+            regions=tuple(f"region_{n:02d}" for n in range(8)),
+            quest_types=("main_story","investigation","regional_story"),
+            stages=2) for i in range(2))
+        with TemporaryDirectory() as folder:
+            ws=GameWorkspace.create(Path(folder)/"studio",authorized=True)
+            registry=ReviewerRegistry(ws.root)
+            deferred,receipt=execute_round5_actual_idle_gameplay(
+                state,registry,worlds,reviewer=self.key,
+                as_of="2026-10-11T12:05:00Z",authorized=True,consent=True,
+                host_idle=lambda:False,hardware_safe=lambda:True)
+            self.assertEqual(receipt["status"],"deferred")
+            self.assertFalse(receipt["new_weights_installed"])
+            self.assertEqual(deferred.digest,state.digest)
+            with self.assertRaises(PermissionError):
+                execute_round5_actual_idle_gameplay(
+                    state,registry,worlds,reviewer=self.key,
+                    as_of="2026-10-11T12:05:00Z",authorized=True,consent=False,
+                    host_idle=lambda:True,hardware_safe=lambda:True)
 
     def test_custody_persists_stale_head_and_tampered_sqlite_are_rejected(self):
         with TemporaryDirectory() as folder:
