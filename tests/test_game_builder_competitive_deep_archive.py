@@ -4,9 +4,13 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from io import StringIO
+from contextlib import redirect_stdout
+import json
 import unittest
 
 from skeleton.ai.game_builder.competitive_deep_archive import DeepEnemyArchive
+from skeleton.ai.game_builder.competitive_watch_cli import main as competitor_cli
 from skeleton.ai.game_builder.competitive_deep_service import examine_enemy_genre_portfolio
 from skeleton.ai.game_builder.competitive_watch_service import review_competitive_frontier
 from skeleton.ai.game_builder.competitive_watch_book import CompetitionWatchBook
@@ -43,6 +47,22 @@ class DeepHistoryCases(DeepEnemyCases):
                 self.assertEqual(first.revision,0)
                 self.assertEqual(first.enemy_ids,("other_atlas",))
                 self.assertEqual(len(dossier.enemy_dossiers[0].analysis_scripts),51)
+                output=StringIO()
+                with redirect_stdout(output):
+                    self.assertEqual(competitor_cli([
+                        "deep","--root",str(root),"--original-id","original_world",
+                        "--trusted-local-operator"]),0)
+                parsed=json.loads(output.getvalue())
+                self.assertEqual(parsed["deep_archive_digest"],first.entry_digest)
+                self.assertEqual(parsed["active_enemy_dossiers"][0][
+                    "genre_ancestry_generations"],3)
+                self.assertEqual(parsed["active_enemy_dossiers"][0][
+                    "domain_facet_counts"],{
+                        "gameplay":14,"graphics":12,"sound":11,"storyline":14})
+                self.assertEqual(parsed["active_enemy_dossiers"][0][
+                    "verified_weakspots"],[])
+                self.assertFalse(parsed["active_enemy_dossiers"][0][
+                    "all_ancestral_facets_outclassed"])
                 with self.assertRaises(ThreatRadarError):
                     archive.record(
                         dossier,current,self.deep_brief,self.deep_packet,
