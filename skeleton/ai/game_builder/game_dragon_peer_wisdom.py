@@ -58,7 +58,7 @@ class SourceMediaReceipt:
                     revision_digest=self.revision_digest,
                     media_kind=self.media_kind,
                     peer_review_receipt_digest=self.peer_review_receipt_digest,
-                    independently_peer_reviewed=self.peer_review_receipt_digest is not None)
+                    peer_review_evidence_claimed_not_cryptographically_verified=self.peer_review_receipt_digest is not None)
 
 
 @dataclass(frozen=True,slots=True)
@@ -97,6 +97,7 @@ class DragonWisdomAlmanac:
             hoag_competitor_scores_not_fabricated=True,
             legality_weight_is_reference_use_gate_not_legal_opinion=True,
             source_copyrighted_text_or_video_copied=False,
+            asserted_peer_review_identity_not_treated_as_signature=True,
             training_examples_exported=False,
             trained_llm_weights_modified=False,
             training_use_authorized=False,
@@ -152,7 +153,7 @@ def distill_dragon_peer_wisdom(
             source_url=hit.source_url,
             license_id=hit.license_id,
             media_kind=kind.media_kind,
-            peer_review_evidence=kind.peer_review_receipt_digest,
+            peer_review_evidence_unverified=kind.peer_review_receipt_digest,
             dependence_groups=sorted({
                 x.dependence_group for x in brief.citations
                 if x.source_id==hit.source_id
@@ -165,9 +166,9 @@ def distill_dragon_peer_wisdom(
     votes={}
     for hit in brief.citations:
         key=(hit.mechanic,hit.dependence_group,hit.stance)
-        effective=min(hit.confidence_ppm,
-                      900000 if medium[hit.source_id].peer_review_receipt_digest
-                      else 650000)
+        # A hash supplied by the caller does not prove that independent peer
+        # review happened. It must not increase epistemic weight.
+        effective=min(hit.confidence_ppm,650000)
         votes[key]=max(votes.get(key,0),effective)
     grouped=defaultdict(lambda:{"supports":[],"challenges":[],"uncertain":[]})
     for (mechanic,group,stance),confidence in sorted(votes.items()):
