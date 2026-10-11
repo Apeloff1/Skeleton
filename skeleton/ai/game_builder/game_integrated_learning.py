@@ -89,6 +89,8 @@ def run_integrated_learning_cycle(
         # Only independently replayed original-game receipts in TRAIN may
         # supply training evidence; a source article's mechanic tags never do.
         mechanic=entry.evidence.get("mechanic")
+        if mechanic is not None and (not isinstance(mechanic,str) or len(mechanic)>128):
+            raise PromotionError("typed original-game mechanic evidence required")
         if mechanic in targets and entry.approval=="quarantined":
             source_groups[mechanic].add(entry.project_digest)
     eligible=[]
