@@ -38,6 +38,7 @@ from .original_world_npc_era_population import (
     EraPopulation, era_budget, create_era_population,
     validate_population, dispatch_food, tick_population,
     population_save, population_restore, population_report,
+    select_active_brains,
     permitted_roles, inhabitant_role_profile,
 )
 
@@ -120,6 +121,7 @@ def validate_product(state: ProductSession):
 
 def create_product(
     index: int, *, inhabitants: int | None = None, era: str | None = None,
+    npc_fidelity: str = "balanced",
 ) -> ProductSession:
     law = living_at(index)
     if era is not None:
@@ -135,7 +137,10 @@ def create_product(
     if era is not None:
         inhabitants_state = inhabitant_role_profile(inhabitants_state, era)
     minds = make_intelligence(physical, inhabitants_state)
-    regional = (create_era_population(physical, inhabitants_state, era)
+    if era is None and npc_fidelity != "balanced":
+        raise FoundationError("hardware NPC fidelity requires selected original era")
+    regional = (create_era_population(
+        physical, inhabitants_state, era, fidelity=npc_fidelity)
                 if era is not None else None)
     game = ProductSession(law.world_id, create_living(index),
                           physical, inhabitants_state, cognition=minds,
@@ -489,8 +494,12 @@ def step_product(
         if action.layer == "causal" and action.verb == "end_turn":
             terrain, _ = step_terrain(
                 state.terrain, TerrainAction("end_turn", 0, 0))
+            thinkers = (select_active_brains(
+                state.population, state.society, terrain, state.cognition,
+                preset=state.population.fidelity)
+                if state.population is not None else None)
             terrain, society, cognition, residents, thoughts = smart_npc_tick(
-                terrain, state.society, state.cognition)
+                terrain, state.society, state.cognition, active_ids=thinkers)
             new = replace(new, terrain=terrain, society=society,
                           cognition=cognition)
             if state.population is not None:
@@ -499,9 +508,13 @@ def step_product(
                 new = replace(new, population=regional, terrain=terrain)
                 info += regional_events
             deliveries = sum(rec.quantity for rec in residents if rec.operation == "deliver")
-            info += (f"Autonomous citizens: {len(residents)} cognitive decisions, "
-                     f"{deliveries} physically delivered resources; "
-                     f"{len(cognition.bonds)} tracked social relationships",)
+            total_thinking = len(residents) if thinkers is None else len(thinkers)
+            info += (
+                f"Autonomous citizens: {total_thinking} full cognitive decisions, "
+                f"{len(residents)-total_thinking} real passive bodies; "
+                f"{deliveries} physically delivered resource units; "
+                f"{len(cognition.bonds)} tracked social relationships",
+            )
     event_hash = _hash({
         "schema": SCHEMA, "world": law.design_id,
         "previous": state.event_head,
@@ -548,6 +561,9 @@ def product_restore(value: str) -> ProductSession:
         if (obj["schema"] == SCHEMA
                 and set(obj) == common | {"cognition", "population"}):
             current, has_population = True, True
+        elif (obj["schema"] == SCHEMA
+              and set(obj) == common | {"cognition"}):
+            current, has_population = True, False
         elif (obj["schema"] == PRIOR_SCHEMA
               and set(obj) == common | {"cognition"}):
             current, has_population = True, False
