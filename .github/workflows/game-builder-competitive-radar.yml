@@ -35,6 +35,7 @@ on:
       - "skeleton/ai/game_builder/game_18round_shadow_sandbox.py"
       - "skeleton/ai/game_builder/game_18round_evolution.py"
       - "skeleton/ai/game_builder/game_18round_journal.py"
+      - "skeleton/ai/game_builder/game_18round_runtime.py"
       - "tests/test_game_builder_18round_evolution.py"
       - "docs/ai/game_18round_hyperweight_evolution_2026_10.md"
       - "tests/test_game_builder_secondary_wisdom.py"
