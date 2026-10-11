@@ -10,6 +10,7 @@ on:
       - "tests/test_original_world*.py"
       - "tests/test_original_foundation*.py"
       - "docs/ORIGINAL_WORLD_MECHANIC_ATLAS.md"
+      - "docs/ORIGINAL_WORLD_FOUNDATIONS_10K.md"
       - ".github/workflows/original-world-atlas.yml"
   push:
     branches: [main]
@@ -19,6 +20,7 @@ on:
       - "tests/test_original_world*.py"
       - "tests/test_original_foundation*.py"
       - "docs/ORIGINAL_WORLD_MECHANIC_ATLAS.md"
+      - "docs/ORIGINAL_WORLD_FOUNDATIONS_10K.md"
       - ".github/workflows/original-world-atlas.yml"
   workflow_dispatch:
 
@@ -53,7 +55,7 @@ jobs:
       - name: Compile atlas and simulation modules
         run: python -m compileall -q skeleton/game/generation
       - name: Verify originals, styles and rule simulations
-        run: python -m pytest -q --noconftest tests/test_original_world_mechanic_atlas.py tests/test_original_world_simulator.py tests/test_original_world_campaign.py tests/test_original_world_campaign_cli.py tests/test_original_world_nexus.py tests/test_original_world_society.py tests/test_original_world_play_cli.py tests/test_original_world_frontier.py tests/test_original_world_frontier_cli.py tests/test_original_world_era_runtime.py tests/test_original_world_era_cli.py tests/test_original_foundation_compiler.py tests/test_original_foundation_cli.py
+        run: python -m pytest -q --noconftest tests/test_original_world_mechanic_atlas.py tests/test_original_world_simulator.py tests/test_original_world_campaign.py tests/test_original_world_campaign_cli.py tests/test_original_world_nexus.py tests/test_original_world_society.py tests/test_original_world_play_cli.py tests/test_original_world_frontier.py tests/test_original_world_frontier_cli.py tests/test_original_world_era_runtime.py tests/test_original_world_era_cli.py tests/test_original_foundation_compiler.py tests/test_original_foundation_cli.py tests/test_original_foundation_discovery.py
       - name: Exercise era and theology preview
         run: |
           python -m skeleton.game.generation.original_world_cli --seed gentle-history --era paleolithic --chronology remote-past --theology animist-invented --theme comfort --tone ultra-snuggly --comfort 100 --realism 95 --brief >/dev/null
@@ -127,5 +129,10 @@ jobs:
           python -m skeleton.game.generation.original_foundation_cli --page 10232 --limit 8 >/dev/null
           python -m skeleton.game.generation.original_foundation_cli --index 9999 --actions-json '[{"verb":"intervene"},{"verb":"study"},{"verb":"end_turn"}]' --show-map
           python -m skeleton.game.generation.original_foundation_cli --seed cross-era-habitat --actions-json '[{"verb":"negotiate"},{"verb":"intervene"},{"verb":"end_turn"}]' --show-map
+      - name: Search authorial causal laws for diverse useful game foundations
+        run: |
+          python -m skeleton.game.generation.original_foundation_cli --find habitat --limit 16 --no-diversify >/dev/null
+          python -m skeleton.game.generation.original_foundation_cli --find consent --operator veto --limit 12 >/dev/null
+          python -m skeleton.game.generation.original_foundation_cli --find memory --domain memory --limit 16 >/dev/null
       - name: Confirm exact head
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
