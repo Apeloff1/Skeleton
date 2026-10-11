@@ -373,20 +373,41 @@ def _puzzle_snapshot(state):
     )}
 
 
+def puzzle_default_layout(cfg):
+    """Small boards use only objects relevant to the selected puzzle logic."""
+    w,h=cfg["board_width"],cfg["board_height"]
+    mode=cfg["logic"]
+    scene={
+        "spawn":[0,0],"exit":[w-1,h-1],
+        "walls":[],"doors":[],"switches":[],"crates":[],
+        "targets":[],"nodes":[],"portals":[],"phase_gates":[],
+    }
+    if mode=="switches":
+        scene["switches"]=[[1,0]]
+        scene["doors"]=[[1,h-1]]
+    elif mode=="push_blocks":
+        scene["crates"]=[[1,1]]
+        scene["targets"]=[[min(w-1,2),1]]
+    elif mode=="circuits":
+        scene["nodes"]=[[1,0],[1,1]]
+        scene["doors"]=[[1,h-1]]
+    elif mode=="time":
+        scene["phase_gates"]=[[1,1]]
+    elif mode=="non_euclidean":
+        scene["portals"]=[[[1,0],[w-2,h-1]]]
+    return scene
+
+
 def puzzle_start(cfg,seed):
     w,h=cfg["board_width"],cfg["board_height"]
-    start=[1,1]
-    exit_cell=[w-2,h-2]
+    layout=puzzle_default_layout(cfg)
     state={
         "tick":0,"mode":cfg["logic"],"width":w,"height":h,
-        "player":start,"exit":exit_cell,
-        "walls":[[2,2]],"doors":[[min(5,w-2),min(5,h-2)]],
-        "switches":[[min(3,w-2),1]],
-        "crates":[[min(3,w-2),min(3,h-2)]],
-        "targets":[[min(4,w-2),min(3,h-2)]],
-        "nodes":[[1,min(3,h-2)],[min(3,w-2),min(3,h-2)]],
-        "portals":[[[1,min(4,h-2)],[max(1,w-3),1]]],
-        "phase_gates":[[min(6,w-2),min(6,h-2)]],
+        "player":list(layout["spawn"]),"exit":list(layout["exit"]),
+        "walls":layout["walls"],"doors":layout["doors"],
+        "switches":layout["switches"],"crates":layout["crates"],
+        "targets":layout["targets"],"nodes":layout["nodes"],
+        "portals":layout["portals"],"phase_gates":layout["phase_gates"],
         "switches_on":[],"powered_nodes":[],"phase":seed%2,
         "portal_visited":False,
         "undo_available":min(cfg["undo_depth"],128),
@@ -394,7 +415,6 @@ def puzzle_start(cfg,seed):
         "events":[],"finished":False,"failed":False,
     }
     return state
-
 
 def _puzzle_valid(state,point):
     if not _valid_location(point,state["width"],state["height"]):
@@ -527,4 +547,4 @@ def apply_genre_scene(editor,state,layout):
 STARTS={"shooter":shooter_start,"deck_battler":deck_start,"puzzle":puzzle_start}
 STEPS={"shooter":shooter_step,"deck_battler":deck_step,"puzzle":puzzle_step}
 __all__=["GenreActionError","GENRE_ACTIONS","CARDS","DEFAULT_DECK",
-         "STARTS","STEPS","apply_genre_scene"]
+         "STARTS","STEPS","apply_genre_scene","puzzle_default_layout"]
