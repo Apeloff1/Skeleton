@@ -57,6 +57,7 @@ class StoryIntent:
     population: int = 24
     mode: str = "postgame"
     quests_to_finish: int = 2
+    quest_arcs: int = 3
 
     def __post_init__(self) -> None:
         if not isinstance(self.project_id, str) or not re.fullmatch(
@@ -75,13 +76,19 @@ class StoryIntent:
             raise StoryError("story population budget is 6-128")
         if self.mode not in {"campaign", "postgame", "sandbox"}:
             raise StoryError("unknown world mode")
-        if type(self.quests_to_finish) is not int or not 1 <= self.quests_to_finish <= 3:
-            raise StoryError("require between 1 and 3 real quests for a story milestone")
+        if type(self.quest_arcs) is not int or not 3 <= self.quest_arcs <= 24:
+            raise StoryError("living RPG must have 3 to 24 original quest arcs")
+        if self.population < self.quest_arcs:
+            raise StoryError("one unique quest-giving NPC required per original quest arc")
+        if (type(self.quests_to_finish) is not int
+                or not 1 <= self.quests_to_finish <= self.quest_arcs):
+            raise StoryError("story milestone requires 1 to original arc count")
 
     def payload(self) -> dict[str, object]:
         return {"project_id": self.project_id, "title": self.title, "seed": self.seed,
                 "regions": self.regions, "population": self.population,
-                "mode": self.mode, "quests_to_finish": self.quests_to_finish}
+                "mode": self.mode, "quests_to_finish": self.quests_to_finish,
+                "quest_arcs": self.quest_arcs}
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,8 +148,8 @@ class StoryWorld:
             raise StoryError("story requires typed intent")
         if len(self.regions) != self.intent.regions or len(self.citizens) != self.intent.population:
             raise StoryError("actual world resource count differs from budget")
-        if len(self.quests) != 3:
-            raise StoryError("three original faction arcs required")
+        if len(self.quests) != self.intent.quest_arcs:
+            raise StoryError("actual original quest count differs from budget")
         ids = {r.key for r in self.regions}
         if len(ids) != len(self.regions) or any(
             not isinstance(r, Region) or r.key not in ids
@@ -162,7 +169,8 @@ class StoryWorld:
             or c.faction not in FACTIONS for c in self.citizens
         ):
             raise StoryError("invalid citizen schedule or faction")
-        if len({q.key for q in self.quests}) != 3 or len({q.item for q in self.quests}) != 3:
+        if (len({q.key for q in self.quests}) != len(self.quests)
+                or len({q.item for q in self.quests}) != len(self.quests)):
             raise StoryError("original quests need distinct objectives")
         if any(q.giver not in citizens or q.source_region not in ids
                or q.faction != citizens[q.giver].faction for q in self.quests):
@@ -229,16 +237,25 @@ def original_story_world(intent: StoryIntent, *, authorized: bool) -> StoryWorld
             temperament=("curious", "patient", "inventive", "careful")[rng.randrange(4)],
         ))
     quests = []
-    verbs = ("Restore the seed archive", "Chart the lost footpath",
-             "Repair the communal beacon")
-    for index in range(3):
+    verbs = (
+        "Restore the seed archive", "Chart the lost footpath",
+        "Repair the communal beacon", "Shelter the migratory birds",
+        "Recover the village records", "Rebuild a quiet bridge",
+        "Plant the last moonflower", "Map the hidden springs",
+        "Craft a lantern for night travel", "Reopen a mountain trail",
+        "Prepare the shared orchard", "Repair the weather station",
+    )
+    for index in range(intent.quest_arcs):
         leader = citizens[index]
         source = regions[(index * 2 + 3) % len(regions)].key
         quests.append(Quest(
             key=f"quest_{index:02d}", giver=leader.key,
             item=f"artifact_{index:02d}", source_region=source,
             faction=leader.faction, reward=20 + index * 10,
-            premise=verbs[index],
+            premise=verbs[index % len(verbs)] + (
+                f" — chapter {index // len(verbs) + 1}"
+                if index >= len(verbs) else ""
+            ),
         ))
     return StoryWorld(intent, tuple(regions), tuple(citizens), tuple(quests))
 
