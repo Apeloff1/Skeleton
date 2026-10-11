@@ -178,7 +178,7 @@ class NativeShooterStudioTests(unittest.TestCase):
 
     def test_visual_export_lists_shooter_but_not_unported_genres(self):
         html=render_workspace_html("D"*32).decode()
-        self.assertIn('"deck_battler","shooter","tactics","tower_defense"].includes(advancedSession.editor)',html)
+        self.assertIn('"deck_battler","shooter","tactics","tower_defense","racing"].includes(advancedSession.editor)',html)
         self.assertIn("Download playable Godot 4 game project",html)
         self.assertIn("Content-Security-Policy",html)
 
