@@ -68,11 +68,12 @@ class SpatialQuestTests(unittest.TestCase):
             encounter_verify(game, proof)
 
     def test_multiple_valid_combat_methods_and_optional_reinforcements(self):
-        game = self.make("timed_rival_combat", waves=1, deadline=12)
-        direct = encounter_play(game, ("attack",), authorized=True)
-        peaceful = encounter_play(game, ("negotiate",), authorized=True)
-        reinforced = encounter_play(game, ("reinforce","attack"),
-                                    authorized=True)
+        game = self.make("timed_rival_combat", waves=2, deadline=12)
+        direct = encounter_play(game, ("attack","attack","attack"), authorized=True)
+        peaceful = encounter_play(game, ("negotiate","negotiate"), authorized=True)
+        reinforced = encounter_play(
+            game, ("reinforce","attack","attack","attack"), authorized=True,
+        )
         for proof in (direct, peaceful, reinforced):
             self.assertEqual(proof.final.status, "won")
             encounter_verify(game, proof)
