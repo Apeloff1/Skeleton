@@ -21,8 +21,21 @@ from skeleton.game.generation.original_world_product_terrain import cell_at
 
 
 def game(era="interstellar", preset="balanced"):
+    # Existing test fixture emulates a pre-recalibration saved simulation.
+    # Its 16,384 census is NOT the default of any new hardware profile.
+    from skeleton.game.generation.original_world_npc_era_population import (
+        era_budget, create_era_population, inhabitant_role_profile,
+    )
+    from skeleton.game.generation.original_world_npc_cognition_v2 import make_intelligence
     law = living_for(0, "puzzle", "lattice", "trophic", "sandbox")
-    return create_product(law.index, era=era, npc_fidelity=preset)
+    count = max(1, era_budget(era).full_npc_limit - 2)
+    base = create_product(law.index, inhabitants=count)
+    people = inhabitant_role_profile(base.society, era)
+    return replace(
+        base, society=people, cognition=make_intelligence(base.terrain, people),
+        population=create_era_population(base.terrain, people, era,
+                                         fidelity=preset),
+    )
 
 
 def action(s, layer, verb, **params):
