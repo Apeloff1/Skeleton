@@ -26,6 +26,7 @@ jobs:
         include:
           - platform: windows-x64
             runner: windows-2025
+            python: "3.11"
             executable: OriginalWorldStudio.exe
           - platform: linux-x64
             runner: ubuntu-24.04
