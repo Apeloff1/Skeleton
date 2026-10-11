@@ -191,12 +191,29 @@ jobs:
       - name: Export and execute real native Windows game
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $root = Join-Path $env:RUNNER_TEMP 'original-studio'
           $project = Join-Path $root 'project/godot'
           $binary = Join-Path $root 'original-homebrew.exe'
-          godot --headless --path $project --import
-          if ($LASTEXITCODE -ne 0) { throw "Windows import failed" }
-          godot --headless --path $project --export-release 'Windows Desktop' $binary
+          # The Godot Windows GUI binary has no console. Recover the console
+          # twin from the same official version-pinned setup-godot archive.
+          $archive = Join-Path $env:USERPROFILE 'downloads/Godot_v4.4.1-stable_win64.exe.zip'
+          $engineDir = Join-Path $root 'windows-godot'
+          if (Test-Path $archive) {
+            Expand-Archive -LiteralPath $archive -DestinationPath $engineDir -Force
+          } else {
+            Copy-Item (Join-Path $env:USERPROFILE 'godot/*') -Destination $engineDir -Force -ErrorAction SilentlyContinue
+          }
+          $console = Get-ChildItem $engineDir -Recurse -Filter '*_console.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -eq $console) {
+            throw "Godot Windows console executable unavailable: cannot verify source/native parity"
+          }
+          Write-Host "Using Godot Windows console engine: $($console.FullName)"
+          & $console.FullName --version
+          if ($LASTEXITCODE -ne 0) { throw "Windows console engine failed" }
+          & $console.FullName --headless --path $project --import
+          if ($LASTEXITCODE -ne 0) { throw "Windows Godot import failed" }
+          & $console.FullName --headless --path $project --export-release 'Windows Desktop' $binary
           if ($LASTEXITCODE -ne 0) { throw "Windows export failed" }
           if (-not (Test-Path $binary) -or (Get-Item $binary).Length -le 1024) {
             throw "No executable Windows consumer candidate"
