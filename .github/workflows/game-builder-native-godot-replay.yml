@@ -1,0 +1,68 @@
+name: Game Builder Native Godot Replay
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/**"
+      - "tests/test_game_builder_dual_runtime.py"
+      - "tests/test_game_builder_authored_tiles.py"
+      - ".github/workflows/game-builder-native-godot-replay.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skeleton/ai/game_builder/**"
+      - "tests/test_game_builder_dual_runtime.py"
+      - "tests/test_game_builder_authored_tiles.py"
+      - ".github/workflows/game-builder-native-godot-replay.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: game-builder-native-godot-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-replay:
+    name: Native Godot 4 replay of Python-proved game
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Checkout exact source head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install non-.NET Godot 4
+        uses: chickensoft-games/setup-godot@f166999204a4f2722c6fe042fbaa3b3ea0d9c789 # v2.4.1
+        with:
+          version: "4.4.1"
+          use-dotnet: false
+          include-templates: false
+          cache: true
+      - name: Verify exact-head and installed engine
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          godot --version
+      - name: Compile native exporter and integration tests
+        run: >-
+          python -m py_compile
+          skeleton/ai/game_builder/dual_runtime_export.py
+          skeleton/ai/game_builder/dual_runtime_cli.py
+          skeleton/ai/game_builder/authored_tiles.py
+          tests/test_game_builder_dual_runtime.py
+          tests/test_game_builder_authored_tiles.py
+      - name: Run actual Godot native winning replays
+        run: |
+          set -euo pipefail
+          python -m unittest             tests.test_game_builder_dual_runtime             tests.test_game_builder_authored_tiles -v
