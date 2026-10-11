@@ -294,13 +294,14 @@ def _defense_start(config, seed):
         "escaped":0, "waves_completed":0,"priority":"first",
         "events":[], "finished":False, "failed":False,
         "seed":seed, "lane_length":config["lane_length"],
+        "allowed_slots":[0,1,2], "wave_limit":3,
     }
 
 
 def _defense_tick(state, config):
     state["tick"]+=1
     events=[]
-    limit=config["wave_size"]*3
+    limit=config["wave_size"]*state["wave_limit"]
     if state["spawned"] < limit and state["tick"] % 2 == 1:
         idx=state["spawned"]
         state["enemies"].append({"id":idx,"x":0,"hp":3+idx//config["wave_size"]*2,
@@ -332,14 +333,14 @@ def _defense_tick(state, config):
         else:
             survivors.append(enemy)
     state["enemies"]=survivors
-    completed_waves=min(3,(state["defeated"]+state["escaped"])//config["wave_size"])
+    completed_waves=min(state["wave_limit"],(state["defeated"]+state["escaped"])//config["wave_size"])
     if completed_waves>state["waves_completed"]:
         state["waves_completed"]=completed_waves
         events.append("wave_resolved")
     if state["spawned"] == limit and not state["enemies"]:
-        state["waves_completed"]=3
+        state["waves_completed"]=state["wave_limit"]
         state["finished"]=True
-        events.append("three_waves_resolved")
+        events.append("authored_waves_resolved")
     if state["base_hp"] == 0:
         state["failed"]=True
         state["finished"]=False
@@ -355,6 +356,8 @@ def _defense_step(state, config, action):
             events.extend(_defense_tick(state,config))
     elif action.startswith("build:"):
         slot=int(action[-1])
+        if slot not in state["allowed_slots"]:
+            raise AdvancedRuntimeError("tower slot not enabled by authored lane scene")
         if any(t["slot"]==slot for t in state["towers"]):
             raise AdvancedRuntimeError("build slot already occupied")
         if state["credits"] < 20:
@@ -615,7 +618,8 @@ def _survival_step(state,config,action):
 
 
 def run_advanced_session(editor: str, settings: Mapping[str, object] | None = None,
-                         actions: Sequence[str] = (), *, seed: int = 0) -> dict:
+                         actions: Sequence[str] = (), *, seed: int = 0,
+                         scene: Mapping[str, object] | None = None) -> dict:
     if editor not in ENGINES:
         raise AdvancedRuntimeError("advanced playable session is not implemented for this family")
     _bounded(seed, actions)
@@ -629,7 +633,36 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
         "survival":_survival_start,
     }
     state=starts[editor](rules,seed)
+    if scene is not None:
+        from .advanced_level_scenes import validate_advanced_scene
+        authored=validate_advanced_scene(scene,rules)
+        if authored["editor"]!=editor or authored["seed"]!=seed:
+            raise AdvancedRuntimeError("authored scene identity/seed mismatches gameplay")
+        layout=authored["layout"]
+        if editor=="platformer":
+            state.update(x=layout["spawn_x"],checkpoint=layout["spawn_x"],
+                exit_x=layout["exit_x"],spikes=list(layout["hazards"]),
+                collectibles=list(layout["collectibles"]),checkpoints=list(layout["checkpoints"]))
+        elif editor=="tactics":
+            state["obstacles"]=[list(c) for c in layout["obstacles"]]
+            state["objective"]=list(layout["objective"])
+            for unit,point in zip(state["units"],layout["squad_spawns"]):
+                unit.update(x=point[0],y=point[1])
+            for enemy,point in zip(state["enemies"],layout["enemy_spawns"]):
+                enemy.update(x=point[0],y=point[1])
+        elif editor=="tower_defense":
+            state["allowed_slots"]=list(layout["build_slots"])
+            state["wave_limit"]=layout["waves"]
+        elif editor=="racing":
+            state.update(corners=list(layout["corners"]),
+                track_obstacle=layout["track_obstacle"],
+                weather=layout["weather"],lane=layout["starting_lane"])
+        elif editor=="survival":
+            state["regions"]=[dict(r) for r in layout["regions"]]
+            state["region"]=layout["starting_region"]
+            state["weather"]=layout["weather"]
     baseline=_digest({"editor":editor,"configuration":config["digest"],"seed":seed,
+                      "scene_digest":scene["digest"] if scene is not None else None,
                       "quality_floor":"advanced"})
     previous=baseline
     trace=[]
@@ -652,6 +685,8 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
     report={
         "schema":SCHEMA,"editor":editor,"quality_floor":"advanced",
         "configuration_digest":config["digest"],"seed":seed,
+        "scene":dict(scene) if scene is not None else None,
+        "scene_digest":scene["digest"] if scene is not None else None,
         "actions":list(actions),"state":state,"trace":trace,
         "baseline_digest":baseline,"head_digest":previous,
         "terminal":state["finished"] or state["failed"],
@@ -667,7 +702,8 @@ def verify_advanced_session(receipt: Mapping[str, object],
     if type(receipt) is not dict or receipt.get("schema") != SCHEMA:
         raise AdvancedRuntimeError("advanced session evidence requires exact schema")
     candidate=run_advanced_session(receipt.get("editor"),settings,
-                                   receipt.get("actions"),seed=receipt.get("seed"))
+                                   receipt.get("actions"),seed=receipt.get("seed"),
+                                   scene=receipt.get("scene"))
     if candidate != receipt:
         raise AdvancedRuntimeError("advanced gameplay receipt was altered or mismatched")
     return True
