@@ -257,6 +257,8 @@ def deliberate_verified_round(
             or type(minimum_role_score_bp) is not int or
             not 7000<=minimum_role_score_bp<=9500):
         raise ThreatRadarError("three distinct and complete authenticated AI deliberators required")
+    if len({r.signer_id for r in reviews})!=3:
+        raise ThreatRadarError("each Dragon/Jeeves/Adversarial role needs a different configured signing key")
     keyring={x.judge_id:x for x in trusted_keys}
     objections=[]
     all_actions=[]
@@ -271,6 +273,9 @@ def deliberate_verified_round(
             raise ThreatRadarError("unauthorized model, stale research or forged review")
         if _date(review.authored_at)<_date(research.researched_at):
             raise ThreatRadarError("AI deliberation predates newly researched evidence")
+        if any(f.source_digest not in research.reviewed_citation_digests
+               for f in review.findings):
+            raise ThreatRadarError("role findings must trace to current reviewed Wiki research")
         if review.quantified_quality_bp<minimum_role_score_bp:
             objections.append(review.role+":below_predeclared_quality")
         if review.hard_vetoes:
