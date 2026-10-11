@@ -125,14 +125,18 @@ def main(argv=None):
                     # Deploying the selected fit is still disallowed. This
                     # only enters the existing independently reviewed
                     # staged/shadow/usage/idle operator control plane.
-                    if trial.promotion_evaluation.passed:
+                    if trial.ready_for_stage:
                         stage=registry.stage(
                             plan,trial.selected_fit,standard=standard,
                             champion=champion,authorized=True)
                         result=dict(result,stage=stage)
                     else:
+                        blockers=list(trial.promotion_evaluation.blockers)
+                        if (trial.champion_digest is not None and
+                                not trial.candidate_improved):
+                            blockers.append("protected_test:no_measurable_champion_uplift")
                         result=dict(result,stage={"status":"blocked",
-                           "blockers":list(trial.promotion_evaluation.blockers),
+                           "blockers":sorted(set(blockers)),
                            "model_installed":False})
             else:
                 fit=(train_robust_game_reviewer(
