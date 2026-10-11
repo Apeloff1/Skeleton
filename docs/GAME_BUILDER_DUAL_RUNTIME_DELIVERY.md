@@ -47,6 +47,7 @@ established by the caller: it is not a login check.
 | godot/scenes/main.tscn | Concrete launchable game scene |
 | godot/scripts/main.gd | Original Godot runtime implementing turn rules and renderer |
 | godot/world.json | Runtime data from the exact same typed world |
+| godot/proof.json | Engine-readable copy of Python winning action proof |
 | proof/verified_solution.json | Full winning Python action replay |
 | release.json | World/proof digests, SHA-256 file checksums, truthful target readiness |
 | README.md | Runtime controls and validation boundaries |
@@ -144,8 +145,18 @@ python scripts/check_enterprise_ai_superiority.py --json
 python scripts/check_enterprise_ai_implementation_notes.py --json
 ~~~
 
-If Godot 4 is on PATH, the dedicated test also attempts a headless scene
-load. A missing engine causes an explicit skip; source generation alone is
+If Godot 4 is on PATH, the dedicated test also attempts a headless native
+replay of the Python winning trace. The scene runs all verified actions and
+checks native final score, health, position, level, collectibles and steps
+against the independently executed Python state, exiting nonzero on
+divergence. A direct operator command from the output folder's parent is:
+
+~~~bash
+godot --headless --path ./my-game/godot -- --verify-proof
+~~~
+
+The only success receipt is a NATIVE_REPLAY_OK line containing the world
+digest. A missing engine causes an explicit skip; source generation alone is
 **not** a claim of a working compiled Godot executable. Hardware, controller,
 conformance, store approval, packaging, usability and console-specific
 emulator certification need independent follow-up evidence.
