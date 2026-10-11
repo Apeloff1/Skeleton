@@ -244,7 +244,7 @@ func _ready() -> void:
     regions = world.get("regions", [])
     citizens = world.get("citizens", [])
     quests = world.get("quests", [])
-    if regions.is_empty() or citizens.is_empty() or quests.size() != 3:
+    if regions.is_empty() or citizens.is_empty() or quests.size() < 3 or quests.size() > 24:
         push_error("Invalid original RPG content")
         return
     get_window().title = str(world["intent"]["title"])
@@ -369,7 +369,8 @@ func _act(action: String, record: bool = true) -> bool:
     for q in quests:
         if completed.has(q["key"]):
             score += int(q["reward"])
-            trust[names.find(str(q["faction"]))] += 25
+            var faction_index: int = names.find(str(q["faction"]))
+            trust[faction_index] = mini(100, int(trust[faction_index]) + 25)
     turn += 1
     status = "playing"
     if ending != null:
