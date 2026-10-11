@@ -901,6 +901,28 @@ $("advanced-scene-stage").addEventListener("click",async()=>{
   status("Authored scene staged: review source and commit. Its system configuration must already be approved.");
  }catch(error){status("Scene staging blocked: "+error.message);}
 });
+$("advanced-godot-export").addEventListener("click",async()=>{
+ try{
+  if(!advancedSession||advancedSession.editor!=="puzzle")
+   throw Error("Native Godot export requires a verified advanced puzzle session");
+  if(!advancedSettings)
+   throw Error("Original authored puzzle settings must be available");
+  const response=await api("/api/advanced-godot-package",{
+   session:advancedSession,settings:advancedSettings});
+  if(response.engine!=="puzzle"||response.gameplay_native_verified_by_this_request)
+   throw Error("Unexpected native package certification claims");
+  const raw=atob(response.zip_base64);
+  if(raw.length>512000)throw Error("Native archive exceeds the offline source budget");
+  const bytes=Uint8Array.from(raw,character=>character.charCodeAt(0));
+  const blob=new Blob([bytes],{type:"application/zip"});
+  const url=URL.createObjectURL(blob),link=document.createElement("a");
+  link.href=url;link.download=response.file_name;
+  document.body.append(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),0);
+  status("Original Godot 4 project downloaded with verified Python gameplay proof. "+
+   "Run Godot's native replay check before distribution.");
+ }catch(error){status("Original Godot project export rejected: "+error.message);}
+});
 $("advanced-save").addEventListener("click",async()=>{
  try{
   if(!advancedSession)throw Error("Start a game to create a savegame");
@@ -1033,6 +1055,7 @@ Other editor families remain authoring-only, not falsely certified engines.</sma
 local until typed revalidation and an explicit human-approved file commit.</small></p>
 <button id="advanced-start" type="button">Start advanced scenario</button>
 <button id="advanced-save" type="button">Download verified savegame</button>
+<button id="advanced-godot-export" type="button">Download playable Godot 4 puzzle project</button>
 <label>Restore portable savegame<input id="advanced-load" type="file" accept=".json,application/json"></label>
 <button id="advanced-verify" type="button">Independently verify replay</button>
 <div id="advanced-actions" aria-label="Advanced gameplay actions"></div>
