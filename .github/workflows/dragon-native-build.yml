@@ -784,7 +784,9 @@ jobs:
           with sqlite3.connect(path) as db:
               produced=materialize_batch(db,start=500,count=4,
                                           routes=2,steps=12,branch_seed=1977)
-              assert produced['new_original_playable_prototypes']==4
+              assert produced['new_original_source_candidates']==4
+              assert (produced['new_original_playable_prototypes']+
+                      produced['new_underbuilt_drafts']==4)
               assert produced['genuinely_finished_licensed_games']==0
               recheck=materialize_batch(db,start=500,count=4,
                                          routes=2,steps=12,branch_seed=1977)
