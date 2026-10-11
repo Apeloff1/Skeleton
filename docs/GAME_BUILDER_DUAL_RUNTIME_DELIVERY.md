@@ -1,0 +1,121 @@
+# Dual-runtime original game production — playable game, not just a design plan
+
+Canonical implementation owner: skeleton/ai/game_builder. This source
+release extends the existing typed GameBuildIntent -> PlayableWorld ->
+demonstrate_solvable -> CompiledPlayableProject pipeline. It does **not**
+introduce a second procedural generator, AI inference service, rights owner,
+state store, or unsupported publication interface.
+
+## Produce a native-editable project and browser game together
+
+Save intent.json with an original project intent:
+
+~~~json
+{
+  "project_id": "my-first-original-game",
+  "title": "Crystal Cartographer",
+  "subtitle": "Explore a new world one step at a time.",
+  "seed": 2061,
+  "width": 19,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 4,
+  "theme": "forest",
+  "starting_health": 3
+}
+~~~
+
+The existing builder already validates this input and proves a safe route.
+Run from the repo root, after operator identity/authority has been handled by
+the host:
+
+~~~bash
+python -m skeleton.ai.game_builder.dual_runtime_cli \
+  --intent ./intent.json --output ./my-game \
+  --trusted-local-operator
+~~~
+
+This creates a new directory and **refuses to overwrite** any existing
+project. The trusted-local-operator flag only acknowledges authorization
+established by the caller: it is not a login check.
+
+| Output | Purpose |
+| --- | --- |
+| index.html | Fully standalone CSP-restricted game; works offline |
+| godot/project.godot | Open with Godot 4.2+ to edit/run a native 2D project |
+| godot/scenes/main.tscn | Concrete launchable game scene |
+| godot/scripts/main.gd | Original Godot runtime implementing turn rules and renderer |
+| godot/world.json | Runtime data from the exact same typed world |
+| proof/verified_solution.json | Full winning Python action replay |
+| release.json | World/proof digests, SHA-256 file checksums, truthful target readiness |
+| README.md | Runtime controls and validation boundaries |
+
+No packaged ROMs, BIOSes, commercial game assets, scraped text, model weights,
+SDK keys or external scripts are required or shipped.
+
+## Two runtimes, one gameplay contract
+
+Both outputs implement the **same reference behavior**:
+
+- Four-direction movement through walls and corridors, one input per turn.
+- One-time collectible scoring (+10), exit locked until all pickups are found.
+- Hazards cost one health on tile entry; zero health means defeat.
+- Completion awards +100 and enters the next level, or ends in a victory.
+- Terminal state cannot accept more moves.
+- Undo for up to 256 actions, restart, and a 20,000-step bound.
+- Godot saves only local action history with a world digest binding and
+  **replays** it upon load instead of trusting a serialized score/position.
+- Python reference proof solves all generated levels while avoiding hazards.
+
+In Godot, use WASD or arrows to move, Z to undo, R to restart, F5 to save
+and F9 to load. The HTML build also has accessible touch controls, an
+accessible text map and optional downloadable browser action logs.
+
+## Verification and operating boundaries
+
+Run:
+
+~~~bash
+python -m unittest tests.test_game_builder_dual_runtime -v
+python -m unittest tests.test_game_builder_playable_world \
+  tests.test_game_builder_playable_export -v
+python scripts/check_architecture_map.py
+python scripts/check_ai_app_construction.py
+python scripts/check_capability_interfaces.py
+python scripts/check_provider_bootstrap.py
+python scripts/check_enterprise_ai_superiority.py --json
+python scripts/check_enterprise_ai_implementation_notes.py --json
+~~~
+
+If Godot 4 is on PATH, the dedicated test also attempts a headless scene
+load. A missing engine causes an explicit skip; source generation alone is
+**not** a claim of a working compiled Godot executable. Hardware, controller,
+conformance, store approval, packaging, usability and console-specific
+emulator certification need independent follow-up evidence.
+
+Every packaged file except the manifest is SHA-256 checked. The manifest
+contains a content digest over its body. Export renders/verifies before
+writing and stages a temporary folder in the destination's parent before
+renaming it into place. Outputs are new snapshots, not updates
+to any existing user's edited Godot project.
+
+Research citations stay outside executable Godot code. Optional researched
+game designs must first be approved through the existing RightsLedger and
+game builder source-clearance flow. Original game inspiration does not
+authorize copying a protected character, distinctive art, music, text,
+map layouts or proprietary game engine code.
+
+## What is still missing for fully featured game production
+
+This milestone delivers *one original playable 2D puzzle/adventure vertical
+slice*, not a universal game editor or all-console native renderer.
+The next meaningful production layers are editor-authored quests/dialogue,
+genre-specific controls and combat, touch/controller mappings in native
+projects, save migrations, original art/audio composition, authored content,
+automated emulator/runtime replay comparisons, UX playtesting, performance
+budgets, full Godot desktop builds and platform/legal release gates.
+
+World/NPC atlas branches can later feed their own approved geometry and
+encounter data through a versioned adapter, after their contracts land;
+they are deliberately not imported from an open PR into the release path.
