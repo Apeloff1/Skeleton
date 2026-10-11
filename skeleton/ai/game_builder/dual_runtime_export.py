@@ -18,6 +18,7 @@ import tempfile
 from .contracts import canonical_digest
 from .playable_compiler import CompiledPlayableProject
 from .playable_simulation import verify_replay
+from .tile_editor_export import render_tile_editor
 
 
 class DualRuntimeExportError(ValueError):
@@ -477,6 +478,10 @@ match the Python reference simulator. No external artwork or licenses are
 included, and the project needs no provider or network at runtime.
 
 Browser: open index.html in a modern desktop/mobile browser.
+Author: open tile-editor.html to paint your own maps, inspect a local safe
+route preview, import/export bounded original authored-world JSON. Rebuild
+with dual_runtime_cli --authored-world and --human-reviewed to run the
+canonical Python solver before distributing a modified game.
 Godot: open godot/project.godot in Godot 4.2+ and press F6/F5 to run.
 
 Godot controls: arrows/WASD/gamepad D-pad/touch swipe movement, Z or gamepad B undo (256 moves), R or Start restart,
@@ -552,8 +557,10 @@ def render_dual_runtime_package(
         "replay_digest": project.proof.digest,
         "final_state": project.proof.final_state.to_payload(),
     }
+    editor = render_tile_editor(world, authorized=True)
     files = {
         "index.html": project.playable.html.encode("utf-8"),
+        "tile-editor.html": editor.content,
         "godot/project.godot": _PROJECT.encode("utf-8"),
         "godot/scenes/main.tscn": _SCENE.encode("utf-8"),
         "godot/scripts/main.gd": _GODOT_SCRIPT.encode("utf-8"),
