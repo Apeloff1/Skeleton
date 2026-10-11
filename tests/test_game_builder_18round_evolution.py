@@ -33,7 +33,8 @@ from skeleton.ai.webcrawler.dragon_research_missions import (
 )
 from skeleton.ai.game_builder.game_18round_runtime import (
     execute_round3_relevance,execute_round4_shadow_backlog,
-    derive_round11_reviewed_destinations,execute_round18_adjacent_recrawl,
+    derive_round11_reviewed_destinations,execute_round11_destinations,
+    execute_round12_crawler_log_ingestion,execute_round18_adjacent_recrawl,
 )
 from skeleton.ai.game_builder.game_dragon_peer_wisdom import (
     SourceMediaReceipt,distill_dragon_peer_wisdom,
@@ -96,8 +97,8 @@ class EighteenRoundCases(unittest.TestCase):
         round_no=len(state.rounds)+3
         if when is None:when=(STAMP+timedelta(minutes=round_no)).isoformat().replace("+00:00","Z")
         r=EvolutionRoundReceipt(
-            round_no,ROUND_DESCRIPTIONS[round_no-3][1],self.task.task_digest,
-            state.rounds[-1].digest if state.rounds else self.task.task_digest,
+            round_no,ROUND_DESCRIPTIONS[round_no-3][1],state.task.task_digest,
+            state.rounds[-1].digest if state.rounds else state.task.task_digest,
             report or canonical_digest(["evidence",round_no]),
             (root,),status,True,self.key.judge_id,when,"0"*64)
         return sign_round_receipt(r,self.key)
@@ -119,6 +120,13 @@ class EighteenRoundCases(unittest.TestCase):
             score_task_knowledge(self.task,self.almanac,(self.subject,),
                                  rows+(rows[0],),(self.key,),lineage=self.lineage,
                                  authorized=True)
+        recycled=replace(rows[0],independence_group="different_group",
+                         signature="0"*64)
+        recycled=sign_utility_observation(recycled,self.key)
+        with self.assertRaises(ThreatRadarError):
+            score_task_knowledge(self.task,self.almanac,(self.subject,),
+                                 (rows[0],recycled),(self.key,),
+                                 lineage=self.lineage,authorized=True)
         reference=replace(self.subject,reference_only=True)
         query=score_task_knowledge(self.task,self.almanac,(reference,),
                                    rows,(self.key,),lineage=self.lineage,
@@ -327,6 +335,39 @@ class EighteenRoundCases(unittest.TestCase):
             derive_round11_reviewed_destinations(
                 existing.db,existing.brief,existing.packet,existing.ledger,
                 authorized=False)
+        for round_no in range(5,11):
+            status=("idle_assessed" if round_no in (5,6) else
+                    "shadow_queued" if round_no in (7,8) else
+                    "research_recorded")
+            row=self.receipt(stage4,status,
+                             when=f"2026-10-11T18:{round_no:02d}:00Z")
+            stage4=accept_round(stage4,row,self.key,authorized=True,
+                **(dict(host_consented=True,host_idle=lambda:True,
+                        thermal_safe=lambda:True)
+                   if round_no in (5,6) else {}))
+        with self.assertRaises(ThreatRadarError):
+            execute_round11_destinations(
+                stage4,existing.db,existing.brief,existing.packet,
+                existing.ledger,reviewer=self.key,
+                as_of="2026-10-11T18:11:00Z",authorized=True,
+                expected_crawler_brief_digest="f"*64)
+        stage11,verified=execute_round11_destinations(
+            stage4,existing.db,existing.brief,existing.packet,
+            existing.ledger,reviewer=self.key,
+            as_of="2026-10-11T18:11:00Z",authorized=True,
+            expected_crawler_brief_digest=stage4.rounds[-1].report_digest)
+        logs=tuple(sign_crawler_log(CrawlerLogObservation(
+            dest.source_id,dest.reviewed_metadata_digest,
+            "a"*64,"b"*64,dest.source_revision_digest,
+            "verified_research","reference_only",
+            self.key.judge_id,"0"*64),self.key)
+            for dest in verified)
+        stage12,received=execute_round12_crawler_log_ingestion(
+            stage11,verified,logs,(self.key,),reviewer=self.key,
+            as_of="2026-10-11T18:12:00Z",authorized=True)
+        self.assertEqual(stage12.rounds[-1].round_number,12)
+        self.assertEqual(received["potential_train_rights_sources"],[])
+        self.assertEqual(len(received["research_admissible_sources"]),3)
 
     def test_round18_runtime_produces_real_native_new_crawler_mission(self):
         state=begin_18round_evolution(self.task,authorized=True)
