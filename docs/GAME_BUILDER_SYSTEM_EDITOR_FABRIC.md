@@ -152,6 +152,69 @@ engines. It never equates successful reference simulation with a certified
 Godot export or native executable. Integration of the actual other 40
 game engines and producer-grade scene/node editors remains outstanding.
 
+## Third independent native engine: original Godot 4 deck battler
+
+The native adapter set has been extended beyond the original puzzle and
+platformer implementations. The `advanced_deck_godot.py` engine independently
+executes the eight original card effects and all turn/economy transitions in
+Godot 4 GDScript. It does not call the Python runtime from within Godot or
+simply animate precomputed outcomes.
+
+**Native rules, advanced floor:** deterministic seed-derived deck shuffles;
+hand limits, finite draw/discard and reshuffle; typed cards `strike`,
+`guard`, `pierce`, `drain`, `rally`, `scry`, `ward` and `spark`;
+energy-per-turn and explicit card costs; shields, piercing attacks, hit
+damage and drain healing; strength and poison; rotating enemy attack/defend/
+poison/charge decisions; finite potions, boss defeat and terminal-player
+failure. Keyboard keys 1–5 select hand cards; Enter ends a turn; H uses a
+potion; R restarts. Gamepad actions and status-rich card rendering are
+included.
+
+The exporter binds its native project to the exact approved scene, settings,
+seed and all gameplay transcript actions. A type-checked
+`game.json` + `proof.json` is included with Godot sources, export presets,
+README, and a content-addressed manifest. Replay mode `--verify-deck`
+executes the entire native game independently then compares **29** Python-
+verified gameplay fields, including draw/discard order, enemy intent, state
+changes, action-result events and terminal outcome. Mismatches fail the
+native executable verification.
+
+The local studio download, human-authorized offline `godot-export` CLI and
+stable original-project ZIP now accept `deck_battler` alongside `puzzle`
+and `platformer`; all remaining advanced reference engines still fail
+closed for native export. Example:
+
+```bash
+python -m skeleton.ai.game_builder.system_editor_cli scene-template \
+  --editor deck_battler --seed 9 > original-deck-scene.json
+python -m skeleton.ai.game_builder.system_editor_cli play \
+  --editor deck_battler --seed 9 --scene original-deck-scene.json \
+  --actions original-commands.json > original-deck-session.json
+python -m skeleton.ai.game_builder.system_editor_cli godot-export \
+  --session original-deck-session.json --output ./original-deck-game \
+  --trusted-local-operator
+godot --headless --path ./original-deck-game/godot --import
+godot --headless --path ./original-deck-game/godot -- --verify-deck
+godot --path ./original-deck-game/godot
+```
+
+The dedicated `game-builder-advanced-deck-native.yml` GitHub workflow
+builds **13 independent native scenarios**—eight card families, victory,
+enemy cycles, poison, deck reshuffle and potion use—on both Windows and
+Linux and exercises actual desktop executable exports. Unit and browser
+tests also reject stale settings, tampered sessions, unapproved exports and
+unsafe source overwrites. A generated ZIP is not certification that hardware
+or a specific game build was actually tested. Native parity must be judged
+from the successful exact-head CI result rather than source presence.
+
+**Maturity accounting:** 43 typed families keep the required Advanced
+design floor; eight have executable Python reference gameplay. Of these,
+native parity is implemented for three distinct families, and it is
+considered verified only after its dedicated CI succeeds. The other five
+remain Python-only prototypes; the other 35 families remain authoring-only.
+Non-homebrew licensed assets, restricted console SDKs and commercial
+publication need separate authorization and rights clearance.
+
 ## First real native adapter: original Godot 4 puzzle game
 
 The `advanced_godot_export.py` native exporter ports the **advanced puzzle**
