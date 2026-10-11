@@ -130,7 +130,7 @@ jobs:
           set -euo pipefail
           root="$RUNNER_TEMP/advanced-native-defense"
           python - "$root" <<'PY'
-          import pathlib, subprocess, sys
+          import os, pathlib, subprocess, sys
           root=pathlib.Path(sys.argv[1])
           cases=("original","upgrades","sell_rebuild","target_priority",
                  "short_waves","long_lane","escaped","base_lost")
@@ -140,7 +140,13 @@ jobs:
               for args in (["--headless","--path",str(project),"--import"],
                            ["--headless","--path",str(project),"--","--verify-defense"]):
                   try:
-                      result=subprocess.run(["godot",*args],stdout=subprocess.PIPE,
+                      # Git Bash provides the Godot launcher on Windows, but
+                      # CreateProcess cannot resolve that shell-only command.
+                      # Use the exact Git Bash installed by actions' bash shell.
+                      cmd=(["godot",*args] if sys.platform!="win32" else [
+                          str(pathlib.Path(os.environ["ProgramFiles"])/"Git"/"bin"/"bash.exe"),
+                          "-c",'godot "$@"',"godot",*args])
+                      result=subprocess.run(cmd,stdout=subprocess.PIPE,
                                             stderr=subprocess.STDOUT,text=True,
                                             encoding="utf-8",errors="replace",timeout=45)
                   except subprocess.TimeoutExpired as exc:
