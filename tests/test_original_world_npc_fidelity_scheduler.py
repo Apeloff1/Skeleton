@@ -167,11 +167,12 @@ def test_honest_visual_impressions_are_budgeted_and_not_fake_individual_agents()
     s = game("interstellar", preset="economy")
     badges = ambient_impressions(s.population, s.terrain, radius=20)
     assert len(badges) <= 64
-    assert all(x.get("visual_only") for x in badges)
+    assert all(x["is_simplified_visual_proxy"] for x in badges)
+    assert all(not x["has_individual_cognition"] and not x["can_vote"]
+               and not x["can_use_resources"] for x in badges)
     report = population_report(s.population, len(s.society.inhabitants))
-    assert report["regional_individual_cognitive_agents"] if (
-        "regional_individual_cognitive_agents" in report
-    ) else report["regional_aggregated_residents"] > 0
+    assert report["regional_aggregated_residents"] == 16384
+    assert len(badges) <= report["visible_proxy_budget"] * 2
     assert report["total_census"] >= 16384
 
 
