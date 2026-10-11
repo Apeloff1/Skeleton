@@ -135,10 +135,10 @@ def _platform_step(state, config, action):
         state["health"] = 0
         state["failed"] = True
         events.append("run_failed")
-    if new_x >= state["exit_x"] and len(state["crystals"]) == len(state["collectibles"]) and not state["failed"]:
+    if state["x"] >= state["exit_x"] and len(state["crystals"]) == len(state["collectibles"]) and not state["failed"]:
         state["finished"] = True
         events.append("exit_unlocked")
-    elif new_x >= state["exit_x"]:
+    elif state["x"] >= state["exit_x"]:
         events.append("exit_locked")
     return events
 
@@ -201,6 +201,8 @@ def _tactics_enemy_round(state, config):
                 spot=[enemy["x"] + (delta if axis=="x" else 0),
                       enemy["y"] + (delta if axis=="y" else 0)]
                 if delta and spot not in state["obstacles"] and not any(
+                    [u["x"], u["y"]] == spot and u["hp"] > 0 for u in state["units"]
+                ) and not any(
                     e is not enemy and [e["x"],e["y"]] == spot for e in state["enemies"]
                 ):
                     enemy[axis]+=delta
@@ -288,7 +290,7 @@ def _defense_start(config, seed):
         "towers":[], "enemies":[], "spawned":0, "defeated":0,
         "escaped":0, "waves_completed":0,"priority":"first",
         "events":[], "finished":False, "failed":False,
-        "seed":seed,
+        "seed":seed, "lane_length":config["lane_length"],
     }
 
 
@@ -307,7 +309,7 @@ def _defense_tick(state, config):
         enemy["slow"]=max(0,enemy["slow"]-1)
     for tower in state["towers"]:
         choices=[enemy for enemy in state["enemies"]
-                 if abs(enemy["x"]-tower["slot"]*3-2) <= config["tower_range"]]
+                 if abs(enemy["x"]-(tower["slot"]*max(1,config["lane_length"]//3)+2)) <= config["tower_range"]]
         if not choices: continue
         enemy=(max(choices,key=lambda e:(e["hp"],-e["id"])) if state["priority"]=="strong"
                else max(choices,key=lambda e:(e["x"],-e["id"])))
@@ -327,6 +329,10 @@ def _defense_tick(state, config):
         else:
             survivors.append(enemy)
     state["enemies"]=survivors
+    completed_waves=min(3,(state["defeated"]+state["escaped"])//config["wave_size"])
+    if completed_waves>state["waves_completed"]:
+        state["waves_completed"]=completed_waves
+        events.append("wave_resolved")
     if state["spawned"] == limit and not state["enemies"]:
         state["waves_completed"]=3
         state["finished"]=True
