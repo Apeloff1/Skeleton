@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from unittest.mock import patch
+from contextlib import redirect_stdout,redirect_stderr
+from io import StringIO
 from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -20,9 +23,10 @@ from skeleton.ai.game_builder.competitive_user_critique import (
 from skeleton.ai.game_builder.competitive_tri_council import (
     ROLES,RoleFinding,AgentDeliberation,sign_deliberation,
     admit_crawler_round,deliberate_verified_round,begin_battle_plan,
-    add_verified_round,record_user_plan_decision,
+    add_verified_round,record_user_plan_decision,request_round_restructure,
 )
 from skeleton.ai.game_builder.competitive_pdf_pack import publish_three_ai_pdfs
+from skeleton.ai.game_builder.competitive_battle_review_cli import main as human_plan_cli
 from skeleton.ai.game_builder.competitive_research_missions import prepare_three_round_crawler_mission
 from skeleton.ai.game_builder.competitive_battle_approval import (
     inspect_all_three_pdfs,submit_user_packet_decision,
@@ -334,6 +338,57 @@ class CompetitiveUserCouncilCases(DeepEnemyCases):
             filename.write_bytes(filename.read_bytes()+b"% injected")
             with self.assertRaisesRegex(ThreatRadarError,"digest"):
                 inspect_all_three_pdfs(root,packet.digest,authorized=True)
+
+
+    def test_any_deliberation_stage_can_be_restructured_with_higher_effort(self):
+        start=begin_battle_plan(self.critique,authorized=True)
+        first=self.research()[0][0]
+        result=deliberate_verified_round(
+            self.critique,first,self.signed_reviews(first),
+            self.reviewers,authorized=True)
+        partially=add_verified_round(start,result,authorized=True)
+        restart=request_round_restructure(
+            partially,feedback="The first round missed measurable NPC false-memory and audio replay scenarios.",
+            authorized=True)
+        self.assertEqual(restart.epoch,1)
+        self.assertEqual(restart.rounds,())
+        self.assertEqual(restart.user_decision,"not_requested")
+        with self.assertRaises(ThreatRadarError):
+            add_verified_round(restart,result,authorized=True)
+
+    def test_user_cli_requires_review_of_every_pdf_and_env_authenticated_session(self):
+        state,_=self.complete_battle()
+        with TemporaryDirectory() as d:
+            root=Path(d)/"studio";GameWorkspace.create(root,authorized=True)
+            packet,_=publish_three_ai_pdfs(root,state,self.critique,
+                                           authorized=True)
+            base=["--root",str(root),"--packet-digest",packet.digest,
+                  "--trusted-local-operator"]
+            captured=StringIO()
+            with redirect_stdout(captured):
+                self.assertEqual(human_plan_cli(["inspect",*base]),0)
+            shown=json.loads(captured.getvalue())
+            self.assertEqual(shown["approval_granted"],False)
+            self.assertEqual(shown["pages_per_role"],{r:3 for r in ROLES})
+            secret="a1"*32
+            args=["approve",*base,"--reviewed-dragon","--reviewed-jeeves",
+                  "--reviewed-adversarial","--as-of","2026-10-14T12:00:00Z",
+                  "--session-context-digest","c"*64]
+            with patch.dict("os.environ",{"SKELETON_GAME_PLAN_SESSION_KEY_HEX":secret}):
+                text=StringIO()
+                with redirect_stdout(text):
+                    self.assertEqual(human_plan_cli(args),0)
+                accepted=json.loads(text.getvalue())
+                self.assertEqual(accepted["user_decision"],"approve")
+                self.assertFalse(accepted["auto_implementation"])
+                # An already accepted exact packet may not be overwritten
+                # with a different decision while pretending same identity.
+                with redirect_stderr(StringIO()):
+                    self.assertEqual(human_plan_cli(
+                        ["revise",*args[1:],"--feedback",
+                         "Please revisit more independent audio and game controls."]),2)
+            with redirect_stderr(StringIO()):
+                self.assertEqual(human_plan_cli(["approve",*base]),2)
 
 
 
