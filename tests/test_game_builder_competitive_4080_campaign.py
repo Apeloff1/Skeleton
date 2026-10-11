@@ -104,7 +104,9 @@ class IntensiveCampaignCases(CompetitiveUserCouncilCases):
         with self.assertRaises(ThreatRadarError):
             audit_council_scrutiny(cat,plan,reports[:-1],keys,authorized=True)
         forged=list(reports)
-        forged[0]=replace(forged[0],independent_review_notes="Not a valid signature.")
+        forged[0]=replace(
+            forged[0],independent_review_notes=forged[0].independent_review_notes+
+            " Tampered external peer review after the expected signature.")
         with self.assertRaises(ThreatRadarError):
             audit_council_scrutiny(cat,plan,tuple(forged),keys,authorized=True)
         # A duplicate role bound to same signer cannot steal another model.
