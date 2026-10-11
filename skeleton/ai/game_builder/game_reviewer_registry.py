@@ -23,6 +23,7 @@ from .game_project_workspace import GameWorkspace
 from .game_model_promotion import (
     PromotionError,PromotionStandard,PromotionEvaluation,
     evaluate_candidate,evaluate_fresh_cohort,validate_policy,require_stronger_standard,
+    predict_review,
 )
 from .game_training_flow import FlowPlan
 from .game_tester_almanac import test_game_personas,TEST_FAMILIES
@@ -384,6 +385,43 @@ class ReviewerRegistry:
                         revision=new["revision"],
                         jeeves_dragon_core_weights_changed=False,
                         gameplay_authority_transferred=False)
+
+    def score_active_game(self, evidence: dict, *, game_digest: str,
+                          authorized: bool)->dict:
+        """Use promoted local weights as a *hint* during real gameplay review.
+
+        No binary accept verdict or quest/story permission is granted by an
+        advisory score. The canonical replay validator is always required.
+        """
+        if not authorized:
+            raise PermissionError("local reviewer inference requires operator authority")
+        if (not isinstance(game_digest,str) or
+            not re.fullmatch(r"[a-f0-9]{64}",game_digest)):
+            raise PromotionError("exact original-game content identity required")
+        if (type(evidence) is not dict or len(evidence)>32 or
+            len(canonical_json(evidence))>12000):
+            raise PromotionError("bounded typed game-review evidence required")
+        state=self.read_state()
+        if state["phase"]!="active" or state["active"] is None:
+            raise PromotionError("no independently promoted local game model is active")
+        from .competitive_mirror_training import TrainingCandidate
+        from .contracts import canonical_digest
+        model=self._candidate(state["active"])
+        item=TrainingCandidate(
+            project_digest=game_digest,split="unlabeled",
+            example_id=canonical_digest({"world":game_digest,"input":evidence}),
+            instruction="Review original gameplay evidence before canonical validation.",
+            input=evidence,expected={},evidence={"runtime":True},
+        )
+        result=predict_review(item,model["policy"])
+        return dict(schema="skeleton.game_builder.promoted_reviewer_inference.v1",
+                    active_model_digest=state["active"],
+                    game_digest=game_digest,
+                    prediction=result,
+                    canon_replay_required=True,
+                    publication_approved=False,
+                    no_model_generated_mission_rewards=True,
+                    no_core_jeeves_or_dragon_weights_changed=True)
 
     def abort(self,reason: str,*,authorized: bool):
         if not authorized:
