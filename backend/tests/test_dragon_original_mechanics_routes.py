@@ -184,3 +184,63 @@ def test_original_game_action_must_exist_in_current_implemented_rule_profile():
     with pytest.raises(HTTPException) as denied:
         route.native_original_mechanics_play(empty,owner=editor())
     assert denied.value.status_code==422
+
+
+
+def test_fusion_endpoint_yields_1024_real_directed_gameplay_options_in_pages():
+    program=str(PROGRAM_COUNT-1)
+    untrained=route.native_original_mechanics_interactions(
+        route.NativeOriginalMechanicFusionRequest(
+            program_index=program,offset=0,limit=32),
+        owner=editor())
+    assert untrained["ok"]
+    assert untrained["total_possible_directed_fusions"]==1024
+    assert untrained["returned"]==32
+    assert not any(item["available"] for item in untrained["interactions"])
+    learned=route.native_original_mechanics_interactions(
+        route.NativeOriginalMechanicFusionRequest(
+            program_index=program,
+            moves=["practice_terraced_trails","practice_river_navigation"],
+            offset=1,limit=1,
+        ),owner=editor())
+    assert learned["ok"]
+    assert learned["returned"]==1
+    route_item=learned["interactions"][0]
+    assert route_item["id"]=="fusion_00_01"
+    assert route_item["available"]
+    played=route.native_original_mechanics_play(
+        route.NativeOriginalMechanicPlayRequest(
+            program_index=program,
+            moves=[
+                "practice_terraced_trails",
+                "practice_river_navigation",
+                "fusion_00_01",
+            ],
+        ),owner=editor())
+    assert played["ok"]
+    assert played["current_game_state"]["turn"]==3
+    assert "fusion_00_01" in played["current_game_state"]["unlocked_joins"]
+
+
+def test_every_untrained_fusion_is_locked_from_direct_API_replay():
+    with pytest.raises(HTTPException) as denied:
+        route.native_original_mechanics_play(
+            route.NativeOriginalMechanicPlayRequest(
+                program_index=str(PROGRAM_COUNT-1),
+                moves=["fusion_00_01"],
+            ),owner=editor())
+    assert denied.value.status_code==422
+
+
+def test_paged_cross_mechanic_discovery_has_role_protection_and_bounded_inputs():
+    path="/api/dragon-academy/native/production/worlds/originals/interactions"
+    endpoint=next(x for x in route.router.routes if x.path==path)
+    assert any(dep.call is route._native_source_editor
+               for dep in endpoint.dependant.dependencies)
+    for values in (
+        {"offset":1024},{"offset":-1},{"offset":True},
+        {"limit":65},{"limit":0},{"limit":True},
+        {"moves":["rest_world"]*129},
+    ):
+        with pytest.raises(ValidationError):
+            route.NativeOriginalMechanicFusionRequest(**values)
