@@ -120,12 +120,72 @@ class AdvancedDefenseTests(unittest.TestCase):
             run_advanced_session("tower_defense",actions=["sell:2"])
 
 
+class AdvancedRacingTests(unittest.TestCase):
+    def test_weather_vehicle_conditions_and_actual_finish(self):
+        commands=["accelerate","accelerate","accelerate","steer_right","coast"]
+        session=run_advanced_session("racing",actions=commands,seed=2)
+        self.assertEqual(session["state"]["weather"],"storm")
+        self.assertEqual(session["state"]["lane"],1)
+        self.assertLess(session["state"]["fuel"],session["state"]["fuel_capacity"])
+        self.assertGreater(session["state"]["distance"],0)
+        self.assertTrue(verify_advanced_session(session))
+        finish=run_advanced_session("racing",{"track_length":20,"laps":1},
+                                    actions=["accelerate"]*4,seed=1)
+        self.assertTrue(finish["state"]["finished"])
+        self.assertTrue(finish["terminal"])
+        self.assertGreater(finish["state"]["championship_points"],0)
+        self.assertTrue(verify_advanced_session(
+            finish,{"track_length":20,"laps":1}))
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("racing",{"track_length":20,"laps":1},
+                                 actions=["accelerate"]*5,seed=1)
+
+    def test_pit_limits_and_cannot_teleport(self):
+        pit=run_advanced_session("racing",actions=["pit"],seed=4)
+        self.assertEqual(pit["state"]["pit_crews"],2)
+        self.assertEqual(pit["state"]["fuel"],pit["state"]["fuel_capacity"])
+        self.assertIn("pit_service",pit["trace"][0]["events"])
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("racing",actions=["pit"]*4)
+
+
+class AdvancedSurvivalTests(unittest.TestCase):
+    def test_finite_resources_crafting_shelter_and_open_ended_outcome(self):
+        commands=["gather_wood","mine_stone","craft_tool",
+                  "gather_wood","mine_stone","build_shelter","travel"]
+        report=run_advanced_session("survival",actions=commands,seed=0)
+        self.assertTrue(verify_advanced_session(report))
+        state=report["state"]
+        self.assertEqual(state["tools"],1)
+        self.assertEqual(state["shelter_level"],1)
+        self.assertIn("permanent_camp",state["milestones"])
+        self.assertEqual(state["region"],1)
+        self.assertFalse(state["finished"])
+        self.assertFalse(report["terminal"])
+        self.assertLess(state["regions"][0]["wood_stock"],16)
+        self.assertLess(state["regions"][0]["stone_stock"],7)
+        self.assertTrue(any("finite_resource_harvested" in x["events"]
+                            for x in report["trace"]))
+
+    def test_no_free_fuel_resources_or_crafting_and_exhaustion_enforced(self):
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("survival",actions=["craft_tool"])
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("survival",actions=["light_fire"])
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("survival",actions=["travel"]*4)
+        self.assertTrue(verify_advanced_session(
+            run_advanced_session("survival",actions=["forage","drink","rest"])))
+
+
 class AdvancedProofTests(unittest.TestCase):
     def test_hash_chain_replay_and_corruption_detection(self):
         for engine,actions in (
             ("platformer",["jump_right","right","wait"]),
             ("tactics",["east","end_turn"]),
             ("tower_defense",["build:0","tick:4"]),
+            ("racing",["accelerate","steer_right","coast"]),
+            ("survival",["forage","drink","rest"]),
         ):
             with self.subTest(engine=engine):
                 session=run_advanced_session(engine,actions=actions,seed=3)
@@ -213,6 +273,10 @@ class AdvancedStudioAPITests(unittest.TestCase):
         self.assertFalse(data["server_mutated_game_files"])
         self.assertEqual(data["session"]["validated_turn_count"],2)
         self.assertIn("end_turn",data["available_actions"])
+        self.assertEqual(self.post("/api/advanced-play",
+                         {"editor":"racing","actions":["accelerate"]})[0],200)
+        self.assertEqual(self.post("/api/advanced-play",
+                         {"editor":"survival","actions":["gather_wood"]})[0],200)
         self.assertFalse((self.work.root/"current/active_game/systems").exists())
         session=data["session"]
         self.assertEqual(self.post("/api/advanced-verify",
