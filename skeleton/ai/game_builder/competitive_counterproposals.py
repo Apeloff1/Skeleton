@@ -7,10 +7,12 @@ installed game code. Advancement requires *new* signed replay evidence.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass,replace
+import hmac
 
 from .contracts import canonical_digest
-from .competitive_title_radar import PlannedOriginalTitle,ThreatAssessment,ThreatRadarError,_sha
+from .competitive_title_radar import PlannedOriginalTitle,ThreatAssessment,ThreatRadarError,_sha,_id,_date
+from .competitive_delivery_gate import TrustedCompetitionJudge,_mac
 from .competitive_deep_analysis import ScriptedProbe,FacetVerdict,ALL_FACETS
 from .competitive_evolution_chain import RivalEvolutionChain
 
@@ -195,6 +197,48 @@ def propose_original_outclassing(
 
 
 @dataclass(frozen=True,slots=True)
+class SignedImplementationReview:
+    """Identity- and exact-evidence-bound QA assessment, not release consent."""
+
+    proposal_digest: str
+    build_digest: str
+    measured_verdict_digest: str
+    reviewer_id: str
+    reviewed_at: str
+    originality_review_passed: bool
+    protected_quality_gates_passed: bool
+    signature: str
+
+    def __post_init__(self):
+        for name in ("proposal_digest","build_digest","measured_verdict_digest","signature"):
+            _sha(getattr(self,name),name)
+        _id(self.reviewer_id,"separate implementation review")
+        _date(self.reviewed_at)
+        for name in ("originality_review_passed","protected_quality_gates_passed"):
+            if type(getattr(self,name)) is not bool:
+                raise ThreatRadarError("explicit typed QA decision required")
+
+    def signed_body(self):
+        return dict(
+            schema="skeleton.game_builder.original_outclassing_review.v1",
+            proposal_digest=self.proposal_digest,
+            build_digest=self.build_digest,
+            measured_verdict_digest=self.measured_verdict_digest,
+            reviewer_id=self.reviewer_id,reviewed_at=self.reviewed_at,
+            originality_review_passed=self.originality_review_passed,
+            protected_quality_gates_passed=self.protected_quality_gates_passed)
+
+
+def sign_implementation_review(review: SignedImplementationReview,
+                               signer: TrustedCompetitionJudge):
+    if (not isinstance(review,SignedImplementationReview)
+            or not isinstance(signer,TrustedCompetitionJudge)
+            or review.reviewer_id!=signer.judge_id):
+        raise ThreatRadarError("exact trusted implementation reviewer required")
+    return replace(review,signature=_mac(review.signed_body(),signer.key))
+
+
+@dataclass(frozen=True,slots=True)
 class OutclassingEvaluation:
     counterproposal_digest: str
     resulting_original_lower_bp: int|None
@@ -214,6 +258,7 @@ class OutclassingEvaluation:
             quality_gain_bp=self.quality_gain_bp,
             reasons=list(self.reasons),
             independently_measured=self.independently_measured,
+            independent_model_release_not_granted=True,
             game_release_authorized=False,
             only_real_game_replay_can_prove_implementation=True)
 
@@ -225,6 +270,8 @@ def evaluate_original_counterproposal(
     originality_review_passed: bool,
     protected_quality_gates_passed: bool,
     authorized: bool,minimum_gain_bp: int=50,
+    implementation_review: SignedImplementationReview|None=None,
+    trusted_evaluator: TrustedCompetitionJudge|None=None,
 )->OutclassingEvaluation:
     if not authorized:
         raise PermissionError("outclassing candidate requires operator attestation")
@@ -243,6 +290,22 @@ def evaluate_original_counterproposal(
     if replay_implementation_digest is not None:
         _sha(replay_implementation_digest,"actual new replayed build")
     reasons=[]
+    if implementation_review is None:
+        reasons.append("no_signed_build_and_measurement_qualification")
+    else:
+        if (not isinstance(implementation_review,SignedImplementationReview)
+                or not isinstance(trusted_evaluator,TrustedCompetitionJudge)
+                or implementation_review.reviewer_id!=trusted_evaluator.judge_id
+                or not hmac.compare_digest(
+                    implementation_review.signature,
+                    _mac(implementation_review.signed_body(),trusted_evaluator.key))
+                or implementation_review.proposal_digest!=proposal.digest
+                or implementation_review.build_digest!=replay_implementation_digest
+                or implementation_review.measured_verdict_digest!=canonical_digest(
+                    after.payload())
+                or implementation_review.originality_review_passed!=originality_review_passed
+                or implementation_review.protected_quality_gates_passed!=protected_quality_gates_passed):
+            raise ThreatRadarError("signed original-build review does not authenticate measured candidate")
     if replay_implementation_digest is None:
         reasons.append("no_implemented_original_game_replay")
     if not originality_review_passed:
@@ -277,5 +340,6 @@ def evaluate_original_counterproposal(
 
 
 __all__=["REMEDIATIONS","OriginalCounterproposal",
+         "SignedImplementationReview","sign_implementation_review",
          "OutclassingEvaluation","propose_original_outclassing",
          "evaluate_original_counterproposal"]
