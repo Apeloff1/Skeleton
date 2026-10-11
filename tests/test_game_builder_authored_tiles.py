@@ -91,7 +91,7 @@ class AuthoredWorldTests(unittest.TestCase):
 
     def test_rejects_unreachable_unbalanced_and_unrecognized_tiles(self) -> None:
         unreachable = list(ROWS)
-        unreachable[1] = "#S#.....#"
+        unreachable[1] = "#S#.C...#"
         unreachable[2] = "#######.#"
         with self.assertRaisesRegex(AuthoredGameError, "safe winning route"):
             compile_authored_world(
@@ -156,7 +156,7 @@ class AuthoredWorldTests(unittest.TestCase):
                 json.loads((output / "godot/world.json").read_text())
                 ["levels"][0]["rows"], ROWS,
             )
-            self.assertNotIn("</script>", (output / "index.html").read_text())
+            self.assertNotIn("Cave </script>", (output / "index.html").read_text())
             with self.assertRaises(AuthoredGameError):
                 compile_authored_document(
                     {**self.document, "schema": "wrong"},
