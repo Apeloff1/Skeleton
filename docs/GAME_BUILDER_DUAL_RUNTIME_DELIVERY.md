@@ -45,6 +45,7 @@ established by the caller: it is not a login check.
 | index.html | Fully standalone CSP-restricted game; works offline |
 | tile-editor.html | Offline multi-level visual map painter, route preview and JSON export |
 | godot/project.godot | Open with Godot 4.2+ to edit/run a native 2D project |
+| godot/export_presets.cfg | Linux x86-64 and Windows x86-64 standalone desktop build recipes |
 | godot/scenes/main.tscn | Concrete launchable game scene |
 | godot/scripts/main.gd | Original Godot runtime implementing turn rules and renderer |
 | godot/world.json | Runtime data from the exact same typed world |
@@ -144,6 +145,36 @@ In Godot, use WASD, arrow keys, gamepad D-pad or touch swipes to move; Z or
 gamepad B to undo; R or gamepad Start to restart; F5 to save and F9 to load.
 Hardware input latency and mobile viewport usability need device testing. The HTML build also has accessible touch controls, an
 accessible text map and optional downloadable browser action logs.
+
+## Building desktop executables from the generated game
+
+With Godot 4.4.1 and matching official export templates installed, the
+Godot source project can produce two unsigned native desktop applications:
+
+~~~bash
+godot --headless --path my-game/godot --import
+godot --headless --path my-game/godot \
+  --export-release Linux original-game.x86_64
+godot --headless --path my-game/godot \
+  --export-release "Windows Desktop" original-game.exe
+~~~
+
+The standalone export includes its original JSON world/proof resources
+and embeds the game data pack inside the platform executable. A native
+Linux executable can then replay its original Python-proved level:
+
+~~~bash
+./original-game.x86_64 --headless --quit-after 200 -- --verify-proof
+~~~
+
+The repository's native Godot workflow builds and exercises the Linux
+executable, cross-exports Windows, verifies the outputs are nonempty,
+emits SHA-256 checksums, and uploads the resulting unsigned candidates
+as a temporary Actions artifact. A Windows cross-export is **not** evidence
+of a successful Windows gameplay test. Commercial release still requires
+OS-specific tests, attribution, publisher/store review, distribution and
+signing/notarization where applicable. A no-template Godot installation
+can still open the source scene or replay directly, but cannot export binaries.
 
 ## Verification and operating boundaries
 
