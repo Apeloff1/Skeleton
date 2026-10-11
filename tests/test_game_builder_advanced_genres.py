@@ -19,6 +19,7 @@ from skeleton.ai.game_builder.advanced_gameplay_runtime import (
     run_advanced_session, verify_advanced_session,
 )
 from skeleton.ai.game_builder.advanced_genre_engines import CARDS
+from skeleton.ai.game_builder.advanced_puzzle_solver import solve_advanced_puzzle
 from skeleton.ai.game_builder.advanced_level_scenes import (
     SceneError, make_advanced_scene, validate_advanced_scene, scene_path,
 )
@@ -215,6 +216,50 @@ class PuzzleGameplayTests(unittest.TestCase):
             make_advanced_scene("puzzle",cfg,layout=original)
 
 
+class BoundedPuzzleProofTests(unittest.TestCase):
+    def test_independent_shortest_solution_and_replay_receipt(self):
+        for logic in ("switches","push_blocks","circuits","time","non_euclidean"):
+            with self.subTest(logic=logic):
+                config={"logic":logic,"board_width":4,"board_height":4}
+                scene=make_advanced_scene("puzzle",config)
+                report=solve_advanced_puzzle(scene,config,max_states=12000,max_depth=48)
+                self.assertEqual(report["status"],"solved")
+                self.assertTrue(report["verified_by_authoritative_replay"])
+                self.assertGreater(report["shortest_steps"],0)
+                self.assertEqual(len(report["commands"]),report["shortest_steps"])
+                playback=run_advanced_session("puzzle",config,report["commands"],
+                                               seed=scene["seed"],scene=scene)
+                self.assertTrue(playback["state"]["finished"])
+                self.assertEqual(playback["digest"],report["gameplay_digest"])
+                self.assertEqual(report,solve_advanced_puzzle(
+                    scene,config,max_states=12000,max_depth=48))
+
+    def test_exhaustively_unsolvable_is_not_confused_with_unproven_budget(self):
+        config={"logic":"switches","board_width":4,"board_height":4,
+                "solution_required":False}
+        scene=make_advanced_scene("puzzle",config)
+        layout=scene["layout"]
+        layout["walls"]=[[2,y] for y in range(4)]
+        impossible=make_advanced_scene("puzzle",config,layout=layout)
+        result=solve_advanced_puzzle(impossible,config,max_states=1000)
+        self.assertEqual(result["status"],"unsatisfiable_exhaustive")
+        self.assertFalse(result["verified_by_authoritative_replay"])
+        constrained=solve_advanced_puzzle(scene,config,max_states=1)
+        self.assertEqual(constrained["status"],"unproven_search_budget")
+        self.assertNotEqual(constrained["status"],result["status"])
+
+    def test_proof_requires_authoritative_settings_and_strict_budget(self):
+        scene=make_advanced_scene("puzzle")
+        with self.assertRaises(SceneError):
+            solve_advanced_puzzle(scene,{"board_width":4})
+        with self.assertRaises(SceneError):
+            solve_advanced_puzzle(scene,max_states=0)
+        with self.assertRaises(SceneError):
+            solve_advanced_puzzle(scene,max_depth=0)
+        with self.assertRaises(SceneError):
+            solve_advanced_puzzle(make_advanced_scene("shooter"))
+
+
 class CrossCuttingCustodyTests(unittest.TestCase):
     def test_new_genres_share_real_save_restore_and_continue(self):
         commands={"shooter":["wait"],"deck_battler":["play:0"],"puzzle":["wait"]}
@@ -290,12 +335,24 @@ class StudioSmokeTests(unittest.TestCase):
                 self.assertEqual(self.post("/api/advanced-play",{
                     "editor":genre,"seed":2,"actions":[]},
                     token=False)[0],403)
+        status,scene_reply=self.post("/api/advanced-scene-template",{
+            "editor":"puzzle","settings":{"board_width":4,"board_height":4}})
+        self.assertEqual(status,200)
+        status,solved=self.post("/api/advanced-puzzle-solve",{
+            "scene":scene_reply["scene"],
+            "settings":{"board_width":4,"board_height":4}})
+        self.assertEqual(status,200)
+        self.assertEqual(solved["proof"]["status"],"solved")
+        self.assertFalse(solved["source_mutated"])
+        self.assertEqual(self.post("/api/advanced-puzzle-solve",{
+            "scene":scene_reply["scene"]},token=False)[0],403)
         html=render_workspace_html("X"*32).decode()
         for genre in ("shooter","deck battler","puzzle"):
             self.assertIn(genre,html)
         for token in (
             'id="advanced-scene-grid"',
             'id="advanced-paint-tool"',
+            'id="advanced-puzzle-solve"',
             "function paintSceneCell(point)",
             "function renderSceneAuthoring()",
             "Use Create / validate authored scene",
