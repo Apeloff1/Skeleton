@@ -8,8 +8,16 @@ on:
       - "skeleton/ai/game_builder/game_idle_review_scheduler.py"
       - "skeleton/ai/game_builder/game_tester_almanac.py"
       - "skeleton/ai/game_builder/game_model_cli.py"
+      - "skeleton/ai/game_builder/game_reviewer_v2.py"
+      - "skeleton/ai/game_builder/game_reviewer_optimizer.py"
+      - "skeleton/ai/game_builder/game_dragon_peer_wisdom.py"
+      - "skeleton/ai/game_builder/reviewed_knowledge.py"
+      - "skeleton/ai/game_builder/knowledge_rights_bridge.py"
       - "tests/test_game_builder_reviewer_promotion.py"
       - "tests/test_game_builder_learning_feedback.py"
+      - "tests/test_game_builder_optimizer_and_wisdom.py"
+      - "tests/test_game_builder_model_cli.py"
+      - "tests/test_game_builder_knowledge_rights_bridge.py"
       - ".github/workflows/game-builder-learning-feedback.yml"
   workflow_dispatch:
 permissions:
@@ -47,6 +55,8 @@ jobs:
             tests/test_game_builder_learning_feedback.py
             tests/test_game_builder_reviewer_promotion.py
             tests/test_game_builder_learning_challenges.py
+            tests/test_game_builder_optimizer_and_wisdom.py
+            tests/test_game_builder_knowledge_rights_bridge.py
       - name: Python 3.11
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
@@ -59,4 +69,4 @@ jobs:
       - name: Independent source and adversarial promotion tests
         shell: bash
         run: |
-          python -m unittest tests.test_game_builder_learning_feedback tests.test_game_builder_reviewer_promotion tests.test_game_builder_learning_challenges -v
+          python -m unittest tests.test_game_builder_learning_feedback tests.test_game_builder_reviewer_promotion tests.test_game_builder_learning_challenges tests.test_game_builder_optimizer_and_wisdom tests.test_game_builder_knowledge_rights_bridge -v
