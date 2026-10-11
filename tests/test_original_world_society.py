@@ -140,6 +140,7 @@ def test_living_session_save_restore_and_replay() -> None:
         CampaignAction("pledge"),
         CampaignAction("end_turn"),
         CampaignAction("forage"),
+        CampaignAction("move", target=1),  # travel to the working resident
         SocietyAction("interview"),
         CampaignAction("end_turn"),
     )
