@@ -112,6 +112,34 @@ class LivingWorldSimulationTests(unittest.TestCase):
                 self.assertLess(len(proof.receipts), 200)
                 story_verify(world, proof, authorized=True)
 
+    def test_full_24_original_quest_arcs_npc_roles_and_postgame_progression(self):
+        intent = StoryIntent(
+            "twenty-four-original-arcs", "Beyond the Old Coast",
+            seed=48274, regions=12, population=128,
+            mode="postgame", quests_to_finish=24, quest_arcs=24,
+        )
+        world = original_story_world(intent, authorized=True)
+        self.assertEqual(len(world.quests), 24)
+        self.assertEqual(len({q.key for q in world.quests}), 24)
+        self.assertEqual(len({q.giver for q in world.quests}), 24)
+        self.assertEqual(len({q.item for q in world.quests}), 24)
+        self.assertEqual(len({q.premise for q in world.quests}), 24)
+        self.assertEqual({q.faction for q in world.quests},
+                         {"gardeners", "wayfinders", "makers"})
+        proof = demonstrate_story(world, authorized=True, ending="discovery")
+        story_verify(world, proof, authorized=True)
+        self.assertEqual(len(proof.final.completed), 24)
+        self.assertEqual(sum(proof.final.faction_trust), 300)
+        self.assertEqual(proof.final.ending, "discovery")
+        self.assertLess(proof.final.turn, MAX_TURNS)
+        self.assertTrue(story_choices(world, proof.final))
+        source = render_story_package(world, proof, authorized=True)
+        self.assertEqual(source.manifest["npc_count"], 128)
+        self.assertEqual(source.manifest["quest_count"], 24)
+        self.assertGreater(source.manifest["proof_actions"], 50)
+        self.assertTrue(review_living_story(
+            world, proof, source, authorized=True, attempts=64).passed)
+
     def test_state_and_action_forgery_fail_closed(self):
         world = original_story_world(self.intent(mode="campaign"), authorized=True)
         proof = demonstrate_story(world, authorized=True)
