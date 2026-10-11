@@ -179,6 +179,34 @@ recrawl planning from #3644 can identify authorized public sources to
 review again; actual source ingestion still requires explicit collection
 and Wiki/rights admission.
 
+## 8. Versioned deep almanacs and operator visibility
+
+\`competitive_deep_archive.py\` stores a complete 51-facet + ancestry
+\`DeepCompetitorPortfolio\` under the real local \`GameWorkspace\`, bound
+to the exact original competitor watch event, current reviewed Wiki state,
+legally cleared source revisions and the original-design source root.
+
+Atomic SQLite WAL events store canonical JSON and SHA-256 parent chains.
+Revisions must strictly advance in UTC time and carry their exact parent
+digest. Re-recording earlier knowledge, omitting an enemy, truncating a
+facet family, losing an ancestor or changing rights without refreshing the
+reviewed brief fails closed. History checks parse each revision, validate
+canonical content, verify parent identity and reject duplicate JSON keys.
+This is durable local custody, not externally notarized immutable storage.
+
+Operators can examine each saved analysis from the existing watch CLI:
+
+\`\`\`sh
+python -m skeleton.ai.game_builder.competitive_watch_cli deep --root STUDIO \
+  --original-id original_world --trusted-local-operator
+\`\`\`
+
+The command displays real recorded script counts by gameplay/graphics/sound/
+storyline, confirmed weakspots only, source-evidence gaps, lineage-generation
+counts, ancestry outclassing status and outstanding original proposal counts.
+No claims are invented for unknown games; missing archives return an explicit
+error. It never modifies the game or downloads a rival's assets.
+
 ## 8. Testing, rollout and standards
 
 \`tests/test_game_builder_competitive_deep.py\` validates the entire 51-script
