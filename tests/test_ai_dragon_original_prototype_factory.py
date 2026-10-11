@@ -7,7 +7,7 @@ import pytest
 
 from skeleton.ai.webcrawler.dragon_original_mechanic_forge import (
     MECHANIC_IDS,MILLION_DISTINCT_ENABLE_PROFILES,
-    binary_nucleus,distinguish,
+    FULL_BINARY_PROFILE_COUNT,full_binary_nucleus,distinguish,
 )
 from skeleton.ai.webcrawler.dragon_original_prototype_factory import (
     SCHEMA,MAX_PREVIEW,materialize,verify_prototype,
@@ -16,7 +16,7 @@ from skeleton.ai.webcrawler.dragon_original_prototype_factory import (
 
 
 def nucleus(*active):
-    return sum(1<<(23-i) for i in active)
+    return sum(1<<(31-i) for i in active)
 
 
 @pytest.mark.parametrize("candidate",[
@@ -26,11 +26,11 @@ def test_every_requested_original_game_has_concrete_separable_actions_world_and_
     original=materialize(candidate,branch_seed=1977,routes=3,steps=16)
     assert original.schema==SCHEMA
     assert original.original_nucleus==candidate
-    assert original.source_digest==binary_nucleus(candidate).source_digest
+    assert original.source_digest==full_binary_nucleus(candidate).source_digest
     assert original.available_mechanic_count==candidate.bit_count()
     assert len(original.active_mechanics)==candidate.bit_count()
     assert original.active_mechanics==tuple(
-        MECHANIC_IDS[i] for i in range(24) if candidate&(1<<(23-i))
+        MECHANIC_IDS[i] for i in range(32) if candidate&(1<<(31-i))
     )
     assert original.start_action_count>=1
     assert len(original.replayed_journeys)==3
@@ -90,7 +90,7 @@ def test_real_short_sample_contains_mechanically_distinct_playable_originals_not
     corpus=sample_prototypes(start=4096,count=12,branch_seed=7,
                              routes=2,steps=12)
     assert corpus["schema"]==SCHEMA
-    assert corpus["nuclei_indexed"]==MILLION_DISTINCT_ENABLE_PROFILES
+    assert corpus["nuclei_indexed"]==FULL_BINARY_PROFILE_COUNT
     assert corpus["requested_materialized"]==12
     assert corpus["distinct_executable_rulebooks"]==12
     assert corpus["individually_finished_games"]==0
@@ -120,7 +120,7 @@ def test_forged_native_release_or_story_ending_is_rejected_by_full_dual_gameplay
 
 
 @pytest.mark.parametrize("values",[
-    {"nucleus":-1},{"nucleus":MILLION_DISTINCT_ENABLE_PROFILES},
+    {"nucleus":-1},{"nucleus":FULL_BINARY_PROFILE_COUNT},
     {"nucleus":True},{"nucleus":2,"routes":13},
     {"nucleus":2,"routes":0},{"nucleus":2,"steps":3},
     {"nucleus":2,"steps":65},{"nucleus":2,"branch_seed":-1},
@@ -135,6 +135,22 @@ def test_original_candidate_sampling_cannot_claim_to_have_built_a_million_games(
     with pytest.raises(ValueError):
         sample_prototypes(start=0,count=MAX_PREVIEW+13)
     with pytest.raises(ValueError):
-        sample_prototypes(start=MILLION_DISTINCT_ENABLE_PROFILES-1,count=2)
+        sample_prototypes(start=FULL_BINARY_PROFILE_COUNT-1,count=2)
     with pytest.raises(ValueError):
         sample_prototypes(start=True,count=3)
+
+
+
+def test_full_four_billion_nuclei_cover_all_32_real_game_systems():
+    assert FULL_BINARY_PROFILE_COUNT==4_294_967_296
+    maximum=materialize(FULL_BINARY_PROFILE_COUNT-1,routes=2,steps=12)
+    assert maximum.available_mechanic_count==32
+    assert maximum.world_style=="post_story_wasteland"
+    assert "postgame_repair" in maximum.active_mechanics
+    assert "world_era_cycles" in maximum.active_mechanics
+    assert maximum.persistent_after_ending
+    assert len(maximum.replayed_journeys)==2
+    assert verify_prototype(maximum)["verified"]
+    before=full_binary_nucleus(FULL_BINARY_PROFILE_COUNT-2)
+    after=full_binary_nucleus(FULL_BINARY_PROFILE_COUNT-1)
+    assert distinguish(before,after)["distinguishable"]
