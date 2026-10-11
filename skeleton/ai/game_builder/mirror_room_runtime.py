@@ -129,7 +129,7 @@ def review_playable_project(
         raise MirrorRoomError("release manifest metadata digest changed")
     serialized_manifest = (
         json.dumps(package.manifest, sort_keys=True, ensure_ascii=True,
-                   separators=(",", ":"), allow_nan=False) + "\\n"
+                   separators=(",", ":"), allow_nan=False) + "\n"
     ).encode("utf-8")
     if package.files["release.json"] != serialized_manifest:
         raise MirrorRoomError("serialized release manifest changed")
