@@ -115,12 +115,17 @@ def plan_post_weight_dragon_research(
     for interest in inputs:
         unique.setdefault(interest.topic,interest)
     if len(unique)>max_topics:
-        # Deliberate bounded priority selection while retaining one slot for
-        # each domain; report exact selected queries, never fake discovery.
-        ordered=sorted(unique.values(),key=lambda x:(-x.weight,x.topic))
-        chosen=tuple(ordered[:max_topics])
+        # Protect each of the four game domains from being squeezed out by
+        # correlated high-priority error categories.
+        reserved=tuple(unique[domain] for domain in DOMAIN_TOPICS)
+        remainder=sorted(
+            (item for topic,item in unique.items() if topic not in DOMAIN_TOPICS),
+            key=lambda x:(-x.weight,x.topic))
+        chosen=reserved+tuple(remainder[:max_topics-len(reserved)])
     else:
         chosen=tuple(unique.values())
+    if not set(DOMAIN_TOPICS).issubset({x.topic for x in chosen}):
+        raise PromotionError("post-weight research may not omit gameplay, graphics, sound or storyline")
     mission=plan_research(
         almanac.owner,chosen,authorized=True,
         geographic_consent=False,
