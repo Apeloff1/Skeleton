@@ -40,7 +40,8 @@ def turn(session):
 
 def test_every_one_of_40_eras_exposes_finite_explicit_census_and_cpu_budgets():
     assert len(ERA_LEVELS) == 40
-    assert set(FIDELITY_MODES) == {"economy", "balanced", "vivid", "unrestricted"}
+    assert {"economy", "balanced", "vivid", "unrestricted"} <= set(FIDELITY_MODES)
+    assert {"eco", "rich"} <= set(FIDELITY_MODES)
     for era in ERA_LEVELS:
         b = era_budget(era)
         assert 1 <= b.full_npc_limit <= 32
