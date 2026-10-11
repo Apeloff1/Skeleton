@@ -34,6 +34,9 @@ from .original_world_npc_cognition_v2 import (
 from .original_world_npc_civics import propose_civic
 from .original_world_npc_apprenticeships import enroll, cancel_enrollment
 from .original_world_npc_households import establish_household, cancel_household
+from .original_world_npc_platform_profiles import (
+    plan_population,
+)
 from .original_world_npc_era_population import (
     EraPopulation, era_budget, create_era_population,
     validate_population, dispatch_food, tick_population,
@@ -111,6 +114,10 @@ def validate_product(state: ProductSession):
     validate_intelligence(state.cognition, state.society, state.terrain)
     if state.population is not None:
         validate_population(state.population, state.society, state.terrain)
+        if (state.population.profile is not None
+                and state.population.profile.genre
+                != law.source.advanced.mode.form.form_id):
+            raise FoundationError("population genre does not match actual playable form")
     if state.society.tick != state.living.living_turns or state.terrain.turns != state.living.living_turns:
         raise FoundationError("source-world, landscape and actor clocks diverged")
     if type(state.events) is not int or not 0 <= state.events <= LIMIT:
@@ -123,14 +130,23 @@ def validate_product(state: ProductSession):
 def create_product(
     index: int, *, inhabitants: int | None = None, era: str | None = None,
     npc_fidelity: str = "balanced",
+    hardware_target: str = "pc-windows",
+    pc_generation: str | None = None,
 ) -> ProductSession:
     law = living_at(index)
+    profile = (
+        plan_population(
+            era, hardware_target, law.source.advanced.mode.form.form_id,
+            pc_generation=pc_generation)
+        if era is not None else None
+    )
     if era is not None:
-        budget = era_budget(era)
-        # Reserve two full-mind slots for physically founded future families.
-        count = (max(1, budget.full_npc_limit - 2)
-                 if inhabitants is None else inhabitants)
+        count = profile.starting_locals if inhabitants is None else inhabitants
+        if type(count) is not int or not 1 <= count <= profile.local_limit:
+            raise FoundationError("NPC request exceeds game genre and native hardware bounds")
     else:
+        if hardware_target != "pc-windows" or pc_generation is not None:
+            raise FoundationError("targeted console/PC NPC scaling requires --era")
         count = 12 if inhabitants is None else inhabitants
     physical = create_terrain(
         law.design_id, BIOMES_BY_ARCH[law.source.spatial.architecture.architecture_id])
@@ -141,7 +157,8 @@ def create_product(
     if era is None and npc_fidelity != "balanced":
         raise FoundationError("hardware NPC fidelity requires selected original era")
     regional = (create_era_population(
-        physical, inhabitants_state, era, fidelity=npc_fidelity)
+        physical, inhabitants_state, era, fidelity=npc_fidelity,
+        profile=profile)
                 if era is not None else None)
     game = ProductSession(law.world_id, create_living(index),
                           physical, inhabitants_state, cognition=minds,
