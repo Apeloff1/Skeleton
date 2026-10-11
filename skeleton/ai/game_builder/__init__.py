@@ -354,6 +354,12 @@ _KNOWLEDGE_EXPORTS = {
     "StoryMirrorError": ".living_story_mirror",
     "StoryMirrorReport": ".living_story_mirror",
     "review_living_story": ".living_story_mirror",
+    "StoryAuthoringError": ".living_story_authoring",
+    "AuthoredStory": ".living_story_authoring",
+    "derive_original_story_intent": ".living_story_authoring",
+    "blueprint_document": ".living_story_authoring",
+    "compile_authored_story": ".living_story_authoring",
+    "read_story_blueprint": ".living_story_authoring",
 }
 
 
