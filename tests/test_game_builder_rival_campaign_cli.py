@@ -164,6 +164,48 @@ class OperatorCLITests(unittest.TestCase):
             self.assertEqual(code,2)
             self.assertIn("repeated key",err)
 
+    def test_campaign_cli_requires_complete_original_evidence(self):
+        plan=original_plan()
+        rival=competitor()
+        signals=(notice("a",("causal-npc-memory",)),
+                 notice("b",("witness-quest-branching",)),
+                 notice("c",("era-adaptive-npcs",)))
+        report=evaluate_convergence(plan,rival,signals,authorized=True)
+        with TemporaryDirectory() as folder:
+            filepath=Path(folder)/"rival-campaign.json"
+            filepath.write_text(json.dumps({
+                "schema":"skeleton.game_builder.competitive_campaign_request.v1",
+                "plan":plan.payload(),"report":report.payload()}),encoding="utf-8")
+            code,_,err=self.run_cli("campaign","--evidence",str(filepath))
+            self.assertEqual(code,2)
+            self.assertIn("authenticated creators",err)
+            code,result,err=self.run_cli(
+                "campaign","--evidence",str(filepath),"--trusted-reviewer")
+            self.assertEqual(code,0,err)
+            campaign=json.loads(result)
+            self.assertEqual(len(campaign["tasks"]),24)
+            proof={
+                "schema":"skeleton.game_builder.competitive_campaign_reconciliation_request.v1",
+                "plan":plan.payload(),"report":report.payload(),
+                "campaign":campaign,"task_evidence":[],
+                "delivery":None,
+            }
+            filepath.write_text(json.dumps(proof),encoding="utf-8")
+            code,out,err=self.run_cli("reconcile","--evidence",str(filepath),
+                                      "--trusted-reviewer")
+            self.assertEqual(code,0,err)
+            pending=json.loads(out)
+            self.assertEqual(pending["status"],"work_required")
+            self.assertEqual(pending["incomplete_task_count"],24)
+            self.assertIn("independent_release_evidence_not_submitted",
+                          pending["blockers"])
+            proof["campaign"]["tasks"]=proof["campaign"]["tasks"][:-1]
+            filepath.write_text(json.dumps(proof),encoding="utf-8")
+            code,_,err=self.run_cli("reconcile","--evidence",str(filepath),
+                                    "--trusted-reviewer")
+            self.assertEqual(code,2)
+            self.assertIn("altered",err)
+
     def test_operator_analysis_ledger_and_delivery_are_verifiable(self):
         plan=original_plan()
         title=competitor()
