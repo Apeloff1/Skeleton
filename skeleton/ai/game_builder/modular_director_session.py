@@ -93,7 +93,8 @@ def orchestrator_plan(tier: str="desktop") -> ExecutionPlan:
 
 
 def open_director_session(world: DirectorWorld, *, population: int,
-                          tier: str="desktop", authorized: bool) -> DirectorSession:
+                          tier: str="desktop", authorized: bool,
+                          authored_society: Society | None=None) -> DirectorSession:
     if not authorized:
         raise PermissionError("shared game director simulation requires authorization")
     if not isinstance(world,DirectorWorld):
@@ -104,7 +105,15 @@ def open_director_session(world: DirectorWorld, *, population: int,
     book=compile_modular_missions(world,authorized=True)
     if len(book.missions)>plan.target.mission_budget:
         raise IntegrationError("world mission count exceeds selected consumer device tier")
-    society=make_society(world,population,authorized=True)
+    if authored_society is not None and (
+        not isinstance(authored_society,Society)
+        or authored_society.world_digest!=world.digest
+        or authored_society.turn!=0
+        or len(authored_society.profiles)!=population
+    ):
+        raise IntegrationError("authored original actors must match game source and population")
+    society=(authored_society if authored_society is not None else
+             make_society(world,population,authorized=True))
     return DirectorSession(
         world.digest,plan.digest,director_initial(world),society,
         mission_initial(book),(),(),world.starting_scene,
@@ -182,7 +191,8 @@ def director_session_step(world: DirectorWorld,session: DirectorSession,
 
 def simulate_director(world: DirectorWorld,actions: Sequence[DirectorAction],*,
                       population: int=96,tier: str="desktop",
-                      authorized: bool) -> DirectorOrchestration:
+                      authorized: bool,
+                      authored_society: Society | None=None) -> DirectorOrchestration:
     if not authorized:
         raise PermissionError("original game director evaluation requires authorization")
     if not isinstance(actions,(tuple,list)) or len(actions)>512:
@@ -192,7 +202,8 @@ def simulate_director(world: DirectorWorld,actions: Sequence[DirectorAction],*,
         director_verify(world,original)
     except DirectorError as exc:
         raise IntegrationError("submitted original game actions failed canonical replay") from exc
-    session=open_director_session(world,population=population,tier=tier,authorized=True)
+    session=open_director_session(world,population=population,tier=tier,
+                                  authored_society=authored_society,authorized=True)
     checks=[]
     for action in actions:
         session=director_session_step(world,session,action,tier=tier,authorized=True)
