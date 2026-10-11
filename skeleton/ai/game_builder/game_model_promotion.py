@@ -96,10 +96,14 @@ def validate_policy(policy: dict):
         "weights","bias","threshold","feature_spec"
     }:
         raise PromotionError("only exact typed local review ranker weights allowed")
-    if policy["feature_spec"]!="input_only_key_family_hash_128_v1":
+    specs={
+        "input_only_key_family_hash_128_v1":128,
+        "normalized_game_evidence_256_v2":256,
+    }
+    if policy["feature_spec"] not in specs:
         raise PromotionError("uninstalled AI model inference adapter")
     weights=policy["weights"]
-    if (type(weights) is not list or len(weights)!=128
+    if (type(weights) is not list or len(weights)!=specs[policy["feature_spec"]]
             or any(type(w) not in (int,float) or not math.isfinite(w) or abs(w)>8.1
                    for w in weights)):
         raise PromotionError("unsupported, nonfinite or uncontrolled model weights")
@@ -114,8 +118,13 @@ def predict_review(case: TrainingCandidate,policy: dict):
     validate_policy(policy)
     if not isinstance(case,TrainingCandidate):
         raise PromotionError("typed source-grounded candidate required")
+    if policy["feature_spec"]=="normalized_game_evidence_256_v2":
+        from .game_reviewer_v2 import evidence_features
+        features=evidence_features(case)
+    else:
+        features=_features(case)
     raw=policy["bias"]+sum(policy["weights"][i]*v
-                           for i,v in _features(case).items())
+                           for i,v in features.items())
     probability=_sigmoid(raw)
     return dict(probability=round(probability,8),
                 predicted_reject=probability>=policy["threshold"],
