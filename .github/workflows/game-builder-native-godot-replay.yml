@@ -115,7 +115,7 @@ jobs:
           "$builds/original-game.x86_64" --headless --quit-after 200 -- --verify-proof | tee "$builds/linux-native-replay.txt"
           grep -q NATIVE_REPLAY_OK "$builds/linux-native-replay.txt"
           cp "$RUNNER_TEMP/game-builder/project/release.json" "$builds/source-release.json"
-          (cd "$builds" && sha256sum original-game.x86_64 original-game.exe source-release.json > SHA256SUMS)
+          (cd "$builds" && sha256sum original-game.x86_64 original-game*.exe source-release.json > SHA256SUMS)
       - name: Preserve unsigned desktop release candidates
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -199,11 +199,16 @@ jobs:
           # twin from the same official version-pinned setup-godot archive.
           $archive = Join-Path $env:USERPROFILE 'downloads/Godot_v4.4.1-stable_win64.exe.zip'
           $engineDir = Join-Path $root 'windows-godot'
-          if (Test-Path $archive) {
-            Expand-Archive -LiteralPath $archive -DestinationPath $engineDir -Force
-          } else {
-            Copy-Item (Join-Path $env:USERPROFILE 'godot/*') -Destination $engineDir -Force -ErrorAction SilentlyContinue
+          # setup-godot's cache contains only the GUI executable in some
+          # runner versions. Fetch the pinned official archive when absent;
+          # never silently accept a console-less editor as tested.
+          if (-not (Test-Path $archive)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path $archive) | Out-Null
+            Invoke-WebRequest -Uri 'https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_win64.exe.zip' -OutFile $archive -MaximumRedirection 5
           }
+          Expand-Archive -LiteralPath $archive -DestinationPath $engineDir -Force
+          Write-Host "Official Godot Windows editor contents:"
+          Get-ChildItem $engineDir -Recurse -File | Select-Object -ExpandProperty Name
           $console = Get-ChildItem $engineDir -Recurse -Filter '*_console.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($null -eq $console) {
             throw "Godot Windows console executable unavailable: cannot verify source/native parity"
@@ -218,6 +223,12 @@ jobs:
           if (-not (Test-Path $binary) -or (Get-Item $binary).Length -le 1024) {
             throw "No executable Windows consumer candidate"
           }
-          python -c 'import subprocess,sys; p=subprocess.run([sys.argv[1],"--headless","--","--verify-proof"],capture_output=True,text=True,timeout=90); print(p.stdout); print(p.stderr); sys.exit(0 if p.returncode == 0 and "NATIVE_REPLAY_OK" in (p.stdout+p.stderr) else 1)' $binary
+          $wrapper = Get-ChildItem $root -File -Filter '*console.exe' | Select-Object -First 1
+          if ($null -eq $wrapper) {
+            throw "Windows native export has no console wrapper for observable proof replay"
+          }
+          Write-Host "Executing exported Windows native console wrapper: $($wrapper.FullName)"
+          python -c 'import subprocess,sys; p=subprocess.run([sys.argv[1],"--headless","--","--verify-proof"],capture_output=True,text=True,timeout=90); print(p.stdout); print(p.stderr); sys.exit(0 if p.returncode == 0 and "NATIVE_REPLAY_OK" in (p.stdout+p.stderr) else 1)' $wrapper.FullName
           if ($LASTEXITCODE -ne 0) { throw "Real Windows consumer executable diverged from Python proof" }
           Get-FileHash $binary -Algorithm SHA256 | Format-List
+          Get-FileHash $wrapper.FullName -Algorithm SHA256 | Format-List
