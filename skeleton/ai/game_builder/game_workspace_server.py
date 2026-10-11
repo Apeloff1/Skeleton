@@ -187,7 +187,9 @@ class _StudioHandler(BaseHTTPRequestHandler):
             return self._json(200,{"savegame":result,
                                     "source_project_mutated":False})
         if path=="/api/advanced-load":
-            return self._json(200,import_advanced_savegame(values["savegame"]))
+            restored=import_advanced_savegame(values["savegame"])
+            return self._json(200,{**restored,
+                "available_actions":list(ACTION_HELP[restored["session"]["editor"]])})
         if path=="/api/advanced-continue":
             result=continue_advanced_savegame(
                 values["savegame"],values["new_actions"])
