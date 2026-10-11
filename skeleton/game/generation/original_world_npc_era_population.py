@@ -539,7 +539,21 @@ def select_active_brains(
         fair = (p.id - state.day * max(1, limit)) % n
         ranking.append((class_rank, min(distance, 1024)
                         if class_rank <= 2 else 0, fair, p.id))
-    return tuple(sorted(x[3] for x in sorted(ranking)[:limit]))
+    ranked = sorted(ranking)
+    selected = [x[-1] for x in ranked[:limit]]
+    # Keep one bounded fair-share slot for a healthy resident who would
+    # otherwise never receive attention because their home is farther from
+    # the player. Never displace emergency, contractual, or family care.
+    if limit >= 2 and len(ranked) > limit:
+        reserve = next((x for x in sorted(
+            ranked[limit:], key=lambda x: (x[2], x[3]))
+            if x[0] >= 2), None)
+        replaceable = next((x for x in reversed(ranked[:limit])
+                            if x[0] >= 2), None)
+        if reserve is not None and replaceable is not None:
+            selected.remove(replaceable[-1])
+            selected.append(reserve[-1])
+    return tuple(sorted(selected))
 
 
 def ambient_impressions(
