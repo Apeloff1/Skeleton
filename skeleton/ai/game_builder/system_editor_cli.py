@@ -19,6 +19,10 @@ from .system_editors import (
 )
 from .system_editor_assembly import assemble_workspace_systems
 from .advanced_gameplay_runtime import run_advanced_session, verify_advanced_session
+from .advanced_level_scenes import make_advanced_scene
+from .advanced_gameplay_save import (
+    export_advanced_savegame, import_advanced_savegame, continue_advanced_savegame,
+)
 from .game_project_workspace import GameWorkspace, WorkspaceError
 
 
@@ -38,6 +42,21 @@ def parser() -> argparse.ArgumentParser:
             p.add_argument("--actions", help="Path to a bounded JSON action array")
         if name == "play":
             p.add_argument("--seed", type=int, default=0)
+            p.add_argument("--scene", help="Reviewed original scene JSON document")
+    scene = commands.add_parser("scene-template", help="Generate a typed advanced original scene")
+    scene.add_argument("--editor",required=True)
+    scene.add_argument("--seed",type=int,default=0)
+    scene.add_argument("--scene-id",default="scene_01")
+    scene.add_argument("--settings")
+    scene.add_argument("--layout",help="Optional JSON authored geometry and resource map")
+    save = commands.add_parser("save",help="Save a verified advanced game receipt")
+    save.add_argument("--session",required=True)
+    save.add_argument("--settings")
+    load = commands.add_parser("load-save",help="Verify and restore a portable game save")
+    load.add_argument("--savegame",required=True)
+    cont = commands.add_parser("continue-save",help="Continue a verified portable game")
+    cont.add_argument("--savegame",required=True)
+    cont.add_argument("--actions",required=True)
     verify = commands.add_parser("verify-play", help="Independently verify advanced action receipts")
     verify.add_argument("--session", required=True)
     verify.add_argument("--settings")
@@ -77,6 +96,19 @@ def main(argv=None) -> int:
                 authorized=args.trusted_local_operator)
         elif args.operation == "validate":
             output = validate_editor_document(_load(args.document))
+        elif args.operation == "scene-template":
+            output = make_advanced_scene(args.editor,
+                _load(args.settings) if args.settings else None,
+                seed=args.seed,scene_id=args.scene_id,
+                layout=_load(args.layout) if args.layout else None)
+        elif args.operation == "save":
+            output = export_advanced_savegame(_load(args.session),
+                _load(args.settings) if args.settings else None)
+        elif args.operation == "load-save":
+            output = import_advanced_savegame(_load(args.savegame))
+        elif args.operation == "continue-save":
+            output = continue_advanced_savegame(
+                _load(args.savegame),_load(args.actions))
         elif args.operation == "verify-play":
             output = {"verified":verify_advanced_session(
                 _load(args.session), _load(args.settings) if args.settings else None)}
@@ -88,7 +120,8 @@ def main(argv=None) -> int:
                 actions = _load(args.actions) if args.actions else []
                 if args.operation == "play":
                     output = run_advanced_session(
-                        args.editor, settings, actions, seed=args.seed)
+                        args.editor, settings, actions, seed=args.seed,
+                        scene=_load(args.scene) if args.scene else None)
                 else:
                     output = preview_editor(args.editor, settings, actions or None)
         else:
