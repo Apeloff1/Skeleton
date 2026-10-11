@@ -34,8 +34,14 @@ from .original_world_npc_cognition_v2 import (
 from .original_world_npc_civics import propose_civic
 from .original_world_npc_apprenticeships import enroll, cancel_enrollment
 from .original_world_npc_households import establish_household, cancel_household
+from .original_world_npc_era_population import (
+    EraPopulation, era_budget, create_era_population,
+    validate_population, dispatch_food, tick_population,
+    population_save, population_restore, population_report,
+)
 
-SCHEMA = "original-world-playable-product-session.v2"
+SCHEMA = "original-world-playable-product-session.v3"
+PRIOR_SCHEMA = "original-world-playable-product-session.v2"
 LEGACY_SCHEMA = "original-world-playable-product-session.v1"
 LIMIT = 2048
 SAVED_BYTES_LIMIT = 4194304
@@ -67,6 +73,7 @@ class ProductSession:
     events: int = 0
     event_head: str = "0" * 64
     cognition: CitizenIntelligence | None = None
+    population: EraPopulation | None = None
 
 
 @dataclass(frozen=True)
@@ -99,6 +106,8 @@ def validate_product(state: ProductSession):
         raise FoundationError("local landscape conflicts with selected world architecture")
     validate_society(state.society, state.terrain)
     validate_intelligence(state.cognition, state.society, state.terrain)
+    if state.population is not None:
+        validate_population(state.population, state.society, state.terrain)
     if state.society.tick != state.living.living_turns or state.terrain.turns != state.living.living_turns:
         raise FoundationError("source-world, landscape and actor clocks diverged")
     if type(state.events) is not int or not 0 <= state.events <= LIMIT:
@@ -108,14 +117,24 @@ def validate_product(state: ProductSession):
     return law
 
 
-def create_product(index: int, *, inhabitants: int = 12) -> ProductSession:
+def create_product(
+    index: int, *, inhabitants: int | None = None, era: str | None = None,
+) -> ProductSession:
     law = living_at(index)
+    if era is not None:
+        budget = era_budget(era)
+        count = budget.full_npc_limit if inhabitants is None else inhabitants
+    else:
+        count = 12 if inhabitants is None else inhabitants
     physical = create_terrain(
         law.design_id, BIOMES_BY_ARCH[law.source.spatial.architecture.architecture_id])
-    inhabitants_state = create_society(physical, inhabitants)
+    inhabitants_state = create_society(physical, count)
     minds = make_intelligence(physical, inhabitants_state)
+    regional = (create_era_population(physical, inhabitants_state, era)
+                if era is not None else None)
     game = ProductSession(law.world_id, create_living(index),
-                          physical, inhabitants_state, cognition=minds)
+                          physical, inhabitants_state, cognition=minds,
+                          population=regional)
     validate_product(game)
     return game
 
@@ -389,6 +408,26 @@ def _npc_operation(
                    cognition=thinking), (message,)
 
 
+def _regional_operation(
+    state: ProductSession, action: ProductAction,
+) -> tuple[ProductSession, tuple[str, ...]]:
+    if state.population is None:
+        raise FoundationError("era-region action needs an explicitly selected era")
+    if state.terrain.position != (0, 0):
+        raise FoundationError("regional food logistics originate at the real depot")
+    if state.living.spatial.game.causal.action_points <= 0:
+        raise FoundationError("regional logistics require one real player action")
+    if action.verb != "dispatch_food":
+        raise FoundationError("unsupported regional physical logistics command")
+    population, terrain = dispatch_food(
+        state.population, state.society, state.terrain,
+        district=action.target, amount=action.amount, direction=action.option)
+    living = _spend_source_ap(state.living)
+    return (replace(state, terrain=terrain, living=living, population=population),
+            (f"Dispatched {action.amount} real food to regional route "
+             f"{action.target}; arrival requires world time",))
+
+
 def step_product(
     state: ProductSession, action: ProductAction,
 ) -> tuple[ProductSession, ProductReceipt]:
@@ -396,12 +435,13 @@ def step_product(
     if state.events >= LIMIT:
         raise FoundationError("product receipt capacity exhausted")
     if not isinstance(action, ProductAction) or action.layer not in (
-        "terrain", "living", "spatial", "mode", "arc", "causal", "studio", "npc",
+        "terrain", "living", "spatial", "mode", "arc", "causal", "studio", "npc", "population",
     ):
         raise FoundationError("invalid product command layer")
     if type(action.amount) is not int or not 1 <= action.amount <= 3:
         raise FoundationError("product quantity must be 1..3")
-    if type(action.target) is not int or not -1 <= action.target <= 23:
+    max_target = 63 if action.layer == "population" else 23
+    if type(action.target) is not int or not -1 <= action.target <= max_target:
         raise FoundationError("invalid product world target")
     if any(type(v) is not int for v in (action.x, action.y)):
         raise FoundationError("invalid local physical coordinates")
@@ -424,6 +464,8 @@ def step_product(
         new, info = _product_operation(state, action)
     elif action.layer == "npc":
         new, info = _npc_operation(state, action)
+    elif action.layer == "population":
+        new, info = _regional_operation(state, action)
     else:
         living, evidence = step_living(
             state.living, LivingAction(action.layer, action.verb,
@@ -437,6 +479,11 @@ def step_product(
                 terrain, state.society, state.cognition)
             new = replace(new, terrain=terrain, society=society,
                           cognition=cognition)
+            if state.population is not None:
+                regional, terrain, regional_events = tick_population(
+                    state.population, society, new.terrain)
+                new = replace(new, population=regional, terrain=terrain)
+                info += regional_events
             deliveries = sum(rec.quantity for rec in residents if rec.operation == "deliver")
             info += (f"Autonomous citizens: {len(residents)} cognitive decisions, "
                      f"{deliveries} physically delivered resources; "
@@ -465,6 +512,8 @@ def product_save(state: ProductSession) -> str:
         "society": society_save(state.society),
         "cognition": cognition_save(state.cognition),
         "events": state.events, "event_head": state.event_head,
+        **({"population": population_save(state.population)}
+           if state.population is not None else {}),
     }
     return json.dumps(
         {"payload": payload, "checksum": _hash(payload)},
@@ -482,10 +531,14 @@ def product_restore(value: str) -> ProductSession:
         obj = data["payload"]
         common = {"schema", "world_id", "design_id", "living",
                   "terrain", "society", "events", "event_head"}
-        if (obj["schema"] == SCHEMA and set(obj) == common | {"cognition"}):
-            current = True
+        if (obj["schema"] == SCHEMA
+                and set(obj) == common | {"cognition", "population"}):
+            current, has_population = True, True
+        elif (obj["schema"] == PRIOR_SCHEMA
+              and set(obj) == common | {"cognition"}):
+            current, has_population = True, False
         elif obj["schema"] == LEGACY_SCHEMA and set(obj) == common:
-            current = False
+            current, has_population = False, False
         else:
             raise FoundationError("wrong product save version or unexpected fields")
         terrain = terrain_restore(json.dumps(obj["terrain"]))
@@ -498,9 +551,11 @@ def product_restore(value: str) -> ProductSession:
             # no fabricated past memories or relationships.
             cognition = replace(make_intelligence(terrain, society),
                                 day=society.tick)
+        regional = (population_restore(obj["population"], society, terrain)
+                    if has_population else None)
         result = ProductSession(
             obj["world_id"], living, terrain, society,
-            obj["events"], obj["event_head"], cognition,
+            obj["events"], obj["event_head"], cognition, regional,
         )
         if validate_product(result).design_id != obj["design_id"]:
             raise FoundationError("underlying authored world changed across save")
