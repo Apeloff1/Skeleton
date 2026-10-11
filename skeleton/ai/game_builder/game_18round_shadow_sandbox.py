@@ -155,7 +155,8 @@ class SandboxVerification:
         return dict(self.payload(),verifier_id=self.verifier_id)
 
     @property
-    def digest(self):return canonical_digest(self.payload())
+    def digest(self):return canonical_digest(dict(
+        proof=self.signed_body(),signature=self.signature))
     def payload(self):
         return dict(schema="skeleton.game_ai.shadow_weight_verification_sandbox.v1",
                     ticket_id=self.ticket_id,model_digest=self.model_digest,
