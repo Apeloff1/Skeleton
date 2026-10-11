@@ -32,8 +32,6 @@ from .original_world_npc_cognition_v2 import (
     commission_project, cancel_project, interview_citizen,
 )
 from .original_world_npc_civics import propose_civic
-from .original_world_npc_cognition_v2 import (
-)
 
 SCHEMA = "original-world-playable-product-session.v2"
 LEGACY_SCHEMA = "original-world-playable-product-session.v1"
