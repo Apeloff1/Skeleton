@@ -22,7 +22,7 @@ from .dragon_living_world import (
     describe,terrain,_sha,
 )
 from .dragon_original_mechanic_forge import (
-    OriginalProgram,binary_nucleus,full_binary_nucleus,
+    OriginalProgram,binary_nucleus,full_binary_nucleus,MECHANICS,
     FULL_BINARY_PROFILE_COUNT,validate_program,capabilities,
     MECHANIC_IDS,MILLION_DISTINCT_ENABLE_PROFILES,
     choices,initial,distinguish,
@@ -78,6 +78,9 @@ class OriginalPrototype:
     gameplay_program_index:str
     active_mechanics:tuple[str,...]
     available_mechanic_count:int
+    independent_domain_count:int
+    core_loop_viable:bool
+    underbuilt_reasons:tuple[str,...]
     world_style:str
     world_lifecycle:str
     world_source_digest:str
@@ -182,12 +185,26 @@ def materialize(nucleus:int,*,branch_seed:int=0,
     )
     if not verify_route(world,world_walk)["verified"]:
         raise ValueError("original prototype world lifecycle failed real play replay")
+    domains={MECHANICS[i][1] for i,v in
+             enumerate(program.intensities) if v>0}
+    unique_play_paths=len({tuple(row["actions"]) for row in journey})
+    missing=[]
+    if len(active)<4:
+        missing.append("fewer_than_four_meaningful_mechanic_systems")
+    if len(domains)<3:
+        missing.append("fewer_than_three_independent_gameplay_domains")
+    if unique_play_paths<2:
+        missing.append("no_observed_choice_path_diversity")
+    viable=not missing
     candidate={
         "schema":SCHEMA,"original_nucleus":nucleus,"title":title,
         "source_digest":program.source_digest,
         "gameplay_program_index":program.decimal_index,
         "active_mechanics":active,
         "available_mechanic_count":len(active),
+        "independent_domain_count":len(domains),
+        "core_loop_viable":viable,
+        "underbuilt_reasons":tuple(missing),
         "world_style":world.style,"world_lifecycle":world.lifecycle,
         "world_source_digest":world.world_fingerprint,
         "world_premise":premise,
@@ -198,16 +215,17 @@ def materialize(nucleus:int,*,branch_seed:int=0,
         "start_action_count":sum(x["available"] for x
                                   in choices(program,initial(program))),
         "replayed_journeys":tuple(journey),
-        "compared_unique_action_sequences":len({
-            tuple(row["actions"]) for row in journey}),
+        "compared_unique_action_sequences":unique_play_paths,
         "living_world_actual_route_actions":world_walk.actions,
         "living_world_route_digest":world_walk.trace_digest,
         "living_world_endings":world_walk.original_endings,
         "living_world_remains_playable":world_walk.remains_playable,
         "originality_scope":"distinct original rule-action signature; "
             "narrative/editorial uniqueness not established",
-        "release_blockers":AUDIT_REQUIREMENTS,
-        "ready_for_individual_experiments":True,
+        "release_blockers":AUDIT_REQUIREMENTS+(
+            ("original_core_loop_quality_gate",) if not viable else ()
+        ),
+        "ready_for_individual_experiments":viable,
         "native_binary_built":False,
         "independently_published":False,
     }
@@ -231,6 +249,8 @@ def verify_prototype(value:OriginalPrototype, *,
     return {
         "schema":SCHEMA,"verified":True,
         "active_original_mechanics":len(value.active_mechanics),
+        "core_loop_viable":value.core_loop_viable,
+        "independent_gameplay_domains":value.independent_domain_count,
         "demonstrated_playable_routes":len(value.replayed_journeys),
         "independent_publication_approved":False,
         "scope":"real gameplay prototype; no art, distribution or legal clearance",
