@@ -123,6 +123,7 @@ def qualify_second_original_game_replays(
         raise PromotionError("every original training example needs both gameplay and adversarial replay attestation")
     roles=dict(trusted_reviewers)
     seen=set()
+    replay_owners={}
     manifest=[]
     for x in attestations:
         candidate=cases.get(x.example_id)
@@ -142,6 +143,10 @@ def qualify_second_original_game_replays(
                    "third_party_video","external_training_source"}
         if forbidden&set(candidate.evidence):
             raise PromotionError("reference-only third party content cannot enter training receipts")
+        original_owner=replay_owners.setdefault(x.independent_replay_digest,
+                                                 x.example_id)
+        if original_owner!=x.example_id:
+            raise PromotionError("one gameplay recording reused as multiple independent game examples")
         identity=(x.example_id,x.review_role)
         if identity in seen:
             raise PromotionError("reused replay signer cannot inflate independent gameplay proof")
