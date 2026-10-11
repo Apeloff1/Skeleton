@@ -217,6 +217,16 @@ $("autoload").addEventListener("click",async()=>{
   status("Previous genre safely forked as "+result.active);
  }catch(error){status("Autoload blocked: "+error.message);}
 });
+$("fork-demo").addEventListener("click",async()=>{
+ try{
+  const result=await api("/api/fork-demo",{
+    reference:$("demo-ref").value,
+    project:$("demo-target").value});
+  selectedTree="current";$("tree").value="current";
+  selectedProject=result.active;selectedFile=null;await refresh();
+  status("Original demo forked to editable current game: "+result.active);
+ }catch(error){status("Demo edit fork blocked: "+error.message);}
+});
 $("download").addEventListener("click",()=>{
  if(!loaded)return;
  const blob=new Blob([$("editor").value],{type:"text/plain;charset=utf-8"});
@@ -252,6 +262,12 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <label>Genre<input id="load-genre" placeholder="rpg"></label>
 <label>New project ID<input id="load-project" placeholder="sequel_01"></label>
 <button id="autoload">Fork prior genre to current</button></fieldset>
+<fieldset><legend>Fork demo for full visual editing</legend>
+<label>Demo reference (genre/project-snapshot)
+<input id="demo-ref" placeholder="rpg/first_game-abcd1234"></label>
+<label>New writable original game ID
+<input id="demo-target" placeholder="demo_customization"></label>
+<button id="fork-demo">Fork demo into current</button></fieldset>
 <p id="readonly" class="readonly"></p></section>
 <section><h2>2. Precise file and folder targeting</h2>
 <label>Natural-language original game design prompt
