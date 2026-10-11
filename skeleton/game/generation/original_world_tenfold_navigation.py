@@ -34,6 +34,11 @@ class RoutePlan:
     snapshot_head: str
     search_states: int
 
+    @property
+    def can_finish_this_turn(self) -> bool:
+        """Public scheduling predicate, consistent with serialized route receipts."""
+        return self.immediate
+
     def as_dict(self) -> dict:
         return {
             "start": self.start, "destination": self.destination,
