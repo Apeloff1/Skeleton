@@ -195,8 +195,8 @@ def audit_council_scrutiny(
         tuple(f"{r.round_number}_{r.role}" for r in sorted(
             reports,key=lambda x:(x.round_number,x.role))),
         all_count,measured,all_count-measured,True,
-        measured==all_count and all(
-            not x.quality_objections for x in reports),
+        False,  # No verified consumer superiority without separate actual
+                # independent cohort, ancestry, rights and release gates.
         tuple(r.digest for r in sorted(reports,key=lambda x:(x.round_number,x.role))))
 
 
