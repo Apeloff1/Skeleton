@@ -1,7 +1,7 @@
 # Original World-Law & Mechanic Atlas — October 2026
 
-**Owner:** Existing `skeleton/game/generation` domain.  
-**Status:** Committed, deterministic **design-recipe compiler**; **not** 1.57 quintillion built games.  
+**Owner:** Existing `skeleton/game/generation` domain.
+**Status:** Committed, deterministic **design-recipe compiler**; **not** billions of built games.
 **Version:** `original-world-atlas.v2`.
 
 This work responds to the need for a truly expansive game builder rather
