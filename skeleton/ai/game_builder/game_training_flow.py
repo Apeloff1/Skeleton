@@ -155,7 +155,7 @@ def plan_training_flow(batches: tuple[CandidateBatch,...],*,
         raise TrainingFlowError("unaccounted original project split")
     source_hashes=tuple(sorted(b.original_almanac for b in batches))
     payload=dict(projects=sorted(projects),
-                 selection=[x.example_id for x in chosen],
+                 selection=[x.payload() for x in chosen],
                  almanacs=source_hashes,
                  per_project_cap=per_project_cap,max_examples=max_examples)
     run=canonical_digest(payload)
@@ -291,6 +291,9 @@ def materialize_training_flow(
         manifest=_load_manifest(complete/"manifest.json")
         if manifest["run_id"]!=plan.run_id:
             raise TrainingFlowError("another run displaced approved sources")
+        current_plan=(canonical_json(plan.payload())+"\n").encode()
+        if manifest["plan_sha256"]!=sha256(current_plan).hexdigest():
+            raise TrainingFlowError("completed run does not match submitted source evidence")
         _verify_run(complete,manifest)
         return dict(**manifest,recovered=True)
     if not stage.exists():
