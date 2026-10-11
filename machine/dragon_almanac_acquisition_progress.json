@@ -2,8 +2,8 @@
   "schema": "skeleton.dragon.almanac_acquisition_progress.v1",
   "registry_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
   "ordering": "source_id_ascending",
-  "next_source_offset": 256,
-  "reviewed_candidate_count": 256,
+  "next_source_offset": 288,
+  "reviewed_candidate_count": 288,
   "entries": [
     {
       "source_id": "source-0017fcb9b1445e4f0a6949fb81b3fe01159175a23ca300ff1350938c2b2a0974",
@@ -2308,33 +2308,321 @@
       "availability": "page_representation_returned",
       "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0008.json",
       "approved": false
+    },
+    {
+      "source_id": "source-0e82a5f400fb603a7c1bd1215c980a50f763313f0364c6ce51d1f17418252778",
+      "source_offset": 256,
+      "url": "https://codeberg.org/Phazorknight/Cogito",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0e8ba35fb48caa9c5be9e4dc2cd02f37648aa73fa8efa27aead0890f6bca2ca3",
+      "source_offset": 257,
+      "url": "http://github.com/thestonefox/vrtk",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0ead1a74b471ef20e0c4c41afb4194faa0c14692b9751b310ba74d4b5f3232a7",
+      "source_offset": 258,
+      "url": "https://github.com/delstuff/threeHungryMice",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0eada6f10ec120399e61411b7d4da537407aabd27b003968776cfe4f5377a09d",
+      "source_offset": 259,
+      "url": "https://github.com/Thekla/thekla_atlas",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0ec4b71bed2f708173c42993bf08b8c8ad550661f4597ed7ff6792be0fcc701f",
+      "source_offset": 260,
+      "url": "http://www.amazon.com/Essential-Mathematics-Games-Interactive-Applications/dp/0123742978/",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0ed338f0f4d2697751b3dafdf40aeb787b37016bda2eaef7f98b3bfd14f36b47",
+      "source_offset": 261,
+      "url": "https://github.com/phoboslab/qoi",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0eddd30117c33984f73cd0c8458be52dca4f0cda9efe5696eb945dd5627a1002",
+      "source_offset": 262,
+      "url": "http://www.geeksforgeeks.org/top-algorithms-and-data-structures-for-competitive-programming/",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0ee417b600d1f4029d216652138b4a70c05f2f3f52568dbe432e95452055caf6",
+      "source_offset": 263,
+      "url": "http://scormpool.com/luastudio",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0eeb759a6fa43aea983d4a0434f0b09ab525161a53bbe5c22fc4e78b86c7afca",
+      "source_offset": 264,
+      "url": "https://docs.microsoft.com/en-us/windows/mixed-reality/develop/unity/performance-recommendations-for-unity",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0eeb942e6632d6559c938558522db6289d4ef630e2e89c52e83451d92b0749d9",
+      "source_offset": 265,
+      "url": "https://patternlanguageforgamedesign.com/PatternLibraryApp/PatternLibrary/",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "metadata_shell_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0efa3af971939b746c58ae793d34bd0142db6dee670ea2d68b05b8908344d84a",
+      "source_offset": 266,
+      "url": "https://blitiri.com.ar/p/bola/",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0f132db0ff5a822fc8b4454ad1ea3f55a3f314789dd06de8fe150bd823b7f838",
+      "source_offset": 267,
+      "url": "https://medium.com/@sorensaket/guide-for-file-structure-in-game-development-2bcfcadfd218",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0f1a547d3a56b7d5776e392a9e790d0c6084c78332b6fa07aaf1fb75e7b24c96",
+      "source_offset": 268,
+      "url": "https://www.youtube.com/watch?v=OBusUGlnmWI",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0f2d6eb20bc8c3b3083284208bd440a820e665afb2de8e468f1398cfd036ef8e",
+      "source_offset": 269,
+      "url": "https://musicforprogramming.net/latest/",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "metadata_shell_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0f344c9bb872ef838843916a1d5bfdff7137ef6c2d2de340cac9a34094ab6207",
+      "source_offset": 270,
+      "url": "https://github.com/r-lyeh/FWK",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0f47f40ef24996fdf2394b8a551e344d1e2818c270d7339aace23a9a8eec5c8d",
+      "source_offset": 271,
+      "url": "https://github.com/Fr0sT-Brutal/awesome-pascal",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0f4b0966cec3d4e58010a2943b964476eadb1a55b53cde5b75a2c84769e22314",
+      "source_offset": 272,
+      "url": "https://www.haroldserrano.com/blog/books-i-used-to-develop-a-game-engine",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0f5ba6b22f48a9430c6150b241adb3fcd119b1e619c95f092ffb894ab0a1d545",
+      "source_offset": 273,
+      "url": "https://www.blender-models.com/",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0f5dcd1d7371851f145847c6b2ca8cdff7ab5f859d879442ae4825e9f02ca1f0",
+      "source_offset": 274,
+      "url": "https://github.com/Roderik11/Squid",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0f699f1be46301f07d609ef123bf5458244b47985708dbd1332d8d5b624a891b",
+      "source_offset": 275,
+      "url": "http://www.gdcvault.com/play/1020389/):",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0f89b0b2873cc80dd4a2ec398582e971f25a95ab234778c093af378ec112d84f",
+      "source_offset": 276,
+      "url": "https://youtu.be/Tfw21ciEyZE",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0fa2dc9bb20af79b4cf27c965a006877a84b4c76ffc76a43bcafac1278726b6a",
+      "source_offset": 277,
+      "url": "https://github.com/ronja-tutorials/ShaderTutorials",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0fab84346a0a06ec8388bd47ebebd564e4accccbfeae9a69f69072f31c713c53",
+      "source_offset": 278,
+      "url": "https://github.com/Tiehuis/2048-cli",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0fbcf53054a15f5d622ebd8654b204df7891e3e7945f54c510f4b7170a2456bc",
+      "source_offset": 279,
+      "url": "https://www.youtube.com/playlist?list=PLS9G7A6kaaHOOXLVNoc7cEE6ytk9tFJql",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "metadata_shell_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0fe12a6e5f7678f667ba680dd8e660577fdccbae676176263398e5c9847919d6",
+      "source_offset": 280,
+      "url": "https://docs.google.com/spreadsheets/d/1MBGEG2OtzuI98srRfvbONxJHassuztPrk_4yMm9CWUY/edit",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0ff9379631d9ee3e7152e5e5fb4253e268bd822e956d29b8ff06469c97ee6f52",
+      "source_offset": 281,
+      "url": "http://www.tomlooman.com/ue4-gameplay-framework/",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "metadata_shell_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0ffc688df178b22399b9f756f77683fb071c251692f97c46f39dc55107ce2060",
+      "source_offset": 282,
+      "url": "https://80.lv/articles/cyberpunk-scene-production-with-unity-blender/",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-10005ccf97cdd09186deb5a8e5a19aecd8546ea244fbc71f950ce9c4aa421d75",
+      "source_offset": 283,
+      "url": "https://mesh2motion.org/",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-10223f644b84dc5242f432bd0dc29812808833e8476d7b721b0a6113ced674e9",
+      "source_offset": 284,
+      "url": "http://gamedesignadvance.com/?page_id=1616%29%3A",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1023e06182f37cc7415f6195cc8762723093857a4951dcdcc273769af3db0a85",
+      "source_offset": 285,
+      "url": "http://devmag.org.za/2012/07/29/how-to-choose-colours-procedurally-algorithms/",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-102f54ef27592b1260a107209c172537f85387ee7ca6a6b1c3abc32a83a5ca19",
+      "source_offset": 286,
+      "url": "https://github.com/google/filament",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-105e47ed71d703d53bfcff090e9a38089874433cac7f62e17a4f228e1df69ec5",
+      "source_offset": 287,
+      "url": "https://www.nodebox.net/",
+      "checked_at": "2026-10-11T11:15:05.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "approved": false
     }
   ],
   "whole_web_complete": false,
-  "notes": "First-pass cursor counts candidate checks, not canonical approval. Every unresolved source remains in its batch retry_queue. Registry unchanged; worldwide denominator unknown.",
-  "checked_candidate_count": 192,
+  "notes": "First-pass cursor counts candidate checks, not canonical approval. Every unresolved source remains blocked in its batch evidence. Registry unchanged; worldwide denominator unknown.",
+  "checked_candidate_count": 288,
   "approved_source_count": 0,
   "distilled_source_count": 0,
   "last_batch_counts": {
     "newly_checked": 32,
-    "fetched_representations": 24,
-    "repository_metadata": 9,
-    "target_page_representations": 11,
-    "metadata_shells": 3,
-    "source_files": 1,
-    "retrieval_failed": 8,
+    "fetched_representations": 22,
+    "repository_metadata": 10,
+    "target_page_representations": 8,
+    "metadata_shells": 4,
+    "source_files": 0,
+    "retrieval_failed": 10,
     "blocked_from_admission": 32,
     "distilled": 0,
     "approved": 0,
-    "additional_license_files_fetched": 10,
-    "license_file_fetch_failures": 0,
-    "exact_source_files_fetched": 1,
-    "auxiliary_identity_or_rights_files_fetched": 19,
-    "git_blob_identities_api_matched": 20,
-    "git_blobs_locally_reproduced": 18,
-    "git_blobs_text_normalization_mismatch": 2
+    "additional_license_files_fetched": 7,
+    "license_file_fetch_failures": 3,
+    "exact_source_files_fetched": 0,
+    "auxiliary_identity_or_rights_files_fetched": 17,
+    "git_blob_identities_api_matched": 0,
+    "git_blobs_locally_reproduced": 17,
+    "git_blobs_text_normalization_mismatch": 0
   },
-  "last_batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0006.json",
-  "last_updated_at": "2026-10-11T08:18:53.559Z",
+  "last_batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+  "last_updated_at": "2026-10-11T11:15:05.000Z",
   "reviewed_candidate_count_definition": "Legacy field counts first-pass candidate checks only; it does not mean independent source review or approval."
 }
