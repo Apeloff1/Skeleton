@@ -34,6 +34,9 @@ WAREHOUSE = {"food": "provisions", "wood": "lumber",
 MAX_MEMORY = 8
 MAX_BONDS = 64
 MAX_ORDERS = 24
+MAX_PROJECTS = 12
+PROJECT_COSTS = {"hearth": (2, 1, 2), "mill": (1, 3, 3),
+                 "beacon": (2, 2, 3)}
 MAX_HISTORY = 1000
 
 
@@ -87,12 +90,26 @@ class Order:
 
 
 @dataclass(frozen=True)
+class CivicProject:
+    project_id: int
+    kind: str
+    x: int
+    y: int
+    escrow_wood: int
+    escrow_stone: int
+    contributors: tuple[int, ...] = ()
+    status: str = "open"
+
+
+@dataclass(frozen=True)
 class CitizenIntelligence:
     world_id: str
     minds: tuple[Mind, ...]
     bonds: tuple[Bond, ...] = ()
     orders: tuple[Order, ...] = ()
     next_order: int = 0
+    projects: tuple[CivicProject, ...] = ()
+    next_project: int = 0
     day: int = 0
     meetings: int = 0
     interventions: int = 0
@@ -220,9 +237,44 @@ def validate_intelligence(
         seen_orders.add(o.order_id)
     if seen_orders and max(seen_orders) >= state.next_order:
         raise FoundationError("order counter reuses existing contract identity")
+    if not isinstance(state.projects, tuple) or len(state.projects) > MAX_PROJECTS:
+        raise FoundationError("too many concurrent authored civic projects")
+    project_ids, project_locations = set(), set()
+    for project in state.projects:
+        if (not isinstance(project, CivicProject)
+                or project.kind not in PROJECT_COSTS
+                or project.status not in ("open", "completed", "cancelled")):
+            raise FoundationError("invalid civic infrastructure project")
+        _bounded(project.project_id, 0, 10000, "public project ID")
+        _bounded(project.x, -(1 << 20), 1 << 20, "project x")
+        _bounded(project.y, -(1 << 20), 1 << 20, "project y")
+        if (project.escrow_wood, project.escrow_stone) != PROJECT_COSTS[project.kind][:2]:
+            raise FoundationError("civic project lacks exact physical materials in escrow")
+        if not isinstance(project.contributors, tuple):
+            raise FoundationError("invalid civic project labor records")
+        for person_id in project.contributors:
+            _bounded(person_id, 0, len(people.inhabitants) - 1, "worker identity")
+        if len(set(project.contributors)) != len(project.contributors):
+            raise FoundationError("duplicated civic labor cannot produce free construction")
+        if len(project.contributors) > PROJECT_COSTS[project.kind][2]:
+            raise FoundationError("civic labor count exceeds required physical workers")
+        if (project.status == "completed") != (
+            len(project.contributors) == PROJECT_COSTS[project.kind][2]
+        ) and project.status != "cancelled":
+            raise FoundationError("structure completion missing verified work receipts")
+        if project.project_id in project_ids:
+            raise FoundationError("duplicated civic project identity")
+        project_ids.add(project.project_id)
+        if project.status == "open":
+            if (project.x, project.y) in project_locations:
+                raise FoundationError("two construction projects claim the same building site")
+            project_locations.add((project.x, project.y))
+    if project_ids and max(project_ids) >= state.next_project:
+        raise FoundationError("reused public construction identity")
     for name in ("day", "meetings", "interventions", "event_count"):
         _bounded(getattr(state, name), 0, MAX_HISTORY, name)
     _bounded(state.next_order, 0, 100000, "next contract ID")
+    _bounded(state.next_project, 0, 10000, "next construction ID")
     if not isinstance(state.event_head, str) or len(state.event_head) != 64 or any(
         c not in "0123456789abcdef" for c in state.event_head
     ):
@@ -314,6 +366,57 @@ def cancel_order(
                    interventions=state.interventions + 1)
 
 
+def commission_project(
+    state: CitizenIntelligence, people: PhysicalSociety, world: TerrainState,
+    *, kind: str, x: int, y: int,
+) -> tuple[TerrainState, CitizenIntelligence]:
+    validate_intelligence(state, people, world)
+    if kind not in PROJECT_COSTS or len(state.projects) >= MAX_PROJECTS:
+        raise FoundationError("unsupported or over-budget civic construction")
+    from .original_world_product_terrain import _coords
+    _coords(x, y)
+    site = cell_at(world, x, y)
+    if site.blocking or site.building:
+        raise FoundationError("construction needs accessible empty physical terrain")
+    if any(p.status == "open" and (p.x, p.y) == (x, y) for p in state.projects):
+        raise FoundationError("same physical building site already commissioned")
+    wood, stone, _required_labor = PROJECT_COSTS[kind]
+    if world.lumber < wood or world.masonry < stone:
+        raise FoundationError("civic construction cannot create unpaid materials")
+    project = CivicProject(state.next_project, kind, x, y, wood, stone)
+    financed = replace(world, lumber=world.lumber - wood,
+                       masonry=world.masonry - stone)
+    updated = replace(state, projects=state.projects + (project,),
+                      next_project=state.next_project + 1,
+                      interventions=state.interventions + 1)
+    validate_intelligence(updated, people, financed)
+    return financed, updated
+
+
+def cancel_project(
+    state: CitizenIntelligence, people: PhysicalSociety, world: TerrainState,
+    project_id: int,
+) -> tuple[TerrainState, CitizenIntelligence]:
+    validate_intelligence(state, people, world)
+    found = [p for p in state.projects if p.project_id == project_id]
+    if len(found) != 1 or found[0].status != "open":
+        raise FoundationError("only an unfinished real project can be cancelled")
+    project = found[0]
+    if (world.lumber + project.escrow_wood > 1000
+            or world.masonry + project.escrow_stone > 1000):
+        raise FoundationError("depot cannot accept returned construction escrow")
+    refunded = replace(world, lumber=world.lumber + project.escrow_wood,
+                       masonry=world.masonry + project.escrow_stone)
+    updated = replace(
+        state, projects=tuple(
+            replace(p, status="cancelled") if p.project_id == project_id else p
+            for p in state.projects
+        ), interventions=state.interventions + 1,
+    )
+    validate_intelligence(updated, people, refunded)
+    return refunded, updated
+
+
 def _plan(person: Person, mind: Mind, state: CitizenIntelligence,
           world: TerrainState) -> tuple[str, int, str, tuple[int, int]]:
     """Deterministic bounded utility choice, personalized and explainable.
@@ -324,6 +427,12 @@ def _plan(person: Person, mind: Mind, state: CitizenIntelligence,
     """
     outstanding = next((o for o in state.orders
                         if o.citizen == person.id and o.status == "open"), None)
+    construction = next(
+        (p for p in state.projects if p.status == "open"
+         and person.id not in p.contributors
+         and person.profession in ("builder", "engineer")),
+        None,
+    )
     nearby_hurt = any(
         person.id != other.person_id and other.stress >= 8
         for other in state.minds
@@ -355,6 +464,8 @@ def _plan(person: Person, mind: Mind, state: CitizenIntelligence,
         scores["work"] += 100 + min(20, outstanding.quantity - outstanding.delivered)
     if person.profession in ("builder", "engineer") and not person.cargo:
         scores["construct"] += 25
+        if construction:
+            scores["construct"] += 105
     if person.profession in ("guardian",):
         scores["guard"] += 35
     if person.profession in ("healer", "caretaker"):
@@ -462,6 +573,7 @@ def smart_npc_tick(
     receipts: list[NpcReceipt] = []
     thoughts: list[ThoughtReceipt] = []
     completed = {o.order_id: o for o in thinking.orders}
+    civic_projects = {p.project_id: p for p in thinking.projects}
     # Healing is scheduled against stable citizen identities and settled once
     # after all actors act, independent of job/identity iteration order.
     healing: dict[int, int] = {}
@@ -562,19 +674,60 @@ def smart_npc_tick(
             else:
                 operation = "isolated-alone"
         elif goal == "construct":
-            at = cell_at(current_world, p.x, p.y)
-            if (not at.building and not at.blocking
-                    and current_world.lumber >= 2
-                    and current_world.masonry >= 1):
-                current_world = replace(
-                    current_world, lumber=current_world.lumber - 2,
-                    masonry=current_world.masonry - 1,
-                    shelter=min(1000, current_world.shelter + 1),
-                )
-                current_world = _write_cell(current_world, replace(at, building="hearth"))
-                operation, resource, quantity = "build-real-hearth", "structure", 1
+            assigned = next(
+                (project for project in civic_projects.values()
+                 if project.status == "open" and p.id not in project.contributors
+                 and p.profession in ("builder", "engineer")),
+                None,
+            )
+            if assigned:
+                location = (assigned.x, assigned.y)
+                if (p.x, p.y) != location:
+                    p, moved = _physically_move(
+                        current_world, p,
+                        lambda nx, ny, dest=location: (nx, ny) == dest,
+                    )
+                    operation = ("travel-to-funded-civic-project" if moved
+                                 else "public-worksite-route-inaccessible")
+                else:
+                    p = replace(p, energy=max(0, p.energy - 2),
+                                experience=min(1000, p.experience + 2))
+                    contributing = assigned.contributors + (p.id,)
+                    done = len(contributing) == PROJECT_COSTS[assigned.kind][2]
+                    civic_projects[assigned.project_id] = replace(
+                        assigned, contributors=contributing,
+                        status="completed" if done else "open",
+                    )
+                    if done:
+                        site = cell_at(current_world, *location)
+                        if site.blocking or site.building:
+                            raise FoundationError("completed building site was obstructed")
+                        current_world = _write_cell(
+                            current_world, replace(site, building=assigned.kind))
+                        if assigned.kind == "hearth":
+                            current_world = replace(
+                                current_world,
+                                shelter=min(1000, current_world.shelter + 1))
+                        operation, resource, quantity = (
+                            "cooperatively-completed-funded-civic-project",
+                            "structure", 1)
+                    else:
+                        operation = "verified-distinct-citizen-construction-labor"
             else:
-                operation = "construction-blocked-by-materials"
+                at = cell_at(current_world, p.x, p.y)
+                if (not at.building and not at.blocking
+                        and current_world.lumber >= 2
+                        and current_world.masonry >= 1):
+                    current_world = replace(
+                        current_world, lumber=current_world.lumber - 2,
+                        masonry=current_world.masonry - 1,
+                        shelter=min(1000, current_world.shelter + 1),
+                    )
+                    current_world = _write_cell(
+                        current_world, replace(at, building="hearth"))
+                    operation, resource, quantity = "build-real-hearth", "structure", 1
+                else:
+                    operation = "construction-blocked-by-materials"
         else:
             operation = "consider-local-company"
         if p.hunger >= 18 and operation != "eat-supplied-food":
@@ -655,6 +808,7 @@ def smart_npc_tick(
     result = replace(
         bonds, minds=tuple(updated_minds),
         orders=tuple(completed[o.order_id] for o in thinking.orders),
+        projects=tuple(civic_projects[p.project_id] for p in thinking.projects),
         day=next_people.tick,
         meetings=bonds.meetings + max(0, len(bonds.bonds) - len(thinking.bonds)),
         event_count=thinking.event_count + 1,
@@ -663,6 +817,8 @@ def smart_npc_tick(
             "world": current_world.design_id,
             "minds": [asdict(m) for m in updated_minds],
             "orders": [asdict(completed[o.order_id]) for o in thinking.orders],
+            "projects": [asdict(civic_projects[p.project_id])
+                         for p in thinking.projects],
             "bonds": [asdict(b) for b in bonds.bonds],
             "thoughts": [asdict(t) for t in thoughts],
         }),
@@ -696,8 +852,12 @@ def cognition_restore(data: dict, people: PhysicalSociety,
         ) for m in raw["minds"])
         relationships = tuple(Bond(**b) for b in raw["bonds"])
         orders = tuple(Order(**o) for o in raw["orders"])
+        projects = tuple(CivicProject(
+            **{**p, "contributors": tuple(p["contributors"])}
+        ) for p in raw["projects"])
         state = CitizenIntelligence(
-            **{**raw, "minds": minds, "bonds": relationships, "orders": orders}
+            **{**raw, "minds": minds, "bonds": relationships,
+               "orders": orders, "projects": projects}
         )
         validate_intelligence(state, people, world)
         return state
@@ -714,6 +874,9 @@ def cognition_report(state: CitizenIntelligence, people: PhysicalSociety,
         "social_relationships": len(state.bonds),
         "verified_world_observations": sum(len(m.memories) for m in state.minds),
         "contracts": [asdict(o) for o in state.orders],
+        "civic_projects": [asdict(p) for p in state.projects],
+        "completed_constructed_projects": sum(p.status == "completed"
+                                              for p in state.projects),
         "active_goals": {m.person_id: m.goal for m in state.minds},
         "health_and_stress": {
             str(m.person_id): {
