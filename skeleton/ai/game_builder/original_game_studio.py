@@ -98,6 +98,8 @@ class CompanionPractice:
     proof_digest: str
     winning_steps: int
     capability_xp: int
+    package_manifest_digest: str
+    package_path: str
 
     def to_payload(self) -> dict[str, object]:
         return {
@@ -107,6 +109,8 @@ class CompanionPractice:
             "proof_digest": self.proof_digest,
             "winning_steps": self.winning_steps,
             "verified_capability_xp": self.capability_xp,
+            "package_manifest_digest": self.package_manifest_digest,
+            "package_path": self.package_path,
         }
 
 
@@ -213,8 +217,16 @@ def run_original_game_studio(
     if not mirror.passed:
         raise StudioError("adversarial game mirror room found a failure")
     practice: list[CompanionPractice] = []
-    for sample in _practice_intents(intent, companion_practice_games):
+    practice_files: dict[str, bytes] = {}
+    for index, sample in enumerate(_practice_intents(intent, companion_practice_games), 1):
         candidate = compile_original_game(sample, authorized=True)
+        # Companion games are independently playable browser/Godot products,
+        # not just names and XP. Each receives a complete canonical package
+        # and a separate manifest, proof, editor and verified world.
+        practice_package = render_dual_runtime_package(candidate, authorized=True)
+        prefix = f"practice/slot-{index:02d}"
+        for relative, payload in practice_package.files.items():
+            practice_files[f"{prefix}/{relative}"] = payload
         practice.append(CompanionPractice(
             seed=sample.seed,
             intent_digest=canonical_digest(sample.to_payload()),
@@ -222,6 +234,8 @@ def run_original_game_studio(
             proof_digest=candidate.proof.digest,
             winning_steps=candidate.proof.final_state.steps,
             capability_xp=25 + len(candidate.world.levels) * 5,
+            package_manifest_digest=str(practice_package.manifest["manifest_digest"]),
+            package_path=prefix,
         ))
     stages = (
         StudioStage("original", canonical_digest(intent.to_payload()),
@@ -272,9 +286,10 @@ def run_original_game_studio(
     }
     new_files = dict(package.files)
     new_files.pop("release.json")
+    new_files.update(practice_files)
     for path, item in metadata.items():
         new_files[path] = _stable_bytes(item)
-    if sum(len(data) for data in new_files.values()) > 4_000_000:
+    if sum(len(data) for data in new_files.values()) > 16_000_000:
         raise StudioError("studio package exceeds source resource budget")
     manifest_body = {
         k: v for k, v in package.manifest.items()
