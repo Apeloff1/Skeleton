@@ -151,7 +151,7 @@ def replay_witness_quests(
         results.append(EmergentQuestState(
             proposed.key,source.digest,index,len(proposed.chapters),
             source.action_index+1,source.observed_turn,
-            receipts[-1].completed_at_action if status=="solved" else None,
+            facts[receipts[-1].completed_at_action].turn if status=="solved" else None,
             tuple(receipts),status,
         ))
     return WitnessQuestReplay(world.digest,replay.digest,
