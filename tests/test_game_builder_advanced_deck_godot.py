@@ -216,7 +216,7 @@ class NativeDeckStudioAPITests(unittest.TestCase):
         rendered=render_workspace_html("C"*32).decode()
         self.assertIn("Download playable Godot 4 game project",rendered)
         self.assertIn('id="advanced-godot-export"',rendered)
-        self.assertIn('"deck_battler","shooter"].includes(advancedSession.editor)',rendered)
+        self.assertIn('"deck_battler","shooter","tactics"].includes(advancedSession.editor)',rendered)
 
 
 if __name__=="__main__":
