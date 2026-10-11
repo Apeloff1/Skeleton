@@ -186,7 +186,10 @@ class PlayableWorld:
                or len(level.collectibles) != self.intent.collectibles_per_level
                for i, level in enumerate(self.levels)):
             raise PlayableWorldError("generated level shape mismatch")
-        if self.algorithm != "skeleton.game_builder.maze-puzzle.v1":
+        if self.algorithm not in {
+            "skeleton.game_builder.maze-puzzle.v1",
+            "skeleton.game_builder.authored-tiles.v1",
+        }:
             raise PlayableWorldError("unrecognized world algorithm")
 
     @property
