@@ -152,6 +152,56 @@ engines. It never equates successful reference simulation with a certified
 Godot export or native executable. Integration of the actual other 40
 game engines and producer-grade scene/node editors remains outstanding.
 
+## Eighth original native gameplay candidate: Godot 4 open-ended Survival
+
+`advanced_survival_godot.py` provides an independent, genuinely playable
+Godot 4 offline survival/crafting simulation. Unlike games with a forced
+objective victory, the original survival world **does not have a solved
+end state**: permanent-camp and self-sufficient-outpost milestones signal
+achievement, but play continues until resource constraints or survivor
+death end the run. This is deliberate, not an unfinished ending.
+
+Canonical authored scenes select a bounded two-to-eight-region world,
+starting region, biome-specific finite food/wood/water/stone/game reserves,
+merchant supplies and initial weather. Native rules independently execute
+twelve meaningful survival commands: forage, gather wood, mine, drink, hunt,
+cook, craft tools, light a fire, build shelter, trade, travel and rest.
+Mechanics include non-replenishing local reserves and finite market supplies,
+energy-limited movement/gathering, crafting costs and boosted harvest with
+tools, weather shifts every six turns, hunger/dehydration every two turns,
+limited temporary fires, healing, heat/cold exposure, shelter levels one
+through three, progression achievements and terminal survivor death.
+
+The native GDScript runtime neither reuses Python gameplay frames nor
+fetches external data. Each user action mutates a distinct native world state,
+renders live biome/resource/weather/crafting/status information and supports
+keyboard and gamepad. The `--verify-survival` native Godot mode reconstructs
+the authorized scene and independently replays every reviewed action before
+comparing **all 21 complete gameplay state fields** (nested finite region
+inventories, health, survival economy, milestones, weather, event ordering
+and terminal outcomes). Numeric values in nested JSON regions are normalized
+strictly at the proof boundary to prevent superficial float/int mismatches.
+
+The local Game Studio's authenticated ZIP handoff and operator-authorized
+offline `godot-export` now support **all eight advanced gameplay reference
+families**, each with distinct native source/game rules. Survival uses its
+own deterministic `original-godot-survival/` source root and manifest.
+Exports cannot overwrite an existing project, and a generated ZIP must
+not be described as hardware-certified or as proof of on-device execution.
+
+Dedicated `game-builder-advanced-survival-native.yml` executes eight authored
+native world histories on Linux and Windows: initial resource gathering,
+travel and region trading, two-stage settlement/outpost progression with
+continued gameplay, fire/hunting/cooking, finite market trade, changing
+weather, multi-region exploration and a terminal resource-loss death. It
+then exports and **executes real native desktop binaries on each OS**.
+The broader advanced regression suite includes scene provenance, replay
+tampering, source ZIP custody, local CLI, API and Studio controls. Native
+Survival becomes **verified** only after exact-head replay and executable
+checks are successful on both OSes. Even with eight of eight reference
+engines verified, the other 35 editor families remain authoring-only and
+overall Game Creator release readiness remains unknown.
+
 ## Seventh native candidate: standalone original Godot 4 circuit racing
 
 `advanced_racing_godot.py` adds an independently executing, original
