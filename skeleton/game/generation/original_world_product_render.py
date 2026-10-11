@@ -11,7 +11,7 @@ from .original_foundation_compiler import FoundationError
 from .original_world_product_terrain import TerrainState, cell_at, validate_terrain
 from .original_world_product_agents import PhysicalSociety, validate_society
 from .original_world_npc_era_population import (
-    EraPopulation, validate_population, era_budget, ambient_impressions,
+    EraPopulation, validate_population, era_budget, ambient_impressions, tuning,
 )
 
 COLORS = {
