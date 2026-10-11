@@ -168,6 +168,33 @@ class AdversarialEvidencePromotionTests(unittest.TestCase):
         self.assertFalse(result["counterfactual"]["training_performed"])
         self.assertFalse(result["heldout_observations_used_for_training"])
 
+    def test_large_counterfactual_cohorts_are_never_partially_sampled(self):
+        originals=evidence_rows()
+        extensive=tuple(replace(
+            originals[i%len(originals)],
+            example_id=canonical_digest({"independent_step":i}),
+            input=dict(originals[i%len(originals)].input,
+                       independently_observed_step=i),
+        ) for i in range(1025))
+        result=evaluate_fresh_cohort(
+            extensive,policy(),standard=forgiving(
+                min_family_cases=1,min_counterfactual_accuracy=0.95),
+            source_projects=(),authorized=True)
+        witness=result["counterfactual"]
+        self.assertEqual(witness["expected_cases"],len(extensive))
+        self.assertEqual(witness["covered_cases"],len(extensive))
+        self.assertTrue(witness["complete_coverage"])
+        self.assertEqual(witness["attempted"],4*len(extensive))
+        self.assertGreater(len(witness["by_split"]),2)
+
+    def test_rehashed_same_gameplay_evidence_does_not_inflate_quality(self):
+        original=evidence_rows()
+        copied=replace(original[0],example_id="e"*64)
+        with self.assertRaises(PromotionError):
+            evaluate_fresh_cohort(
+                (*original,copied),policy(),
+                standard=forgiving(),source_projects=(),authorized=True)
+
     def test_project_reuse_and_unauthorized_review_fail_closed(self):
         rows=evidence_rows()
         with self.assertRaises(PromotionError):
