@@ -58,7 +58,7 @@ class AuthoredStory:
 
 def derive_original_story_intent(
     base: GameBuildIntent, *, population: int, regions: int = 7,
-    mode: str = "postgame", quests: int = 2, authorized: bool,
+    mode: str = "postgame", quests: int = 2, arcs: int = 3, authorized: bool,
 ) -> StoryIntent:
     """Stable original-product link for custom story editor and consumer build."""
     if not authorized:
@@ -73,7 +73,7 @@ def derive_original_story_intent(
             "version": "skeleton.living_world.v1",
         })[:15], 16),
         regions=regions, population=population,
-        mode=mode, quests_to_finish=quests,
+        mode=mode, quests_to_finish=quests, quest_arcs=arcs,
     )
 
 
@@ -131,7 +131,7 @@ def compile_authored_story(
     citizens_raw = _rows(document["citizens"], intent.population,
                          ("key", "name", "role", "faction", "home",
                           "workplace", "lookout", "temperament"), "citizen")
-    quests_raw = _rows(document["quests"], 3,
+    quests_raw = _rows(document["quests"], intent.quest_arcs,
                        ("key", "giver", "item", "source_region", "faction",
                         "reward", "premise"), "quest")
     regions = []
