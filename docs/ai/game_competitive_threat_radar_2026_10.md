@@ -205,6 +205,45 @@ launch an idle watcher, install OS startup jobs or deliver producer commits
 by itself. The host crawler must supply freshly approved source revisions,
 and an authenticated scheduler must invoke the service on each due tick.
 
+## Dragon native source recrawl integration
+
+The candidate \`competitive_dragon_recrawl.py\` adapter uses the existing
+\`skeleton.ai.webcrawler.dragon_mission_scheduler.plan_adaptive_recrawls\`
+function. It consumes current Wiki citations and the exact RightsLedger,
+each reviewed competitor/title source link, bounded historical acquisition
+timestamps and source volatility, and the current competitor status.
+
+Enemy-designated games receive elevated source importance, but the native
+scheduler still controls recrawl intervals, URL normalization, source
+identity and egress restrictions. The adapter returns one
+\`DragonRecrawlQueue\` with due times, source IDs, citations, priorities,
+consent/host-defer reasons and **zero** performed network calls.
+
+Example operator-run integration:
+
+\`\`\`python
+from skeleton.ai.game_builder.competitive_dragon_recrawl import (
+    ReviewedCrawlHistory,plan_dragon_competitor_recrawls,
+)
+queue = plan_dragon_competitor_recrawls(
+    wiki, brief, cleared_packet, rights, current_threats,
+    source_links, source_histories,
+    as_of="2026-10-13T12:00:00Z",
+    crawl_consent=True, host_safe_to_work=True,
+    authorized=True,
+)
+# queue.eligible_for_host_dispatch is a proposed source-id set,
+# NOT a completed crawl. The separate Dragon host and rights executors
+# must verify egress permission and deposit approved fresh evidence.
+\`\`\`
+
+The operator must update \`ReviewedCrawlHistory\` after actual licensed
+fetches, preserve both observed and changed times, and independently review
+new claims and change/retraction evidence. Repeating a source does not create
+a new independent publisher group. A host resource flag is only a
+cooperative eligibility signal, not authorization to initiate external
+network work; no OS scheduled service is installed.
+
 ## Adversarial test inventory
 
 The Windows and Linux test suites exercise independent-source thresholds,
