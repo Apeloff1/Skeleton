@@ -104,7 +104,7 @@ does not count as a completed advanced engine. Editor maturity is one of:
 - `advanced_reference_runtime`: a real replayable, command-driven game engine
   prototype with explicit evidence, not native hardware certification.
 
-Three engine families currently meet the second level:
+Five engine families currently meet the second level:
 
 1. **Platformer**: swept tile traversal, integer jump physics, optional
    double jump, finite dash cooldown, spike damage, checkpoint respawn,
@@ -116,6 +116,12 @@ Three engine families currently meet the second level:
 3. **Tower defense**: three placeable/upgradable towers, finite costs,
    targeting priorities, armor, slowing effects, deterministic waves,
    enemy progress, kills, leaks and base damage.
+4. **Racing**: acceleration/braking, integer track distance and laps, variable
+   road grip/weather, tire wear, vehicle integrity, obstacle encounters,
+   limited nitro, service pit windows, finite pit crews, finishing and scoring.
+5. **Survival**: multi-biome travel, explicit depleting resource nodes, energy,
+   hunger and thirst, weather exposure, resource-dependent craft/shelter/fire,
+   tools and finite trading; open-ended play continues after building a camp.
 
 Run `Start advanced scenario` in the studio after selecting one of these
 three systems. Visible gameplay action buttons replay a **fully submitted
