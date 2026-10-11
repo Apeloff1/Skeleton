@@ -16,6 +16,7 @@ from .advanced_gameplay_runtime import (
     ENGINES, _layout, _tactics_start, _racing_start, _survival_start,
 )
 from .system_editors import make_editor_document, SystemEditorError
+from .advanced_genre_engines import STARTS as GENRE_STARTS, CARDS, puzzle_default_layout
 
 SCHEMA = "skeleton.game_builder.advanced_scene.v1"
 MAX_SCENE_BYTES = 64_000
@@ -95,6 +96,21 @@ def _default_layout(engine, config, seed):
         state=_survival_start(config,seed)
         return {"regions":state["regions"],"starting_region":0,
                 "weather":state["weather"]}
+    if engine == "shooter":
+        state=GENRE_STARTS["shooter"](config,seed)
+        return {"width":state["width"],"height":state["height"],
+                "player_spawn":state["player"],"cover":state["cover"],
+                "enemy_spawns":state["spawns"],"extraction":state["extraction"],
+                "medkits":state["pickups"]}
+    if engine == "deck_battler":
+        state=GENRE_STARTS["deck_battler"](config,seed)
+        return {"cards":state["deck_origin"],
+                "enemy_pattern":state["enemy_pattern"],
+                "hand_size":state["hand_limit"],
+                "enemy_armor":state["enemy_block"],
+                "potions":state["potions"]}
+    if engine == "puzzle":
+        return puzzle_default_layout(config)
     raise SceneError("no advanced authored scene available for that engine")
 
 
@@ -188,6 +204,124 @@ def _normalize_layout(engine, config, layout):
         if type(weather) is not str or weather not in WEATHER:
             raise SceneError("unsupported survival weather")
         return {"regions":checked,"starting_region":region_id,"weather":weather}
+    if engine=="shooter":
+        keys={"width","height","player_spawn","cover","enemy_spawns",
+              "extraction","medkits"}
+        if set(layout)!=keys:
+            raise SceneError("exact advanced arena scene layout required")
+        width=_number(layout["width"],8,30,"width")
+        height=_number(layout["height"],6,20,"height")
+        cover=_cells(layout["cover"],width,height,100,"cover")
+        enemies=_cells(layout["enemy_spawns"],width,height,3,"enemy_spawns")
+        pickups=_cells(layout["medkits"],width,height,12,"medkits")
+        player=_cells([layout["player_spawn"]],width,height,1,"player_spawn")[0]
+        extraction=_cells([layout["extraction"]],width,height,1,"extraction")[0]
+        if len(enemies)!=3 or player==extraction:
+            raise SceneError("arena requires three enemy spawns and distinct extraction")
+        occupied={tuple(x) for x in cover+enemies+pickups+[player,extraction]}
+        if len(occupied)!=len(cover)+len(enemies)+len(pickups)+2:
+            raise SceneError("combat arena cannot overlap terrain, units or pickups")
+        blocked={tuple(c) for c in cover}
+        visited={tuple(player)};queue=deque([tuple(player)])
+        while queue:
+            x,y=queue.popleft()
+            for point in ((x-1,y),(x+1,y),(x,y-1),(x,y+1)):
+                if (0<=point[0]<width and 0<=point[1]<height
+                    and point not in visited and point not in blocked):
+                    visited.add(point);queue.append(point)
+        if tuple(extraction) not in visited or any(tuple(e) not in visited for e in enemies):
+            raise SceneError("original arena blocks extraction or enemy combat route")
+        return {"width":width,"height":height,"player_spawn":player,
+                "cover":cover,"enemy_spawns":enemies,"extraction":extraction,
+                "medkits":pickups}
+    if engine=="deck_battler":
+        keys={"cards","enemy_pattern","hand_size","enemy_armor","potions"}
+        if set(layout)!=keys:
+            raise SceneError("exact original deck and boss encounter required")
+        cards=layout["cards"];patterns=layout["enemy_pattern"]
+        if type(cards) is not list or not 10<=len(cards)<=40 or any(
+            type(card) is not str or card not in CARDS for card in cards
+        ):
+            raise SceneError("deck must use ten to forty registered original card rules")
+        if type(patterns) is not list or not 2<=len(patterns)<=8 or any(
+            type(p) is not str or p not in {"attack","defend","poison","charge"}
+            for p in patterns
+        ):
+            raise SceneError("enemy intent pattern must be a bounded typed cycle")
+        hand=_number(layout["hand_size"],3,5,"hand_size")
+        armor=_number(layout["enemy_armor"],0,20,"enemy_armor")
+        potions=_number(layout["potions"],0,5,"potions")
+        if not any(card in {"strike","pierce","drain","spark"} and
+                   CARDS[card][0]<=config["energy_per_turn"] for card in cards):
+            raise SceneError("deck requires at least one affordable damaging card")
+        return {"cards":list(cards),"enemy_pattern":list(patterns),
+                "hand_size":hand,"enemy_armor":armor,"potions":potions}
+    if engine=="puzzle":
+        keys={"spawn","exit","walls","doors","switches","crates",
+              "targets","nodes","portals","phase_gates"}
+        if set(layout)!=keys:
+            raise SceneError("exact puzzle geometry and mode-specific devices required")
+        w=config["board_width"];h=config["board_height"]
+        result={}
+        for key in ("walls","doors","switches","crates","targets","nodes","phase_gates"):
+            result[key]=_cells(layout[key],w,h,min(96,w*h),key)
+        result["spawn"]=_cells([layout["spawn"]],w,h,1,"spawn")[0]
+        result["exit"]=_cells([layout["exit"]],w,h,1,"exit")[0]
+        portals=layout["portals"]
+        if type(portals) is not list or len(portals)>4:
+            raise SceneError("puzzle portal count exceeds bounded original scene")
+        result["portals"]=[]
+        for pair in portals:
+            if type(pair) is not list or len(pair)!=2:
+                raise SceneError("portal must link exactly two cells")
+            endpoints=_cells(pair,w,h,2,"portal")
+            if endpoints[0]==endpoints[1]:
+                raise SceneError("self-referential portal is not a valid original link")
+            result["portals"].append(endpoints)
+        mode=config["logic"]
+        mode_objects={
+            "switches":{"switches","doors"},
+            "push_blocks":{"crates","targets"},
+            "circuits":{"nodes","doors"},
+            "time":{"phase_gates"},
+            "non_euclidean":{"portals"},
+        }[mode]
+        for group in ("doors","switches","crates","targets","nodes","phase_gates","portals"):
+            if group not in mode_objects and result[group]:
+                raise SceneError("scene contains inactive devices for puzzle logic mode")
+        requirements={
+            "switches":bool(result["switches"]),
+            "push_blocks":bool(result["crates"]) and len(result["crates"])==len(result["targets"]),
+            "circuits":bool(result["nodes"]),
+            "time":bool(result["phase_gates"]),
+            "non_euclidean":bool(result["portals"]),
+        }
+        if not requirements[mode]:
+            raise SceneError("mode-specific puzzle victory devices are required")
+        groups=[result[k] for k in ("walls","doors","switches","crates","nodes","phase_gates")]
+        all_items=[tuple(x) for group in groups for x in group]
+        all_items += [tuple(x) for pair in result["portals"] for x in pair]
+        all_items += [tuple(result["spawn"]),tuple(result["exit"])]
+        if len(all_items)!=len(set(all_items)):
+            raise SceneError("puzzle walls, devices, portals and spawn/exits overlap")
+        if result["spawn"]==result["exit"]:
+            raise SceneError("puzzle entrance and exit must be distinct")
+        # Targets are legitimate future crate locations, but cannot be walls or exits.
+        if any(tuple(c) in {tuple(p) for p in result["walls"]+[result["spawn"],result["exit"]]}
+               for c in result["targets"]):
+            raise SceneError("push-block goals cannot be impassable or initial spawn/exit")
+        if config["solution_required"]:
+            blocked={tuple(c) for c in result["walls"]}
+            seen={tuple(result["spawn"])};queue=deque([tuple(result["spawn"])])
+            while queue:
+                x,y=queue.popleft()
+                for q in ((x-1,y),(x+1,y),(x,y-1),(x,y+1)):
+                    if 0<=q[0]<w and 0<=q[1]<h and q not in blocked and q not in seen:
+                        seen.add(q);queue.append(q)
+            if tuple(result["exit"]) not in seen:
+                raise SceneError("required-solution puzzle exit is statically isolated")
+        # Static reachability alone does not certify actual puzzle solvability.
+        return result
     raise SceneError("unsupported authored scene type")
 
 
