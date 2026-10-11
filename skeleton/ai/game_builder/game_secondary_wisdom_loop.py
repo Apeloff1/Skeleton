@@ -33,7 +33,7 @@ from .game_post_weight_dragon import PostWeightDragonMission
 from .game_integrated_learning import (
     IntegratedLearningCycle,run_integrated_learning_cycle,
 )
-from .game_reviewer_optimizer import OptimizerSchedule
+from .game_reviewer_optimizer import OptimizerSchedule,OptimizationResult
 from .game_model_promotion import PromotionError,PromotionStandard
 from .game_training_flow import FlowPlan
 from .competitive_delivery_gate import TrustedCompetitionJudge,_mac
@@ -99,6 +99,7 @@ class WisdomPassAttestation:
     research_packet_digest: str
     first_weight_audit_digest: str
     proofread_output_digest: str
+    proofread_notes: str
     proofread_checks: tuple[str,...]
     adversarial_objection_count: int
     unresolved_source_conflicts: int
@@ -129,6 +130,10 @@ class WisdomPassAttestation:
                 or type(self.quality_bp) is not int
                 or not 0<=self.quality_bp<=10000):
             raise PromotionError("six exact proofreading controls and complete objection inventory required")
+        if (not isinstance(self.proofread_notes,str)
+                or not 100<=len(self.proofread_notes)<=6000
+                or canonical_digest(self.proofread_notes)!=self.proofread_output_digest):
+            raise PromotionError("reviewer must bind exact substantive proofread comprehension artifact")
         _id(self.reviewer_id,"credentialed wisdom actor")
         _date(self.reviewed_at)
 
@@ -140,6 +145,7 @@ class WisdomPassAttestation:
             research_packet_digest=self.research_packet_digest,
             first_weight_audit_digest=self.first_weight_audit_digest,
             proofread_output_digest=self.proofread_output_digest,
+            proofread_notes=self.proofread_notes,
             proofread_checks=list(self.proofread_checks),
             adversarial_objection_count=self.adversarial_objection_count,
             unresolved_source_conflicts=self.unresolved_source_conflicts,
@@ -229,6 +235,8 @@ def run_secondary_wisdom_cycle(
     first_post_weight: PostWeightReport,
     prior_original_games: FlowPlan,
     previous_candidate_policy: dict,
+    first_optimization: OptimizationResult,
+    first_champion: dict|None,
     mission: PostWeightDragonMission,
     wiki: ReviewedKnowledgeStore,
     brief: KnowledgeBrief,
@@ -254,6 +262,17 @@ def run_secondary_wisdom_cycle(
             or type(minimum_quality_bp) is not int
             or not 8000<=minimum_quality_bp<=9900):
         raise PromotionError("verified first weight report and frozen original-game source plan required")
+    if not isinstance(first_optimization,OptimizationResult):
+        raise PromotionError("actual prior original-game SGD optimization receipt required")
+    verified_first=analyze_post_weight_change(
+        prior_original_games,first_optimization,standard=standard,
+        champion=first_champion,authorized=True)
+    if verified_first.digest!=first_post_weight.digest:
+        raise PromotionError("forged post-weight qualification or summary is not trusted")
+    if (first_optimization.selected_fit is None or
+            canonical_digest(first_optimization.selected_fit["symbolic_policy"])!=
+            canonical_digest(previous_candidate_policy)):
+        raise PromotionError("candidate policy differs from actual first fitted SGD result")
     if (first_post_weight.plan_digest!=canonical_digest(prior_original_games.payload())
             or first_post_weight.model_after_digest!=canonical_digest(previous_candidate_policy)
             or mission.source_report_digest!=first_post_weight.digest
