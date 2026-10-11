@@ -9,6 +9,7 @@ from .contracts import canonical_json
 from .quest_scene_engine import ARCHETYPES, DirectorError
 from .quest_scene_forge import forge_director, read_director_blueprint
 from .quest_director_enhanced_product import build_earned_story_product
+from .director_evolution_product import build_evolution_product
 from .quest_director_export import export_director_studio
 
 
@@ -37,6 +38,16 @@ def parser():
     cli.add_argument("--human-reviewed", action="store_true",
                      help="Operator attests originality of all custom scene and quest content")
     cli.add_argument("--mirror-attempts", type=int, default=128)
+    cli.add_argument("--evolve", action="store_true",
+                     help="Build full modular NPC + mission + original scene director product")
+    cli.add_argument("--society-npcs", type=int, default=96,
+                     help="Persistent individual citizens, 3..512")
+    cli.add_argument("--target-tier",
+                     choices=("retro","handheld","mobile","desktop","high_end"),
+                     default="desktop")
+    cli.add_argument("--no-deep-search", action="store_true",
+                     help="Disable bounded alternative-route search in evolved source only")
+
     return cli
 
 
@@ -80,8 +91,15 @@ def main(argv=None):
                 "custom_originality_review_needed_for_rebuild": True,
             }))
         else:
-            product = build_earned_story_product(
-                world, authorized=True, mirror_attempts=args.mirror_attempts,
+            product = (
+                build_evolution_product(
+                    world, authorized=True,
+                    population=args.society_npcs, tier=args.target_tier,
+                    deep_route_search=not args.no_deep_search,
+                    mirror_attempts=args.mirror_attempts,
+                ) if args.evolve else build_earned_story_product(
+                    world, authorized=True, mirror_attempts=args.mirror_attempts,
+                )
             )
             export_director_studio(product, output, authorized=True)
             print(canonical_json({
