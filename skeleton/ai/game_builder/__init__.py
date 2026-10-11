@@ -277,6 +277,7 @@ _KNOWLEDGE_EXPORTS = {
     "PlayableCompilationError": ".playable_compiler",
     "CompiledPlayableProject": ".playable_compiler",
     "compile_original_game": ".playable_compiler",
+    "compile_authored_game": ".playable_compiler",
     "compile_game_from_reviewed_research": ".playable_compiler",
     "export_compiled_project": ".playable_compiler",
     "PlayabilityAnalysisError": ".playability_analysis",
@@ -290,6 +291,10 @@ _KNOWLEDGE_EXPORTS = {
     "DualRuntimePackage": ".dual_runtime_export",
     "render_dual_runtime_package": ".dual_runtime_export",
     "export_dual_runtime_package": ".dual_runtime_export",
+    "AuthoredGameError": ".authored_tiles",
+    "read_authored_document": ".authored_tiles",
+    "compile_authored_world": ".authored_tiles",
+    "compile_authored_document": ".authored_tiles",
 }
 
 
