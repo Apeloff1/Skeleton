@@ -26,6 +26,9 @@ def parser() -> argparse.ArgumentParser:
     entry.add_argument("--intent", required=True, help="Bounded original-game JSON intent")
     entry.add_argument("--output", required=True, help="New directory for browser+Godot project and evidence")
     entry.add_argument("--authored-world", help="Original editor-authored tile JSON")
+    entry.add_argument("--tiled-level", action="append",
+                       help="Original numeric Tiled map JSON file, one per game level")
+    entry.add_argument("--tiled-palette", help="Optional decimal GID -> original tile symbol JSON")
     entry.add_argument("--human-reviewed", action="store_true",
                        help="Confirm original tile geometry human review")
     entry.add_argument("--mirror-attempts", type=int, default=128,
@@ -45,6 +48,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         intent = _intent(_read_json(args.intent, MAX_INPUT_BYTES))
         authored = None
+        tiled_palette = None
+        if args.authored_world and args.tiled_level:
+            raise AuthoredGameError("choose either authored JSON or Tiled editor sources")
+        if args.tiled_palette:
+            if not args.tiled_level:
+                raise AuthoredGameError("Tiled palette requires Tiled source maps")
+            raw_palette = _read_json(args.tiled_palette, 3000)
+            if not raw_palette or len(raw_palette) > 64:
+                raise AuthoredGameError("Tiled palette must have 1 to 64 GID entries")
+            tiled_palette = {}
+            for key, value in raw_palette.items():
+                if not key.isdecimal() or int(key) in tiled_palette:
+                    raise AuthoredGameError("Tiled palette IDs must be unique decimal numbers")
+                tiled_palette[int(key)] = value
         if args.authored_world:
             payload = read_authored_document(args.authored_world, authorized=True)
             if (set(payload) != {"schema", "intent", "levels"}
@@ -52,11 +69,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                     or payload["intent"] != intent.to_payload()):
                 raise AuthoredGameError("authored tiles do not match original intent")
             authored = payload["levels"]
-        elif args.human_reviewed:
-            raise AuthoredGameError("--human-reviewed requires --authored-world")
+        elif args.human_reviewed and not args.tiled_level:
+            raise AuthoredGameError("--human-reviewed requires --authored-world or --tiled-level")
         run = run_original_game_studio(
             intent, authorized=True,
             human_reviewed_tiles=authored,
+            tiled_sources=args.tiled_level,
+            tiled_gid_palette=tiled_palette,
             human_authored_approved=args.human_reviewed,
             mirror_attempts=args.mirror_attempts,
             companion_practice_games=args.companion_practice,
