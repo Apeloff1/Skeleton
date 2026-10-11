@@ -22,6 +22,7 @@ from .system_editor_assembly import assemble_workspace_systems
 from .advanced_gameplay_runtime import (
     run_advanced_session, verify_advanced_session, ACTION_HELP,
 )
+from .advanced_level_scenes import make_advanced_scene, scene_path
 
 
 class StudioServerError(ValueError):
@@ -178,10 +179,24 @@ class _StudioHandler(BaseHTTPRequestHandler):
         path=urlsplit(self.path).path
         values=self._body()
         studio=self.server.workspace
+        if path=="/api/advanced-scene-template":
+            scene=make_advanced_scene(
+                values["editor"],values.get("settings"),
+                seed=values.get("seed",0),
+                layout=values.get("layout"),
+                scene_id=values.get("scene_id","scene_01"))
+            return self._json(200,{
+                "scene":scene,"path":scene_path(scene),
+                "content":json.dumps(scene,sort_keys=True,ensure_ascii=True,
+                                      separators=(",",":"))+"\\n",
+                "requires_approved_system":True,
+                "automatically_committed":False,
+            })
         if path=="/api/advanced-play":
             result=run_advanced_session(
                 values["editor"], values.get("settings"),
-                values.get("actions", []), seed=values.get("seed", 0))
+                values.get("actions", []), seed=values.get("seed", 0),
+                scene=values.get("scene"))
             return self._json(200, {"session":result,
                                     "available_actions":list(ACTION_HELP[result["editor"]]),
                                     "server_mutated_game_files":False})
