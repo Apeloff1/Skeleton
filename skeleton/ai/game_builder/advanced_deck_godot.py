@@ -183,14 +183,14 @@ func _step(action: String) -> bool:
                               int(state["strength"]),true)
             "drain":
                 var dealt: int = _enemy_damage(maxi(1,
-                    int(rules["attack_damage"])/2+int(state["strength"])))
+                    int(int(rules["attack_damage"])/2)+int(state["strength"])))
                 state["hp"] = mini(int(state["max_hp"]),int(state["hp"])+dealt)
             "rally":
                 state["strength"] = int(state["strength"])+2
             "scry":
                 _draw_cards(2)
             "ward":
-                state["block"] = int(state["block"])+maxi(2,int(rules["block_value"])/2)
+                state["block"] = int(state["block"])+maxi(2,int(int(rules["block_value"])/2))
                 state["poison"] = maxi(0,int(state["poison"])-2)
             "spark":
                 state["enemy_poison"] = int(state["enemy_poison"])+3
