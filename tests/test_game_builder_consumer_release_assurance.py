@@ -20,7 +20,7 @@ from skeleton.ai.game_builder.playable_world import GameBuildIntent
 class ConsumerReleaseAssuranceTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.run = run_original_game_studio(
+        cls.studio = run_original_game_studio(
             GameBuildIntent(
                 project_id="original-consumer-release-2026",
                 title="Original Native Game",
@@ -48,7 +48,7 @@ class ConsumerReleaseAssuranceTests(unittest.TestCase):
         receipt = SignedReleaseEvidence(
             kind=kind,
             issuer_id=kind.value,
-            subject_manifest_digest=subject or cls.run.package.manifest["manifest_digest"],
+            subject_manifest_digest=subject or cls.studio.package.manifest["manifest_digest"],
             evidence_digest=evidence or sha256(kind.value.encode("utf-8")).hexdigest(),
             observed_at=stamp,
             signature="0" * 64,
@@ -60,18 +60,18 @@ class ConsumerReleaseAssuranceTests(unittest.TestCase):
 
     def test_original_game_is_release_blocked_without_independent_evidence(self):
         result = assess_consumer_release(
-            self.run, [], self.trust, now_utc=self.now, authorized=True)
+            self.studio, [], self.trust, now_utc=self.now, authorized=True)
         self.assertFalse(result.proof.approved_for_publication)
         self.assertEqual(result.proof.to_payload()["status"], "release-blocked")
         self.assertFalse(result.proof.blockers == ())
         self.assertEqual(result.source_manifest_digest,
-                         self.run.package.manifest["manifest_digest"])
+                         self.studio.package.manifest["manifest_digest"])
         self.assertEqual(result.to_payload()["evidence_receipts"], [])
 
     def test_separate_signed_reviewers_can_clear_all_consumer_gates(self):
         all_rows = tuple(self.sign(kind) for kind in EvidenceKind)
         result = assess_consumer_release(
-            self.run, all_rows, self.trust, now_utc=self.now, authorized=True,
+            self.studio, all_rows, self.trust, now_utc=self.now, authorized=True,
         )
         self.assertFalse(result.proof.blockers)
         self.assertTrue(result.proof.approved_for_publication)
@@ -80,7 +80,7 @@ class ConsumerReleaseAssuranceTests(unittest.TestCase):
         self.assertEqual(len(result.reviewers), len(EvidenceKind))
         self.assertEqual(len(result.evidence_receipts), len(EvidenceKind))
         self.assertEqual(result.digest, assess_consumer_release(
-            self.run, all_rows, self.trust, now_utc=self.now,
+            self.studio, all_rows, self.trust, now_utc=self.now,
             authorized=True).digest)
         serialized = result.to_payload()
         self.assertNotIn("key", str(serialized).lower().replace(
@@ -91,13 +91,13 @@ class ConsumerReleaseAssuranceTests(unittest.TestCase):
         good = self.sign(EvidenceKind.MALWARE)
         with self.assertRaisesRegex(ReleaseEvidenceError, "signature"):
             assess_consumer_release(
-                self.run, [replace(good, signature="0" * 64)], self.trust,
+                self.studio, [replace(good, signature="0" * 64)], self.trust,
                 now_utc=self.now, authorized=True,
             )
         forged = self.sign(EvidenceKind.RIGHTS, subject="a" * 64)
         with self.assertRaisesRegex(ReleaseEvidenceError, "different source"):
             assess_consumer_release(
-                self.run, [forged], self.trust, now_utc=self.now,
+                self.studio, [forged], self.trust, now_utc=self.now,
                 authorized=True,
             )
         wrong_role = dict(self.trust)
@@ -106,19 +106,19 @@ class ConsumerReleaseAssuranceTests(unittest.TestCase):
             wrong_role[good.issuer_id].key)
         with self.assertRaisesRegex(ReleaseEvidenceError, "outside designated"):
             assess_consumer_release(
-                self.run, [good], wrong_role, now_utc=self.now,
+                self.studio, [good], wrong_role, now_utc=self.now,
                 authorized=True,
             )
 
     def test_publisher_cannot_self_approve_before_all_separate_gates(self):
         with self.assertRaisesRegex(ReleaseEvidenceError, "all independent"):
             assess_consumer_release(
-                self.run, [self.sign(EvidenceKind.PUBLICATION)],
+                self.studio, [self.sign(EvidenceKind.PUBLICATION)],
                 self.trust, now_utc=self.now, authorized=True)
         only_quality = [self.sign(kind) for kind in EvidenceKind
                         if kind is not EvidenceKind.PUBLICATION]
         outcome = assess_consumer_release(
-            self.run, only_quality, self.trust, now_utc=self.now,
+            self.studio, only_quality, self.trust, now_utc=self.now,
             authorized=True)
         self.assertEqual(outcome.proof.blockers, ("approved_for_publication",))
         self.assertFalse(outcome.proof.approved_for_publication)
@@ -128,22 +128,22 @@ class ConsumerReleaseAssuranceTests(unittest.TestCase):
             EvidenceKind.MALWARE, date=self.now - timedelta(days=31))
         with self.assertRaisesRegex(ReleaseEvidenceError, "expired"):
             assess_consumer_release(
-                self.run, [stale], self.trust, now_utc=self.now, authorized=True)
+                self.studio, [stale], self.trust, now_utc=self.now, authorized=True)
         future = self.sign(
             EvidenceKind.MALWARE, date=self.now + timedelta(days=1))
         with self.assertRaisesRegex(ReleaseEvidenceError, "future"):
             assess_consumer_release(
-                self.run, [future], self.trust, now_utc=self.now, authorized=True)
+                self.studio, [future], self.trust, now_utc=self.now, authorized=True)
         valid = self.sign(EvidenceKind.MALWARE)
         with self.assertRaisesRegex(ReleaseEvidenceError, "duplicate"):
             assess_consumer_release(
-                self.run, [valid, valid], self.trust, now_utc=self.now, authorized=True)
+                self.studio, [valid, valid], self.trust, now_utc=self.now, authorized=True)
         with self.assertRaisesRegex(ReleaseEvidenceError, "no configured trust"):
             assess_consumer_release(
-                self.run, [valid], {}, now_utc=self.now, authorized=True)
+                self.studio, [valid], {}, now_utc=self.now, authorized=True)
         with self.assertRaises(PermissionError):
             assess_consumer_release(
-                self.run, [valid], self.trust, now_utc=self.now,
+                self.studio, [valid], self.trust, now_utc=self.now,
                 authorized=False)
         with self.assertRaises(ReleaseEvidenceError):
             TrustedReviewer("fake", ReviewerRole.LEGAL, b"short")
