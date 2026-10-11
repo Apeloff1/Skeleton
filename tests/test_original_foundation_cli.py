@@ -93,3 +93,26 @@ def test_player_parser_supports_directed_move_and_persistent_fork() -> None:
     for invalid in ("move", "move no", "choose", "intervene a", "unknown"):
         with pytest.raises(FoundationError):
             _parse_command(invalid)
+
+
+def test_legacy_game_atlas_gateway_exposes_large_foundation_inventory(capsys) -> None:
+    from skeleton.game.generation.original_world_cli import main as atlas_main
+
+    assert atlas_main(["--foundation-index", "10239", "--brief"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["foundation"]["index"] == "10239"
+    assert data["inventory"]["total_world_foundation_entries"] == 11536
+    assert data["realization_status"] == "bounded-generic-causal-prototype"
+    assert "--index 10239" in data["play_command"]
+    assert "not individually handwritten" in data["warning"]
+
+    assert atlas_main(["--foundation-seed", "cross-world-legacy"]) == 0
+    another = json.loads(capsys.readouterr().out)
+    assert another["foundation"]["foundation_index"].isdigit()
+
+    # The original bespoke atlas path must remain independently addressable.
+    assert atlas_main(["--index", "0", "--brief"]) == 0
+    original = json.loads(capsys.readouterr().out)
+    assert original["world"]["world_id"] in {"affection-01", "aging-01"} or (
+        original["world"]["world_id"] != data["foundation"]["foundation_id"]
+    )
