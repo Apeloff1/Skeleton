@@ -31,6 +31,9 @@ from .original_world_npc_cognition_v2 import (
     register_player_care, commission, cancel_order, _bond_change,
     commission_project, cancel_project, interview_citizen,
 )
+from .original_world_npc_civics import propose_civic
+from .original_world_npc_cognition_v2 import (
+)
 
 SCHEMA = "original-world-playable-product-session.v2"
 LEGACY_SCHEMA = "original-world-playable-product-session.v1"
@@ -219,7 +222,28 @@ def _npc_operation(
     """
     world, society = session.terrain, session.society
     thinking = session.cognition
-    if action.verb == "interview":
+    if action.verb == "propose":
+        if world.position != (0, 0):
+            raise FoundationError("player must attend the physical public depot")
+        if world.provisions < 1:
+            raise FoundationError("a public vote needs a real funded meeting meal")
+        old = session.living.spatial
+        if old.game.causal.trust < 1:
+            raise FoundationError("public policy requires an actual civic trust mandate")
+        revised = propose_civic(
+            thinking.civic, society, world, policy=action.option,
+            citizen=action.target, day=thinking.day,
+        )
+        thinking = replace(thinking, civic=revised)
+        world = replace(world, provisions=world.provisions - 1)
+        living = replace(session.living, spatial=replace(
+            old, game=replace(old.game, causal=replace(
+                old.game.causal, trust=old.game.causal.trust - 1))))
+        message = (
+            f"Resident {action.target} sponsored {action.option}; "
+            "real food and trust paid. Actual in-person ballots occur on next world turn"
+        )
+    elif action.verb == "interview":
         if not 0 <= action.target < len(society.inhabitants):
             raise FoundationError("interviewee must be a real local citizen")
         actor = society.inhabitants[action.target]
