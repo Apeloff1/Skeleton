@@ -23,7 +23,7 @@ from .game_project_workspace import GameWorkspace
 from .game_model_promotion import (
     PromotionError,PromotionStandard,PromotionEvaluation,
     evaluate_candidate,evaluate_fresh_cohort,validate_policy,require_stronger_standard,
-    predict_review,
+    predict_review,propose_progressive_standard,
 )
 from .game_training_flow import FlowPlan
 from .game_learning_feedback import feedback_from_evaluation,feedback_from_cohort
@@ -405,6 +405,49 @@ class ReviewerRegistry:
                         qualification_digest=qualification_digest,
                         jeeves_dragon_core_weights_changed=False,
                         gameplay_authority_transferred=False)
+
+    def propose_next_standard(self,*,authorized: bool)->dict:
+        """Advance the bar only *after* confirmed usage AND idle qualification.
+
+        This is an advisory next-generation standard, not model deployment or
+        a silent update of the currently installed qualification requirements.
+        The subsequent new candidate must acquire fresh original game evidence.
+        """
+        if not authorized:
+            raise PermissionError("progressive model quality ratchet needs operator")
+        state=self.read_state()
+        if (state["phase"]!="active" or state["active"] is None
+                or set(state["observations"])!={"usage","idle"}
+                or len(state["attestations"])!=len(ROLES)
+                or {r["role"] for r in state["attestations"]}!=set(ROLES)
+                or any(not c["passed"] for c in state["observations"].values())):
+            raise PromotionError("complete confirmed human and two-cohort promotion required")
+        model=self._candidate(state["active"])
+        if model["evaluation"]["passed"] is not True:
+            raise PromotionError("cannot ratchet from unqualified candidate")
+        former=PromotionStandard(**{k:v for k,v in state["standard"].items()
+                                    if k!="schema"})
+        next_standard=propose_progressive_standard(former,authorized=True)
+        evidence=canonical_digest({
+            "active_model":state["active"],
+            "source_evaluation":model["evaluation"],
+            "roles":state["attestations"],
+            "usage":state["observations"]["usage"],
+            "idle":state["observations"]["idle"],
+            "current_standard":state["standard"],
+        })
+        return dict(
+            schema="skeleton.game_builder.next_reviewer_standard.v1",
+            promoted_model=state["active"],
+            qualifying_evidence_digest=evidence,
+            current_standard_digest=former.digest,
+            next_standard=next_standard.payload(),
+            proposed_standard_digest=next_standard.digest,
+            new_independent_project_cohorts_required=True,
+            approval_and_separate_stage_required=True,
+            active_standard_unchanged=True,
+            promoted_model_weights_unchanged=True,
+        )
 
     def score_active_game(self, evidence: dict, *, game_digest: str,
                           authorized: bool)->dict:
