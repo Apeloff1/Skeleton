@@ -39,7 +39,7 @@ jobs:
   native-replay:
     name: Native Godot 4 replay of Python-proved game
     runs-on: ubuntu-24.04
-    timeout-minutes: 22
+    timeout-minutes: 32
     env:
       PYTHONPATH: "."
       EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
@@ -153,7 +153,7 @@ jobs:
   windows-native-studio:
     name: Execute original Godot consumer candidate on Windows
     runs-on: windows-2022
-    timeout-minutes: 24
+    timeout-minutes: 32
     env:
       PYTHONPATH: "."
       EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
@@ -258,9 +258,23 @@ jobs:
           Write-Host "Executing exported Windows native console wrapper: $($wrapper.FullName)"
           python -c 'import subprocess,sys; p=subprocess.run([sys.argv[1],"--headless","--","--verify-proof"],capture_output=True,text=True,timeout=90); print(p.stdout); print(p.stderr); sys.exit(0 if p.returncode == 0 and "NATIVE_REPLAY_OK" in (p.stdout+p.stderr) else 1)' $wrapper.FullName
           if ($LASTEXITCODE -ne 0) { throw "Real Windows consumer executable diverged from Python proof" }
+          # The companion's practice game has its own world, scene, digest
+          # and replay. Exercise it as a separate native executable.
+          $practiceProject = Join-Path $root 'project/practice/slot-01/godot'
+          $practiceBinary = Join-Path $root 'companion-practice.exe'
+          & $console.FullName --headless --path $practiceProject --import
+          if ($LASTEXITCODE -ne 0) { throw "Companion Windows Godot import failed" }
+          & $console.FullName --headless --path $practiceProject --export-release 'Windows Desktop' $practiceBinary
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $practiceBinary)) { throw "Companion native game export failed" }
+          $practiceWrapper = Join-Path $root 'companion-practice.console.exe'
+          if (-not (Test-Path $practiceWrapper)) { throw "Companion release missing proof console wrapper" }
+          python -c 'import subprocess,sys; p=subprocess.run([sys.argv[1],"--headless","--","--verify-proof"],capture_output=True,text=True,timeout=90); print(p.stdout); print(p.stderr); sys.exit(0 if p.returncode == 0 and "NATIVE_REPLAY_OK" in (p.stdout+p.stderr) else 1)' $practiceWrapper
+          if ($LASTEXITCODE -ne 0) { throw "Companion Windows game diverged from independently verified practice proof" }
+          Get-FileHash $practiceBinary -Algorithm SHA256 | Format-List
+          Get-FileHash $practiceWrapper -Algorithm SHA256 | Format-List
           Get-FileHash $binary -Algorithm SHA256 | Format-List
           Get-FileHash $wrapper.FullName -Algorithm SHA256 | Format-List
-          $hashes = @($binary, $wrapper.FullName) | ForEach-Object {
+          $hashes = @($binary, $wrapper.FullName, $practiceBinary, $practiceWrapper) | ForEach-Object {
             $item = $_
             $hash = (Get-FileHash -LiteralPath $item -Algorithm SHA256).Hash.ToLowerInvariant()
             "$hash  $(Split-Path -Leaf $item)"
@@ -273,6 +287,8 @@ jobs:
           path: |
             ${{ runner.temp }}/original-studio/original-homebrew.exe
             ${{ runner.temp }}/original-studio/original-homebrew.console.exe
+            ${{ runner.temp }}/original-studio/companion-practice.exe
+            ${{ runner.temp }}/original-studio/companion-practice.console.exe
             ${{ runner.temp }}/original-studio/SHA256SUMS
             ${{ runner.temp }}/original-studio/project/
           retention-days: 7
