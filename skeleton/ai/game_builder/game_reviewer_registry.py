@@ -22,7 +22,7 @@ from .contracts import canonical_digest,canonical_json
 from .game_project_workspace import GameWorkspace
 from .game_model_promotion import (
     PromotionError,PromotionStandard,PromotionEvaluation,
-    evaluate_candidate,evaluate_fresh_cohort,validate_policy,
+    evaluate_candidate,evaluate_fresh_cohort,validate_policy,require_stronger_standard,
 )
 from .game_training_flow import FlowPlan
 from .game_tester_almanac import test_game_personas,TEST_FAMILIES
@@ -204,6 +204,11 @@ class ReviewerRegistry:
               standard: PromotionStandard=PromotionStandard(),champion: dict|None=None):
         if not authorized:
             raise PermissionError("staging a game-review model requires operator authority")
+        previous=self.read_state()
+        if previous["standard"] is not None:
+            former=PromotionStandard(**{k:v for k,v in previous["standard"].items()
+                                        if k!="schema"})
+            require_stronger_standard(former,standard)
         evaluation=evaluate_candidate(plan,fit,standard=standard,
                                       champion=champion,authorized=True)
         if not evaluation.passed:
