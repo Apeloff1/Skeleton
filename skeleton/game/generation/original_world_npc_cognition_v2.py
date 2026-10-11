@@ -707,9 +707,18 @@ def smart_npc_tick(
     world: TerrainState,
     people: PhysicalSociety,
     thinking: CitizenIntelligence,
+    *, active_ids: tuple[int, ...] | None = None,
 ) -> tuple[TerrainState, PhysicalSociety, CitizenIntelligence,
            tuple[NpcReceipt, ...], tuple[ThoughtReceipt, ...]]:
     validate_intelligence(thinking, people, world)
+    if active_ids is not None and (
+        not isinstance(active_ids, tuple)
+        or active_ids != tuple(sorted(set(active_ids)))
+        or any(type(pid) is not int or not 0 <= pid < len(people.inhabitants)
+               for pid in active_ids)
+    ):
+        raise FoundationError("invalid bounded local NPC active-cognition schedule")
+    active_set = set(active_ids) if active_ids is not None else None
     if thinking.day >= MAX_HISTORY or people.tick >= MAX_HISTORY:
         raise FoundationError("bounded cognitive simulator event budget exceeded")
     before = thinking
@@ -727,6 +736,32 @@ def smart_npc_tick(
     bonds = thinking
     for person, mind in zip(people.inhabitants, thinking.minds):
         start = (person.x, person.y)
+        if active_set is not None and person.id not in active_set:
+            # Genuine *passive* physical citizen state, not an abstract
+            # decision: time, hunger and survival still advance. No path
+            # search, labor, inventory minting, social learning, movement,
+            # medicine or constructed work in an unallocated cognition slot.
+            hunger = min(20, person.hunger + 1)
+            updated = replace(
+                person, hunger=hunger,
+                energy=min(20, person.energy + 2),
+                health=max(0, person.health - (1 if hunger >= 18 else 0)),
+            )
+            updated_people.append(updated)
+            updated_minds.append(replace(
+                mind, stress=min(20, mind.stress + (1 if hunger >= 16 else 0)),
+                loneliness=min(20, mind.loneliness + 1),
+            ))
+            receipts.append(NpcReceipt(
+                people.event_count + 1, person.id, person.profession,
+                "passive-survival-no-cognition", start, start, "", 0,
+            ))
+            thoughts.append(ThoughtReceipt(
+                person.id, mind.goal, 0,
+                "Unallocated brain slot; only embodied survival clock advanced",
+                "passive-survival-no-cognition",
+            ))
+            continue
         goal, utility, reason, objective = _plan(person, mind, thinking, current_world)
         if thinking.households.ages[person.id] < CHILDCARE_TURNS:
             goal, utility, reason = (
@@ -1029,6 +1064,10 @@ def smart_npc_tick(
     # interactions. Each pair counts at most one meeting per day.
     for i, a in enumerate(updated_people):
         for b in updated_people[i+1:]:
+            if active_set is not None and (
+                a.id not in active_set or b.id not in active_set
+            ):
+                continue
             if (a.x, a.y) != (b.x, b.y):
                 continue
             if a.health == 0 or b.health == 0:
