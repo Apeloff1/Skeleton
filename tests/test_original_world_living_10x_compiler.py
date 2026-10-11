@@ -235,8 +235,8 @@ def test_power_grid_burns_real_source_fuel_and_shortages_accumulate() -> None:
     initial = s.spatial.fuel
     s = use(s, "living", "generate")
     assert s.spatial.fuel == initial - 1
-    s = turn(s, 5)
-    assert s.spatial.fuel <= initial - 1
+    s = turn(s, 6)
+    assert s.spatial.fuel == 0
     assert s.metrics.grid_wear > 0 or s.metrics.outages > 0
 
 
