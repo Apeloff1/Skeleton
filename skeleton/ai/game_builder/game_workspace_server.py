@@ -18,6 +18,7 @@ from .game_project_workspace import GameWorkspace, WorkspaceError
 from .game_workspace_ui import render_workspace_html
 from .game_prompt_router import route_game_prompt,ingest_ai_draft
 from .system_editors import catalog as system_editor_catalog, editor_source, editor_path, preview_editor
+from .system_editor_assembly import assemble_workspace_systems
 
 
 class StudioServerError(ValueError):
@@ -152,6 +153,10 @@ class _StudioHandler(BaseHTTPRequestHandler):
         if path=="/api/editors":
             return self._json(200,{"schema":"skeleton.game_builder.system_editor_catalog.v1",
                                    "editors":system_editor_catalog()})
+        if path=="/api/editor-assembly":
+            result = assemble_workspace_systems(
+                self.server.workspace, params["project"], authorized=True)
+            return self._json(200, result)
         if path=="/api/tree":
             return self._json(200,self.server.workspace.tree())
         if path=="/api/files":
