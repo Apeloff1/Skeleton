@@ -1,0 +1,949 @@
+{
+  "schema": "skeleton.dragon.acquisition_topics.v1",
+  "checked_at": "2026-10-11T21:15:09.000Z",
+  "source_range": {
+    "start_inclusive": 576,
+    "end_exclusive": 608
+  },
+  "authority": "acquisition_side_unreviewed_only",
+  "topics": [
+    {
+      "knowledge_header": "**Design**",
+      "sources": [
+        {
+          "source_id": "source-1fbc7f721d4385dd5a25c22d1e525a429562dfe1410232216c6e474abea6246f",
+          "source_offset": 576,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-2171aab8f9d700246ac2d0b3367ef5568e4edab1bb38d846ef93617f922f4e6d",
+          "source_offset": 598,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+      "sources": [
+        {
+          "source_id": "source-1fbf3a05a5973ae6c1b536194b120fa6ae8dcf0ca690f1b310f670f36c78b2cb",
+          "source_offset": 577,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-1fc01f93f694943a2bb9c3819d107154ec4fb1ef9b1ba94c1e0b4228de23c213",
+          "source_offset": 578,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-21c6966c7db16a62aedb73c07d4bd7db0f9009fd672b43fcf12615cd31ee3ae0",
+          "source_offset": 605,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Projects",
+      "sources": [
+        {
+          "source_id": "source-1fbf3a05a5973ae6c1b536194b120fa6ae8dcf0ca690f1b310f670f36c78b2cb",
+          "source_offset": 577,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Godot 4",
+      "sources": [
+        {
+          "source_id": "source-1fbf3a05a5973ae6c1b536194b120fa6ae8dcf0ca690f1b310f670f36c78b2cb",
+          "source_offset": 577,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Plugins and scripts",
+      "sources": [
+        {
+          "source_id": "source-1fc01f93f694943a2bb9c3819d107154ec4fb1ef9b1ba94c1e0b4228de23c213",
+          "source_offset": 578,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Godot 3",
+      "sources": [
+        {
+          "source_id": "source-1fc01f93f694943a2bb9c3819d107154ec4fb1ef9b1ba94c1e0b4228de23c213",
+          "source_offset": 578,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-21c6966c7db16a62aedb73c07d4bd7db0f9009fd672b43fcf12615cd31ee3ae0",
+          "source_offset": 605,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "**Code**",
+      "sources": [
+        {
+          "source_id": "source-1fc2aecb899c69517aba8fed5f3282a77e4586f868ebac2510df44573c40f5fb",
+          "source_offset": 579,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1fc2aecb899c69517aba8fed5f3282a77e4586f868ebac2510df44573c40f5fb",
+          "source_offset": 579,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+      "sources": [
+        {
+          "source_id": "source-1fc2e3785da0e8e2e70951678f2059f873efea7ca9acd881bbe43f7c39713d3e",
+          "source_offset": 580,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-1fc9a2ef6624e43415c4a39b71c0ddf3d82e3350738e17023518d57c7f20eb33",
+          "source_offset": 581,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-20223ac3e06dbcd11d22afc5b4cf3eac9e4c77879a6c4e69fae0f112e598c374",
+          "source_offset": 584,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-2046021a61bb3f1930f67117f6ec8c69dc5abbf8a9e3b5a933a00ef88433f3ee",
+          "source_offset": 585,
+          "availability": "metadata_shell_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-2079448d923710ea329a45e933dd03a21c10543060705fa8510c87636c1245ea",
+          "source_offset": 587,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-20d8ea8b195a4ba800041da43f4124fa7a87472822aecfeb621854c39a0ccfe5",
+          "source_offset": 591,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-213abf623beb795bc8c68ff0b590c7007708575aab4918d11a087c5e2751683e",
+          "source_offset": 595,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-216c5bf1cb56170e81b033a41228a96dab49f5413afff5ee388324e756487cd4",
+          "source_offset": 597,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        },
+        {
+          "source_id": "source-21808914a4e7c3714ddd342691bae34924f2697cb2624ebb3a4e62381e693e7a",
+          "source_offset": 599,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-219d15f9b7b7a8f176359810f5af10053065bfdfd7c5ffc7c1013d6ab4a3a84c",
+          "source_offset": 601,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-21cb7464f9d33ffcbcf7caa76fa32d95ed54c5eefc995ecbcfbe887d339d0a35",
+          "source_offset": 606,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-216c5bf1cb56170e81b033a41228a96dab49f5413afff5ee388324e756487cd4",
+          "source_offset": 597,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Libraries",
+      "sources": [
+        {
+          "source_id": "source-1fc2e3785da0e8e2e70951678f2059f873efea7ca9acd881bbe43f7c39713d3e",
+          "source_offset": 580,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-1fc9a2ef6624e43415c4a39b71c0ddf3d82e3350738e17023518d57c7f20eb33",
+          "source_offset": 581,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-20223ac3e06dbcd11d22afc5b4cf3eac9e4c77879a6c4e69fae0f112e598c374",
+          "source_offset": 584,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-20d8ea8b195a4ba800041da43f4124fa7a87472822aecfeb621854c39a0ccfe5",
+          "source_offset": 591,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-216c5bf1cb56170e81b033a41228a96dab49f5413afff5ee388324e756487cd4",
+          "source_offset": 597,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        },
+        {
+          "source_id": "source-21cb7464f9d33ffcbcf7caa76fa32d95ed54c5eefc995ecbcfbe887d339d0a35",
+          "source_offset": 606,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-216c5bf1cb56170e81b033a41228a96dab49f5413afff5ee388324e756487cd4",
+          "source_offset": 597,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "JavaScript",
+      "sources": [
+        {
+          "source_id": "source-1fc2e3785da0e8e2e70951678f2059f873efea7ca9acd881bbe43f7c39713d3e",
+          "source_offset": 580,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-20223ac3e06dbcd11d22afc5b4cf3eac9e4c77879a6c4e69fae0f112e598c374",
+          "source_offset": 584,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-20d8ea8b195a4ba800041da43f4124fa7a87472822aecfeb621854c39a0ccfe5",
+          "source_offset": 591,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-216c5bf1cb56170e81b033a41228a96dab49f5413afff5ee388324e756487cd4",
+          "source_offset": 597,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-216c5bf1cb56170e81b033a41228a96dab49f5413afff5ee388324e756487cd4",
+          "source_offset": 597,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Kotlin",
+      "sources": [
+        {
+          "source_id": "source-1fc9a2ef6624e43415c4a39b71c0ddf3d82e3350738e17023518d57c7f20eb33",
+          "source_offset": 581,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Table of Contents",
+      "sources": [
+        {
+          "source_id": "source-1fe72fd2e696d64cafe5b597d9b9b68686269355719cae04874775f631c07543",
+          "source_offset": 582,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-213abf623beb795bc8c68ff0b590c7007708575aab4918d11a087c5e2751683e",
+          "source_offset": 595,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Engines and Frameworks",
+      "sources": [
+        {
+          "source_id": "source-1fe72fd2e696d64cafe5b597d9b9b68686269355719cae04874775f631c07543",
+          "source_offset": 582,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Frameworks",
+      "sources": [
+        {
+          "source_id": "source-1ff8b112c231430ee9e7cc569bbb5cef2b8c3d32749c961bb8991d2cfb3ee876",
+          "source_offset": 583,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Tools / Software",
+      "sources": [
+        {
+          "source_id": "source-2046021a61bb3f1930f67117f6ec8c69dc5abbf8a9e3b5a933a00ef88433f3ee",
+          "source_offset": 585,
+          "availability": "metadata_shell_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-2079448d923710ea329a45e933dd03a21c10543060705fa8510c87636c1245ea",
+          "source_offset": 587,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-21808914a4e7c3714ddd342691bae34924f2697cb2624ebb3a4e62381e693e7a",
+          "source_offset": 599,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-219d15f9b7b7a8f176359810f5af10053065bfdfd7c5ffc7c1013d6ab4a3a84c",
+          "source_offset": 601,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Audio Tools",
+      "sources": [
+        {
+          "source_id": "source-2046021a61bb3f1930f67117f6ec8c69dc5abbf8a9e3b5a933a00ef88433f3ee",
+          "source_offset": 585,
+          "availability": "metadata_shell_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+      "sources": [
+        {
+          "source_id": "source-204b09a59fde244807728846e49161599ed0f899f84a0b73b20fe6a3e98f5f3a",
+          "source_offset": 586,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-21195d92afc4e310c713aa0629db2aa52469016fb66dd19893a73cb070be94a9",
+          "source_offset": 594,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-21913fae10883c2833cb08c5a32a958ec8b2a7f8a14d92b833c182658eec0b77",
+          "source_offset": 600,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Audio",
+      "sources": [
+        {
+          "source_id": "source-204b09a59fde244807728846e49161599ed0f899f84a0b73b20fe6a3e98f5f3a",
+          "source_offset": 586,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Vector Editors",
+      "sources": [
+        {
+          "source_id": "source-2079448d923710ea329a45e933dd03a21c10543060705fa8510c87636c1245ea",
+          "source_offset": 587,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "**Unity**",
+      "sources": [
+        {
+          "source_id": "source-20b2b47bef1209555a6978438117151e40f2fa1623af2d2ac07e46331068d91e",
+          "source_offset": 588,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-210575ed1c73273e8110f1d1f30fb8fd02f2f5d50cc26b1be50be3ed41f76581",
+          "source_offset": 593,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        },
+        {
+          "source_id": "source-21a37d1f6370357665c958781b360f5209a7823a24fda08b190377ae27256461",
+          "source_offset": 602,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-210575ed1c73273e8110f1d1f30fb8fd02f2f5d50cc26b1be50be3ed41f76581",
+          "source_offset": 593,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Browser-Based",
+      "sources": [
+        {
+          "source_id": "source-20c4552a7f2208ab6953dfe634fc3edeba6d7ccebd2628e469e86dba8fe68af4",
+          "source_offset": 589,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-21d1decd00e7446a68bb3b442d62dd551494ecd30c5c94ffab75f18bed951224",
+          "source_offset": 607,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Arcade",
+      "sources": [
+        {
+          "source_id": "source-20c4552a7f2208ab6953dfe634fc3edeba6d7ccebd2628e469e86dba8fe68af4",
+          "source_offset": 589,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-21d1decd00e7446a68bb3b442d62dd551494ecd30c5c94ffab75f18bed951224",
+          "source_offset": 607,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Native",
+      "sources": [
+        {
+          "source_id": "source-20d0a8d580cac667f87e650beb72f6a8a93ffbd2457fa5e30cc66c8d541441fd",
+          "source_offset": 590,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-21b9806b8093b19b71e18e2bc577de853757b0a9ba15c91747990be2d1c0ee9d",
+          "source_offset": 604,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Strategy",
+      "sources": [
+        {
+          "source_id": "source-20d0a8d580cac667f87e650beb72f6a8a93ffbd2457fa5e30cc66c8d541441fd",
+          "source_offset": 590,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "**Unreal**",
+      "sources": [
+        {
+          "source_id": "source-20df5c292a24e1cd73e424eb69748fb02c1277a875830a3bfce5aea53fcbd92d",
+          "source_offset": 592,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-20df5c292a24e1cd73e424eb69748fb02c1277a875830a3bfce5aea53fcbd92d",
+          "source_offset": 592,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Production",
+      "sources": [
+        {
+          "source_id": "source-21195d92afc4e310c713aa0629db2aa52469016fb66dd19893a73cb070be94a9",
+          "source_offset": 594,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Open Source Games",
+      "sources": [
+        {
+          "source_id": "source-213abf623beb795bc8c68ff0b590c7007708575aab4918d11a087c5e2751683e",
+          "source_offset": 595,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "C++",
+      "sources": [
+        {
+          "source_id": "source-213abf623beb795bc8c68ff0b590c7007708575aab4918d11a087c5e2751683e",
+          "source_offset": 595,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Complete Game Sources",
+      "sources": [
+        {
+          "source_id": "source-213abf623beb795bc8c68ff0b590c7007708575aab4918d11a087c5e2751683e",
+          "source_offset": 595,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "**Commercial**",
+      "sources": [
+        {
+          "source_id": "source-21457dd378a871a36532e91e327b28c029ce44d17f48f718dd2d4cef125b129d",
+          "source_offset": 596,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-21457dd378a871a36532e91e327b28c029ce44d17f48f718dd2d4cef125b129d",
+          "source_offset": 596,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Tilemap Editors",
+      "sources": [
+        {
+          "source_id": "source-21808914a4e7c3714ddd342691bae34924f2697cb2624ebb3a4e62381e693e7a",
+          "source_offset": 599,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Other",
+      "sources": [
+        {
+          "source_id": "source-21913fae10883c2833cb08c5a32a958ec8b2a7f8a14d92b833c182658eec0b77",
+          "source_offset": 600,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Pixel Art",
+      "sources": [
+        {
+          "source_id": "source-219d15f9b7b7a8f176359810f5af10053065bfdfd7c5ffc7c1013d6ab4a3a84c",
+          "source_offset": 601,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "**Marketing**",
+      "sources": [
+        {
+          "source_id": "source-21b14bc8cb8a4f028972b1371acc3e6d8ca02f45996ca028c2717685784f6c7d",
+          "source_offset": 603,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-21b14bc8cb8a4f028972b1371acc3e6d8ca02f45996ca028c2717685784f6c7d",
+          "source_offset": 603,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "RPG",
+      "sources": [
+        {
+          "source_id": "source-21b9806b8093b19b71e18e2bc577de853757b0a9ba15c91747990be2d1c0ee9d",
+          "source_offset": 604,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Games",
+      "sources": [
+        {
+          "source_id": "source-21c6966c7db16a62aedb73c07d4bd7db0f9009fd672b43fcf12615cd31ee3ae0",
+          "source_offset": 605,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "XR",
+      "sources": [
+        {
+          "source_id": "source-21c6966c7db16a62aedb73c07d4bd7db0f9009fd672b43fcf12615cd31ee3ae0",
+          "source_offset": 605,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Pascal",
+      "sources": [
+        {
+          "source_id": "source-21cb7464f9d33ffcbcf7caa76fa32d95ed54c5eefc995ecbcfbe887d339d0a35",
+          "source_offset": 606,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    }
+  ]
+}
