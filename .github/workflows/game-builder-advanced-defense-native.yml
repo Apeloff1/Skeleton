@@ -129,13 +129,33 @@ jobs:
         run: |
           set -euo pipefail
           root="$RUNNER_TEMP/advanced-native-defense"
-          for mode in original upgrades sell_rebuild target_priority short_waves long_lane escaped base_lost; do
-            project="$root/$mode/godot"
-            echo "Native tactical combat case $mode"
-            godot --headless --path "$project" --import
-            godot --headless --path "$project" -- --verify-defense | tee "$root/$mode/native-replay.log"
-            grep -q "NATIVE_ADVANCED_DEFENSE_OK" "$root/$mode/native-replay.log"
-          done
+          python - "$root" <<'PY'
+          import pathlib, subprocess, sys
+          root=pathlib.Path(sys.argv[1])
+          cases=("original","upgrades","sell_rebuild","target_priority",
+                 "short_waves","long_lane","escaped","base_lost")
+          for case in cases:
+              project=root/case/"godot"
+              print("NATIVE_ADVANCED_DEFENSE_CASE",case,flush=True)
+              for args in (["--headless","--path",str(project),"--import"],
+                           ["--headless","--path",str(project),"--","--verify-defense"]):
+                  try:
+                      result=subprocess.run(["godot",*args],stdout=subprocess.PIPE,
+                                            stderr=subprocess.STDOUT,text=True,
+                                            encoding="utf-8",errors="replace",timeout=45)
+                  except subprocess.TimeoutExpired as exc:
+                      print("NATIVE_ADVANCED_DEFENSE_TIMEOUT",case,args,flush=True)
+                      if exc.stdout:
+                          print(exc.stdout.decode("utf-8","replace") if isinstance(exc.stdout,bytes) else exc.stdout)
+                      raise
+                  print(result.stdout,flush=True)
+                  if "--verify-defense" in args:
+                      (root/case/"native-replay.log").write_text(result.stdout,encoding="utf-8")
+                      if "NATIVE_ADVANCED_DEFENSE_OK" not in result.stdout:
+                          raise SystemExit("native gameplay proof marker absent: "+case)
+                  if result.returncode:
+                      raise SystemExit(f"Godot returned {result.returncode} on {case} {args}")
+          PY
       - name: Export Linux desktop defense executable and execute the actual binary
         if: runner.os == 'Linux'
         shell: bash
