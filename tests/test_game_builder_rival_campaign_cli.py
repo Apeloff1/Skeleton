@@ -19,6 +19,7 @@ from skeleton.ai.game_builder.rival_delivery_campaign import (
     reconcile_competitive_campaign,
 )
 from skeleton.ai.game_builder.rival_watch_cli import main
+from skeleton.ai.game_builder.rival_trajectory import trace_competitive_trajectory
 from tests.test_game_builder_rival_convergence import (
     original_plan,competitor,notice,H,T2,q,
 )
@@ -132,6 +133,58 @@ class CampaignTests(unittest.TestCase):
         low=plan_competitive_campaign(self.plan,watch,authorized=True)
         self.assertEqual(low.tasks,())
         self.assertEqual(low.open_orders,())
+
+
+class AdaptiveRivalTrajectoryTests(unittest.TestCase):
+    def test_new_enemy_ratcheting_and_stable_history_do_not_forge_quality_claims(self):
+        plan=original_plan()
+        rival=competitor()
+        one=(notice("a",("causal-npc-memory",)),)
+        full=(
+            notice("a",("causal-npc-memory",)),
+            notice("b",("witness-quest-branching",)),
+            notice("c",("era-adaptive-npcs",)),
+        )
+        watch=evaluate_convergence(plan,rival,one,authorized=True)
+        enemy=evaluate_convergence(
+            plan,rival,full,previous=watch,authorized=True)
+        trend=trace_competitive_trajectory(
+            plan,(watch,enemy),authorized=True)
+        self.assertEqual(trend.trend,"new_enemy")
+        self.assertTrue(trend.newly_confirmed_enemy)
+        self.assertIn("witness-quest-branching",trend.novelty_features)
+        self.assertIn("era-adaptive-npcs",trend.novelty_features)
+        self.assertEqual(trend.consecutive_enemy_cycles,1)
+        self.assertTrue(any(x["stage"]=="builder_original_implementation"
+                            for x in trend.priority_actions))
+        self.assertFalse(trend.payload()["actual_quality_advancement_not_yet_proven"] is False)
+        again=evaluate_convergence(
+            plan,rival,full,previous=enemy,authorized=True)
+        stable=trace_competitive_trajectory(
+            plan,(watch,enemy,again),authorized=True)
+        self.assertEqual(stable.trend,"stable_convergence")
+        self.assertEqual(stable.consecutive_enemy_cycles,2)
+        self.assertEqual(stable.novelty_features,())
+        self.assertEqual(stable.digest,trace_competitive_trajectory(
+            plan,(watch,enemy,again),authorized=True).digest)
+
+    def test_replay_broken_chains_and_wrong_title_cannot_increase_pressure(self):
+        plan=original_plan()
+        rival=competitor()
+        source=(notice("a",("causal-npc-memory",)),)
+        watch=evaluate_convergence(plan,rival,source,authorized=True)
+        latest=evaluate_convergence(plan,rival,source,previous=watch,
+                                    authorized=True)
+        with self.assertRaisesRegex(CompetitiveError,"hash chain"):
+            trace_competitive_trajectory(plan,(latest,watch),authorized=True)
+        with self.assertRaisesRegex(CompetitiveError,"replay"):
+            trace_competitive_trajectory(
+                plan,(watch,latest,latest),authorized=True)
+        revised=replace(plan,plan_revision=H("changed underlying original game"))
+        with self.assertRaisesRegex(CompetitiveError,"unrelated"):
+            trace_competitive_trajectory(revised,(watch,latest),authorized=True)
+        with self.assertRaises(PermissionError):
+            trace_competitive_trajectory(plan,(watch,latest),authorized=False)
 
 
 class OperatorCLITests(unittest.TestCase):
