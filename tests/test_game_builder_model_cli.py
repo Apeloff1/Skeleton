@@ -54,16 +54,17 @@ class RealModelOperatorCLITests(unittest.TestCase):
         # exploit the attack_family metadata. Default production rigor must
         # reject it; only an explicit advisory-only lab setting permits
         # testing the lifecycle and emergency rollback behavior.
-        strict=self.cmd("evaluate","--trusted-local-operator")
-        self.assertFalse(strict["evaluation"]["passed"])
+        baseline=self.cmd("evaluate","--trusted-local-operator",
+                          "--feature-version","baseline_v1")
+        self.assertFalse(baseline["evaluation"]["passed"])
         self.assertIn("validation:reviewer_shortcut_detection",
-                      strict["evaluation"]["blockers"])
-        tested=self.cmd("evaluate","--trusted-local-operator",
-                        "--minimum-counterfactual-accuracy","0")
+                      baseline["evaluation"]["blockers"])
+        tested=self.cmd("evaluate","--trusted-local-operator")
+        self.assertEqual(
+            tested["evaluation"]["metrics"]["metamorphic_test"]["failed"],0)
         self.assertTrue(tested["evaluation"]["passed"])
         self.assertFalse(tested["core_ai_model_changed"])
-        staged=self.cmd("stage","--trusted-local-operator",
-                        "--minimum-counterfactual-accuracy","0")
+        staged=self.cmd("stage","--trusted-local-operator")
         self.assertEqual(staged["status"],"staged")
         self.assertEqual(self.cmd("status")["phase"],"staged")
         state=self.registry.read_state()
