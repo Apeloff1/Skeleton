@@ -132,7 +132,9 @@ def make_intelligence(world: TerrainState, society: PhysicalSociety) -> CitizenI
             1 + raw[1] % 10, 1 + raw[2] % 10,
             1 + raw[3] % 10, 1 + raw[4] % 10,
         ))
-    result = CitizenIntelligence(world.design_id, tuple(minds))
+    # An older save can have an existing physically advanced town clock.
+    # Seed new minds at that actual day, never invent past observations.
+    result = CitizenIntelligence(world.design_id, tuple(minds), day=society.tick)
     validate_intelligence(result, society, world)
     return result
 
