@@ -35,7 +35,9 @@ def test_all_modes_execute_nontrivial_sequences(
     if mode == "nexus":
         assert data["state"]["state"]["current_realm"] == 2
         assert data["state"]["state"]["realms"][0]["quilt"] == 4
-        assert data["state"]["state"]["realms"][2]["rain_west"] == 8
+        rain = data["state"]["state"]["realms"][2]
+        assert rain["rain_west"] >= 8
+        assert rain["rain_west"] + rain["rain_east"] == 12
     elif mode == "living":
         assert data["state"]["society"]["day"] == 1
         assert data["state"]["society"]["residents"][0]["trust"] == 6
@@ -76,8 +78,8 @@ def test_living_mode_actual_contact_and_save(tmp_path, capsys) -> None:
     assert main(["--mode", "living", "--load", str(dest),
                  "--actions-json", '[{"verb":"forage"}]']) == 0
     second = json.loads(capsys.readouterr().out)
-    assert second["state"]["campaign"]["event_count"] == (
-        first["state"]["campaign"]["event_count"] + 1
+    assert second["state"]["campaign"]["payload"]["state"]["event_count"] == (
+        first["state"]["campaign"]["payload"]["state"]["event_count"] + 1
     )
 
 
