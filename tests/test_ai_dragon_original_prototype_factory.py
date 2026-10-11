@@ -39,7 +39,8 @@ def test_every_requested_original_game_has_concrete_separable_actions_world_and_
     assert original.living_world_actual_route_actions
     assert original.living_world_route_digest
     assert original.originality_scope.startswith("distinct original")
-    assert original.ready_for_individual_experiments
+    assert original.ready_for_individual_experiments==original.core_loop_viable
+    assert original.core_loop_viable==(not original.underbuilt_reasons)
     assert not original.native_binary_built
     assert not original.independently_published
     assert original.release_blockers
