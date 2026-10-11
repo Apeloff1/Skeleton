@@ -4,6 +4,9 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/ai/game_builder/advanced_deck_godot.py"
+      - "skeleton/ai/game_builder/advanced_godot_export.py"
+      - "docs/GAME_BUILDER_SYSTEM_EDITOR_FABRIC.md"
+      - ".github/workflows/game-builder-advanced-system-engines.yml"
       - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
       - "skeleton/ai/game_builder/advanced_level_scenes.py"
       - "skeleton/ai/game_builder/advanced_genre_engines.py"
@@ -62,7 +65,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
           godot --version
-          python -m py_compile skeleton/ai/game_builder/advanced_godot_export.py
+          python -m py_compile skeleton/ai/game_builder/advanced_godot_export.py skeleton/ai/game_builder/advanced_deck_godot.py
           python -m unittest tests.test_game_builder_advanced_deck_godot -v
       - name: Build thirteen original native card economies, victory and enemy-intent scenarios
         shell: bash
