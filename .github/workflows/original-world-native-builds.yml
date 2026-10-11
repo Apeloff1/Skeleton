@@ -30,6 +30,7 @@ jobs:
             executable: OriginalWorldStudio.exe
           - platform: linux-x64
             runner: ubuntu-24.04
+            python: "3.11.16"
             executable: OriginalWorldStudio
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
