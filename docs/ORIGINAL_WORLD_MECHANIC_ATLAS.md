@@ -360,7 +360,7 @@ python -m pytest -q \
   physically accurate simulation. Benchmark each supported adapter,
   motion system, animation budget, accessibility setting and model.
 - Authorship: 1,296 distinct written premises and 712 separately described
-  mechanic implementations are useful source material, not
+  mechanic specifications are useful source material, not
   externally peer-reviewed originality proofs or independent games.
 - Shipping: no evidence here demonstrates that all game styles or original
   worlds have been transformed into finished playable software. Preserve
