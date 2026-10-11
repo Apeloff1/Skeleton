@@ -23,6 +23,11 @@ from skeleton.ai.game_builder.competitive_tri_council import (
     add_verified_round,record_user_plan_decision,
 )
 from skeleton.ai.game_builder.competitive_pdf_pack import publish_three_ai_pdfs
+from skeleton.ai.game_builder.competitive_research_missions import prepare_three_round_crawler_mission
+from skeleton.ai.game_builder.competitive_battle_approval import (
+    inspect_all_three_pdfs,submit_user_packet_decision,
+    require_authenticated_packet_decision,
+)
 from skeleton.ai.game_builder.competitive_title_radar import ThreatRadarError
 from skeleton.ai.game_builder.competitive_deep_service import examine_enemy_genre_portfolio
 from skeleton.ai.game_builder.competitive_watch_service import review_competitive_frontier
@@ -260,6 +265,76 @@ class CompetitiveUserCouncilCases(DeepEnemyCases):
                 self.research_store,research_steps[-1][1],research_steps[-1][2],
                 self.research_rights,epoch=1,round_number=3,
                 as_of="2026-10-14T12:00:00Z",authorized=True)
+
+    def test_native_dragon_crawler_missions_widen_without_fake_network_work(self):
+        state=begin_battle_plan(self.critique,authorized=True)
+        first=prepare_three_round_crawler_mission(
+            state,self.critique,authorized=True,consent=True)
+        self.assertEqual(first.target_round,1)
+        self.assertEqual(first.planned_queries,24)
+        self.assertEqual(len(first.topics),6)
+        self.assertFalse(first.network_work_performed)
+        research=self.research()
+        for index,expected in enumerate((48,80)):
+            admitted=deliberate_verified_round(
+                self.critique,research[index][0],
+                self.signed_reviews(research[index][0]),
+                self.reviewers,authorized=True)
+            state=add_verified_round(state,admitted,authorized=True)
+            mission=prepare_three_round_crawler_mission(
+                state,self.critique,authorized=True,consent=True)
+            self.assertEqual(mission.planned_queries,expected)
+            self.assertEqual(mission.target_round,index+2)
+            self.assertEqual(len({item.sources[0].value for item in
+                                  mission.genuine_dragon_mission.queries}),4)
+        with self.assertRaises(PermissionError):
+            prepare_three_round_crawler_mission(
+                state,self.critique,authorized=True,consent=False)
+
+    def test_real_user_must_approve_three_byte_exact_role_pdfs_together(self):
+        state,_=self.complete_battle()
+        with TemporaryDirectory() as d:
+            root=Path(d)/"studio";GameWorkspace.create(root,authorized=True)
+            packet,awaiting=publish_three_ai_pdfs(root,state,self.critique,
+                                                  authorized=True)
+            manifest=inspect_all_three_pdfs(root,packet.digest,authorized=True)
+            self.assertEqual(set(manifest["role_pages"]),set(ROLES))
+            with self.assertRaises(ThreatRadarError):
+                submit_user_packet_decision(
+                    root,packet.digest,decision="approve",feedback="",
+                    authenticated_session_key=b"u"*32,
+                    authenticated_session_context_digest="a"*64,
+                    reviewed_roles=("dragon",),
+                    as_of="2026-10-14T12:00:00Z",authorized=True)
+            signed=submit_user_packet_decision(
+                root,packet.digest,decision="approve",feedback="",
+                authenticated_session_key=b"u"*32,
+                authenticated_session_context_digest="a"*64,
+                reviewed_roles=tuple(sorted(ROLES)),
+                as_of="2026-10-14T12:00:00Z",authorized=True)
+            with self.assertRaises(ThreatRadarError):
+                require_authenticated_packet_decision(
+                    awaiting,signed,authenticated_session_key=b"x"*32,
+                    authenticated_session_context_digest="a"*64,
+                    authorized=True)
+            approved=require_authenticated_packet_decision(
+                awaiting,signed,authenticated_session_key=b"u"*32,
+                authenticated_session_context_digest="a"*64,
+                authorized=True)
+            self.assertEqual(approved.user_decision,"user_approved")
+            with self.assertRaises(ThreatRadarError):
+                submit_user_packet_decision(
+                    root,packet.digest,decision="revise",
+                    feedback="Please cover further original-game audio and NPC state.",
+                    authenticated_session_key=b"u"*32,
+                    authenticated_session_context_digest="a"*64,
+                    reviewed_roles=tuple(sorted(ROLES)),
+                    as_of="2026-10-15T12:00:00Z",authorized=True)
+            filename=Path(packet.folder)/"dragon.pdf"
+            filename.write_bytes(filename.read_bytes()+b"% injected")
+            with self.assertRaisesRegex(ThreatRadarError,"digest"):
+                inspect_all_three_pdfs(root,packet.digest,authorized=True)
+
 
 
 if __name__=="__main__":
