@@ -75,6 +75,11 @@ def test_original_governance_is_not_completed_by_reading_blueprint() -> None:
     assert first["missions"][0]["current"] == 0
     assert first["verified_local_milestones"] == 0
     s = action(s, "causal", "intervene")
+    first_real_action = mission_report(s)
+    assert first_real_action["missions"][0]["current"] == 0
+    # Governance needs two separate, physically paid legal interventions
+    # before one full mandate unit is actually established.
+    s = action(s, "causal", "intervene")
     second = mission_report(s)
     assert second["missions"][0]["verified"]
     assert second["missions"][2]["verified"] is False
