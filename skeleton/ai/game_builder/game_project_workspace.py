@@ -448,7 +448,7 @@ class GameWorkspace:
                 if row.path=="project.json":
                     item=_json(body)
                     item["project"]=target_project
-                    body=canonical_json(item)+"\\n"
+                    body=canonical_json(item)+"\n"
                 _newfile(target/row.path,body)
             self.select_project(target_project,authorized=True)
         except BaseException:
