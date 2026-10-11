@@ -314,6 +314,13 @@ _KNOWLEDGE_EXPORTS = {
     "StudioError": ".original_game_studio",
     "run_original_game_studio": ".original_game_studio",
     "export_studio_run": ".original_game_studio",
+    "SignedReleaseEvidence": ".consumer_release_assurance",
+    "TrustedReviewer": ".consumer_release_assurance",
+    "ConsumerAssurance": ".consumer_release_assurance",
+    "ReleaseEvidenceError": ".consumer_release_assurance",
+    "EvidenceKind": ".consumer_release_assurance",
+    "ReviewerRole": ".consumer_release_assurance",
+    "assess_consumer_release": ".consumer_release_assurance",
 }
 
 
