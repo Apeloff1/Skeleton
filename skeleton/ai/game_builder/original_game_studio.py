@@ -435,6 +435,18 @@ def run_original_game_studio(
         StudioStage("consumer_source_candidate", project.proof.digest,
                     str(package.manifest["manifest_digest"]), plan.digest, mirror.digest),
     )
+    if living_package is not None and living_mirror is not None:
+        stages = (
+            *stages[:-1],
+            StudioStage(
+                "living_world",
+                canonical_digest(story_intent.payload()),
+                living_package.manifest["world_digest"],
+                plan.digest,
+                living_mirror.digest,
+            ),
+            stages[-1],
+        )
     # Never accept an operator-supplied boolean as a substitute for independent
     # legal, platform, human, performance, store, safety or signing evidence.
     consumer = ConsumerReview(
