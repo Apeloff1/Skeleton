@@ -673,12 +673,14 @@ def ambient_impressions(
     validate_terrain(terrain)
     if type(radius) is not int or not 2 <= radius <= 24:
         raise FoundationError("invalid hardware-safe ambient viewport")
-    # Default must respect the *selected* consumer CPU/graphics budget;
-    # otherwise economy mode still creates vivid-tier crowd impressions.
-    amount = (tuning(state.era, state.fidelity)[1]
-              if max_visible is None else max_visible)
-    if type(amount) is not int or not 0 <= amount <= MAX_IMPRESSIONS:
+    # Every entry point, including explicit caller requests, must honor the
+    # selected consumer-device render cap; visual requests cannot override it.
+    hardware_cap = min(MAX_IMPRESSIONS, tuning(state.era, state.fidelity)[1])
+    if (max_visible is not None and
+            (type(max_visible) is not int
+             or not 0 <= max_visible <= MAX_IMPRESSIONS)):
         raise FoundationError("rendered population budget out of bounds")
+    amount = hardware_cap if max_visible is None else min(max_visible, hardware_cap)
     if not state.districts or amount == 0:
         return ()
     ox, oy = terrain.position
