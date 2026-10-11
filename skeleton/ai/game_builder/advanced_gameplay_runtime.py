@@ -1,4 +1,4 @@
-"""Advanced-floor playable reference sessions for three original game families.
+"""Advanced-floor replayable sessions for eight original game families.
 
 Runs entirely offline, integer-only, content-addressed and stateless. Gameplay
 is reconstructed from a bounded command transcript, so client-controlled state
@@ -12,9 +12,13 @@ import json
 from typing import Mapping, Sequence
 
 from .system_editors import make_editor_document, SystemEditorError
+from .advanced_genre_engines import (
+    GENRE_ACTIONS, STARTS as GENRE_STARTS, STEPS as GENRE_STEPS,
+    GenreActionError, apply_genre_scene,
+)
 
 SCHEMA = "skeleton.game_builder.advanced_session.v1"
-ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival")
+ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle")
 MAX_TURNS = 128
 MAX_SEED = 2**31 - 1
 
@@ -31,6 +35,7 @@ ACTION_HELP = {
     "survival": ("forage", "gather_wood", "mine_stone", "drink", "hunt",
                  "cook", "craft_tool", "light_fire", "build_shelter",
                  "trade", "travel", "rest"),
+    **GENRE_ACTIONS,
 }
 
 
@@ -631,6 +636,7 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
         "tower_defense":_defense_start,
         "racing":_racing_start,
         "survival":_survival_start,
+        **GENRE_STARTS,
     }
     state=starts[editor](rules,seed)
     if scene is not None:
@@ -661,6 +667,8 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             state["regions"]=[dict(r) for r in layout["regions"]]
             state["region"]=layout["starting_region"]
             state["weather"]=layout["weather"]
+        else:
+            apply_genre_scene(editor,state,layout)
     baseline=_digest({"editor":editor,"configuration":config["digest"],"seed":seed,
                       "scene_digest":scene["digest"] if scene is not None else None,
                       "quality_floor":"advanced"})
@@ -675,8 +683,12 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             "platformer":_platform_step,"tactics":_tactics_step,
             "tower_defense":_defense_step,"racing":_racing_step,
             "survival":_survival_step,
+            **GENRE_STEPS,
         }
-        events=steps[editor](state,rules,action)
+        try:
+            events=steps[editor](state,rules,action)
+        except GenreActionError as exc:
+            raise AdvancedRuntimeError(str(exc)) from exc
         state["events"]=events
         receipt={"index":index,"action":action,"events":events,
                  "state_digest":_digest(state),"previous":previous}
