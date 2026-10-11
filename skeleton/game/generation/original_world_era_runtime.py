@@ -96,6 +96,7 @@ class StyledState:
     devotion: int = 0
     heritage: int = 0
     visions: int = 0
+    last_vision: str = ""
     loops: int = 0
     events: int = 0
     event_head: str = "0" * 64
@@ -123,6 +124,8 @@ def validate_styled(state: StyledState) -> None:
         val = getattr(state, name)
         if type(val) is not int or not 0 <= val <= 10000:
             raise CampaignError("invalid styled world resource: " + name)
+    if state.last_vision not in {"", "drought-risk", "migration-west", "migration-east"}:
+        raise CampaignError("invalid oracle evidence")
     if (not isinstance(state.event_head, str) or len(state.event_head) != 64
             or any(c not in "0123456789abcdef" for c in state.event_head)):
         raise CampaignError("invalid styled event digest")
@@ -216,9 +219,16 @@ def _styled_effect(state: StyledState, action: StyledAction
         elif verb == "survey_drone":
             if state.grid_power < n or state.robots < n:
                 raise CampaignError("drone requires robots and stored power")
+            undiscovered = [i for i in range(len(world.sectors))
+                            if i not in world.explored]
+            if not undiscovered:
+                raise CampaignError("all reachable sectors already surveyed")
+            target = undiscovered[0]
+            world = replace(world, explored=world.explored + (target,),
+                            knowledge=min(100, world.knowledge + 1))
             state = replace(state, grid_power=state.grid_power - n,
                             probes=state.probes + n)
-            effects.append("Launched persistent exploration drones")
+            effects.append(f"Drone surveyed previously unseen sector {target}")
         elif verb == "adaptive_habitat":
             if state.metal < n or state.machinery < n:
                 raise CampaignError("advanced shelter requires metal and machinery")
@@ -270,8 +280,13 @@ def _styled_effect(state: StyledState, action: StyledAction
             effects.append("Created a costly revocable civic covenant")
         elif verb == "oracle":
             world = _spend(world, knowledge=n)
-            state = replace(state, visions=state.visions + n)
-            effects.append("Received fallible speculative future information")
+            forecast_index = int.from_bytes(sha256(
+                (world.seed + ":" + str(world.tick) + ":oracle").encode("utf-8")
+            ).digest()[:4], "big") % 3
+            omen = ("drought-risk", "migration-west", "migration-east")[forecast_index]
+            state = replace(state, visions=state.visions + n,
+                            last_vision=omen)
+            effects.append(f"Received uncertain, nonbinding omen: {omen}")
     else:
         raise CampaignError("unimplemented era or theology action")
     return replace(state, world=world), tuple(effects)
@@ -333,7 +348,7 @@ def styled_save(state: StyledState) -> str:
         "styling": state.styling.as_dict(),
         "extras": {key: getattr(state, key) for key in (
             "metal", "machinery", "grid_power", "robots", "probes",
-            "devotion", "heritage", "visions", "loops", "events", "event_head",
+            "devotion", "heritage", "visions", "last_vision", "loops", "events", "event_head",
         )},
     }
     return json.dumps({"payload": payload, "checksum": _digest(payload)},
