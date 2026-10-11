@@ -485,6 +485,7 @@ def render_dual_runtime_package(
         "schema": "skeleton.game_builder.dual_runtime_package.v1",
         "project_id": world.intent.project_id,
         "world_digest": world.digest,
+        "world_algorithm": world.algorithm,
         "proof_digest": project.proof.digest,
         "proof_status": "python-simulated-winning-actions",
         "targets": {
