@@ -5,6 +5,12 @@ on:
     paths:
       - 'skeleton/ai/webcrawler/dragon_native_*.py'
       - 'skeleton/ai/webcrawler/dragon_living_world*.py'
+      - 'skeleton/ai/webcrawler/dragon_original_mechanic_forge.py'
+      - 'skeleton/ai/webcrawler/dragon_original_campaign_forge.py'
+      - 'tests/test_ai_dragon_original_mechanic_forge.py'
+      - 'tests/test_ai_dragon_original_campaign_forge.py'
+      - 'backend/tests/test_dragon_original_mechanics_routes.py'
+      - 'frontend/app/dragon-originals-forge.tsx'
       - 'skeleton/ai/webcrawler/dragon_world_genome.py'
       - 'skeleton/ai/webcrawler/dragon_world_codex.py'
       - 'skeleton/ai/webcrawler/dragon_world_codex_runtime.py'
@@ -675,6 +681,92 @@ jobs:
           path: /tmp/dragon-genomic-world-proof/*.json
           if-no-files-found: error
           retention-days: 7
+
+  original-gameplay-millions-and-quintillions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile real executable game mechanic and campaign sources
+        run: |
+          set -euo pipefail
+          python -m compileall -q \
+            skeleton/ai/webcrawler/dragon_original_mechanic_forge.py \
+            skeleton/ai/webcrawler/dragon_original_campaign_forge.py
+      - name: Install deterministic original mechanics game test harness
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Verify every one of 32 mechanic axes at all real enabled levels
+        run: |
+          set -euo pipefail
+          python -m pytest -q \
+            tests/test_ai_dragon_original_mechanic_forge.py \
+            tests/test_ai_dragon_original_campaign_forge.py
+      - name: Generate signed gameplay evidence for 16.7m nuclei and quintillion rulebook capacity
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/dragon-original-mechanic-evidence
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          from dataclasses import asdict
+          from skeleton.ai.webcrawler.dragon_original_mechanic_forge import (
+              PROGRAM_COUNT,MILLION_DISTINCT_ENABLE_PROFILES,
+              make_program,binary_nucleus,capabilities,distinguish,
+              prove_mechanic,initial,choices,perform,
+          )
+          from skeleton.ai.webcrawler.dragon_original_campaign_forge import (
+              sample_experiences,compose_journey,verify_journey,
+          )
+          assert PROGRAM_COUNT==2**64
+          assert MILLION_DISTINCT_ENABLE_PROFILES==2**24
+          directory=Path('/tmp/dragon-original-mechanic-evidence')
+          cases={
+              'zero_program':make_program('0'),
+              'single_rule':make_program('1'),
+              'millionth_nucleus':binary_nucleus(1_000_000),
+              'largest_nucleus':binary_nucleus(2**24-1),
+              'highest_quintillion_program':make_program(str(2**64-1)),
+          }
+          sampled=[]
+          for name,program in cases.items():
+              portfolio=sample_experiences(
+                  program,seed=1977,limit=16,steps=24)
+              assert portfolio['sampled']==16
+              assert portfolio['programs_materialized_as_finished_games']==0
+              filename=directory/(name+'.json')
+              filename.write_text(
+                  json.dumps({
+                      'kind':'actual_original_replayed_mechanic_program',
+                      'program':asdict(program),
+                      'replay_portfolio':portfolio,
+                  },sort_keys=True,indent=2)+'\n',encoding='utf-8')
+              sampled.append(name)
+          for axis in range(32):
+              from skeleton.ai.webcrawler.dragon_original_mechanic_forge import (
+                  program_from_levels,
+              )
+              old=[0]*32
+              old[axis]=1
+              first=program_from_levels(tuple(old))
+              old[axis]=3
+              advanced=program_from_levels(tuple(old))
+              assert distinguish(first,advanced)['distinguishable']
+          assert len(sampled)==5
+          print('ORIGINAL_MECHANIC_PROOFS_READY',len(sampled),
+                'NATIVE_READY_FALSE',capabilities()['finished_unique_cleared_games'])
+          PY
+      - name: Publish replayed original gameplay receipts, not fictitious finished binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-original-gameplay-program-proofs
+          path: /tmp/dragon-original-mechanic-evidence/*.json
+          retention-days: 7
+          if-no-files-found: error
 
   living-world-lifecycle-and-endings:
     runs-on: ubuntu-24.04
