@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Sequence, Mapping
 
 from .contracts import canonical_digest
-from .tiled_map_import import import_tiled_levels
+from .tiled_map_import import TiledConversion, import_tiled_levels
 from .companion_curriculum import (
     PracticeInsight, measure_original_practice, validate_practice_cohort,
 )
@@ -87,6 +87,7 @@ class ExecutionOutcome:
     practice_packages: tuple[DualRuntimePackage, ...]
     practice_insights: tuple[PracticeInsight, ...]
     practice_mirror_reports: tuple[MirrorReport, ...]
+    tiled_conversion: TiledConversion | None
     exported_path: Path | None
 
     @property
@@ -110,6 +111,9 @@ class ExecutionOutcome:
             ],
             "practice_insight_digests": [item.digest for item in self.practice_insights],
             "practice_mirror_digests": [item.digest for item in self.practice_mirror_reports],
+            "tiled_import_digest": (
+                self.tiled_conversion.digest if self.tiled_conversion else None
+            ),
             "exported": self.exported_path is not None,
             "external_code_executed": False,
             "trained_model": False,
@@ -222,6 +226,7 @@ def execute_local_tool_plan(
     practice_insights: list[PracticeInsight] = []
     practice_mirrors: list[MirrorReport] = []
     exported: Path | None = None
+    tiled_conversion: TiledConversion | None = None
     receipts: list[ExecutedToolReceipt] = []
     consumed = set()
     for index, row in enumerate(plan.requests):
@@ -256,6 +261,7 @@ def execute_local_tool_plan(
                 intent, tiled_sources, human_reviewed=True,
                 authorized=True, gid_palette=tiled_gid_palette,
             )
+            tiled_conversion = conversion
             project = compile_authored_game(
                 intent, [list(rows) for rows in conversion.levels],
                 human_reviewed=True, authorized=True,
@@ -359,7 +365,7 @@ def execute_local_tool_plan(
     return ExecutionOutcome(
         anchored, plan.digest, tuple(receipts), world, project,
         package, mirror, tuple(practice), tuple(practice_insights),
-        tuple(practice_mirrors), exported,
+        tuple(practice_mirrors), tiled_conversion, exported,
     )
 
 
