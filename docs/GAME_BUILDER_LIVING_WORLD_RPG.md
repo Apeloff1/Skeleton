@@ -35,6 +35,11 @@ playable puzzle title and independently playable companion practice games.
   independence, accessible after a configurable 1–24 real quest
   completions, no more than the number of authored arcs. These choices
   are recorded in irreversible replay history rather than randomized.
+  They are **not interchangeable labels**: stewardship requires a completed
+  gardeners quest, discovery requires wayfinders support, and independence
+  requires makers support. Those requirements are checked identically by
+  the Python, browser and native Godot action engines; choosing an
+  unsupported outcome is an invalid player action.
 - **World styles:** campaign (completes at an ending), postgame (keeps
   playing in an epilogue), and sandbox (remains open regardless of
   narrative progress). Postgame and sandbox are *actually* tested by
