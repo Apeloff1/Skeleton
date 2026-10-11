@@ -169,6 +169,10 @@ def run_original_game_studio(
     authorized: bool,
     human_reviewed_tiles: tuple[object, ...] | list[object] | None = None,
     human_authored_approved: bool = False,
+    reviewed_library: object | None = None,
+    research_brief: object | None = None,
+    rights_ledger: object | None = None,
+    human_research_approved: bool = False,
     mirror_attempts: int = 128,
     companion_practice_games: int = 2,
     fabric: ToolFabric | None = None,
@@ -184,13 +188,25 @@ def run_original_game_studio(
         raise StudioError("typed original game intent required")
     if human_reviewed_tiles is None and human_authored_approved:
         raise StudioError("authored approval cannot be applied to generated levels")
+    research_enabled = any(
+        value is not None for value in (reviewed_library, research_brief, rights_ledger)
+    ) or human_research_approved
+    if research_enabled:
+        if (reviewed_library is None or research_brief is None or rights_ledger is None
+                or type(human_research_approved) is not bool
+                or not human_research_approved):
+            raise StudioError("research requires reviewed library, brief, rights and human approval")
+        if human_reviewed_tiles is not None:
+            raise StudioError("authored editor games need independent rights handoff")
     if human_reviewed_tiles is not None and not human_authored_approved:
         raise StudioError("manually authored geometry requires human review")
     if fabric is None:
         fabric = ToolFabric()
     if not isinstance(fabric, ToolFabric):
         raise StudioError("typed game-tool fabric required")
-    source = "original-authored" if human_reviewed_tiles is not None else "original-generated"
+    source = ("original-authored" if human_reviewed_tiles is not None
+              else "original-research-referenced" if research_enabled
+              else "original-generated")
     work = [
         (Actor.JEEVES, Phase.ORIGINAL, "world.authored" if human_reviewed_tiles is not None else "world.generate"),
         (Actor.DRAGON, Phase.STEPPING_STONE, "game.simulate"),
@@ -201,6 +217,11 @@ def run_original_game_studio(
         (Actor.JEEVES, Phase.CONSUMER, "release.assess"),
         (Actor.JEEVES, Phase.CONSUMER, "package.source"),
     ]
+    if research_enabled:
+        work[:0] = [
+            (Actor.JEEVES, Phase.RESEARCH, "knowledge.search"),
+            (Actor.JEEVES, Phase.RESEARCH, "rights.check"),
+        ]
     requests = tuple(ToolRequest(actor, phase, tool,
                                  canonical_digest(intent.to_payload()),
                                  "Build and inspect independently reproducible original game")
@@ -213,6 +234,14 @@ def run_original_game_studio(
     if human_reviewed_tiles is not None:
         project = compile_authored_game(intent, human_reviewed_tiles,
                                         human_reviewed=True, authorized=True)
+    elif research_enabled:
+        from .playable_compiler import compile_game_from_reviewed_research
+        # The compiler independently verifies source revisions, RightsLedger
+        # decisions and project-bound reference-only authorization.
+        project = compile_game_from_reviewed_research(
+            reviewed_library, research_brief, rights_ledger, intent,
+            human_approved=True, authorized=True,
+        )
     else:
         project = compile_original_game(intent, authorized=True)
     package = render_dual_runtime_package(project, authorized=True)
@@ -241,7 +270,19 @@ def run_original_game_studio(
             package_manifest_digest=str(practice_package.manifest["manifest_digest"]),
             package_path=prefix,
         ))
-    stages = (
+    earlier_stages: tuple[StudioStage, ...] = ()
+    if project.cleared_research is not None:
+        cleared = project.cleared_research.to_payload()
+        earlier_stages = (
+            StudioStage(
+                "reviewed_research",
+                str(cleared["research_brief_digest"]),
+                str(cleared["packet_digest"]),
+                plan.digest,
+                str(cleared["rights_ledger_digest"]),
+            ),
+        )
+    stages = earlier_stages + (
         StudioStage("original", canonical_digest(intent.to_payload()),
                     project.world.digest, plan.digest,
                     canonical_digest({"algorithm": project.world.algorithm, "source": source})),
@@ -254,7 +295,7 @@ def run_original_game_studio(
     # Never accept an operator-supplied boolean as a substitute for independent
     # legal, platform, human, performance, store, safety or signing evidence.
     consumer = ConsumerReview(
-        original_source=project.cleared_research is None,
+        original_source=True,  # world geometry and runnable code stay original
         canonical_proof=project.proof.final_state.status == "won",
         mirror_passed=mirror.passed,
         rights_reviewed=False,
@@ -273,7 +314,11 @@ def run_original_game_studio(
             "source": source,
             "project_id": intent.project_id,
             "stages": [stage.to_payload() for stage in stages],
-            "rights_reference_only": False,
+            "rights_reference_only": project.cleared_research is not None,
+            "research_packet_digest": (
+                project.cleared_research.to_payload()["packet_digest"]
+                if project.cleared_research is not None else None
+            ),
             "original_game_claim": "generated-or-user-authored-geometry",
             "not_automatically_published": True,
         },
