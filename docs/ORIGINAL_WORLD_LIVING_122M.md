@@ -1,7 +1,7 @@
 # Original Living Worlds — 10,240,000 foundations / 122,880,000 configurations
 
-**Design version:** `original-world-living-10x.v1`  
-**Implementation:** `skeleton/game/generation/original_world_living_10x_*.py`  
+**Design version:** `original-world-living-10x.v1`
+**Implementation:** `skeleton/game/generation/original_world_living_10x_*.py`
 **Status:** Bounded offline Python reference simulations, not independently
 written game scripts, 3-D engines, production NPC models or console binaries.
 
