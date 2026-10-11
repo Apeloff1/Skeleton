@@ -238,7 +238,7 @@ class BoundedPuzzleProofTests(unittest.TestCase):
         config={"logic":"switches","board_width":4,"board_height":4,
                 "solution_required":False}
         scene=make_advanced_scene("puzzle",config)
-        layout=scene["layout"]
+        layout=deepcopy(scene["layout"])
         layout["walls"]=[[2,y] for y in range(4)]
         impossible=make_advanced_scene("puzzle",config,layout=layout)
         result=solve_advanced_puzzle(impossible,config,max_states=1000)
