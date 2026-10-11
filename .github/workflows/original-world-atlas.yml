@@ -51,10 +51,16 @@ jobs:
       - name: Compile atlas and simulation modules
         run: python -m compileall -q skeleton/game/generation
       - name: Verify originals, styles and rule simulations
-        run: python -m pytest -q --noconftest tests/test_original_world_mechanic_atlas.py tests/test_original_world_simulator.py
+        run: python -m pytest -q --noconftest tests/test_original_world_mechanic_atlas.py tests/test_original_world_simulator.py tests/test_original_world_campaign.py tests/test_original_world_campaign_cli.py
       - name: Exercise era and theology preview
         run: |
           python -m skeleton.game.generation.original_world_cli --seed gentle-history --era paleolithic --chronology remote-past --theology animist-invented --theme comfort --tone ultra-snuggly --comfort 100 --realism 95 --brief >/dev/null
           python -m skeleton.game.generation.original_world_cli --index 123456789 --era deep-future --theology cosmic-mythic --theme cosmic-horror --visual-style photorealistic-target --tone nightmarish --simulation-realism hyperrealism-target --demo-rules >/dev/null
+      - name: Play four authored worlds with real actions
+        run: |
+          python -m skeleton.game.generation.original_world_campaign_cli --world topology-02 --seed maze --actions-json '[{"verb":"observe"},{"verb":"end_turn"},{"verb":"move","target":1}]' --show-map
+          python -m skeleton.game.generation.original_world_campaign_cli --world ecology-03 --seed living-rain --actions-json '[{"verb":"redirect_rain","option":"west","amount":2},{"verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_campaign_cli --world civilization-01 --seed promises --actions-json '[{"verb":"pledge"},{"verb":"fulfill"},{"verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_campaign_cli --world serenity-05 --seed cozy --actions-json '[{"verb":"weave","amount":2},{"verb":"rest"},{"verb":"end_turn"}]' --show-map
       - name: Confirm exact head
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
