@@ -308,3 +308,41 @@ def test_invalid_commands_cannot_mutate_immutable_states(bad) -> None:
     with pytest.raises(FoundationError):
         step_advanced(state, bad)
     assert asdict(state) == initial
+
+
+def test_postgame_player_remains_free_to_play_in_both_endless_and_postgame_worlds() -> None:
+    for arc in ("endless", "chapters", "sandbox", "branching"):
+        s = create_advanced(advanced_for(0, "puzzle", arc).advanced_id)
+        s = advance(s, AdvancedAction("mode", "toggle", target=0))
+        s = advance(s, AdvancedAction("mode", "toggle", target=2))
+        s = advance(s, AdvancedAction("mode", "pass"))
+        assert s.mode.cleared
+        after, receipt = step_advanced(s, AdvancedAction("mode", "toggle", target=0))
+        assert after.events == s.events + 1
+        assert after.mode.switches == 4
+        assert after.mode.cleared
+        assert receipt.changes
+
+
+def test_wrong_mystery_claim_is_persistent_and_has_real_legitimacy_cost() -> None:
+    state = create_advanced(advanced_for(0, "puzzle", "mystery").advanced_id)
+    after, evidence = step_advanced(state, AdvancedAction("arc", "commit"))
+    assert after.arc.uncertainty == state.arc.uncertainty + 1
+    assert after.arc.chapter == 0
+    assert after.causal.trust == state.causal.trust - 1
+    assert "Unsupported conclusion" in " ".join(evidence.changes)
+    after = advance(after, AdvancedAction("causal", "study", amount=2))
+    after = advance(after, AdvancedAction("arc", "investigate", amount=3))
+    assert after.arc.clues == 3
+    proven = advance(after, AdvancedAction("arc", "commit"))
+    assert proven.arc.chapter == 1
+    assert proven.arc.clues == 0
+
+
+def test_conservation_failure_never_produces_partial_state_changes() -> None:
+    state = create_advanced(advanced_for(0, "commerce", "factions").advanced_id)
+    state = replace(state, mode=replace(state.mode, wallet=0))
+    before = asdict(state)
+    with pytest.raises(FoundationError):
+        step_advanced(state, AdvancedAction("mode", "buy", amount=3))
+    assert asdict(state) == before
