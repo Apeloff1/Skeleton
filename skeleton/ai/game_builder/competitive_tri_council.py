@@ -368,6 +368,31 @@ def attach_multipart_pdf_packet(battle: ThreeRoundBattlePlan,packet_digest: str,
     return replace(battle,packet_digest=packet_digest,user_decision="awaiting_user")
 
 
+def request_round_restructure(
+    battle: ThreeRoundBattlePlan, *,
+    feedback: str,
+    authorized: bool,
+)->ThreeRoundBattlePlan:
+    """Operator/user may interrupt at ANY deliberation stage.
+
+    Escalate the entire council research epoch; never reuse previously
+    'passed' partial deliberations under changed design premises.
+    """
+    if not authorized:
+        raise PermissionError("user-directed strategic restructure needs studio authorization")
+    if (not isinstance(battle,ThreeRoundBattlePlan) or
+            battle.user_decision not in {"not_requested","awaiting_user"} or
+            type(feedback) is not str or
+            not 40<=len(feedback)<=2000):
+        raise ThreatRadarError("substantive stage-specific course correction required")
+    if battle.epoch>=3:
+        raise ThreatRadarError("bounded independent research exhaustion requires new project review")
+    return ThreeRoundBattlePlan(
+        battle.original_id,battle.snapshot_digest,battle.critique_digest,
+        battle.epoch+1,(),user_decision="not_requested",
+        user_feedback=feedback,packet_digest=None)
+
+
 def record_user_plan_decision(
     battle: ThreeRoundBattlePlan,*,decision: str,feedback: str,
     exact_packet_digest: str,authorized: bool,
@@ -400,4 +425,4 @@ __all__=["ROLES","TARGET_SOURCES","ApprovedCrawlerRound",
          "sign_deliberation","DeliberatedRound","deliberate_verified_round",
          "ThreeRoundBattlePlan","begin_battle_plan",
          "add_verified_round","attach_multipart_pdf_packet",
-         "record_user_plan_decision"]
+         "record_user_plan_decision","request_round_restructure"]
