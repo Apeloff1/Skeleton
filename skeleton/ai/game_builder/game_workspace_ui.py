@@ -27,6 +27,8 @@ small{color:#b9d0d3}.status{background:#254653;padding:.6rem;margin:.8rem 0;whit
 #system-fields label{margin:0}
 #system-fields input[type=checkbox]{width:auto;min-height:auto}
 #system-preview{max-height:170px;overflow:auto;white-space:pre-wrap;font:12px/1.4 ui-monospace,monospace}
+#system-canvas{width:100%;max-width:500px;height:auto;border:1px solid #537783;
+ background:#0b2331;border-radius:.4rem}
 #system-description{display:block;min-height:2.5rem}
 @media(max-width:940px){main{grid-template-columns:1fr}section{min-height:0}}
 """
@@ -326,11 +328,66 @@ async function loadSystemEditors(){
    }
    select.append(optgroup);
   }
-  select.value="platformer";renderSystemControls();
+  select.value="platformer";renderSystemControls();drawSystemPreview(null);
   $("system-count").textContent=systemCatalog.length+" system editors ready";
  }catch(error){status("System editor catalog unavailable: "+error.message);}
 }
-$("system-kind").addEventListener("change",renderSystemControls);
+// Offline canvas views reproduce validated backend evidence: they never
+// become the authoritative simulation or a replacement for proof receipts.
+function drawSystemPreview(report){
+ const canvas=$("system-canvas"),c=canvas.getContext("2d");
+ const w=canvas.width,h=canvas.height;
+ c.fillStyle="#0b2331";c.fillRect(0,0,w,h);
+ c.font="14px system-ui";c.fillStyle="#d5ecf0";
+ if(!report||!report.simulation_executed){
+  c.fillText("Choose Validate and simulate preview",14,28);return;
+ }
+ c.fillText(report.editor.replaceAll("_"," ").toUpperCase()+" · reference simulation",14,25);
+ const state=report.state;
+ if(report.editor==="platformer"){
+  const points=state.trajectory;
+  c.strokeStyle="#7fe4bd";c.lineWidth=3;c.beginPath();
+  const maxX=Math.max(1,...points.map(x=>x.x));
+  const maxY=Math.max(1,...points.map(x=>x.y));
+  for(let i=0;i<points.length;i++){
+   const x=30+points[i].x/maxX*(w-60), y=h-28-points[i].y/maxY*(h-82);
+   if(i===0)c.moveTo(x,y);else c.lineTo(x,y);
+  }
+  c.stroke();c.fillText("Horizontal movement / jump arc",14,h-8);
+ }else if(report.editor==="racing"){
+  const points=state.telemetry,maxSpeed=Math.max(1,...points.map(x=>x.speed));
+  c.strokeStyle="#f2c879";c.lineWidth=3;c.beginPath();
+  for(let i=0;i<points.length;i++){
+   const x=20+(i/(Math.max(1,points.length-1)))*(w-45);
+   const y=h-35-(points[i].speed/maxSpeed)*(h-78);
+   if(i===0)c.moveTo(x,y);else c.lineTo(x,y);
+  }
+  c.stroke();c.fillText("Speed / tick · "+state.distance+" units traversed",14,h-8);
+ }else if(report.editor==="tactics"){
+  const side=8,size=17,ox=25,oy=39;
+  c.strokeStyle="#496d78";c.lineWidth=1;
+  for(let i=0;i<=side;i++){
+   c.beginPath();c.moveTo(ox+i*size,oy);c.lineTo(ox+i*size,oy+side*size);c.stroke();
+   c.beginPath();c.moveTo(ox,oy+i*size);c.lineTo(ox+side*size,oy+i*size);c.stroke();
+  }
+  const px=Math.min(side-1,state.unit[0]),py=Math.min(side-1,state.unit[1]);
+  c.fillStyle="#7fe4bd";c.fillRect(ox+px*size+3,oy+py*size+3,size-6,size-6);
+  c.fillStyle="#d5ecf0";c.fillText("AP "+state.ap_remaining+" · enemy HP "+state.enemy_hp,195,75);
+ }else{
+  const metrics=Object.entries(state).filter(x=>typeof x[1]==="number" ||
+   typeof x[1]==="boolean").slice(0,6);
+  metrics.forEach((entry,i)=>{
+   const y=48+i*27;
+   c.fillStyle=i%2?"#f2c879":"#7fe4bd";
+   c.fillRect(15,y-12,7,15);
+   c.fillStyle="#d5ecf0";
+   c.fillText(entry[0].replaceAll("_"," ")+": "+String(entry[1]),30,y);
+  });
+ }
+}
+$("system-kind").addEventListener("change",()=>{
+ renderSystemControls();drawSystemPreview(null);
+});
 $("system-assembly").addEventListener("click",async()=>{
  try{
   if(!model||selectedTree!=="current"||selectedProject!==model.active)
@@ -354,6 +411,7 @@ $("system-try").addEventListener("click",async()=>{
   const result=await api("/api/editor-preview",{
    editor:systemEditor().id,settings:systemSettings()});
   $("system-preview").textContent=JSON.stringify(result.preview,null,2);
+  drawSystemPreview(result.preview);
   status("Validated "+result.editor+" settings without writing files.");
  }catch(error){status("System preview blocked: "+error.message);}
 });
@@ -381,6 +439,7 @@ $("system-stage").addEventListener("click",async()=>{
   $("propose").disabled=false;$("commit").disabled=true;
   $("proposal").textContent="";
   $("system-preview").textContent=JSON.stringify(result.preview,null,2);
+  drawSystemPreview(result.preview);
   diff();
   status("System staged in source review. Use Review proposed edit, inspect diff, then explicitly approve commit.");
  }catch(error){status("System staging rejected: "+error.message);}
@@ -441,6 +500,8 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <button id="system-try" type="button">Validate and simulate preview</button>
 <button id="system-stage" type="button">Stage system into source review</button>
 <button id="system-assembly" type="button">Review assembled current systems</button>
+<canvas id="system-canvas" width="470" height="210" role="img"
+ aria-label="Validated genre-system mechanics preview"></canvas>
 <pre id="system-preview" role="status" aria-live="polite"></pre>
 <p><small>Playable preview where implemented; other editors validate authored system settings.
 All writes still require exact-file review and human approval.</small></p>
