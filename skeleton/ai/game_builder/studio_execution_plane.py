@@ -13,6 +13,9 @@ from pathlib import Path
 from typing import Sequence
 
 from .contracts import canonical_digest
+from .companion_curriculum import (
+    PracticeInsight, measure_original_practice, validate_practice_cohort,
+)
 from .dual_runtime_export import (
     DualRuntimePackage, export_dual_runtime_package, render_dual_runtime_package,
 )
@@ -81,6 +84,7 @@ class ExecutionOutcome:
     package: DualRuntimePackage | None
     mirror: MirrorReport | None
     practice_packages: tuple[DualRuntimePackage, ...]
+    practice_insights: tuple[PracticeInsight, ...]
     exported_path: Path | None
 
     @property
@@ -102,6 +106,7 @@ class ExecutionOutcome:
             "practice_manifest_digests": [
                 item.manifest["manifest_digest"] for item in self.practice_packages
             ],
+            "practice_insight_digests": [item.digest for item in self.practice_insights],
             "exported": self.exported_path is not None,
             "external_code_executed": False,
             "trained_model": False,
@@ -203,6 +208,7 @@ def execute_local_tool_plan(
     package: DualRuntimePackage | None = None
     mirror: MirrorReport | None = None
     practice: list[DualRuntimePackage] = []
+    practice_insights: list[PracticeInsight] = []
     exported: Path | None = None
     receipts: list[ExecutedToolReceipt] = []
     consumed = set()
@@ -266,13 +272,22 @@ def execute_local_tool_plan(
                 raise ExecutionPlaneError("mirror room rejected playable artifact")
             artifact_digest = mirror.digest
         elif row.tool_id == "companion.practice":
-            from .original_game_studio import _practice_intents
-            for practice_intent in _practice_intents(intent, companion_games):
+            from .companion_curriculum import plan_original_companion_intents
+            variants = plan_original_companion_intents(intent, companion_games)
+            theme_count = validate_practice_cohort(variants, parent=intent)
+            for practice_intent in variants:
                 practice_project = compile_original_game(practice_intent, authorized=True)
                 practice.append(render_dual_runtime_package(practice_project, authorized=True))
-            artifact_digest = canonical_digest([
-                pkg.manifest["manifest_digest"] for pkg in practice
-            ])
+                practice_insights.append(measure_original_practice(
+                    practice_project.world, practice_project.proof,
+                    authorized=True, distinct_themes=theme_count,
+                ))
+            artifact_digest = canonical_digest({
+                "practice_manifests": [
+                    pkg.manifest["manifest_digest"] for pkg in practice
+                ],
+                "insights": [row.digest for row in practice_insights],
+            })
         elif row.tool_id == "release.assess":
             if mirror is None or not mirror.passed:
                 raise ExecutionPlaneError("release assessment must follow verified mirror room")
@@ -305,7 +320,7 @@ def execute_local_tool_plan(
         ))
     return ExecutionOutcome(
         anchored, plan.digest, tuple(receipts), world, project,
-        package, mirror, tuple(practice), exported,
+        package, mirror, tuple(practice), tuple(practice_insights), exported,
     )
 
 
