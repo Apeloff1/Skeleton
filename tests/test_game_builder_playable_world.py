@@ -218,12 +218,17 @@ class PlayableWorldTests(unittest.TestCase):
         state = initial_state(game, authorized=True)
         for direction in route:
             state = advance(game, state, direction, authorized=True)
-        if len(state.collected) != game.intent.collectibles_per_level:
-            self.assertEqual(state.level_index, 0)
+        if state.level_index == 0:
+            # The route reached the locked exit without collecting all items.
+            self.assertNotEqual(len(state.collected), game.intent.collectibles_per_level)
             self.assertEqual(state.status, "playing")
         else:
-            # A maze may place every collectible on the unique path to exit.
-            self.assertGreaterEqual(state.level_index, 1)
+            # Completing an exit advances to the next level and clears the
+            # *new* level's collected list; inspect score instead.
+            self.assertEqual(state.level_index, 1)
+            self.assertGreaterEqual(
+                state.score, game.intent.collectibles_per_level * 10 + 100
+            )
 
     def test_corrupted_generated_level_proof_is_rejected(self):
         game = generate_playable_world(intent(), authorized=True)
