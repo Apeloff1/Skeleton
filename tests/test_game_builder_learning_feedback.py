@@ -13,7 +13,7 @@ from skeleton.ai.game_builder.game_learning_feedback import (
 )
 from skeleton.ai.game_builder.game_model_promotion import (
     PromotionError, PromotionEvaluation, PromotionStandard,
-    evaluate_fresh_cohort,
+    evaluate_fresh_cohort,propose_progressive_standard,require_stronger_standard,
 )
 
 
@@ -93,6 +93,24 @@ class AdversarialEvidencePromotionTests(unittest.TestCase):
         self.assertFalse(p["model_promotion_approved"])
         with self.assertRaises(PermissionError):
             feedback_from_evaluation(e, authorized=False)
+
+    def test_stronger_standards_are_versioned_monotonic_and_not_installed(self):
+        first = PromotionStandard()
+        second = propose_progressive_standard(first,authorized=True)
+        self.assertTrue(second.name.endswith("_v2"))
+        self.assertGreater(second.min_train_projects,first.min_train_projects)
+        self.assertGreater(second.min_per_class,first.min_per_class)
+        self.assertGreaterEqual(second.min_counterfactual_accuracy,0.98)
+        self.assertLess(second.max_brier,first.max_brier)
+        require_stronger_standard(first,second)
+        with self.assertRaises(PromotionError):
+            require_stronger_standard(second,first)
+        with self.assertRaises(PermissionError):
+            propose_progressive_standard(first,authorized=False)
+        third=propose_progressive_standard(second,authorized=True)
+        require_stronger_standard(second,third)
+        self.assertEqual(third.name,"game_review_progressive_2026_10_v3")
+        self.assertEqual(first.name,"game_review_progressive_2026_10_v1")
 
     def test_mismatched_or_partial_cohort_evidence_is_rejected(self):
         with self.assertRaises(PromotionError):
