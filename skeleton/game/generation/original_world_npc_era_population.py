@@ -469,8 +469,12 @@ def tick_population(
             rations, remainder = divmod(owed, 16)
             eaten = min(district.pantry, rations)
             shortage = rations - eaten
-            lost = min(district.population, shortage // 3)
+            # Carry small real shortages across sparse catch-up batches.
+            # Without cumulative threshold crossings, a village missing
+            # one ration each turn would never experience any mortality.
             hardship = min(1000, district.hardship + shortage)
+            lost = min(district.population,
+                       hardship // 3 - district.hardship // 3)
             morale = max(0, min(20, district.morale +
                                 (1 if shortage == 0 else -min(shortage, 3))))
             districts[index] = replace(
