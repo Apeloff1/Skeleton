@@ -38,6 +38,7 @@ from .original_world_npc_era_population import (
     EraPopulation, era_budget, create_era_population,
     validate_population, dispatch_food, tick_population,
     population_save, population_restore, population_report,
+    permitted_roles, inhabitant_role_profile,
 )
 
 SCHEMA = "original-world-playable-product-session.v3"
@@ -129,6 +130,8 @@ def create_product(
     physical = create_terrain(
         law.design_id, BIOMES_BY_ARCH[law.source.spatial.architecture.architecture_id])
     inhabitants_state = create_society(physical, count)
+    if era is not None:
+        inhabitants_state = inhabitant_role_profile(inhabitants_state, era)
     minds = make_intelligence(physical, inhabitants_state)
     regional = (create_era_population(physical, inhabitants_state, era)
                 if era is not None else None)
@@ -158,6 +161,9 @@ def _product_operation(
     verb = action.verb
     if local.position != (0, 0) and verb.startswith("deposit_"):
         raise FoundationError("physical depot transfers require player presence at origin")
+    if verb == "assign" and session.population is not None:
+        if action.option not in permitted_roles(session.population.era):
+            raise FoundationError("profession is unavailable in this historical technology era")
     if verb in ("deposit_wood", "deposit_stone"):
         key = "lumber" if verb == "deposit_wood" else "masonry"
         if getattr(local, key) < action.amount:
@@ -241,6 +247,12 @@ def _npc_operation(
     """
     world, society = session.terrain, session.society
     thinking = session.cognition
+    if action.verb == "mentor" and session.population is not None:
+        if not 0 <= action.target < len(society.inhabitants):
+            raise FoundationError("unknown era teacher")
+        if society.inhabitants[action.target].profession not in permitted_roles(
+                session.population.era):
+            raise FoundationError("a future-era profession cannot be taught yet")
     if action.verb == "household":
         try:
             caregiver_b = int(action.option)
