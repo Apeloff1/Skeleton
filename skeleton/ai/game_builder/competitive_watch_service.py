@@ -108,7 +108,9 @@ def _stored_report(data):
     if not isinstance(data,dict) or data.get("schema")!="skeleton.game_builder.competitive_delivery.v1":
         raise ThreatRadarError("unrecognized earlier work-ratchet receipt")
     try:
-        orders=tuple(DeliveryDemand(**entry) for entry in data["demands"])
+        fields=tuple(DeliveryDemand.__dataclass_fields__)
+        orders=tuple(DeliveryDemand(**{key:entry[key] for key in fields})
+                     for entry in data["demands"])
         report=CompetitiveDeliveryReport(
             data["original_id"],data["rival_id"],data["as_of"],
             data["watch_digest"],data["baseline_design_digest"],
