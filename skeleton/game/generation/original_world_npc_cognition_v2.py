@@ -1048,3 +1048,66 @@ def cognition_report(state: CitizenIntelligence, people: PhysicalSociety,
         },
         "report_not_an_llm": True,
     }
+
+
+def npc_profile(
+    state: CitizenIntelligence, people: PhysicalSociety,
+    world: TerrainState, person_id: int,
+) -> dict:
+    """Read-only biography assembled from actual citizen state and memories."""
+    validate_intelligence(state, people, world)
+    _bounded(person_id, 0, len(people.inhabitants) - 1, "inspected citizen")
+    person, mind = people.inhabitants[person_id], state.minds[person_id]
+    contacts = [
+        {
+            "citizen": b.right if b.left == person_id else b.left,
+            "affinity": b.affinity, "trust": b.trust,
+            "materially_reciprocated_aid": b.reciprocated_aid,
+        } for b in state.bonds if person_id in (b.left, b.right)
+    ]
+    known = sorted(
+        (asdict(memory) for memory in mind.memories),
+        key=lambda evidence: (
+            -evidence["turn"], -evidence["confidence"],
+            evidence["subject"], evidence["position"],
+        ),
+    )
+    return {
+        "identity": person.id,
+        "profession": person.profession,
+        "temperament": mind.temperament,
+        "individual_drives": {
+            "curiosity": mind.curiosity, "empathy": mind.empathy,
+            "discipline": mind.discipline, "prudence": mind.prudence,
+        },
+        "physical_position": (person.x, person.y),
+        "carried_stock": {
+            "kind": person.cargo_kind,
+            "units": person.cargo,
+        },
+        "needs": {
+            "health": person.health, "energy": person.energy,
+            "hunger": person.hunger, "morale": mind.morale,
+            "stress": mind.stress, "loneliness": mind.loneliness,
+        },
+        "current_goal": mind.goal,
+        "goal_persistence": mind.goal_age,
+        "last_visited_objective": mind.objective,
+        "decision_count": mind.decisions,
+        "learned_action_policies": {
+            goal: mind.learned[i] for i, goal in enumerate(GOAL_ORDER)
+        },
+        "observation_memory": known,
+        "social_contacts": contacts,
+        "personal_contracts": [
+            asdict(o) for o in state.orders if o.citizen == person_id
+        ],
+        "construction_contributions": [
+            asdict(p) for p in state.projects if person_id in p.contributors
+        ],
+        "first_hand_testimony": [
+            asdict(e) for e in state.testimonies if e.citizen == person_id
+        ],
+        "provenance": VERSION,
+        "individually_simulated_not_a_language_model": True,
+    }
