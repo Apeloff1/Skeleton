@@ -38,6 +38,7 @@ from skeleton.ai.game_builder.reviewed_knowledge import ReviewedDocument,Reviewe
 from skeleton.ai.game_builder.knowledge_rights_bridge import clear_research_for_design
 from tests.test_game_builder_optimizer_and_wisdom import ActualPeerWisdomTests
 from tests.test_game_builder_reviewer_promotion import promotion_corpus
+from skeleton.ai.game_builder.competitive_mirror_training import split_project
 from tests.test_game_builder_knowledge_rights_bridge import record
 
 CHECKS=("evidence_trace","legal_source_scope","logical_consistency",
@@ -233,6 +234,73 @@ class SecondaryWisdomIntegrationTests(ActualPeerWisdomTests):
         # model-supplied Boolean or an unexamined document digest.
         with self.assertRaises(PromotionError):
             replace(reviews[0],proofread_notes="The result is obviously fine.")
+
+    def independent_second_projects(self):
+        fresh=[]
+        existing=set(self.plan.source_projects)
+        for batch in promotion_corpus():
+            split=split_project(batch.source_project)
+            n=0
+            while True:
+                project=sha256(
+                    f"fresh-independent-original-game-world-{batch.source_project}-{n}".encode()
+                ).hexdigest()
+                n+=1
+                if (project not in existing and
+                        split_project(project)==split):
+                    break
+                if n>200:
+                    raise RuntimeError("unable to create independent fixed-split regression world")
+            existing.add(project)
+            new_examples=[]
+            for j,source in enumerate(batch.examples):
+                changed_input=dict(source.input)
+                if "source_campaign_digest" in changed_input:
+                    changed_input["source_campaign_digest"]=project
+                if "canonical_witness" in changed_input:
+                    changed_input["canonical_witness"]=dict(
+                        changed_input["canonical_witness"],
+                        source_world=project)
+                changed_evidence=dict(source.evidence,
+                    mechanic="platforming",
+                    source_almanac=canonical_digest({"p":project}))
+                new_examples.append(replace(
+                    source,project_digest=project,split=split,
+                    example_id=canonical_digest(
+                        {"new_original_game":project,"case":j}),
+                    input=changed_input,evidence=changed_evidence))
+            fresh.append(CandidateBatch(
+                project,canonical_digest({"independent_second_game":project}),
+                tuple(new_examples)))
+        plan=plan_training_flow(tuple(fresh),authorized=True)
+        self.assertFalse(
+            set(plan.source_projects)&set(self.plan.source_projects))
+        return plan
+
+    def test_real_secondary_sgd_only_if_first_shadow_and_new_games_qualify(self):
+        first,mission=self.context()
+        brief,packet,second=self.expand_sources()
+        _,reviews,keys=self.reviews(first,second,mission,packet)
+        fresh=self.independent_second_projects()
+        result=self.process(first,mission,brief,packet,reviews,keys,
+                            second_games=fresh)
+        self.assertTrue(result.new_train_worlds_independent)
+        if self.post.shadow_fit_qualified:
+            self.assertIsNotNone(result.second_training)
+            self.assertEqual(result.second_training.eligible_mechanics,
+                             ("platforming",))
+            self.assertIsNotNone(result.second_training.optimization)
+            self.assertTrue(result.second_training.optimization.selected_fit[
+                "training_performed"])
+            self.assertIsNotNone(result.post_second_weights)
+            self.assertTrue(result.payload()["real_second_reviewer_sgd_executed"])
+            self.assertFalse(result.post_second_weights.actual_active_installation_verified)
+            self.assertFalse(result.payload()["secondary_model_staged_or_activated"])
+        else:
+            self.assertIn("first_weight_candidate_not_independently_qualified",
+                          result.blockers)
+            self.assertIsNone(result.second_training)
+            self.assertFalse(result.payload()["real_second_reviewer_sgd_executed"])
 
     def test_reference_retraction_or_no_new_sources_blocks_secondary_wisdom(self):
         first,mission=self.context()
