@@ -39,6 +39,7 @@ class PromotionStandard:
     max_generalization_drop: float = 0.06
     max_regression: float = 0.0
     min_family_cases: int = 2
+    min_counterfactual_accuracy: float = 0.0
 
     def __post_init__(self):
         for k in ("min_train_projects","min_validation_projects",
@@ -48,7 +49,8 @@ class PromotionStandard:
                 raise PromotionError("standards need positive bounded independent evidence")
         for k in ("min_balanced_accuracy","min_project_accuracy",
                   "min_critical_recall","min_wilson_recall",
-                  "max_brier","max_generalization_drop","max_regression"):
+                  "max_brier","max_generalization_drop","max_regression",
+                  "min_counterfactual_accuracy"):
             value=getattr(self,k)
             if type(value) not in (float,int) or not math.isfinite(value) or not 0<=value<=1:
                 raise PromotionError("promotion thresholds must be finite percentages")
@@ -80,7 +82,8 @@ def require_stronger_standard(previous: PromotionStandard,
         raise PromotionError("typed monotonic industry standard required")
     minimums=("min_train_projects","min_validation_projects","min_test_projects",
               "min_per_class","min_balanced_accuracy","min_project_accuracy",
-              "min_critical_recall","min_wilson_recall","min_family_cases")
+              "min_critical_recall","min_wilson_recall","min_family_cases",
+              "min_counterfactual_accuracy")
     maximums=("max_brier","max_generalization_drop","max_regression")
     if any(getattr(successor,key)<getattr(previous,key) for key in minimums) or any(
         getattr(successor,key)>getattr(previous,key) for key in maximums
@@ -278,6 +281,15 @@ def evaluate_candidate(plan: FlowPlan,fit: dict,*,
     if (metrics["validation"]["balanced_accuracy"]-
         metrics["test"]["balanced_accuracy"]>standard.max_generalization_drop):
         blockers.append("heldout_generalization_gap")
+    if standard.min_counterfactual_accuracy>0:
+        # Import after model module initialization to avoid a module cycle.
+        from .game_learning_challenges import challenge_reviewer
+        for split in ("validation","test"):
+            redteam=challenge_reviewer(
+                grouped[split],policy,authorized=True,max_examples=512)
+            metrics["metamorphic_"+split]=redteam.payload()
+            if redteam.accuracy<standard.min_counterfactual_accuracy:
+                blockers.append(split+":reviewer_shortcut_detection")
     if champion is not None:
         leader={s:_metric(grouped[s],champion) for s in ("validation","test")}
         for split in leader:
