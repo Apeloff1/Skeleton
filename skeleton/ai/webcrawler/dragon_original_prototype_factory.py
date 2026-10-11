@@ -178,7 +178,7 @@ def materialize(nucleus:int,*,branch_seed:int=0,
         })
     world_walk=materialize_route(
         world,slot=(nucleus+branch_seed)%10,
-        steps=max(12,steps),
+        steps=min(48,max(12,steps)),
     )
     if not verify_route(world,world_walk)["verified"]:
         raise ValueError("original prototype world lifecycle failed real play replay")
