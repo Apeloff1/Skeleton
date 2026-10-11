@@ -61,7 +61,7 @@ jobs:
       - name: Compile atlas and simulation modules
         run: python -m compileall -q skeleton/game/generation
       - name: Verify originals, styles and rule simulations
-        run: python -m pytest -q --noconftest tests/test_original_world_mechanic_atlas.py tests/test_original_world_simulator.py tests/test_original_world_campaign.py tests/test_original_world_campaign_cli.py tests/test_original_world_nexus.py tests/test_original_world_society.py tests/test_original_world_play_cli.py tests/test_original_world_frontier.py tests/test_original_world_frontier_cli.py tests/test_original_world_era_runtime.py tests/test_original_world_era_cli.py tests/test_original_foundation_compiler.py tests/test_original_foundation_cli.py tests/test_original_foundation_discovery.py tests/test_original_world_million_compiler.py tests/test_original_world_million_cli.py tests/test_original_world_million_objectives.py tests/test_original_world_million_synergy.py tests/test_original_world_tenfold_compiler.py tests/test_original_world_tenfold_cli.py tests/test_original_world_tenfold_navigation.py tests/test_original_world_living_10x_compiler.py tests/test_original_world_living_10x_cli.py tests/test_original_world_living_10x_objectives.py
+        run: python -m pytest -q --noconftest tests/test_original_world_mechanic_atlas.py tests/test_original_world_simulator.py tests/test_original_world_campaign.py tests/test_original_world_campaign_cli.py tests/test_original_world_nexus.py tests/test_original_world_society.py tests/test_original_world_play_cli.py tests/test_original_world_frontier.py tests/test_original_world_frontier_cli.py tests/test_original_world_era_runtime.py tests/test_original_world_era_cli.py tests/test_original_foundation_compiler.py tests/test_original_foundation_cli.py tests/test_original_foundation_discovery.py tests/test_original_world_million_compiler.py tests/test_original_world_million_cli.py tests/test_original_world_million_objectives.py tests/test_original_world_million_synergy.py tests/test_original_world_tenfold_compiler.py tests/test_original_world_tenfold_cli.py tests/test_original_world_tenfold_navigation.py tests/test_original_world_living_10x_compiler.py tests/test_original_world_living_10x_cli.py tests/test_original_world_living_10x_objectives.py tests/test_original_world_living_10x_synergy.py
       - name: Exercise era and theology preview
         run: |
           python -m skeleton.game.generation.original_world_cli --seed gentle-history --era paleolithic --chronology remote-past --theology animist-invented --theme comfort --tone ultra-snuggly --comfort 100 --realism 95 --brief >/dev/null
@@ -182,5 +182,8 @@ jobs:
           python -m skeleton.game.generation.original_world_living_10x_cli --base 0 --form puzzle --architecture lattice --system watershed --arc endless --actions-json '[{"layer":"living","verb":"irrigate"},{"layer":"causal","verb":"end_turn"}]' --objectives >/dev/null
           python -m skeleton.game.generation.original_world_cli --living-index 122879999 --brief >/dev/null
           python -m skeleton.game.generation.original_world_cli --living-foundation-index 10239999 >/dev/null
+      - name: Prove living-system costs alter real original-world gameplay
+        run: |
+          python -m pytest -q --noconftest tests/test_original_world_living_10x_synergy.py
       - name: Confirm exact head
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
