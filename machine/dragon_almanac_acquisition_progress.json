@@ -2,8 +2,8 @@
   "schema": "skeleton.dragon.almanac_acquisition_progress.v1",
   "registry_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
   "ordering": "source_id_ascending",
-  "next_source_offset": 448,
-  "reviewed_candidate_count": 448,
+  "next_source_offset": 480,
+  "reviewed_candidate_count": 480,
   "entries": [
     {
       "source_id": "source-0017fcb9b1445e4f0a6949fb81b3fe01159175a23ca300ff1350938c2b2a0974",
@@ -4035,6 +4035,294 @@
       "checked_at": "2026-10-11T16:19:02.000Z",
       "availability": "retrieval_failed",
       "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-18c5544497941c4bac7dfafb4bc8e0ba38d63686959cbeb9c802bbcc13ce8486",
+      "source_offset": 448,
+      "url": "https://github.com/LWJGL/lwjgl3",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1900f9f355098dd92be4de1405674e32d69213280209e3a2295b3e8f726c4c4b",
+      "source_offset": 449,
+      "url": "https://pikuma.com/blog/how-to-make-your-own-cpp-game-engine",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-192cba64d0b8f44e98c402aa571771553fd9b1a0ed9546d0036dee7713b8a807",
+      "source_offset": 450,
+      "url": "http://www.squeakywheel.ph/blog/2017/5/24/7-tips-for-aspiring-game-designers",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-19417842b7896a251d0a8a831ec0d35358741f0e8e9215a04d4253e27b095f67",
+      "source_offset": 451,
+      "url": "https://youtu.be/WWI07UQbJ9E",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-19446e425a9a00b331c9f024c116dba27e0c1f05fffbacd072a552743f60479b",
+      "source_offset": 452,
+      "url": "https://github.com/gabrielecirulli/2048",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-194765e7381ab2052ac64a19dbd14d5ee3aed7ea6e1c14eff86de25c54b47c42",
+      "source_offset": 453,
+      "url": "https://github.com/clintbellanger/flare-game",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-194f477001db0511d5a259dbea7bcf64c0a42fa92970e5fadcca7d34221109a0",
+      "source_offset": 454,
+      "url": "http://www.qiciengine.com/",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-195050e38af32114aaf5e44689a608cdf83b69c4352005aa8d5a929d39ca3474",
+      "source_offset": 455,
+      "url": "https://github.com/RandyGaul/tinyheaders",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1975160bea13abc06bfff8d42824df1bac235a219365d505e1fa36b994bec610",
+      "source_offset": 456,
+      "url": "https://www.youtube.com/watch?v=DXw9QhsjlME",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1976982e8b6410d3783b5d387ed7c0cc8d0120ee9c6a03f3bc6c09c039e9936d",
+      "source_offset": 457,
+      "url": "https://www.youtube.com/watch?v=xPu_oftSo2I&list=PLm1dtWebLYwWK2zb6lmgdonm3Z5BE5su0",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-197de363ab042f7510b17765449e0e224c839ea86c2fcb4511cb976b369839b5",
+      "source_offset": 458,
+      "url": "https://github.com/Elesh-Norn/kaleidoscope",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-198a77ad4b5f9efd49344eb8a7ad3aeb2b3c3b3afb42f1929401f28b80369317",
+      "source_offset": 459,
+      "url": "https://github.com/phisko/kengine",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-198ea46952fe61326108a31e402d32b14a284d783df7fb37f9265406898c3a82",
+      "source_offset": 460,
+      "url": "https://docs.google.com/document/d/1yGzqp1Cq8emRasH0JHYMXE4-Z6xYxQ0GDe6ZyemctVM/edit",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-19a0d56b891918c4362c057cf036161ab5b77ca608144be8c1e140d876f24282",
+      "source_offset": 461,
+      "url": "https://github.com/razh/game-off-2013",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-19ad246d30bd5b2620a05d3001d529fc87cce684c73ad364a13944b73107bc5c",
+      "source_offset": 462,
+      "url": "https://github.com/protongraph/protongraph",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-19bdba803543b6a25c8592438568deeb5bc2028a06201fd3022848799dad5d54",
+      "source_offset": 463,
+      "url": "https://noob3xploiter.medium.com/hacking-and-reverse-engineering-il2cpp-games-with-ghidra-5cee894024f2",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-19c6dc8aaf3daf95c6e9976906805367e2e974750ddd0de8fb6fb8b35f854333",
+      "source_offset": 464,
+      "url": "https://www.gabrielgambetta.com/client-side-prediction-server-reconciliation.html",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-19c9d8ed1f18e4819f539e48d60c2fc42e8d97d8a8cbf8bc63e13c5c36a0f17c",
+      "source_offset": 465,
+      "url": "http://stingrayengine.com/",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-19cb5663e8a54d1bb86b206f91da708995c013d9f8a7145c8fdb1b34d8c847b5",
+      "source_offset": 466,
+      "url": "https://codemanu.itch.io/fluid-fx",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-19cc988b9b779c9c0f26736eea5435663dacd5b9881ef78cab4af15377c68a12",
+      "source_offset": 467,
+      "url": "https://realtimevfx.com/t/getting-started-in-real-time-vfx-start-here/3415",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-19cd13314ccef68bda8727b014f00eafe707e47db27fc9ccf3a113e98572472f",
+      "source_offset": 468,
+      "url": "http://ansimuz.com/site/",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-19ddac9eb66c188e5dce007993a4a68f090ba4d0500d7735542fac02bc27ffe0",
+      "source_offset": 469,
+      "url": "https://www.brendanmeachen.com/soloartist",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-19df384a73c7e6768fed36e2732f3e0438839342ac361dbb529cb8e628571866",
+      "source_offset": 470,
+      "url": "https://www.youtube.com/watch?v=3yuBOB3VrCk",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "metadata_shell_only",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1a1424e95521456a1665a822661762920b9209d92006a50c4da19658473ece72",
+      "source_offset": 471,
+      "url": "https://github.com/v8/v8",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1a17faa1c6e0f6219dee9ac305ebb7893df1b1d6676e28e58c50eb76a6249b21",
+      "source_offset": 472,
+      "url": "https://queue.acm.org/detail.cfm?id=3212479",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1a2afc6372ac13a2a498115e6c2dc307131447ef7ee58e67023e96c5f40aa2e7",
+      "source_offset": 473,
+      "url": "https://www.gamedev.net/articles/programming/artificial-intelligence/the-total-beginners-guide-to-game-ai-r4942/",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1a2f72dcd0d1a67848a1333980853a5bf32f814748f39353dae0a4e91f9c0cf0",
+      "source_offset": 474,
+      "url": "https://www.youtube.com/watch?v=etNmLiaLxb8",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1a3ae6aa80506d8f2d98e036382f6973ed81d1cd0e5b336c74fbc766e5438712",
+      "source_offset": 475,
+      "url": "https://assetstore.unity.com/packages/tools/animation/itween-84",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1a3c3e9ac6a4ac730d8da4a27d0feaa8e21394e620e409d9feaeaebbddd21ccf",
+      "source_offset": 476,
+      "url": "https://github.com/Circular-Studios/Dash",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1a3d9e5b7a3dfdce7fd157eef3750913ac6974371f128c254a94c081c55aa621",
+      "source_offset": 477,
+      "url": "https://www.youtube.com/watch?v=8eAW-7Js7NA",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1a3e089d26b558710fe3d9b15b4503c6b311abca302de7024f525f27e944a567",
+      "source_offset": 478,
+      "url": "http://www.appodeal.com/",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1a4341ca914d9a6fb13a60200ceb1de9637031b44d47c582224324242c2f4dcb",
+      "source_offset": 479,
+      "url": "https://github.com/ConfettiFX/The-Forge",
+      "checked_at": "2026-10-11T17:20:35.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
       "approved": false
     }
   ],
