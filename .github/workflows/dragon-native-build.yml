@@ -9,6 +9,7 @@ on:
       - 'skeleton/ai/webcrawler/dragon_original_campaign_forge.py'
       - 'tests/test_ai_dragon_original_mechanic_forge.py'
       - 'tests/test_ai_dragon_original_campaign_forge.py'
+      - 'tests/test_ai_dragon_original_mechanic_fusions.py'
       - 'backend/tests/test_dragon_original_mechanics_routes.py'
       - 'frontend/app/dragon-originals-forge.tsx'
       - 'skeleton/ai/webcrawler/dragon_world_genome.py'
@@ -705,7 +706,8 @@ jobs:
           set -euo pipefail
           python -m pytest -q \
             tests/test_ai_dragon_original_mechanic_forge.py \
-            tests/test_ai_dragon_original_campaign_forge.py
+            tests/test_ai_dragon_original_campaign_forge.py \
+            tests/test_ai_dragon_original_mechanic_fusions.py
       - name: Generate signed gameplay evidence for 16.7m nuclei and quintillion rulebook capacity
         run: |
           set -euo pipefail
