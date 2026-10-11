@@ -9,7 +9,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from skeleton.ai.game_builder.quest_scene_forge import forge_director
+from skeleton.ai.game_builder.quest_scene_forge import forge_director, read_director_blueprint
 from skeleton.ai.game_builder.npc_authoring import (
     CitizenAuthoringError,npc_template,compile_npc_roster,read_npc_roster,
 )
@@ -83,14 +83,9 @@ class NPCAuthoredProductTests(unittest.TestCase):
             doc=json.loads(roster.read_text())
             doc["profiles"][1]["name"]="Original Mapmaker of the Glass Isles"
             roster.write_text(json.dumps(doc,ensure_ascii=False),encoding="utf-8")
-            world=compile_npc_roster(self.world,npc_template(self.world,24,
-                    authorized=True),human_reviewed=True,authorized=True).society
             # Verify actual source bytes are retained, even after whitespace
             # and independently authored character changes.
-            target_world=__import__(
-                "skeleton.ai.game_builder.quest_scene_forge",
-                fromlist=["read_director_blueprint"]).read_director_blueprint(
-                    scene,human_reviewed=True)
+            target_world=read_director_blueprint(scene,human_reviewed=True)
             approved=read_npc_roster(target_world,roster,
                                     human_reviewed=True,authorized=True)
             self.assertEqual(approved.source_sha256,sha256(roster.read_bytes()).hexdigest())
@@ -111,9 +106,11 @@ class NPCAuthoredProductTests(unittest.TestCase):
             handoff=json.loads((output/"systems/npc_authoring_handoff.json").read_text())
             self.assertEqual(handoff["source_sha256"],approved.source_sha256)
             society=json.loads((output/"systems/npc_society_replay.json").read_text())
-            self.assertEqual(society["session"]["society"]["profiles"][1]["name"]
-                             if "session" in society else
-                             society["terminal_session_digest"] is not None,True)
+            self.assertEqual(society["performance"]["population"],24)
+            conversations=json.loads(
+                (output/"systems/npc_social_propagation.json").read_text())
+            self.assertIn("Original Mapmaker of the Glass Isles",
+                          conversations["dialogue_samples"][1]["line"])
             self.assertFalse(handoff["publication_approved"])
 
     def test_rejects_fake_witnesses_unknown_characters_and_unreviewed_content(self):
