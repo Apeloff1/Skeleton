@@ -70,7 +70,7 @@ def _arc_progress(state: AdvancedState, arc_id: str) -> tuple[int, int, str]:
         "factions": (int(bool(a.branch)), 1, "make a binding faction commitment"),
         "sandbox": (a.civic, 1, "invest actual material in self-chosen development"),
         "mystery": (a.chapter, 1, "test a theory using three expended independent clues"),
-        "seasonal": (a.season, 1, "reach a changed seasonal regime"),
+        "seasonal": (int(a.checkpoint >= 4), 1, "persist evidence of a completed seasonal transition"),
         "rescue": (a.rescues, 1, "deliver finite aid to a remote need"),
         "campaign": (a.territory, 1, "take an accounted region after a played objective"),
         "civilization": (a.civic, 1, "make concrete long-term public investment"),
@@ -158,7 +158,8 @@ def objective_report(state: AdvancedState) -> dict:
         "continuation": law.arc.arc_id,
         "chapter_completed": state.mode.cleared,
         "arc_completed": state.arc.completed,
-        "world_winnable": law.arc.continuation_policy != "unwinnable",
+        "world_winnable": (law.arc.continuation_policy != "unwinnable" and
+                           law.mode.base.ending_policy != "unwinnable"),
         "not_a_native_game_certification": True,
         "objectives": [x.as_dict() for x in goalbook],
         "completed_objectives": sum(x.verified for x in goalbook),
