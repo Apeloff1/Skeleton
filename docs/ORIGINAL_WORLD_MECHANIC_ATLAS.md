@@ -2,7 +2,7 @@
 
 **Owner:** Existing `skeleton/game/generation` domain.  
 **Status:** Committed, deterministic **design-recipe compiler**; **not** 1.57 quintillion built games.  
-**Version:** `original-world-atlas.v1`.
+**Version:** `original-world-atlas.v2`.
 
 This work responds to the need for a truly expansive game builder rather
 than a palette-swapping level generator. A world is defined by an *original
@@ -11,36 +11,53 @@ mechanic is defined by its *trigger*, *effect on the world*, and *drawback*.
 The catalog does not import copyrighted maps, scripts, characters, game
 assets, platform firmware, or protected SDK material.
 
-## What exists in this delivery
+## Verified authored inventory and capacity
 
-| Component | Implemented | Meaning |
-| --- | --- | --- |
-| Authored world-law designs | 128 | Sixteen rule domains, eight independently described premises each |
-| Authored mechanic designs | 192 | Sixteen domains, twelve trigger/effect/drawback specs each |
-| Mechanic selection | 12 per recipe | Exactly two from the seed world's domain and ten from distinct others |
-| Rule-bridge hypotheses | 52 authored pairs | Explicit semantic explanations for cross-domain consequences; not engine execution |
-| Structural topology tags | 12 | Design hints for dynamic maze, streaming voxel, recursive and other world realizations |
-| Ending continuity policies | 7 | `closed`, `open`, `postgame`, `persistent`, `unwinnable`, `branched`, `looping` |
-| Exact-addressable design combinations | 1,570,802,912,571,949,056 | Unique *world + mechanic recipe* tuples; NOT independent playtested games |
+| Layer | Count | Authoring and implementation status |
+| --- | ---: | --- |
+| Original world premises | **1,296** | 81 causal domains, 16 independent world laws each |
+| Independently authored mechanic specifications | **712** | Each has trigger, proposed effect and stated drawback |
+| Derived, world-specific action levers | **1,232** | Drawn from authored worlds; **cost model not implemented** |
+| Mechanic/lever design entries | **1,944** | Exactly 24 selectable designs in every domain |
+| Explicit authored cross-domain bridge descriptions | 52 | Original pairings retained; further bridges are inferred hypotheses |
+| Cross-domain interaction hypotheses per recipe | 55 | One for every pair among 11 represented domains |
+| Mechanics and levers in each recipe | 12 | Two native-domain entries plus ten distinct foreign domains |
+| Topology design tags | 12 | Not equivalent to implemented map generators |
+| Era options | 40 | Independent from world originality |
+| Chronology settings | 32 | Historical, alternate, branching, cyclic and other times |
+| Invented theology models | 24 | Non-theistic, invented pantheons, animism, oracular settings, etc. |
+| Theme options | 81 | Up to eight theme tags in a single experience |
+| Emotional tones | 24 | Ultra-snuggly to nightmarish; independent comfort 0–100 slider |
+| Visual styles | 32 | Retro pixels, illustrated modes, physically based render targets |
+| Simulation-realism profiles | 12 | Symbolic to hyperrealism **targets**, not validated physics |
+| Hardware-target tags | 41 | Platform adaptation requests, **not** certified builds |
+| Executable abstract mechanic kernels | 8 | Deterministic Python prototypes; not console/3D gameplay |
+| Exact indexed design combinations | **37,341,018,089,543,468,949,354,074,603,520** | Combinatorial recipes, not independently reviewed games |
 
-The exact indexed recipe count is
+The exact number of distinct world/mechanic recipe identities is
 
+```python
+from math import comb
+
+total = 1296 * comb(24, 2) * comb(80, 10) * (24 ** 10)
+assert total == 37_341_018_089_543_468_949_354_074_603_520
 ```
-128 * C(12, 2) * C(15, 10) * 12**10
-= 1,570,802,912,571,949,056
-```
 
-There are 128 authored worlds. Each has 12 locally relevant mechanics and
-15 other domains with 12 mechanics apiece. Each recipe picks two local
-mechanics and one from each of ten chosen external domains. It is *not*
-a count based on multiplying irrelevant paint colors, audio settings,
-difficulty values, or hypothetical yet-to-be-implemented features.
+Each recipe selects two of the world's 24 entries, chooses ten of the other
+80 domains, and chooses one of 24 mechanics or levers from each chosen
+domain. The 55 pairwise bridges are only **interaction proposals**; 52
+pair types have authored interpretations, while other pairings use visibly
+labeled inference templates. Entries with `cost_specified=False` require
+genuine playable effects and balanced costs before implementation.
 
-Different recipe tuples are guaranteed by indexed combinatorial unranking.
-**They are not guaranteed to be different player experiences.** Full design
-novelty, fun, legal clearance and runtime correctness need separate review.
-The combinatorial cardinality is not a claim of millions of manually
-authored world's foundations, nor evidence of executable mechanics.
+Recipe uniqueness guarantees a different world ID or mechanic identity.
+It does **not** guarantee meaningful experiential diversity or
+compatibility; combinations must pass causal consistency, accessibility,
+quality, originality and runtime checks before promotion.
+
+Presentation dimensions **never multiply the independent authorship count**.
+An original world rendered as cozy pixel art and then as cinematic 3D is
+one original causal foundation with two presentation configurations.
 
 ## User-facing and engine-facing contract
 
@@ -229,6 +246,122 @@ and study authorized sources under the repository's established knowledge
 promotion workflow, but no unverified scraped assets or proprietary code
 should enter the generated world.
 
-**Honest maturity statement:** 128 authored laws and 192 mechanic designs
-are real additions; the exactly indexed 1.57-quintillion-space is a design
-assembly capacity, not the count of verified playable games.
+**Honest maturity statement:** 1,296 authored world laws, 712 independently
+specified mechanic concepts and 1,232 derived world levers are cataloged.
+The vast indexed space is design-only until runtime/evaluation promotion.
+
+## October 2026 expansion: eras, chronologies, religions, themes, fidelity
+
+`skeleton/game/generation/world_styling.py` declares these axes separately.
+A world can be Neolithic and animist, contemporary and secular,
+a far-future invented pantheon, or an explicitly contradictory alternate
+history. Each combination remains a *design request* until the supporting
+asset pipeline and simulation engines demonstrate it.
+
+Emotional comfort and presentation realism are orthogonal: a
+high-fidelity physically simulated village may be exceptionally comforting;
+an eight-bit low-resolution dungeon may be genuinely nightmarish.
+Choose comfort and realism independently over integer ranges 0–100.
+`WorldStyling` rejects unknown identifiers, non-integer sliders, repeated
+themes and unbounded theme lists.
+
+`world_experience_manifest.py` projects a recipe and styling into a
+deterministic `experience_id`. The core `recipe_id` does not change
+when art, theology, chronology or emotional intensity changes. Its
+compatibility findings identify uncosted world levers, inferred mechanic
+interactions, fidelity demands that exceed unverified retro budgets,
+and mismatches between requested comfort and intense tones.
+
+**No runtime extrapolation is counted as an additional authored original.**
+For example, a gentle, dense-garden version of a branching historical
+world and a hyperrealistic, frightening, distant-future version may share
+the same core authorial premise but produce different experience digests.
+
+## Eight bounded executable mechanic kernels
+
+The atlas now includes a small abstract Python interpreter at
+`skeleton/game/generation/original_world_simulator.py`.
+It implements only these action IDs:
+
+| Mechanic | Executable state change | Constraint actually checked |
+| --- | --- | --- |
+| `time-m01` Future Collateral | Borrow 1–3 actions into the current turn | Future action debt is repaid; bounded ceiling |
+| `topology-m02` Occlusion Drift | Rotate a five-room traversal cycle | Only on unobserved transition; never removes a room |
+| `ecology-m02` Rain Herding | Move rainfall between two regions | Total precipitation is exactly conserved |
+| `serenity-m01` Soft Rest | Restore energy in a safe abstract scene | Energy capped; player spends an action |
+| `survival-m01` Resource Intake | Gather food into a player reserve | Local wildlife/food reserves decrease equally |
+| `crafting-m04` Repair Workflow | Restore shelter durability | Wood, energy and actions decrease |
+| `physics-m02` Shadow Momentum | Shift a bounded simulated momentum state | Energy costs and momentum bounds enforced |
+| `infrastructure-m01` Last Train Rewire | Rotate transit destinations at last train | Preserves connected room-cycle identity |
+
+Every accepted transition records a deterministic SHA-256 evidence digest.
+Illegal requests fail without mutating frozen state. Tick advancement pays
+future-action debt. The simulator supports replay and source-code tests.
+
+It is deliberately named **abstract simulation**; it does not render a
+world, run its 1,944 candidate actions or compile hardware-native game
+binaries. Only a small proportion of the candidate mechanic catalog is
+connected to this interpreter.
+
+## Offline preview — executable user-facing entrypoint
+
+```bash
+python -m skeleton.game.generation.original_world_cli \
+  --seed gentle-history \
+  --era paleolithic \
+  --chronology remote-past \
+  --theology animist-invented \
+  --theme comfort \
+  --theme mystery \
+  --tone ultra-snuggly \
+  --comfort 100 \
+  --realism 95 \
+  --simulation-realism environmental-sim \
+  --hardware-target pc-windows \
+  --brief
+
+python -m skeleton.game.generation.original_world_cli \
+  --index 123456789 \
+  --era deep-future \
+  --theology cosmic-mythic \
+  --theme cosmic-horror \
+  --tone nightmarish \
+  --visual-style photorealistic-target \
+  --simulation-realism hyperrealism-target \
+  --realism 100 \
+  --demo-rules
+```
+
+The latter command includes an **independent** abstract simulation demo.
+The simulation is not a compilation of the sampled recipe; that distinction
+is stated in the command output.
+
+Focused tests:
+
+```bash
+python -m pytest -q \
+  tests/test_original_world_mechanic_atlas.py \
+  tests/test_original_world_simulator.py
+```
+
+## Unfinished integration work, expressed plainly
+
+- Mechanic catalog: 712 independently cost-described specifications and
+  1,232 derived levers require complete typed execution semantics,
+  compatibility gates and economically coherent outcomes.
+- World variation: 12 topology tags are design hints. Dynamic mazes,
+  streaming voxel terrains, multiple dimensions and open-ended frontiers
+  need dedicated runtime realizers and save/replay policies.
+- Porting: 41 hardware choices are *tags*, not 41 executable emitters.
+  Continue using Dragon's existing per-platform native source,
+  compiler and emulator verification lanes. Do not bundle proprietary
+  SDKs, firmware or licensed game assets.
+- Visual quality: a photorealistic render target does not prove
+  physically accurate simulation. Benchmark each supported adapter,
+  motion system, animation budget, accessibility setting and model.
+- Authorship: 1,296 distinct written premises and 712 separately described
+  mechanic implementations are useful source material, not
+  externally peer-reviewed originality proofs or independent games.
+- Shipping: no evidence here demonstrates that all game styles or original
+  worlds have been transformed into finished playable software. Preserve
+  the design-only status until proven otherwise.
