@@ -117,3 +117,43 @@ def test_citizen_mental_state_report_is_a_transparent_causal_observation():
     assert report["first_hand_testimonies"] == []
     assert report["report_not_an_llm"]
     assert before == asdict(state)
+
+
+def test_goal_weights_learn_from_verified_delivery_not_arbitrary_idle_loops():
+    from skeleton.game.generation.original_world_npc_cognition_v2 import GOAL_ORDER
+    s = product(1)
+    s, _ = step_product(s, ProductAction(
+        "npc", "commission", target=0, option="food"))
+    s, _ = step_product(s, ProductAction("causal", "end_turn"))
+    learned = dict(zip(GOAL_ORDER, s.cognition.minds[0].learned))
+    assert learned["work"] >= 2
+    s, _ = step_product(s, ProductAction("causal", "end_turn"))
+    learned = dict(zip(GOAL_ORDER, s.cognition.minds[0].learned))
+    assert learned["deliver"] >= 2
+    assert s.cognition.orders[0].status == "fulfilled"
+    assert product_restore(product_save(s)) == s
+
+
+def test_failed_construction_feedback_discourages_repeated_unfunded_plans():
+    from skeleton.game.generation.original_world_npc_cognition_v2 import GOAL_ORDER
+    s = product(1)
+    engineer = replace(s.society.inhabitants[0], profession="builder")
+    s = replace(s,
+                society=replace(s.society, inhabitants=(engineer,)),
+                terrain=replace(s.terrain, lumber=0, masonry=0))
+    s, _ = step_product(s, ProductAction("causal", "end_turn"))
+    result = dict(zip(GOAL_ORDER, s.cognition.minds[0].learned))
+    assert result["construct"] == -2
+    assert not s.terrain.edits
+    assert s.terrain.lumber == s.terrain.masonry == 0
+
+
+def test_invalid_learned_utility_cannot_be_loaded_even_with_adjusted_memory_checks():
+    from skeleton.game.generation.original_world_npc_cognition_v2 import (
+        validate_intelligence,
+    )
+    s = product(1)
+    fake_mind = replace(s.cognition.minds[0], learned=(999,) * 10)
+    fake_cognition = replace(s.cognition, minds=(fake_mind,))
+    with pytest.raises(FoundationError):
+        validate_intelligence(fake_cognition, s.society, s.terrain)
