@@ -73,6 +73,21 @@ def _wilson(wins,total):
     return max(0.0,(center-distance)/divisor)
 
 
+def require_stronger_standard(previous: PromotionStandard,
+                              successor: PromotionStandard) -> None:
+    """A newer industry-grade bar can rise or remain fixed, never decay."""
+    if not isinstance(previous,PromotionStandard) or not isinstance(successor,PromotionStandard):
+        raise PromotionError("typed monotonic industry standard required")
+    minimums=("min_train_projects","min_validation_projects","min_test_projects",
+              "min_per_class","min_balanced_accuracy","min_project_accuracy",
+              "min_critical_recall","min_wilson_recall","min_family_cases")
+    maximums=("max_brier","max_generalization_drop","max_regression")
+    if any(getattr(successor,key)<getattr(previous,key) for key in minimums) or any(
+        getattr(successor,key)>getattr(previous,key) for key in maximums
+    ):
+        raise PromotionError("industry quality thresholds cannot silently weaken")
+
+
 def validate_policy(policy: dict):
     if type(policy) is not dict or set(policy)!={
         "weights","bias","threshold","feature_spec"
@@ -329,5 +344,6 @@ def evaluate_fresh_cohort(rows: tuple[TrainingCandidate,...],policy: dict,*,
 __all__=[
     "PromotionError","PromotionStandard","PromotionEvaluation",
     "validate_policy","predict_review","evaluate_candidate",
+    "require_stronger_standard",
     "evaluate_fresh_cohort",
 ]
