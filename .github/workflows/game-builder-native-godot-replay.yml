@@ -121,3 +121,68 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
+
+  windows-native-studio:
+    name: Execute original Godot consumer candidate on Windows
+    runs-on: windows-2022
+    timeout-minutes: 24
+    env:
+      PYTHONPATH: "."
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Checkout exact source head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install non-.NET Godot 4 on Windows
+        uses: chickensoft-games/setup-godot@f166999204a4f2722c6fe042fbaa3b3ea0d9c789 # v2.4.1
+        with:
+          version: "4.4.1"
+          use-dotnet: false
+          include-templates: true
+          cache: true
+      - name: Verify exact-head and native editor installation
+        shell: pwsh
+        run: |
+          if ((git rev-parse HEAD).Trim() -ne "$env:EXPECTED_SHA") {
+            throw "Windows runner did not checkout exact source head"
+          }
+          godot --version
+          if ($LASTEXITCODE -ne 0) { throw "Godot Windows install failed" }
+      - name: Exercise Python, authored and mirror studio contracts on Windows
+        shell: pwsh
+        run: |
+          python -m unittest tests.test_game_builder_studio_pipeline tests.test_game_builder_dual_runtime tests.test_game_builder_authored_tiles -v
+          if ($LASTEXITCODE -ne 0) { throw "Windows game studio tests failed" }
+      - name: Build original consumer source on Windows
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'original-studio'
+          New-Item -ItemType Directory -Force -Path $root | Out-Null
+          $json = '{"project_id":"skeleton-windows-native-studio-2026","title":"Original Windows Homebrew","subtitle":"Offline consumer QA candidate.","seed":471126,"width":11,"height":11,"levels":1,"collectibles_per_level":1,"hazards_per_level":1,"theme":"arcade","starting_health":4}'
+          [IO.File]::WriteAllText((Join-Path $root 'intent.json'), $json)
+          python -m skeleton.ai.game_builder.original_game_studio_cli --intent (Join-Path $root 'intent.json') --output (Join-Path $root 'project') --mirror-attempts 64 --companion-practice 1 --trusted-local-operator
+          if ($LASTEXITCODE -ne 0) { throw "Original studio project failed" }
+          $gate = Get-Content (Join-Path $root 'project/studio/consumer_gate.json') -Raw | ConvertFrom-Json
+          if ($gate.status -ne 'release-blocked') { throw "Missing consumer publication safeguards" }
+      - name: Export and execute real native Windows game
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'original-studio'
+          $project = Join-Path $root 'project/godot'
+          $binary = Join-Path $root 'original-homebrew.exe'
+          godot --headless --path $project --import
+          if ($LASTEXITCODE -ne 0) { throw "Windows import failed" }
+          godot --headless --path $project --export-release 'Windows Desktop' $binary
+          if ($LASTEXITCODE -ne 0) { throw "Windows export failed" }
+          if (-not (Test-Path $binary) -or (Get-Item $binary).Length -le 1024) {
+            throw "No executable Windows consumer candidate"
+          }
+          python -c 'import subprocess,sys; p=subprocess.run([sys.argv[1],"--headless","--","--verify-proof"],capture_output=True,text=True,timeout=90); print(p.stdout); print(p.stderr); sys.exit(0 if p.returncode == 0 and "NATIVE_REPLAY_OK" in (p.stdout+p.stderr) else 1)' $binary
+          if ($LASTEXITCODE -ne 0) { throw "Real Windows consumer executable diverged from Python proof" }
+          Get-FileHash $binary -Algorithm SHA256 | Format-List
