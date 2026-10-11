@@ -33,6 +33,7 @@ from .original_world_npc_cognition_v2 import (
 )
 from .original_world_npc_civics import propose_civic
 from .original_world_npc_apprenticeships import enroll, cancel_enrollment
+from .original_world_npc_households import establish_household, cancel_household
 
 SCHEMA = "original-world-playable-product-session.v2"
 LEGACY_SCHEMA = "original-world-playable-product-session.v1"
@@ -221,7 +222,44 @@ def _npc_operation(
     """
     world, society = session.terrain, session.society
     thinking = session.cognition
-    if action.verb == "mentor":
+    if action.verb == "household":
+        try:
+            caregiver_b = int(action.option)
+        except ValueError as exc:
+            raise FoundationError("household requires two existing distinct caregivers") from exc
+        first, second = action.target, caregiver_b
+        candidate = next(
+            (bond for bond in thinking.bonds
+             if (bond.left, bond.right) == (min(first, second),
+                                           max(first, second))),
+            None,
+        )
+        if session.living.spatial.game.causal.trust < 1:
+            raise FoundationError("new household requires community legitimacy")
+        physical, family = establish_household(
+            thinking.households, society, world,
+            caregiver_a=first, caregiver_b=second,
+            affinity=candidate.affinity if candidate else 0,
+            mutual_trust=candidate.trust if candidate else 0,
+        )
+        world = physical
+        thinking = replace(thinking, households=family)
+        previous = session.living.spatial
+        living = replace(session.living, spatial=replace(
+            previous, game=replace(previous.game, causal=replace(
+                previous.game.causal, trust=previous.game.causal.trust - 1))))
+        message = (
+            f"Two mutually trusted caregivers {first} and {second} reserved "
+            "finite food and water for a household; the new dependent is "
+            "not yet an available citizen"
+        )
+    elif action.verb == "cancel_household":
+        world, family = cancel_household(
+            thinking.households, society, world, action.target)
+        thinking = replace(thinking, households=family)
+        living = session.living
+        message = "Pending dependent's food and water escrow returned to actual stores"
+    elif action.verb == "mentor":
         try:
             apprentice = int(action.option)
         except ValueError as exc:
