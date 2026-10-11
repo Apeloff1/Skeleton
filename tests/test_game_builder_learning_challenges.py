@@ -28,8 +28,8 @@ class AdversarialReviewerQualityTests(unittest.TestCase):
         heldout=tuple(x for x in self.plan.selected if x.split=="validation")
         audit=challenge_reviewer(heldout,self.policy,authorized=True)
         self.assertGreater(audit.attempted,60)
-        self.assertEqual(audit.attempted,len(heldout)*3)
-        self.assertGreater(len(audit.by_family),3)
+        self.assertEqual(audit.attempted,len(heldout)*4)
+        self.assertGreater(len(audit.by_family),4)
         self.assertTrue(audit.heldout)
         self.assertGreater(len(audit.failed),0,
                            "metadata-only reviewer should not falsely appear fully robust")
