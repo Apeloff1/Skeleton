@@ -10,6 +10,7 @@ from html import escape
 from .original_foundation_compiler import FoundationError
 from .original_world_product_terrain import TerrainState, cell_at, validate_terrain
 from .original_world_product_agents import PhysicalSociety, validate_society
+from .original_world_npc_era_population import EraPopulation, validate_population, era_budget
 
 COLORS = {
     "meadow": (119, 174, 92),
@@ -25,10 +26,14 @@ BUILDING_COLORS = {"hearth": "#ffb55f", "mill": "#e8d7a0", "beacon": "#f3e970"}
 
 
 def scene(terrain: TerrainState, society: PhysicalSociety | None = None, *,
-          radius: int = 10) -> dict:
+          radius: int = 10, population: EraPopulation | None = None) -> dict:
     validate_terrain(terrain)
     if society is not None:
         validate_society(society, terrain)
+    if population is not None:
+        if society is None:
+            raise FoundationError("era districts require the attached real local society")
+        validate_population(population, society, terrain)
     if type(radius) is not int or not 2 <= radius <= 24:
         raise FoundationError("render radius must be 2..24")
     ox, oy = terrain.position
@@ -43,18 +48,27 @@ def scene(terrain: TerrainState, society: PhysicalSociety | None = None, *,
         for p in society.inhabitants
         if abs(p.x - ox) <= radius and abs(p.y - oy) <= radius
     ) if society is not None else ()
+    remote_districts = tuple(
+        {"id": d.id, "x": d.x, "y": d.y, "census": d.population,
+         "pantry": d.pantry, "morale": d.morale, "last_day": d.last_day}
+        for d in population.districts
+        if d.population > 0 and abs(d.x - ox) <= radius and abs(d.y - oy) <= radius
+    )[:era_budget(population.era).render_budget] if population else ()
     return {
         "world": terrain.design_id, "biome": terrain.biome,
         "center": (ox, oy), "radius": radius, "side": radius * 2 + 1,
         "cells": cells, "people": agents, "player": terrain.position,
+        "districts": remote_districts,
+        "era": population.era if population is not None else None,
     }
 
 
 def svg_render(terrain: TerrainState, society: PhysicalSociety | None = None, *,
-               radius: int = 10, tile_size: int = 22, title: str = "Original World") -> str:
+               radius: int = 10, tile_size: int = 22, title: str = "Original World",
+               population: EraPopulation | None = None) -> str:
     if type(tile_size) is not int or not 8 <= tile_size <= 64:
         raise FoundationError("invalid render tile size")
-    view = scene(terrain, society, radius=radius)
+    view = scene(terrain, society, radius=radius, population=population)
     side = view["side"]
     height = side * tile_size + 94
     width = side * tile_size
@@ -79,6 +93,15 @@ def svg_render(terrain: TerrainState, society: PhysicalSociety | None = None, *,
         if tile.building:
             parts.append(f'<rect x="{x + 5}" y="{y + 5}" width="{max(2,tile_size-10)}" '
                          f'height="{max(2,tile_size-10)}" fill="{BUILDING_COLORS[tile.building]}"/>')
+    for district in view["districts"]:
+        dx = (district["x"] - ox + radius) * tile_size
+        dy = (district["y"] - oy + radius) * tile_size
+        parts.append(f'<rect x="{dx + 3}" y="{dy + 3}" width="{tile_size - 6}" '
+                     f'height="{tile_size - 6}" rx="3" fill="#c39bfa" '
+                     f'stroke="#36234c" stroke-width="1"/>')
+        parts.append(f'<text x="{dx + tile_size//2}" y="{dy + tile_size//2+3}" '
+                     f'text-anchor="middle" font-family="sans-serif" '
+                     f'font-size="9" fill="#151326">R</text>')
     for p in view["people"]:
         px = (p["x"] - ox + radius) * tile_size + tile_size / 2
         py = (p["y"] - oy + radius) * tile_size + tile_size / 2
@@ -93,7 +116,9 @@ def svg_render(terrain: TerrainState, society: PhysicalSociety | None = None, *,
         f"{escape(title)} · {terrain.biome} · ({ox},{oy})",
         f"Energy {terrain.energy} · Provisions {terrain.provisions} · Water {terrain.freshwater}",
         f"Wood {terrain.lumber} · Stone {terrain.masonry} · "
-        f"Residents {len(society.inhabitants) if society else 0} · Turn {terrain.turns}",
+        f"Detailed residents {len(society.inhabitants) if society else 0} · "
+        f"Regional census {sum(x.population for x in population.districts) if population else 0} "
+        f"· Turn {terrain.turns}",
     )
     for i, value in enumerate(info):
         parts.append(f'<text x="9" y="{side * tile_size + 22 + 25*i}" '
@@ -103,14 +128,16 @@ def svg_render(terrain: TerrainState, society: PhysicalSociety | None = None, *,
 
 
 def ppm_render(terrain: TerrainState, society: PhysicalSociety | None = None, *,
-               radius: int = 10, scale: int = 5) -> bytes:
+               radius: int = 10, scale: int = 5,
+               population: EraPopulation | None = None) -> bytes:
     """Binary PPM: simple native raster image requiring no PIL, browser or GPU."""
     if type(scale) is not int or not 1 <= scale <= 12:
         raise FoundationError("render pixel scale outside safe bounds")
-    view = scene(terrain, society, radius=radius)
+    view = scene(terrain, society, radius=radius, population=population)
     side = view["side"]
     width = height = side * scale
     positions = {(p["x"], p["y"]) for p in view["people"]}
+    regional = {(r["x"], r["y"]) for r in view["districts"]}
     ox, oy = view["center"]
     raw = bytearray()
     for sy in range(height):
@@ -123,6 +150,8 @@ def ppm_render(terrain: TerrainState, society: PhysicalSociety | None = None, *,
                 rgb = (218, 179, 101)
             if cell.building:
                 rgb = (238, 216, 163)
+            if (ox + dx, oy + dy) in regional:
+                rgb = (195, 155, 250)
             if (ox + dx, oy + dy) in positions:
                 rgb = (250, 231, 192)
             if dx == 0 and dy == 0:
@@ -132,14 +161,15 @@ def ppm_render(terrain: TerrainState, society: PhysicalSociety | None = None, *,
 
 
 def ascii_render(terrain: TerrainState, society: PhysicalSociety | None = None, *,
-                 radius: int = 8) -> str:
-    view = scene(terrain, society, radius=radius)
+                 radius: int = 8, population: EraPopulation | None = None) -> str:
+    view = scene(terrain, society, radius=radius, population=population)
     sprites = {
         "meadow": ".", "grove": "T", "stone": "s",
         "marsh": "~", "cliff": "#", "spring": "w",
         "sand": ":", "orchard": "o",
     }
     people = {(p["x"], p["y"]) for p in view["people"]}
+    districts = {(r["x"], r["y"]) for r in view["districts"]}
     ox, oy = view["center"]
     rows = []
     for dy in range(-radius, radius + 1):
@@ -151,6 +181,8 @@ def ascii_render(terrain: TerrainState, society: PhysicalSociety | None = None, 
                 symbol = "="
             if tile.building:
                 symbol = "H"
+            if (ox + dx, oy + dy) in districts:
+                symbol = "R"
             if (ox + dx, oy + dy) in people:
                 symbol = "n"
             if (dx, dy) == (0, 0):
