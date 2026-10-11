@@ -25,6 +25,7 @@ from .quest_pareto_planner import (
 )
 from .director_capability_graph import TIERS
 from .modular_scene_compositor import compose_scene, storyboard
+from .npc_authoring import read_npc_roster
 
 
 def _payload(obj):
@@ -37,6 +38,8 @@ def build_evolution_product(
     tier: str = "desktop",
     deep_route_search: bool = True,
     mirror_attempts: int = 128,
+    npc_blueprint: str | None = None,
+    npc_human_reviewed: bool = False,
     authorized: bool,
 ) -> DirectorStudioProduct:
     if not authorized:
@@ -47,6 +50,12 @@ def build_evolution_product(
         raise DirectorError("unknown hardware tier or actual population budget")
     if type(deep_route_search) is not bool:
         raise DirectorError("deep route exploration must be explicitly enabled")
+    if (npc_blueprint is None and npc_human_reviewed) or (
+        npc_blueprint is not None and npc_human_reviewed is not True
+    ):
+        raise DirectorError("custom original NPCs need both source and human review")
+    approved=(read_npc_roster(world,npc_blueprint,human_reviewed=True,
+                              authorized=True) if npc_blueprint is not None else None)
     base=build_earned_story_product(
         world,authorized=True,mirror_attempts=mirror_attempts,
     )
@@ -55,6 +64,7 @@ def build_evolution_product(
     session=simulate_director(
         world,proof.replay.actions,population=population,
         tier=tier,authorized=True,
+        authored_society=approved.society if approved is not None else None,
     )
     missions=compile_modular_missions(world,authorized=True)
     capability=orchestrator_plan(tier)
@@ -84,6 +94,8 @@ def build_evolution_product(
             raise DirectorError("replayable alternate mission plans not available")
     files=dict(base.files)
     files.pop("release.json")
+    if approved is not None:
+        files["systems/npc_authoring_handoff.json"]=_payload(approved.evidence())
     files["systems/capability_graph.json"]=_payload(capability.payload())
     files["systems/npc_society_replay.json"]=_payload(session.payload())
     files["systems/npc_economy.json"]=_payload(market.payload())
