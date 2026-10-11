@@ -101,7 +101,7 @@ jobs:
                ["rest"]*12,2,"cold",0),
               ("new_world",{"starting_food":15,"starting_water":15},
                ["travel","rest","travel","forage","rest"],
-               5,"storm" if False else "rain",2),
+               5,"rain",2),
               ("survivor_lost",{"max_health":2,"starting_food":0,
                                 "starting_water":0,"hunger_rate":2},
                ["rest","rest"],6,"heat",0),
