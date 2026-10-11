@@ -223,6 +223,7 @@ def execute_round10_crawler_brief(
 
 def execute_round13_sandbox(
     state:EvolutionRun,ticket:ModularShadowTicket,
+    shadow_backlog:tuple[ModularShadowTicket,...],
     plan:FlowPlan,standard:PromotionStandard,
     champion:dict|None,
     usage:tuple[TrainingCandidate,...],idle:tuple[TrainingCandidate,...],*,
@@ -236,6 +237,14 @@ def execute_round13_sandbox(
 ):
     if not authorized or not consent:
         raise PermissionError("adversarial actual reviewer sandbox needs active operator consent")
+    if (len(state.rounds)!=10
+            or state.rounds[1].round_number!=4
+            or type(shadow_backlog) is not tuple
+            or ticket not in shadow_backlog
+            or state.rounds[1].report_digest!=canonical_digest(
+                [x.payload() for x in shadow_backlog])
+            or ticket.task_digest!=state.task.task_digest):
+        raise ThreatRadarError("sandbox test can only use the exact original preapproved R4 ticket")
     verdict,model=verify_shadow_in_sandbox(
         ticket,plan,standard,champion,usage,idle,authorized=True,
         consent=True,original_code_quality_approved=professional_code_review_approved,
@@ -302,6 +311,10 @@ def execute_round15_structure(
 )->tuple[EvolutionRun,WeightStructureReport]:
     if not authorized:raise PermissionError("model structure needs approved original game review")
     verify_independent_sandbox_receipts(verified,verifiers,authorized=True)
+    if (len(state.rounds)!=12 or len(state.rounds)<2
+            or state.rounds[1].report_digest!=canonical_digest(
+                [x.payload() for x in tickets])):
+        raise ThreatRadarError("structured modules must retain the exact original R4 queue")
     by_id={x.ticket_id:x for x in verified}
     if len(by_id)!=len(verified):
         raise PromotionError("duplicate post-weight candidate proof is not extra competence")
@@ -337,6 +350,9 @@ def execute_round16_load_order(
     verifiers:tuple[TrustedCompetitionJudge,...]=(),
 ):
     if not authorized:raise PermissionError("priority-weight queue needs authorized user objective")
+    if (len(state.rounds)!=13 or state.rounds[1].report_digest!=
+            canonical_digest([x.payload() for x in tickets])):
+        raise ThreatRadarError("load order must use precise preapproved R4 module queue")
     ordered=order_verified_hyperweights(state.task,tickets,proofs,
                                         authorized=True,verifiers=verifiers)
     return _advance(
