@@ -57,7 +57,7 @@ jobs:
       - name: Compile atlas and simulation modules
         run: python -m compileall -q skeleton/game/generation
       - name: Verify originals, styles and rule simulations
-        run: python -m pytest -q --noconftest tests/test_original_world_mechanic_atlas.py tests/test_original_world_simulator.py tests/test_original_world_campaign.py tests/test_original_world_campaign_cli.py tests/test_original_world_nexus.py tests/test_original_world_society.py tests/test_original_world_play_cli.py tests/test_original_world_frontier.py tests/test_original_world_frontier_cli.py tests/test_original_world_era_runtime.py tests/test_original_world_era_cli.py tests/test_original_foundation_compiler.py tests/test_original_foundation_cli.py tests/test_original_foundation_discovery.py tests/test_original_world_million_compiler.py tests/test_original_world_million_cli.py tests/test_original_world_million_objectives.py tests/test_original_world_million_synergy.py
+        run: python -m pytest -q --noconftest tests/test_original_world_mechanic_atlas.py tests/test_original_world_simulator.py tests/test_original_world_campaign.py tests/test_original_world_campaign_cli.py tests/test_original_world_nexus.py tests/test_original_world_society.py tests/test_original_world_play_cli.py tests/test_original_world_frontier.py tests/test_original_world_frontier_cli.py tests/test_original_world_era_runtime.py tests/test_original_world_era_cli.py tests/test_original_foundation_compiler.py tests/test_original_foundation_cli.py tests/test_original_foundation_discovery.py tests/test_original_world_million_compiler.py tests/test_original_world_million_cli.py tests/test_original_world_million_objectives.py tests/test_original_world_million_synergy.py tests/test_original_world_tenfold_compiler.py tests/test_original_world_tenfold_cli.py
       - name: Exercise era and theology preview
         run: |
           python -m skeleton.game.generation.original_world_cli --seed gentle-history --era paleolithic --chronology remote-past --theology animist-invented --theme comfort --tone ultra-snuggly --comfort 100 --realism 95 --brief >/dev/null
@@ -151,5 +151,12 @@ jobs:
       - name: Check authored domain × game-form pressure effects
         run: |
           python -m pytest -q --noconftest tests/test_original_world_million_synergy.py
+      - name: Prove 12.288 million world graph rules, real resources and play
+        run: |
+          python -m skeleton.game.generation.original_world_tenfold_cli --inventory
+          python -m skeleton.game.generation.original_world_tenfold_cli --page 12287997 --limit 3 >/dev/null
+          python -m skeleton.game.generation.original_world_tenfold_cli --base 0 --form puzzle --architecture lattice --arc endless --actions-json '[{"layer":"spatial","verb":"extract","amount":2},{"layer":"spatial","verb":"travel","target":1},{"layer":"mode","verb":"toggle","target":0},{"layer":"causal","verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_tenfold_cli --base 4 --form puzzle --architecture phase --arc branching --actions-json '[{"layer":"spatial","verb":"stabilize"},{"layer":"mode","verb":"toggle","target":0},{"layer":"causal","verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_tenfold_cli --base 123 --form tactics --architecture orbit --arc roguelite --actions-json '[{"layer":"spatial","verb":"align"},{"layer":"mode","verb":"guard"},{"layer":"causal","verb":"end_turn"}]' --show-map
       - name: Confirm exact head
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
