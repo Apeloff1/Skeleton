@@ -168,6 +168,9 @@ class _StudioHandler(BaseHTTPRequestHandler):
         elif path=="/api/autoload":
             output=studio.autoload_previous(values["genre"],values["project"],
                                             authorized=True)
+        elif path=="/api/fork-demo":
+            output=studio.fork_demo(values["reference"],values["project"],
+                                    authorized=True)
         else:
             return self._json(404,{"error":"unrecognized game studio mutation"})
         return self._json(200,output)
