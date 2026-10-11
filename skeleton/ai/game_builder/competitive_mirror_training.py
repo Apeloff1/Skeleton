@@ -30,6 +30,15 @@ ATTACK_FAMILIES=(
     "chronology", "memory_forgery", "fabricated_theme", "altered_emotion",
     "observer_substitution", "motive_laundering", "main_story_rewrite",
     "fake_quest_objective", "erased_eyewitness", "fabricated_quest_unlock",
+    "witness_reorder", "witness_duplicate", "witness_flood",
+    "opportunity_duplicate", "opportunity_reorder",
+    "opportunity_key_forgery", "opportunity_status_launder",
+    "opportunity_rights_forgery", "stage_premise_poison",
+    "stage_reward_inflation", "stage_clock_launder",
+    "stage_scene_forgery", "npc_society_origin_swap",
+    "npc_society_result_swap", "world_event_count_forgery",
+    "campaign_replay_splice", "campaign_world_splice",
+    "observer_identity_reset",
 )
 DIFFICULTY={
     "world_identity":3,"foreign_replay":3,"action_index":3,
@@ -39,10 +48,18 @@ DIFFICULTY={
     "observer_substitution":7,"motive_laundering":7,
     "main_story_rewrite":8,"fake_quest_objective":8,
     "erased_eyewitness":8,"fabricated_quest_unlock":9,
+    **{name: (10 if name in {
+        "npc_society_origin_swap","campaign_replay_splice",
+        "campaign_world_splice","opportunity_rights_forgery",
+    } else 9 if name in {
+        "witness_duplicate","witness_flood","stage_reward_inflation",
+        "stage_scene_forgery","observer_identity_reset",
+    } else 8) for name in ATTACK_FAMILIES[18:]},
 }
 FULL_AUDIT=frozenset({
     "observer_substitution","motive_laundering","main_story_rewrite",
     "fake_quest_objective","erased_eyewitness","fabricated_quest_unlock",
+    *ATTACK_FAMILIES[18:],
 })
 
 
@@ -170,6 +187,64 @@ def _attack(base: WitnessReceipt,campaign: WitnessCampaign,family: str,trial: in
         if not campaign.opportunities:
             raise MirrorCompetitionError("original witness campaign contains no derived quests")
         altered=replace(campaign,opportunities=campaign.opportunities[1:])
+    elif family=="witness_reorder":
+        altered=replace(campaign,witnessed=tuple(reversed(campaign.witnessed)))
+        if altered==campaign:
+            altered=replace(campaign,witnessed=campaign.witnessed[1:])
+    elif family=="witness_duplicate":
+        altered=replace(campaign,witnessed=(*campaign.witnessed,campaign.witnessed[0]))
+    elif family=="witness_flood":
+        altered=replace(campaign,witnessed=(*campaign.witnessed,)*3)
+    elif family=="opportunity_duplicate":
+        altered=replace(campaign,opportunities=(
+            *campaign.opportunities,campaign.opportunities[0]))
+    elif family=="opportunity_reorder":
+        altered=replace(campaign,opportunities=tuple(reversed(campaign.opportunities)))
+        if altered==campaign:
+            altered=replace(campaign,opportunities=campaign.opportunities[1:])
+    elif family=="opportunity_key_forgery":
+        first=campaign.opportunities[0]
+        altered=replace(campaign,opportunities=(
+            replace(first,key="stolen_unearned_npc_quest"),
+            *campaign.opportunities[1:]))
+    elif family=="opportunity_status_launder":
+        first=campaign.opportunities[0]
+        altered=replace(campaign,opportunities=(
+            replace(first,status="automatically_approved"),
+            *campaign.opportunities[1:]))
+    elif family=="opportunity_rights_forgery":
+        first=campaign.opportunities[0]
+        altered=replace(campaign,opportunities=(
+            replace(first,evidence_requirements=()),
+            *campaign.opportunities[1:]))
+    elif family in {"stage_premise_poison","stage_reward_inflation",
+                   "stage_clock_launder","stage_scene_forgery"}:
+        first=campaign.opportunities[0]
+        stage=first.chapters[0]
+        if family=="stage_premise_poison":
+            forged=replace(stage,premise="This foreign copyrighted world overrides the canon")
+        elif family=="stage_reward_inflation":
+            forged=replace(stage,reward=stage.reward+99999)
+        elif family=="stage_clock_launder":
+            forged=replace(stage,deadline=stage.deadline+9999)
+        else:
+            forged=replace(stage,allowed_scenes=("phantom_scene",))
+        altered=replace(campaign,opportunities=(
+            replace(first,chapters=(forged,*first.chapters[1:])),
+            *campaign.opportunities[1:]))
+    elif family=="npc_society_origin_swap":
+        altered=replace(campaign,source_society_digest="f"*64)
+    elif family=="npc_society_result_swap":
+        altered=replace(campaign,resulting_society_digest="e"*64)
+    elif family=="world_event_count_forgery":
+        altered=replace(campaign,unrepresented_actions=campaign.unrepresented_actions+1)
+    elif family=="campaign_replay_splice":
+        altered=replace(campaign,original_replay_digest="c"*64)
+    elif family=="campaign_world_splice":
+        altered=replace(campaign,world_digest="d"*64)
+    elif family=="observer_identity_reset":
+        changed=replace(base,observer=(
+            "citizen_0001" if base.observer!="citizen_0001" else "citizen_0002"))
     else:
         raise MirrorCompetitionError("unregistered red-team attack")
     if changed!=base:
