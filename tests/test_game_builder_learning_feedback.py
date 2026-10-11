@@ -14,6 +14,7 @@ from skeleton.ai.game_builder.game_learning_feedback import (
 from skeleton.ai.game_builder.game_model_promotion import (
     PromotionError, PromotionEvaluation, PromotionStandard,
     evaluate_fresh_cohort,propose_progressive_standard,require_stronger_standard,
+    _complete_metamorphic_evaluation,
 )
 
 
@@ -186,6 +187,22 @@ class AdversarialEvidencePromotionTests(unittest.TestCase):
         self.assertTrue(witness["complete_coverage"])
         self.assertEqual(witness["attempted"],4*len(extensive))
         self.assertGreater(len(witness["by_split"]),2)
+
+    def test_frozen_heldout_challenges_cover_all_cases_not_first_512(self):
+        original=evidence_rows()[0]
+        synthetic=tuple(replace(
+            original,
+            example_id=canonical_digest({"sealed_challenge_example":i}),
+            input=dict(original.input,independent_replay_step=i),
+        ) for i in range(1025))
+        result=_complete_metamorphic_evaluation(synthetic,policy())
+        self.assertEqual(result["expected_cases"],1025)
+        self.assertEqual(result["covered_cases"],1025)
+        self.assertEqual(result["attempted"],4100)
+        self.assertEqual(sum(s["source_examples"] for s in result["shards"]),1025)
+        self.assertTrue(result["complete_coverage"])
+        self.assertGreaterEqual(len(result["shards"]),3)
+        self.assertTrue(result["heldout_examples_used_for_training"] is False)
 
     def test_rehashed_same_gameplay_evidence_does_not_inflate_quality(self):
         original=evidence_rows()
