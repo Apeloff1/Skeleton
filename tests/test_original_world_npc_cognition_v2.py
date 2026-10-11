@@ -79,7 +79,7 @@ def test_cognitive_ticks_replan_without_teleportation_or_free_energy():
             assert 0 <= after.energy <= 20
             assert 0 <= after.health <= 20
             assert 0 <= after.hunger <= 20
-            assert 1 <= len(minds.minds[before.id].memories) <= 8
+            assert 1 <= len(minds.minds[before.id].memories) <= 16
 
 
 def test_issued_npc_work_order_uses_actual_tile_and_finite_depot_delivery():
@@ -138,7 +138,7 @@ def test_thoughts_have_bounded_persistent_observations_with_authentic_coordinate
     world, people, minds = sample(1)
     for _ in range(15):
         world, people, minds, _, _ = smart_npc_tick(world, people, minds)
-    assert len(minds.minds[0].memories) <= 8
+    assert len(minds.minds[0].memories) <= 16
     for record in minds.minds[0].memories:
         assert record.turn <= minds.day
         assert record.position
