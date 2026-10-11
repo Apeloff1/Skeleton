@@ -358,9 +358,9 @@ class WorldStyling:
                 raise ValueError(f"{name} must be integer 0 to 100")
 
     @property
-    def scientifically_grounded(self) -> bool:
-        # Hyperreal rendering is *not* scientific truth. Physics needs
-        # independent validation if changed by fictional world-law rules.
+    def requires_scientific_validation(self) -> bool:
+        # This is a fidelity request, not proof of scientific correctness.
+        # Independent physics/domain validation remains mandatory.
         return self.simulation_realism in {
             "physical-consistent", "material-sim", "environmental-sim",
             "high-fidelity-sim", "hyperrealism-target",
