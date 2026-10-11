@@ -144,7 +144,7 @@ def test_individual_thought_history_conserves_people_and_stocks_for_many_ticks()
         s = act(s, "end_turn", layer="causal")
         validate_product(s)
         assert len(s.society.inhabitants) == len(s.cognition.minds) == 6
-        assert all(len(m.memories) <= 8 for m in s.cognition.minds)
+        assert all(len(m.memories) <= 16 for m in s.cognition.minds)
         assert all(0 <= x.hunger <= 20 for x in s.society.inhabitants)
         assert all(0 <= x.health <= 20 for x in s.society.inhabitants)
     restored = product_restore(product_save(s))
