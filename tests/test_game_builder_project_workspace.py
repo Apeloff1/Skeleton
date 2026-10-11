@@ -194,7 +194,7 @@ class OriginalGameWorkbenchTests(unittest.TestCase):
         html=render_workspace_html("a"*32).decode()
         js=re.findall(r"<script>(.*?)</script>",html,re.DOTALL)
         self.assertEqual(len(js),1)
-        self.assertIn("game studio",html.lower())
+        self.assertIn("original game ai studio",html.lower())
         self.assertIn("Fork demo into current",html)
         self.assertIn("Plan affected modules",html)
         self.assertIn("Content-Security-Policy",html)
