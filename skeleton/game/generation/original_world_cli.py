@@ -14,6 +14,9 @@ from .original_world_compiler import TOTAL_VARIANTS, blueprint_at, blueprint_fro
 from .original_foundation_compiler import (
     foundation_at, foundation_from_seed, provenance_report,
 )
+from .original_world_million_compiler import (
+    advanced_at, advanced_from_seed, advanced_inventory, mode_at,
+)
 from .original_world_simulator import (
     WorldRuleAction, replay_rules, route_edges,
 )
@@ -32,6 +35,12 @@ def _parser() -> argparse.ArgumentParser:
                           help="Exact authorial cross-law foundation index [0,10239]")
     selector.add_argument("--foundation-seed",
                           help="Deterministically choose a causal foundation")
+    selector.add_argument("--mode-index", type=int,
+                          help="Exact 100k gameplay-form foundation index [0,102399]")
+    selector.add_argument("--advanced-index", type=int,
+                          help="Exact million-world game configuration [0,1228799]")
+    selector.add_argument("--advanced-seed",
+                          help="Deterministic gameplay and progression configuration")
     parser.add_argument("--era", default="near-future")
     parser.add_argument("--chronology", default="fictional-history")
     parser.add_argument("--theology", default="none")
@@ -63,6 +72,41 @@ def main(argv: Sequence[str] | None = None) -> int:
             realism=args.realism,
             hardware_target=args.hardware_target,
         )
+        if args.mode_index is not None:
+            selected = mode_at(args.mode_index)
+            print(json.dumps({
+                "catalog": "mechanically-mode-bound-world-foundations",
+                "mode": selected.as_dict(),
+                "count": advanced_inventory()["mechanically_mode_bound_foundation_entries"],
+                "styling_request_only": styling.as_dict(),
+                "warning": "Gameplay form has a generic executing adapter. "
+                           "Visual/hardware settings are design targets, not native builds.",
+            }, sort_keys=True, indent=2, ensure_ascii=False))
+            return 0
+        if args.advanced_index is not None or args.advanced_seed is not None:
+            law = (advanced_at(args.advanced_index) if args.advanced_index is not None
+                   else advanced_from_seed(args.advanced_seed))
+            print(json.dumps({
+                "catalog": "million-composed-causal-worlds",
+                "advanced_world": law.as_dict() if not args.brief else {
+                    "id": law.advanced_id,
+                    "index": str(law.index),
+                    "design_id": law.design_id,
+                    "base_id": law.mode.base.foundation_id,
+                    "play_form": law.mode.form.form_id,
+                    "progression": law.arc.arc_id,
+                    "provenance": law.provenance,
+                    "simulation_status": law.simulation_status,
+                },
+                "inventory": advanced_inventory(),
+                "styling_request_only": styling.as_dict(),
+                "play_command": "python -m skeleton.game.generation.original_world_million_cli --index "
+                                + str(law.index) + " --interactive",
+                "warning": "The advanced catalog is lazy and composed, not 1.2m "
+                           "individually authored or native playable games. "
+                           "Styles are not implemented renderer artifacts.",
+            }, sort_keys=True, indent=2, ensure_ascii=False))
+            return 0
         if args.foundation_index is not None or args.foundation_seed is not None:
             law = (foundation_at(args.foundation_index)
                    if args.foundation_index is not None
