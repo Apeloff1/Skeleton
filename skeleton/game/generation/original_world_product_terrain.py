@@ -220,7 +220,10 @@ def step_terrain(state: TerrainState, action: TerrainAction) -> tuple[TerrainSta
     needs_adjacent = action.verb in ("walk", "jump")
     if needs_adjacent and distance != 1:
         raise FoundationError("tile travel requires adjacent physical grid position")
-    if not needs_adjacent and action.verb != "end_turn" and (
+    if action.verb == "bridge":
+        if distance != 1:
+            raise FoundationError("bridge construction targets an adjacent hazard")
+    elif not needs_adjacent and action.verb != "end_turn" and (
         action.target_x, action.target_y
     ) != current:
         raise FoundationError("tile interaction requires physically present player")
