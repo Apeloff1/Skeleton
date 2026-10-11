@@ -12,7 +12,7 @@ import unittest
 from skeleton.ai.game_builder.advanced_gameplay_runtime import (
     run_advanced_session, AdvancedRuntimeError,
 )
-from skeleton.ai.game_builder.advanced_level_scenes import make_advanced_scene
+from skeleton.ai.game_builder.advanced_level_scenes import make_advanced_scene, SceneError
 from skeleton.ai.game_builder.advanced_puzzle_solver import solve_advanced_puzzle
 from skeleton.ai.game_builder.advanced_godot_export import (
     AdvancedGodotExportError, NativeAdvancedGamePackage,
@@ -84,7 +84,7 @@ class AdvancedGodotPackageTests(unittest.TestCase):
         manipulated["actions"]=["wait"]
         with self.assertRaises(AdvancedRuntimeError):
             render_advanced_godot_package(manipulated,settings,authorized=True)
-        with self.assertRaises(AdvancedRuntimeError):
+        with self.assertRaises(SceneError):
             render_advanced_godot_package(game,{"board_width":6},authorized=True)
         with self.assertRaises(AdvancedGodotExportError):
             render_advanced_godot_package(
