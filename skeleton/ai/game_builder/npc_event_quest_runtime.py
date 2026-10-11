@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from .contracts import canonical_digest
 from .quest_scene_engine import DirectorWorld,DirectorReplay,director_verify
 from .modular_mission_runtime import director_facts
+from .npc_society_runtime import Society
 from .npc_witness_quest_engine import (
     WitnessCampaign,EmergentQuest,WitnessError,
     audit_witness_campaign,validate_witness,
@@ -131,6 +132,7 @@ def replay_witness_quests(
     maximum_witnesses: int=128,authorized: bool,
     authored_chapters: dict[str,tuple] | None=None,
     human_reviewed: bool=False,
+    starting_society: Society | None=None,
 ) -> WitnessQuestReplay:
     if not authorized:
         raise PermissionError("real witnessed quest replay needs original operator authority")
@@ -138,7 +140,8 @@ def replay_witness_quests(
     audit_witness_campaign(world,replay,campaign,
                            population=population,active_budget=active_budget,
                            ambient_budget=ambient_budget,
-                           maximum_witnesses=maximum_witnesses,authorized=True)
+                           maximum_witnesses=maximum_witnesses,
+                           starting_society=starting_society,authorized=True)
     if authored_chapters is not None:
         if human_reviewed is not True or type(authored_chapters) is not dict:
             raise WitnessProgressError("designer witness changes require human review")
