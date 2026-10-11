@@ -51,7 +51,7 @@ jobs:
       - name: Compile atlas and simulation modules
         run: python -m compileall -q skeleton/game/generation
       - name: Verify originals, styles and rule simulations
-        run: python -m pytest -q --noconftest tests/test_original_world_mechanic_atlas.py tests/test_original_world_simulator.py tests/test_original_world_campaign.py tests/test_original_world_campaign_cli.py
+        run: python -m pytest -q --noconftest tests/test_original_world_mechanic_atlas.py tests/test_original_world_simulator.py tests/test_original_world_campaign.py tests/test_original_world_campaign_cli.py tests/test_original_world_nexus.py
       - name: Exercise era and theology preview
         run: |
           python -m skeleton.game.generation.original_world_cli --seed gentle-history --era paleolithic --chronology remote-past --theology animist-invented --theme comfort --tone ultra-snuggly --comfort 100 --realism 95 --brief >/dev/null
@@ -62,5 +62,24 @@ jobs:
           python -m skeleton.game.generation.original_world_campaign_cli --world ecology-03 --seed living-rain --actions-json '[{"verb":"redirect_rain","option":"west","amount":2},{"verb":"end_turn"}]' --show-map
           python -m skeleton.game.generation.original_world_campaign_cli --world civilization-01 --seed promises --actions-json '[{"verb":"pledge"},{"verb":"fulfill"},{"verb":"end_turn"}]' --show-map
           python -m skeleton.game.generation.original_world_campaign_cli --world serenity-05 --seed cozy --actions-json '[{"verb":"weave","amount":2},{"verb":"rest"},{"verb":"end_turn"}]' --show-map
+      - name: Run connected four-world expedition
+        run: |
+          python - <<'PY'
+          from skeleton.game.generation.original_world_campaign import CampaignAction
+          from skeleton.game.generation.original_world_nexus import (
+              create_nexus, act, travel, recharge, nexus_save, nexus_restore,
+          )
+          state = create_nexus("cross-world-expedition")
+          state, _ = act(state, CampaignAction("weave", amount=2))
+          for realm in (1, 2, 3, 0):
+              state, _ = travel(state, realm)
+              state, _ = act(state, CampaignAction("end_turn"))
+          restored = nexus_restore(nexus_save(state))
+          assert restored == state
+          assert state.realms[0].quilt == 4
+          assert sum(realm.wood for realm in state.realms) == 1
+          assert len(state.realms) == 4
+          print("Four-world traversal and non-duplicated inventory verified")
+          PY
       - name: Confirm exact head
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
