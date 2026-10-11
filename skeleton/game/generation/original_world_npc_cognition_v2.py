@@ -742,6 +742,16 @@ def smart_npc_tick(
             # search, labor, inventory minting, social learning, movement,
             # medicine or constructed work in an unallocated cognition slot.
             hunger = min(20, person.hunger + 1)
+            operation, resource, quantity = "passive-survival-no-cognition", "", 0
+            if (hunger >= 7 and (person.x, person.y) == (0, 0)
+                    and current_world.provisions >= 1 and person.health > 0):
+                # A simple local meal needs neither route-planning nor a
+                # costly mind. It still pays EXACTLY one actual ration.
+                current_world = replace(
+                    current_world, provisions=current_world.provisions - 1)
+                hunger = max(0, hunger - 7)
+                operation, resource, quantity = (
+                    "passive-funded-depot-meal", "food", 1)
             updated = replace(
                 person, hunger=hunger,
                 energy=min(20, person.energy + 2),
@@ -754,12 +764,12 @@ def smart_npc_tick(
             ))
             receipts.append(NpcReceipt(
                 people.event_count + 1, person.id, person.profession,
-                "passive-survival-no-cognition", start, start, "", 0,
+                operation, start, start, resource, quantity,
             ))
             thoughts.append(ThoughtReceipt(
                 person.id, mind.goal, 0,
-                "Unallocated brain slot; only embodied survival clock advanced",
-                "passive-survival-no-cognition",
+                "Unallocated brain slot; embodied survival plus honest local meal",
+                operation, resource, quantity,
             ))
             continue
         goal, utility, reason, objective = _plan(person, mind, thinking, current_world)
