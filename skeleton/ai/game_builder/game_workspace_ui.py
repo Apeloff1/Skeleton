@@ -849,6 +849,31 @@ $("advanced-scene-template").addEventListener("click",async()=>{
   status("Authored scene template validated. Modify terrain/regions, then validate again.");
  }catch(error){status("Authored scene rejected: "+error.message);}
 });
+$("advanced-puzzle-solve").addEventListener("click",async()=>{
+ try{
+  if(systemEditor().id!=="puzzle")
+   throw Error("Proof search currently supports the advanced puzzle editor only");
+  const template=await reviewedSceneTemplate();
+  $("advanced-scene-json").value=JSON.stringify(template.scene,null,2);
+  renderSceneAuthoring();
+  const result=await api("/api/advanced-puzzle-solve",{
+   scene:template.scene,settings:systemSettings(),
+   max_states:12000,max_depth:96});
+  const proof=result.proof;
+  $("advanced-puzzle-proof").textContent=JSON.stringify({
+   status:proof.status,states:proof.search_state_count,
+   solution_steps:proof.shortest_steps,actions:proof.commands,
+   proof_digest:proof.digest,
+   authoritative_replay:proof.verified_by_authoritative_replay,
+   hardware_certified:proof.hardware_certified,
+  },null,2);
+  status(proof.status==="solved"?
+   "Puzzle solvability proved by actual gameplay replay":
+   proof.status==="unsatisfiable_exhaustive"?
+   "Exhaustive bounded puzzle state graph shows no solution":
+   "Puzzle solvability remains unproven within bounded search");
+ }catch(error){status("Original puzzle proof rejected: "+error.message);}
+});
 $("advanced-scene-stage").addEventListener("click",async()=>{
  try{
   if(!model||selectedTree!=="current"||selectedProject!==model.active)
@@ -996,6 +1021,8 @@ Other editor families remain authoring-only, not falsely certified engines.</sma
 <label>Original authored scene ID<input id="advanced-scene-id" value="scene_01"></label>
 <button id="advanced-scene-template" type="button">Create / validate authored scene</button>
 <button id="advanced-scene-stage" type="button">Stage authored scene for review</button>
+<button id="advanced-puzzle-solve" type="button">Prove puzzle solution / detect impossible state</button>
+<pre id="advanced-puzzle-proof" role="status" aria-live="polite"></pre>
 <label>Editable scene geometry and resource JSON
 <textarea id="advanced-scene-json" rows="6" spellcheck="false"
  placeholder="Generate an advanced authored scene, then edit its layout."></textarea></label>
