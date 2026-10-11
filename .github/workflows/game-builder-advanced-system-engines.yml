@@ -1,0 +1,50 @@
+name: Game Builder Advanced System Engines
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
+      - "skeleton/ai/game_builder/system_editors.py"
+      - "skeleton/ai/game_builder/system_editor_assembly.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_*.py"
+      - "tests/test_game_builder_advanced_runtime.py"
+      - "tests/test_game_builder_system_editors.py"
+      - ".github/workflows/game-builder-advanced-system-engines.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: advanced-original-game-engines-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  executable-reference:
+    name: Advanced reference gameplay and forged-replay resistance (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Exact head checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Validate exact head and Python syntax
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          python -m py_compile skeleton/ai/game_builder/advanced_gameplay_runtime.py skeleton/ai/game_builder/system_editors.py skeleton/ai/game_builder/system_editor_assembly.py skeleton/ai/game_builder/system_editor_cli.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_workspace_ui.py tests/test_game_builder_advanced_runtime.py tests/test_game_builder_system_editors.py
+      - name: Execute advanced-floor authoring, three engines and replay attacks
+        shell: bash
+        run: python -m unittest tests.test_game_builder_advanced_runtime tests.test_game_builder_system_editors -v
