@@ -198,6 +198,8 @@ def execute_round11_destinations(
     as_of:str,authorized:bool,
 )->tuple[EvolutionRun,tuple[CrawlerDestination,...]]:
     if not authorized:raise PermissionError("research destination lookup needs permission")
+    if packet.project_id!=state.task.original_id:
+        raise ThreatRadarError("crawler destination source rights belong to another original game")
     sources=derive_round11_reviewed_destinations(
         wiki,brief,packet,rights,authorized=True)
     return _advance(
