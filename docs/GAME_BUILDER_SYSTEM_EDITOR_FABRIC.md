@@ -89,6 +89,34 @@ The same restricted loopback/CSRF-token protocol exposes `GET /api/editors`
 and `POST /api/editor-preview`. No action accepts arbitrary scripts or invokes
 a network provider; the server does not itself write a project during preview.
 
+## Composing an original hybrid game
+
+The newly implemented `system_editor_assembly` builds a content-addressed,
+deterministic composition graph across all **approved, current** system files.
+It orders systems, checks cross-editor constraints, preserves independent
+mechanics preview proofs, surfaces coupling edges and explicitly lists
+missing production adapters and remaining independent release reviews.
+
+The **Review assembled current systems** UI button runs this check without
+altering source. It detects incompatible gravity scales, platform-era NPC
+budgets, missing NPC dialogue population, unsupported multiplayer authority,
+unbounded sandbox saves, and undersized audio channel budgets.
+
+The offline command line also exposes precise automation-friendly operations:
+
+```bash
+python -m skeleton.ai.game_builder.system_editor_cli list
+python -m skeleton.ai.game_builder.system_editor_cli template --editor tower_defense
+python -m skeleton.ai.game_builder.system_editor_cli preview --editor racing
+python -m skeleton.ai.game_builder.system_editor_cli assembly \
+  --root /tmp/original-studio --project new_hybrid --trusted-local-operator
+```
+
+These commands validate or inspect local authored configurations; they do not
+auto-approve edits, install engines, run untrusted external tools or publish a
+game. Cross-editor coupling edges are shown as **not yet integrated** until
+their production runtime adapters actually exist.
+
 ## Unfinished implementation work — factual release blockers
 
 - Connect each of the 35 authoring-only editors to real genre mechanics,
