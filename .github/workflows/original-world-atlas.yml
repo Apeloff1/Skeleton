@@ -240,7 +240,7 @@ jobs:
         run: |
           python -m pytest -q --noconftest tests/test_original_world_npc_era_population.py
           python -m skeleton.game.generation.original_world_product_cli --base 0 --form puzzle --architecture lattice --system trophic --arc sandbox --era interstellar --population-report --actions-json '[{"layer":"population","verb":"dispatch_food","target":0,"option":"to-region","amount":2},{"layer":"causal","verb":"end_turn"}]' --save /tmp/npc-era-sim.json --svg /tmp/npc-era-view.svg > /tmp/npc-era-proof.json
-          python -c "import json; p=json.load(open('/tmp/npc-era-proof.json')); assert p['product']['regional_population']['regional_aggregated_residents'] == 16384"
+          python -c "import json; p=json.load(open('/tmp/npc-era-proof.json'))['product']['regional_population']; assert 0 < p['regional_aggregated_residents'] <= 144 and p['platform_genre_profile']['genre']=='puzzle' and not p['legacy_high_density']"
           python -m skeleton.game.generation.original_world_product_cli --load /tmp/npc-era-sim.json --population-report >/dev/null
           test -s /tmp/npc-era-view.svg
       - name: Verify 40-era adaptive local NPC CPU budgets and bounded animated crowds
