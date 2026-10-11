@@ -118,7 +118,7 @@ def prepare_shadow_tickets(
             canonical_digest([task.task_digest,priority.topic_digest,"shadow"]),
             task.task_digest,priority.topic_id,priority.estimated_usefulness_bp,
             size,(task.era,),(task.genre,),task.themes,
-            priority.topic_digest,original_code_review_digest,
+            priority.source_almanac_digest,original_code_review_digest,
             canonical_digest(plan.payload()),True))
     return tuple(result)
 
