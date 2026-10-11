@@ -2,8 +2,8 @@
   "schema": "skeleton.dragon.almanac_acquisition_progress.v1",
   "registry_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
   "ordering": "source_id_ascending",
-  "next_source_offset": 416,
-  "reviewed_candidate_count": 416,
+  "next_source_offset": 448,
+  "reviewed_candidate_count": 448,
   "entries": [
     {
       "source_id": "source-0017fcb9b1445e4f0a6949fb81b3fe01159175a23ca300ff1350938c2b2a0974",
@@ -3748,33 +3748,321 @@
       "availability": "repository_metadata_returned",
       "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0013.json",
       "approved": false
+    },
+    {
+      "source_id": "source-1733f1f864767fdb84cbfa940b30d0790231568000a4b896284018366ebf352f",
+      "source_offset": 416,
+      "url": "https://github.com/bryanedds/Nu",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-174a693eabf99a5dc3e3ba4d622cf3a6506b3dbe48461c8b57d1ae5161d34962",
+      "source_offset": 417,
+      "url": "https://emshort.blog/",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-175583e9e8720858c5d53791dae21dc802a9796fb8e7e61509f06f6e7cb1c9bc",
+      "source_offset": 418,
+      "url": "https://coffeebraingames.wordpress.com/2020/04/05/one-million-sprites-more-than-120fps-dots-not-required/",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-17665c689addf7d1df814c8b7f0523266a9c3318a1aeef73cf975d1910e155db",
+      "source_offset": 419,
+      "url": "https://youtu.be/if_hvgLC5cM",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-176802f66eb6ebffc6ed14bc127eb0a4ef8dd919a94d51a0e71ec5851906029c",
+      "source_offset": 420,
+      "url": "https://github.com/jwvhewitt/dmeternal",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-176831227e8a39bfa3e3719687aa487cec41b0901e34ecba4f01c22c5b8bcc07",
+      "source_offset": 421,
+      "url": "https://medium.com/mighty-bear-games/a-gentle-introduction-to-ai-8d7efaea12cc",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-176999eaf742836644e5915f15c0005f6da9f68867cafd7d024de91addf2abe9",
+      "source_offset": 422,
+      "url": "https://laroldsjubilantjunkyard.com/tutorials/how-to-make-a-gameboy-game/",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "redirect_to_related_index",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-176e4858fc0790d2cb8356e5154dd5dc05db77d17253007b580841c52e59e198",
+      "source_offset": 423,
+      "url": "https://www.udacity.com/course/interactive-3d-graphics--cs291",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1789e1b1813053feafba17d2551483d679937c286e2f4544c403e7a1928434c3",
+      "source_offset": 424,
+      "url": "https://storiedcolors.com/browse/",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-17a2e8571b526cc7faa902f00ed9cc8111fc929a17a77f747670f428dd289f31",
+      "source_offset": 425,
+      "url": "https://discord.com/developers/docs/game-sdk/sdk-starter-guide",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-17c786f3992e4db8f7eee8e9a0eccc5d0fc214438f6dcfacf381e4aac3b54880",
+      "source_offset": 426,
+      "url": "https://github.com/0xFA11/GameNetworkingResources",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-17cc5bf6f93b52327e711725e1bab25e2ad00257c3cea5d28a2a858440bb2f7b",
+      "source_offset": 427,
+      "url": "https://ambiera.com/copperlicht/",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-17cfb07f93118933104231bc0da7f0778a361b399e1665c07d29d75d27780f44",
+      "source_offset": 428,
+      "url": "http://www.adityaravishankar.com/projects/games/command-and-conquer/",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-17d075b203b08ed58569da91276baccd88a8dc8cfb0e69aaf4d817770e27f2fc",
+      "source_offset": 429,
+      "url": "http://www.gamasutra.com/view/feature/129948/the_chemistry_of_game_design.php",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "redirect_to_non_target_index",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-17d14184319542eb1dadde8cc182c7c673073e5c56be1397d397bfbd786e8518",
+      "source_offset": 430,
+      "url": "https://80.lv/articles/environment-design-style-over-function/",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-17e3926963f79d1352531af132d4e4942a72252965929a4fccfe4cb7387b2325",
+      "source_offset": 431,
+      "url": "https://github.com/AdamAtomic/GraveRobbers",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-18098a6feae51d0539d11cd700dab308ac473f917313eb15efcbb4ad73703bb1",
+      "source_offset": 432,
+      "url": "https://randygaul.github.io/math/2022/09/18/Game-Math-101-Writing-your-Own-2D-Math-in-CPP.html",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-181aab5ce3889912eb23cdc6eec33e262621ebd2d5e584def5dd0fd9334c6ce1",
+      "source_offset": 433,
+      "url": "https://github.com/redorav/public_source_engines",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-181d80a46245c999b4b9a321bc7beb440276d20f60aa0d47fce79c6882f7bdcf",
+      "source_offset": 434,
+      "url": "https://github.com/beefsack/GDScript-sublime",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-181e7b8dcbc3b684d79abd690897ab974cba5e84f156a068e3bf14e7f381e3bc",
+      "source_offset": 435,
+      "url": "https://github.com/faiface/pixel-examples",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1823f5d484727ea04f3f95643b87792087aa5e886e8d800ea1a08efdd8dc0b27",
+      "source_offset": 436,
+      "url": "https://www.gamasutra.com/blogs/ShazYousaf/20200409/360899/The_Likelihood_of_Making_at_Least_10000_in_the_First_30_days_of_Launch_on_Steam.php",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-18297bb0527234b051fb092f9a7bf42cd2cdc9ffcf41b588f0368d5b129c1939",
+      "source_offset": 437,
+      "url": "https://github.com/libgdx/libgdx/wiki/Texture-packer",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "redirect_to_non_target_index",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-18324bca9c54013d42f4800a975d3157721c90819257fced22f30b05dbfa49ad",
+      "source_offset": 438,
+      "url": "https://www.derek-lieu.com/blog/",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-184e5537636257ac4c6291b08ebe8e09bb4f7d0cc69073571f24192a0095f1f7",
+      "source_offset": 439,
+      "url": "https://github.com/3ddelano/discord.gd",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-18692230ee231e43f0a218f54129ed07559475fb159990b8de6dda466344fb48",
+      "source_offset": 440,
+      "url": "https://medium.com/@shaigreenbergtm/on-translating-portal-and-other-games-fa146a514484",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-187c14433601683f7cf273e4e9e02fc83331f6ea32e7fb5f25cd7cbe89eea45e",
+      "source_offset": 441,
+      "url": "http://hughsk.io/ludum-dare-27/",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "metadata_shell_only",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1887f74b14bb5e937402cf58b27c8e639b81ad7efef80fb0c13b84a6a26873e1",
+      "source_offset": 442,
+      "url": "http://oryxdesignlab.com/",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1894e3e6f2caff5c3159be258b182f4f901f1b4bad009570f7345a1441540cd4",
+      "source_offset": 443,
+      "url": "https://github.com/Tonejs/Tone.js",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-18a2521c2ff27651359fb36ea3fc2160b692f95c6fec9047e3f220705dff20c3",
+      "source_offset": 444,
+      "url": "https://www.youtube.com/playlist?list=PLcRSafycjWFceHTT-m5wU51oVlJySCJbr",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-18a4c085bd903f34a1cec6edf3c30ba64c10f1ec2ae2de8a8bcdc664cf3987b3",
+      "source_offset": 445,
+      "url": "https://doc.mapeditor.org/en/stable/",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-18a768eae7426f58046ad0686bc8f1e3aafa50b1b137c1d4d3dfd4ae8cd3811c",
+      "source_offset": 446,
+      "url": "http://www.gamasutra.com/view/feature/3675/the_pursuit_of_games_designing_.php",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-18b71a8fbf54c164a020637c3fe68ee438d2fe6610d6688d675e4565f87b16ff",
+      "source_offset": 447,
+      "url": "http://gamasutra.com/blogs/LindseyHandley/20140930/226640/Lessons_Learned_in_a_Successful_Indie_Game_Kickstarter_Campaign_How_CodeSpells_Raised_120K.php",
+      "checked_at": "2026-10-11T16:19:02.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "approved": false
     }
   ],
   "whole_web_complete": false,
   "notes": "First-pass cursor counts candidate checks, not canonical approval. Every unresolved source remains blocked in its batch evidence. Registry unchanged; worldwide denominator unknown.",
-  "checked_candidate_count": 416,
+  "checked_candidate_count": 448,
   "approved_source_count": 0,
   "distilled_source_count": 0,
   "last_batch_counts": {
     "newly_checked": 32,
-    "fetched_representations": 22,
-    "repository_metadata": 13,
-    "target_page_representations": 9,
-    "metadata_shells": 3,
+    "fetched_representations": 20,
+    "repository_metadata": 9,
+    "target_page_representations": 11,
+    "metadata_shells": 1,
     "source_files": 0,
-    "retrieval_failed": 7,
+    "retrieval_failed": 11,
     "blocked_from_admission": 32,
     "distilled": 0,
     "approved": 0,
-    "additional_license_files_fetched": 10,
+    "additional_license_files_fetched": 7,
     "license_file_fetch_failures": 3,
     "exact_source_files_fetched": 0,
-    "auxiliary_identity_or_rights_files_fetched": 22,
-    "git_blob_identities_api_matched": 22,
-    "git_blobs_locally_reproduced": 22,
+    "auxiliary_identity_or_rights_files_fetched": 16,
+    "git_blob_identities_api_matched": 16,
+    "git_blobs_locally_reproduced": 16,
     "git_blobs_text_normalization_mismatch": 0
   },
-  "last_batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0013.json",
-  "last_updated_at": "2026-10-11T15:12:54.000Z",
+  "last_batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+  "last_updated_at": "2026-10-11T16:19:02.000Z",
   "reviewed_candidate_count_definition": "Legacy field counts first-pass candidate checks only; it does not mean independent source review or approval."
 }
