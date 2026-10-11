@@ -22,6 +22,9 @@ from .rival_convergence_observatory import (
     CompetitiveLedger,evaluate_convergence,verify_delivery,
 )
 from .rival_public_monitor import MonitoringError,poll_public_steam_titles
+from .rival_delivery_campaign import (
+    TaskEvidence,plan_competitive_campaign,reconcile_competitive_campaign,
+)
 
 
 def _file(path:str,maximum=900_000):
@@ -106,6 +109,16 @@ def _report(doc):
     return report
 
 
+def _delivery(raw):
+    if type(raw) is not dict or set(raw)!=set(DeliveryVerification.__dataclass_fields__):
+        raise CompetitiveError("complete delivery proof shape required")
+    if type(raw["measurements"]) is not list:
+        raise CompetitiveError("bounded measured gameplay receipt list required")
+    return DeliveryVerification(
+        **{**raw,"measurements":tuple(
+            _typed(QualityMeasurement,m) for m in raw["measurements"])})
+
+
 def parser():
     p=argparse.ArgumentParser(prog="python -m skeleton.ai.game_builder.rival_watch_cli")
     sub=p.add_subparsers(dest="action",required=True)
@@ -118,6 +131,12 @@ def parser():
     analyze.add_argument("--previous-report")
     analyze.add_argument("--ledger")
     analyze.add_argument("--expected-head",default=None)
+    work=sub.add_parser("campaign")
+    work.add_argument("--evidence",required=True)
+    work.add_argument("--trusted-reviewer",action="store_true")
+    rec=sub.add_parser("reconcile")
+    rec.add_argument("--evidence",required=True)
+    rec.add_argument("--trusted-reviewer",action="store_true")
     delivery=sub.add_parser("signoff")
     delivery.add_argument("--evidence",required=True)
     delivery.add_argument("--trusted-reviewer",action="store_true")
@@ -165,6 +184,31 @@ def main(argv=None):
                 with CompetitiveLedger(a.ledger) as ledger:
                     result["audit_head"]=ledger.append(
                         report,expected_head=a.expected_head,authorized=True)
+        elif a.action in {"campaign","reconcile"}:
+            if not a.trusted_reviewer:
+                raise PermissionError("only authenticated creators can dispatch rival work")
+            doc=_file(a.evidence)
+            schema=("skeleton.game_builder.competitive_campaign_request.v1"
+                    if a.action=="campaign" else
+                    "skeleton.game_builder.competitive_campaign_reconciliation_request.v1")
+            expected={"schema","plan","report"} if a.action=="campaign" else {
+                "schema","plan","report","campaign","task_evidence","delivery"}
+            if set(doc)!=expected or doc["schema"]!=schema:
+                raise CompetitiveError("exact original-game work campaign schema required")
+            plan=_planned(doc["plan"])
+            report=_report(doc["report"])
+            campaign=plan_competitive_campaign(plan,report,authorized=True)
+            if a.action=="campaign":
+                result=campaign.payload()
+            else:
+                if doc["campaign"]!=campaign.payload():
+                    raise CompetitiveError("original six-stage work campaign cannot be altered")
+                if type(doc["task_evidence"]) is not list:
+                    raise CompetitiveError("complete task receipts required")
+                receipts=tuple(_typed(TaskEvidence,e) for e in doc["task_evidence"])
+                proof=_delivery(doc["delivery"]) if doc["delivery"] is not None else None
+                result=reconcile_competitive_campaign(
+                    plan,report,campaign,receipts,proof,authorized=True)
         else:
             if not a.trusted_reviewer:
                 raise PermissionError("only independent actual game delivery may pass verification")
@@ -173,14 +217,7 @@ def main(argv=None):
                 raise CompetitiveError("exact delivery source evidence required")
             plan=_planned(doc["plan"])
             report=_report(doc["report"])
-            raw=doc["delivery"]
-            if type(raw) is not dict or set(raw)!=set(DeliveryVerification.__dataclass_fields__):
-                raise CompetitiveError("complete delivery proof shape required")
-            if type(raw["measurements"]) is not list:
-                raise CompetitiveError("bounded measured gameplay receipt list required")
-            proof=DeliveryVerification(
-                **{**raw,"measurements":tuple(
-                    _typed(QualityMeasurement,m) for m in raw["measurements"])})
+            proof=_delivery(doc["delivery"])
             result=verify_delivery(plan,report,proof,authorized=True)
         print(canonical_json(result))
         return 0
