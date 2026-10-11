@@ -22,6 +22,9 @@ from .original_world_million_runtime import (
     restore_advanced, save_advanced, validate_game, LAYERS,
 )
 from .original_world_play_forms import PLAY_FORMS, PROGRESSION_LAWS
+from .original_world_million_objectives import (
+    objective_report, guided_next_action,
+)
 
 MAX_SCRIPT_BYTES = 65536
 
@@ -101,13 +104,14 @@ def render_advanced(state: AdvancedState) -> str:
         f"Genre objective {'completed' if mode.cleared else 'ongoing'}, "
         f"arc {'completed' if arc.completed else 'ongoing'}; "
         f"continuation {law.arc.continuation_policy}",
+        "Next action: " + guided_next_action(state),
         "This is a genre-specific abstract reference game, not verified native software.",
     ))
 
 
 def _interactive(state: AdvancedState) -> AdvancedState:
     print("Original Million-World Forge — terminal reference game.")
-    print("Commands: status, help, quit; mode VERB, arc VERB, causal VERB.")
+    print("Commands: status, objectives, help, quit; mode VERB, arc VERB, causal VERB.")
     print(render_advanced(state))
     while True:
         try:
@@ -121,6 +125,9 @@ def _interactive(state: AdvancedState) -> AdvancedState:
             continue
         if command in ("status", "map"):
             print(render_advanced(state))
+            continue
+        if command in ("objectives", "quests"):
+            print(json.dumps(objective_report(state), sort_keys=True, indent=2))
             continue
         if command == "help":
             law = validate_game(state)
@@ -158,6 +165,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--form", choices=tuple(f.form_id for f in PLAY_FORMS))
     parser.add_argument("--arc", choices=tuple(a.arc_id for a in PROGRESSION_LAWS))
     parser.add_argument("--inventory", action="store_true")
+    parser.add_argument("--objectives", action="store_true",
+                        help="Include a live proof-based quest ledger")
     parser.add_argument("--page", type=int)
     parser.add_argument("--limit", type=int, default=12)
     parser.add_argument("--actions-json", default="[]")
@@ -217,6 +226,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "configuration": law.as_dict(),
                     "game": json.loads(save_advanced(state))["payload"],
                     "status": "bounded-reference-game",
+                    "objectives": objective_report(state) if args.objectives else None,
+                    "next_action": guided_next_action(state),
                     "note": "No per-configuration bespoke native game is implied by index.",
                 }, sort_keys=True, indent=2, ensure_ascii=False))
     except (FoundationError, ValueError, OSError) as exc:
