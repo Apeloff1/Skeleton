@@ -51,7 +51,7 @@ jobs:
       - name: Compile atlas and simulation modules
         run: python -m compileall -q skeleton/game/generation
       - name: Verify originals, styles and rule simulations
-        run: python -m pytest -q --noconftest tests/test_original_world_mechanic_atlas.py tests/test_original_world_simulator.py tests/test_original_world_campaign.py tests/test_original_world_campaign_cli.py tests/test_original_world_nexus.py tests/test_original_world_society.py
+        run: python -m pytest -q --noconftest tests/test_original_world_mechanic_atlas.py tests/test_original_world_simulator.py tests/test_original_world_campaign.py tests/test_original_world_campaign_cli.py tests/test_original_world_nexus.py tests/test_original_world_society.py tests/test_original_world_play_cli.py
       - name: Exercise era and theology preview
         run: |
           python -m skeleton.game.generation.original_world_cli --seed gentle-history --era paleolithic --chronology remote-past --theology animist-invented --theme comfort --tone ultra-snuggly --comfort 100 --realism 95 --brief >/dev/null
@@ -103,5 +103,10 @@ jobs:
           assert living_restore(living_save(session)) == session
           print("Autonomous resident economy and save/replay verified")
           PY
+      - name: Exercise unified playable terminal in all three modes
+        run: |
+          python -m skeleton.game.generation.original_world_play_cli --mode campaign --world serenity-05 --actions-json '[{"verb":"weave","amount":2},{"verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_play_cli --mode living --world topology-02 --actions-json '[{"social":"greet"},{"social":"invite"},{"verb":"move","target":1},{"verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_play_cli --mode nexus --actions-json '[{"verb":"weave","amount":2},{"portal":1},{"verb":"end_turn"},{"portal":2},{"verb":"redirect_rain","option":"west","amount":2}]' --show-map
       - name: Confirm exact head
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
