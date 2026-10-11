@@ -109,7 +109,8 @@ def test_mystery_false_conclusion_has_consequence_and_corrected_proof() -> None:
     state = run(state, "arc", "commit")
     report = objective_report(state)
     assert report["objectives"][3]["verified"]
-    assert state.arc.uncertainty > 0
+    assert state.arc.uncertainty == 0  # verified evidence resolves the earlier doubt
+    assert state.causal.trust == 8  # the premature accusation's reputational cost persists
 
 
 def test_seasonal_objective_does_not_uncomplete_on_yearly_wrap() -> None:
