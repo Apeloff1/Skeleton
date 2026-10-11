@@ -55,7 +55,10 @@ def scene(terrain: TerrainState, society: PhysicalSociety | None = None, *,
          "pantry": d.pantry, "morale": d.morale, "last_day": d.last_day}
         for d in population.districts
         if d.population > 0 and abs(d.x - ox) <= radius and abs(d.y - oy) <= radius
-    )[:era_budget(population.era).render_budget] if population else ()
+    )[:min(
+        era_budget(population.era).render_budget,
+        population.profile.visual_proxy_limit if population.profile else 64,
+    )] if population else ()
     return {
         "world": terrain.design_id, "biome": terrain.biome,
         "center": (ox, oy), "radius": radius, "side": radius * 2 + 1,
@@ -63,7 +66,10 @@ def scene(terrain: TerrainState, society: PhysicalSociety | None = None, *,
         "districts": remote_districts,
         "ambient": ambient_impressions(
             population, terrain, radius=radius,
-            max_visible=min(24, tuning(population.era, population.fidelity)[1]),
+            max_visible=min(
+                24, tuning(population.era, population.fidelity)[1],
+                population.profile.visual_proxy_limit if population.profile else 64,
+            ),
         ) if population else (),
         "era": population.era if population is not None else None,
     }
