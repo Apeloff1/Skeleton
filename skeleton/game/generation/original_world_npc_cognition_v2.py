@@ -996,6 +996,7 @@ def cognition_restore(data: dict, people: PhysicalSociety,
             raise FoundationError("cognitive memory integrity mismatch")
         minds = tuple(Mind(
             **{**m, "objective": tuple(m["objective"]),
+               "learned": tuple(m["learned"]),
                "memories": tuple(Memory(
                    **{**obs, "position": tuple(obs["position"])}
                ) for obs in m["memories"])}
