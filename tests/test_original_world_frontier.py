@@ -163,7 +163,7 @@ def test_every_player_action_has_a_bound_effect_or_gated_precondition() -> None:
             else:
                 action = FrontierAction(verb)
             before = game.player()
-            if verb in {"irrigate", "harvest", "repair", "settle", "fulfill",
+            if verb in {"irrigate", "harvest", "repair", "fulfill",
                         "redirect_rain"}:
                 with pytest.raises(FrontierError):
                     game.act(action)
