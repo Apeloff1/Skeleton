@@ -68,8 +68,9 @@ Both outputs implement the **same reference behavior**:
   **replays** it upon load instead of trusting a serialized score/position.
 - Python reference proof solves all generated levels while avoiding hazards.
 
-In Godot, use WASD or arrows to move, Z to undo, R to restart, F5 to save
-and F9 to load. The HTML build also has accessible touch controls, an
+In Godot, use WASD, arrow keys, gamepad D-pad or touch swipes to move; Z or
+gamepad B to undo; R or gamepad Start to restart; F5 to save and F9 to load.
+Hardware input latency and mobile viewport usability need device testing. The HTML build also has accessible touch controls, an
 accessible text map and optional downloadable browser action logs.
 
 ## Verification and operating boundaries
