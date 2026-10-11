@@ -26,7 +26,8 @@ from .original_world_product_render import (
 from .original_world_product_missions import mission_report
 from .original_world_npc_cognition_v2 import cognition_report, npc_profile
 from .original_world_npc_era_population import (
-    era_budget, population_report, ERA_LEVELS,
+    era_budget, population_report, fidelity_report,
+    FIDELITY_MODES, ERA_LEVELS,
 )
 
 MAX_SCRIPT = 131072
@@ -271,6 +272,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--system")
     parser.add_argument("--arc")
     parser.add_argument("--inhabitants", type=int, default=None)
+    parser.add_argument("--npc-fidelity", choices=FIDELITY_MODES,
+                        default="balanced",
+                        help="Limit expensive per-person thinking to 3, 7, 16 or 32 slots per world turn")
     parser.add_argument("--era", choices=tuple(ERA_LEVELS),
                         help="Scale physical NPCs and offscreen resident districts by any of 40 eras")
     parser.add_argument("--population-report", action="store_true",
@@ -296,6 +300,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.inventory:
             print(json.dumps({
                 "living": living_inventory(),
+                "era_npc_hardware_presets": {
+                    "economy": 3, "balanced": 7,
+                    "vivid": 16, "unrestricted": 32,
+                },
                 "era_population_capabilities": {
                     era: {
                         "named_physically_simulated_NPCs": era_budget(era).full_npc_limit,
@@ -319,8 +327,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             }, indent=2, sort_keys=True))
             return 0
         if args.load is not None:
-            if args.era is not None:
-                raise FoundationError("--era cannot alter the historical era of a saved living world")
+            if args.era is not None or args.npc_fidelity != "balanced":
+                raise FoundationError("saved game era and NPC fidelity cannot be overwritten")
             if not args.load.is_file() or args.load.stat().st_size > 4194304:
                 raise FoundationError("missing or oversized saved game")
             state = product_restore(args.load.read_text(encoding="utf-8"))
@@ -330,12 +338,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             law = living_for(args.base, args.form, args.architecture,
                              args.system, args.arc)
             state = create_product(law.index, inhabitants=args.inhabitants,
-                                   era=args.era)
+                                   era=args.era, npc_fidelity=args.npc_fidelity)
         else:
             if any((args.form, args.architecture, args.system, args.arc)):
                 raise FoundationError("specify --base to select game dimensions")
             state = create_product(args.index if args.index is not None else 0,
-                                   inhabitants=args.inhabitants, era=args.era)
+                                   inhabitants=args.inhabitants, era=args.era,
+                                   npc_fidelity=args.npc_fidelity)
         for action in parse_script(args.actions_json):
             state, _ = step_product(state, action)
         if args.interactive:
@@ -372,9 +381,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "local_energy": state.terrain.energy,
                     "physical_edits": len(state.terrain.edits),
                     "local_residents": len(state.society.inhabitants),
-                    "regional_population": (population_report(
-                        state.population, len(state.society.inhabitants))
-                        if args.population_report and state.population else None),
+                    "regional_population": ({
+                        **population_report(
+                            state.population, len(state.society.inhabitants)),
+                        "hardware_fidelity": fidelity_report(
+                            state.population, state.society, state.terrain,
+                            preset=state.population.fidelity),
+                    } if args.population_report and state.population else None),
                     "npc_cognition": cognition_report(state.cognition, state.society,
                                                      state.terrain)
                                      if args.npc_report else None,
