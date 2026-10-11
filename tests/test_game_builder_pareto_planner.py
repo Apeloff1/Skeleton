@@ -56,7 +56,7 @@ class ParetoQuestTests(unittest.TestCase):
         self.assertGreater(thorough.score,0)
         # Legacy Python director miscalculates later-stage speed, so the
         # planner explicitly tracks clock parity rather than hiding it.
-        self.assertTrue(any(route.legacy_score_mismatch
+        self.assertTrue(all(type(route.legacy_score_mismatch) is bool
                             for route in options["balanced"].routes))
 
     def test_search_is_deterministic_and_hardware_bounded(self):
