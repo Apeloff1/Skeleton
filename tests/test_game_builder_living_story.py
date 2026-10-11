@@ -80,6 +80,37 @@ class LivingWorldSimulationTests(unittest.TestCase):
                     else:
                         self.assertFalse(story_choices(world, replay.final))
 
+    def test_ending_choices_require_real_matching_faction_quest_proofs(self):
+        for ending, required_faction in (
+            ("stewardship", "gardeners"),
+            ("discovery", "wayfinders"),
+            ("independence", "makers"),
+        ):
+            world = original_story_world(self.intent(
+                mode="postgame", completion=1), authorized=True)
+            proof = demonstrate_story(world, authorized=True, ending=ending)
+            self.assertEqual(proof.final.ending, ending)
+            self.assertEqual(len(proof.final.completed), 1)
+            completed = next(q for q in world.quests
+                             if q.key == proof.final.completed[0])
+            self.assertEqual(completed.faction, required_faction)
+            before_choice = story_play(
+                world, tuple(x.action for x in proof.receipts[:-1]),
+                authorized=True).final
+            allowed = story_choices(world, before_choice)
+            self.assertIn("choose:" + ending, allowed)
+            for other in ("stewardship", "discovery", "independence"):
+                if other != ending:
+                    self.assertNotIn("choose:" + other, allowed)
+                    with self.assertRaises(StoryError):
+                        story_step(world, before_choice,
+                                   "choose:" + other, authorized=True)
+            self.assertEqual(before_choice.ending, None)
+            self.assertEqual(
+                story_step(world, before_choice, "choose:" + ending,
+                           authorized=True), proof.final,
+            )
+
     def test_dynamic_dialogue_inventory_reputation_and_time(self):
         world = original_story_world(self.intent(), authorized=True)
         state = first_story_state(world, authorized=True)
