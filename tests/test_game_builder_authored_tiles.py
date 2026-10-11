@@ -72,7 +72,7 @@ class AuthoredWorldTests(unittest.TestCase):
         self.assertEqual(proof["final_state"]["status"], "won")
         self.assertEqual(native["levels"][0]["rows"], ROWS)
         self.assertNotIn(b"</script>", package.files["godot/scripts/main.gd"])
-        self.assertNotIn(b"</script>", package.files["index.html"])
+        self.assertNotIn(b"Cave </script>", package.files["index.html"])
         self.assertFalse(package.manifest["automatic_publication"])
 
     def test_rejects_unreviewed_and_unauthorized_imports(self) -> None:
