@@ -186,6 +186,10 @@ def run_original_game_studio(
         raise PermissionError("offline studio execution requires operator authorization")
     if not isinstance(intent, GameBuildIntent):
         raise StudioError("typed original game intent required")
+    if type(companion_practice_games) is not int or not 0 <= companion_practice_games <= 8:
+        raise StudioError("companion practice batch must be 0 to 8 playable games")
+    if type(mirror_attempts) is not int or not 64 <= mirror_attempts <= 512:
+        raise StudioError("adversarial mirror attempts must be 64 to 512")
     if human_reviewed_tiles is None and human_authored_approved:
         raise StudioError("authored approval cannot be applied to generated levels")
     research_enabled = any(
