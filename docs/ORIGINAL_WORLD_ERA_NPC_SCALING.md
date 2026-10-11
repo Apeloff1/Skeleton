@@ -1,5 +1,19 @@
 # Original Worlds — Era-aware NPC population and hardware fidelity
 
+> **Updated population policy (October 11, 2026):** The 16,384
+> regional census and 32-local-NPC examples below describe the original
+> **legacy v3 stress/reference configuration**, not the default for newly
+> generated worlds. New games derive realistic, genre-aware budgets from
+> all 41 registered consoles/PC targets, nine PC hardware generations,
+> ten playable genres and 40 world eras. Newly generated games now cap
+> **local persistent NPC slots at 24** and **offscreen aggregate census at 144**,
+> usually substantially less. Existing saved large worlds remain loadable.
+> For the currently authoritative defaults and commands, see
+> [Console, PC and Genre NPC Fidelity](ORIGINAL_WORLD_NPC_PLATFORM_GENRE_FIDELITY.md).
+> Hardware certification and objectively measured industry averages are
+> not claimed.
+
+
 **Implementation scope:** Directly executable original-world gameplay for all
 40 existing era names, persistent local NPCs, sparse remote settlements,
 material-backed trade and optional embodiment of named residents.
