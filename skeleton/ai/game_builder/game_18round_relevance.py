@@ -133,6 +133,7 @@ class TopicPriority:
     mode: str
     reason_codes: tuple[str,...]
     topic_digest: str
+    source_almanac_digest: str
 
     def payload(self):
         return dict(schema="skeleton.game_ai.task_correlated_hyperweight_priority.v1",
@@ -143,7 +144,9 @@ class TopicPriority:
                     estimated_usefulness_bp=self.estimated_usefulness_bp,
                     observations=self.observations,independent_projects=self.independent_projects,
                     rights=self.rights,mode=self.mode,reason_codes=list(self.reason_codes),
-                    topic_digest=self.topic_digest,calibrated_probability_claim=False,
+                    topic_digest=self.topic_digest,
+                    source_almanac_digest=self.source_almanac_digest,
+                    calibrated_probability_claim=False,
                     direct_llm_weight_write=False)
 
 def score_task_knowledge(
@@ -219,7 +222,8 @@ def score_task_knowledge(
             round(10000*applicability),round(10000*min(covered,1.0)),
             score,len(rows),len({x.original_project_digest for x in rows}),
             "reference_only" if subject.reference_only else "separately_training_licensed",
-            mode,tuple(reasons),canonical_digest(subject.payload())))
+            mode,tuple(reasons),canonical_digest(subject.payload()),
+            subject.source_almanac_digest))
     return tuple(sorted(out,key=lambda x:(-x.estimated_usefulness_bp,x.topic_id)))
 
 __all__=["OriginalTaskFocus","RelevantKnowledge","SignedUtilityObservation",
