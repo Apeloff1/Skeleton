@@ -12,7 +12,7 @@ free constructions or spontaneous social trust.
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from hashlib import sha256
 import json
 
@@ -23,6 +23,9 @@ from .original_world_product_terrain import (
 from .original_world_product_agents import (
     Person, PhysicalSociety, NpcReceipt, _path, _neighbors, _resource,
     _specialty, _deliver, _acquire, validate_society, MAX_AGENTS,
+)
+from .original_world_npc_civics import (
+    CivicInstitutions, validate_civics, settle_civic, civic_report, civic_restore, SCHEMA as CIVIC_SCHEMA,
 )
 
 VERSION = "original-npc-cognition.v2"
@@ -125,6 +128,7 @@ class CitizenIntelligence:
     projects: tuple[CivicProject, ...] = ()
     next_project: int = 0
     testimonies: tuple[Testimony, ...] = ()
+    civic: CivicInstitutions = field(default_factory=CivicInstitutions)
     day: int = 0
     meetings: int = 0
     interventions: int = 0
@@ -180,6 +184,7 @@ def validate_intelligence(
         raise FoundationError("NPC thoughts are bound to a different physical world")
     if state.day != people.tick:
         raise FoundationError("inhabitant thought clock diverged from physical body")
+    validate_civics(state.civic, people, world, state.day)
     if not isinstance(state.minds, tuple) or len(state.minds) != len(people.inhabitants):
         raise FoundationError("missing or extra persistent minds")
     for p, mind in zip(people.inhabitants, state.minds):
@@ -580,6 +585,12 @@ def _plan(person: Person, mind: Mind, state: CitizenIntelligence,
             scores[category] = -1
     if outstanding and not person.cargo:
         scores["work"] += 100 + min(20, outstanding.quantity - outstanding.delivered)
+    if state.civic.active_mandate == "expedition":
+        scores["scout"] += 25
+        scores["investigate"] += 25
+    if state.civic.active_mandate == "conservation":
+        if world.lumber < 5 or world.masonry < 4:
+            scores["construct"] = -100
     if person.profession in ("builder", "engineer") and not person.cargo:
         scores["construct"] += 25
         if construction:
@@ -994,6 +1005,15 @@ def smart_npc_tick(
             "thoughts": [asdict(t) for t in thoughts],
         }),
     )
+    current_world, next_people, civic, outcomes = settle_civic(
+        result.civic, next_people, current_world, result.minds, next_people.tick)
+    result = replace(
+        result, civic=civic, event_head=_hash({
+            "prior-npc-day": result.event_head,
+            "civic-state": asdict(civic),
+            "civic-outcomes": outcomes,
+        }),
+    )
     validate_intelligence(result, next_people, current_world)
     return current_world, next_people, result, tuple(receipts), tuple(thoughts)
 
@@ -1011,8 +1031,9 @@ def cognition_restore(data: dict, people: PhysicalSociety,
         } or data["schema"] != VERSION:
             raise FoundationError("wrong cognitive save version")
         raw = data["payload"]
-        if data["checksum"] != _hash(raw) or set(raw) != set(
-            CitizenIntelligence.__dataclass_fields__
+        allowed_fields = set(CitizenIntelligence.__dataclass_fields__)
+        if data["checksum"] != _hash(raw) or set(raw) not in (
+            allowed_fields, allowed_fields - {"civic"},
         ):
             raise FoundationError("cognitive memory integrity mismatch")
         minds = tuple(Mind(
@@ -1028,10 +1049,15 @@ def cognition_restore(data: dict, people: PhysicalSociety,
             **{**p, "contributors": tuple(p["contributors"])}
         ) for p in raw["projects"])
         testimonies = tuple(Testimony(**statement) for statement in raw["testimonies"])
+        civic = (civic_restore({
+            "schema": CIVIC_SCHEMA,
+            "payload": raw["civic"],
+            "checksum": _hash(raw["civic"]),
+        }, people, world, people.tick) if "civic" in raw else CivicInstitutions())
         state = CitizenIntelligence(
             **{**raw, "minds": minds, "bonds": relationships,
                "orders": orders, "projects": projects,
-               "testimonies": testimonies}
+               "testimonies": testimonies, "civic": civic}
         )
         validate_intelligence(state, people, world)
         return state
@@ -1050,6 +1076,7 @@ def cognition_report(state: CitizenIntelligence, people: PhysicalSociety,
         "contracts": [asdict(o) for o in state.orders],
         "civic_projects": [asdict(p) for p in state.projects],
         "first_hand_testimonies": [asdict(t) for t in state.testimonies],
+        "public_institutions": civic_report(state.civic),
         "socially_learned_material_observations": sum(
             m.subject in STOCK and m.witness != mind.person_id
             for mind in state.minds for m in mind.memories
