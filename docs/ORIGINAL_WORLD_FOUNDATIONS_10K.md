@@ -196,3 +196,40 @@ A large indexed set is useful to the Dragon builder only if it can
 pick foundations by actual causal need and convert those chosen
 foundations into rigorously tested native deliverables. A huge number
 alone is not proof of that last mile.
+
+
+## Causal discovery and shortlisting
+
+The `original_foundation_discovery.py` module ranks by authored law
+text, an explicitly written domain/regime interaction, stated player
+levers and failure conditions. It makes **no** unsupported subjective
+gameplay quality score or external LLM claim. For unfiltered broad
+discovery, it distributes the selected entries across different domain
+and operator groups before showing near-identical family variants.
+
+```bash
+# Search all 10,240 foundations for resource ecology.
+python -m skeleton.game.generation.original_foundation_cli \
+  --find habitat --limit 20
+
+# Find consent-sensitive laws that can veto an action.
+python -m skeleton.game.generation.original_foundation_cli \
+  --find consent --operator veto --limit 12
+
+# Research one discipline deeply, sorted by literal authored-text match.
+python -m skeleton.game.generation.original_foundation_cli \
+  --find memory --domain memory --no-diversify --limit 40
+
+# Explicit original endings; worlds may intentionally be unwinnable.
+python -m skeleton.game.generation.original_foundation_cli \
+  --find risk --ending unwinnable --limit 20
+```
+
+Queries and limits are bounded. A search result carries its exact
+foundation index and root/regime provenance, so it can be opened in
+interactive play or exported into downstream native-game adapters without
+altering the original authorial inputs.
+
+The next editor layer should include explicit legality checks, scenario
+playtesting receipts and verified engine capability matching before a
+foundation is marked ready for automatic product delivery.
