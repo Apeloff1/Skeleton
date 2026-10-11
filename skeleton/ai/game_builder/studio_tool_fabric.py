@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from itertools import islice
 import re
 from typing import Iterable, Mapping
 
@@ -201,7 +202,10 @@ class ToolFabric:
     """Deterministic discovery/planning. External adapters cannot run here."""
 
     def __init__(self, additions: Iterable[ToolSpec] = ()) -> None:
-        values = [*BUILTIN_TOOLS, *tuple(additions)]
+        external = tuple(islice(additions, 2049))
+        if len(external) > 2048:
+            raise ToolFabricError("game tool catalog exceeds 2048 typed adapters")
+        values = [*BUILTIN_TOOLS, *external]
         if any(not isinstance(value, ToolSpec) for value in values):
             raise ToolFabricError("typed capability descriptors required")
         names = [value.tool_id for value in values]
@@ -236,7 +240,8 @@ class ToolFabric:
             for k, v in enabled_external.items()
         ):
             raise ToolFabricError("external capability grants must be keyed by pinned digests")
-        rows = tuple(requests)
+        # Never materialize an unbounded producer-controlled iterable.
+        rows = tuple(islice(requests, 129))
         if len(rows) > 128 or any(not isinstance(r, ToolRequest) for r in rows):
             raise ToolFabricError("unbounded or invalid tool requests")
         blocked = []
