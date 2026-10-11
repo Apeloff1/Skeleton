@@ -216,6 +216,52 @@ class ReviewerRegistry:
         validate_policy(doc["policy"])
         return doc
 
+    def _historic_source_roles(self,*,excluding_candidate: str|None=None):
+        """Recover a cross-generation source firewall from the sealed ledger.
+
+        An observation must NEVER become a future fit/evaluation project,
+        even if newer usage/idle runs overwrote the two current display slots.
+        Previously frozen validation/test sets remain protected for subsequent
+        generations. Prior TRAIN project data can remain reusable as TRAIN,
+        but cannot be reclassified into a sealed evaluation cohort.
+        Legacy candidate files without explicit split provenance are treated
+        entirely as protected, not optimistically guessed as TRAIN.
+        """
+        self.read_state()  # Verifies the complete numbered digest chain.
+        protected=set()
+        trained=set()
+        for file in sorted((self.root/"ledger").iterdir()):
+            entry=_strict_read(file)
+            snapshot=entry.get("state")
+            if type(snapshot) is not dict:
+                raise PromotionError("incomplete historical reviewer source custody")
+            if entry.get("event")=="stage":
+                digest=snapshot.get("candidate")
+                if digest==excluding_candidate:
+                    continue
+                candidate=self._candidate(digest)
+                splits=candidate.get("split_projects")
+                if splits is None:
+                    protected.update(candidate["projects"])
+                elif (type(splits) is not dict or
+                      set(splits)!={"train","validation","test"}):
+                    raise PromotionError("historical model lacks a complete split ledger")
+                else:
+                    grouped={key:set(values) for key,values in splits.items()}
+                    if (sum(len(values) for values in splits.values())
+                            !=len(candidate["projects"])
+                            or set.union(*grouped.values())!=set(candidate["projects"])):
+                        raise PromotionError("historic sealed evaluation projects were relabeled")
+                    protected.update(grouped["validation"])
+                    protected.update(grouped["test"])
+                    trained.update(grouped["train"])
+            for observed in snapshot.get("observations",{}).values():
+                if (type(observed) is not dict
+                        or type(observed.get("source_project_ids")) is not list):
+                    raise PromotionError("historical game observation lacks source receipt")
+                protected.update(observed["source_project_ids"])
+        return trained,protected
+
     def stage(self,plan: FlowPlan,fit: dict,*,authorized: bool,
               standard: PromotionStandard=PromotionStandard(),champion: dict|None=None):
         if not authorized:
@@ -231,6 +277,14 @@ class ReviewerRegistry:
         if not evaluation.passed:
             return dict(status="blocked",evaluation=evaluation.payload(),
                         improvement_ledger=feedback.payload())
+        historic_train,historic_protected=self._historic_source_roles(
+            excluding_candidate=evaluation.candidate_digest)
+        incoming={key:set(ids) for key,ids in plan.split_projects}
+        if set(incoming["train"]) & historic_protected:
+            raise PromotionError("historical sealed or gameplay cohort cannot become training data")
+        if (set(incoming["validation"])|set(incoming["test"])) & (
+                historic_protected|historic_train):
+            raise PromotionError("new frozen validation/test must use fresh original projects")
         with _mutex(self.root):
             state=self.read_state()
             if state["phase"] not in {"idle","active","rolled_back"}:
@@ -247,6 +301,7 @@ class ReviewerRegistry:
                      evaluation=evaluation.payload(),
                      standard=standard.payload(),
                      projects=list(plan.source_projects),
+                     split_projects={k:list(v) for k,v in plan.split_projects},
                      advisory_only=True,
                      jeeves_dragon_core_weights_changed=False)
             loc=self.root/"candidates"/(evaluation.candidate_digest+".json")
@@ -308,7 +363,8 @@ class ReviewerRegistry:
             raise PromotionError("only independently approved model can receive real gameplay observations")
         if mode in state["observations"] and state["phase"]=="shadow":
             raise PromotionError("independent evidence mode already recorded for shadow promotion")
-        prior=set(state["source_projects"])
+        _,historic=self._historic_source_roles()
+        prior=set(state["source_projects"])|historic
         for event in state["observations"].values():
             prior.update(event["source_project_ids"])
         if any(key in prior for key in ids):
