@@ -107,10 +107,12 @@ def _world_style(active:set[str])->str:
         return "living_ecosystem"
     if "settlement_growth" in active and "artisan_crafting" in active:
         return "colony_simulation"
-    if "branching_chronicles" in active and "alternate_conclusions" in active:
+    if "alternate_conclusions" in active:
         return "branching_campaign"
+    if "branching_chronicles" in active:
+        return "open_world_story"
     if "survival_foraging" in active and "hardcore_perils" in active:
-        return "survival_sandbox"
+        return "hardcore_roguelike"
     if "terrain_terraforming" in active and "world_era_cycles" in active:
         return "generational_world"
     if "river_navigation" in active and "open_seas" in active:
