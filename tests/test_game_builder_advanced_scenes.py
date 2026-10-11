@@ -118,7 +118,8 @@ class AuthoredSceneTests(unittest.TestCase):
                                      set(positions["checkpoints"]))
                     self.assertTrue(verify_advanced_session(
                         run_advanced_session("platformer",
-                           {"level_width":width},seed=seed,scene=authored)))
+                           {"level_width":width},seed=seed,scene=authored),
+                        {"level_width":width}))
 
     def test_fail_closed_geometry_and_configuration_binding(self):
         scene=make_advanced_scene("platformer")
