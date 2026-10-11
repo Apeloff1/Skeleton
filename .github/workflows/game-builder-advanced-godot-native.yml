@@ -9,6 +9,8 @@ on:
       - "skeleton/ai/game_builder/advanced_genre_engines.py"
       - "skeleton/ai/game_builder/advanced_puzzle_solver.py"
       - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
       - "tests/test_game_builder_advanced_godot.py"
       - ".github/workflows/game-builder-advanced-godot-native.yml"
   workflow_dispatch:
