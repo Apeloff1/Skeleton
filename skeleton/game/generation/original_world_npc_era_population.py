@@ -115,6 +115,7 @@ class EraPopulation:
     total_deaths: int = 0
     updates: int = 0
     event_head: str = "0" * 64
+    fidelity: str = "balanced"
 
 
 def _hash(data: object) -> str:
@@ -173,16 +174,20 @@ def _allocation(people: int, count: int) -> tuple[int, ...]:
 
 def create_era_population(
     world: TerrainState, people: PhysicalSociety, era: str,
+    *, fidelity: str = "balanced",
 ) -> EraPopulation:
     validate_society(people, world)
     budget = era_budget(era)
+    if fidelity not in FIDELITY_MODES:
+        raise FoundationError("invalid local cognitive hardware budget")
     if len(people.inhabitants) > budget.full_npc_limit:
         raise FoundationError("requested detailed NPCs exceed era/CPU fidelity budget")
     allowed_roles = permitted_roles(era)
     if any(p.profession not in allowed_roles for p in people.inhabitants):
         raise FoundationError("anachronistic NPC professions for selected technology era")
     if budget.background_limit == 0:
-        result = EraPopulation(era, world.design_id, (), day=people.tick)
+        result = EraPopulation(era, world.design_id, (), day=people.tick,
+                               fidelity=fidelity)
         validate_population(result, people, world)
         return result
     allocations = _allocation(budget.background_limit, budget.district_limit)
@@ -200,6 +205,7 @@ def create_era_population(
         districts.append(District(index, x, y, count, count * 6))
     result = EraPopulation(
         era, world.design_id, tuple(districts), day=people.tick,
+        fidelity=fidelity,
     )
     validate_population(result, people, world)
     return result
@@ -212,6 +218,8 @@ def validate_population(
     if not isinstance(state, EraPopulation) or state.world_id != world.design_id:
         raise FoundationError("era population belongs to another physical world")
     budget = era_budget(state.era)
+    if state.fidelity not in FIDELITY_MODES:
+        raise FoundationError("unrecognized active-brain hardware preset")
     if (len(people.inhabitants) > budget.full_npc_limit
             or len(state.districts) != budget.district_limit
             or any(p.profession not in permitted_roles(state.era)
@@ -421,7 +429,8 @@ def population_restore(
                 or envelope["checksum"] != _hash(envelope["payload"])):
             raise FoundationError("tampered or unsupported population save")
         raw = envelope["payload"]
-        if set(raw) != set(EraPopulation.__dataclass_fields__):
+        fields = set(EraPopulation.__dataclass_fields__)
+        if set(raw) not in (fields, fields - {"fidelity"}):
             raise FoundationError("unexpected population archive")
         districts = tuple(District(**d) for d in raw["districts"])
         caravans = tuple(Caravan(**c) for c in raw["caravans"])
@@ -438,6 +447,9 @@ def population_report(state: EraPopulation, local: int) -> dict:
     count = sum(d.population for d in state.districts)
     return {
         "schema": SCHEMA, "era": b.era, "technology": b.technology,
+        "cognitive_preset": state.fidelity,
+        "full_local_brain_budget_per_turn": active_brain_budget(
+            state.era, state.fidelity),
         "full_personality_and_physics_NPCs": local,
         "detailed_limit": b.full_npc_limit,
         "regional_aggregated_residents": count,
