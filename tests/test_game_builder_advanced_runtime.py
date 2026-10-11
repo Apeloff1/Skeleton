@@ -17,6 +17,7 @@ from skeleton.ai.game_builder.advanced_gameplay_runtime import (
 )
 from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
 from skeleton.ai.game_builder.game_workspace_server import create_workspace_server
+from skeleton.ai.game_builder.game_prompt_router import route_game_prompt, AXES
 from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html
 from skeleton.ai.game_builder.system_editor_cli import main as editor_cli
 from skeleton.ai.game_builder.system_editors import catalog
@@ -250,6 +251,31 @@ class AdvancedCliTests(unittest.TestCase):
             trace.write_text(json.dumps(session),encoding="utf-8")
             with redirect_stderr(io.StringIO()):
                 self.assertEqual(editor_cli(["verify-play","--session",str(trace)]),2)
+
+
+class AdvancedPromptRoutingTests(unittest.TestCase):
+    def test_natural_language_targets_specialist_advanced_editors(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            studio=GameWorkspace.create(Path(tmp)/"prompt-studio",authorized=True)
+            studio.create_project("original_hybrid", "hybrid",authorized=True)
+            plan=route_game_prompt(studio,
+                "Create a racing game with variable tire conditions and advanced "
+                "tower defence combat with enemy waves and strategy.",
+                project="original_hybrid",authorized=True)
+            keys={axis.key for axis in plan.axes}
+            paths={item.path for item in plan.files}
+            self.assertIn("system_racing",keys)
+            self.assertIn("system_tower_defense",keys)
+            self.assertIn("systems/racing.json",paths)
+            self.assertIn("systems/tower_defense.json",paths)
+            self.assertTrue(all(item.approval_required for item in plan.files))
+            self.assertFalse(plan.payload()["model_inference_performed"])
+            self.assertFalse((studio.root/"current/original_hybrid/systems").exists())
+            self.assertGreaterEqual(len([a for a in AXES if a.key.startswith("system_")]),43)
+            self.assertEqual(plan.digest,route_game_prompt(studio,
+                "Create a racing game with variable tire conditions and advanced "
+                "tower defence combat with enemy waves and strategy.",
+                project="original_hybrid",authorized=True).digest)
 
 
 class AdvancedStudioAPITests(unittest.TestCase):
