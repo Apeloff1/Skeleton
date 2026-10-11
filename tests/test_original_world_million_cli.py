@@ -127,3 +127,24 @@ def test_invalid_selectors_raise_real_cli_error(capsys) -> None:
         main(["--index", "1228800"])
     with pytest.raises(SystemExit):
         main(["--page", "12", "--index", "33"])
+
+
+def test_main_world_atlas_cli_exposes_exact_million_configuration(capsys) -> None:
+    from skeleton.game.generation.original_world_cli import main as atlas_main
+    assert atlas_main(["--advanced-index", "1228799", "--brief"]) == 0
+    view = json.loads(capsys.readouterr().out)
+    assert view["advanced_world"]["index"] == "1228799"
+    assert view["inventory"]["mechanically_mode_bound_foundation_entries"] == 102400
+    assert view["inventory"]["advanced_structured_configuration_entries"] == 1228800
+    assert view["advanced_world"]["provenance"] == "composed-authored-laws-with-executable-modes"
+    assert "--index 1228799" in view["play_command"]
+
+    assert atlas_main(["--mode-index", "102399"]) == 0
+    by_mode = json.loads(capsys.readouterr().out)
+    assert by_mode["mode"]["mode_index"] == "102399"
+    assert by_mode["mode"]["form"]["form_id"] == "rhythm"
+
+    assert atlas_main(["--advanced-seed", "seek-new-forms", "--brief"]) == 0
+    seeded = json.loads(capsys.readouterr().out)
+    assert seeded["advanced_world"]["index"].isdigit()
+    assert seeded["styling_request_only"]
