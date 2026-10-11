@@ -53,7 +53,7 @@ class ModularShadowTicket:
     weight_policy_digest: str|None=None
 
     def __post_init__(self):
-        for name in (self.ticket_id,self.topic_id):_id(getattr(self,name),"shadow ticket")
+        for value in (self.ticket_id,self.topic_id):_id(value,"shadow ticket")
         for d in (self.task_digest,self.source_almanac_digest,
                   self.original_code_review_digest,self.original_game_plan_digest):_sha(d)
         if (type(self.priority_bp) is not int or not 0<=self.priority_bp<=10000 or
