@@ -562,7 +562,8 @@ def population_restore(
         raw = envelope["payload"]
         fields = set(EraPopulation.__dataclass_fields__)
         if set(raw) not in (
-            fields, fields - {"profile"}, fields - {"profile", "fidelity"},
+            fields, fields - {"profile"}, fields - {"fidelity"},
+            fields - {"profile", "fidelity"},
         ):
             raise FoundationError("unexpected population archive")
         districts = tuple(District(**d) for d in raw["districts"])
