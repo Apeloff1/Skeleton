@@ -2,8 +2,8 @@
   "schema": "skeleton.dragon.almanac_acquisition_progress.v1",
   "registry_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
   "ordering": "source_id_ascending",
-  "next_source_offset": 640,
-  "reviewed_candidate_count": 640,
+  "next_source_offset": 672,
+  "reviewed_candidate_count": 672,
   "entries": [
     {
       "source_id": "source-0017fcb9b1445e4f0a6949fb81b3fe01159175a23ca300ff1350938c2b2a0974",
@@ -5764,30 +5764,317 @@
       "availability": "retrieval_failed",
       "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0020.json",
       "approved": false
+    },
+    {
+      "source_id": "source-233cd59cb87233835fa4960e5c89a4e241f23d731cf641e2c441464fdf0a1318",
+      "source_offset": 640,
+      "url": "https://software.intel.com/en-us/articles/the-ultimate-question-of-programming-refactoring-and-everything",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-233ed529b822f7c49835c652fbec0c7f30bb782766a2530212df04cf653a469f",
+      "source_offset": 641,
+      "url": "https://github.com/summertimejordi/fmod_gd4",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-236a4d1c98b8fe50f79b6f698095f37603637272cb6caefee47a6319aedcbea7",
+      "source_offset": 642,
+      "url": "https://gdkeys.com/",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-237f9056966641cf5f25af49079fa25d5da0c001716807f0f48ecc63037cfe15",
+      "source_offset": 643,
+      "url": "https://github.com/codeplea/hexembed",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-23aa9c19537d4e1b6067cf65d1c912e499262ccbe2ada34743aa055dc816af06",
+      "source_offset": 644,
+      "url": "https://github.com/Revolutionary-Games/Thrive/",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-23adeecfec0f981a679eeda6db39b87883ca7620695bdf9fcdbd9ed0e0ffd55d",
+      "source_offset": 645,
+      "url": "https://vimeo.com/125149688):",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-23c499007623b6c80ecf72ae559ca16e935f108bedf912461b86d4811234a0c3",
+      "source_offset": 646,
+      "url": "https://www.rust-lang.org/learn",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-23c4c16dfb4ae38aa14270529aef09cf4c5ccd2d8f0641c7a2a7aff0762ebc07",
+      "source_offset": 647,
+      "url": "https://bullet-mania.netlify.app/",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-23ceb0273c2f6ff8d07bb122c61b6ca4e1e7e8b9819ad3dc750e4202473732f4",
+      "source_offset": 648,
+      "url": "https://zeux.io/",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-23f5f14ba7768a261873f421b729b806bda8b191e3d39b072042fe1b04d33b8d",
+      "source_offset": 649,
+      "url": "https://codeberg.org/dulvui/99managers-futsal-edition",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-2400b59443057932ae83a50746e1a2924ade77fe23d7853ffac6ebeab23a982f",
+      "source_offset": 650,
+      "url": "https://github.com/WhitestormJS/whs.js",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-2400f44811b84ad8fa76047408e0f181fe70d6f869460f355dacc8c0aac5e130",
+      "source_offset": 651,
+      "url": "https://github.com/increpare/puzzlescript",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-240542dd238a65c22b0499c3e96796da0aa46b38a898420b305dd47b496eddea",
+      "source_offset": 652,
+      "url": "https://aws.amazon.com/lumberyard/",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "redirect_to_non_target_index",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-242fea09749f2c853905daad03fa140e32d976131f3281b64571999c6be45e5b",
+      "source_offset": 653,
+      "url": "https://www.youtube.com/watch?v=dAX0trP3hIQ",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-24352718e6619044c173b1dabf38aac5b7536e7861df92572cfe88cfc409c437",
+      "source_offset": 654,
+      "url": "https://docs.godotengine.org/en/stable/tutorials/performance/pipeline_compilations.html",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-2438ebf602208cc56071da4daae6056d300db84a9c043c027b05429aab2a8302",
+      "source_offset": 655,
+      "url": "https://github.com/prideout/streamlines_demo",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-243e75f33d0d04956471d6651befdc96c5f4ec74ae68b84fd00013e284ba2e51",
+      "source_offset": 656,
+      "url": "https://sketchpunklabs.github.io/irregular_grid/",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-245550db93e830c9689a66227320d508f7cf00b8b843dca7eca1c73147ab038e",
+      "source_offset": 657,
+      "url": "https://www.youtube.com/watch?v=OzYnPGnDDIk",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-24607f3488b057c0f32f3a46dea07084badccce87ffa1fa2fef381c435e85512",
+      "source_offset": 658,
+      "url": "https://github.com/inkle/ink",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-24658a47a66077eff8336677a0a57cf926b977639e03a2e47c90953aaf6143ce",
+      "source_offset": 659,
+      "url": "http://www.easel.ly/",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-246ba22eab323c158e2c53c3b65ac308d95e82d3ba0ba3cc2ceca8ff04f08460",
+      "source_offset": 660,
+      "url": "http://soundbible.com/",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-24736728d415e3c08de8d1d713095dc90271a7a867717c7a3cdb6ff02dba9b32",
+      "source_offset": 661,
+      "url": "https://github.com/sachinthankachan/msdf-atlas-studio",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-24a2677805eb857358eadd5b6331340a2091260d5c2c5672c63f6ccc4feaa07f",
+      "source_offset": 662,
+      "url": "https://github.com/DaVikingCode/Citrus-Engine",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-24ac848c23685fb09f0a69a2283516cb07a4a8cd57de8ad470b19bdc31f067dc",
+      "source_offset": 663,
+      "url": "https://trello.com/",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-24c99ecde4ca1eaa0295d317c746a3f3baf9ad1bf8f4857347c01248d6c37292",
+      "source_offset": 664,
+      "url": "https://github.com/Rubonnek/dialogue-engine",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-24e1e5d215cd646730ac404ebaa8c48abfd5a95a9948aac7b571669d29eeea5a",
+      "source_offset": 665,
+      "url": "https://80.lv/articles/simple-stylized-content-for-unity-games/",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-24e34b44b2c2a67bdd7165cda4ca799860c78edc94e15ee40bbeedb8e3333e21",
+      "source_offset": 666,
+      "url": "http://gamedevelopment.tutsplus.com/articles/cardinal-quest-how-i-made-60000-from-my-indie-game--gamedev-12073",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-24e68945ea9cbfb1638c341f57cc7a63013557a2f30bd66801f1f976294676ed",
+      "source_offset": 667,
+      "url": "https://github.com/AtomicGameEngine/AtomicGameEngine",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-2504713a77a33a34d03027d03b3e454077fa620cda0a937e25f61953f456979a",
+      "source_offset": 668,
+      "url": "https://developer.apple.com/metal/",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-251d7f289e250d1bea76811901d9c667bfe378143b6f207f8596790bdcfda3c4",
+      "source_offset": 669,
+      "url": "https://codeberg.org/dulvui/pocket-broomball/",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-25560f13fec6815b7a6d6efd822f90e10913b5bb551a3139a10a90bfb9b332a5",
+      "source_offset": 670,
+      "url": "http://www.rpgmakerweb.com/",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-255c79421088e7d46fae3f3c50f6dcb0f17a32da389f9c6f3b2e07cc5ef9a5ba",
+      "source_offset": 671,
+      "url": "https://github.com/KrofDrakula/squirts",
+      "checked_at": "2026-10-11T23:15:51Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "approved": false
     }
   ],
   "whole_web_complete": false,
   "notes": "First-pass cursor counts candidate checks, not canonical approval. Every unresolved source remains blocked in its batch evidence. Registry unchanged; worldwide denominator unknown.",
-  "checked_candidate_count": 640,
+  "checked_candidate_count": 672,
   "approved_source_count": 0,
   "distilled_source_count": 0,
   "last_batch_counts": {
     "newly_checked": 32,
-    "fetched_representations": 19,
-    "repository_metadata": 0,
-    "target_page_representations": 19,
-    "metadata_shells": 1,
-    "retrieval_failed": 12,
+    "fetched_representations": 23,
+    "target_page_representations": 17,
+    "repository_metadata_checks": 12,
+    "repository_metadata_only": 6,
+    "redirect_to_non_target_index": 1,
+    "retrieval_failed": 8,
     "blocked_from_admission": 32,
     "distilled": 0,
     "approved": 0,
-    "auxiliary_identity_or_rights_files_fetched": 17,
-    "additional_license_files_fetched": 8,
-    "git_blob_identities_api_matched": 17,
-    "git_blobs_locally_reproduced": 17,
-    "git_blob_identity_mismatch": 0
+    "auxiliary_identity_or_rights_files_fetched": 22,
+    "additional_license_or_rights_files_fetched": 10,
+    "git_blob_identities_captured": 22
   },
-  "last_batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0020.json",
-  "last_updated_at": "2026-10-11T22:23:21.258680+00:00",
+  "last_batch_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+  "last_updated_at": "2026-10-11T23:15:51Z",
   "reviewed_candidate_count_definition": "Legacy field counts first-pass candidate checks only; it does not mean independent source review or approval."
 }
