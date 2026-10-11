@@ -50,10 +50,20 @@ class RealModelOperatorCLITests(unittest.TestCase):
 
     def test_cli_evaluation_stage_shadow_usage_idle_activation_inference(self):
         self._populate_real_quarantine()
-        tested=self.cmd("evaluate","--trusted-local-operator")
+        # The deliberately simplistic unit-test classifier is known to
+        # exploit the attack_family metadata. Default production rigor must
+        # reject it; only an explicit advisory-only lab setting permits
+        # testing the lifecycle and emergency rollback behavior.
+        strict=self.cmd("evaluate","--trusted-local-operator")
+        self.assertFalse(strict["evaluation"]["passed"])
+        self.assertIn("validation:reviewer_shortcut_detection",
+                      strict["evaluation"]["blockers"])
+        tested=self.cmd("evaluate","--trusted-local-operator",
+                        "--minimum-counterfactual-accuracy","0")
         self.assertTrue(tested["evaluation"]["passed"])
         self.assertFalse(tested["core_ai_model_changed"])
-        staged=self.cmd("stage","--trusted-local-operator")
+        staged=self.cmd("stage","--trusted-local-operator",
+                        "--minimum-counterfactual-accuracy","0")
         self.assertEqual(staged["status"],"staged")
         self.assertEqual(self.cmd("status")["phase"],"staged")
         state=self.registry.read_state()
