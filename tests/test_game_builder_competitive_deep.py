@@ -17,6 +17,7 @@ from skeleton.ai.game_builder.competitive_evolution_chain import (
 from skeleton.ai.game_builder.competitive_counterproposals import (
     propose_original_outclassing,evaluate_original_counterproposal,
 )
+from skeleton.ai.game_builder.competitive_ancestry_frontier import evaluate_ancestral_outclassing
 from skeleton.ai.game_builder.competitive_deep_service import (
     examine_enemy_genre_portfolio,
 )
@@ -285,6 +286,63 @@ class DeepEnemyCases(CompetitorRadarCases):
         self.assertTrue(passed.fulfilled)
         self.assertEqual(passed.quality_gain_bp,2500)
         self.assertFalse(passed.payload()["game_release_authorized"])
+
+    def ancestral_samples(self,script,*,original_low=5000):
+        rows=[]
+        for subject,score,low,high in (
+            ("rust_labyrinth",6200,6000,6400),
+            ("clockwork_vale",6600,6400,6800),
+        ):
+            for judge in self.judges:
+                row=FacetMeasurement(
+                    script.digest,subject,judge.judge_id,
+                    score,low,high,60,
+                    sha256(f"era|{subject}|{judge.judge_id}|{original_low}".encode()).hexdigest(),
+                    T0,"0"*64)
+                rows.append(sign_facet_measurement(row,judge))
+        return tuple(rows)
+
+    def test_deep_evolution_must_outwork_strongest_verified_generation(self):
+        scripts,verdicts,_,_=self.scoring()
+        npc=next(x for x in scripts if x.facet=="npc_agency")
+        ancestor=self.ancestral_samples(npc)
+        frontier=evaluate_ancestral_outclassing(
+            self.original,self.chain(),scripts,verdicts,ancestor,
+            self.judges,as_of=T0,authorized=True)
+        focus=next(x for x in frontier.studies if x.facet=="npc_agency")
+        self.assertEqual(focus.strongest_predecessor_id,"clockwork_vale")
+        self.assertEqual(focus.conservative_ancestry_ceiling_bp,6800)
+        self.assertEqual(focus.target_floor_bp,6950)
+        self.assertEqual(focus.covered_title_ids,
+                         ("clockwork_vale","rust_labyrinth"))
+        self.assertFalse(focus.proved_outclassing)
+        self.assertFalse(frontier.complete_ancestry_outclassed)
+        improved=self.scoring(original_low=7500)[1]
+        greater=evaluate_ancestral_outclassing(
+            self.original,self.chain(),scripts,improved,ancestor,
+            self.judges,as_of=T0,authorized=True)
+        self.assertTrue(next(x for x in greater.studies
+                             if x.facet=="npc_agency").proved_outclassing)
+        self.assertFalse(greater.complete_ancestry_outclassed)
+        self.assertEqual(len(greater.studies),51)
+
+    def test_missing_ancestor_or_forged_ancestry_score_cannot_be_winning(self):
+        scripts,verdicts,_,_=self.scoring()
+        npc=next(x for x in scripts if x.facet=="npc_agency")
+        ancestor=self.ancestral_samples(npc)
+        fewer=tuple(x for x in ancestor if x.subject_id=="rust_labyrinth")
+        verdict=evaluate_ancestral_outclassing(
+            self.original,self.chain(),scripts,verdicts,fewer,
+            self.judges,as_of=T0,authorized=True)
+        focus=next(x for x in verdict.studies if x.facet=="npc_agency")
+        self.assertIn("clockwork_vale",focus.missing_title_ids)
+        self.assertIn("unmeasured_or_single_source_predecessor",focus.blockers)
+        forged=list(ancestor)
+        forged[0]=replace(forged[0],score_bp=6300)
+        with self.assertRaisesRegex(ThreatRadarError,"untrusted"):
+            evaluate_ancestral_outclassing(
+                self.original,self.chain(),scripts,verdicts,
+                tuple(forged),self.judges,as_of=T0,authorized=True)
 
     def test_portfolio_composes_independent_source_and_quality_lanes(self):
         with TemporaryDirectory() as d:
