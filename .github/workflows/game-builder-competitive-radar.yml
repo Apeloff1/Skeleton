@@ -1,0 +1,59 @@
+name: Game Builder Competitive Threat Radar
+on:
+  pull_request:
+    paths:
+      - "skeleton/ai/game_builder/competitive_title_radar.py"
+      - "skeleton/ai/game_builder/competitive_delivery_gate.py"
+      - "skeleton/ai/game_builder/competitive_watch_book.py"
+      - "skeleton/ai/game_builder/competitive_watch_service.py"
+      - "tests/test_game_builder_competitive_radar.py"
+      - "docs/ai/game_competitive_threat_radar_2026_10.md"
+      - ".github/workflows/game-builder-competitive-radar.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: game-competing-title-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  source-verified-competitive-intelligence:
+    name: Exact-head competing-title review and individuality (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
+      EXACT_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Verify exact-head source with no credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_competitive_radar.py
+            tests/test_game_builder_knowledge_rights_bridge.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Compile and verify exact commit
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXACT_SHA"
+          python -m compileall -q skeleton/ai/game_builder
+      - name: Adversarial competitor, originality and delivery gate tests
+        shell: bash
+        run: |
+          python -m unittest tests.test_game_builder_competitive_radar tests.test_game_builder_knowledge_rights_bridge -v
