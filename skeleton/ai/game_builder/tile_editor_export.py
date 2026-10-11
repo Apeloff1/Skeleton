@@ -82,7 +82,7 @@ function restore(){
  dirty=true;announce("Undo applied.");render();
 }
 function apply(x,y,tile){
- if(!" #.SGCH".includes(tile)||tile===" ")return;
+ if(typeof tile!=="string"||!["#",".","S","G","C","H"].includes(tile))return;
  if(x<=0||y<=0||x>=intent.width-1||y>=intent.height-1){
   announce("The sealed world boundary cannot be edited.");return;
  }
@@ -247,7 +247,9 @@ async function importFile(file){
  if(!data||typeof data!=="object"||Array.isArray(data)||
     Object.keys(data).sort().join()!=="intent,levels,schema"||
     data.schema!=="skeleton.game_builder.authored_tiles.v1"||
-    JSON.stringify(data.intent)!==JSON.stringify(intent)||
+    !data.intent||typeof data.intent!=="object"||Array.isArray(data.intent)||
+    Object.keys(data.intent).sort().join()!==Object.keys(intent).sort().join()||
+    Object.keys(intent).some(field=>data.intent[field]!==intent[field])||
     !Array.isArray(data.levels)||data.levels.length!==intent.levels){
     announce("Import schema or project identity mismatch.");return;
  }
