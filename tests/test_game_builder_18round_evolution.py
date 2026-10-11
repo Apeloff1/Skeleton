@@ -21,6 +21,14 @@ from skeleton.ai.game_builder.game_18round_shadow_sandbox import (
     SandboxVerification,ModularShadowTicket,prepare_shadow_tickets,
     verify_shadow_in_sandbox,sign_sandbox_verification,order_verified_hyperweights,
 )
+from skeleton.ai.game_builder.game_18round_runtime import (
+    execute_round3_relevance,execute_round4_shadow_backlog,
+    derive_round11_reviewed_destinations,execute_round18_adjacent_recrawl,
+)
+from skeleton.ai.game_builder.game_dragon_peer_wisdom import (
+    SourceMediaReceipt,distill_dragon_peer_wisdom,
+)
+from tests.test_game_builder_optimizer_and_wisdom import ActualPeerWisdomTests
 from skeleton.ai.game_builder.game_18round_journal import GameEvolutionJournal
 from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
 from skeleton.ai.game_builder.game_18round_evolution import (
@@ -268,6 +276,68 @@ class EighteenRoundCases(unittest.TestCase):
                     ('{}',))
                 with self.assertRaises(ThreatRadarError):
                     journal.read(signers=(self.key,),authorized=True)
+
+
+    def test_real_wiki_rights_revision_r3_to_shadow_and_safe_crawler_destinations(self):
+        existing=ActualPeerWisdomTests(
+            "test_video_article_blog_become_rights_bound_wisdom_without_illegal_training")
+        existing.setUp()
+        self.addCleanup(existing.db.close)
+        almanac=distill_dragon_peer_wisdom(
+            existing.db,existing.brief,existing.packet,existing.ledger,
+            tuple(existing.medium),authorized=True)
+        task=replace(self.task,original_id="original-platformer")
+        candidate=RelevantKnowledge(
+            "platforming_evidence","platforming",almanac.digest,
+            ("platformer",),("retro",),("warm",),
+            ("gameplay_quality",),(),True,4,None)
+        state=begin_18round_evolution(task,authorized=True)
+        stage3,priorities=execute_round3_relevance(
+            state,existing.db,existing.brief,existing.packet,existing.ledger,
+            tuple(existing.medium),(candidate,),(),(),None,
+            reviewer=self.key,as_of="2026-10-11T18:00:00Z",authorized=True)
+        self.assertEqual(stage3.rounds[0].round_number,3)
+        self.assertEqual(priorities[0].mode,"research_queue_only")
+        self.assertEqual(priorities[0].rights,"reference_only")
+        stage4,shadow=execute_round4_shadow_backlog(
+            stage3,priorities,self.plan,"f"*64,100,
+            reviewer=self.key,as_of="2026-10-11T18:01:00Z",
+            authorized=True)
+        self.assertEqual(shadow,())
+        self.assertFalse(stage4.shadow_approved_for_stage)
+        self.assertEqual(stage4.rounds[-1].round_number,4)
+        destinations=derive_round11_reviewed_destinations(
+            existing.db,existing.brief,existing.packet,existing.ledger,
+            authorized=True)
+        self.assertEqual(len(destinations),3)
+        self.assertTrue(all(x.url.startswith("https://") for x in destinations))
+        self.assertTrue(all(x.license_use=="facts_ideas_reference"
+                            for x in destinations))
+        with self.assertRaises(PermissionError):
+            derive_round11_reviewed_destinations(
+                existing.db,existing.brief,existing.packet,existing.ledger,
+                authorized=False)
+
+    def test_round18_runtime_produces_real_native_new_crawler_mission(self):
+        state=begin_18round_evolution(self.task,authorized=True)
+        for round_no in range(3,18):
+            status=("idle_assessed" if round_no in (5,6) else
+                    "shadow_queued" if round_no in (4,7,8,13,14,15,16)
+                    else "research_recorded")
+            state=accept_round(
+                state,self.receipt(state,status),self.key,authorized=True,
+                **(dict(host_consented=True,host_idle=lambda:True,
+                        thermal_safe=lambda:True)
+                   if round_no in (5,6) else {}))
+        completed,mission=execute_round18_adjacent_recrawl(
+            state,("known historical mechanics",),
+            ("incomplete witness evidence","unknown era graphics quality"),
+            reviewer=self.key,as_of="2026-10-12T12:00:00Z",
+            authorized=True,consent=True)
+        self.assertEqual(len(completed.rounds),16)
+        self.assertEqual(completed.rounds[-1].round_number,18)
+        self.assertEqual(len(mission.queries),8)
+        self.assertFalse(completed.user_model_activation_granted)
 
 
 
