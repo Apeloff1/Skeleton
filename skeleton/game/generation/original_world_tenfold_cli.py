@@ -44,7 +44,17 @@ def script_actions(text: str) -> tuple[TenfoldAction, ...]:
         }:
             raise FoundationError("invalid action structure")
         try:
-            actions.append(TenfoldAction(**item))
+            action = TenfoldAction(**item)
+            if action.layer not in ("spatial", "mode", "arc", "causal"):
+                raise FoundationError("unrecognized scripted gameplay layer")
+            if (type(action.amount) is not int or not 1 <= action.amount <= 3
+                    or type(action.target) is not int
+                    or not -1 <= action.target <= 23
+                    or not isinstance(action.verb, str) or not action.verb
+                    or len(action.verb) > 64
+                    or not isinstance(action.option, str) or len(action.option) > 32):
+                raise FoundationError("invalid typed scripted action")
+            actions.append(action)
         except (TypeError, ValueError) as exc:
             raise FoundationError("malformed world action") from exc
     return tuple(actions)
@@ -86,6 +96,7 @@ def render(state: TenfoldState) -> str:
         f"{arch.title} — {world.advanced.mode.base.root.title}",
         f"Play form: {world.advanced.mode.form.form_id}, "
         f"continuation: {world.advanced.arc.arc_id}",
+        f"Original world causal law: {world.advanced.mode.base.root.invariant}",
         f"Spatial law: {arch.spatial_contract}",
         f"Action: {arch.intervention}; hazard: {arch.hazard_model}",
         f"Spatial node {state.position}/23, exits {passages(state)}; "
