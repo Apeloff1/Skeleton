@@ -169,7 +169,7 @@ func _enemy_round() -> Array:
                     if int(unit["hp"])>0 and [unit["x"],unit["y"]]==point:
                         blocked=true
                 for other in state["enemies"]:
-                    if other is not enemy and [other["x"],other["y"]]==point:
+                    if not is_same(other,enemy) and [other["x"],other["y"]]==point:
                         blocked=true
                 if delta!=0 and not blocked:
                     enemy[axis]=int(enemy[axis])+delta
@@ -223,7 +223,7 @@ func _step(action: String) -> bool:
         var cell: Array=[x,y]
         var blocked: bool=cell in state["obstacles"]
         for other in state["units"]:
-            if other is not unit and int(other["hp"])>0 and [other["x"],other["y"]]==cell:
+            if not is_same(other,unit) and int(other["hp"])>0 and [other["x"],other["y"]]==cell:
                 blocked=true
         for enemy in state["enemies"]:
             if int(enemy["hp"])>0 and [enemy["x"],enemy["y"]]==cell:
