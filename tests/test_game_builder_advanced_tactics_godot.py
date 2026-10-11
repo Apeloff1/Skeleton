@@ -190,7 +190,7 @@ class TacticsStudioExportTests(unittest.TestCase):
 
     def test_gated_native_game_ui(self):
         html=render_workspace_html("E"*32).decode()
-        self.assertIn('"shooter","tactics","tower_defense"].includes(advancedSession.editor)',html)
+        self.assertIn('"shooter","tactics","tower_defense","racing"].includes(advancedSession.editor)',html)
         self.assertIn("Download playable Godot 4 game project",html)
 
 
