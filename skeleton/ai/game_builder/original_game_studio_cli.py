@@ -44,7 +44,9 @@ def parser() -> argparse.ArgumentParser:
     entry.add_argument("--living-world-mode", choices=("campaign", "postgame", "sandbox"),
                        default="postgame", help="Story ends, lives on, or remains an open sandbox")
     entry.add_argument("--living-world-quests", type=int, default=2,
-                       help="Required faction quests before an ending, 1..3")
+                       help="Faction quests required before ending, 1..arcs")
+    entry.add_argument("--living-world-arcs", type=int, default=3,
+                       help="Independent faction story arcs, 3..24")
     entry.add_argument("--living-world-blueprint",
                        help="Human-authored original NPC/region/quest blueprint JSON")
     entry.add_argument("--living-world-human-reviewed", action="store_true",
@@ -100,6 +102,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             narrative_regions=args.living_world_regions,
             narrative_mode=args.living_world_mode,
             narrative_quests=args.living_world_quests,
+            narrative_arcs=args.living_world_arcs,
             narrative_ending=args.living_world_ending,
             narrative_blueprint=args.living_world_blueprint,
             narrative_human_reviewed=args.living_world_human_reviewed,
