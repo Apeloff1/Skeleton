@@ -9,9 +9,16 @@ Dragon, Wiki or HOAG neural model.
 
 ## Proven vs not yet proven
 
-The repository actually fits an isolated 128-feature logistic *game-review
-ranker* with deterministic numeric weights. This is a real, small classifier.
-It does **not** train or edit Dragon/Jeeves LLM parameters. Its role is to
+The repository actually fits **two** isolated logistic game-review
+classifiers: a 128-feature v1 baseline and a second-generation
+**256-feature normalized-evidence v2** that is now the default operator
+promotion candidate. Both produce real learned, deterministic numeric
+weights. The v2 training set is expanded only with source-preserving,
+adversarially transformed examples from train projects; validation
+selects its checkpoint, and test projects remain strictly held out.
+The v2 representation excludes attack-family labels and normalizes
+nested witness/replay data. Neither classifier trains or edits
+Dragon/Jeeves LLM parameters. Its role is to
 prioritize suspicious evidence for the authoritative original-game replay
 verifier. An active advisory result must never authorize a quest victory,
 story change, copyrighted asset, platform export, or commercial launch.
@@ -43,9 +50,17 @@ red-teams **labels masquerading as knowledge**: adding an irrelevant
 `attack_family` field to a valid case, removing the family name from an
 actually corrupted case, or changing field presentation must not invert the
 answer. This catches a genuine weakness in simple schema-based classifiers.
-The existing isolated v1 ranker is often blocked here. An explicit override
-to zero is supported for **advisory-only laboratory lifecycle tests** and is
-not evidence of competitive model quality.
+The existing isolated **v1** ranker is blocked by the source-preserving
+wrapper challenge on the focused benchmark. The current v2 implementation
+passes the stricter 98% test on that same original-game benchmark
+(including the actual Linux and Windows CI training/promotion tests).
+These results prove this particular evaluation, not competitive
+industry-wide superiority or creative model generalization.
+
+The CLI uses `--feature-version robust_v2` by default. For a baseline
+comparison use `--feature-version baseline_v1`. An explicit reduction of
+`--minimum-counterfactual-accuracy` to zero is intended **only for
+lab demonstrations**; it cannot justify consumer-production claims.
 
 `game_learning_challenges.py` turns failed *train*-project probes into
 traceable, quarantined hard examples. Held-out validation and test failures
@@ -171,6 +186,20 @@ numerical model weights invalidates its custody. State/journal divergence
 blocks work until safe recovery. Missing/reordered entries, unauthorized
 promotion, duplicate reviewers, missing fresh cohorts, tampered candidates,
 weakening standards and severe new mistakes fail closed.
+
+## Visibility in the local studio
+
+The browser-based file-tree workbench now shows read-only reviewer
+progression (phase, independent signoffs, usage and idle verification
+status, model source count and rollback incident) through the
+authenticated `/api/model-status` endpoint. This does not permit
+browser-side model promotion or expose the trained weight vectors.
+Run the existing supervised workbench server to view it:
+
+```sh
+python -m skeleton.ai.game_builder.game_workspace_cli serve \\
+  --root ORIGINAL_STUDIO --open-browser
+```
 
 ## Further competitive work
 
