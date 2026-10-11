@@ -172,19 +172,24 @@ def test_importing_remote_food_never_mints_or_teleports_goods():
 
 
 def test_import_stays_escrowed_when_local_warehouse_is_full():
+    from skeleton.game.generation.original_world_npc_era_population import tick_population
     s = product("paleolithic")
     s = step(s, "dispatch_food", "population",
              target=0, option="to-player", amount=1)
-    s = replace(s, terrain=replace(s.terrain, provisions=1000))
-    until = s.population.caravans[0].arrives
-    for _ in range(until):
-        s = step(s)
-    assert s.population.caravans[0].status == "travelling"
-    assert s.terrain.provisions == 1000
-    s = replace(s, terrain=replace(s.terrain, provisions=995))
-    s = step(s)
-    assert s.population.caravans[0].status == "delivered"
-    assert s.terrain.provisions >= 996
+    region = s.population
+    # Isolate the warehouse-capacity boundary from independent active
+    # local NPCs legitimately eating their own food later in the day.
+    depot = replace(s.terrain, provisions=1000)
+    for day in range(1, region.caravans[0].arrives + 1):
+        citizens = replace(s.society, tick=day)
+        region, depot, events = tick_population(region, citizens, depot)
+    assert region.caravans[0].status == "travelling"
+    assert depot.provisions == 1000
+    depot = replace(depot, provisions=995)
+    citizens = replace(s.society, tick=region.day + 1)
+    region, depot, events = tick_population(region, citizens, depot)
+    assert region.caravans[0].status == "delivered"
+    assert depot.provisions == 996
 
 
 def test_districts_eventually_experience_real_shortages_and_census_mortality():
