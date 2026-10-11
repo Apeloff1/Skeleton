@@ -537,7 +537,7 @@ def archive_advanced_godot_package(package: NativeAdvancedGamePackage)->bytes:
     if not isinstance(package,NativeAdvancedGamePackage):
         raise AdvancedGodotExportError("typed original native game package required")
     genre=package.manifest.get("native_editor")
-    if genre not in ("puzzle","platformer","deck_battler","shooter","tactics","tower_defense","racing","survival"):
+    if genre not in ("puzzle","platformer","deck_battler","shooter","tactics","tower_defense","racing","survival","farming"):
         raise AdvancedGodotExportError("only independently implemented native genres may be archived")
     output=BytesIO()
     with ZipFile(output,"w",compression=ZIP_DEFLATED,compresslevel=9) as archive:
