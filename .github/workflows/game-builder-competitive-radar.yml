@@ -31,6 +31,12 @@ on:
       - "skeleton/ai/game_builder/game_secondary_wisdom_loop.py"
       - "skeleton/ai/game_builder/game_wisdom_report_archive.py"
       - "skeleton/ai/game_builder/game_second_train_replay_custody.py"
+      - "skeleton/ai/game_builder/game_18round_relevance.py"
+      - "skeleton/ai/game_builder/game_18round_shadow_sandbox.py"
+      - "skeleton/ai/game_builder/game_18round_evolution.py"
+      - "skeleton/ai/game_builder/game_18round_journal.py"
+      - "tests/test_game_builder_18round_evolution.py"
+      - "docs/ai/game_18round_hyperweight_evolution_2026_10.md"
       - "tests/test_game_builder_secondary_wisdom.py"
       - "docs/ai/game_secondary_wisdom_aftercare_2026_10.md"
       - "tests/test_game_builder_competitive_4080_campaign.py"
@@ -88,6 +94,7 @@ jobs:
             tests/test_game_builder_competitive_council_pdfs.py
             tests/test_game_builder_competitive_4080_campaign.py
             tests/test_game_builder_secondary_wisdom.py
+            tests/test_game_builder_18round_evolution.py
             tests/test_game_builder_optimizer_and_wisdom.py
             tests/test_game_builder_reviewer_promotion.py
             tests/test_game_builder_knowledge_rights_bridge.py
@@ -103,4 +110,4 @@ jobs:
       - name: Adversarial competitor, originality and delivery gate tests
         shell: bash
         run: |
-          python -m unittest tests.test_game_builder_secondary_wisdom tests.test_game_builder_competitive_4080_campaign tests.test_game_builder_competitive_council_pdfs tests.test_game_builder_competitive_deep_archive tests.test_game_builder_competitive_probe_runner tests.test_game_builder_competitive_deep tests.test_game_builder_competitive_radar tests.test_game_builder_knowledge_rights_bridge -v
+          python -m unittest tests.test_game_builder_18round_evolution tests.test_game_builder_secondary_wisdom tests.test_game_builder_competitive_4080_campaign tests.test_game_builder_competitive_council_pdfs tests.test_game_builder_competitive_deep_archive tests.test_game_builder_competitive_probe_runner tests.test_game_builder_competitive_deep tests.test_game_builder_competitive_radar tests.test_game_builder_knowledge_rights_bridge -v
