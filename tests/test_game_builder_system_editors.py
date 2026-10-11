@@ -194,6 +194,7 @@ class StudioIntegrationTests(unittest.TestCase):
         for token in ('id="system-kind"', 'id="system-fields"',
                       'id="system-stage"', 'id="system-try"',
                       'id="system-assembly"',
+                      'id="system-canvas"',
                       "Review proposed edit","Content-Security-Policy"):
             self.assertIn(token,html)
         self.assertNotIn("https://",html)
