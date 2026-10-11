@@ -90,7 +90,9 @@ def test_one_mentor_cannot_duplicate_same_day_training_or_certify_self():
 def test_apprenticeship_pause_requires_actual_two_bodies_in_same_place():
     s = physically_present(original())
     s = issue(s, "mentor", target=0, option="1")
-    apprentice = replace(s.society.inhabitants[1], x=1, y=0)
+    from skeleton.game.generation.original_world_product_agents import _neighbors
+    nx, ny = next(iter(_neighbors(s.terrain, 0, 0)))
+    apprentice = replace(s.society.inhabitants[1], x=nx, y=ny)
     s = replace(s, society=replace(s.society, inhabitants=(
         s.society.inhabitants[0], apprentice,
     )))
