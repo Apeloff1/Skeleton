@@ -478,7 +478,7 @@ class WatchCLIIntegrationCases(CompetitiveDeliveryCases):
 class DragonCompetitorRecrawlCases(CompetitorRadarCases):
     def histories(self):
         return tuple(ReviewedCrawlHistory(
-            link.source_id,1791622800,9000,0)
+            link.source_id,1791532800,9000,0)
             for link in self.links)
 
     def plan(self,*,consent=True,host_safe=True,links=None,histories=None,
