@@ -11,6 +11,7 @@ on:
       - "skeleton/ai/game_builder/game_reviewer_v2.py"
       - "skeleton/ai/game_builder/game_reviewer_optimizer.py"
       - "skeleton/ai/game_builder/game_dragon_peer_wisdom.py"
+      - "skeleton/ai/game_builder/game_integrated_learning.py"
       - "skeleton/ai/game_builder/reviewed_knowledge.py"
       - "skeleton/ai/game_builder/knowledge_rights_bridge.py"
       - "tests/test_game_builder_reviewer_promotion.py"
