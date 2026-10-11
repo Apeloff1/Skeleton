@@ -56,7 +56,29 @@ class OptimizationResult:
 
     @property
     def candidate_improved(self):
-        return self.promotion_evaluation is not None and self.promotion_evaluation.passed
+        """Require actual frozen TEST uplift over an independently installed champion.
+
+        This never invents a comparative claim for an initial bootstrap model.
+        Balanced accuracy and calibration must not regress and at least one
+        metric must improve by more than the precision of the stored result.
+        """
+        if (self.promotion_evaluation is None
+                or not self.promotion_evaluation.passed
+                or self.champion_digest is None):
+            return False
+        metrics=self.promotion_evaluation.metrics
+        current=metrics["test"]
+        incumbent=metrics["champion"]["test"]
+        accuracy_delta=current["balanced_accuracy"]-incumbent["balanced_accuracy"]
+        brier_delta=incumbent["brier"]-current["brier"]
+        return (accuracy_delta>=-1e-6 and brier_delta>=-1e-8
+                and (accuracy_delta>1e-6 or brier_delta>1e-7))
+
+    @property
+    def ready_for_stage(self):
+        return (self.promotion_evaluation is not None
+                and self.promotion_evaluation.passed
+                and (self.champion_digest is None or self.candidate_improved))
 
     def payload(self):
         # Never expose a validation-only candidate as a deployable policy;
@@ -72,6 +94,12 @@ class OptimizationResult:
             qualification=self.promotion_evaluation.payload()
                 if self.promotion_evaluation else None,
             champion_digest=self.champion_digest,
+            measured_champion_uplift=self.candidate_improved,
+            qualified_bootstrap_without_champion=(
+                self.champion_digest is None and
+                self.promotion_evaluation is not None and
+                self.promotion_evaluation.passed),
+            ready_for_independent_shadow_staging=self.ready_for_stage,
             independent_test_used_for_search=False,
             protected_test_evaluated_for_frozen_winner=bool(self.selected_fit),
             actual_sgd_weights_updated=bool(self.selected_fit),
