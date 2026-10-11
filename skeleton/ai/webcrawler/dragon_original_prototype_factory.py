@@ -6,9 +6,9 @@ actual living-world lifecycle, (3) original narrative/terrain direction,
 (4) genuinely replayed gameplay examples, (5) machine-verifiable identity,
 and (6) explicit unfulfilled art, user-playtest, device and legal signoff.
 
-16,777,216 binary rulebook addresses correspond to different *available
+4,294,967,296 full-width binary rulebook addresses correspond to different *available
 mechanic action sets*. That is a mathematical and executable property;
-not 16.7m already produced, aesthetically unique or commercially finished
+not 4.29b already produced, aesthetically unique or commercially finished
 games. No external game assets or copyrighted maps are read or emitted.
 """
 from __future__ import annotations
@@ -22,7 +22,8 @@ from .dragon_living_world import (
     describe,terrain,_sha,
 )
 from .dragon_original_mechanic_forge import (
-    OriginalProgram,binary_nucleus,validate_program,capabilities,
+    OriginalProgram,binary_nucleus,full_binary_nucleus,
+    FULL_BINARY_PROFILE_COUNT,validate_program,capabilities,
     MECHANIC_IDS,MILLION_DISTINCT_ENABLE_PROFILES,
     choices,initial,distinguish,
 )
@@ -135,12 +136,12 @@ def _canonical(obj)->str:
 def materialize(nucleus:int,*,branch_seed:int=0,
                 routes:int=4,steps:int=16)->OriginalPrototype:
     if (type(nucleus) is not int or
-            not 0<=nucleus<MILLION_DISTINCT_ENABLE_PROFILES or
+            not 0<=nucleus<FULL_BINARY_PROFILE_COUNT or
             type(branch_seed) is not int or not 0<=branch_seed<2**32 or
             type(routes) is not int or not 1<=routes<=MAX_PREVIEW or
             type(steps) is not int or not 4<=steps<=64):
         raise ValueError("bounded original game prototype request invalid")
-    program=binary_nucleus(nucleus)
+    program=full_binary_nucleus(nucleus)
     active=tuple(MECHANIC_IDS[i] for i,level
                  in enumerate(program.intensities) if level>0)
     world_type=_world_style(set(active))
@@ -239,8 +240,8 @@ def verify_prototype(value:OriginalPrototype, *,
 def distinguish_prototypes(left:int,right:int)->dict:
     if left==right:
         raise ValueError("different game prototypes must use distinct original nuclei")
-    first=binary_nucleus(left)
-    second=binary_nucleus(right)
+    first=full_binary_nucleus(left)
+    second=full_binary_nucleus(right)
     causal=distinguish(first,second)
     if not causal["distinguishable"]:
         raise ValueError("distinct original prototypes unexpectedly share mechanic rules")
@@ -258,15 +259,15 @@ def sample_prototypes(*,start:int,count:int,
                       branch_seed:int=0,
                       routes:int=2,steps:int=12)->dict:
     if (type(start) is not int or type(count) is not int or
-            not 0<=start<MILLION_DISTINCT_ENABLE_PROFILES or
+            not 0<=start<FULL_BINARY_PROFILE_COUNT or
             not 1<=count<=24 or
-            start+count>MILLION_DISTINCT_ENABLE_PROFILES):
+            start+count>FULL_BINARY_PROFILE_COUNT):
         raise ValueError("original prototype sampling must be small and bounded")
     entries=[materialize(index,branch_seed=branch_seed,
                          routes=routes,steps=steps)
              for index in range(start,start+count)]
     return {
-        "schema":SCHEMA,"nuclei_indexed":MILLION_DISTINCT_ENABLE_PROFILES,
+        "schema":SCHEMA,"nuclei_indexed":FULL_BINARY_PROFILE_COUNT,
         "requested_materialized":count,
         "distinct_executable_rulebooks":len({
             x.gameplay_program_index for x in entries}),
