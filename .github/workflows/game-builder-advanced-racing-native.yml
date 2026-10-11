@@ -1,0 +1,238 @@
+name: Advanced Godot Native Racing Replay
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_racing_godot.py"
+      - "skeleton/ai/game_builder/advanced_godot_export.py"
+      - "docs/GAME_BUILDER_SYSTEM_EDITOR_FABRIC.md"
+      - ".github/workflows/game-builder-advanced-system-engines.yml"
+      - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
+      - "skeleton/ai/game_builder/advanced_level_scenes.py"
+      - "skeleton/ai/game_builder/advanced_genre_engines.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_advanced_racing_godot.py"
+      - ".github/workflows/game-builder-advanced-racing-native.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: advanced-native-racing-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  independently-execute-racing:
+    name: Python/Godot racing parity on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    timeout-minutes: 23
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Checkout exact PR head with safe source scope
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_advanced_racing_godot.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Godot 4.4.1 native runtime and export templates
+        uses: chickensoft-games/setup-godot@f166999204a4f2722c6fe042fbaa3b3ea0d9c789
+        with:
+          version: "4.4.1"
+          use-dotnet: false
+          include-templates: true
+          cache: true
+      - name: Validate exact source and Python proof contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          godot --version
+          python -m py_compile skeleton/ai/game_builder/advanced_godot_export.py skeleton/ai/game_builder/advanced_racing_godot.py
+          python -m unittest tests.test_game_builder_advanced_racing_godot -v
+      - name: Build eight distinct original racing circuits and weather situations
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from skeleton.ai.game_builder.advanced_level_scenes import make_advanced_scene
+          from skeleton.ai.game_builder.advanced_gameplay_runtime import run_advanced_session
+          from skeleton.ai.game_builder.advanced_racing_godot import render_racing_godot_package
+          from skeleton.ai.game_builder.advanced_godot_export import write_advanced_godot_package
+          root=Path(os.environ["RUNNER_TEMP"])/"advanced-native-racing"
+          root.mkdir()
+          # Every game has an original authored scene; no external tracks/assets.
+          cases=(
+              ("dry",{"track_length":100},["accelerate","accelerate","coast","brake"],
+               {"corners":[25,50,75],"track_obstacle":32,"weather":"dry","starting_lane":0},0),
+              ("wet",{"track_length":100},["accelerate","steer_right","accelerate","coast"],
+               {"corners":[15,35,65],"track_obstacle":12,"weather":"wet","starting_lane":-1},1),
+              ("storm",{"track_length":90,"max_speed":20},
+               ["accelerate","accelerate","steer_left","brake","coast"],
+               {"corners":[10,20,60],"track_obstacle":15,"weather":"storm","starting_lane":1},2),
+              ("pit",{"track_length":60},["accelerate","brake","pit","accelerate"],
+               {"corners":[10,20,40],"track_obstacle":16,"weather":"dry","starting_lane":1},3),
+              ("boost",{"track_length":100,"max_speed":24},
+               ["boost","steer_right","coast","accelerate"],
+               {"corners":[8,25,40],"track_obstacle":12,"weather":"dry","starting_lane":0},4),
+              ("damage",{"track_length":60,"max_speed":30,"acceleration":18},
+               ["accelerate","boost","coast"],
+               {"corners":[3,9,20,30,45],"track_obstacle":5,"weather":"storm","starting_lane":0},5),
+              ("laps",{"track_length":20,"laps":2,"max_speed":15,"acceleration":10},
+               ["accelerate","accelerate","accelerate"],
+               {"corners":[4,10],"track_obstacle":7,"weather":"dry","starting_lane":1},6),
+              ("finish",{"track_length":20,"laps":1,"max_speed":15,"acceleration":10},
+               ["accelerate","accelerate"],
+               {"corners":[4,10],"track_obstacle":7,"weather":"dry","starting_lane":1},7),
+          )
+          witnessed=set()
+          for name,settings,actions,layout,seed in cases:
+              scene=make_advanced_scene("racing",settings,seed=seed,layout=layout)
+              game=run_advanced_session("racing",settings,actions,seed=seed,scene=scene)
+              witnessed.update(e for event in game["trace"] for e in event["events"])
+              if name=="finish":
+                  assert game["state"]["finished"] and game["terminal"]
+              if name=="laps":
+                  assert game["state"]["lap"]>=1
+              package=render_racing_godot_package(game,settings,authorized=True)
+              write_advanced_godot_package(package,root/name,authorized=True)
+              print("NATIVE_RACING_SOURCE",name,"steps",len(actions),
+                    "lap",game["state"]["lap"],"score",game["state"]["championship_points"],
+                    "digest",game["digest"])
+          assert {"pit_service","boost_consumed","race_completed",
+                  "centerline_obstacle_hit","corner_understeer_damage",
+                  "lane_changed","lap_completed"} <= witnessed,witnessed
+          PY
+      - name: Independently execute eight real original Godot circuit races
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/advanced-native-racing"
+          python - "$root" <<'PY'
+          import pathlib, subprocess, sys
+          root=pathlib.Path(sys.argv[1])
+          cases=("dry","wet","storm","pit",
+                 "boost","damage","laps","finish")
+          for case in cases:
+              project=root/case/"godot"
+              print("NATIVE_ADVANCED_RACING_CASE",case,flush=True)
+              for args in (["--headless","--path",str(project),"--import"],
+                           ["--headless","--path",str(project),"--","--verify-racing"]):
+                  try:
+                      result=subprocess.run(["godot",*args],stdout=subprocess.PIPE,
+                                            stderr=subprocess.STDOUT,text=True,
+                                            encoding="utf-8",errors="replace",timeout=45)
+                  except subprocess.TimeoutExpired as exc:
+                      print("NATIVE_ADVANCED_RACING_TIMEOUT",case,args,flush=True)
+                      if exc.stdout:
+                          print(exc.stdout.decode("utf-8","replace") if isinstance(exc.stdout,bytes) else exc.stdout)
+                      raise
+                  print(result.stdout,flush=True)
+                  if "--verify-racing" in args:
+                      (root/case/"native-replay.log").write_text(result.stdout,encoding="utf-8")
+                      if "NATIVE_ADVANCED_RACING_OK" not in result.stdout:
+                          raise SystemExit("native gameplay proof marker absent: "+case)
+                  if result.returncode:
+                      raise SystemExit(f"Godot returned {result.returncode} on {case} {args}")
+          PY
+      - name: Export Linux desktop racing executable and execute the actual binary
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          project="$RUNNER_TEMP/advanced-native-racing/finish/godot"
+          executable="$RUNNER_TEMP/advanced-native-racing/original-advanced-racing.x86_64"
+          godot --headless --path "$project" --export-release Linux "$executable"
+          test -s "$executable"
+          chmod +x "$executable"
+          "$executable" --headless -- --verify-racing | tee "$RUNNER_TEMP/advanced-native-racing/linux-export-replay.log"
+          grep -q "NATIVE_ADVANCED_RACING_OK" "$RUNNER_TEMP/advanced-native-racing/linux-export-replay.log"
+      - name: Export actual Windows game and verify native console executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'advanced-native-racing'
+          $project = Join-Path $root 'finish/godot'
+          $binary = Join-Path $root 'original-advanced-racing.exe'
+          # The setup-godot Windows GUI editor can detach without a reliable
+          # synchronous exit code. Use the same pinned official console engine
+          # already required by the repository's Windows native integration.
+          $archive = Join-Path $env:USERPROFILE 'downloads/Godot_v4.4.1-stable_win64.exe.zip'
+          $engineDir = Join-Path $root 'pinned-godot-console'
+          if (-not (Test-Path $archive)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path $archive) | Out-Null
+            Invoke-WebRequest -Uri 'https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_win64.exe.zip' -OutFile $archive -MaximumRedirection 5
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $engineDir -Force
+          $nativeEditor = Get-ChildItem $engineDir -Recurse -Filter '*_console.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -eq $nativeEditor) {
+            throw "Version-pinned official Godot Windows console editor unavailable"
+          }
+          & $nativeEditor.FullName --version
+          if ($LASTEXITCODE -ne 0) { throw "Godot Windows console startup failed" }
+          & $nativeEditor.FullName --headless --path $project --import
+          if ($LASTEXITCODE -ne 0) { throw "Advanced racing Windows resource import failed" }
+          & $nativeEditor.FullName --headless --path $project --export-release 'Windows Desktop' $binary
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $binary)) {
+            throw "Advanced Godot Windows console game executable export failed"
+          }
+          if ((Get-Item $binary).Length -le 1024) {
+            throw "Advanced Godot Windows game executable is empty"
+          }
+          $console = Join-Path $root 'original-advanced-racing.console.exe'
+          if (-not (Test-Path $console)) {
+            throw "Exported original racing lacks an observable Windows console binary"
+          }
+          $python = @'
+          import subprocess,sys
+          result=subprocess.run(
+              [sys.argv[1],"--headless","--","--verify-racing"],
+              capture_output=True,text=True,timeout=90)
+          print(result.stdout)
+          print(result.stderr)
+          sys.exit(0 if result.returncode==0 and
+              "NATIVE_ADVANCED_RACING_OK" in result.stdout+result.stderr else 1)
+          '@
+          $proofScript = Join-Path $root 'verify_windows_native.py'
+          [IO.File]::WriteAllText($proofScript, $python)
+          & python $proofScript $console
+          if ($LASTEXITCODE -ne 0) {
+            throw "Exported Windows homebrew racing gameplay diverged from reviewed Python"
+          }
+          Write-Host "Native Windows executable SHA256:"
+          Get-FileHash -Algorithm SHA256 $binary | Format-List
+          Get-FileHash -Algorithm SHA256 $console | Format-List
+      - name: Upload native gameplay proof logs and source release manifests
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: original-advanced-racing-${{ matrix.os }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/advanced-native-racing/*/native-replay.log
+            ${{ runner.temp }}/advanced-native-racing/*/release.json
+            ${{ runner.temp }}/advanced-native-racing/linux-export-replay.log
+            ${{ runner.temp }}/advanced-native-racing/original-advanced-racing.exe
+            ${{ runner.temp }}/advanced-native-racing/original-advanced-racing.console.exe
+            ${{ runner.temp }}/advanced-native-racing/original-advanced-racing.x86_64
+          if-no-files-found: warn
+          retention-days: 7
