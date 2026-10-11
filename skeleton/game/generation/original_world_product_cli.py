@@ -75,6 +75,13 @@ def parse_command(command: str, player: tuple[int, int]) -> ProductAction:
         except ValueError as exc:
             raise FoundationError("invalid terrain amount") from exc
         return ProductAction(layer, verb, amount=count, x=player[0], y=player[1])
+    if layer == "npc" and verb == "propose":
+        if len(parts) != 4:
+            raise FoundationError("usage: npc propose RESIDENT POLICY")
+        try:
+            return ProductAction("npc", "propose", target=int(parts[2]), option=parts[3])
+        except ValueError as exc:
+            raise FoundationError("resident ID must be an integer") from exc
     if layer == "npc" and verb == "project":
         if len(parts) != 5:
             raise FoundationError("new project: npc project hearth|mill|beacon X Y")
