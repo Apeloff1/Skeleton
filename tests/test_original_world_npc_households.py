@@ -179,3 +179,42 @@ def test_household_terminal_commands_have_real_scope():
         "npc", "household", target=0, option="1",
     )
     assert parse_command("npc cancel_household 0", (0, 0)).target == 0
+
+
+def test_parental_child_meal_spends_exactly_one_existing_stock_and_prevents_double_feeding():
+    state = propose(move_in(product()))
+    for _ in range(3):
+        state = turn(state)
+    parents = tuple(replace(p, x=0, y=0, energy=10, hunger=0, health=20)
+                    for p in state.society.inhabitants[:2])
+    dependent = replace(state.society.inhabitants[2],
+                        x=0, y=0, hunger=6, health=14)
+    state = replace(state,
+                    society=replace(state.society,
+                                    inhabitants=parents+(dependent,)),
+                    terrain=replace(state.terrain, provisions=2))
+    before = state.terrain.provisions
+    state = turn(state)
+    assert state.terrain.provisions == before - 1
+    assert state.society.inhabitants[2].hunger < 6
+    assert state.society.inhabitants[2].health >= 15
+    assert state.cognition.households.completed == 1
+    assert npc_profile(state.cognition, state.society, state.terrain, 2)[
+        "dependent_caregivers"] == [0, 1]
+
+
+def test_unfunded_dependent_care_cannot_magically_create_food():
+    state = propose(move_in(product()))
+    for _ in range(3):
+        state = turn(state)
+    parents = tuple(replace(p, x=0, y=0, energy=10, hunger=0, health=20,
+                            cargo_kind="", cargo=0)
+                    for p in state.society.inhabitants[:2])
+    child = replace(state.society.inhabitants[2], hunger=6, health=14)
+    state = replace(state,
+                    society=replace(state.society, inhabitants=parents+(child,)),
+                    terrain=replace(state.terrain, provisions=0))
+    state = turn(state)
+    assert state.terrain.provisions == 0
+    assert state.society.inhabitants[2].hunger >= 7
+    assert state.cognition.households.completed == 1
