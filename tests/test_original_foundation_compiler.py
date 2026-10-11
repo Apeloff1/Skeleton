@@ -205,7 +205,7 @@ def test_all_eight_regime_intensities_change_effect_or_gate() -> None:
     ("migration", "remote"),
     ("veto", "trust"),
     ("cascade", "momentum"),
-    ("exchange", "supplies"),
+    ("exchange", "reserve"),
     ("auction", "reserve"),
     ("fork", "branch"),
 ])
