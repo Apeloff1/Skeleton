@@ -39,6 +39,38 @@ Environmental Codex and game rules are independent composition layers;
 multiply these capacities only as theoretical addresses, not as audited
 unique human experiences.
 
+## Substantial candidates versus thin rule combinations
+
+Even a provably different one-action program is not automatically a
+meaningful game. The original prototype factory therefore checks:
+
+- At least **four** actual enabled mechanics
+- At least **three** independently defined gameplay domains
+- Evidence of different replayed journeys when multiple variants are sampled
+- A compatible living-world mode and independently replayed world actions
+
+A dynamic-programming exact combinatorial count over the **actual 19
+authored mechanic domains** shows:
+
+- **4,294,967,296** full binary rulebook addresses
+- **4,294,961,625** satisfy the *structural* four-mechanic, three-domain
+  quality threshold
+- **5,671** are thin configurations and cannot automatically be treated as
+  substantial games
+
+This does **not** certify that 4.29 billion configurations pass human fun,
+commercial originality or even all empirical choice-diversity tests.
+The candidate receipt records a `core_loop_viable` flag
+and `underbuilt_reasons`; its preliminary
+classification depends on the independently replayed scenarios actually
+evaluated.
+
+The SQLite production spool distinguishes `source_playable_only`
+from `underbuilt_source_draft`. Its totals separately
+report every materialized source candidate, preliminarily viable gameplay
+prototypes, and underbuilt drafts. An empty rest-only game is never silently
+counted as a satisfactory delivered title.
+
 ## Why there really are millions of different executable rules
 
 For any two distinct binary mechanic masks, there is at least one mechanic
