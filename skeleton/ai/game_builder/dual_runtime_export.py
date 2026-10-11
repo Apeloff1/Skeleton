@@ -53,6 +53,8 @@ var notice: String = "Collect every crystal, then reach the exit."
 var history: Array = []
 var actions: Array = []
 var ready_to_play: bool = false
+var touch_origin: Vector2 = Vector2.ZERO
+var touch_active: bool = false
 
 func _ready() -> void:
     set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -267,6 +269,35 @@ func _unhandled_key_input(event: InputEvent) -> void:
         _step(action)
     get_viewport().set_input_as_handled()
 
+func _unhandled_input(event: InputEvent) -> void:
+    if event is InputEventJoypadButton and event.pressed:
+        var action: String = ""
+        match event.button_index:
+            JOY_BUTTON_DPAD_UP: action = "up"
+            JOY_BUTTON_DPAD_LEFT: action = "left"
+            JOY_BUTTON_DPAD_RIGHT: action = "right"
+            JOY_BUTTON_DPAD_DOWN: action = "down"
+            JOY_BUTTON_B: _undo()
+            JOY_BUTTON_START: _reset()
+        if not action.is_empty():
+            _step(action)
+        get_viewport().set_input_as_handled()
+    elif event is InputEventScreenTouch:
+        if event.pressed:
+            touch_origin = event.position
+            touch_active = true
+        elif touch_active:
+            touch_active = false
+            var swipe: Vector2 = event.position - touch_origin
+            if swipe.length() >= 28.0:
+                var direction: String = ""
+                if absf(swipe.x) > absf(swipe.y):
+                    direction = "right" if swipe.x > 0.0 else "left"
+                else:
+                    direction = "down" if swipe.y > 0.0 else "up"
+                _step(direction)
+                get_viewport().set_input_as_handled()
+
 func _notification(what: int) -> void:
     if what == NOTIFICATION_RESIZED:
         queue_redraw()
@@ -315,7 +346,7 @@ func _draw() -> void:
     var player_rect := Rect2(start + Vector2(hero) * tile_size, Vector2.ONE * tile_size)
     draw_circle(player_rect.get_center(), tile_size * 0.32, Color("#f2f8fe"))
     _text(Vector2(20, start.y + height * tile_size + 26),
-        "WASD/arrows move   Z undo   R restart   F5 save   F9 load", 14, Color.WHITE)
+        "Arrows/WASD/D-pad/swipe move   Z/B undo   R/Start restart", 14, Color.WHITE)
     _text(Vector2(20, start.y + height * tile_size + 48),
         "Original geometry | Offline | No external game assets", 13, Color("#afc8c3"))
 
@@ -366,7 +397,7 @@ included, and the project needs no provider or network at runtime.
 Browser: open index.html in a modern desktop/mobile browser.
 Godot: open godot/project.godot in Godot 4.2+ and press F6/F5 to run.
 
-Godot controls: arrows/WASD movement, Z undo (256 moves), R restart,
+Godot controls: arrows/WASD/gamepad D-pad/touch swipe movement, Z or gamepad B undo (256 moves), R or Start restart,
 F5 local save, F9 local load. Local save stores actions rather than
 trusting serialized game state, and binds them to the source world digest.
 It is unverified until replayed by the Python reference simulator.
