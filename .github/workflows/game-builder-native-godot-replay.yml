@@ -130,11 +130,23 @@ jobs:
       PYTHONPATH: "."
       EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
     steps:
+      - name: Enable long-path Git support
+        shell: pwsh
+        run: git config --global core.longpaths true
       - name: Checkout exact source head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_studio_pipeline.py
+            tests/test_game_builder_dual_runtime.py
+            tests/test_game_builder_authored_tiles.py
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
