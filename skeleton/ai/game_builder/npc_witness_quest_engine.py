@@ -285,6 +285,16 @@ def validate_witness(world: DirectorWorld,replay: DirectorReplay,
     director_verify(world,replay)
     if receipt.world_digest!=world.digest or receipt.replay_digest!=replay.digest:
         raise WitnessError("witness source project or action replay is foreign")
+    if (receipt.action_kind not in REACTIONS or
+        receipt.theme!=REACTIONS[receipt.action_kind][0] or
+        receipt.emotion!=REACTIONS[receipt.action_kind][-1]):
+        raise WitnessError("witness meaning differs from canonical event response")
+    if (not receipt.observer.startswith("citizen_") or
+        not receipt.observer[8:].isdigit() or
+        receipt.motive not in {
+            "safety","belonging","mastery","freedom","discovery","prosperity"
+        }):
+        raise WitnessError("unattributed or impossible witness")
     if receipt.action_index<0 or receipt.action_index>=len(replay.actions):
         raise WitnessError("invented witness action index")
     state=director_initial(world)
@@ -300,9 +310,37 @@ def validate_witness(world: DirectorWorld,replay: DirectorReplay,
         director_step(world,state,action).turn!=receipt.observed_turn or
         receipt.action_kind not in REACTIONS):
         raise WitnessError("witness testimony cannot be verified from gameplay facts")
+    from .npc_society_runtime import Memory
+    memory=Memory("observed_"+receipt.action_kind,"hero",state.scene,
+                  state.turn,receipt.emotion,100,"observed")
+    if canonical_digest(memory.payload())!=receipt.source_memory_digest:
+        raise WitnessError("witness memory evidence was altered")
+
+
+
+def audit_witness_campaign(world: DirectorWorld,replay: DirectorReplay,
+                           campaign: WitnessCampaign, *,
+                           population: int,active_budget: int=40,
+                           ambient_budget: int=40,maximum_witnesses: int=128,
+                           starting_society: Society | None=None,
+                           authorized: bool) -> None:
+    """Full independent recomputation validates physical NPC presence,
+    observation timing, replay identity and the non-omniscient quest proposals.
+    """
+    if not authorized:
+        raise PermissionError("independent eyewitness review requires authority")
+    if not isinstance(campaign,WitnessCampaign):
+        raise WitnessError("typed original witness campaign required")
+    expected=observe_story(
+        world,replay,population=population,active_budget=active_budget,
+        ambient_budget=ambient_budget,maximum_witnesses=maximum_witnesses,
+        starting_society=starting_society,authorized=True,
+    )
+    if expected!=campaign:
+        raise WitnessError("eyewitness campaign diverges from lived NPC simulation")
 
 
 __all__=[
     "WitnessError","WitnessReceipt","EmergentQuest","WitnessCampaign",
-    "observe_story","validate_witness","REACTIONS",
+    "observe_story","validate_witness","audit_witness_campaign","REACTIONS",
 ]
