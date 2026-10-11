@@ -245,8 +245,8 @@ class CompetitiveDeliveryCases(CompetitorRadarCases):
     def test_originality_pillars_and_rights_block_even_strong_scores(self):
         changed=sign_identity_review(replace(
             self.proof,retained_pillars=("branching_world_myth",
-                                         "handcrafted_encounters",
-                                         "generic_visuals")),self.identity_judge)
+                                         "generic_visuals",
+                                         "handcrafted_encounters")),self.identity_judge)
         outcome=self.duel(identity=changed)
         self.assertIn("lost_originality_pillars",outcome.identity_blockers)
         self.assertFalse(outcome.qualified_to_claim_superiority)
