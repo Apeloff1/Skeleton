@@ -223,7 +223,7 @@ class DeepEnemyCases(CompetitorRadarCases):
     def test_independent_peer_evidence_and_script_identity_cannot_be_spoofed(self):
         scripts,verdicts,measured,baseline=self.scoring()
         forged=list(measured)
-        forged[0]=replace(forged[0],score_bp=6000)
+        forged[0]=replace(forged[0],score_bp=5300)
         with self.assertRaises(ThreatRadarError):
             score_deep_scripts(
                 scripts,self.threat.rival_id,self.original.title_id,
