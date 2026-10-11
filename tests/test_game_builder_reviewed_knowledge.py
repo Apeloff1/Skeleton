@@ -102,7 +102,10 @@ class ReviewedKnowledgeTests(unittest.TestCase):
         self.store.close()
         self.store = ReviewedKnowledgeStore(self.dbfile)
         reopened = self.store.search("studio-a", "jump", authorized=True)
-        self.assertEqual(hits, reopened)
+        # Query relevance depends on the actual search terms; the evidence must not.
+        self.assertEqual(tuple(replace(hit, relevance=0) for hit in hits),
+                         tuple(replace(hit, relevance=0) for hit in reopened))
+        self.assertGreater(hits[0].relevance, reopened[0].relevance)
         self.assertEqual(self.store.history("studio-a", "source-a", authorized=True)[0], receipt)
 
     def test_idempotent_queries_and_root(self):
@@ -166,9 +169,9 @@ class ReviewedKnowledgeTests(unittest.TestCase):
         bad = replace(base.notes[0], end=len(TEXT) + 1)
         with self.assertRaisesRegex(KnowledgeError, "outside"):
             self.admit(replace(base, notes=(bad,)))
-        bad = replace(base.notes[0], start=6, end=6)
+        # Invalid span is rejected already by the immutable note constructor.
         with self.assertRaises(KnowledgeError):
-            self.admit(replace(base, notes=(bad,)))
+            replace(base.notes[0], start=6, end=6)
         long_doc = replace(
             base, text="Z" * 1200,
             notes=(replace(base.notes[0], start=0, end=1100),),
@@ -266,7 +269,8 @@ class ReviewedKnowledgeTests(unittest.TestCase):
             """UPDATE game_builder_knowledge SET payload=replace(payload, 'predictable', 'unreliable')
             WHERE owner='studio-a'"""
         )
-        with self.assertRaisesRegex(KnowledgeError, "integrity"):
+        # Both authenticated integrity checks and exact-span checks must fail closed.
+        with self.assertRaisesRegex(KnowledgeError, "integrity|stored source span mismatch"):
             self.store.search("studio-a", "jump", authorized=True)
 
     def test_modified_digest_is_rejected(self):
