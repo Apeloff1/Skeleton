@@ -31,7 +31,34 @@ MAX_DISTRICTS = 64
 MAX_CARAVANS = 24
 MAX_HISTORY = 1000
 MAX_POPULATION = 16384
-MAX_FOOD = 262144
+MAX_FOOD = 2000000
+ERA_ROLES = {
+    0: ("forager", "scout", "naturalist", "caretaker", "guardian"),
+    1: ("forager", "scout", "naturalist", "caretaker", "guardian",
+        "farmer", "builder"),
+    2: ("forager", "scout", "naturalist", "caretaker", "guardian",
+        "farmer", "builder", "mason", "courier"),
+    3: ("forager", "scout", "naturalist", "caretaker", "guardian",
+        "farmer", "builder", "mason", "courier", "forester", "healer"),
+    4: ("forager", "scout", "naturalist", "caretaker", "guardian",
+        "farmer", "builder", "mason", "courier", "forester",
+        "healer", "engineer"),
+}
+
+
+def permitted_roles(era: str) -> tuple[str, ...]:
+    level = era_budget(era).technology
+    return ERA_ROLES[min(level, 4)]
+
+
+def inhabitant_role_profile(
+    state: PhysicalSociety, era: str,
+) -> PhysicalSociety:
+    roles = permitted_roles(era)
+    people = tuple(replace(p, profession=roles[i % len(roles)])
+                   for i, p in enumerate(state.inhabitants))
+    return replace(state, inhabitants=people)
+
 
 
 @dataclass(frozen=True)
@@ -151,6 +178,9 @@ def create_era_population(
     budget = era_budget(era)
     if len(people.inhabitants) > budget.full_npc_limit:
         raise FoundationError("requested detailed NPCs exceed era/CPU fidelity budget")
+    allowed_roles = permitted_roles(era)
+    if any(p.profession not in allowed_roles for p in people.inhabitants):
+        raise FoundationError("anachronistic NPC professions for selected technology era")
     if budget.background_limit == 0:
         result = EraPopulation(era, world.design_id, (), day=people.tick)
         validate_population(result, people, world)
@@ -183,7 +213,9 @@ def validate_population(
         raise FoundationError("era population belongs to another physical world")
     budget = era_budget(state.era)
     if (len(people.inhabitants) > budget.full_npc_limit
-            or len(state.districts) != budget.district_limit):
+            or len(state.districts) != budget.district_limit
+            or any(p.profession not in permitted_roles(state.era)
+                   for p in people.inhabitants)):
         raise FoundationError("era detailed and background budgets disagree")
     if state.day != people.tick:
         raise FoundationError("era population tick is not the NPC world clock")
