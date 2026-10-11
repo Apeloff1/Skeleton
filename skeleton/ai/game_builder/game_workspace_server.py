@@ -31,6 +31,7 @@ from .advanced_platformer_godot import render_platformer_godot_package
 from .advanced_deck_godot import render_deck_godot_package
 from .advanced_shooter_godot import render_shooter_godot_package
 from .advanced_tactics_godot import render_tactics_godot_package
+from .advanced_defense_godot import render_defense_godot_package
 from .advanced_gameplay_save import (
     export_advanced_savegame, import_advanced_savegame, continue_advanced_savegame,
 )
@@ -201,6 +202,8 @@ class _StudioHandler(BaseHTTPRequestHandler):
                       if type(session) is dict and session.get("editor")=="shooter"
                       else render_tactics_godot_package
                       if type(session) is dict and session.get("editor")=="tactics"
+                      else render_defense_godot_package
+                      if type(session) is dict and session.get("editor")=="tower_defense"
                       else render_advanced_godot_package)
             package=renderer(session,values.get("settings"),authorized=True)
             compressed=archive_advanced_godot_package(package)
