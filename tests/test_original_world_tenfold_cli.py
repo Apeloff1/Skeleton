@@ -127,3 +127,25 @@ def test_illegal_selector_combinations_refuse_to_fabricate_worlds() -> None:
         main(["--index", "12288000"])
     with pytest.raises(SystemExit):
         main(["--page", "5", "--seed", "colliding"])
+
+
+def test_legacy_original_world_preview_exposes_new_tenfold_index_without_renumbering(
+    capsys,
+) -> None:
+    from skeleton.game.generation.original_world_cli import main as old_main
+
+    assert old_main(["--tenfold-index", "12287999", "--brief"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["configuration"]["index"] == "12287999"
+    assert data["inventory"]["full_gameplay_configuration_entries"] == 12288000
+    assert data["configuration"]["architecture"] == "abyss"
+    assert "--index 12287999" in data["play_command"]
+
+    assert old_main(["--spatial-index", "1023999"]) == 0
+    spatial = json.loads(capsys.readouterr().out)
+    assert spatial["foundation"]["index"] == "1023999"
+    assert spatial["inventory"]["spatial_gameplay_foundation_entries"] == 1024000
+
+    assert old_main(["--tenfold-seed", "reproducible-world", "--brief"]) == 0
+    seeded = json.loads(capsys.readouterr().out)
+    assert seeded["configuration"]["index"].isdigit()
