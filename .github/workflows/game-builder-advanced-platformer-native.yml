@@ -44,7 +44,7 @@ jobs:
             skeleton/ai/capability_map.py
             skeleton/ai/game_builder/
             tests/__init__.py
-            tests/test_game_builder_advanced_godot.py
+            tests/test_game_builder_advanced_platformer_godot.py
       - name: Python 3.11
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
