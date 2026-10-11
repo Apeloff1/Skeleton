@@ -189,7 +189,7 @@ class NativeDefenseStudioTests(unittest.TestCase):
 
     def test_gated_studio_export_allowlist_has_tower_defense(self):
         html=render_workspace_html("F"*32).decode()
-        self.assertIn('"tactics","tower_defense"].includes(advancedSession.editor)',html)
+        self.assertIn('"tactics","tower_defense","racing"].includes(advancedSession.editor)',html)
         self.assertIn("Download playable Godot 4 game project",html)
 
 
