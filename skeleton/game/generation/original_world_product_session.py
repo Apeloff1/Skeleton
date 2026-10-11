@@ -533,7 +533,8 @@ def step_product(
 def product_save(state: ProductSession) -> str:
     law = validate_product(state)
     payload = {
-        "schema": SCHEMA, "world_id": law.world_id, "design_id": law.design_id,
+        "schema": SCHEMA if state.population is not None else PRIOR_SCHEMA,
+        "world_id": law.world_id, "design_id": law.design_id,
         "living": json.loads(save_living(state.living)),
         "terrain": json.loads(terrain_save(state.terrain)),
         "society": society_save(state.society),
