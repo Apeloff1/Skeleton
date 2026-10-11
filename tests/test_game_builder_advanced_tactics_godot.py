@@ -65,7 +65,7 @@ class NativeTacticsProofTests(unittest.TestCase):
             receipt,cfg,authorized=True).files)
 
     def test_real_authored_victory_and_objective_retained(self):
-        cfg={"board_width":4,"board_height":4,"attack_range":5,"unit_health":4}
+        cfg={"board_width":4,"board_height":4,"attack_range":4,"unit_health":4}
         scene=authored_tactics(cfg)
         win=run_advanced_session("tactics",cfg,["attack:0","attack:1"],
                                  seed=3,scene=scene)
