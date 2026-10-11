@@ -24,6 +24,9 @@ from .advanced_gameplay_runtime import (
 )
 from .advanced_level_scenes import make_advanced_scene, scene_path
 from .advanced_puzzle_solver import solve_advanced_puzzle
+from .advanced_godot_export import (
+    render_advanced_godot_package, archive_advanced_godot_package,
+)
 from .advanced_gameplay_save import (
     export_advanced_savegame, import_advanced_savegame, continue_advanced_savegame,
 )
@@ -183,6 +186,21 @@ class _StudioHandler(BaseHTTPRequestHandler):
         path=urlsplit(self.path).path
         values=self._body()
         studio=self.server.workspace
+        if path=="/api/advanced-godot-package":
+            from base64 import b64encode
+            package=render_advanced_godot_package(
+                values["session"],values.get("settings"),authorized=True)
+            compressed=archive_advanced_godot_package(package)
+            return self._json(200,{
+                "file_name":"original-godot-puzzle.zip",
+                "zip_base64":b64encode(compressed).decode("ascii"),
+                "zip_sha256":__import__("hashlib").sha256(compressed).hexdigest(),
+                "source_session_digest":package.manifest["source_session_digest"],
+                "engine":"puzzle",
+                "gameplay_native_verified_by_this_request":False,
+                "source_project_mutated":False,
+                "requires_external_hardware_release_review":True,
+            })
         if path=="/api/advanced-puzzle-solve":
             proof=solve_advanced_puzzle(
                 values["scene"],values.get("settings"),
