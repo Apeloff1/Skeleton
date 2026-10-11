@@ -175,6 +175,8 @@ BUILTIN_TOOLS = (
              (Phase.ORIGINAL, Phase.STEPPING_STONE), BUILD, 15),
     _builtin("world.authored", "validate human-authored game editor geometry",
              (Phase.ORIGINAL, Phase.STEPPING_STONE), BUILD, 10),
+    _builtin("world.tiled", "import original numeric geometry from local Tiled JSON and prove gameplay",
+             (Phase.ORIGINAL,), (Actor.JEEVES, Actor.DRAGON, Actor.OPERATOR), 13),
     _builtin("game.simulate", "execute deterministic Python game-state transitions",
              (Phase.STEPPING_STONE, Phase.REVIEW), (*BUILD, Actor.MIRROR), 5),
     _builtin("game.browser", "render an offline browser-playable original game",
