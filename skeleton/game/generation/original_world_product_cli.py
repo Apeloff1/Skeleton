@@ -90,6 +90,14 @@ def parse_command(command: str, player: tuple[int, int]) -> ProductAction:
             return ProductAction("npc", "cancel_project", target=int(parts[2]))
         except ValueError as exc:
             raise FoundationError("bad project identity") from exc
+    if layer == "npc" and verb == "interview":
+        if len(parts) not in (3, 4):
+            raise FoundationError("interview command: npc interview CITIZEN [food|wood|stone|water]")
+        try:
+            return ProductAction("npc", "interview", target=int(parts[2]),
+                                 option=parts[3] if len(parts) == 4 else "")
+        except ValueError as exc:
+            raise FoundationError("interview requires existing citizen ID") from exc
     if layer == "npc" and verb == "commission":
         if len(parts) not in (4, 5):
             raise FoundationError("NPC contract: npc commission CITIZEN food|wood|stone|water [1..3]")
@@ -164,7 +172,8 @@ def _interactive(state: ProductSession) -> ProductSession:
             print("Social: studio gift ID or studio assign ID PROFESSION")
             print("NPC cognition: npc commission ID food|wood|stone|water [1..3];")
             print("npc cancel ORDER_ID; npc project hearth|mill|beacon X Y;")
-            print("npc cancel_project PROJECT_ID; npc council; minds (inspect plans)")
+            print("npc cancel_project PROJECT_ID; npc interview CITIZEN [SUBJECT];")
+            print("npc council; minds (inspect actual plans and sworn statements)")
             continue
         try:
             action = parse_command(line, state.terrain.position)
