@@ -23,6 +23,7 @@ type Mechanic={
 type Catalog={
   ok:boolean;actual_mechanic_verbs:number;
   mechanically_separable_binary_nuclei:number;
+  full_original_32_mechanic_binary_nuclei:number;
   exact_original_rule_program_address_count:string;
   mechanics:Mechanic[];playable_route_intents:string[];
   finished_unique_cleared_games:number;
@@ -104,6 +105,17 @@ function Creator(){
   const [manualIndex,setManualIndex]=React.useState('0');
   const [useIndex,setUseIndex]=React.useState(false);
   const [nucleus,setNucleus]=React.useState('1048575');
+  const [prototypeAddress,setPrototypeAddress]=React.useState('4294967295');
+  const [prototype,setPrototype]=React.useState<{
+    original_nucleus:number;title:string;world_premise:string;
+    world_style:string;world_lifecycle:string;
+    active_mechanics:string[];available_mechanic_count:number;
+    biome:string;visible_landmark:string;
+    living_world_actual_route_actions:string[];
+    replayed_journeys:Array<{intent:string;actions:string[];trace_digest:string}>;
+    release_blockers:string[];proof_digest:string;
+    native_binary_built:boolean;independently_published:boolean;
+  }|null>(null);
   const [parentCodex,setParentCodex]=React.useState('');
   const [preview,setPreview]=React.useState<Preview|null>(null);
   const [player,setPlayer]=React.useState<State|null>(null);
@@ -128,6 +140,7 @@ function Creator(){
     turn.current++;
     setPreview(null);setPlayer(null);setOptions([]);
     setHistory([]);setGuided(null);setPortfolio(null);
+    setPrototype(null);
     setFusionPage(0);setFusions([]);
     setBusy(false);setFailure('');setNotice('');
   };
@@ -169,6 +182,54 @@ function Creator(){
       if(ticket===turn.current)setFailure(
         e instanceof Error?e.message:'Original nucleus generation failed.');
     }finally{if(ticket===turn.current)setBusy(false);}
+  };
+  const makePlayablePrototype=async()=>{
+    const integer=Number(prototypeAddress);
+    if(!editor||busy||!/^(0|[1-9]\d{0,9})$/.test(prototypeAddress)||
+       !Number.isSafeInteger(integer)||integer<0||integer>=4294967296)return;
+    const ticket=++turn.current;
+    setBusy(true);setFailure('');
+    try{
+      const result=await post<{
+        ok:boolean;
+        original_prototype:{
+          original_nucleus:number;title:string;world_premise:string;
+          world_style:string;world_lifecycle:string;
+          active_mechanics:string[];available_mechanic_count:number;
+          biome:string;visible_landmark:string;
+          living_world_actual_route_actions:string[];
+          replayed_journeys:Array<{intent:string;actions:string[];trace_digest:string}>;
+          release_blockers:string[];proof_digest:string;
+          native_binary_built:boolean;independently_published:boolean;
+        };
+        verification:{verified:boolean;independent_publication_approved:boolean};
+      }>('/prototype',{
+        original_nucleus:integer,branch_seed:1977,
+        routes:4,steps:16,
+      });
+      if(!result.ok||!result.verification.verified||
+         result.original_prototype.original_nucleus!==integer||
+         result.original_prototype.native_binary_built||
+         result.original_prototype.independently_published)
+        throw new Error('Original prototype failed independent game and world replay.');
+      if(ticket===turn.current){
+        setPrototype(result.original_prototype);
+        setNotice('Actual original gameplay and living-world journeys have been replayed.');
+      }
+    }catch(e){
+      if(ticket===turn.current)setFailure(
+        e instanceof Error?e.message:'Original prototype could not be generated.');
+    }finally{if(ticket===turn.current)setBusy(false);}
+  };
+  const previewEditedAsPrototype=()=>{
+    if(levels.some(v=>v!==0&&v!==1)){
+      setFailure('A full binary candidate uses off/on mechanics. '
+        +'Use the separate rule-program compiler for levels 2 and 3.');
+      return;
+    }
+    const number=levels.reduce((n,v)=>n*2+v,0);
+    setPrototypeAddress(String(number));
+    setPrototype(null);
   };
   const create=async()=>{
     if(!editor||busy||(useIndex&&!validExact))return;
@@ -333,6 +394,60 @@ function Creator(){
           disabled={!editor||busy} onPress={fromNucleus}>
           <Text style={s.actionText}>Materialize executable original rules</Text>
         </TouchableOpacity>
+      </View>
+      <View style={s.panel}>
+        <Text style={s.heading}>Billions of actual original game prototypes</Text>
+        <Text style={s.copy}>
+          {catalog?.full_original_32_mechanic_binary_nuclei.toLocaleString()||
+            '4,294,967,296'} behaviorally distinguishable, addressable
+          source-game candidates across all 32 systems, including story endings,
+          postgame, hardcore survival and world-era changes.
+        </Text>
+        <Text style={s.hint}>
+          One request generates a coherent original premise, compatible living
+          world and real playthroughs in both simulators. Neither the address
+          space nor generated titles constitute billions of released games.
+        </Text>
+        <TextInput style={s.input} value={prototypeAddress} maxLength={10}
+          editable={editor&&!busy} keyboardType="number-pad"
+          accessibilityLabel="Full original 32-mechanic prototype index"
+          onChangeText={v=>{setPrototypeAddress(v);setPrototype(null);}}/>
+        <View style={s.chips}>
+          <TouchableOpacity style={s.chip} disabled={busy}
+            onPress={previewEditedAsPrototype}>
+            <Text style={s.copy}>Use current 32 off/on choices</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.action,busy&&s.disabled]}
+            disabled={busy||!editor} onPress={makePlayablePrototype}>
+            <Text style={s.actionText}>Materialize actual playable original</Text>
+          </TouchableOpacity>
+        </View>
+        {prototype&&<>
+          <Text style={s.heading}>{prototype.title}</Text>
+          <Text style={s.copy}>{prototype.world_premise}</Text>
+          <Text style={s.copy}>
+            {pretty(prototype.world_style)} ·
+            {' '}{pretty(prototype.world_lifecycle)} ·
+            {prototype.available_mechanic_count} active gameplay mechanics
+          </Text>
+          <Text style={s.hint}>
+            {pretty(prototype.biome)} · {pretty(prototype.visible_landmark)}
+            {' · '}{prototype.living_world_actual_route_actions.length}
+            {' '}actual living-world choices ·
+            {' '}{prototype.replayed_journeys.length} actual rulebook experiences
+          </Text>
+          {prototype.replayed_journeys.map((journey,i)=>(
+            <Text style={s.hint} key={i}>
+              {pretty(journey.intent)}: {journey.actions.length} actual
+              choices · proof {journey.trace_digest.slice(0,16)}…
+            </Text>
+          ))}
+          <Text style={s.warning}>
+            Candidate only · {prototype.release_blockers.length}
+            {' '}art, gameplay, platform, originality or legal approval gates
+            remain open. No native binary or published game is claimed.
+          </Text>
+        </>}
       </View>
       <View style={s.panel}>
         <Text style={s.heading}>32-mechanic composition</Text>
