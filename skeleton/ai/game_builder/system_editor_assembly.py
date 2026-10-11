@@ -138,6 +138,8 @@ def compile_system_assembly(project_id: str,
         "platformer": ("jump_right", "right", "wait"),
         "tactics": ("east", "end_turn"),
         "tower_defense": ("build:0", "tick:4"),
+        "racing": ("accelerate", "accelerate", "coast"),
+        "survival": ("forage", "drink", "rest"),
     }
     advanced_evidence = [
         {"editor": name,
