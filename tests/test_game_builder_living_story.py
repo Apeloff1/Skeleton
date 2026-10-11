@@ -260,7 +260,7 @@ class LivingStoryExportTests(unittest.TestCase):
         script = self.pkg.files["godot/scripts/main.gd"].decode("utf-8")
         for item in ("func _choices()", "func _where(", "func _act(",
                      "func _verify()", "STORY_NATIVE_REPLAY_OK",
-                     "choose:stewardship", "quest", "trust", "scroll",
+                     '"stewardship"', '"choose:"', "quest", "trust", "scroll",
                      "func _unhandled_key_input"):
             self.assertIn(item, script)
         proof = json.loads(self.pkg.files["godot/proof.json"])
