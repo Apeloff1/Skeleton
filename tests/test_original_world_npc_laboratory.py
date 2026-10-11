@@ -16,10 +16,10 @@ def test_five_fully_played_world_scenarios_produce_factual_evidence(scenario):
     assert result["schema"] == SCHEMA
     assert result["scenario"] == scenario
     assert result["actual_world_ticks"] == 8
-    assert result["population_retained"] == 12
-    assert result["citizen_decisions"] == 96
-    assert result["alive"] + result["incapacitated"] == 12
-    assert result["verified_observations"] <= 12 * 16
+    assert result["population_retained"] in (12, 13)
+    assert result["citizen_decisions"] >= 96
+    assert result["alive"] + result["incapacitated"] == result["population_retained"]
+    assert result["verified_observations"] <= result["population_retained"] * 16
     assert result["completed_native_games_claimed"] == 0
     assert len(result["first_receipt"]) == len(result["last_receipt"]) == 64
     assert len(result["final_game_state_sha256"]) == 64
@@ -158,3 +158,21 @@ def test_injured_resident_receives_physically_present_healer_funded_by_real_wate
     assert citizens.inhabitants[0].health >= 10
     assert receipts[1].operation == "healed-named-patient"
     assert minds.bonds[0].reciprocated_aid >= 1
+
+
+def test_family_expansion_scenario_requires_real_town_build_consent_and_food():
+    r = evaluate("family-expansion", turns=8, population=12)
+    assert r["physically_added_dependents"] == 1
+    assert r["population_retained"] == 13
+    assert r["resource_provenance"]["constructed_physical_sites"] >= 1
+    assert r["dependent_ages"] == [5]
+    assert r["citizen_decisions"] > 96
+
+
+def test_public_ration_policy_scenario_records_actual_representative_votes():
+    r = evaluate("civic-food-aid", turns=3, population=12)
+    assert r["recorded_civic_voters"] >= 4
+    assert r["real_public_mandate"] == "food-aid"
+    assert r["actually_funded_public_aid"] >= 1
+    assert r["warehouse_stock"]["food"] >= 0
+    assert r["population_retained"] == 12
