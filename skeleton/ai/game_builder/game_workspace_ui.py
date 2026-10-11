@@ -27,7 +27,7 @@ small{color:#b9d0d3}.status{background:#254653;padding:.6rem;margin:.8rem 0;whit
 #system-fields label{margin:0}
 #system-fields input[type=checkbox]{width:auto;min-height:auto}
 #system-preview{max-height:170px;overflow:auto;white-space:pre-wrap;font:12px/1.4 ui-monospace,monospace}
-#system-canvas,#advanced-canvas{width:100%;max-width:500px;height:auto;border:1px solid #537783;
+#system-canvas,#advanced-canvas,#advanced-scene-grid{width:100%;max-width:500px;height:auto;border:1px solid #537783;
  background:#0b2331;border-radius:.4rem}
 #advanced-actions{display:flex;flex-wrap:wrap;gap:.3rem}
 #advanced-actions button{font-size:12px}
@@ -333,7 +333,7 @@ async function loadSystemEditors(){
    }
    select.append(optgroup);
   }
-  select.value="platformer";renderSystemControls();drawSystemPreview(null);
+  select.value="platformer";renderSystemControls();drawSystemPreview(null);paintPalette();
   $("system-count").textContent=systemCatalog.length+" system editors ready";
  }catch(error){status("System editor catalog unavailable: "+error.message);}
 }
@@ -391,7 +391,7 @@ function drawSystemPreview(report){
  }
 }
 $("system-kind").addEventListener("change",()=>{
- renderSystemControls();drawSystemPreview(null);
+ renderSystemControls();drawSystemPreview(null);paintPalette();
 });
 $("system-assembly").addEventListener("click",async()=>{
  try{
@@ -681,6 +681,153 @@ async function advanceAdvanced(action){
   status("Advanced action verified: "+action+" · "+reply.session.head_digest.slice(0,16));
  }catch(error){status("Advanced action rejected: "+error.message);}
 }
+// Visual paint works only on the local draft JSON. It cannot bypass the
+// server's canonical validation, exact-file review, or human commit.
+const PAINT_TOOLS={
+ shooter:["cover","medkit","player_spawn","extraction",
+          "enemy_spawn_0","enemy_spawn_1","enemy_spawn_2","erase"],
+ tactics:["obstacles","squad_0","squad_1","enemy_0","enemy_1",
+          "objective","erase"],
+ puzzle:["walls","spawn","exit","doors","switches","crates","targets",
+         "nodes","phase_gates","portal_a","portal_b","erase"],
+};
+const GRID_COLORS={
+ cover:"#7690a3",medkits:"#e1c76f",enemy_spawns:"#ef9691",
+ squad_spawns:"#8dd9ca",obstacles:"#6e8294",walls:"#607789",
+ player_spawn:"#92e7b1",spawn:"#92e7b1",player:"#92e7b1",
+ objective:"#f1db9f",extraction:"#849de1",exit:"#a0e5ba",
+ switches:"#f0c36b",doors:"#b97769",crates:"#b58d61",
+ targets:"#85c6dc",nodes:"#86d5ec",phase_gates:"#b39ae6",
+ portal_a:"#b19eea",portal_b:"#b19eea",
+};
+function paintPalette(){
+ const target=$("advanced-paint-tool");target.replaceChildren();
+ const options=PAINT_TOOLS[systemEditor()?.id]||[];
+ for(const name of options){
+  const option=document.createElement("option");
+  option.value=name;option.textContent=name.replaceAll("_"," ");
+  target.append(option);
+ }
+ $("advanced-scene-grid").style.cursor=options.length?"crosshair":"default";
+ renderSceneAuthoring();
+}
+function sceneGridShape(source){
+ const kind=source.editor,layout=source.layout;
+ if(kind==="shooter")return [layout.width,layout.height];
+ if(kind==="puzzle")return [systemSettings().board_width,systemSettings().board_height];
+ if(kind==="tactics")return [systemSettings().board_width,systemSettings().board_height];
+ return null;
+}
+function renderSceneAuthoring(){
+ const canvas=$("advanced-scene-grid"),ctx=canvas.getContext("2d");
+ const W=canvas.width,H=canvas.height;
+ ctx.fillStyle="#09202f";ctx.fillRect(0,0,W,H);
+ ctx.fillStyle="#dae9ed";ctx.font="12px system-ui";
+ const sourceText=$("advanced-scene-json").value.trim();
+ if(!sourceText){ctx.fillText("Generate an authored scene to paint its cells.",12,24);return;}
+ let source,shape;
+ try{
+  source=JSON.parse(sourceText);
+  if(source.editor!==systemEditor()?.id)throw Error("Editor and scene family differ");
+  shape=sceneGridShape(source);
+ }catch(_){ctx.fillText("Invalid or mismatched scene JSON: use Validate.",12,24);return;}
+ if(!shape){ctx.fillText("This system uses the detailed typed source editor.",12,24);return;}
+ const [cols,rows]=shape;
+ const step=Math.max(2,Math.min(23,Math.floor(448/cols),Math.floor(240/rows)));
+ const ox=12,oy=31;const layout=source.layout;
+ ctx.fillText("Draft scene grid · "+cols+"×"+rows+" · validate before staging",12,18);
+ ctx.strokeStyle="#31586b";ctx.lineWidth=1;
+ for(let x=0;x<=cols;x++){
+  ctx.beginPath();ctx.moveTo(ox+x*step,oy);
+  ctx.lineTo(ox+x*step,oy+rows*step);ctx.stroke();
+ }
+ for(let y=0;y<=rows;y++){
+  ctx.beginPath();ctx.moveTo(ox,oy+y*step);
+  ctx.lineTo(ox+cols*step,oy+y*step);ctx.stroke();
+ }
+ const draw=(value,kind)=>{
+  if(!Array.isArray(value)||value.length!==2||!Number.isInteger(value[0])
+     ||!Number.isInteger(value[1]))return;
+  if(value[0]<0||value[1]<0||value[0]>=cols||value[1]>=rows)return;
+  ctx.fillStyle=GRID_COLORS[kind]||"#cde6e1";
+  ctx.fillRect(ox+value[0]*step+2,oy+value[1]*step+2,
+               Math.max(1,step-4),Math.max(1,step-4));
+ };
+ if(source.editor==="shooter"){
+  (layout.cover||[]).forEach(p=>draw(p,"cover"));
+  (layout.medkits||[]).forEach(p=>draw(p,"medkits"));
+  (layout.enemy_spawns||[]).forEach(p=>draw(p,"enemy_spawns"));
+  draw(layout.extraction,"extraction");
+  draw(layout.player_spawn,"player_spawn");
+ }else if(source.editor==="tactics"){
+  (layout.obstacles||[]).forEach(p=>draw(p,"obstacles"));
+  (layout.enemy_spawns||[]).forEach(p=>draw(p,"enemy_spawns"));
+  (layout.squad_spawns||[]).forEach(p=>draw(p,"squad_spawns"));
+  draw(layout.objective,"objective");
+ }else if(source.editor==="puzzle"){
+  for(const kind of ["walls","targets","switches","doors","crates",
+    "nodes","phase_gates"])(layout[kind]||[]).forEach(p=>draw(p,kind));
+  (layout.portals||[]).forEach(pair=>pair.forEach(p=>draw(p,"portal_a")));
+  draw(layout.exit,"exit");draw(layout.spawn,"spawn");
+ }
+}
+function paintSceneCell(point){
+ const text=$("advanced-scene-json").value.trim();
+ const source=JSON.parse(text);
+ if(source.editor!==systemEditor().id)throw Error("Scene identity differs from editor");
+ const layout=source.layout,tool=$("advanced-paint-tool").value;
+ const arrayKeys={
+  shooter:["cover","medkits"],
+  tactics:["obstacles"],puzzle:["walls","doors","switches","crates",
+                               "targets","nodes","phase_gates"],
+ };
+ const arrays=arrayKeys[source.editor]||[];
+ if(tool==="erase"){
+  for(const key of arrays)layout[key]=layout[key].filter(
+   cell=>cell[0]!==point[0]||cell[1]!==point[1]);
+ }else if(tool==="medkit"||tool==="cover"||arrays.includes(tool)){
+  const key=tool==="medkit"?"medkits":tool;
+  const old=layout[key].findIndex(p=>p[0]===point[0]&&p[1]===point[1]);
+  if(old>=0)layout[key].splice(old,1);
+  else layout[key].push(point);
+ }else if(tool==="player_spawn"||tool==="extraction"||
+          tool==="spawn"||tool==="exit"||tool==="objective"){
+  layout[tool]=point;
+ }else if(tool.startsWith("enemy_spawn_")){
+  layout.enemy_spawns[Number(tool.slice(-1))]=point;
+ }else if(tool.startsWith("squad_")){
+  layout.squad_spawns[Number(tool.slice(-1))]=point;
+ }else if(tool.startsWith("enemy_")){
+  layout.enemy_spawns[Number(tool.slice(-1))]=point;
+ }else if(tool==="portal_a"||tool==="portal_b"){
+  if(!layout.portals.length)
+   layout.portals=[[[1,0],[Math.max(2,point[0]),point[1]]]];
+  layout.portals[0][tool==="portal_a"?0:1]=point;
+ }else throw Error("Select a supported paint action");
+ // Keep stale checksum intentionally until canonical server validation:
+ // gameplay and project source reviewer must reject unapproved modifications.
+ $("advanced-scene-json").value=JSON.stringify(source,null,2);
+ renderSceneAuthoring();
+ status("Edited local scene cells. Use Create / validate authored scene to recalculate the reviewed digest.");
+}
+$("advanced-scene-grid").addEventListener("click",event=>{
+ try{
+  const text=$("advanced-scene-json").value.trim();
+  if(!text)throw Error("Generate a scene document first");
+  const doc=JSON.parse(text),shape=sceneGridShape(doc);
+  if(!shape)throw Error("Graphical cell painting is supported for shooter, tactics and puzzles");
+  const [cols,rows]=shape;
+  const canvas=$("advanced-scene-grid"),rect=canvas.getBoundingClientRect();
+  const scaleX=canvas.width/rect.width,scaleY=canvas.height/rect.height;
+  const step=Math.max(2,Math.min(23,Math.floor(448/cols),Math.floor(240/rows)));
+  const x=Math.floor(((event.clientX-rect.left)*scaleX-12)/step);
+  const y=Math.floor(((event.clientY-rect.top)*scaleY-31)/step);
+  if(x<0||x>=cols||y<0||y>=rows)return;
+  paintSceneCell([x,y]);
+ }catch(error){status("Visual authored-scene edit rejected: "+error.message);}
+});
+$("advanced-scene-json").addEventListener("input",renderSceneAuthoring);
+
 async function reviewedSceneTemplate(){
  const editor=systemEditor().id,settings=systemSettings();
  const input=$("advanced-scene-json").value.trim();
@@ -698,6 +845,7 @@ $("advanced-scene-template").addEventListener("click",async()=>{
  try{
   const template=await reviewedSceneTemplate();
   $("advanced-scene-json").value=JSON.stringify(template.scene,null,2);
+  renderSceneAuthoring();
   status("Authored scene template validated. Modify terrain/regions, then validate again.");
  }catch(error){status("Authored scene rejected: "+error.message);}
 });
@@ -708,6 +856,7 @@ $("advanced-scene-stage").addEventListener("click",async()=>{
   const validated=await reviewedSceneTemplate();
   const file=validated.path;
   $("advanced-scene-json").value=JSON.stringify(validated.scene,null,2);
+  renderSceneAuthoring();
   let prior={content:"",version:{
    sha256:"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
    editable:true}};
@@ -764,6 +913,7 @@ $("advanced-load").addEventListener("change",async()=>{
   $("advanced-seed").value=String(session.seed);
   $("advanced-scene-json").value=session.scene?JSON.stringify(session.scene,null,2):"";
   if(session.scene)$("advanced-scene-id").value=session.scene.scene_id;
+  paintPalette();
   showAdvanced({session,available_actions:restored.available_actions});
   status("Savegame replay verified; exact original settings and command history restored.");
  }catch(error){status("Savegame import blocked: "+error.message);}
@@ -849,6 +999,11 @@ Other editor families remain authoring-only, not falsely certified engines.</sma
 <label>Editable scene geometry and resource JSON
 <textarea id="advanced-scene-json" rows="6" spellcheck="false"
  placeholder="Generate an advanced authored scene, then edit its layout."></textarea></label>
+<label>Graphical scene painting tool<select id="advanced-paint-tool" aria-label="Scene cell paint operation"></select></label>
+<canvas id="advanced-scene-grid" width="470" height="285" role="img"
+ aria-label="Editable tactical scene cell grid"></canvas>
+<p><small>Graphical cell painting: shooter, tactics and puzzle. Scene edits stay
+local until typed revalidation and an explicit human-approved file commit.</small></p>
 <button id="advanced-start" type="button">Start advanced scenario</button>
 <button id="advanced-save" type="button">Download verified savegame</button>
 <label>Restore portable savegame<input id="advanced-load" type="file" accept=".json,application/json"></label>
