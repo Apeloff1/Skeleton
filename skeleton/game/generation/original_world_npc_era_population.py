@@ -228,11 +228,17 @@ def create_era_population(
     districts = []
     sites = set()
     for index, count in enumerate(allocations):
-        x, y = _site(world, index)
-        # Distinct physical district anchors, not duplicated population pins.
-        while (x, y) in sites:
-            index_probe = index + len(sites) * 13
-            x, y = _site(world, index_probe)
+        # Never retry the same deterministic coordinate indefinitely.
+        # Each candidate is distinct input, attempts are strictly bounded.
+        location = None
+        for attempt in range(MAX_DISTRICTS * 8):
+            candidate = _site(world, index + attempt * 9973)
+            if candidate not in sites:
+                location = candidate
+                break
+        if location is None:
+            raise FoundationError("bounded regional settlement location space exhausted")
+        x, y = location
         sites.add((x, y))
         # These are initial locally authored *regional* stores, separate from
         # the player's starter supplies. They can run out; no daily minting.
