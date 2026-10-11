@@ -45,7 +45,7 @@ jobs:
   native-replay:
     name: Native Godot 4 replay of Python-proved game
     runs-on: ubuntu-24.04
-    timeout-minutes: 32
+    timeout-minutes: 42
     env:
       PYTHONPATH: "."
       EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
@@ -125,7 +125,10 @@ jobs:
           python -m skeleton.ai.game_builder.original_game_studio_cli \
             --intent "$RUNNER_TEMP/game-builder/intent.json" \
             --output "$RUNNER_TEMP/game-builder/project" \
-            --companion-practice 1 --mirror-attempts 64 --trusted-local-operator
+            --companion-practice 1 --mirror-attempts 64 \
+            --living-world-npcs 24 --living-world-regions 7 \
+            --living-world-mode postgame --trusted-local-operator
+          test -s "$RUNNER_TEMP/game-builder/project/living_story/godot/project.godot"
           test -s "$RUNNER_TEMP/game-builder/project/godot/export_presets.cfg"
           test -s "$RUNNER_TEMP/game-builder/project/practice/slot-01/godot/project.godot"
           test -s "$RUNNER_TEMP/game-builder/project/studio/companion_almanac.json"
@@ -152,9 +155,18 @@ jobs:
           chmod +x "$builds/companion-practice.x86_64"
           "$builds/companion-practice.x86_64" --headless --quit-after 200 -- --verify-proof | tee "$builds/linux-companion-replay.txt"
           grep -q NATIVE_REPLAY_OK "$builds/linux-companion-replay.txt"
+          # Independent second genre: original NPC, quest and faction world,
+          # with a separate Python -> native story-state convergence proof.
+          living="$RUNNER_TEMP/game-builder/project/living_story/godot"
+          godot --headless --path "$living" --import
+          godot --headless --path "$living" --export-release Linux "$builds/living-world.x86_64"
+          godot --headless --path "$living" --export-release 'Windows Desktop' "$builds/living-world.exe"
+          chmod +x "$builds/living-world.x86_64"
+          "$builds/living-world.x86_64" --headless --quit-after 240 -- --verify-story | tee "$builds/linux-story-replay.txt"
+          grep -q STORY_NATIVE_REPLAY_OK "$builds/linux-story-replay.txt"
           cp "$RUNNER_TEMP/game-builder/project/release.json" "$builds/source-release.json"
           cp "$RUNNER_TEMP/game-builder/project/studio/companion_almanac.json" "$builds/companion-almanac.json"
-          (cd "$builds" && sha256sum original-game.x86_64 original-game*.exe companion-practice.x86_64 companion-practice*.exe source-release.json companion-almanac.json > SHA256SUMS)
+          (cd "$builds" && sha256sum original-game.x86_64 original-game*.exe companion-practice.x86_64 companion-practice*.exe living-world.x86_64 living-world*.exe source-release.json companion-almanac.json > SHA256SUMS)
       - name: Preserve unsigned desktop release candidates
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -229,8 +241,8 @@ jobs:
           New-Item -ItemType Directory -Force -Path $root | Out-Null
           $json = '{"project_id":"skeleton-windows-native-studio-2026","title":"Original Windows Homebrew","subtitle":"Offline consumer QA candidate.","seed":471126,"width":11,"height":11,"levels":1,"collectibles_per_level":1,"hazards_per_level":1,"theme":"arcade","starting_health":4}'
           [IO.File]::WriteAllText((Join-Path $root 'intent.json'), $json)
-          python -m skeleton.ai.game_builder.original_game_studio_cli --intent (Join-Path $root 'intent.json') --output (Join-Path $root 'project') --mirror-attempts 64 --companion-practice 1 --trusted-local-operator
-          if ($LASTEXITCODE -ne 0) { throw "Original studio project failed" }
+          python -m skeleton.ai.game_builder.original_game_studio_cli --intent (Join-Path $root 'intent.json') --output (Join-Path $root 'project') --mirror-attempts 64 --companion-practice 1 --living-world-npcs 24 --living-world-regions 7 --living-world-mode postgame --trusted-local-operator
+          if ($LASTEXITCODE -ne 0) { throw "Original two-genre studio project failed" }
           $gate = Get-Content (Join-Path $root 'project/studio/consumer_gate.json') -Raw | ConvertFrom-Json
           if ($gate.status -ne 'release-blocked') { throw "Missing consumer publication safeguards" }
       - name: Export and execute real native Windows game
@@ -287,11 +299,25 @@ jobs:
           if (-not (Test-Path $practiceWrapper)) { throw "Companion release missing proof console wrapper" }
           python -c 'import subprocess,sys; p=subprocess.run([sys.argv[1],"--headless","--","--verify-proof"],capture_output=True,text=True,timeout=90); print(p.stdout); print(p.stderr); sys.exit(0 if p.returncode == 0 and "NATIVE_REPLAY_OK" in (p.stdout+p.stderr) else 1)' $practiceWrapper
           if ($LASTEXITCODE -ne 0) { throw "Companion Windows game diverged from independently verified practice proof" }
+          $livingProject = Join-Path $root 'project/living_story/godot'
+          $livingBinary = Join-Path $root 'living-world.exe'
+          & $console.FullName --headless --path $livingProject --import
+          if ($LASTEXITCODE -ne 0) { throw "Living-world Godot import failed" }
+          & $console.FullName --headless --path $livingProject --export-release 'Windows Desktop' $livingBinary
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $livingBinary)) {
+            throw "Original living-world native export failed"
+          }
+          $livingWrapper = Join-Path $root 'living-world.console.exe'
+          if (-not (Test-Path $livingWrapper)) { throw "Living-world native console wrapper missing" }
+          python -c 'import subprocess,sys; p=subprocess.run([sys.argv[1],"--headless","--","--verify-story"],capture_output=True,text=True,timeout=100); print(p.stdout); print(p.stderr); sys.exit(0 if p.returncode == 0 and "STORY_NATIVE_REPLAY_OK" in (p.stdout+p.stderr) else 1)' $livingWrapper
+          if ($LASTEXITCODE -ne 0) { throw "Native Windows NPC and quest state diverged from Python" }
+          Get-FileHash $livingBinary -Algorithm SHA256 | Format-List
+          Get-FileHash $livingWrapper -Algorithm SHA256 | Format-List
           Get-FileHash $practiceBinary -Algorithm SHA256 | Format-List
           Get-FileHash $practiceWrapper -Algorithm SHA256 | Format-List
           Get-FileHash $binary -Algorithm SHA256 | Format-List
           Get-FileHash $wrapper.FullName -Algorithm SHA256 | Format-List
-          $hashes = @($binary, $wrapper.FullName, $practiceBinary, $practiceWrapper) | ForEach-Object {
+          $hashes = @($binary, $wrapper.FullName, $practiceBinary, $practiceWrapper, $livingBinary, $livingWrapper) | ForEach-Object {
             $item = $_
             $hash = (Get-FileHash -LiteralPath $item -Algorithm SHA256).Hash.ToLowerInvariant()
             "$hash  $(Split-Path -Leaf $item)"
@@ -306,6 +332,8 @@ jobs:
             ${{ runner.temp }}/original-studio/original-homebrew.console.exe
             ${{ runner.temp }}/original-studio/companion-practice.exe
             ${{ runner.temp }}/original-studio/companion-practice.console.exe
+            ${{ runner.temp }}/original-studio/living-world.exe
+            ${{ runner.temp }}/original-studio/living-world.console.exe
             ${{ runner.temp }}/original-studio/SHA256SUMS
             ${{ runner.temp }}/original-studio/project/
           retention-days: 7
