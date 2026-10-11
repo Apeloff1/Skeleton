@@ -8,7 +8,7 @@ import sys
 from .contracts import canonical_json
 from .quest_scene_engine import ARCHETYPES, DirectorError
 from .quest_scene_forge import forge_director, read_director_blueprint
-from .quest_director_studio import build_director_studio
+from .quest_director_enhanced_product import build_earned_story_product
 from .quest_director_export import export_director_studio
 
 
@@ -80,7 +80,7 @@ def main(argv=None):
                 "custom_originality_review_needed_for_rebuild": True,
             }))
         else:
-            product = build_director_studio(
+            product = build_earned_story_product(
                 world, authorized=True, mirror_attempts=args.mirror_attempts,
             )
             export_director_studio(product, output, authorized=True)
