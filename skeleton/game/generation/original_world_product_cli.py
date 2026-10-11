@@ -75,6 +75,21 @@ def parse_command(command: str, player: tuple[int, int]) -> ProductAction:
         except ValueError as exc:
             raise FoundationError("invalid terrain amount") from exc
         return ProductAction(layer, verb, amount=count, x=player[0], y=player[1])
+    if layer == "npc" and verb == "project":
+        if len(parts) != 5:
+            raise FoundationError("new project: npc project hearth|mill|beacon X Y")
+        try:
+            return ProductAction("npc", "project", option=parts[2],
+                                 x=int(parts[3]), y=int(parts[4]))
+        except ValueError as exc:
+            raise FoundationError("civic project coordinates must be integers") from exc
+    if layer == "npc" and verb == "cancel_project":
+        if len(parts) != 3:
+            raise FoundationError("project cancellation requires a physical project ID")
+        try:
+            return ProductAction("npc", "cancel_project", target=int(parts[2]))
+        except ValueError as exc:
+            raise FoundationError("bad project identity") from exc
     if layer == "npc" and verb == "commission":
         if len(parts) not in (4, 5):
             raise FoundationError("NPC contract: npc commission CITIZEN food|wood|stone|water [1..3]")
@@ -148,7 +163,8 @@ def _interactive(state: ProductSession) -> ProductSession:
             print("World: causal end_turn; studio: deposit_wood, deposit_stone, share_food")
             print("Social: studio gift ID or studio assign ID PROFESSION")
             print("NPC cognition: npc commission ID food|wood|stone|water [1..3];")
-            print("npc cancel ORDER_ID; npc council; minds (inspect all private plans)")
+            print("npc cancel ORDER_ID; npc project hearth|mill|beacon X Y;")
+            print("npc cancel_project PROJECT_ID; npc council; minds (inspect plans)")
             continue
         try:
             action = parse_command(line, state.terrain.position)
