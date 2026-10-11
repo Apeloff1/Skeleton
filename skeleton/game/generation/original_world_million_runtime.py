@@ -48,6 +48,7 @@ class ModeState:
     vehicle_speed: int = 0
     vehicle_integrity: int = 12
     distance: int = 0
+    corners: int = 0
     laps: int = 0
     alert: int = 0
     market_stock: int = 10
@@ -133,7 +134,7 @@ MODE_BOUNDS = {
     "population": (0, 20), "colony_food": (0, 100),
     "farms": (0, 8), "vehicle_speed": (0, 6),
     "vehicle_integrity": (0, 20), "distance": (0, 200),
-    "laps": (0, 10), "alert": (0, 20),
+    "corners": (0, 2), "laps": (0, 10), "alert": (0, 20),
     "market_stock": (0, 100), "wallet": (0, 200),
     "goods": (0, 100), "price": (1, 8),
     "beat": (0, 1000), "combo": (0, 100),
@@ -224,10 +225,13 @@ def _mode_operation(
     effects = []
     if form == "platform":
         if action.verb == "step":
-            if mode.height == 0 and mode.course % 5 == 4:
-                raise FoundationError("gap requires a jump or safety brace")
+            landing = min(20, mode.course + n)
+            exposed = any(cell % 5 == 4 for cell in range(mode.course + 1, landing + 1))
+            if exposed and mode.height == 0 and mode.shield == 0:
+                raise FoundationError("a grounded path crosses a gap; jump or brace first")
             causal = _debit(causal, energy=n)
-            mode = replace(mode, course=min(20, mode.course + n))
+            mode = replace(mode, course=landing,
+                           shield=mode.shield - (1 if exposed and mode.height == 0 else 0))
         elif action.verb == "jump":
             causal = _debit(causal, energy=2)
             mode = replace(mode, course=min(20, mode.course + n),
@@ -297,19 +301,24 @@ def _mode_operation(
         if action.verb == "accelerate":
             causal = _debit(causal, energy=n)
             speed = min(6, mode.vehicle_speed + n)
+            next_gate = 12 if mode.corners == 0 else (28 if mode.corners == 1 else 200)
             mode = replace(mode, vehicle_speed=speed,
-                           distance=min(200, mode.distance + speed))
+                           distance=min(next_gate, mode.distance + speed))
         elif action.verb == "brake":
             mode = replace(mode, vehicle_speed=max(0, mode.vehicle_speed - n))
         else:
             if mode.vehicle_speed == 0:
                 raise FoundationError("cannot corner a stopped vehicle")
-            wear = max(0, mode.vehicle_speed - 3)
-            mode = replace(mode, distance=min(200, mode.distance + mode.vehicle_speed),
-                           vehicle_integrity=max(0, mode.vehicle_integrity - wear * n))
-        if mode.distance >= 40 and mode.laps == 0:
+            required = 12 if mode.corners == 0 else 28
+            if mode.corners >= 2 or mode.distance < required:
+                raise FoundationError("turning requires reaching the next marked course bend")
+            wear = max(1, mode.vehicle_speed - 3) * n
+            mode = replace(mode, corners=mode.corners + 1,
+                           distance=min(200, mode.distance + mode.vehicle_speed),
+                           vehicle_integrity=max(0, mode.vehicle_integrity - wear))
+        if mode.distance >= 40 and mode.corners == 2 and mode.vehicle_integrity > 0:
             mode = replace(mode, laps=1)
-        effects.append("Track distance depends on physical speed and wear")
+        effects.append("Track distance, mandatory physical corners and vehicle wear accounted")
     elif form == "stealth":
         if action.verb == "sneak":
             causal = _debit(causal, energy=n)
