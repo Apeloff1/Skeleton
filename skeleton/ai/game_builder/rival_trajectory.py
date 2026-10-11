@@ -62,6 +62,10 @@ def trace_competitive_trajectory(
         raise PermissionError("historical rival assessment requires trusted operator")
     if not isinstance(plan,PlannedTitle) or type(reports) is not tuple or not 2<=len(reports)<=64:
         raise CompetitiveError("at least two and at most 64 audited rival reports required")
+    if any(not isinstance(report,ConvergenceReport) for report in reports):
+        raise CompetitiveError("typed historical rival observations required")
+    if len({r.digest for r in reports})!=len(reports):
+        raise CompetitiveError("cycle replay cannot manufacture continuous competitive pressure")
     for i,report in enumerate(reports):
         if (not isinstance(report,ConvergenceReport)
                 or report.original_plan_digest!=plan.digest
@@ -74,8 +78,6 @@ def trace_competitive_trajectory(
         if any(o.protected_identity_digest!=plan.distinctive_signature_digest
                for o in report.orders):
             raise CompetitiveError("history mutated the original game identity")
-    if len({r.digest for r in reports})!=len(reports):
-        raise CompetitiveError("cycle replay cannot manufacture continuous competitive pressure")
     last=reports[-1]
     prior=reports[-2]
     new=tuple(sorted(set(last.convergent_features)-set(prior.convergent_features)))
