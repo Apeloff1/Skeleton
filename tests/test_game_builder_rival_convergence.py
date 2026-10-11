@@ -98,9 +98,9 @@ class ConvergenceTests(unittest.TestCase):
                             for o in report.orders))
         self.assertTrue(all(o.kind=="commission_comparable_benchmark"
                             for o in report.orders if o.axis!="originality"))
-        self.assertIn("differentiate",next(o.requirement for o in
-                            report.orders if o.axis=="originality").lower()
-                      if False else "original")
+        self.assertIn("original differentiation",next(
+            o.requirement for o in report.orders
+            if o.axis=="originality").lower())
         self.assertTrue(report.payload()["strategic_enemy_label_is_not_an_accusation"])
         self.assertFalse(report.payload()["automatic_delivery_or_model_promotion"])
         self.assertEqual(report.digest,self.evaluate().digest)
