@@ -223,8 +223,12 @@ class NativeStudioDownloadTests(unittest.TestCase):
         self.assertEqual(code,200)
         self.assertEqual(source["engine"],"racing")
         self.assertFalse(source["gameplay_native_verified_by_this_request"])
-        self.assertEqual(self.post("/api/advanced-godot-package",{
-            "session":run_advanced_session("survival")})[0],400)
+        code,world=self.post("/api/advanced-godot-package",{
+            "session":run_advanced_session("survival")})
+        self.assertEqual(code,200)
+        self.assertEqual(world["engine"],"survival")
+        self.assertFalse(world["gameplay_native_verified_by_this_request"])
+        self.assertEqual(world["file_name"],"original-godot-survival.zip")
 
     def test_visual_studio_handoff_controls_present(self):
         html=render_workspace_html("A"*32).decode()
