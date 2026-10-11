@@ -906,7 +906,7 @@ $("advanced-godot-export").addEventListener("click",async()=>{
   if(!advancedSession||!["puzzle","platformer","deck_battler"].includes(advancedSession.editor))
    throw Error("Native Godot export requires a verified puzzle, platformer or deck battler session");
   if(!advancedSettings)
-   throw Error("Original authored puzzle settings must be available");
+   throw Error("Original authored game settings must be available");
   const response=await api("/api/advanced-godot-package",{
    session:advancedSession,settings:advancedSettings});
   if(response.engine!==advancedSession.editor||response.gameplay_native_verified_by_this_request)
