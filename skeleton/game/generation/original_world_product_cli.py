@@ -25,6 +25,9 @@ from .original_world_product_render import (
 )
 from .original_world_product_missions import mission_report
 from .original_world_npc_cognition_v2 import cognition_report, npc_profile
+from .original_world_npc_era_population import (
+    era_budget, population_report, ERA_LEVELS,
+)
 
 MAX_SCRIPT = 131072
 
@@ -75,6 +78,15 @@ def parse_command(command: str, player: tuple[int, int]) -> ProductAction:
         except ValueError as exc:
             raise FoundationError("invalid terrain amount") from exc
         return ProductAction(layer, verb, amount=count, x=player[0], y=player[1])
+    if layer == "population" and verb == "dispatch_food":
+        if len(parts) not in (4, 5):
+            raise FoundationError("usage: population dispatch_food DISTRICT to-region|to-player [1..3]")
+        try:
+            return ProductAction(layer, verb,
+                                 target=int(parts[2]), option=parts[3],
+                                 amount=int(parts[4]) if len(parts) == 5 else 1)
+        except ValueError as exc:
+            raise FoundationError("invalid regional food district or quantity") from exc
     if layer == "npc" and verb == "household":
         if len(parts) != 4:
             raise FoundationError("usage: npc household CAREGIVER_A CAREGIVER_B")
@@ -203,6 +215,13 @@ def _interactive(state: ProductSession) -> ProductSession:
             except (ValueError, IndexError, FoundationError) as exc:
                 print("Unknown citizen:", exc)
             continue
+        if line in ("districts", "region", "census"):
+            print(json.dumps(
+                population_report(state.population, len(state.society.inhabitants))
+                if state.population else {"status": "select --era to instantiate actual regions"},
+                sort_keys=True, indent=2,
+            ))
+            continue
         if line in ("npc", "people", "minds"):
             print(json.dumps(cognition_report(state.cognition, state.society,
                                               state.terrain), sort_keys=True, indent=2))
@@ -219,6 +238,8 @@ def _interactive(state: ProductSession) -> ProductSession:
             print("npc cancel ORDER_ID; npc project hearth|mill|beacon X Y;")
             print("npc cancel_project PROJECT_ID; npc interview CITIZEN [SUBJECT];")
             print("npc council; minds (inspect actual plans and sworn statements)")
+            print("districts (see distinct offscreen census and finite food)")
+            print("population dispatch_food DISTRICT to-region|to-player [1..3]")
             continue
         try:
             action = parse_command(line, state.terrain.position)
@@ -249,7 +270,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--architecture")
     parser.add_argument("--system")
     parser.add_argument("--arc")
-    parser.add_argument("--inhabitants", type=int, default=12)
+    parser.add_argument("--inhabitants", type=int, default=None)
+    parser.add_argument("--era", choices=tuple(ERA_LEVELS),
+                        help="Scale physical NPCs and offscreen resident districts by any of 40 eras")
+    parser.add_argument("--population-report", action="store_true",
+                        help="Inspect era fidelity budgets, remote census and actual supply/caravan ledger")
     parser.add_argument("--actions-json", default="[]")
     parser.add_argument("--inventory", action="store_true")
     parser.add_argument("--npc-profile", type=int,
@@ -271,6 +296,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.inventory:
             print(json.dumps({
                 "living": living_inventory(),
+                "era_population_capabilities": {
+                    era: {
+                        "named_physically_simulated_NPCs": era_budget(era).full_npc_limit,
+                        "real_aggregated_census": era_budget(era).background_limit,
+                        "districts": era_budget(era).district_limit,
+                        "bounded_district_updates": era_budget(era).district_updates,
+                        "rendered_region_badges": era_budget(era).render_budget,
+                    } for era in ERA_LEVELS
+                },
                 "product": {
                     "local_terrain_chunk_size": 32,
                     "persistent_sparse_tile_edits": 2048,
@@ -285,6 +319,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             }, indent=2, sort_keys=True))
             return 0
         if args.load is not None:
+            if args.era is not None:
+                raise FoundationError("--era cannot alter the historical era of a saved living world")
             if not args.load.is_file() or args.load.stat().st_size > 4194304:
                 raise FoundationError("missing or oversized saved game")
             state = product_restore(args.load.read_text(encoding="utf-8"))
@@ -293,12 +329,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 raise FoundationError("--base requires form, architecture, system and arc")
             law = living_for(args.base, args.form, args.architecture,
                              args.system, args.arc)
-            state = create_product(law.index, inhabitants=args.inhabitants)
+            state = create_product(law.index, inhabitants=args.inhabitants,
+                                   era=args.era)
         else:
             if any((args.form, args.architecture, args.system, args.arc)):
                 raise FoundationError("specify --base to select game dimensions")
             state = create_product(args.index if args.index is not None else 0,
-                                   inhabitants=args.inhabitants)
+                                   inhabitants=args.inhabitants, era=args.era)
         for action in parse_script(args.actions_json):
             state, _ = step_product(state, action)
         if args.interactive:
@@ -317,14 +354,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             if not args.svg.parent.is_dir():
                 raise FoundationError("SVG output directory does not exist")
             args.svg.write_text(svg_render(state.terrain, state.society,
-                                           radius=args.radius), encoding="utf-8")
+                                           radius=args.radius, population=state.population), encoding="utf-8")
         if args.ppm:
             if not args.ppm.parent.is_dir():
                 raise FoundationError("PPM output directory does not exist")
             args.ppm.write_bytes(ppm_render(state.terrain, state.society,
-                                            radius=args.radius))
+                                            radius=args.radius, population=state.population))
         if args.show_map:
-            print(ascii_render(state.terrain, state.society, radius=args.radius))
+            print(ascii_render(state.terrain, state.society, radius=args.radius,
+                               population=state.population))
         elif not args.desktop:
             law = validate_product(state)
             print(json.dumps({
@@ -334,6 +372,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "local_energy": state.terrain.energy,
                     "physical_edits": len(state.terrain.edits),
                     "local_residents": len(state.society.inhabitants),
+                    "regional_population": (population_report(
+                        state.population, len(state.society.inhabitants))
+                        if args.population_report and state.population else None),
                     "npc_cognition": cognition_report(state.cognition, state.society,
                                                      state.terrain)
                                      if args.npc_report else None,
