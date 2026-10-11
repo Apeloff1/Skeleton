@@ -125,8 +125,8 @@ function play(action){
   s.inventory.splice(s.inventory.indexOf(q.item),1);s.completed.push(q.key);
  }else if(action.startsWith("choose:"))s.ending=action.slice(7);
  for(const k of ["inventory","known","completed","discussed"])s[k].sort();
- s.faction_trust=factions.map(f=>25*WORLD.quests.filter(
-  q=>q.faction===f&&s.completed.includes(q.key)).length);
+ s.faction_trust=factions.map(f=>Math.min(100,25*WORLD.quests.filter(
+  q=>q.faction===f&&s.completed.includes(q.key)).length));
  s.score=WORLD.quests.filter(q=>s.completed.includes(q.key))
     .reduce((t,q)=>t+q.reward,0);
  s.turn++;
