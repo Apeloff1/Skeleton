@@ -903,8 +903,8 @@ $("advanced-scene-stage").addEventListener("click",async()=>{
 });
 $("advanced-godot-export").addEventListener("click",async()=>{
  try{
-  if(!advancedSession||!["puzzle","platformer"].includes(advancedSession.editor))
-   throw Error("Native Godot export requires a verified advanced puzzle or platformer session");
+  if(!advancedSession||!["puzzle","platformer","deck_battler"].includes(advancedSession.editor))
+   throw Error("Native Godot export requires a verified puzzle, platformer or deck battler session");
   if(!advancedSettings)
    throw Error("Original authored puzzle settings must be available");
   const response=await api("/api/advanced-godot-package",{
