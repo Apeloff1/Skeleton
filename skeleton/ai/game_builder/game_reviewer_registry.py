@@ -26,6 +26,7 @@ from .game_model_promotion import (
     predict_review,
 )
 from .game_training_flow import FlowPlan
+from .game_learning_feedback import feedback_from_evaluation,feedback_from_cohort
 from .game_tester_almanac import test_game_personas,TEST_FAMILIES
 from .game_learning_almanac import build_game_tester_curriculum
 from .quest_scene_engine import DirectorWorld
@@ -226,8 +227,10 @@ class ReviewerRegistry:
             require_stronger_standard(former,standard)
         evaluation=evaluate_candidate(plan,fit,standard=standard,
                                       champion=champion,authorized=True)
+        feedback=feedback_from_evaluation(evaluation,authorized=True)
         if not evaluation.passed:
-            return dict(status="blocked",evaluation=evaluation.payload())
+            return dict(status="blocked",evaluation=evaluation.payload(),
+                        improvement_ledger=feedback.payload())
         with _mutex(self.root):
             state=self.read_state()
             if state["phase"] not in {"idle","active","rolled_back"}:
@@ -260,7 +263,9 @@ class ReviewerRegistry:
                          last_incident=None)
             changed=self._transition(state,updated,"stage")
             return dict(status="staged",candidate=changed["candidate"],
-                        evaluation=evaluation.payload(),revision=changed["revision"])
+                        evaluation=evaluation.payload(),
+                        improvement_ledger=feedback.payload(),
+                        revision=changed["revision"])
 
     def authorize_shadow(self,attestations: tuple[PromotionAttestation,...],*,
                          authorized: bool):
@@ -330,10 +335,16 @@ class ReviewerRegistry:
         standard=PromotionStandard(**{
             k:v for k,v in state["standard"].items() if k!="schema"
         })
+        champion_digest=(state["active"] if state["phase"]=="shadow"
+                         else state["previous"])
+        champion=(self._candidate(champion_digest)["policy"]
+                  if champion_digest is not None else None)
         result=evaluate_fresh_cohort(
             tuple(cases),policy,standard=standard,
-            source_projects=tuple(prior),authorized=True)
+            source_projects=tuple(prior),authorized=True,champion=champion)
         result["replay_receipts"]=receipts
+        result["improvement_ledger"]=feedback_from_cohort(
+            result,mode=mode,authorized=True).payload()
         with _mutex(self.root):
             current=self.read_state()
             if current["revision"]!=state["revision"]:
@@ -380,9 +391,18 @@ class ReviewerRegistry:
                          candidate=None,candidate_source_digest=None,phase="active",
                          observations=dict(state["observations"]))
             new=self._transition(state,updated,"activate_local_advisory_model")
+            qualification_digest=canonical_digest({
+                "candidate":state["candidate"],
+                "evaluation":self._candidate(state["candidate"])["evaluation"],
+                "standard":state["standard"],
+                "independent_review":state["attestations"],
+                "usage":state["observations"]["usage"],
+                "idle":state["observations"]["idle"],
+            })
             return dict(status="active",active=new["active"],
                         rollback_pointer=new["previous"],
                         revision=new["revision"],
+                        qualification_digest=qualification_digest,
                         jeeves_dragon_core_weights_changed=False,
                         gameplay_authority_transferred=False)
 
