@@ -296,7 +296,7 @@ func _verify() -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
-    if not ready or not event is InputEventKey or not event.pressed or event.echo:
+    if not ready_to_play or not event is InputEventKey or not event.pressed or event.echo:
         return
     var action: String=""
     match event.keycode:
