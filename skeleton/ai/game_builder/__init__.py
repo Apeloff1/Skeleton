@@ -286,6 +286,10 @@ _KNOWLEDGE_EXPORTS = {
     "CohortExperience": ".playability_analysis",
     "analyze_replay": ".playability_analysis",
     "aggregate_playability": ".playability_analysis",
+    "DualRuntimeExportError": ".dual_runtime_export",
+    "DualRuntimePackage": ".dual_runtime_export",
+    "render_dual_runtime_package": ".dual_runtime_export",
+    "export_dual_runtime_package": ".dual_runtime_export",
 }
 
 
