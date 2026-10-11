@@ -21,6 +21,16 @@ from skeleton.ai.game_builder.game_18round_shadow_sandbox import (
     SandboxVerification,ModularShadowTicket,prepare_shadow_tickets,
     verify_shadow_in_sandbox,sign_sandbox_verification,order_verified_hyperweights,
 )
+from skeleton.ai.game_builder.game_18round_executor_extensions import (
+    execute_idle_round,execute_round7_era_profile,
+    execute_round8_engineering_gate,execute_round10_crawler_brief,
+    execute_round13_sandbox,execute_round15_structure,
+    execute_round16_load_order,execute_round17_report,
+)
+from skeleton.ai.game_builder.game_post_weight_dragon import PostWeightDragonMission
+from skeleton.ai.webcrawler.dragon_research_missions import (
+    ResearchInterest,MissionPolicy,plan_research,
+)
 from skeleton.ai.game_builder.game_18round_runtime import (
     execute_round3_relevance,execute_round4_shadow_backlog,
     derive_round11_reviewed_destinations,execute_round18_adjacent_recrawl,
@@ -338,6 +348,98 @@ class EighteenRoundCases(unittest.TestCase):
         self.assertEqual(completed.rounds[-1].round_number,18)
         self.assertEqual(len(mission.queries),8)
         self.assertFalse(completed.user_model_activation_granted)
+
+
+    def test_operational_18_round_pipeline_executes_bounded_host_and_module_stages(self):
+        values,_=self.priority()
+        stage=begin_18round_evolution(self.task,authorized=True)
+        r3_digest=canonical_digest([v.payload() for v in values])
+        stage=accept_round(stage,self.receipt(stage,"research_recorded",
+                                              report=r3_digest),
+                           self.key,authorized=True)
+        stage,queue=execute_round4_shadow_backlog(
+            stage,values,self.plan,"1"*64,24,
+            reviewer=self.key,as_of="2026-10-11T12:04:00Z",
+            authorized=True)
+        self.assertEqual(len(queue),1)
+        stage,background=execute_idle_round(
+            stage,queue,reviewer=self.key,
+            as_of="2026-10-11T12:05:00Z",consent=True,authorized=True,
+            host_idle=lambda:True,hardware_safe=lambda:True)
+        self.assertEqual(background.game_replays_completed,0)
+        self.assertFalse(background.foundation_model_trained)
+        stage,general=execute_idle_round(
+            stage,queue,reviewer=self.key,
+            as_of="2026-10-11T12:06:00Z",consent=True,authorized=True,
+            host_idle=lambda:True,hardware_safe=lambda:True)
+        self.assertEqual(general.planned_topic_ids,
+                         ("gameplay_foundations","graphics_materials",
+                          "sound_accessibility","narrative_agency"))
+        stage,profile=execute_round7_era_profile(
+            stage,queue,reviewer=self.key,
+            as_of="2026-10-11T12:07:00Z",authorized=True)
+        self.assertEqual(profile.shadow_ids,(queue[0].ticket_id,))
+        stage,professional=execute_round8_engineering_gate(
+            stage,"1"*64,reviewer=self.key,
+            as_of="2026-10-11T12:08:00Z",authorized=True)
+        self.assertFalse(professional.quality_certified)
+        self.assertEqual(professional.minimum_facet_coverage,102)
+        native=plan_research(
+            self.task.original_id,(ResearchInterest(
+                "player game agency archival evidence",1.0),),
+            authorized=True,policy=MissionPolicy(max_interests=1,max_queries=4))
+        frontier=PostWeightDragonMission(
+            "d"*64,self.almanac.digest,"second_glance",
+            ("player game agency archival evidence",),native,1)
+        stage=accept_round(stage,self.receipt(
+            stage,"research_recorded",
+            report=canonical_digest(frontier.payload()),
+            when="2026-10-11T12:09:00Z"),self.key,authorized=True)
+        stage,brief=execute_round10_crawler_brief(
+            stage,frontier,reviewer=self.key,
+            as_of="2026-10-11T12:10:00Z",authorized=True)
+        self.assertEqual(brief.newly_fetched_sources,0)
+        for r in (11,12):
+            stage=accept_round(stage,self.receipt(
+                stage,"research_recorded",
+                when=f"2026-10-11T12:{r:02d}:00Z"),
+                self.key,authorized=True)
+        stage,sandbox,optimization=execute_round13_sandbox(
+            stage,queue[0],queue,self.plan,PromotionStandard(),
+            None,(),(),reviewer=self.key,
+            independent_verifier=self.verifier,
+            as_of="2026-10-11T12:13:00Z",
+            authorized=True,consent=True,
+            professional_code_review_approved=True,
+            professional_code_review_digest="1"*64)
+        self.assertIsNone(optimization)
+        self.assertFalse(sandbox.permission_to_stage)
+        self.assertEqual(stage.rounds[-1].status,"blocked")
+        stage=accept_round(stage,self.receipt(
+            stage,"blocked",when="2026-10-11T12:14:00Z"),
+            self.key,authorized=True)
+        stage,structure=execute_round15_structure(
+            stage,queue,(sandbox,),reviewer=self.key,
+            as_of="2026-10-11T12:15:00Z",authorized=True)
+        self.assertEqual(structure.staged_candidates,())
+        self.assertEqual(structure.research_only_candidates,
+                         (queue[0].ticket_id,))
+        stage,loading=execute_round16_load_order(
+            stage,queue,(sandbox,),reviewer=self.key,
+            as_of="2026-10-11T12:16:00Z",authorized=True)
+        self.assertEqual(loading.cached_ticket_ids,())
+        stage,report=execute_round17_report(
+            stage,None,reviewer=self.key,
+            as_of="2026-10-11T12:17:00Z",authorized=True)
+        self.assertEqual(report.approved_sandbox_events,0)
+        self.assertEqual(report.genuine_model_improvement_claims,0)
+        stage,mission=execute_round18_adjacent_recrawl(
+            stage,("archived reading",),("npc witnessed rumors",),
+            reviewer=self.key,as_of="2026-10-11T12:18:00Z",
+            authorized=True,consent=True)
+        self.assertEqual(stage.rounds[-1].round_number,18)
+        self.assertEqual(len(mission.queries),4)
+        self.assertFalse(stage.user_model_activation_granted)
 
 
 
