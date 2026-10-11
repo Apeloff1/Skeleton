@@ -10,9 +10,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
+from typing import Sequence, Mapping
 
 from .contracts import canonical_digest
+from .tiled_map_import import import_tiled_levels
 from .companion_curriculum import (
     PracticeInsight, measure_original_practice, validate_practice_cohort,
 )
@@ -36,7 +37,7 @@ class ExecutionPlaneError(ValueError):
 # Deliberately small and auditable. A tool catalog entry never becomes a
 # process-launch adapter just because an agent asks to invoke it.
 EXECUTABLE_TOOLS = frozenset({
-    "world.generate", "world.authored", "game.simulate", "game.browser",
+    "world.generate", "world.authored", "world.tiled", "game.simulate", "game.browser",
     "game.godot", "game.editor", "mirror.fuzz", "release.assess",
     "package.source", "companion.practice",
 })
@@ -123,6 +124,8 @@ def execute_local_tool_plan(
     authorized: bool,
     fabric: ToolFabric | None = None,
     authored_levels: Sequence[object] | None = None,
+    tiled_sources: Sequence[str | Path] | None = None,
+    tiled_gid_palette: Mapping[int, str] | None = None,
     human_reviewed: bool = False,
     destination: Path | None = None,
     mirror_attempts: int = 128,
@@ -180,10 +183,11 @@ def execute_local_tool_plan(
         deps = {
             "world.generate": (),
             "world.authored": (),
-            "game.simulate": ("world.generate", "world.authored"),
-            "game.browser": ("world.generate", "world.authored"),
-            "game.editor": ("world.generate", "world.authored"),
-            "game.godot": ("game.browser", "world.authored"),
+            "world.tiled": (),
+            "game.simulate": ("world.generate", "world.authored", "world.tiled"),
+            "game.browser": ("world.generate", "world.authored", "world.tiled"),
+            "game.editor": ("world.generate", "world.authored", "world.tiled"),
+            "game.godot": ("game.browser", "world.authored", "world.tiled"),
             "mirror.fuzz": ("game.godot",),
             "release.assess": ("mirror.fuzz",),
             "package.source": ("mirror.fuzz",),
@@ -199,10 +203,15 @@ def execute_local_tool_plan(
         raise ExecutionPlaneError("package export requires explicit write grant and destination")
     if not writes and destination is not None:
         raise ExecutionPlaneError("destination supplied without a package-source operation")
-    if any(row.tool_id == "world.authored" for row in plan.requests):
-        if authored_levels is None or human_reviewed is not True:
+    authored_mode = "world.authored" in ids
+    tiled_mode = "world.tiled" in ids
+    if authored_mode:
+        if authored_levels is None or human_reviewed is not True or tiled_sources is not None:
             raise ExecutionPlaneError("human-reviewed original authored geometry required")
-    elif authored_levels is not None or human_reviewed:
+    elif tiled_mode:
+        if tiled_sources is None or authored_levels is not None or human_reviewed is not True:
+            raise ExecutionPlaneError("reviewed local Tiled map files required for world.tiled")
+    elif authored_levels is not None or tiled_sources is not None or human_reviewed:
         raise ExecutionPlaneError("authored input provided without an authorized authored operation")
 
     world: PlayableWorld | None = None
@@ -240,6 +249,21 @@ def execute_local_tool_plan(
             )
             world = project.world
             artifact_digest = world.digest
+        elif row.tool_id == "world.tiled":
+            if world is not None or project is not None:
+                raise ExecutionPlaneError("Tiled import conflicts with previous original world")
+            conversion = import_tiled_levels(
+                intent, tiled_sources, human_reviewed=True,
+                authorized=True, gid_palette=tiled_gid_palette,
+            )
+            project = compile_authored_game(
+                intent, [list(rows) for rows in conversion.levels],
+                human_reviewed=True, authorized=True,
+            )
+            world = project.world
+            if world.digest != conversion.world_digest:
+                raise ExecutionPlaneError("Tiled conversion and canonical authored world diverged")
+            artifact_digest = conversion.digest
         elif row.tool_id == "game.simulate":
             if world is None:
                 raise ExecutionPlaneError("simulation needs a previously constructed world")
