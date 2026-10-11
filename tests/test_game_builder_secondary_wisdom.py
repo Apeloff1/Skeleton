@@ -14,6 +14,10 @@ from skeleton.ai.game_builder.game_post_weight_forensics import (
 from skeleton.ai.game_builder.game_post_weight_dragon import (
     plan_post_weight_dragon_research,
 )
+from skeleton.ai.game_builder.game_wisdom_report_archive import (
+    publish_secondary_wisdom_report,verify_secondary_wisdom_report,
+)
+from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
 from skeleton.ai.game_builder.game_secondary_wisdom_loop import (
     ANGLES,ROLES,_full_tasks,WisdomPassAttestation,sign_wisdom_pass,
     run_secondary_wisdom_cycle,
@@ -189,6 +193,25 @@ class SecondaryWisdomIntegrationTests(ActualPeerWisdomTests):
                       result.blockers)
         self.assertFalse(result.payload()["real_second_reviewer_sgd_executed"])
         self.assertFalse(result.payload()["foundation_llm_weights_updated"])
+
+        with TemporaryDirectory() as folder:
+            ws=GameWorkspace.create(Path(folder)/"studio",authorized=True)
+            digest=publish_secondary_wisdom_report(
+                ws.root,result,authorized=True)
+            self.assertEqual(digest,result.digest)
+            self.assertEqual(publish_secondary_wisdom_report(
+                ws.root,result,authorized=True),digest)
+            archived=verify_secondary_wisdom_report(
+                ws.root,digest,authorized=True)
+            self.assertEqual(archived,result.payload())
+            target=ws.root/"training"/"post_weight_wisdom"/(digest+".json")
+            target.write_text("{}\n",encoding="utf-8")
+            with self.assertRaises(PromotionError):
+                verify_secondary_wisdom_report(
+                    ws.root,digest,authorized=True)
+            with self.assertRaises(PromotionError):
+                publish_secondary_wisdom_report(
+                    ws.root,result,authorized=True)
 
     def test_unsigned_forged_and_incomplete_proofread_reviews_fail_closed(self):
         first,mission=self.context()
