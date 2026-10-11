@@ -74,6 +74,9 @@ class DualRuntimeGameTests(unittest.TestCase):
             "health -= 1", "MAX_ACTIONS = 20000",
             "func _undo()", "func _save_actions()", "func _load_actions()",
             "func _draw()", "func _unhandled_key_input(",
+            "func _unhandled_input(", "JOY_BUTTON_DPAD_UP",
+            "JOY_BUTTON_DPAD_DOWN", "JOY_BUTTON_B",
+            "InputEventScreenTouch", "touch_origin",
         ):
             with self.subTest(mechanic=mechanic):
                 self.assertIn(mechanic, script)
