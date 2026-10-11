@@ -1,0 +1,1162 @@
+{
+  "schema": "skeleton.dragon.acquisition_topic_triage.v1",
+  "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+  "independent_support_added": 0,
+  "canonical_admission": false,
+  "topics": [
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Video Game Assets",
+        "Material Assets"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-05a5769075d99be4cd7fd562d3e3a760e64a9ef31df80ec61763dc67c0660d64",
+          "url": "https://ambientcg.com/",
+          "representation_sha256": "18f6279088201df9e7b3450726224c82b4cfd3a80d644b50248e0ac6af782994",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn78view0",
+          "observation": {
+            "statement": "The primary license page states that all downloadable asset files and preview renders are CC0 1.0 and may be copied, modified, distributed and included raw in a video game.",
+            "span": "license lines 67–93; homepage lines 17–19",
+            "state": "unreviewed_reference_observation",
+            "limitations": "Bounded representation only; linked materials and downstream assertions were not independently verified."
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Unreal**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-05b84ae1984984e8b26001bbfbd2cdd8056442c9ba9577d894f37b3403fa707a",
+          "url": "https://www.youtube.com/watch?v=ITCWa3oLNAQ",
+          "representation_sha256": "6052592e7ff2b9d007661ada14230f79cb4ab4103d77e53ff746b11cd5a1aa90",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn79view0",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-05b84ae1984984e8b26001bbfbd2cdd8056442c9ba9577d894f37b3403fa707a",
+          "finding": "retrieval_failed",
+          "scope": "This channel and time only; not global unavailability, abandonment or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "JavaScript"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-05f32a68c330b398b9cbfc8240d2fc0378a98e54de1e48a4015f89b06331a6ca",
+          "url": "https://github.com/sorrycc/awesome-javascript",
+          "representation_sha256": "a4b45af111be6d02e82b15d81022f4209a9911eda097464190b0077771e69dfd",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": null,
+          "observation": null
+        },
+        {
+          "source_id": "source-0626b07f9fe04da05ecd93dfaf04949265a1692a24c91a5ea54beac8d07b1c3e",
+          "url": "https://github.com/cocopon/tweakpane",
+          "representation_sha256": "354e37049c50241a923af42d026f58f93edeca561fb7d6d9439e10fecff51573",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": null,
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "C"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-05ffc80681d744e0e31d2707be185f6639123fbeba2873c3e505cfaefbdd69d9",
+          "url": "https://github.com/quozd/awesome-dotnet",
+          "representation_sha256": "691ce0db55fa3ed1d2fa3391d4b19cb4afca9d5bb97e9a900f9dee91714e858b",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": null,
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Code**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-05ffc80681d744e0e31d2707be185f6639123fbeba2873c3e505cfaefbdd69d9",
+          "url": "https://github.com/quozd/awesome-dotnet",
+          "representation_sha256": "691ce0db55fa3ed1d2fa3391d4b19cb4afca9d5bb97e9a900f9dee91714e858b",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": null,
+          "observation": null
+        },
+        {
+          "source_id": "source-072d59210cc2b9747b70253af5a4dd81930e0ba35ba68c06118f7f7f910c5840",
+          "url": "https://www.youtube.com/watch?v=hG9SzQxaCm8",
+          "representation_sha256": "7f0a590af48801dca634cf870562f453a111589b9cc2a8ff1f5f8e1e01760e1c",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn95view0",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Other"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-060d28795676a034f2f7500ddc76a606db3f4b71faaf01d86b96c5eb9ed8c140",
+          "url": "https://github.com/adolson/godot-stuff/blob/master/strip-to-frames.pl",
+          "representation_sha256": "0df50f7198a40cbc29aa937e67f2cc551f417e0dcc76ddd1a97be8ff105f8038",
+          "source_revision": "cfa5306d2c63c7890d61ca0563e2ee948d7ca2fc",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "The exact Perl script says it converts sprite-sheet rows into numbered frame files and supports padding and dimension normalization.",
+            "span": "exact Git blob header",
+            "state": "unreviewed_reference_observation",
+            "limitations": "Bounded representation only; linked materials and downstream assertions were not independently verified."
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Art**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-060fb733c955bd1b5ca72337fcd7e44254d0e6c2c27ec79eff4d7e2ceae1df4b",
+          "url": "http://design.tutsplus.com/tutorials/draw-a-cartoon-monster-character-in-photoshop--psd-18136",
+          "representation_sha256": "8bfeec8ad33dcc6df4153f6d1ec8dd9a5c2dd41c77c67b595c042abe780df0cf",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn80view0",
+          "observation": {
+            "statement": "The tutorial exposes research, sketching, tracing and subsequent Photoshop construction steps for a cartoon monster.",
+            "span": "lines 345–371",
+            "state": "unreviewed_reference_observation",
+            "limitations": "Bounded representation only; linked materials and downstream assertions were not independently verified."
+          }
+        },
+        {
+          "source_id": "source-06a716b082365536b927720b8235b0b6e35ee13cde1cfaf2f416c20cba4f9388",
+          "url": "https://www.youtube.com/watch?v=2pGGDxVF-pk",
+          "representation_sha256": "15fd0e5c7206b97ebf9d50b258c40810ed4099aa2e4aed427ab6c3308d8e33d6",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn88view0",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-06a716b082365536b927720b8235b0b6e35ee13cde1cfaf2f416c20cba4f9388",
+          "finding": "retrieval_failed",
+          "scope": "This channel and time only; not global unavailability, abandonment or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Learning",
+        "Game Development"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0622967d6270af2f55a963ee4394b6ab9bef7c339b88d269fe525ae66fadc911",
+          "url": "https://github.com/Kavex/GameDev-Resources",
+          "representation_sha256": "f3f61be8280f12fdcc26b84127cb6b173a067ee6c20acc28b752a87c99964bfc",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": null,
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "General",
+        "[New to game development? Start here](https://allurious.itch.io/cheatsheets2018) 💠🟪"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0622967d6270af2f55a963ee4394b6ab9bef7c339b88d269fe525ae66fadc911",
+          "url": "https://github.com/Kavex/GameDev-Resources",
+          "representation_sha256": "f3f61be8280f12fdcc26b84127cb6b173a067ee6c20acc28b752a87c99964bfc",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": null,
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Design"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-062d054788376272b9abce70dc147e1417ebadcd50da3eb9a77d29612672a63e",
+          "url": "https://gmtk.itch.io/platformer-toolkit",
+          "representation_sha256": "35476343204d5392037a571f3661d37b33da16d3f8658e3d9d00ff5c029faeb2",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn81view0",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-062d054788376272b9abce70dc147e1417ebadcd50da3eb9a77d29612672a63e",
+          "finding": "retrieval_failed",
+          "scope": "This channel and time only; not global unavailability, abandonment or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Table of Contents",
+        "Engines and Frameworks"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-063a1dda402f37783022a66bb1c3cba18296c60fd344a42a465855df23af7a52",
+          "url": "http://springrts.com/",
+          "representation_sha256": "79666f7b757955a4a1a761d8b65f8f168f63448257ed04982c6d792abb6fe91b",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn82view0",
+          "observation": {
+            "statement": "The returned homepage identifies Spring RTS and exposes download, learning and tournament navigation; engine capabilities and license were not extracted.",
+            "span": "lines 0–36",
+            "state": "unreviewed_reference_observation",
+            "limitations": "Bounded representation only; linked materials and downstream assertions were not independently verified."
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Design**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-066954477437b78fa1ac5437eaad7e76bbcbf19c702a9346ca00e2233d3b51ac",
+          "url": "http://www.gamasutra.com/blogs/JosephSopko/20160630/276193/On_Making_Good_Combat_Mechanics_Part_1.php",
+          "representation_sha256": "9b90d5eadd5680129edfdfa54d95b2c2e7b419a428b79485d39ddb5e953608fa",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn83view0",
+          "observation": null
+        },
+        {
+          "source_id": "source-0673a81df3c925ab647f049e3721fc03d33907c7fa9f4926bfba2846e7e45f33",
+          "url": "https://youtu.be/VO4FNf-Xc58",
+          "representation_sha256": "79df956ca6d09bc2a129204a61c4db25cdbbacc91cc962fe1469af7c27ce7b04",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn84view0",
+          "observation": null
+        },
+        {
+          "source_id": "source-06b5038deb69f9b684fd18275af385a3f0927163480068fcb051c2b78506f915",
+          "url": "https://medium.com/super-jump/replayability-in-game-design-798fbb91a726",
+          "representation_sha256": "70ddcd2bebd071c7245d6d6246e30c8ccd7f4861c1febd43006bdd3e645d565f",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn91view0",
+          "observation": {
+            "statement": "The article groups replayability drivers into generation, item pools, loot tables, social factors and user-generated content.",
+            "span": "lines 53–172",
+            "state": "unreviewed_reference_observation",
+            "limitations": "Bounded representation only; linked materials and downstream assertions were not independently verified."
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-066954477437b78fa1ac5437eaad7e76bbcbf19c702a9346ca00e2233d3b51ac",
+          "finding": "retrieval_failed",
+          "scope": "This channel and time only; not global unavailability, abandonment or rights expiry."
+        },
+        {
+          "source_id": "source-0673a81df3c925ab647f049e3721fc03d33907c7fa9f4926bfba2846e7e45f33",
+          "finding": "retrieval_failed",
+          "scope": "This channel and time only; not global unavailability, abandonment or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Commercial**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0676b53f1bcb673e1081cdea0f85d1e2d1b77037d94c205f02449b4e8723ec41",
+          "url": "http://blog.tigerstylegames.com/post/23104925410/15-days-of-waking-mars-at-299",
+          "representation_sha256": "0381847a1f019380e3d85b8c02b8127b8eec90f1b3d628dc164a4eb6d5a4b77a",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn85view0",
+          "observation": null
+        },
+        {
+          "source_id": "source-06825a5060ad0dd6bc8cdf4ab5ff79af6fc8e14328b8212f4db7597f1d2d8527",
+          "url": "https://medium.com/@kkll7952/independent-game-developer-a-guide-to-conquering-asia-02ca7b0b1df1",
+          "representation_sha256": "231f53a1e6ee65e1706f6bdeca92a7e79e986bdab242b4a1df3065c1e64813bf",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn86view0",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-0676b53f1bcb673e1081cdea0f85d1e2d1b77037d94c205f02449b4e8723ec41",
+          "finding": "retrieval_failed",
+          "scope": "This channel and time only; not global unavailability, abandonment or rights expiry."
+        },
+        {
+          "source_id": "source-06825a5060ad0dd6bc8cdf4ab5ff79af6fc8e14328b8212f4db7597f1d2d8527",
+          "finding": "retrieval_failed",
+          "scope": "This channel and time only; not global unavailability, abandonment or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Game Engines",
+        "Commercial"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0692da389dfa5ea641ca6584ef9094d903fb13fb3c4975a0b0ef8d171241b2fd",
+          "url": "https://github.com/NeoAxis/NeoAxisEngine",
+          "representation_sha256": "c524cc06aec3455ed741b3dae7d914d6ecbb0db92260034bf5c2b96072427bef",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": null,
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Legend"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-069a19191c5c78682e3453d0025334bb7581c5680561981e9fd3f501f21c2aff",
+          "url": "https://en.wikipedia.org/wiki/Apache_License",
+          "representation_sha256": "3320fea0a21bef6035a86738301d97dcf8a8b30e7da5fc46ce9088b4930dce67",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn87view0",
+          "observation": {
+            "statement": "The page describes Apache License history, notice preservation, changed-file notices and permissive distribution characteristics; a primary license must govern actual decisions.",
+            "span": "lines 149–188",
+            "state": "unreviewed_reference_observation",
+            "limitations": "Bounded representation only; linked materials and downstream assertions were not independently verified."
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "Swift"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-06a8c68ef354eb80cf4bc1a1b5228275a176f14b575e59887c8d6bcdd3ab4df5",
+          "url": "https://developer.apple.com/swiftui/",
+          "representation_sha256": "b0c2a2028c28c5f940e9d854cf2d34d28613d80202dbe18f878bfdd30efbdd33",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn89view0",
+          "observation": {
+            "statement": "Apple describes SwiftUI in terms of declarative results, incremental adoption, previews and rapid iteration.",
+            "span": "lines 131–173",
+            "state": "unreviewed_reference_observation",
+            "limitations": "Bounded representation only; linked materials and downstream assertions were not independently verified."
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Specialty Topics",
+        "Shaders"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-06b3208705454a7d658132a6d8684c2b258c7c8fe2ffa3aa073c7571e7293781",
+          "url": "https://threejs.org/examples/?q=pixel",
+          "representation_sha256": "dd7fc2036cda03690a786ee013cc6f9fa483501ed1ae69862f95f2c9a7831193",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn90view0",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Browser-Based",
+        "Others"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-06b5d9682a9138bac6e746053f07ed5d625057d0f1c7482315d6fe85d3d8d2f9",
+          "url": "https://github.com/TomWHall/Descensus2",
+          "representation_sha256": "537a6bfb23f36cee30868e05ff6e7970c08b90734a7ad45a00cc2ba3cc373d31",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": null,
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Browser-Based",
+        "Racing"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-06b731887eaecdf597c8f0565e9933ac66bc0141a2b9970f04b2f7ad6bdcdbba",
+          "url": "https://github.com/BKcore/HexGL",
+          "representation_sha256": "909063c8bb8e36b251e444365fb03e32180d6cb6b48a5a9ada7356b0c8408dc7",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": null,
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Browser-Based",
+        "MMORPG"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-06dbccd6a8d7712ab10d7d4563ecfce2a6b89d0976acaf0fddfedf0bb5736737",
+          "url": "http://taptapadventure.com/play",
+          "representation_sha256": "5669142ec28473d87bb4347945f357125ef73e6a0ee3b4e98de43e802cc1542c",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn92view0",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-06dbccd6a8d7712ab10d7d4563ecfce2a6b89d0976acaf0fddfedf0bb5736737",
+          "finding": "retrieval_failed",
+          "scope": "This channel and time only; not global unavailability, abandonment or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Technical Art",
+        "Rigging"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-06eccf7f8dcfe0147d2acb9a2c082f5dd80c244ad10f91634cc69d93a1a8a1cc",
+          "url": "https://www.thegnomonworkshop.com/tutorials/master-rigging-python-scripting-in-maya",
+          "representation_sha256": "267e69682cd1ccd3c8ab06d10d246775b06f583c6ef32b8b5d4907f203051119",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn93view0",
+          "observation": {
+            "statement": "The returned page identifies a Maya rigging and Python scripting workshop; curriculum access and reuse permissions were not assessed.",
+            "span": "page title and redirect",
+            "state": "unreviewed_reference_observation",
+            "limitations": "Bounded representation only; linked materials and downstream assertions were not independently verified."
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Native",
+        "Strategy"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-06f97d8467585ab2e36bd046510e627f032f61c7cf35b4c539045e46e9ad0aa2",
+          "url": "https://github.com/Wargus/wargus",
+          "representation_sha256": "2f540ec49dd718e97eb5b83bb519b995e6392596ee9d58be3af462b117767d20",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": null,
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Plugins and scripts",
+        "Godot 3"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-070de8d62af98e088b4cfdcf4ef9cae408ed7886eb9b711914f9f57ab9692d6b",
+          "url": "https://github.com/ClarkThyLord/Voxel-Core",
+          "representation_sha256": "70bd7609c5758b0eb791c0f5620466423839d82de3324eb40e0764fb2dbda93a",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": null,
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Marketing**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-07277d0f752a56a70f8f69b096d0cc0d9c5c5d6fc4ee1a18c05327205b372346",
+          "url": "http://corporate.onebip.com/onebip-data-insights-discover-the-spending-habits-of-online-gamers-worldwide/",
+          "representation_sha256": "16adad2751b9370e94e59b58c7ae7548653f4108d515c58385446af3d7156e2d",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn94view0",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-07277d0f752a56a70f8f69b096d0cc0d9c5c5d6fc4ee1a18c05327205b372346",
+          "finding": "retrieval_failed",
+          "scope": "This channel and time only; not global unavailability, abandonment or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "Java"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-072e505990379459c763b5d78f3cf988950ede0f00f8a82bea298484d5eb388f",
+          "url": "https://en.wikipedia.org/wiki/Java_virtual_machine",
+          "representation_sha256": "8baecf1a3e3d9d647fb22d67b3d333d308b530e1314f64f0586850333aa05c39",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn96view0",
+          "observation": {
+            "statement": "The page exposes JVM specification, garbage-collection and virtual-machine architecture sections.",
+            "span": "lines 66–236",
+            "state": "unreviewed_reference_observation",
+            "limitations": "Bounded representation only; linked materials and downstream assertions were not independently verified."
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Resources**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0746321c121ef642a45cc90fc75744081f4dd7843740d01fcab02e9ad6808418",
+          "url": "https://www.youtube.com/watch?v=Ef0VrcrOatg&list=PLsVfn9YIFmNC3SL_FgAe6k4_is4stMOh2",
+          "representation_sha256": "7d473e1d512c9607ee6d6c238e03243515f4b4c161d5c4dc4c2e046779b41c72",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn97view0",
+          "observation": null
+        },
+        {
+          "source_id": "source-074a2e277eda2f015f50dd3e27bb38af704e0cc9d05a96afce17f9f4c382c58f",
+          "url": "https://nasa3d.arc.nasa.gov/models",
+          "representation_sha256": "d45b41651b876f56e3b4c1b26d0b7b62409ecff0af719e14033585c96ce3236e",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn99view0",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-0746321c121ef642a45cc90fc75744081f4dd7843740d01fcab02e9ad6808418",
+          "finding": "retrieval_failed",
+          "scope": "This channel and time only; not global unavailability, abandonment or rights expiry."
+        },
+        {
+          "source_id": "source-074a2e277eda2f015f50dd3e27bb38af704e0cc9d05a96afce17f9f4c382c58f",
+          "finding": "retrieval_failed",
+          "scope": "This channel and time only; not global unavailability, abandonment or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Tools / Software",
+        "Particle Tools"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-07472a3c990597bbc88751c4baf79ce55db402be03a71d00290626d7c7f85f8d",
+          "url": "https://www.71squared.com/particledesigner",
+          "representation_sha256": "520ffb0b8ca0368b9411b2ce07fb3117e9fcf920a31fa9ceb12685bcb808da52",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn98view0",
+          "observation": {
+            "statement": "The page describes Particle Designer, open-source particle-system support, undo, device profiles, free emitters and multi-framework export.",
+            "span": "lines 0–70",
+            "state": "unreviewed_reference_observation",
+            "limitations": "Bounded representation only; linked materials and downstream assertions were not independently verified."
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    }
+  ],
+  "license_observations": [
+    {
+      "source_id": "source-06b5d9682a9138bac6e746053f07ed5d625057d0f1c7482315d6fe85d3d8d2f9",
+      "url": "https://github.com/TomWHall/Descensus2/blob/master/LICENSE",
+      "git_blob_sha": "73050a0a56b9b2d8d6d04f6f224c7d1c95860843",
+      "checked_at": "2026-10-11T06:17:24.118Z",
+      "statement": "MIT License  Copyright (c) 2017 Tom W Hall",
+      "scope": "License-file observation only; covered files, dependencies, bundled assets, patents, trademarks, upstream game data and training rights not determined.",
+      "review_state": "unreviewed",
+      "training_authorized": false
+    },
+    {
+      "source_id": "source-06b731887eaecdf597c8f0565e9933ac66bc0141a2b9970f04b2f7ad6bdcdbba",
+      "url": "https://github.com/BKcore/HexGL/blob/master/LICENSE",
+      "git_blob_sha": "ccdfb1cae9a9ad9b248d830d70d52e7f3456634c",
+      "checked_at": "2026-10-11T06:17:24.120Z",
+      "statement": "The MIT License (MIT)  Copyright (c) 2015 Thibaut Despoulain",
+      "scope": "License-file observation only; covered files, dependencies, bundled assets, patents, trademarks, upstream game data and training rights not determined.",
+      "review_state": "unreviewed",
+      "training_authorized": false
+    },
+    {
+      "source_id": "source-06f97d8467585ab2e36bd046510e627f032f61c7cf35b4c539045e46e9ad0aa2",
+      "url": "https://github.com/Wargus/wargus/blob/master/COPYING",
+      "git_blob_sha": "d60c31a97a544b53039088d14fe9114583c0efc3",
+      "checked_at": "2026-10-11T06:17:24.139Z",
+      "statement": "GNU GENERAL PUBLIC LICENSE \t\t       Version 2, June 1991   Copyright (C) 1989, 1991 Free Software Foundation, Inc.",
+      "scope": "License-file observation only; covered files, dependencies, bundled assets, patents, trademarks, upstream game data and training rights not determined.",
+      "review_state": "unreviewed",
+      "training_authorized": false
+    },
+    {
+      "source_id": "source-070de8d62af98e088b4cfdcf4ef9cae408ed7886eb9b711914f9f57ab9692d6b",
+      "url": "https://github.com/ClarkThyLord/Voxel-Core/blob/master/LICENSE",
+      "git_blob_sha": "c669ad3ff554455795676aeee695ef55eca8c01e",
+      "checked_at": "2026-10-11T06:17:24.140Z",
+      "statement": "MIT License  Copyright (c) 2021 Christian Cuevas",
+      "scope": "License-file observation only; covered files, dependencies, bundled assets, patents, trademarks, upstream game data and training rights not determined.",
+      "review_state": "unreviewed",
+      "training_authorized": false
+    }
+  ],
+  "scope_specific_rights_observations": [
+    {
+      "source_id": "source-05a5769075d99be4cd7fd562d3e3a760e64a9ef31df80ec61763dc67c0660d64",
+      "url": "https://docs.ambientcg.com/license/",
+      "checked_at": "2026-10-11T06:17:53.308Z",
+      "citation_ref": "turn101view0",
+      "representation_sha256": "82ee20a8f9fe1d3a6b21eb1b8f7b59f38751d8f4510c730c7bf6b5b10d157c97",
+      "statement": "ambientCG documentation states that downloadable asset files and site preview renders are CC0 1.0 and may be copied, modified, distributed and included raw in a video game.",
+      "limitation": "Applies to the provider-defined assets and previews; does not establish provenance of every upstream contribution, trademark/privacy status, or authorization to train a model.",
+      "training_authorized": false
+    }
+  ],
+  "entity_candidates": [
+    {
+      "provider": "github_repository_metadata",
+      "provider_id": "88115327",
+      "kind": "game",
+      "title": "Descensus2",
+      "url": "https://github.com/TomWHall/Descensus2",
+      "source_id": "source-06b5d9682a9138bac6e746053f07ed5d625057d0f1c7482315d6fe85d3d8d2f9",
+      "representation_sha256": "537a6bfb23f36cee30868e05ff6e7970c08b90734a7ad45a00cc2ba3cc373d31",
+      "identity_verified_across_providers": false,
+      "edition": null,
+      "admission": "unreviewed_metadata_candidate"
+    },
+    {
+      "provider": "github_repository_metadata",
+      "provider_id": "6090347",
+      "kind": "game",
+      "title": "HexGL",
+      "url": "https://github.com/BKcore/HexGL",
+      "source_id": "source-06b731887eaecdf597c8f0565e9933ac66bc0141a2b9970f04b2f7ad6bdcdbba",
+      "representation_sha256": "909063c8bb8e36b251e444365fb03e32180d6cb6b48a5a9ada7356b0c8408dc7",
+      "identity_verified_across_providers": false,
+      "edition": null,
+      "admission": "unreviewed_metadata_candidate"
+    },
+    {
+      "provider": "youtube_url_candidate",
+      "provider_id": "ITCWa3oLNAQ",
+      "kind": "video",
+      "title": null,
+      "url": "https://www.youtube.com/watch?v=ITCWa3oLNAQ",
+      "source_id": "source-05b84ae1984984e8b26001bbfbd2cdd8056442c9ba9577d894f37b3403fa707a",
+      "representation_sha256": "6052592e7ff2b9d007661ada14230f79cb4ab4103d77e53ff746b11cd5a1aa90",
+      "creator_identity": "unresolved",
+      "availability": "retrieval_failed",
+      "admission": "blocked_unreviewed_metadata_candidate"
+    },
+    {
+      "provider": "youtube_url_candidate",
+      "provider_id": "VO4FNf-Xc58",
+      "kind": "video",
+      "title": null,
+      "url": "https://youtu.be/VO4FNf-Xc58",
+      "source_id": "source-0673a81df3c925ab647f049e3721fc03d33907c7fa9f4926bfba2846e7e45f33",
+      "representation_sha256": "79df956ca6d09bc2a129204a61c4db25cdbbacc91cc962fe1469af7c27ce7b04",
+      "creator_identity": "unresolved",
+      "availability": "retrieval_failed",
+      "admission": "blocked_unreviewed_metadata_candidate"
+    },
+    {
+      "provider": "youtube_url_candidate",
+      "provider_id": "2pGGDxVF-pk",
+      "kind": "video",
+      "title": null,
+      "url": "https://www.youtube.com/watch?v=2pGGDxVF-pk",
+      "source_id": "source-06a716b082365536b927720b8235b0b6e35ee13cde1cfaf2f416c20cba4f9388",
+      "representation_sha256": "15fd0e5c7206b97ebf9d50b258c40810ed4099aa2e4aed427ab6c3308d8e33d6",
+      "creator_identity": "unresolved",
+      "availability": "retrieval_failed",
+      "admission": "blocked_unreviewed_metadata_candidate"
+    },
+    {
+      "provider": "youtube_url_candidate",
+      "provider_id": "hG9SzQxaCm8",
+      "kind": "video",
+      "title": "Math for Game Programmers: Building a Better Jump",
+      "url": "https://www.youtube.com/watch?v=hG9SzQxaCm8",
+      "source_id": "source-072d59210cc2b9747b70253af5a4dd81930e0ba35ba68c06118f7f7f910c5840",
+      "representation_sha256": "7f0a590af48801dca634cf870562f453a111589b9cc2a8ff1f5f8e1e01760e1c",
+      "creator_identity": "unresolved",
+      "availability": "metadata_shell_only",
+      "admission": "blocked_unreviewed_metadata_candidate"
+    },
+    {
+      "provider": "youtube_url_candidate",
+      "provider_id": "Ef0VrcrOatg",
+      "kind": "video",
+      "title": null,
+      "url": "https://www.youtube.com/watch?v=Ef0VrcrOatg&list=PLsVfn9YIFmNC3SL_FgAe6k4_is4stMOh2",
+      "source_id": "source-0746321c121ef642a45cc90fc75744081f4dd7843740d01fcab02e9ad6808418",
+      "representation_sha256": "7d473e1d512c9607ee6d6c238e03243515f4b4c161d5c4dc4c2e046779b41c72",
+      "creator_identity": "unresolved",
+      "availability": "retrieval_failed",
+      "admission": "blocked_unreviewed_metadata_candidate"
+    }
+  ],
+  "provider_candidates": [
+    {
+      "catalog_type": "texture_model_assets",
+      "url": "https://ambientcg.com/",
+      "source_id": "source-05a5769075d99be4cd7fd562d3e3a760e64a9ef31df80ec61763dc67c0660d64",
+      "representation_sha256": "18f6279088201df9e7b3450726224c82b4cfd3a80d644b50248e0ac6af782994",
+      "availability": "page_representation_returned",
+      "rights_state": "provider_reports_CC0_1_0_scope_recorded",
+      "admission": "unreviewed_provider_candidate"
+    },
+    {
+      "catalog_type": "ui_toolkit",
+      "url": "https://github.com/cocopon/tweakpane",
+      "source_id": "source-0626b07f9fe04da05ecd93dfaf04949265a1692a24c91a5ea54beac8d07b1c3e",
+      "representation_sha256": "354e37049c50241a923af42d026f58f93edeca561fb7d6d9439e10fecff51573",
+      "availability": "repository_metadata_returned",
+      "rights_state": "pending",
+      "admission": "unreviewed_provider_candidate"
+    },
+    {
+      "catalog_type": "game_engine",
+      "url": "http://springrts.com/",
+      "source_id": "source-063a1dda402f37783022a66bb1c3cba18296c60fd344a42a465855df23af7a52",
+      "representation_sha256": "79666f7b757955a4a1a761d8b65f8f168f63448257ed04982c6d792abb6fe91b",
+      "availability": "page_representation_returned",
+      "rights_state": "pending",
+      "admission": "unreviewed_provider_candidate"
+    },
+    {
+      "catalog_type": "game_engine",
+      "url": "https://github.com/NeoAxis/NeoAxisEngine",
+      "source_id": "source-0692da389dfa5ea641ca6584ef9094d903fb13fb3c4975a0b0ef8d171241b2fd",
+      "representation_sha256": "c524cc06aec3455ed741b3dae7d914d6ecbb0db92260034bf5c2b96072427bef",
+      "availability": "repository_metadata_returned",
+      "rights_state": "pending",
+      "admission": "unreviewed_provider_candidate"
+    },
+    {
+      "catalog_type": "platform_ui_framework",
+      "url": "https://developer.apple.com/swiftui/",
+      "source_id": "source-06a8c68ef354eb80cf4bc1a1b5228275a176f14b575e59887c8d6bcdd3ab4df5",
+      "representation_sha256": "b0c2a2028c28c5f940e9d854cf2d34d28613d80202dbe18f878bfdd30efbdd33",
+      "availability": "page_representation_returned",
+      "rights_state": "pending",
+      "admission": "unreviewed_provider_candidate"
+    },
+    {
+      "catalog_type": "graphics_examples",
+      "url": "https://threejs.org/examples/?q=pixel",
+      "source_id": "source-06b3208705454a7d658132a6d8684c2b258c7c8fe2ffa3aa073c7571e7293781",
+      "representation_sha256": "dd7fc2036cda03690a786ee013cc6f9fa483501ed1ae69862f95f2c9a7831193",
+      "availability": "metadata_shell_only",
+      "rights_state": "pending",
+      "admission": "unreviewed_provider_candidate"
+    },
+    {
+      "catalog_type": "training_course",
+      "url": "https://www.thegnomonworkshop.com/tutorials/master-rigging-python-scripting-in-maya",
+      "source_id": "source-06eccf7f8dcfe0147d2acb9a2c082f5dd80c244ad10f91634cc69d93a1a8a1cc",
+      "representation_sha256": "267e69682cd1ccd3c8ab06d10d246775b06f583c6ef32b8b5d4907f203051119",
+      "availability": "page_representation_returned",
+      "rights_state": "pending",
+      "admission": "unreviewed_provider_candidate"
+    },
+    {
+      "catalog_type": "commercial_game_importer",
+      "url": "https://github.com/Wargus/wargus",
+      "source_id": "source-06f97d8467585ab2e36bd046510e627f032f61c7cf35b4c539045e46e9ad0aa2",
+      "representation_sha256": "2f540ec49dd718e97eb5b83bb519b995e6392596ee9d58be3af462b117767d20",
+      "availability": "repository_metadata_returned",
+      "rights_state": "GPL_code_observed_commercial_game_assets_excluded",
+      "admission": "unreviewed_provider_candidate"
+    },
+    {
+      "catalog_type": "voxel_engine_plugin",
+      "url": "https://github.com/ClarkThyLord/Voxel-Core",
+      "source_id": "source-070de8d62af98e088b4cfdcf4ef9cae408ed7886eb9b711914f9f57ab9692d6b",
+      "representation_sha256": "70bd7609c5758b0eb791c0f5620466423839d82de3324eb40e0764fb2dbda93a",
+      "availability": "repository_metadata_returned",
+      "rights_state": "pending",
+      "admission": "unreviewed_provider_candidate"
+    },
+    {
+      "catalog_type": "particle_authoring_tool",
+      "url": "https://www.71squared.com/particledesigner",
+      "source_id": "source-07472a3c990597bbc88751c4baf79ce55db402be03a71d00290626d7c7f85f8d",
+      "representation_sha256": "520ffb0b8ca0368b9411b2ce07fb3117e9fcf920a31fa9ceb12685bcb808da52",
+      "availability": "page_representation_returned",
+      "rights_state": "pending",
+      "admission": "unreviewed_provider_candidate"
+    }
+  ],
+  "provider_coverage": {
+    "games_added_as_unreviewed_candidates": 2,
+    "videos_added_as_blocked_candidates": 5,
+    "provider_catalogs_added_as_unreviewed_candidates": 10,
+    "editions_added": 0,
+    "global_denominator": "unknown",
+    "known_gaps": [
+      "No authoritative edition, territory, platform or release normalization.",
+      "Four videos failed and one supplied title-shell metadata only.",
+      "Provider and code licenses do not establish rights to every bundled or imported asset."
+    ]
+  }
+}

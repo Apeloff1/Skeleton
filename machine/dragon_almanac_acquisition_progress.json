@@ -2,8 +2,8 @@
   "schema": "skeleton.dragon.almanac_acquisition_progress.v1",
   "registry_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
   "ordering": "source_id_ascending",
-  "next_source_offset": 96,
-  "reviewed_candidate_count": 96,
+  "next_source_offset": 128,
+  "reviewed_candidate_count": 128,
   "entries": [
     {
       "source_id": "source-0017fcb9b1445e4f0a6949fb81b3fe01159175a23ca300ff1350938c2b2a0974",
@@ -868,30 +868,317 @@
       "availability": "retrieval_failed",
       "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0003.json",
       "approved": false
+    },
+    {
+      "source_id": "source-05a5769075d99be4cd7fd562d3e3a760e64a9ef31df80ec61763dc67c0660d64",
+      "source_offset": 96,
+      "url": "https://ambientcg.com/",
+      "checked_at": "2026-10-11T06:15:28.362Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-05b84ae1984984e8b26001bbfbd2cdd8056442c9ba9577d894f37b3403fa707a",
+      "source_offset": 97,
+      "url": "https://www.youtube.com/watch?v=ITCWa3oLNAQ",
+      "checked_at": "2026-10-11T06:15:30.070Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-05f32a68c330b398b9cbfc8240d2fc0378a98e54de1e48a4015f89b06331a6ca",
+      "source_offset": 98,
+      "url": "https://github.com/sorrycc/awesome-javascript",
+      "checked_at": "2026-10-11T06:15:30.501Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-05ffc80681d744e0e31d2707be185f6639123fbeba2873c3e505cfaefbdd69d9",
+      "source_offset": 99,
+      "url": "https://github.com/quozd/awesome-dotnet",
+      "checked_at": "2026-10-11T06:15:30.921Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-060d28795676a034f2f7500ddc76a606db3f4b71faaf01d86b96c5eb9ed8c140",
+      "source_offset": 100,
+      "url": "https://github.com/adolson/godot-stuff/blob/master/strip-to-frames.pl",
+      "checked_at": "2026-10-11T06:15:31.686Z",
+      "availability": "source_file_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-060fb733c955bd1b5ca72337fcd7e44254d0e6c2c27ec79eff4d7e2ceae1df4b",
+      "source_offset": 101,
+      "url": "http://design.tutsplus.com/tutorials/draw-a-cartoon-monster-character-in-photoshop--psd-18136",
+      "checked_at": "2026-10-11T06:15:35.416Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0622967d6270af2f55a963ee4394b6ab9bef7c339b88d269fe525ae66fadc911",
+      "source_offset": 102,
+      "url": "https://github.com/Kavex/GameDev-Resources",
+      "checked_at": "2026-10-11T06:15:35.862Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0626b07f9fe04da05ecd93dfaf04949265a1692a24c91a5ea54beac8d07b1c3e",
+      "source_offset": 103,
+      "url": "https://github.com/cocopon/tweakpane",
+      "checked_at": "2026-10-11T06:15:36.276Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-062d054788376272b9abce70dc147e1417ebadcd50da3eb9a77d29612672a63e",
+      "source_offset": 104,
+      "url": "https://gmtk.itch.io/platformer-toolkit",
+      "checked_at": "2026-10-11T06:15:37.996Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-063a1dda402f37783022a66bb1c3cba18296c60fd344a42a465855df23af7a52",
+      "source_offset": 105,
+      "url": "http://springrts.com/",
+      "checked_at": "2026-10-11T06:15:39.962Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-066954477437b78fa1ac5437eaad7e76bbcbf19c702a9346ca00e2233d3b51ac",
+      "source_offset": 106,
+      "url": "http://www.gamasutra.com/blogs/JosephSopko/20160630/276193/On_Making_Good_Combat_Mechanics_Part_1.php",
+      "checked_at": "2026-10-11T06:15:41.565Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0673a81df3c925ab647f049e3721fc03d33907c7fa9f4926bfba2846e7e45f33",
+      "source_offset": 107,
+      "url": "https://youtu.be/VO4FNf-Xc58",
+      "checked_at": "2026-10-11T06:15:43.575Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0676b53f1bcb673e1081cdea0f85d1e2d1b77037d94c205f02449b4e8723ec41",
+      "source_offset": 108,
+      "url": "http://blog.tigerstylegames.com/post/23104925410/15-days-of-waking-mars-at-299",
+      "checked_at": "2026-10-11T06:15:45.101Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-06825a5060ad0dd6bc8cdf4ab5ff79af6fc8e14328b8212f4db7597f1d2d8527",
+      "source_offset": 109,
+      "url": "https://medium.com/@kkll7952/independent-game-developer-a-guide-to-conquering-asia-02ca7b0b1df1",
+      "checked_at": "2026-10-11T06:15:46.668Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0692da389dfa5ea641ca6584ef9094d903fb13fb3c4975a0b0ef8d171241b2fd",
+      "source_offset": 110,
+      "url": "https://github.com/NeoAxis/NeoAxisEngine",
+      "checked_at": "2026-10-11T06:15:47.397Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-069a19191c5c78682e3453d0025334bb7581c5680561981e9fd3f501f21c2aff",
+      "source_offset": 111,
+      "url": "https://en.wikipedia.org/wiki/Apache_License",
+      "checked_at": "2026-10-11T06:15:50.907Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-06a716b082365536b927720b8235b0b6e35ee13cde1cfaf2f416c20cba4f9388",
+      "source_offset": 112,
+      "url": "https://www.youtube.com/watch?v=2pGGDxVF-pk",
+      "checked_at": "2026-10-11T06:15:52.934Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-06a8c68ef354eb80cf4bc1a1b5228275a176f14b575e59887c8d6bcdd3ab4df5",
+      "source_offset": 113,
+      "url": "https://developer.apple.com/swiftui/",
+      "checked_at": "2026-10-11T06:15:55.533Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-06b3208705454a7d658132a6d8684c2b258c7c8fe2ffa3aa073c7571e7293781",
+      "source_offset": 114,
+      "url": "https://threejs.org/examples/?q=pixel",
+      "checked_at": "2026-10-11T06:15:57.609Z",
+      "availability": "metadata_shell_only",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-06b5038deb69f9b684fd18275af385a3f0927163480068fcb051c2b78506f915",
+      "source_offset": 115,
+      "url": "https://medium.com/super-jump/replayability-in-game-design-798fbb91a726",
+      "checked_at": "2026-10-11T06:16:00.408Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-06b5d9682a9138bac6e746053f07ed5d625057d0f1c7482315d6fe85d3d8d2f9",
+      "source_offset": 116,
+      "url": "https://github.com/TomWHall/Descensus2",
+      "checked_at": "2026-10-11T06:16:00.820Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-06b731887eaecdf597c8f0565e9933ac66bc0141a2b9970f04b2f7ad6bdcdbba",
+      "source_offset": 117,
+      "url": "https://github.com/BKcore/HexGL",
+      "checked_at": "2026-10-11T06:16:01.290Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-06dbccd6a8d7712ab10d7d4563ecfce2a6b89d0976acaf0fddfedf0bb5736737",
+      "source_offset": 118,
+      "url": "http://taptapadventure.com/play",
+      "checked_at": "2026-10-11T06:16:02.867Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-06eccf7f8dcfe0147d2acb9a2c082f5dd80c244ad10f91634cc69d93a1a8a1cc",
+      "source_offset": 119,
+      "url": "https://www.thegnomonworkshop.com/tutorials/master-rigging-python-scripting-in-maya",
+      "checked_at": "2026-10-11T06:16:06.756Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-06f97d8467585ab2e36bd046510e627f032f61c7cf35b4c539045e46e9ad0aa2",
+      "source_offset": 120,
+      "url": "https://github.com/Wargus/wargus",
+      "checked_at": "2026-10-11T06:16:07.232Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-070de8d62af98e088b4cfdcf4ef9cae408ed7886eb9b711914f9f57ab9692d6b",
+      "source_offset": 121,
+      "url": "https://github.com/ClarkThyLord/Voxel-Core",
+      "checked_at": "2026-10-11T06:16:07.634Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-07277d0f752a56a70f8f69b096d0cc0d9c5c5d6fc4ee1a18c05327205b372346",
+      "source_offset": 122,
+      "url": "http://corporate.onebip.com/onebip-data-insights-discover-the-spending-habits-of-online-gamers-worldwide/",
+      "checked_at": "2026-10-11T06:16:09.146Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-072d59210cc2b9747b70253af5a4dd81930e0ba35ba68c06118f7f7f910c5840",
+      "source_offset": 123,
+      "url": "https://www.youtube.com/watch?v=hG9SzQxaCm8",
+      "checked_at": "2026-10-11T06:16:11.104Z",
+      "availability": "metadata_shell_only",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-072e505990379459c763b5d78f3cf988950ede0f00f8a82bea298484d5eb388f",
+      "source_offset": 124,
+      "url": "https://en.wikipedia.org/wiki/Java_virtual_machine",
+      "checked_at": "2026-10-11T06:16:14.948Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0746321c121ef642a45cc90fc75744081f4dd7843740d01fcab02e9ad6808418",
+      "source_offset": 125,
+      "url": "https://www.youtube.com/watch?v=Ef0VrcrOatg&list=PLsVfn9YIFmNC3SL_FgAe6k4_is4stMOh2",
+      "checked_at": "2026-10-11T06:16:16.975Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-07472a3c990597bbc88751c4baf79ce55db402be03a71d00290626d7c7f85f8d",
+      "source_offset": 126,
+      "url": "https://www.71squared.com/particledesigner",
+      "checked_at": "2026-10-11T06:16:19.232Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-074a2e277eda2f015f50dd3e27bb38af704e0cc9d05a96afce17f9f4c382c58f",
+      "source_offset": 127,
+      "url": "https://nasa3d.arc.nasa.gov/models",
+      "checked_at": "2026-10-11T06:16:20.923Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "approved": false
     }
   ],
   "whole_web_complete": false,
   "notes": "First-pass cursor counts candidate checks, not canonical approval. Every unresolved source remains in its batch retry_queue. Registry unchanged; worldwide denominator unknown.",
-  "checked_candidate_count": 96,
+  "checked_candidate_count": 128,
   "approved_source_count": 0,
   "distilled_source_count": 0,
   "last_batch_counts": {
     "newly_checked": 32,
-    "fetched_representations": 24,
-    "repository_metadata": 6,
-    "target_page_representations": 14,
+    "fetched_representations": 21,
+    "repository_metadata": 9,
+    "target_page_representations": 9,
     "metadata_shells": 2,
-    "directory_metadata": 1,
     "source_files": 1,
-    "retrieval_failed": 8,
+    "retrieval_failed": 11,
     "blocked_from_admission": 32,
     "distilled": 0,
     "approved": 0,
-    "additional_license_files_fetched": 3,
-    "license_file_fetch_failures": 3,
+    "additional_license_files_fetched": 4,
+    "license_file_fetch_failures": 2,
     "exact_source_files_fetched": 1
   },
-  "last_batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0003.json",
-  "last_updated_at": "2026-10-11T05:16:24.869Z",
+  "last_batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+  "last_updated_at": "2026-10-11T06:17:53.308Z",
   "reviewed_candidate_count_definition": "Legacy field counts first-pass candidate checks only; it does not mean independent source review or approval."
 }
