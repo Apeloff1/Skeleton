@@ -462,3 +462,155 @@ def population_report(state: EraPopulation, local: int) -> dict:
             "updates, not individually instantiated AI agents."
         ),
     }
+
+
+# Adaptive resource fidelity: budget is per active local *brain*, not the
+# regional cohort count. All 32 local bodies still exist and age each turn.
+# Four levels are available for testing and user-selected consumer hardware.
+FIDELITY_MODES = ("economy", "balanced", "vivid", "unrestricted")
+MAX_IMPRESSIONS = 64
+
+
+def active_brain_budget(era: str, preset: str = "balanced") -> int:
+    b = era_budget(era)
+    if preset not in FIDELITY_MODES:
+        raise FoundationError("unknown NPC hardware fidelity preset")
+    limits = {"economy": 3, "balanced": 7,
+              "vivid": 16, "unrestricted": MAX_AGENTS}
+    return min(b.full_npc_limit, limits[preset])
+
+
+def select_active_brains(
+    state: EraPopulation, society: PhysicalSociety, terrain: TerrainState,
+    cognition, *, preset: str = "balanced",
+) -> tuple[int, ...]:
+    """Deterministic urgency, local proximity, promise and fairness scheduler.
+
+    Every selected ID is a fully embodied resident. Selecting a subset never
+    promotes a regional census member into an actual individual. The rest are
+    explicit passive bodies: they continue to age/hunger but cannot harvest,
+    teleport, form free friendships or create offscreen resource credits.
+    """
+    validate_population(state, society, terrain)
+    limit = min(active_brain_budget(state.era, preset),
+                len(society.inhabitants))
+    here = terrain.position
+    protected = set()
+    for order in cognition.orders:
+        if order.status == "open":
+            protected.add(order.citizen)
+    for build in cognition.projects:
+        if build.status == "open":
+            protected.update(p.id for p in society.inhabitants
+                             if p.profession in ("builder", "engineer")
+                             and p.id not in build.contributors)
+    for lesson in cognition.training.records:
+        if lesson.status == "active":
+            protected.update((lesson.mentor, lesson.apprentice))
+    for family in cognition.households.families:
+        if family.status == "established":
+            child = society.inhabitants[family.child_id]
+            if child.hunger >= 5:
+                protected.update((family.caregiver_a, family.caregiver_b,
+                                  family.child_id))
+    ranking = []
+    n = len(society.inhabitants)
+    for p in society.inhabitants:
+        distance = abs(here[0] - p.x) + abs(here[1] - p.y)
+        class_rank = (
+            0 if p.health <= 5 or p.hunger >= 10 else
+            1 if p.id in protected else
+            2 if distance <= 4 else 3
+        )
+        # Rotate background priorities each real day to avoid permanent
+        # id-based preference and keep every idle local body eligible.
+        fair = (p.id - state.day * max(1, limit)) % n
+        ranking.append((class_rank, min(distance, 1024)
+                        if class_rank <= 2 else 0, fair, p.id))
+    return tuple(sorted(x[3] for x in sorted(ranking)[:limit]))
+
+
+def ambient_impressions(
+    state: EraPopulation, terrain: TerrainState, *,
+    radius: int = 8, max_visible: int | None = None,
+) -> tuple[dict, ...]:
+    """Honest, spatially anchored background *render proxies*.
+
+    Distinct sprites are drawn around physically anchored districts in the
+    current viewport. Each is deliberately tagged visual-only, without
+    individual AI, assets, goods, ballots, citizen IDs or persistent health.
+    Work is O(min(render budget, 64)), never O(census).
+    """
+    validate_terrain(terrain)
+    if type(radius) is not int or not 2 <= radius <= 24:
+        raise FoundationError("invalid hardware-safe ambient viewport")
+    budget = era_budget(state.era)
+    amount = budget.render_budget if max_visible is None else max_visible
+    if type(amount) is not int or not 0 <= amount <= MAX_IMPRESSIONS:
+        raise FoundationError("rendered population budget out of bounds")
+    if not state.districts or amount == 0:
+        return ()
+    ox, oy = terrain.position
+    occupied = set()
+    result = []
+    for district in state.districts:
+        if district.population == 0:
+            continue
+        # Anchor sprites to the district's real map point with bounded local
+        # spread. The same day, coordinates and seed replay exactly.
+        limit = min(6, district.population, amount-len(result))
+        if limit <= 0:
+            break
+        for i in range(limit * 3):
+            if len(result) >= amount:
+                break
+            hashed = sha256(
+                f"{state.world_id}:{district.id}:{i}:{state.day//3}".encode()
+            ).digest()
+            x = district.x + hashed[0] % 9 - 4
+            y = district.y + hashed[1] % 9 - 4
+            if ((x,y) in occupied or (x,y) == (ox,oy)
+                    or abs(x-ox) > radius or abs(y-oy) > radius):
+                continue
+            if cell_at(terrain, x, y).blocking:
+                continue
+            occupied.add((x,y))
+            result.append({
+                "id": f"ambient-{district.id}-{i}",
+                "district": district.id,
+                "x": x, "y": y,
+                "role": "background-crowd",
+                "is_simplified_visual_proxy": True,
+                "has_individual_cognition": False,
+                "can_use_resources": False,
+                "can_vote": False,
+            })
+            if len([p for p in result if p["district"] == district.id]) >= limit:
+                break
+    return tuple(result)
+
+
+def fidelity_report(
+    state: EraPopulation, people: PhysicalSociety, terrain: TerrainState,
+    *, preset: str = "balanced",
+) -> dict:
+    # Never implicitly simulate brains merely to compute public counters.
+    return {
+        "era": state.era, "preset": preset,
+        "named_physical_people": len(people.inhabitants),
+        "maximum_individual_brain_decisions_per_turn":
+            min(active_brain_budget(state.era, preset),
+                len(people.inhabitants)),
+        "local_passive_survival_bodies": max(
+            0, len(people.inhabitants) -
+            active_brain_budget(state.era, preset)),
+        "regional_simplified_census": sum(d.population for d in state.districts),
+        "regional_individual_cognitive_agents": 0,
+        "graphic_crowd_impressions_cap": min(
+            era_budget(state.era).render_budget, MAX_IMPRESSIONS),
+        "guarantee": (
+            "Only scheduled real residents run full per-person cognition; "
+            "passive bodies consume no magically created resources, "
+            "while remote district stocks are conserved independently."
+        ),
+    }
