@@ -67,9 +67,11 @@ def evidence_features(case: TrainingCandidate)->dict[int,int]:
     if not isinstance(case,TrainingCandidate) or type(case.input) is not dict:
         raise TrainingFlowError("typed original game evidence required for normalized reviewer")
     tokens=set(_walk(case.input))
-    if not tokens:
+    # A canonical firsthand witness is an actual specific typed claim.
+    # Other fragment/change indicators alone do not constitute one.
+    if "witness" not in tokens:
         tokens.add("no_source_witness")
-    if "witness" in tokens:
+    else:
         tokens.discard("no_source_witness")
     # Hash semantic facts, not attack names, source IDs or split labels.
     result={}
