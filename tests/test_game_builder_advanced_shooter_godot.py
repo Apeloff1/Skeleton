@@ -83,7 +83,7 @@ class NativeArenaShooterProofTests(unittest.TestCase):
         game=run_advanced_session("shooter",cfg,["wait"])
         with self.assertRaises(PermissionError):
             render_shooter_godot_package(game,cfg,authorized=False)
-        with self.assertRaises(SceneError):
+        with self.assertRaises(AdvancedRuntimeError):
             render_shooter_godot_package(game,{"player_health":50},authorized=True)
         altered=deepcopy(game);altered["state"]["ammo"]=999
         with self.assertRaises(AdvancedRuntimeError):
