@@ -16,6 +16,7 @@ import re
 from typing import Any
 
 from .contracts import canonical_digest, canonical_json
+from .playable_world import GameBuildIntent
 from .living_story_runtime import (
     StoryIntent, StoryWorld, Region, Citizen, Quest, StoryError,
     original_story_world, demonstrate_story,
@@ -53,6 +54,27 @@ class AuthoredStory:
             "model_training": False,
             "legally_cleared_for_publication": False,
         }
+
+
+def derive_original_story_intent(
+    base: GameBuildIntent, *, population: int, regions: int = 7,
+    mode: str = "postgame", quests: int = 2, authorized: bool,
+) -> StoryIntent:
+    """Stable original-product link for custom story editor and consumer build."""
+    if not authorized:
+        raise PermissionError("story intent derivation requires authorization")
+    if not isinstance(base, GameBuildIntent):
+        raise StoryAuthoringError("typed original game anchor required")
+    return StoryIntent(
+        project_id=base.project_id[:95] + ".living-world",
+        title=("Living World: " + base.title)[:120],
+        seed=int(canonical_digest({
+            "story_parent": base.to_payload(),
+            "version": "skeleton.living_world.v1",
+        })[:15], 16),
+        regions=regions, population=population,
+        mode=mode, quests_to_finish=quests,
+    )
 
 
 def blueprint_document(world: StoryWorld, *, authorized: bool) -> dict[str, object]:
@@ -193,5 +215,6 @@ def read_story_blueprint(
 
 __all__ = [
     "StoryAuthoringError", "AuthoredStory", "AUTHORED_STORY_SCHEMA",
-    "blueprint_document", "compile_authored_story", "read_story_blueprint",
+    "derive_original_story_intent", "blueprint_document",
+    "compile_authored_story", "read_story_blueprint",
 ]
