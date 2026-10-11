@@ -35,6 +35,17 @@ def parser() -> argparse.ArgumentParser:
                        help="Real deterministic adversarial attempts, 64..512")
     entry.add_argument("--companion-practice", type=int, default=2,
                        help="Real original practice games, 0..8 (proof receipts only)")
+    entry.add_argument("--living-world-npcs", type=int, default=0,
+                       help="Build second original RPG genre with 6..128 scheduled NPCs, or 0 to disable")
+    entry.add_argument("--living-world-regions", type=int, default=7,
+                       help="Connected living-world regions, 4..12")
+    entry.add_argument("--living-world-mode", choices=("campaign", "postgame", "sandbox"),
+                       default="postgame", help="Story ends, lives on, or remains an open sandbox")
+    entry.add_argument("--living-world-quests", type=int, default=2,
+                       help="Required faction quests before an ending, 1..3")
+    entry.add_argument("--living-world-ending",
+                       choices=("stewardship", "discovery", "independence"),
+                       default="stewardship", help="Which distinct narrative outcome to replay-prove")
     entry.add_argument("--trusted-local-operator", action="store_true",
                        help="Acknowledge separately established operator authorization")
     return entry
@@ -79,6 +90,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             human_authored_approved=args.human_reviewed,
             mirror_attempts=args.mirror_attempts,
             companion_practice_games=args.companion_practice,
+            narrative_population=args.living_world_npcs,
+            narrative_regions=args.living_world_regions,
+            narrative_mode=args.living_world_mode,
+            narrative_quests=args.living_world_quests,
+            narrative_ending=args.living_world_ending,
         )
         output = export_studio_run(run, str(Path(args.output)), authorized=True)
     except (StudioError, ToolFabricError, MirrorRoomError,
@@ -94,6 +110,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         "mirror_attempts": len(run.mirror.probes),
         "mirror_failures": len(run.mirror.failures),
         "verified_practice_games": len(run.practice),
+        "living_world_npcs": run.narrative.manifest["npc_count"] if run.narrative else 0,
+        "living_world_mirror_attacks": (
+            len(run.narrative_mirror.probes) if run.narrative_mirror else 0
+        ),
+        "living_world_manifest_digest": run.narrative.digest if run.narrative else None,
         "consumer_status": run.consumer.to_payload()["status"],
         "consumer_blockers": list(run.consumer.blockers),
         "source_manifest_digest": run.package.manifest["manifest_digest"],
