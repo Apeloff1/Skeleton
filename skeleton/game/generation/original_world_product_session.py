@@ -352,15 +352,27 @@ def product_restore(value: str) -> ProductSession:
         if set(data) != {"payload", "checksum"} or data["checksum"] != _hash(data["payload"]):
             raise FoundationError("product checksum mismatch")
         obj = data["payload"]
-        if set(obj) != {"schema", "world_id", "design_id", "living",
-                        "terrain", "society", "events", "event_head"} or obj["schema"] != SCHEMA:
-            raise FoundationError("wrong product save version")
+        common = {"schema", "world_id", "design_id", "living",
+                  "terrain", "society", "events", "event_head"}
+        if (obj["schema"] == SCHEMA and set(obj) == common | {"cognition"}):
+            current = True
+        elif obj["schema"] == LEGACY_SCHEMA and set(obj) == common:
+            current = False
+        else:
+            raise FoundationError("wrong product save version or unexpected fields")
         terrain = terrain_restore(json.dumps(obj["terrain"]))
         living = restore_living(json.dumps(obj["living"]))
+        society = society_restore(obj["society"], terrain)
+        if current:
+            cognition = cognition_restore(obj["cognition"], society, terrain)
+        else:
+            # Preserve older playable saves; introduce the cognitive layer with
+            # no fabricated past memories or relationships.
+            cognition = replace(make_intelligence(terrain, society),
+                                day=society.tick)
         result = ProductSession(
-            obj["world_id"], living, terrain,
-            society_restore(obj["society"], terrain),
-            obj["events"], obj["event_head"],
+            obj["world_id"], living, terrain, society,
+            obj["events"], obj["event_head"], cognition,
         )
         if validate_product(result).design_id != obj["design_id"]:
             raise FoundationError("underlying authored world changed across save")
