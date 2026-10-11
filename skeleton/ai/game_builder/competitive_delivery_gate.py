@@ -10,8 +10,10 @@ game/consumer rights and QA authorities, never this advisory gate.
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass,replace
 from datetime import datetime
+import hashlib
+import hmac
 import re
 
 from .contracts import QUALITY_AXES,PROTECTED_AXES,canonical_digest
@@ -40,6 +42,24 @@ def _bp(value,name):
 
 
 @dataclass(frozen=True,slots=True)
+class TrustedCompetitionJudge:
+    """Operator-supplied HMAC verifier: possession is checked, human identity not."""
+
+    judge_id: str
+    key: bytes
+
+    def __post_init__(self):
+        _id(self.judge_id,"trusted evaluator")
+        if type(self.key) is not bytes or len(self.key)<32:
+            raise ThreatRadarError("independent benchmark signer requires >=256 bit secret")
+
+
+def _mac(body,key):
+    return hmac.new(key,canonical_digest(body).encode("ascii"),
+                    hashlib.sha256).hexdigest()
+
+
+@dataclass(frozen=True,slots=True)
 class VerifiedQualitySample:
     """Operator-supplied score envelope; judge identity alone is not a signature."""
 
@@ -56,6 +76,7 @@ class VerifiedQualitySample:
     observed_at: str
     sample_count: int
     platform: str
+    signature: str
 
     def __post_init__(self):
         _id(self.subject_id,"subject")
@@ -70,12 +91,14 @@ class VerifiedQualitySample:
             _sha(getattr(self,n),n)
         _id(self.judge_id,"judge")
         _id(self.platform,"platform")
+        _sha(self.signature,"benchmark signature")
         _date(self.observed_at)
         if type(self.sample_count) is not int or not 10<=self.sample_count<=1000000:
             raise ThreatRadarError("quality needs independent repeatable evaluation, n >=10")
 
-    def payload(self):
+    def signed_body(self):
         return dict(
+            schema="skeleton.game_builder.quality_measurement.v1",
             subject_id=self.subject_id,axis=self.axis,
             score_bp=self.score_bp,lower_bp=self.lower_bp,upper_bp=self.upper_bp,
             protocol_digest=self.protocol_digest,
@@ -84,6 +107,18 @@ class VerifiedQualitySample:
             evidence_digest=self.evidence_digest,
             judge_id=self.judge_id,observed_at=self.observed_at,
             sample_count=self.sample_count,platform=self.platform)
+
+    def payload(self):
+        return dict(self.signed_body(),signature=self.signature)
+
+
+def sign_competitive_sample(sample: VerifiedQualitySample,
+                            judge: TrustedCompetitionJudge):
+    if not isinstance(sample,VerifiedQualitySample) or not isinstance(judge,TrustedCompetitionJudge):
+        raise ThreatRadarError("typed benchmark sample and evaluator key required")
+    if judge.judge_id!=sample.judge_id:
+        raise ThreatRadarError("judge key does not match declared subject")
+    return replace(sample,signature=_mac(sample.signed_body(),judge.key))
 
 
 @dataclass(frozen=True,slots=True)
@@ -98,6 +133,7 @@ class OriginalIdentityReview:
     reviewer_id: str
     reviewed_at: str
     human_reviewed: bool
+    signature: str
 
     def __post_init__(self):
         _id(self.original_id)
@@ -111,9 +147,11 @@ class OriginalIdentityReview:
         _date(self.reviewed_at)
         if type(self.human_reviewed) is not bool:
             raise ThreatRadarError("explicit independent review status required")
+        _sha(self.signature,"originality reviewer signature")
 
-    def payload(self):
+    def signed_body(self):
         return dict(
+            schema="skeleton.game_builder.originality_review.v1",
             original_id=self.original_id,candidate_digest=self.candidate_digest,
             canonical_design_digest=self.canonical_design_digest,
             retained_pillars=list(self.retained_pillars),
@@ -122,6 +160,18 @@ class OriginalIdentityReview:
             independent_originality_evidence=self.independent_originality_evidence,
             reviewer_id=self.reviewer_id,reviewed_at=self.reviewed_at,
             human_reviewed=self.human_reviewed)
+
+    def payload(self):
+        return dict(self.signed_body(),signature=self.signature)
+
+
+def sign_identity_review(review: OriginalIdentityReview,
+                         judge: TrustedCompetitionJudge):
+    if not isinstance(review,OriginalIdentityReview) or not isinstance(judge,TrustedCompetitionJudge):
+        raise ThreatRadarError("typed independent originality-review signature required")
+    if judge.judge_id!=review.reviewer_id:
+        raise ThreatRadarError("originality signer identity mismatch")
+    return replace(review,signature=_mac(review.signed_body(),judge.key))
 
 
 @dataclass(frozen=True,slots=True)
@@ -217,16 +267,22 @@ class CompetitiveDeliveryReport:
             qualified_to_claim_superiority=self.qualified_to_claim_superiority,
             **{"no_claim_of_consumer_release":True,
                "no_assumed_independent_judge_credentials":True,
+               "verified_operator_configured_hmac_evaluator_keys":True,
                "no_right_to_copy_competing_game":True,
                "requires_canonical_release_assurance":True})
 
 
-def _identity_blockers(planned, proof, rights, standard, as_of):
+def _identity_blockers(planned, proof, rights, standard, as_of, trusted_identity_reviewer):
     reasons=[]
     if proof is None:
         return ["no_independent_original_identity_review"]
     if not isinstance(proof,OriginalIdentityReview):
         raise ThreatRadarError("typed independent originality evidence required")
+    if (not isinstance(trusted_identity_reviewer,TrustedCompetitionJudge)
+            or trusted_identity_reviewer.judge_id!=proof.reviewer_id
+            or not hmac.compare_digest(proof.signature,_mac(
+                proof.signed_body(),trusted_identity_reviewer.key))):
+        reasons.append("missing_or_forged_independent_originality_signature")
     if proof.original_id!=planned.title_id:
         reasons.append("wrong_title_originality_review")
     if proof.canonical_design_digest!=planned.design_digest:
@@ -255,6 +311,8 @@ def compare_competitive_delivery(
     rights: RightsLedger,*,
     as_of: str,authorized: bool,
     identity: OriginalIdentityReview|None=None,
+    trusted_identity_reviewer: TrustedCompetitionJudge|None=None,
+    trusted_judges: tuple[TrustedCompetitionJudge,...]=(),
     standard: SuperiorityStandard=SuperiorityStandard(),
     preceding: CompetitiveDeliveryReport|None=None,
 )->CompetitiveDeliveryReport:
@@ -279,11 +337,20 @@ def compare_competitive_delivery(
             or preceding.baseline_design_digest!=planned.design_digest
             or _date(preceding.as_of)>=date):
         raise ThreatRadarError("previous title/standard evidence inconsistent or time rolled back")
+    if (type(trusted_judges) is not tuple or
+            any(not isinstance(x,TrustedCompetitionJudge) for x in trusted_judges)
+            or len({x.judge_id for x in trusted_judges})!=len(trusted_judges)):
+        raise ThreatRadarError("distinct, operator-trusted quality benchmark keys required")
+    trusted={x.judge_id:x for x in trusted_judges}
     # Protocol, population and platform MUST match *per axis*. Diverse
     # judges within a protocol are required; score means are never a proof.
     records=defaultdict(lambda:defaultdict(list))
     seen=set()
     for row in measurements:
+        judge=trusted.get(row.judge_id)
+        if judge is None or not hmac.compare_digest(
+                row.signature,_mac(row.signed_body(),judge.key)):
+            raise ThreatRadarError("missing or invalid exact-sample quality benchmark signature")
         if row.subject_id not in {planned.title_id,assessment.rival_id}:
             raise ThreatRadarError("unrelated competitor measurement")
         if row.platform not in planned.platforms:
@@ -298,7 +365,8 @@ def compare_competitive_delivery(
             raise ThreatRadarError("replayed measurement from same judge cannot inflate evidence")
         seen.add(identity_key)
         records[row.axis][row.subject_id].append(row)
-    identity_blockers=_identity_blockers(planned,identity,rights,standard,as_of)
+    identity_blockers=_identity_blockers(
+        planned,identity,rights,standard,as_of,trusted_identity_reviewer)
     quality=[]
     demands=[]
     for axis in standard.required_axes:
@@ -393,6 +461,7 @@ def ratchet_superiority_standard(
     return new
 
 
-__all__=["VerifiedQualitySample","OriginalIdentityReview","SuperiorityStandard",
+__all__=["TrustedCompetitionJudge","sign_competitive_sample",
+         "sign_identity_review","VerifiedQualitySample","OriginalIdentityReview","SuperiorityStandard",
          "DeliveryDemand","CompetitiveDeliveryReport",
          "compare_competitive_delivery","ratchet_superiority_standard"]
