@@ -87,6 +87,12 @@ class DualRuntimeGameTests(unittest.TestCase):
                 self.assertIn(mechanic, script)
         self.assertNotIn(self.intent.title, script)
         self.assertNotIn(self.intent.subtitle, script)
+        presets = self.bundle.files["godot/export_presets.cfg"].decode()
+        self.assertIn('platform="Linux"', presets)
+        self.assertIn('platform="Windows Desktop"', presets)
+        self.assertIn('include_filter="*.json"', presets)
+        self.assertIn('binary_format/embed_pck=true', presets)
+        self.assertNotIn('codesign/enable=true', presets)
         self.assertIn("run/main_scene", self.bundle.files["godot/project.godot"].decode())
         self.assertIn("ExtResource", self.bundle.files["godot/scenes/main.tscn"].decode())
 
