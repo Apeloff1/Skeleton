@@ -1,0 +1,1089 @@
+{
+  "schema": "skeleton.dragon.acquisition_topic_triage.v1",
+  "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+  "independent_support_added": 0,
+  "canonical_admission": false,
+  "topics": [
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "JavaScript"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-10669a4a2b44d84c6d2b3840b128001ad82f600a611f241aec95fa050049af4e",
+          "url": "https://github.com/kripken/box2d.js/",
+          "representation_sha256": "9debafdef924d8d902a7259144e1cfce7acfeed3e484d77ac52f48e7658d48f7",
+          "source_revision": "1e6e9da36a3160a9f40cda4cddcb4f83abb4d82c",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "box2d.js describes a direct Emscripten-generated JavaScript port of the Box2D 2D physics engine and states zlib licensing in its README.",
+            "span": "README.markdown at the recorded selected revision",
+            "limitations": "README-level license statement only; upstream Box2D version, generated bindings, examples and any patent or third-party scope require separate review.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Games",
+        "2D",
+        "Godot 2"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-10904fa09b01c5695b3a47a997aa77a61bdad564b3bac4f1fb1a3be0321902af",
+          "url": "https://github.com/KOBUGE-Games/Ninja-Training",
+          "representation_sha256": "e173cd83017044413c85c3174d9694e085a2769708ae70ae44a4b75eefeb7c4f",
+          "source_revision": "e8fb5f2a16ed04f09054d41fbd09b8130ce81f87",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "Ninja-Training describes a small running game begun as a one-hour challenge and states GPLv3+ terms; the captured root LICENSE is GPL-3.0 text.",
+            "span": "README.md and LICENSE at the recorded selected revision",
+            "limitations": "Software licensing does not automatically establish rights in screenshots, music, sound effects, names or other assets.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Games",
+        "3D",
+        "Godot 4"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1098456a4f897ced38a1c0e59aeaa157fcba5d895bdd8cb3ad2e1d3f94a9d401",
+          "url": "https://gitlab.com/SuperTuxParty/SuperTuxParty",
+          "representation_sha256": "f99d05056e89601ab81c09ef0aa356ee59b7045b9480cea80f16b77ca2de04d4",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn115view0",
+          "observation": {
+            "statement": "GitLab identifies SuperTuxParty as an open-source party game inspired by Mario Party and records its creation date as 4 August 2018.",
+            "span": "turn115view0 lines 0–14",
+            "limitations": "Project metadata only; no repository revision, creator chain, license text, source files or asset permissions were captured, and inspiration is not legal clearance.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Talks [![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://github.com/sindres",
+        "GDC Talks",
+        "TED Talks"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-109e4bcc1dd91813411d65668c0d881595b4b659a7d754880f3f4eb4323f734b",
+          "url": "http://www.ted.com/talks/seth_priebatsch_the_game_layer_on_top_of_the_world):",
+          "representation_sha256": "9973c3838cb895a6d701ea9433cb036ad39e2314ae7cef9a76c0f14541b46e73",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn115view1",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-109e4bcc1dd91813411d65668c0d881595b4b659a7d754880f3f4eb4323f734b",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Programming",
+        "Networking"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-10a0001856c71a41c15ad407b980d6bc2ab4269d262b831ac209535ee769f4cc",
+          "url": "https://www.gabrielgambetta.com/client-server-game-architecture.html",
+          "representation_sha256": "32f7f1f95258d68ab4b89d861713dabc4d0d6c630a23597a658c5cbb218b5346",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn115view2",
+          "observation": {
+            "statement": "Gabriel Gambetta explains an authoritative-server model in which clients send actions, the server owns game state and returns results, while noting that latency makes a naive implementation unresponsive for fast-paced play.",
+            "span": "turn115view2 lines 2–37",
+            "limitations": "Introductory practitioner article, not a security proof or measured network benchmark; later prediction, reconciliation and compensation articles were not acquired.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Art**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-10ab5219ec17afb9ffcd89d100d7a39514cede752f6e23ccbd69ab3d5ed0075b",
+          "url": "https://iosicongallery.com/",
+          "representation_sha256": "afad6124b6718d313d5284ccaf3df29354e603a002092a6dffc3f72624ff32fe",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn115view3",
+          "observation": null
+        },
+        {
+          "source_id": "source-11015432f736f937f62267a5a494cf07519c359bac77d3f092a5b48942f6e0b9",
+          "url": "https://madewith.unity.com/stories/making-descendant",
+          "representation_sha256": "b6700f73123e735e91469f5e8527f114fd51f2ee532186344e129de24807b68d",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn115view10",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-10ab5219ec17afb9ffcd89d100d7a39514cede752f6e23ccbd69ab3d5ed0075b",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        },
+        {
+          "source_id": "source-11015432f736f937f62267a5a494cf07519c359bac77d3f092a5b48942f6e0b9",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Plugins and scripts",
+        "Godot 4"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-10bdf9b9bb560c5070da500b80dbf453484b7a4991a98dae6fcd243756f85231",
+          "url": "https://github.com/AndreMicheletti/godot-agones-sdk",
+          "representation_sha256": "e139b4764cf65a1f8f8087eb233781f127a4ae231cfe213d9f3ca6fcc3caefb8",
+          "source_revision": "b848eb382e80354b4d27e3fa601ca0fc2f39ef37",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "godot-agones-sdk describes a community-driven Agones SDK for Godot, with its captured snapshot targeting Godot 4.2; the root LICENSE is MIT.",
+            "span": "README.md and LICENSE at the recorded selected revision",
+            "limitations": "Agones, Godot, examples, network services and dependencies have separate versions and rights.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-118576e3b4afab097e63f68b2289bef9185efc7d065608a46f78d959f1510091",
+          "url": "https://github.com/godothub/konado",
+          "representation_sha256": "341d2f86495a56bf8cb7256e354a217d87e63c44387e46c127e0e79e51ba8652",
+          "source_revision": "57682c6adcbb5ff3a5c1849d6f02b525894d978c",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "Konado describes a Godot visual-novel framework and offers a multi-license choice among MIT, BSD-3-Clause and Mulan PSL v2; all three referenced license files were captured.",
+            "span": "README.md, LICENSE, LICENSE-BSD and LICENSE-MULANPSL at the recorded selected revision",
+            "limitations": "License choice and scope require project-specific review; dependencies, mascot artwork, translations, examples and patent/trademark issues remain separate.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Tools / Software",
+        "Modeling Tools"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-10c38833207c9dae614d56b5f1b3e52ab7f02323a5b9d583372dfb8cc137ce6c",
+          "url": "https://www.blender.org/",
+          "representation_sha256": "6491183e7789d1965b23648d4c214f6845ba78f90787121b84ec4a92ae97db21",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn115view4",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-10c38833207c9dae614d56b5f1b3e52ab7f02323a5b9d583372dfb8cc137ce6c",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Other"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-10d6a5c9a429e67a47d4a19e94ecd11a0bd45f770386c8ee751f355aeb68c3e5",
+          "url": "https://github.com/aBARICHELLO/godot-ci",
+          "representation_sha256": "9b737903bf538d46120fc51ec57978beea547c284e0bc5ed3388d8e59056b8d7",
+          "source_revision": "500bfbc8fee22e9ec1211599194c1de68a8e9e62",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "godot-ci describes Docker-based export and deployment of Godot projects through GitLab CI or GitHub Actions to destinations including Pages and itch.io; the root LICENSE is MIT.",
+            "span": "README.md and LICENSE at the recorded selected revision",
+            "limitations": "Workflow examples require secret, signing-key and deployment-policy review; the README itself warns against committing non-revocable signing credentials.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "Zig"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-10dfcbe56f0cce2b4ad838c82cf3be1cdd0c27fe7ccee425d472f918a5105107",
+          "url": "https://github.com/michal-z/zig-gamedev",
+          "representation_sha256": "1254472e17d4e36e86f390c37bae620f9fa127ca80a21d16c41f7450c7097067",
+          "source_revision": "9af37ec05bbfe5164dafc4c741a7d35667bd09c5",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "The redirected zig-gamedev repository identifies itself as the main development repository for Zig game-development libraries and sample applications; its root LICENSE is MIT.",
+            "span": "README.md and LICENSE at the recorded selected revision",
+            "limitations": "The catalog owner path redirected from michal-z to the zig-gamedev organization. That transition does not by itself establish continuity of every dependency, sample asset or external library right.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Browser-Based",
+        "Puzzle"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-10e9981ffd78d234412c7955780555121390b05b51a918a08ae9df3501e4dd69",
+          "url": "http://gamejolt.com/games/puzzle/beatrix/27454/",
+          "representation_sha256": "c5b29dc7bb39d6101a88d278ef567125924748783d4b513760072f72a5f8e8ea",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn115view5",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-10e9981ffd78d234412c7955780555121390b05b51a918a08ae9df3501e4dd69",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Audio**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-10eda8bf56ab43b7cb23fb60533c03193f239e00f89d0958a1d0878acc73a21d",
+          "url": "https://www.gamasutra.com/view/news/264301/The_minimalist_sound_design_of_The_Witness.php",
+          "representation_sha256": "ef75a4dc989c64bf0050296f703d60c15157e7f98ff07fbf2a4c9ab433832876",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn115view6",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-10eda8bf56ab43b7cb23fb60533c03193f239e00f89d0958a1d0878acc73a21d",
+          "finding": "target_mismatch",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Design**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-10f1f04a5a2056a9d426a38d1791ead621fa20adecf51676cb9bd9c5b2711769",
+          "url": "https://www.alanzucconi.com/2021/05/24/accessibility-in-videogames/",
+          "representation_sha256": "9503b5b79aee232f143fddbe1b2cf88fb48f0d91c044335d2de2db00a986de9b",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn115view7",
+          "observation": {
+            "statement": "Alan Zucconi argues that accessibility needs differ between people, recommends testing with disabled players or specialist consultation, and introduces adjustments for impairments including colour blindness.",
+            "span": "turn116view0 lines 20–49",
+            "limitations": "Practitioner article from 24 May 2021; cited prevalence figures and linked resources were not independently verified.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-11f08cb7eaab0fdc5ad3e9b67e62bcb5d78ca29c3534c3ae6be812f020711536",
+          "url": "https://gamedesignskills.com/game-design/worldbuilding/",
+          "representation_sha256": "ac27bae7b37d1890fa8d7923f150ba03624cb3c7873c2f31e8fa47087e2ece4c",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn115view16",
+          "observation": {
+            "statement": "Kelly Bender's worldbuilding guide frames game-world planning around mythology, universe, narrative, inhabitants and player conflict, and warns that weak alignment can mix incompatible aesthetics and eras.",
+            "span": "turn116view6 lines 38–59",
+            "limitations": "Practitioner guidance, not empirical proof; portfolio claims and downstream examples were not independently verified.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Uncategorized"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-10f5e8272792e898711a94b68da145e4b316c4c8612820961252f7915b3b977d",
+          "url": "https://github.com/RyanNielson/awesome-unity/blob/master/CONTRIBUTING.md",
+          "representation_sha256": "9c4aebfccc0683bb28ff42330c8b840e4d06179603f818da44fdfcd7a140ac85",
+          "source_revision": "2c1bd317816e3cb28c94168a8e0e62a0db1bf932",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "awesome-unity's contribution guide asks for one researched, documented and maintained addition per pull request; its README says the repository is archived and no longer maintained, and its root LICENSE is CC0-1.0.",
+            "span": "CONTRIBUTING.md, README.md and LICENSE at the recorded selected revision",
+            "limitations": "CC0 applies to the curated list and contribution text, not automatically to linked Unity assets or resources. Archived status is not abandonment or public-domain evidence.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Contributing"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-10f5e8272792e898711a94b68da145e4b316c4c8612820961252f7915b3b977d",
+          "url": "https://github.com/RyanNielson/awesome-unity/blob/master/CONTRIBUTING.md",
+          "representation_sha256": "9c4aebfccc0683bb28ff42330c8b840e4d06179603f818da44fdfcd7a140ac85",
+          "source_revision": "2c1bd317816e3cb28c94168a8e0e62a0db1bf932",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "awesome-unity's contribution guide asks for one researched, documented and maintained addition per pull request; its README says the repository is archived and no longer maintained, and its root LICENSE is CC0-1.0.",
+            "span": "CONTRIBUTING.md, README.md and LICENSE at the recorded selected revision",
+            "limitations": "CC0 applies to the curated list and contribution text, not automatically to linked Unity assets or resources. Archived status is not abandonment or public-domain evidence.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "UI"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-10fa951e5ad04e5d847d65c8c774417327936d4b8faad8efef370aae90e87ec0",
+          "url": "https://docs.unity3d.com/Packages/com.unity.textmeshpro@1.3/manual/index.html",
+          "representation_sha256": "fe2a8f1f67580d0825b1b8c457e31dfc079dcf447d57f9debaad57a2edaff7ff",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn115view8",
+          "observation": {
+            "statement": "Unity's TextMesh Pro 1.3.0 guide distinguishes MeshRenderer and CanvasRenderer text components and documents importing essential resources plus optional examples.",
+            "span": "turn118view0 lines 85–104",
+            "limitations": "Historical package documentation generated in 2025; current package behavior, licensing and compatibility were not tested.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Talks [![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://github.com/sindres",
+        "Other Talks"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-110132a904c9ffbe62f7dcbcf4dfbb5c77c847c219dafedc45cf8aa6d77319ff",
+          "url": "https://www.youtube.com/watch?v=qwPe3OHR04c%29%3A",
+          "representation_sha256": "fac6db8e2ebe9a231eda3ff4c1e4e762f4c60e346b57080c9996ac060afc8f9e",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn115view9",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-110132a904c9ffbe62f7dcbcf4dfbb5c77c847c219dafedc45cf8aa6d77319ff",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Game Engines",
+        "Popular"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-110511923a49f696234eb412e877cf2f515ea4c22c549ed052bf53edcb3dc4fe",
+          "url": "https://unity.com/",
+          "representation_sha256": "d9bb1239203265bb7f3b802725219ad44c1f7065a64e61f51034d3136ed682dd",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn115view11",
+          "observation": {
+            "statement": "Unity's homepage states support for desktop, mobile, major consoles, XR and web, and presents an integrated develop/deploy/grow toolchain.",
+            "span": "turn116view2 lines 7–48",
+            "limitations": "Vendor marketing and platform-support claims, not independent compatibility tests or license permission for any target platform.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-114ebb5bf537c17b5132d2cbedd9c72282a94de5e5b4f99a58c58915d47cc850",
+          "url": "https://www.unrealengine.com/",
+          "representation_sha256": "eab2a1c8d8f1a01eeee79cb9360d8cf08a7db7540814d7fe70a126778fc95719",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn115view13",
+          "observation": {
+            "statement": "Unreal Engine's homepage describes a real-time creation platform for games, film, visualization and interfaces and reports Unreal Engine 5.8 availability on 23 June 2026.",
+            "span": "turn116view4 lines 4–61",
+            "limitations": "Vendor marketing and dated product news; the linked licensing terms, platform agreements and current technical limits were not acquired.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Game Engines",
+        "AAA"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-112ed389377cc186b54db29623b185be0079341c0ed736d0e100ed413d53cc4e",
+          "url": "https://www.cryengine.com/",
+          "representation_sha256": "58840a859444908d2445e01d846366076fdaea8eb6e32ab4d0a2973ecedc0a69",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn115view12",
+          "observation": {
+            "statement": "CRYENGINE's homepage presents Sandbox world editing, real-time PBR lighting, physics, audio middleware integration, particles, animation and high-end platform support.",
+            "span": "turn116view3 lines 3–43",
+            "limitations": "Vendor marketing centered on CRYENGINE 5.6; licensing, current platform access and production performance were not independently verified.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Engines**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-112ed389377cc186b54db29623b185be0079341c0ed736d0e100ed413d53cc4e",
+          "url": "https://www.cryengine.com/",
+          "representation_sha256": "58840a859444908d2445e01d846366076fdaea8eb6e32ab4d0a2973ecedc0a69",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn115view12",
+          "observation": {
+            "statement": "CRYENGINE's homepage presents Sandbox world editing, real-time PBR lighting, physics, audio middleware integration, particles, animation and high-end platform support.",
+            "span": "turn116view3 lines 3–43",
+            "limitations": "Vendor marketing centered on CRYENGINE 5.6; licensing, current platform access and production performance were not independently verified.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-114ebb5bf537c17b5132d2cbedd9c72282a94de5e5b4f99a58c58915d47cc850",
+          "url": "https://www.unrealengine.com/",
+          "representation_sha256": "eab2a1c8d8f1a01eeee79cb9360d8cf08a7db7540814d7fe70a126778fc95719",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn115view13",
+          "observation": {
+            "statement": "Unreal Engine's homepage describes a real-time creation platform for games, film, visualization and interfaces and reports Unreal Engine 5.8 availability on 23 June 2026.",
+            "span": "turn116view4 lines 4–61",
+            "limitations": "Vendor marketing and dated product news; the linked licensing terms, platform agreements and current technical limits were not acquired.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "Kotlin"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-112fd0053fd49c3992b3b37e07808ad2b2823b965cdaf8a670215e454b87d193",
+          "url": "https://github.com/fabmax/kool",
+          "representation_sha256": "d90fa6046917dbe6f6f13a9746f28b84597c3e2908342ec135102c75ce6f5b70",
+          "source_revision": "7c95ee922a31b15990c9615ae1824f472de308c2",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "The redirected kool repository describes a Kotlin graphics engine using Vulkan, WebGPU and OpenGL across desktop Java, Android and browsers; the root LICENSE is Apache-2.0.",
+            "span": "README.md and LICENSE at the recorded selected revision",
+            "limitations": "The catalog owner path redirected from fabmax to kool-engine. Platform, driver, dependency, sample and trademark scope remain separate.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Demos",
+        "Godot 4"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-11309342872b877c3e67501b224e05bd353de846fdf269c8fc8543dc99bfd512",
+          "url": "https://github.com/Zylann/voxelgame",
+          "representation_sha256": "18d4e3cca4769ac7a9e1450cfa4551b8ad48c3e221de00734ad5183f98c6f1cd",
+          "source_revision": "4cf747a8456375e527c8c976c50fb24446f9d18f",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "voxelgame describes Godot 4.4 demo scenes for blocky and smooth voxel terrain and depends on a separate C++ voxel module; its LICENSE.md carries MIT terms.",
+            "span": "README.md and LICENSE.md at the recorded selected revision",
+            "limitations": "A demo and dependency reference are not production-readiness evidence; the voxel module and any assets require separate review.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Plugins and scripts",
+        "Godot 2"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1144281c389adfb89b0410232d0b99c0360ed957b66871cb637933950286ae91",
+          "url": "https://github.com/marcosbitetti/grass_plugin_4_godot",
+          "representation_sha256": "ead7c1aee201ffe0c486ae07c936e387e727b592aec82a9c88ea0a6ceb0dc6e7",
+          "source_revision": "4ba853a8a88dfab8d784468882793477eb1eedb9",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "grass_plugin_4_godot describes a Godot vegetation plugin and makes a project-specific performance claim; its README states CC BY-SA 4.0 terms.",
+            "span": "README.md at the recorded selected revision",
+            "limitations": "No standalone root license file was captured; the performance statement was not reproduced, and share-alike/attribution scope requires review.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "C++"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-11456a5160969485ba452a452d1467bb518ee37921dae9a8ad05691c3efb13cc",
+          "url": "https://github.com/cinder/Cinder",
+          "representation_sha256": "b9c47a2bc51812d7821f2fce5b2d7a6d8b6d81556034370aef681ff43ddb3e4d",
+          "source_revision": "f90f332d1a4d453282c76435f3401271f25922f9",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "Cinder describes a peer-reviewed open-source C++ creative-coding library, notes recursive submodules, and carries a Modified BSD-style COPYING file.",
+            "span": "README.md and COPYING at the recorded selected revision",
+            "limitations": "Peer-reviewed is the project's characterization, not evidence of academic peer review; submodules and packaged downloads require separate rights review.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Tools / Software",
+        "Level Editors"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-11472dae6fa8106854d995f42774d3725b182ad9c9dea584097fc0bd071aadd3",
+          "url": "https://github.com/TTimo/GtkRadiant",
+          "representation_sha256": "0e6321a6ada515e4bea9ce6ee991c1462d1bd9b6d5e1a49fafff1a62642bc826",
+          "source_revision": "270af88f3c2471f6773bded0b5760a3115b52965",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "GtkRadiant describes an open-source cross-platform level editor for id Tech games with map compilers and authoring tools; the captured GPL file is GPL-2.0 text.",
+            "span": "README.md and GPL at the recorded selected revision",
+            "limitations": "Editor source rights do not transfer rights in supported games, maps, textures, trademarks or proprietary data.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Table of Contents",
+        "Engines and Frameworks"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-114ebb5bf537c17b5132d2cbedd9c72282a94de5e5b4f99a58c58915d47cc850",
+          "url": "https://www.unrealengine.com/",
+          "representation_sha256": "eab2a1c8d8f1a01eeee79cb9360d8cf08a7db7540814d7fe70a126778fc95719",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn115view13",
+          "observation": {
+            "statement": "Unreal Engine's homepage describes a real-time creation platform for games, film, visualization and interfaces and reports Unreal Engine 5.8 availability on 23 June 2026.",
+            "span": "turn116view4 lines 4–61",
+            "limitations": "Vendor marketing and dated product news; the linked licensing terms, platform agreements and current technical limits were not acquired.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Games",
+        "2D",
+        "Godot 3"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-115a896ff5333e8970b2e1257d8f5b85cae8cf3f7e4d92910b196ea25440a536",
+          "url": "https://github.com/EmilienLeroy/FallingSquare",
+          "representation_sha256": "efa1ea6091d4bb0a7236fec29b79273b066b9249d0a77f277b735e9bc6e80f9b",
+          "source_revision": "a757ce1887812ea991a876cc91a091634d439980",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "Falling Square describes a Godot mobile game in which the player touches random squares before they explode and states MIT licensing in its README.",
+            "span": "README.md at the recorded selected revision",
+            "limitations": "No standalone root license file was captured; store listings, branding, icons, screenshots and bundled assets require separate review.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Learning",
+        "Engine Development"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-116a09c11dc697aae108e1af3beddda450d4ca8fd38e4f28ca8c8b8cf50c810a",
+          "url": "https://www.3dgep.com/",
+          "representation_sha256": "aecdba9f715bbe5e3b3c2314fc41c74817dcaf502fbb1c291f34e0a8594ef59b",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn115view14",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-116a09c11dc697aae108e1af3beddda450d4ca8fd38e4f28ca8c8b8cf50c810a",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Code**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-118f179271c9fe1bd8414007ef9eb632653d1b77257e2c17164e4603aaa7067a",
+          "url": "http://www.tapirgames.com/blog/open-source-physics-engines",
+          "representation_sha256": "9d465bd5f1ba2e44153033a357cd9f64f8ee9a239d78ea2cb30cbb8147e2b815",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn115view15",
+          "observation": {
+            "statement": "Tapir Games' list groups many open-source physics engines and ports by dimension and implementation language, including Box2D, Bullet, Jolt, Rapier and JavaScript ports.",
+            "span": "turn116view5 lines 6–61",
+            "limitations": "Secondary catalog; entries may be stale, duplicated, renamed or differently licensed. Every repository, version, benchmark and rights claim needs primary-source verification.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Frameworks/Engines/Libraries"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-11a9984670e2cae41d4c8af52a47b84270399aa0a008a0038c86d087365d1c02",
+          "url": "https://github.com/mrdoob/three.js",
+          "representation_sha256": "f13ad276e0f4f1f456b04d6a88b22ba43450c6acd3167425f9404b4b32608a02",
+          "source_revision": "180fe50ef3cd4c2863729ec9b6b699635dc9483b",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "three.js describes an easy-to-use cross-browser JavaScript 3D library whose current builds include WebGL and WebGPU renderers, with SVG and CSS3D available as add-ons; its root LICENSE is MIT.",
+            "span": "README.md and LICENSE at the recorded selected revision",
+            "limitations": "Examples, add-ons, loaders, bundled assets and dependencies may carry separate terms.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Browser-Based",
+        "Arcade"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-11f99b46d3fe2ce2795b18ffa41c36b372b33068abfaa6a3f1fc09000ab5f09d",
+          "url": "http://www.varunpant.com/static/resources/CrappyBird/index.html",
+          "representation_sha256": "93a4874c23e23fbb920ec9e078a40015d80c3738460ed32f9dbf2ba7e0b8f49c",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn115view17",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-11f99b46d3fe2ce2795b18ffa41c36b372b33068abfaa6a3f1fc09000ab5f09d",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    }
+  ]
+}

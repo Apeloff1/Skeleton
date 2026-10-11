@@ -2,8 +2,8 @@
   "schema": "skeleton.dragon.almanac_acquisition_progress.v1",
   "registry_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
   "ordering": "source_id_ascending",
-  "next_source_offset": 288,
-  "reviewed_candidate_count": 288,
+  "next_source_offset": 320,
+  "reviewed_candidate_count": 320,
   "entries": [
     {
       "source_id": "source-0017fcb9b1445e4f0a6949fb81b3fe01159175a23ca300ff1350938c2b2a0974",
@@ -2596,33 +2596,321 @@
       "availability": "page_representation_returned",
       "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
       "approved": false
+    },
+    {
+      "source_id": "source-10669a4a2b44d84c6d2b3840b128001ad82f600a611f241aec95fa050049af4e",
+      "source_offset": 288,
+      "url": "https://github.com/kripken/box2d.js/",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-10904fa09b01c5695b3a47a997aa77a61bdad564b3bac4f1fb1a3be0321902af",
+      "source_offset": 289,
+      "url": "https://github.com/KOBUGE-Games/Ninja-Training",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1098456a4f897ced38a1c0e59aeaa157fcba5d895bdd8cb3ad2e1d3f94a9d401",
+      "source_offset": 290,
+      "url": "https://gitlab.com/SuperTuxParty/SuperTuxParty",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-109e4bcc1dd91813411d65668c0d881595b4b659a7d754880f3f4eb4323f734b",
+      "source_offset": 291,
+      "url": "http://www.ted.com/talks/seth_priebatsch_the_game_layer_on_top_of_the_world):",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-10a0001856c71a41c15ad407b980d6bc2ab4269d262b831ac209535ee769f4cc",
+      "source_offset": 292,
+      "url": "https://www.gabrielgambetta.com/client-server-game-architecture.html",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-10ab5219ec17afb9ffcd89d100d7a39514cede752f6e23ccbd69ab3d5ed0075b",
+      "source_offset": 293,
+      "url": "https://iosicongallery.com/",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-10bdf9b9bb560c5070da500b80dbf453484b7a4991a98dae6fcd243756f85231",
+      "source_offset": 294,
+      "url": "https://github.com/AndreMicheletti/godot-agones-sdk",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-10c38833207c9dae614d56b5f1b3e52ab7f02323a5b9d583372dfb8cc137ce6c",
+      "source_offset": 295,
+      "url": "https://www.blender.org/",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-10d6a5c9a429e67a47d4a19e94ecd11a0bd45f770386c8ee751f355aeb68c3e5",
+      "source_offset": 296,
+      "url": "https://github.com/aBARICHELLO/godot-ci",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-10dfcbe56f0cce2b4ad838c82cf3be1cdd0c27fe7ccee425d472f918a5105107",
+      "source_offset": 297,
+      "url": "https://github.com/michal-z/zig-gamedev",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-10e9981ffd78d234412c7955780555121390b05b51a918a08ae9df3501e4dd69",
+      "source_offset": 298,
+      "url": "http://gamejolt.com/games/puzzle/beatrix/27454/",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-10eda8bf56ab43b7cb23fb60533c03193f239e00f89d0958a1d0878acc73a21d",
+      "source_offset": 299,
+      "url": "https://www.gamasutra.com/view/news/264301/The_minimalist_sound_design_of_The_Witness.php",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "target_mismatch",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-10f1f04a5a2056a9d426a38d1791ead621fa20adecf51676cb9bd9c5b2711769",
+      "source_offset": 300,
+      "url": "https://www.alanzucconi.com/2021/05/24/accessibility-in-videogames/",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-10f5e8272792e898711a94b68da145e4b316c4c8612820961252f7915b3b977d",
+      "source_offset": 301,
+      "url": "https://github.com/RyanNielson/awesome-unity/blob/master/CONTRIBUTING.md",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "source_file_and_repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-10fa951e5ad04e5d847d65c8c774417327936d4b8faad8efef370aae90e87ec0",
+      "source_offset": 302,
+      "url": "https://docs.unity3d.com/Packages/com.unity.textmeshpro@1.3/manual/index.html",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-110132a904c9ffbe62f7dcbcf4dfbb5c77c847c219dafedc45cf8aa6d77319ff",
+      "source_offset": 303,
+      "url": "https://www.youtube.com/watch?v=qwPe3OHR04c%29%3A",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-11015432f736f937f62267a5a494cf07519c359bac77d3f092a5b48942f6e0b9",
+      "source_offset": 304,
+      "url": "https://madewith.unity.com/stories/making-descendant",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-110511923a49f696234eb412e877cf2f515ea4c22c549ed052bf53edcb3dc4fe",
+      "source_offset": 305,
+      "url": "https://unity.com/",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-112ed389377cc186b54db29623b185be0079341c0ed736d0e100ed413d53cc4e",
+      "source_offset": 306,
+      "url": "https://www.cryengine.com/",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-112fd0053fd49c3992b3b37e07808ad2b2823b965cdaf8a670215e454b87d193",
+      "source_offset": 307,
+      "url": "https://github.com/fabmax/kool",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-11309342872b877c3e67501b224e05bd353de846fdf269c8fc8543dc99bfd512",
+      "source_offset": 308,
+      "url": "https://github.com/Zylann/voxelgame",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1144281c389adfb89b0410232d0b99c0360ed957b66871cb637933950286ae91",
+      "source_offset": 309,
+      "url": "https://github.com/marcosbitetti/grass_plugin_4_godot",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-11456a5160969485ba452a452d1467bb518ee37921dae9a8ad05691c3efb13cc",
+      "source_offset": 310,
+      "url": "https://github.com/cinder/Cinder",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-11472dae6fa8106854d995f42774d3725b182ad9c9dea584097fc0bd071aadd3",
+      "source_offset": 311,
+      "url": "https://github.com/TTimo/GtkRadiant",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-114ebb5bf537c17b5132d2cbedd9c72282a94de5e5b4f99a58c58915d47cc850",
+      "source_offset": 312,
+      "url": "https://www.unrealengine.com/",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-115a896ff5333e8970b2e1257d8f5b85cae8cf3f7e4d92910b196ea25440a536",
+      "source_offset": 313,
+      "url": "https://github.com/EmilienLeroy/FallingSquare",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-116a09c11dc697aae108e1af3beddda450d4ca8fd38e4f28ca8c8b8cf50c810a",
+      "source_offset": 314,
+      "url": "https://www.3dgep.com/",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-118576e3b4afab097e63f68b2289bef9185efc7d065608a46f78d959f1510091",
+      "source_offset": 315,
+      "url": "https://github.com/godothub/konado",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-118f179271c9fe1bd8414007ef9eb632653d1b77257e2c17164e4603aaa7067a",
+      "source_offset": 316,
+      "url": "http://www.tapirgames.com/blog/open-source-physics-engines",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-11a9984670e2cae41d4c8af52a47b84270399aa0a008a0038c86d087365d1c02",
+      "source_offset": 317,
+      "url": "https://github.com/mrdoob/three.js",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-11f08cb7eaab0fdc5ad3e9b67e62bcb5d78ca29c3534c3ae6be812f020711536",
+      "source_offset": 318,
+      "url": "https://gamedesignskills.com/game-design/worldbuilding/",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-11f99b46d3fe2ce2795b18ffa41c36b372b33068abfaa6a3f1fc09000ab5f09d",
+      "source_offset": 319,
+      "url": "http://www.varunpant.com/static/resources/CrappyBird/index.html",
+      "checked_at": "2026-10-11T12:11:03.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "approved": false
     }
   ],
   "whole_web_complete": false,
   "notes": "First-pass cursor counts candidate checks, not canonical approval. Every unresolved source remains blocked in its batch evidence. Registry unchanged; worldwide denominator unknown.",
-  "checked_candidate_count": 288,
+  "checked_candidate_count": 320,
   "approved_source_count": 0,
   "distilled_source_count": 0,
   "last_batch_counts": {
     "newly_checked": 32,
-    "fetched_representations": 22,
-    "repository_metadata": 10,
-    "target_page_representations": 8,
-    "metadata_shells": 4,
-    "source_files": 0,
-    "retrieval_failed": 10,
+    "fetched_representations": 23,
+    "repository_metadata": 14,
+    "target_page_representations": 9,
+    "metadata_shells": 0,
+    "source_files": 1,
+    "retrieval_failed": 9,
     "blocked_from_admission": 32,
     "distilled": 0,
     "approved": 0,
-    "additional_license_files_fetched": 7,
+    "additional_license_files_fetched": 13,
     "license_file_fetch_failures": 3,
-    "exact_source_files_fetched": 0,
-    "auxiliary_identity_or_rights_files_fetched": 17,
+    "exact_source_files_fetched": 1,
+    "auxiliary_identity_or_rights_files_fetched": 27,
     "git_blob_identities_api_matched": 0,
-    "git_blobs_locally_reproduced": 17,
+    "git_blobs_locally_reproduced": 28,
     "git_blobs_text_normalization_mismatch": 0
   },
-  "last_batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
-  "last_updated_at": "2026-10-11T11:15:05.000Z",
+  "last_batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+  "last_updated_at": "2026-10-11T12:11:03.000Z",
   "reviewed_candidate_count_definition": "Legacy field counts first-pass candidate checks only; it does not mean independent source review or approval."
 }
