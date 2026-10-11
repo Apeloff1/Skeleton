@@ -35,8 +35,8 @@ CREATE TABLE IF NOT EXISTS dragon_original_candidate_v1(
    playable_world_digest TEXT NOT NULL,
    content_sha256 TEXT NOT NULL,
    source_receipt TEXT NOT NULL,
-   candidate_status TEXT NOT NULL DEFAULT 'source_playable_only'
-      CHECK(candidate_status='source_playable_only'),
+   candidate_status TEXT NOT NULL DEFAULT 'underbuilt_source_draft'
+      CHECK(candidate_status IN ('source_playable_only','underbuilt_source_draft')),
    CHECK(original_nucleus>=0 AND original_nucleus<4294967296)
 )
 """
@@ -74,6 +74,8 @@ def materialize_batch(
     _request(start,count,routes,steps,branch_seed)
     _open(db)
     written=0
+    genuinely_playable=0
+    underbuilt=0
     verified=0
     chain=[]
     # SQLite context manager makes the *entire batch* atomic. It never
@@ -88,6 +90,9 @@ def materialize_batch(
                 raise ValueError("original game failed independent gameplay verification")
             receipt=_canonical(asdict(candidate))
             digest=_sha(receipt)
+            candidate_status=(
+                "source_playable_only" if candidate.core_loop_viable
+                else "underbuilt_source_draft")
             row=db.execute(
                 "SELECT gameplay_source_digest,playable_world_digest,"
                 "content_sha256,source_receipt,candidate_status "
@@ -97,7 +102,7 @@ def materialize_batch(
             if row:
                 if row!=(
                     candidate.source_digest,candidate.world_source_digest,
-                    digest,receipt,"source_playable_only",
+                    digest,receipt,candidate_status,
                 ):
                     raise PermissionError(
                         "original game candidate already exists with another "
@@ -109,15 +114,22 @@ def materialize_batch(
                     "(original_nucleus,gameplay_source_digest,"
                     "playable_world_digest,content_sha256,"
                     "source_receipt,candidate_status) "
-                    "VALUES(?,?,?,?,?,'source_playable_only')",
+                    "VALUES(?,?,?,?,?,?)",
                     (index,candidate.source_digest,
-                     candidate.world_source_digest,digest,receipt),
+                     candidate.world_source_digest,digest,receipt,
+                     candidate_status),
                 )
                 written+=1
+                if candidate.core_loop_viable:
+                    genuinely_playable+=1
+                else:
+                    underbuilt+=1
             chain.append((index,digest))
     return {
         "schema":SCHEMA,"requested":count,
-        "new_original_playable_prototypes":written,
+        "new_original_source_candidates":written,
+        "new_original_playable_prototypes":genuinely_playable,
+        "new_underbuilt_drafts":underbuilt,
         "independently_verified_existing_prototypes":verified,
         "start":start,"end_exclusive":start+count,
         "content_chain_sha256":_sha(_canonical(chain)),
@@ -148,7 +160,8 @@ def audit_batch(db:sqlite3.Connection,*,start:int,count:int,
     if len(rows)!=count:
         raise ValueError("original candidate evidence batch incomplete")
     for number,digest,document,status in rows:
-        if status!="source_playable_only" or _sha(document)!=digest:
+        if (status not in ("source_playable_only","underbuilt_source_draft")
+                or _sha(document)!=digest):
             raise PermissionError("original source game receipt was altered")
         claim=json.loads(document)
         if claim.get("original_nucleus")!=number or claim.get("schema")!=PROTOTYPE_SCHEMA:
@@ -163,6 +176,9 @@ def audit_batch(db:sqlite3.Connection,*,start:int,count:int,
             routes=len(route_list),
             steps=len(route_list[0]["actions"]),
         )
+        if (("source_playable_only" if fresh.core_loop_viable
+             else "underbuilt_source_draft")!=status):
+            raise PermissionError("saved candidate deceptively claims playable quality")
         if _canonical(asdict(fresh))!=document:
             raise PermissionError(
                 "original candidate source, choices, outcomes or world changed"
