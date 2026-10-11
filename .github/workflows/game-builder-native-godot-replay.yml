@@ -8,6 +8,7 @@ on:
       - "tests/test_game_builder_dual_runtime.py"
       - "tests/test_game_builder_authored_tiles.py"
       - "tests/test_game_builder_tile_editor.py"
+      - "tests/test_game_builder_studio_pipeline.py"
       - ".github/workflows/game-builder-native-godot-replay.yml"
   push:
     branches: [main]
@@ -15,6 +16,7 @@ on:
       - "skeleton/ai/game_builder/**"
       - "tests/test_game_builder_dual_runtime.py"
       - "tests/test_game_builder_authored_tiles.py"
+      - "tests/test_game_builder_studio_pipeline.py"
       - ".github/workflows/game-builder-native-godot-replay.yml"
   workflow_dispatch:
 
@@ -63,10 +65,15 @@ jobs:
           skeleton/ai/game_builder/authored_tiles.py
           tests/test_game_builder_dual_runtime.py
           tests/test_game_builder_authored_tiles.py
+          skeleton/ai/game_builder/studio_tool_fabric.py
+          skeleton/ai/game_builder/mirror_room_runtime.py
+          skeleton/ai/game_builder/original_game_studio.py
+          skeleton/ai/game_builder/original_game_studio_cli.py
+          tests/test_game_builder_studio_pipeline.py
       - name: Run actual Godot native winning replays
         run: |
           set -euo pipefail
-          python -m unittest             tests.test_game_builder_dual_runtime             tests.test_game_builder_authored_tiles             tests.test_game_builder_tile_editor -v
+          python -m unittest             tests.test_game_builder_dual_runtime             tests.test_game_builder_authored_tiles             tests.test_game_builder_tile_editor             tests.test_game_builder_studio_pipeline -v
       - name: Create reproducible native desktop release fixture
         run: |
           set -euo pipefail
