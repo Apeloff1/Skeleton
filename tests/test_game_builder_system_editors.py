@@ -9,6 +9,9 @@ import threading
 import unittest
 
 from skeleton.ai.game_builder.game_project_workspace import GameWorkspace, WorkspaceError
+from skeleton.ai.game_builder.system_editor_assembly import (
+    AssemblyError, compile_system_assembly, assemble_workspace_systems,
+)
 from skeleton.ai.game_builder.game_workspace_server import create_workspace_server
 from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html
 from skeleton.ai.game_builder.system_editors import (
@@ -187,10 +190,80 @@ class StudioIntegrationTests(unittest.TestCase):
         html=render_workspace_html("Z"*32).decode()
         for token in ('id="system-kind"', 'id="system-fields"',
                       'id="system-stage"', 'id="system-try"',
+                      'id="system-assembly"',
                       "Review proposed edit","Content-Security-Policy"):
             self.assertIn(token,html)
         self.assertNotIn("https://",html)
 
+
+class AssemblyContractTests(unittest.TestCase):
+    def test_hybrid_assembly_evidence_and_order_are_deterministic(self):
+        docs = [
+            make_editor_document("platformer", {"gravity": 10}),
+            make_editor_document("physics", {"gravity": 10}),
+            make_editor_document("rpg"),
+            make_editor_document("npc_society", {"population": 40, "active_npcs": 20}),
+            make_editor_document("platform_profile", {"npc_active_budget": 20}),
+            make_editor_document("dialogue", {"speakers": 12}),
+        ]
+        first = compile_system_assembly("original-hybrid", docs, authorized=True)
+        second = compile_system_assembly("original-hybrid", docs[::-1], authorized=True)
+        self.assertEqual(first, second)
+        self.assertEqual(first["source_system_count"], 6)
+        self.assertEqual([r["editor"] for r in first["prototype_evidence"]], ["platformer"])
+        self.assertFalse(first["ready_for_release"])
+        self.assertTrue(first["coupling_edges"])
+        self.assertTrue(all(not link["adapter_ready"] for link in first["coupling_edges"]))
+        self.assertEqual(len(first["digest"]), 64)
+        with self.assertRaises(PermissionError):
+            compile_system_assembly("original-hybrid", docs, authorized=False)
+        with self.assertRaises(AssemblyError):
+            compile_system_assembly("original-hybrid", docs + [docs[0]], authorized=True)
+
+    def test_cross_system_incompatibilities_rejected(self):
+        for documents in (
+            [make_editor_document("npc_society", {"active_npcs": 70}),
+             make_editor_document("platform_profile", {"npc_active_budget": 20})],
+            [make_editor_document("npc_society", {"population": 10, "active_npcs": 10}),
+             make_editor_document("dialogue", {"speakers": 30})],
+            [make_editor_document("physics", {"gravity": 20}),
+             make_editor_document("platformer", {"gravity": 3})],
+            [make_editor_document("networking", {"authority": "local_only", "max_players": 3})],
+            [make_editor_document("networking", {"authority": "lockstep", "rollback_frames": 8})],
+            [make_editor_document("sandbox"),
+             make_editor_document("save_system", {"autosave_minutes": 0})],
+            [make_editor_document("audio", {"channels": 2, "dynamic_layers": 8}),
+             make_editor_document("rhythm")],
+        ):
+            with self.subTest(systems=[v["editor"] for v in documents]):
+                with self.assertRaises(AssemblyError):
+                    compile_system_assembly("product-suite", documents, authorized=True)
+
+    def test_current_workspace_assembly_only_after_human_review(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            work = GameWorkspace.create(Path(tmp)/"game", authorized=True)
+            work.create_project("hybrid_one", "hybrid", authorized=True)
+            empty="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            for name in ("racing", "tactics"):
+                proposal = work.propose(
+                    "hybrid_one", editor_path(name), editor_source(name),
+                    expected_sha256=empty,
+                    reason="Stage and review the new original genre system",
+                    authorized=True,
+                )
+                # Unapproved proposals cannot appear in the assembled project.
+                if name == "racing":
+                    with self.assertRaises(AssemblyError):
+                        assemble_workspace_systems(work, "hybrid_one", authorized=True)
+                work.commit(proposal["proposal_id"], human_approved=True, authorized=True)
+            report=assemble_workspace_systems(work, "hybrid_one", authorized=True)
+            self.assertEqual(report["source_system_count"],2)
+            self.assertEqual(len(report["prototype_evidence"]),2)
+            self.assertIn("racing", report["source_order"])
+            self.assertIn("tactics", report["source_order"])
+            self.assertFalse(report["ready_for_release"])
+            self.assertRaises(PermissionError, assemble_workspace_systems,
+                              work, "hybrid_one", authorized=False)
 
 if __name__=="__main__":
     unittest.main()
