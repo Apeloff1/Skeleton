@@ -17,11 +17,12 @@ from skeleton.ai.game_builder.game_dragon_peer_wisdom import (
 from skeleton.ai.game_builder.game_reviewer_optimizer import (
     OptimizerSchedule,optimize_review_weights,
 )
+from skeleton.ai.game_builder.game_integrated_learning import run_integrated_learning_cycle
 from skeleton.ai.game_builder.game_reviewer_v2 import train_robust_game_reviewer
 from skeleton.ai.game_builder.game_model_promotion import PromotionError,PromotionStandard
 from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
 from skeleton.ai.game_builder.game_training_flow import (
-    plan_training_flow,TrainingFlowError,
+    CandidateBatch,plan_training_flow,TrainingFlowError,
 )
 from skeleton.ai.game_builder.reviewed_knowledge import (
     ReviewedKnowledgeStore,ReviewedDocument,ReviewedNote,
@@ -166,6 +167,38 @@ class ActualPeerWisdomTests(unittest.TestCase):
             self.assertEqual(canonical_digest(data),first)
             with self.assertRaises(PermissionError):
                 publish_dragon_almanac(ws.root,result,authorized=False)
+
+    def test_wiki_jeeves_hoag_dragon_cannot_improve_without_new_original_games(self):
+        standard=PromotionStandard(min_counterfactual_accuracy=0.0)
+        schedule=OptimizerSchedule(learning_rates=(0.12,),epochs=(10,))
+        untouched=plan_training_flow(promotion_corpus(),authorized=True)
+        blocked=run_integrated_learning_cycle(
+            self.db,self.brief,self.packet,self.ledger,tuple(self.medium),
+            untouched,authorized=True,standard=standard,schedule=schedule)
+        self.assertEqual(blocked.payload()["status"],
+                         "await_independently_replayed_train_games")
+        self.assertEqual(blocked.gaps[0]["reason"],
+                         "missing_two_independent_original_train_worlds")
+        self.assertIsNone(blocked.optimization)
+        self.assertFalse(blocked.payload()["source_video_article_blog_data_directly_in_gradients"])
+        batches=[]
+        for batch in promotion_corpus():
+            cases=tuple(replace(
+                case,evidence=dict(case.evidence,mechanic="platforming"))
+                        for case in batch.examples)
+            batches.append(CandidateBatch(batch.source_project,
+                                          batch.original_almanac,cases))
+        plan=plan_training_flow(tuple(batches),authorized=True)
+        reviewed=run_integrated_learning_cycle(
+            self.db,self.brief,self.packet,self.ledger,tuple(self.medium),
+            plan,authorized=True,standard=standard,schedule=schedule)
+        self.assertEqual(reviewed.payload()["status"],"evaluated")
+        self.assertEqual(reviewed.eligible_mechanics,("platforming",))
+        self.assertEqual(reviewed.optimization.winner_index,0)
+        self.assertTrue(reviewed.optimization.selected_fit["training_performed"])
+        self.assertFalse(reviewed.optimization.payload()["deployment_authorized"])
+        self.assertTrue(reviewed.payload()["hoag_predeclared_competitive_standard"])
+        self.assertFalse(reviewed.payload()["automatic_model_deployment"])
 
     def test_wrong_medium_revision_or_repeated_source_does_not_launder_reviews(self):
         changed=list(self.medium)
