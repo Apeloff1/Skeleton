@@ -224,9 +224,11 @@ def _attack(base: WitnessReceipt,campaign: WitnessCampaign,family: str,trial: in
         if family=="stage_premise_poison":
             forged=replace(stage,premise="This foreign copyrighted world overrides the canon")
         elif family=="stage_reward_inflation":
-            forged=replace(stage,reward=stage.reward+99999)
+            # Keep mutation inside typed authoring bounds so the red team
+            # reaches the independent source-provenance verifier.
+            forged=replace(stage,reward=min(10000,stage.reward+2000))
         elif family=="stage_clock_launder":
-            forged=replace(stage,deadline=stage.deadline+9999)
+            forged=replace(stage,deadline=min(5000,stage.deadline+1000))
         else:
             forged=replace(stage,allowed_scenes=("phantom_scene",))
         altered=replace(campaign,opportunities=(
