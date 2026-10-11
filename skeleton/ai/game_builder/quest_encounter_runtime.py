@@ -254,33 +254,33 @@ def encounter_verify(spec: EncounterSpec, replay: EncounterReplay) -> None:
 def demonstrate_encounter(spec: EncounterSpec, *, authorized: bool) -> EncounterReplay:
     if not authorized:
         raise PermissionError("encounter solver requires authority")
+    if not isinstance(spec, EncounterSpec):
+        raise EncounterError("typed original encounter required")
+    state = encounter_initial(spec)
+    moves: list[str] = []
     if spec.kind.startswith("escort"):
-        actions=[]
-        path=spec.path
-        for previous,point in zip(path,path[1:]):
-            dx=point[0]-previous[0]
-            dy=point[1]-previous[1]
-            actions.append(next(name for name,offset in DIRS.items()
-                                if offset==(dx,dy)))
-        actions.append("introduce" if spec.kind=="escort_introduction" else "wait")
+        for previous, point in zip(spec.path, spec.path[1:]):
+            if state.status != "playing":
+                break
+            dx, dy = point[0] - previous[0], point[1] - previous[1]
+            action = next(name for name, offset in DIRS.items()
+                          if offset == (dx, dy))
+            state = encounter_advance(spec, state, action, authorized=True)
+            moves.append(action)
+        if spec.kind == "escort_introduction" and state.status == "playing":
+            state = encounter_advance(spec, state, "introduce", authorized=True)
+            moves.append("introduce")
     else:
-        actions=["reinforce"] if spec.waves>4 else []
-        actions.extend("attack" for _ in range(spec.waves+2))
-    replay=encounter_play(spec,actions,authorized=True)
-    if replay.final.status != "won":
-        if not spec.kind.startswith("escort"):
-            # Stop on first winning round; don't submit terminal actions.
-            moves=[]
-            state=encounter_initial(spec)
-            for action in (["reinforce"] if spec.waves>4 else [])+["attack"]*spec.waves:
-                if state.status != "playing":
-                    break
-                state=encounter_advance(spec,state,action,authorized=True)
-                moves.append(action)
-            replay=encounter_play(spec,moves,authorized=True)
+        if spec.waves > 4:
+            state = encounter_advance(spec, state, "reinforce", authorized=True)
+            moves.append("reinforce")
+        while state.status == "playing" and len(moves) < MAX_ACTIONS:
+            state = encounter_advance(spec, state, "attack", authorized=True)
+            moves.append("attack")
+    replay = encounter_play(spec, moves, authorized=True)
     if replay.final.status != "won":
         raise EncounterError("encounter has no demonstrated winning playthrough")
-    encounter_verify(spec,replay)
+    encounter_verify(spec, replay)
     return replay
 
 
