@@ -55,7 +55,7 @@ jobs:
       - name: Compile atlas and simulation modules
         run: python -m compileall -q skeleton/game/generation
       - name: Verify originals, styles and rule simulations
-        run: python -m pytest -q --noconftest tests/test_original_world_mechanic_atlas.py tests/test_original_world_simulator.py tests/test_original_world_campaign.py tests/test_original_world_campaign_cli.py tests/test_original_world_nexus.py tests/test_original_world_society.py tests/test_original_world_play_cli.py tests/test_original_world_frontier.py tests/test_original_world_frontier_cli.py tests/test_original_world_era_runtime.py tests/test_original_world_era_cli.py tests/test_original_foundation_compiler.py tests/test_original_foundation_cli.py tests/test_original_foundation_discovery.py tests/test_original_world_million_compiler.py tests/test_original_world_million_cli.py tests/test_original_world_million_objectives.py
+        run: python -m pytest -q --noconftest tests/test_original_world_mechanic_atlas.py tests/test_original_world_simulator.py tests/test_original_world_campaign.py tests/test_original_world_campaign_cli.py tests/test_original_world_nexus.py tests/test_original_world_society.py tests/test_original_world_play_cli.py tests/test_original_world_frontier.py tests/test_original_world_frontier_cli.py tests/test_original_world_era_runtime.py tests/test_original_world_era_cli.py tests/test_original_foundation_compiler.py tests/test_original_foundation_cli.py tests/test_original_foundation_discovery.py tests/test_original_world_million_compiler.py tests/test_original_world_million_cli.py tests/test_original_world_million_objectives.py tests/test_original_world_million_synergy.py
       - name: Exercise era and theology preview
         run: |
           python -m skeleton.game.generation.original_world_cli --seed gentle-history --era paleolithic --chronology remote-past --theology animist-invented --theme comfort --tone ultra-snuggly --comfort 100 --realism 95 --brief >/dev/null
@@ -146,5 +146,8 @@ jobs:
           python -m skeleton.game.generation.original_world_million_cli --base 0 --form puzzle --arc endless --actions-json '[{"layer":"mode","verb":"toggle","target":0},{"layer":"mode","verb":"toggle","target":2},{"layer":"mode","verb":"pass"},{"layer":"causal","verb":"end_turn"}]' --objectives >/dev/null
           python -m skeleton.game.generation.original_world_cli --advanced-index 1228799 --brief >/dev/null
           python -m skeleton.game.generation.original_world_cli --mode-index 102399 >/dev/null
+      - name: Check authored domain × game-form pressure effects
+        run: |
+          python -m pytest -q --noconftest tests/test_original_world_million_synergy.py
       - name: Confirm exact head
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
