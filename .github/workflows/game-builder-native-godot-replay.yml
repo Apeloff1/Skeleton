@@ -108,10 +108,13 @@ jobs:
           }
           (root / 'intent.json').write_text(json.dumps(body), encoding='utf-8')
           PY
-          python -m skeleton.ai.game_builder.dual_runtime_cli \
+          python -m skeleton.ai.game_builder.original_game_studio_cli \
             --intent "$RUNNER_TEMP/game-builder/intent.json" \
-            --output "$RUNNER_TEMP/game-builder/project" --trusted-local-operator
+            --output "$RUNNER_TEMP/game-builder/project" \
+            --companion-practice 1 --mirror-attempts 64 --trusted-local-operator
           test -s "$RUNNER_TEMP/game-builder/project/godot/export_presets.cfg"
+          test -s "$RUNNER_TEMP/game-builder/project/practice/slot-01/godot/project.godot"
+          test -s "$RUNNER_TEMP/game-builder/project/studio/companion_almanac.json"
       - name: Export runnable Linux and Windows desktop applications
         run: |
           set -euo pipefail
@@ -126,8 +129,18 @@ jobs:
           chmod +x "$builds/original-game.x86_64"
           "$builds/original-game.x86_64" --headless --quit-after 200 -- --verify-proof | tee "$builds/linux-native-replay.txt"
           grep -q NATIVE_REPLAY_OK "$builds/linux-native-replay.txt"
+          # Companion practice games are genuine native titles too, not just
+          # lessons: export and execute the independently replay-proved slot.
+          companion="$RUNNER_TEMP/game-builder/project/practice/slot-01/godot"
+          godot --headless --path "$companion" --import
+          godot --headless --path "$companion" --export-release Linux "$builds/companion-practice.x86_64"
+          godot --headless --path "$companion" --export-release 'Windows Desktop' "$builds/companion-practice.exe"
+          chmod +x "$builds/companion-practice.x86_64"
+          "$builds/companion-practice.x86_64" --headless --quit-after 200 -- --verify-proof | tee "$builds/linux-companion-replay.txt"
+          grep -q NATIVE_REPLAY_OK "$builds/linux-companion-replay.txt"
           cp "$RUNNER_TEMP/game-builder/project/release.json" "$builds/source-release.json"
-          (cd "$builds" && sha256sum original-game.x86_64 original-game*.exe source-release.json > SHA256SUMS)
+          cp "$RUNNER_TEMP/game-builder/project/studio/companion_almanac.json" "$builds/companion-almanac.json"
+          (cd "$builds" && sha256sum original-game.x86_64 original-game*.exe companion-practice.x86_64 companion-practice*.exe source-release.json companion-almanac.json > SHA256SUMS)
       - name: Preserve unsigned desktop release candidates
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
