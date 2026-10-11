@@ -159,3 +159,51 @@ completion gates are:
 That boundary is an intentional integrity requirement: an enormous design
 namespace should support a game-production pipeline, **not substitute for
 verified production deliverables**.
+
+
+## Pathfinding as an engineering primitive, not a cosmetic waypoint
+
+`original_world_tenfold_navigation.py` supplies a deterministic,
+resource-conscious Dijkstra route planner for all ten topologies.
+It calls the **actual navigation transition function**, including
+current changing passages, energy, propellant, oxygen, hazard and
+consent/portal preconditions. A path across disconnected islands is
+not returned without a built ferry service; an uncalibrated pocket
+gateway cannot be bypassed by optimistic map geometry.
+
+Four route objectives are implemented: `balanced`, `fastest`,
+`safest`, and `fuel-frugal`. These are explicit cost preferences,
+not promises of global optimality across future stochastic world
+phases. Search is bounded to 4096 expansions and never guesses
+that a twelve-hour journey can fit four remaining turn actions.
+
+Route plans carry the source location, current phase, current
+event head, exact graph nodes and resource estimates. Executing
+a route rejects a changed source state, performs full immutable
+simulation and returns only if every movement passes. Routes too
+long for the present action budget are provided as **plans only**,
+not partially executed when the user requests atomic travel.
+Changing maze, wind or orbital phases requires re-planning.
+
+```bash
+# Inspect a preflighted, resource-accounted route.
+python -m skeleton.game.generation.original_world_tenfold_cli \
+  --base 0 --form puzzle --architecture lattice --arc sandbox \
+  --route-target 1 --route-priority safest
+
+# Execute only when every route action can be completed this turn.
+python -m skeleton.game.generation.original_world_tenfold_cli \
+  --base 0 --form puzzle --architecture lattice --arc sandbox \
+  --route-target 1 --execute-route
+
+# Calibrate a portal first; only then can the planner enter the pocket.
+python -m skeleton.game.generation.original_world_tenfold_cli \
+  --base 0 --form puzzle --architecture pocket --arc sandbox \
+  --actions-json '[{"layer":"spatial","verb":"attune"}]' \
+  --route-target 12 --execute-route
+```
+
+Interactive play also supports `route N` for an inspectable
+preflight plan and `go N` for an atomic execution attempt.
+Every route taken produces individual event receipts that remain in
+the game's save/replay chain.
