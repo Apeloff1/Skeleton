@@ -92,7 +92,7 @@ class DualRuntimeGameTests(unittest.TestCase):
         self.assertIn('platform="Windows Desktop"', presets)
         self.assertIn('include_filter="*.json"', presets)
         self.assertIn('binary_format/embed_pck=true', presets)
-        self.assertIn('debug/export_console_wrapper=1', presets)
+        self.assertIn('debug/export_console_wrapper=2', presets)
         self.assertNotIn('codesign/enable=true', presets)
         self.assertIn("run/main_scene", self.bundle.files["godot/project.godot"].decode())
         self.assertIn("ExtResource", self.bundle.files["godot/scenes/main.tscn"].decode())
