@@ -1,6 +1,6 @@
 # Original Million-World Forge — executable breadth, not numerical inflation
 
-**Version:** `original-world-million-forge.v1`  
+**Version:** `original-world-million-forge.v1`
 **Status:** Verified abstract offline Python gameplay after the PR-specific workflow
 has passed; native game deliverables remain separate engineering milestones.
 
