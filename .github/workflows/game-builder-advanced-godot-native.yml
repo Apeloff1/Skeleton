@@ -126,9 +126,27 @@ jobs:
           $root = Join-Path $env:RUNNER_TEMP 'advanced-native-puzzles'
           $project = Join-Path $root 'switches/godot'
           $binary = Join-Path $root 'original-advanced-puzzle.exe'
-          & godot --headless --path $project --export-release 'Windows Desktop' $binary
+          # The setup-godot Windows GUI editor can detach without a reliable
+          # synchronous exit code. Use the same pinned official console engine
+          # already required by the repository's Windows native integration.
+          $archive = Join-Path $env:USERPROFILE 'downloads/Godot_v4.4.1-stable_win64.exe.zip'
+          $engineDir = Join-Path $root 'pinned-godot-console'
+          if (-not (Test-Path $archive)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path $archive) | Out-Null
+            Invoke-WebRequest -Uri 'https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_win64.exe.zip' -OutFile $archive -MaximumRedirection 5
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $engineDir -Force
+          $nativeEditor = Get-ChildItem $engineDir -Recurse -Filter '*_console.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -eq $nativeEditor) {
+            throw "Version-pinned official Godot Windows console editor unavailable"
+          }
+          & $nativeEditor.FullName --version
+          if ($LASTEXITCODE -ne 0) { throw "Godot Windows console startup failed" }
+          & $nativeEditor.FullName --headless --path $project --import
+          if ($LASTEXITCODE -ne 0) { throw "Advanced puzzle Windows resource import failed" }
+          & $nativeEditor.FullName --headless --path $project --export-release 'Windows Desktop' $binary
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path $binary)) {
-            throw "Advanced Godot Windows game executable export failed"
+            throw "Advanced Godot Windows console game executable export failed"
           }
           if ((Get-Item $binary).Length -le 1024) {
             throw "Advanced Godot Windows game executable is empty"
