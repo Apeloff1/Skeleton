@@ -162,6 +162,30 @@ def execute_local_tool_plan(
         for row in plan.requests
     ):
         raise ExecutionPlaneError("local executor refuses unanchored or unsupported actions")
+    ids = [row.tool_id for row in plan.requests]
+    if len(ids) != len(set(ids)):
+        raise ExecutionPlaneError("plan cannot execute a tool more than once per run")
+    # Preflight dependency ordering, avoiding partial filesystem work before
+    # a later step fails. CPU/resource budgets were checked above.
+    seen: set[str] = set()
+    for name in ids:
+        deps = {
+            "world.generate": (),
+            "world.authored": (),
+            "game.simulate": ("world.generate", "world.authored"),
+            "game.browser": ("world.generate", "world.authored"),
+            "game.editor": ("world.generate", "world.authored"),
+            "game.godot": ("game.browser", "world.authored"),
+            "mirror.fuzz": ("game.godot",),
+            "release.assess": ("mirror.fuzz",),
+            "package.source": ("mirror.fuzz",),
+            "companion.practice": (),
+        }[name]
+        if deps and not any(dep in seen for dep in deps):
+            raise ExecutionPlaneError(f"{name} lacks prior prerequisite {deps}")
+        if name.startswith("world.") and any(x.startswith("world.") for x in seen):
+            raise ExecutionPlaneError("one original world source per execution")
+        seen.add(name)
     writes = any(row.tool_id == "package.source" for row in plan.requests)
     if writes and (not plan.write_authorized or not isinstance(destination, Path)):
         raise ExecutionPlaneError("package export requires explicit write grant and destination")
@@ -230,7 +254,7 @@ def execute_local_tool_plan(
             if world is None:
                 raise ExecutionPlaneError("editor requires original world")
             from .tile_editor_export import render_tile_editor
-            artifact_digest = render_tile_editor(world, authorized=True).sha256
+            artifact_digest = render_tile_editor(world, authorized=True).source_sha256
         elif row.tool_id == "mirror.fuzz":
             if project is None or package is None:
                 raise ExecutionPlaneError("mirror room requires real compiled browser+native project")
