@@ -39,6 +39,12 @@ class EvolutionProductTests(unittest.TestCase):
         self.assertIn("systems/npc_economy.json",result.files)
         self.assertIn("systems/npc_social_propagation.json",result.files)
         self.assertIn("systems/modular_missions.json",result.files)
+        self.assertIn("systems/original_scene_frames.json",result.files)
+        frames=json.loads(result.files["systems/original_scene_frames.json"])
+        self.assertEqual(len(frames["sampled_scene_frames"]),8)
+        self.assertGreater(len(frames["sampled_cinematic_storyboards"]),0)
+        self.assertFalse(frames["native_cinematic_renderer_verified"])
+
         self.assertIn("systems/capability_graph.json",result.files)
         self.assertIn("systems/quest_routes.json",result.files)
         self.assertIn("game/earned_story_endings.json",result.files)
