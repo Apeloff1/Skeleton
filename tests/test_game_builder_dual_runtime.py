@@ -43,6 +43,9 @@ class DualRuntimeGameTests(unittest.TestCase):
         self.assertEqual(world["world_digest"], self.compiled.world.digest)
         self.assertEqual(trace["world_digest"], self.compiled.world.digest)
         self.assertEqual(manifest["proof_digest"], self.compiled.proof.digest)
+        self.assertEqual(
+            json.loads(self.bundle.files["godot/proof.json"]), trace
+        )
         self.assertEqual(trace["final_state"]["status"], "won")
         self.assertEqual(trace["final_state"]["health"], self.intent.starting_health)
         self.assertEqual(len(world["levels"]), self.intent.levels)
@@ -77,6 +80,7 @@ class DualRuntimeGameTests(unittest.TestCase):
             "func _unhandled_input(", "JOY_BUTTON_DPAD_UP",
             "JOY_BUTTON_DPAD_DOWN", "JOY_BUTTON_B",
             "InputEventScreenTouch", "touch_origin",
+            "func _verify_native_proof()", "NATIVE_REPLAY_OK",
         ):
             with self.subTest(mechanic=mechanic):
                 self.assertIn(mechanic, script)
@@ -154,10 +158,11 @@ class DualRuntimeGameTests(unittest.TestCase):
             )
             result = subprocess.run(
                 [engine, "--headless", "--path", str(output / "godot"),
-                 "--quit-after", "5"],
+                 "--quit-after", "200", "--", "--verify-proof"],
                 capture_output=True, text=True, timeout=45, check=False,
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("NATIVE_REPLAY_OK", result.stdout + result.stderr)
             self.assertNotIn("SCRIPT ERROR", result.stdout + result.stderr)
             self.assertNotIn("Parse Error", result.stdout + result.stderr)
 
