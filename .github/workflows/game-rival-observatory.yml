@@ -5,7 +5,9 @@ on:
       - "skeleton/ai/game_builder/rival_convergence_observatory.py"
       - "skeleton/ai/game_builder/rival_public_monitor.py"
       - "skeleton/ai/game_builder/rival_watch_cli.py"
+      - "skeleton/ai/game_builder/rival_delivery_campaign.py"
       - "tests/test_game_builder_rival_convergence.py"
+      - "tests/test_game_builder_rival_campaign_cli.py"
       - "docs/ai/game_rival_watchlist.json"
       - "docs/ai/game_rival_convergence_design_2026_10.md"
       - ".github/workflows/game-rival-observatory.yml"
@@ -45,6 +47,7 @@ jobs:
             skeleton/ai/game_builder/
             tests/__init__.py
             tests/test_game_builder_rival_convergence.py
+            tests/test_game_builder_rival_campaign_cli.py
             docs/ai/game_rival_watchlist.json
       - name: Python 3.11
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
@@ -55,7 +58,7 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$EXACT_SHA"
           python -m compileall -q skeleton/ai/game_builder
-          python -m unittest tests.test_game_builder_rival_convergence -v
+          python -m unittest tests.test_game_builder_rival_convergence tests.test_game_builder_rival_campaign_cli -v
       - name: Daily metadata-only public watch
         if: matrix.os == 'ubuntu-24.04' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
         shell: bash
