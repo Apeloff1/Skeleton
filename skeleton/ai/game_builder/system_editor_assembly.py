@@ -12,9 +12,10 @@ import re
 from typing import Mapping, Sequence
 
 from .system_editors import (
-    CATALOG, PREVIEW_ACTIONS, SystemEditorError, validate_editor_document,
-    preview_editor,
+    CATALOG, PREVIEW_ACTIONS, ADVANCED_ENGINE_IDS, MINIMUM_PROGRESSION,
+    SystemEditorError, validate_editor_document, preview_editor,
 )
+from .advanced_gameplay_runtime import run_advanced_session
 
 GROUP_ORDER = ("Product", "World", "Simulation", "Strategy", "Action", "Vehicle", "Creative")
 EDGES = (
@@ -118,7 +119,11 @@ def compile_system_assembly(project_id: str,
     ]
     snapshots = [
         {"editor": name, "source_digest": configs[name]["digest"],
-         "preview_mode": "reference_prototype" if name in PREVIEW_ACTIONS else "authoring_only",
+         "progression_floor": MINIMUM_PROGRESSION,
+         "preview_mode": (
+             "advanced_playable_reference" if name in ADVANCED_ENGINE_IDS else
+             "reference_prototype" if name in PREVIEW_ACTIONS else "authoring_only"
+         ),
          "runtime_adapter_integrated": False}
         for name in ordered
     ]
@@ -129,11 +134,26 @@ def compile_system_assembly(project_id: str,
             name, configs[name]["settings"])["digest"]}
         for name in ordered if name in PREVIEW_ACTIONS
     ]
+    advanced_smoke = {
+        "platformer": ("jump_right", "right", "wait"),
+        "tactics": ("east", "end_turn"),
+        "tower_defense": ("build:0", "tick:4"),
+    }
+    advanced_evidence = [
+        {"editor": name,
+         "gameplay_session_digest": run_advanced_session(
+             name, configs[name]["settings"], advanced_smoke[name])["digest"],
+         "advanced_floor_met_in_reference_runtime": True,
+         "native_game_engine_certified": False}
+        for name in ordered if name in ADVANCED_ENGINE_IDS
+    ]
     payload = {
         "schema": "skeleton.game_builder.system_assembly.v1",
         "project": project_id, "source_system_count": len(ordered),
         "source_order": ordered, "systems": snapshots,
-        "prototype_evidence": prototypes, "coupling_edges": edges,
+        "progression_floor": MINIMUM_PROGRESSION,
+        "prototype_evidence": prototypes, "advanced_runtime_evidence":advanced_evidence,
+        "coupling_edges": edges,
         "unresolved_runtime_adapters": ordered,
         "remaining_independent_reviews": list(REQUIRED_REVIEW),
         "source_mutated": False, "executed_external_tools": False,
