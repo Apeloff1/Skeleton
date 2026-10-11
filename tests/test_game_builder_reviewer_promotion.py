@@ -206,11 +206,39 @@ class ReviewerPromotionTests(unittest.TestCase):
         self.assertGreater(preview["next_standard"]["min_per_class"],
                            self.standards.min_per_class)
         self.assertEqual(active.read_state(),state)
+        _,historical=active._historic_source_roles()
+        self.assertTrue(
+            set(state["observations"]["usage"]["source_project_ids"])
+            .issubset(historical))
+        self.assertTrue(
+            set(state["observations"]["idle"]["source_project_ids"])
+            .issubset(historical))
+        with self.assertRaises(PromotionError):
+            active.stage(self.plan,self.fit,authorized=True,
+                         champion=self.fit["symbolic_policy"])
         with self.assertRaises(PermissionError):
             active.propose_next_standard(authorized=False)
         result=active.abort("Human reviewer requests safe rollback.",authorized=True)
         self.assertEqual(result["status"],"rolled_back")
         self.assertIsNone(result["active"])
+
+    def test_historical_idle_and_usage_cohorts_cannot_be_replayed(self):
+        self._stage()
+        self.registry.authorize_shadow(self._attest(),authorized=True)
+        self.registry.observe(self._worlds("usage"),mode="usage",authorized=True)
+        self.registry.observe(self._worlds("idle"),mode="idle",authorized=True)
+        self.registry.activate(authorized=True)
+        # Active scoring may overwrite the display's "usage" slot, but its
+        # earlier sources must remain protected in the full sealed journal.
+        new=self.registry.observe(self._worlds("fresh_live"),
+                                  mode="usage",authorized=True)
+        self.assertEqual(new["status"],"active")
+        historical=self.registry._historic_source_roles()[1]
+        self.assertTrue(set(new["cohort"]["source_project_ids"]).issubset(historical))
+        self.assertTrue({w.digest for w in self._worlds("usage")}.issubset(historical))
+        with self.assertRaises(PromotionError):
+            self.registry.observe(self._worlds("usage"),mode="idle",
+                                  authorized=True)
 
     def test_abort_incomplete_candidates_leaves_canonical_review_unchanged(self):
         staged=self._stage()
