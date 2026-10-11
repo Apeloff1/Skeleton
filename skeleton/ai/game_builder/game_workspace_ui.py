@@ -277,7 +277,9 @@ function renderSystemControls(){
  $("system-preview").textContent="";
  if(!spec)return;
  $("system-description").textContent=spec.description+
-  (spec.preview?" · deterministic prototype available":" · typed authoring; runtime not yet integrated");
+  (spec.runtime_maturity==="advanced_reference_runtime"?
+    " · advanced playable reference engine":spec.preview?
+    " · deterministic prototype only":" · authoring-only, runtime not integrated");
  for(const field of spec.fields){
   const label=document.createElement("label");label.textContent=field.key.replaceAll("_"," ");
   let element;
@@ -507,7 +509,7 @@ function drawAdvancedGame(session){
   c.fillText("AP "+state.action_points,Math.min(W-125,ox+dims[0]*size+14),76);
   c.fillText("Enemies "+state.enemies.length,Math.min(W-125,ox+dims[0]*size+14),97);
  }else if(editor==="tower_defense"){
-  const y=H-85,scale=(W-40)/Math.max(1,12);
+  const y=H-85,scale=(W-40)/Math.max(1,state.lane_length);
   c.strokeStyle="#799da8";c.lineWidth=4;c.beginPath();c.moveTo(20,y);
   c.lineTo(W-20,y);c.stroke();
   for(const enemy of state.enemies){
@@ -516,7 +518,8 @@ function drawAdvancedGame(session){
   }
   for(const tower of state.towers){
    c.fillStyle=tower.level>1?"#eed27b":"#7be2c0";
-   c.fillRect(20+(tower.slot*3+2)*scale,y-38,12,30);
+   c.fillRect(20+(tower.slot*Math.max(1,Math.floor(state.lane_length/3))+2)*scale,
+              y-38,12,30);
   }
   c.fillStyle="#d8eef0";c.fillText("Credits "+state.credits+" · Base "+state.base_hp,15,H-42);
   c.fillText("Defeated "+state.defeated+" · Escaped "+state.escaped,15,H-18);
