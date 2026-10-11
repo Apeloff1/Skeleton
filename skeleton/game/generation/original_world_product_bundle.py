@@ -78,15 +78,11 @@ def build_portable_app(source_root: Path, output: Path) -> dict:
     modules = _source_modules(source_root)
     contents = dict(modules)
     contents["__main__.py"] = ARCHIVE_MAIN.encode("utf-8")
+    # The repository's package initializers import unrelated simulation
+    # backends. Portable archives deliberately isolate only the audited,
+    # transitively discovered original-game source modules.
     for directory in ("skeleton", "skeleton/game", "skeleton/game/generation"):
-        name = directory + "/__init__.py"
-        init = source_root / name
-        if init.exists():
-            if not init.is_file() or init.is_symlink():
-                raise ValueError("unsafe Python package initializer")
-            contents[name] = init.read_bytes()
-        else:
-            contents[name] = b""
+        contents[directory + "/__init__.py"] = b""
     manifest = {
         "schema": SCHEMA, "required_python": "3.11+",
         "entry": ENTRY,
