@@ -223,7 +223,7 @@ var ending: Variant = null
 var status: String = "playing"
 var score: int = 0
 var message: String = "Explore the world and meet its people."
-var ready: bool = false
+var ready_to_play: bool = false
 var action_log: Array = []
 var undo_log: Array = []
 var buttons: VBoxContainer
@@ -254,7 +254,7 @@ func _ready() -> void:
     buttons.position = Vector2(560, 18)
     buttons.custom_minimum_size = Vector2(310, 640)
     add_child(buttons)
-    ready = true
+    ready_to_play = true
     _reset()
     if "--verify-story" in OS.get_cmdline_user_args():
         _verify()
@@ -297,7 +297,7 @@ func _where(n: Dictionary) -> String:
 
 func _choices() -> Array:
     var choices: Array = []
-    if not ready or status == "won" or turn >= MAX_ACTIONS:
+    if not ready_to_play or status == "won" or turn >= MAX_ACTIONS:
         return choices
     choices.append("wait")
     for next_region in _region(location)["neighbors"]:
@@ -394,7 +394,7 @@ func _undo() -> void:
 
 func _redraw() -> void:
     queue_redraw()
-    if not ready or buttons == null:
+    if not ready_to_play or buttons == null:
         return
     for child in buttons.get_children():
         buttons.remove_child(child)
@@ -511,7 +511,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO, size), Color("#0a1924"), true)
-    if not ready:
+    if not ready_to_play:
         return
     _label(Vector2(20, 32), str(world["intent"]["title"]), 23, Color("#d5f5e6"))
     var region: Dictionary = _region(location)
