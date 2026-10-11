@@ -24,7 +24,7 @@ from .original_world_product_render import (
     ascii_render, ppm_render, svg_render,
 )
 from .original_world_product_missions import mission_report
-from .original_world_npc_cognition_v2 import cognition_report
+from .original_world_npc_cognition_v2 import cognition_report, npc_profile
 
 MAX_SCRIPT = 131072
 
@@ -158,6 +158,15 @@ def _interactive(state: ProductSession) -> ProductSession:
         if line in ("missions", "quests"):
             print(json.dumps(mission_report(state), sort_keys=True, indent=2))
             continue
+        if line.startswith("person ") or line.startswith("citizen "):
+            try:
+                citizen = int(line.split()[1])
+                print(json.dumps(npc_profile(
+                    state.cognition, state.society, state.terrain, citizen
+                ), sort_keys=True, indent=2))
+            except (ValueError, IndexError, FoundationError) as exc:
+                print("Unknown citizen:", exc)
+            continue
         if line in ("npc", "people", "minds"):
             print(json.dumps(cognition_report(state.cognition, state.society,
                                               state.terrain), sort_keys=True, indent=2))
@@ -207,6 +216,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--inhabitants", type=int, default=12)
     parser.add_argument("--actions-json", default="[]")
     parser.add_argument("--inventory", action="store_true")
+    parser.add_argument("--npc-profile", type=int,
+                        help="Inspect an individual persistent NPC's goal, memories and contracts")
     parser.add_argument("--npc-report", action="store_true",
                         help="Expose each physical resident's real plans, memory and work contracts")
     parser.add_argument("--missions", action="store_true",
@@ -290,6 +301,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "npc_cognition": cognition_report(state.cognition, state.society,
                                                      state.terrain)
                                      if args.npc_report else None,
+                    "npc_profile": npc_profile(state.cognition, state.society,
+                                               state.terrain, args.npc_profile)
+                                   if args.npc_profile is not None else None,
                     "world_turn": state.living.living_turns,
                     "player_events": state.events,
                     "real_gameplay_not_native_release": True,
