@@ -326,10 +326,22 @@ def evaluate_candidate(plan: FlowPlan,fit: dict,*,
 
 def evaluate_fresh_cohort(rows: tuple[TrainingCandidate,...],policy: dict,*,
                           standard: PromotionStandard,
-                          source_projects: tuple[str,...],authorized: bool)->dict:
+                          source_projects: tuple[str,...],authorized: bool,
+                          champion: dict | None=None)->dict:
+    """Hold fresh gameplay evidence to the same adversarial bar as sealed tests.
+
+    Both usage and idle cohorts are independent of TRAIN, validation, test and
+    previous cohorts. The counterfactual gate is opt-in through the (monotonic)
+    standard; it is not legal to tune a model against these live observations.
+    """
     if not authorized:
         raise PermissionError("live review feedback needs operator authority")
     validate_policy(policy)
+    if not isinstance(standard, PromotionStandard):
+        raise PromotionError("explicit immutable live review standard required")
+    if (not isinstance(source_projects, tuple)
+            or any(not isinstance(s, str) or len(s)!=64 for s in source_projects)):
+        raise PromotionError("complete previously used source identities required")
     if (not isinstance(rows,tuple) or not 16<=len(rows)<=2048
         or any(not isinstance(x,TrainingCandidate) for x in rows)):
         raise PromotionError("complete independent reviewer observations required")
@@ -354,11 +366,72 @@ def evaluate_fresh_cohort(rows: tuple[TrainingCandidate,...],policy: dict,*,
     for k,v in quality["projects"].items():
         if v["correct"]/v["n"]<standard.min_project_accuracy:
             blockers.append("live_project_regression:"+k[:12])
+    for family,counts in quality["attacks"].items():
+        if family=="verified_control":
+            continue
+        if counts["n"]<standard.min_family_cases:
+            blockers.append("live_family_coverage:"+canonical_digest(family)[:12])
+        if counts["missed_dangers"]:
+            blockers.append("live_missed_attack_family:"+canonical_digest(family)[:12])
+    # Live evaluator uses independent retained data, never gradients. No
+    # shortcut can be approved just because the ordinary cohort looked good.
+    counterfactual=None
+    if standard.min_counterfactual_accuracy>0:
+        from .game_learning_challenges import challenge_reviewer
+        splits=defaultdict(list)
+        for row in rows:
+            if row.split not in {"train","validation","test"}:
+                raise PromotionError("independent observed project split unrecognized")
+            splits[row.split].append(row)
+        reports=[]
+        attempted=passed=0
+        for split,cases in sorted(splits.items()):
+            if len(cases)<2:
+                blockers.append("live_counterfactual_split_undercovered")
+                continue
+            report=challenge_reviewer(tuple(cases),policy,
+                                     authorized=True,max_examples=512)
+            attempted+=report.attempted
+            passed+=report.passed
+            reports.append(dict(split=split,report_digest=report.digest,
+                                attempted=report.attempted,passed=report.passed,
+                                by_family=[dict(family=f,attempted=n,passed=good)
+                                           for f,n,good in report.by_family]))
+        accuracy=passed/attempted if attempted else 0.0
+        counterfactual=dict(attempted=attempted,passed=passed,
+                            accuracy=round(accuracy,6),by_split=reports,
+                            training_performed=False)
+        if not attempted or accuracy<standard.min_counterfactual_accuracy:
+            blockers.append("live_counterfactual_shortcut_detection")
+    leader=None
+    if champion is not None:
+        validate_policy(champion)
+        baseline=_metric(rows,champion)
+        leader=dict(candidate_champion_digest=canonical_digest(champion),
+                    balanced_accuracy=baseline["balanced_accuracy"],
+                    brier=baseline["brier"])
+        if (quality["balanced_accuracy"]+standard.max_regression
+                <baseline["balanced_accuracy"]):
+            blockers.append("live_champion_quality_regression")
+        if quality["brier"]>baseline["brier"]+standard.max_regression:
+            blockers.append("live_champion_calibration_regression")
+        for key,row in quality["projects"].items():
+            if row["correct"]<baseline["projects"][key]["correct"]:
+                blockers.append("live_champion_per_game_regression:"+key[:12])
+        for key,row in quality["attacks"].items():
+            if row["missed_dangers"]>baseline["attacks"][key]["missed_dangers"]:
+                blockers.append("live_champion_adversarial_regression:"
+                                +canonical_digest(key)[:12])
+    blockers=sorted(set(blockers))
     return dict(schema="skeleton.game_builder.fresh_cohort.v1",
-                metrics=quality,blockers=sorted(set(blockers)),
+                candidate_digest=canonical_digest(policy),
+                standard_digest=standard.digest,
+                metrics=quality,blockers=blockers,
                 passed=not blockers,source_project_ids=sorted({
                     x.project_digest for x in rows
                 }),cohort_digest=canonical_digest([x.payload() for x in rows]),
+                counterfactual=counterfactual,champion_comparison=leader,
+                heldout_observations_used_for_training=False,
                 advisory_only=True)
 
 
