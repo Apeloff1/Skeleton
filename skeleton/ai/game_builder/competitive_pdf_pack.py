@@ -115,9 +115,9 @@ def _ensure_page(rows):
     return content
 
 
-def _pdf_3_pages(role,parts,battle,packet_id):
-    if role not in ROLES or type(parts) is not tuple or len(parts)!=3:
-        raise ThreatRadarError("exactly 3 parts per independently reviewed AI document")
+def _pdf_pages(role,parts,battle,packet_id):
+    if role not in ROLES or type(parts) is not tuple or len(parts) not in {3,9}:
+        raise ThreatRadarError("only three-page role sections or nine-page role dossiers")
     streams=[]
     for page,rows in enumerate(parts,1):
         content=_ensure_page(rows)
@@ -147,7 +147,7 @@ def _pdf_3_pages(role,parts,battle,packet_id):
             "ET","0.82 0.85 0.91 RG 49 60 m 546 60 l S",
             "BT /F1 7.5 Tf 0.38 0.43 0.50 rg "
             "1 0 0 1 49 47 Tm "+
-            _pdf_hex(f"PART {page}/3  |  {role.upper()}  |  EPOCH {battle.epoch}  |  AWAITING YOUR DECISION")+
+            _pdf_hex(f"PART {page}/{len(parts)}  |  {role.upper()}  |  EPOCH {battle.epoch}  |  AWAITING YOUR DECISION")+
             " Tj ET",
         ])
         raw="\n".join(instructions).encode("ascii")
@@ -173,7 +173,7 @@ def _pdf_3_pages(role,parts,battle,packet_id):
              f"/Resources << /Font << /F1 {font1} 0 R /F2 {font2} 0 R >> >> "
              f"/Contents {sid} 0 R >>").encode())
         pageids.append(page_id)
-    object_blobs[pages_id-1]=(f"<< /Type /Pages /Count 3 /Kids ["+
+    object_blobs[pages_id-1]=(f"<< /Type /Pages /Count {len(parts)} /Kids ["+
                                " ".join(f"{p} 0 R" for p in pageids)+
                                "] >>").encode()
     info=obj((
@@ -196,6 +196,12 @@ def _pdf_3_pages(role,parts,battle,packet_id):
         f"trailer\n<< /Size {len(object_blobs)+1} /Root {root} 0 R "
         f"/Info {info} 0 R >>\nstartxref\n{xref}\n%%EOF\n").encode())
     return stream.getvalue()
+
+
+def _pdf_3_pages(role,parts,battle,packet_id):
+    if type(parts) is not tuple or len(parts)!=3:
+        raise ThreatRadarError("legacy packet strictly needs three pages per role")
+    return _pdf_pages(role,parts,battle,packet_id)
 
 
 def _rows(role,page,battle,critique):
