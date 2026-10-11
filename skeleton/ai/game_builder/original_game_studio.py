@@ -15,7 +15,9 @@ from typing import Mapping, Sequence
 
 from .contracts import canonical_digest
 from .living_story_runtime import StoryIntent
-from .living_story_authoring import AuthoredStory, read_story_blueprint
+from .living_story_authoring import (
+    AuthoredStory, derive_original_story_intent, read_story_blueprint,
+)
 from .living_story_export import StoryPackage
 from .living_story_mirror import StoryMirrorReport
 from .companion_curriculum import (
@@ -223,15 +225,10 @@ def run_original_game_studio(
     story_intent: StoryIntent | None = None
     authored_story: AuthoredStory | None = None
     if narrative_population:
-        story_intent = StoryIntent(
-            project_id=intent.project_id[:95] + ".living-world",
-            title=("Living World: " + intent.title)[:120],
-            seed=int(canonical_digest({
-                "story_parent": intent.to_payload(),
-                "version": "skeleton.living_world.v1",
-            })[:15], 16),
-            regions=narrative_regions, population=narrative_population,
-            mode=narrative_mode, quests_to_finish=narrative_quests,
+        story_intent = derive_original_story_intent(
+            intent, population=narrative_population,
+            regions=narrative_regions, mode=narrative_mode,
+            quests=narrative_quests, authorized=True,
         )
     elif (narrative_regions, narrative_mode, narrative_quests, narrative_ending) != (
         7, "postgame", 2, "stewardship"
