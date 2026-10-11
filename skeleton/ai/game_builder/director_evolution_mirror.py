@@ -13,6 +13,7 @@ import random
 from .contracts import canonical_digest
 from .quest_scene_engine import (
     DirectorAction, DirectorError, DirectorWorld, director_play, director_verify,
+    director_step,
 )
 from .quest_director_solver import solve_quest
 from .quest_director_endings import evaluate_story_ending
@@ -126,10 +127,8 @@ def review_evolution(
         elif family==2:
             label="illegal_source_teleport"
             state=director_play(world,proof.actions[:point]).final
-            passed=_reject(lambda:__import__(
-                "skeleton.ai.game_builder.quest_scene_engine",
-                fromlist=["director_step"]).director_step(
-                    world,state,DirectorAction("travel","nonexistent",state.scene)))
+            passed=_reject(lambda:director_step(
+                world,state,DirectorAction("travel","nonexistent",state.scene)))
         elif family==3:
             label="unearned_faction_ending"
             passed=_reject(lambda:evaluate_story_ending(
