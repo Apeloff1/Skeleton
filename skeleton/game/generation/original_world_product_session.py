@@ -32,6 +32,7 @@ from .original_world_npc_cognition_v2 import (
     commission_project, cancel_project, interview_citizen,
 )
 from .original_world_npc_civics import propose_civic
+from .original_world_npc_apprenticeships import enroll, cancel_enrollment
 
 SCHEMA = "original-world-playable-product-session.v2"
 LEGACY_SCHEMA = "original-world-playable-product-session.v1"
@@ -220,7 +221,28 @@ def _npc_operation(
     """
     world, society = session.terrain, session.society
     thinking = session.cognition
-    if action.verb == "propose":
+    if action.verb == "mentor":
+        try:
+            apprentice = int(action.option)
+        except ValueError as exc:
+            raise FoundationError("mentor requires existing apprentice ID") from exc
+        if session.living.spatial.game.causal.trust < 1:
+            raise FoundationError("professional mentorship requires authentic civic consent")
+        trained = enroll(thinking.training, society, world,
+                         mentor=action.target, student=apprentice)
+        thinking = replace(thinking, training=trained)
+        source = session.living.spatial
+        living = replace(session.living, spatial=replace(
+            source, game=replace(source.game, causal=replace(
+                source.game.causal, trust=source.game.causal.trust - 1))))
+        message = (f"Real citizen {action.target} enrolled citizen {apprentice} "
+                   "in three paid in-person professional lessons")
+    elif action.verb == "cancel_mentorship":
+        thinking = replace(thinking, training=cancel_enrollment(
+            thinking.training, society, world, action.target))
+        living = session.living
+        message = "An unfinished individual apprenticeship was cancelled"
+    elif action.verb == "propose":
         if world.position != (0, 0):
             raise FoundationError("player must attend the physical public depot")
         if world.provisions < 1:
