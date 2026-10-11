@@ -1,0 +1,63 @@
+name: Modular Director NPC and Mission Integration
+
+on:
+  pull_request:
+    paths:
+      - "skeleton/ai/game_builder/npc_society_runtime.py"
+      - "skeleton/ai/game_builder/modular_mission_*.py"
+      - "skeleton/ai/game_builder/modular_director_session.py"
+      - "skeleton/ai/game_builder/director_capability_graph.py"
+      - "tests/test_game_builder_npc_society.py"
+      - "tests/test_game_builder_modular_synergy.py"
+      - ".github/workflows/game-builder-modular-society.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modular-director-npc-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actual-modular-runtime:
+    name: Replay modular quests and NPC decisions (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
+      EXACT_HEAD: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_npc_society.py
+            tests/test_game_builder_modular_synergy.py
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Confirm provenance and Python syntax
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXACT_HEAD"
+          python -m compileall -q skeleton/ai/game_builder
+      - name: Replay actual NPC societies and modular missions
+        shell: bash
+        run: |
+          python -m unittest tests.test_game_builder_npc_society tests.test_game_builder_modular_synergy -v
