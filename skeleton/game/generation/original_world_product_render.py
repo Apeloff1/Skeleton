@@ -10,7 +10,9 @@ from html import escape
 from .original_foundation_compiler import FoundationError
 from .original_world_product_terrain import TerrainState, cell_at, validate_terrain
 from .original_world_product_agents import PhysicalSociety, validate_society
-from .original_world_npc_era_population import EraPopulation, validate_population, era_budget
+from .original_world_npc_era_population import (
+    EraPopulation, validate_population, era_budget, ambient_impressions,
+)
 
 COLORS = {
     "meadow": (119, 174, 92),
@@ -59,6 +61,10 @@ def scene(terrain: TerrainState, society: PhysicalSociety | None = None, *,
         "center": (ox, oy), "radius": radius, "side": radius * 2 + 1,
         "cells": cells, "people": agents, "player": terrain.position,
         "districts": remote_districts,
+        "ambient": ambient_impressions(
+            population, terrain, radius=radius,
+            max_visible=min(24, era_budget(population.era).render_budget),
+        ) if population else (),
         "era": population.era if population is not None else None,
     }
 
@@ -102,6 +108,14 @@ def svg_render(terrain: TerrainState, society: PhysicalSociety | None = None, *,
         parts.append(f'<text x="{dx + tile_size//2}" y="{dy + tile_size//2+3}" '
                      f'text-anchor="middle" font-family="sans-serif" '
                      f'font-size="9" fill="#151326">R</text>')
+    for proxy in view["ambient"]:
+        px = (proxy["x"] - ox + radius) * tile_size + tile_size / 2
+        py = (proxy["y"] - oy + radius) * tile_size + tile_size / 2
+        parts.append(
+            f'<circle cx="{px}" cy="{py}" r="{max(2,tile_size//7)}" '
+            f'fill="#7da9cd" fill-opacity="0.7" stroke="#2e4962" '
+            f'data-agent-kind="render-only" />'
+        )
     for p in view["people"]:
         px = (p["x"] - ox + radius) * tile_size + tile_size / 2
         py = (p["y"] - oy + radius) * tile_size + tile_size / 2
@@ -138,6 +152,7 @@ def ppm_render(terrain: TerrainState, society: PhysicalSociety | None = None, *,
     width = height = side * scale
     positions = {(p["x"], p["y"]) for p in view["people"]}
     regional = {(r["x"], r["y"]) for r in view["districts"]}
+    ambience = {(r["x"], r["y"]) for r in view["ambient"]}
     ox, oy = view["center"]
     raw = bytearray()
     for sy in range(height):
@@ -152,6 +167,8 @@ def ppm_render(terrain: TerrainState, society: PhysicalSociety | None = None, *,
                 rgb = (238, 216, 163)
             if (ox + dx, oy + dy) in regional:
                 rgb = (195, 155, 250)
+            if (ox + dx, oy + dy) in ambience:
+                rgb = (125, 169, 205)
             if (ox + dx, oy + dy) in positions:
                 rgb = (250, 231, 192)
             if dx == 0 and dy == 0:
@@ -170,6 +187,7 @@ def ascii_render(terrain: TerrainState, society: PhysicalSociety | None = None, 
     }
     people = {(p["x"], p["y"]) for p in view["people"]}
     districts = {(r["x"], r["y"]) for r in view["districts"]}
+    ambience = {(r["x"], r["y"]) for r in view["ambient"]}
     ox, oy = view["center"]
     rows = []
     for dy in range(-radius, radius + 1):
@@ -183,6 +201,8 @@ def ascii_render(terrain: TerrainState, society: PhysicalSociety | None = None, 
                 symbol = "H"
             if (ox + dx, oy + dy) in districts:
                 symbol = "R"
+            if (ox + dx, oy + dy) in ambience:
+                symbol = "+"
             if (ox + dx, oy + dy) in people:
                 symbol = "n"
             if (dx, dy) == (0, 0):
