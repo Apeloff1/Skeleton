@@ -55,7 +55,7 @@ jobs:
       - name: Compile atlas and simulation modules
         run: python -m compileall -q skeleton/game/generation
       - name: Verify originals, styles and rule simulations
-        run: python -m pytest -q --noconftest tests/test_original_world_mechanic_atlas.py tests/test_original_world_simulator.py tests/test_original_world_campaign.py tests/test_original_world_campaign_cli.py tests/test_original_world_nexus.py tests/test_original_world_society.py tests/test_original_world_play_cli.py tests/test_original_world_frontier.py tests/test_original_world_frontier_cli.py tests/test_original_world_era_runtime.py tests/test_original_world_era_cli.py tests/test_original_foundation_compiler.py tests/test_original_foundation_cli.py tests/test_original_foundation_discovery.py
+        run: python -m pytest -q --noconftest tests/test_original_world_mechanic_atlas.py tests/test_original_world_simulator.py tests/test_original_world_campaign.py tests/test_original_world_campaign_cli.py tests/test_original_world_nexus.py tests/test_original_world_society.py tests/test_original_world_play_cli.py tests/test_original_world_frontier.py tests/test_original_world_frontier_cli.py tests/test_original_world_era_runtime.py tests/test_original_world_era_cli.py tests/test_original_foundation_compiler.py tests/test_original_foundation_cli.py tests/test_original_foundation_discovery.py tests/test_original_world_million_compiler.py tests/test_original_world_million_cli.py
       - name: Exercise era and theology preview
         run: |
           python -m skeleton.game.generation.original_world_cli --seed gentle-history --era paleolithic --chronology remote-past --theology animist-invented --theme comfort --tone ultra-snuggly --comfort 100 --realism 95 --brief >/dev/null
@@ -134,5 +134,12 @@ jobs:
           python -m skeleton.game.generation.original_foundation_cli --find habitat --limit 16 --no-diversify >/dev/null
           python -m skeleton.game.generation.original_foundation_cli --find consent --operator veto --limit 12 >/dev/null
           python -m skeleton.game.generation.original_foundation_cli --find memory --domain memory --limit 16 >/dev/null
+      - name: Validate 102400 modes and 1228800 advanced worlds
+        run: |
+          python -m skeleton.game.generation.original_world_million_cli --inventory
+          python -m skeleton.game.generation.original_world_million_cli --page 1228797 --limit 3 >/dev/null
+          python -m skeleton.game.generation.original_world_million_cli --base 0 --form puzzle --arc chapters --actions-json '[{"layer":"mode","verb":"toggle","target":0},{"layer":"mode","verb":"toggle","target":2},{"layer":"mode","verb":"pass"},{"layer":"arc","verb":"commit"}]' --show-map
+          python -m skeleton.game.generation.original_world_million_cli --base 9999 --form colony --arc civilization --actions-json '[{"layer":"mode","verb":"construct","amount":2},{"layer":"mode","verb":"cultivate"},{"layer":"causal","verb":"end_turn"},{"layer":"causal","verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_million_cli --index 1228799 --actions-json '[{"layer":"mode","verb":"tap","target":0},{"layer":"arc","verb":"reflect"},{"layer":"causal","verb":"end_turn"}]' --show-map
       - name: Confirm exact head
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
