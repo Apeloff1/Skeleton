@@ -87,8 +87,11 @@ function available(s){
       &&!s.completed.includes(q.key))output.push("resolve:"+q.key);
   }
  }
- if(s.ending===null&&s.completed.length>=WORLD.intent.quests_to_finish)
-  output.push("choose:stewardship","choose:discovery","choose:independence");
+ if(s.ending===null&&s.completed.length>=WORLD.intent.quests_to_finish){
+  ["stewardship","discovery","independence"].forEach((ending,i)=>{
+   if(s.faction_trust[i]>=25)output.push("choose:"+ending);
+  });
+ }
  return output;
 }
 function line(n,s){
@@ -313,7 +316,10 @@ func _choices() -> Array:
             if str(q["giver"]) == str(n["key"]) and known.has(q["key"]) and inventory.has(q["item"]) and not completed.has(q["key"]):
                 choices.append("resolve:" + str(q["key"]))
     if ending == null and completed.size() >= int(world["intent"]["quests_to_finish"]):
-        choices.append_array(["choose:stewardship", "choose:discovery", "choose:independence"])
+        var endings: Array = ["stewardship", "discovery", "independence"]
+        for faction_index in range(3):
+            if int(trust[faction_index]) >= 25:
+                choices.append("choose:" + str(endings[faction_index]))
     return choices
 
 func _snapshot() -> Dictionary:
