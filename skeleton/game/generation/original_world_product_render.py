@@ -63,7 +63,7 @@ def scene(terrain: TerrainState, society: PhysicalSociety | None = None, *,
         "districts": remote_districts,
         "ambient": ambient_impressions(
             population, terrain, radius=radius,
-            max_visible=min(24, era_budget(population.era).render_budget),
+            max_visible=min(24, tuning(population.era, population.fidelity)[1]),
         ) if population else (),
         "era": population.era if population is not None else None,
     }
