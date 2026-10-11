@@ -34,14 +34,11 @@ class DirectorBrowserTests(unittest.TestCase):
         self.assertIn("script-src", html)
         self.assertIn("function action(ev)", html)
         self.assertIn("function cinema(trigger)", html)
-        self.assertIn("function available()", html)
+        self.assertIn("function allowed()", html)
         self.assertIn("function render()", html)
         self.assertIn("time_target", html)
         self.assertIn("quest_00", html)
         self.assertIn("escort_leash", html)
-        self.assertIn("Optional", self.world.quests[0].stages[0].title+"Optional"
-                      if "Optional" in self.world.quests[0].stages[0].title else
-                      "Optional") # the optional objective is in serialized quest JSON
         self.assertIn('"optional"', html)
         self.assertIn('"cues"', html)
         self.assertIn('"invariant_goal"', html)
