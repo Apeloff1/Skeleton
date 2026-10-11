@@ -1379,6 +1379,211 @@ def native_genomic_world_sample_paths(
             detail="Original world path sample is not validly replayable") from None
 
 
+class NativeOriginalMechanicRequest(BaseModel):
+    """Typed executable original game program: exact decimal, never float."""
+    model_config=ConfigDict(extra="forbid")
+    program_index:str=Field(default="0",min_length=1,max_length=20,
+                            pattern=r"^(0|[1-9][0-9]*)$")
+    levels:list[StrictInt]|None=Field(default=None,min_length=32,max_length=32)
+    parent_codex_index:str|None=Field(default=None,min_length=1,max_length=900,
+                                       pattern=r"^(0|[1-9][0-9]*)$")
+
+
+class NativeOriginalMechanicPlayRequest(NativeOriginalMechanicRequest):
+    moves:list[str]=Field(default_factory=list,max_length=128)
+
+
+class NativeOriginalMechanicCompareRequest(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    first:str=Field(min_length=1,max_length=20,
+                    pattern=r"^(0|[1-9][0-9]*)$")
+    second:str=Field(min_length=1,max_length=20,
+                     pattern=r"^(0|[1-9][0-9]*)$")
+
+
+class NativeOriginalMechanicNucleusRequest(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    original_nucleus:StrictInt=Field(ge=0,lt=16_777_216)
+
+
+class NativeOriginalCampaignRequest(NativeOriginalMechanicRequest):
+    route_intent:StrictInt=Field(default=0,ge=0,le=15)
+    branch_seed:StrictInt=Field(default=0,ge=0,le=0xffffffff)
+    steps:StrictInt=Field(default=24,ge=1,le=128)
+
+
+class NativeOriginalCampaignPortfolioRequest(NativeOriginalMechanicRequest):
+    branch_seed:StrictInt=Field(default=0,ge=0,le=0xffffffff)
+    count:StrictInt=Field(default=8,ge=1,le=16)
+    steps:StrictInt=Field(default=24,ge=1,le=128)
+
+
+def _original_mechanic_program(body:NativeOriginalMechanicRequest):
+    from skeleton.ai.webcrawler.dragon_original_mechanic_forge import (
+        make_program,program_from_levels,
+    )
+    if body.levels is not None:
+        if body.program_index!="0":
+            raise ValueError("exact numeric index cannot contradict 32 selected rule levels")
+        return program_from_levels(tuple(body.levels),
+                                   parent_codex_index=body.parent_codex_index)
+    return make_program(body.program_index,
+                        parent_codex_index=body.parent_codex_index)
+
+
+@router.get("/native/production/worlds/originals/catalog")
+def native_original_mechanics_catalog(
+    owner:str=Depends(_principal),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_original_mechanic_forge import (
+        capabilities,MECHANICS,
+    )
+    from skeleton.ai.webcrawler.dragon_original_campaign_forge import ROUTE_INTENTS
+    return {
+        "ok":True,**capabilities(),
+        "mechanics":[{
+            "id":row[0],"domain":row[1],
+            "cost_resource":row[2],"reward_resource":row[3],
+            "levels":[0,1,2,3],
+        } for row in MECHANICS],
+        "playable_route_intents":list(ROUTE_INTENTS),
+    }
+
+
+@router.post("/native/production/worlds/originals/preview")
+def native_original_mechanics_preview(
+    body:NativeOriginalMechanicRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from dataclasses import asdict
+    from skeleton.ai.webcrawler.dragon_original_mechanic_forge import (
+        initial,choices,
+    )
+    from skeleton.ai.webcrawler.dragon_original_campaign_forge import (
+        demonstrate_mechanics,
+    )
+    try:
+        program=_original_mechanic_program(body)
+        state=initial(program)
+        return {
+            "ok":True,"program":asdict(program),
+            "initial_game_state":asdict(state),
+            "playable_actions":choices(program,state),
+            "causal_gameplay_proofs":demonstrate_mechanics(program),
+            "fixed_win_required":False,
+            "prebuilt_finished_games":0,
+        }
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original game program or indexed codex configuration is invalid") from None
+
+
+@router.post("/native/production/worlds/originals/play")
+def native_original_mechanics_play(
+    body:NativeOriginalMechanicPlayRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from dataclasses import asdict
+    from skeleton.ai.webcrawler.dragon_original_mechanic_forge import (
+        replay,choices,
+    )
+    try:
+        program=_original_mechanic_program(body)
+        state=replay(program,tuple(body.moves))
+        return {
+            "ok":True,"program_index":program.decimal_index,
+            "source_digest":program.source_digest,
+            "played_actions":list(body.moves),
+            "current_game_state":asdict(state),
+            "available_actions":choices(program,state),
+            "playable_after_endings":True,
+            "claim":"real original game-state choices, no mandatory world victory",
+        }
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original game action is unavailable or has invalid replay evidence") from None
+
+
+@router.post("/native/production/worlds/originals/compare")
+def native_original_mechanics_difference(
+    body:NativeOriginalMechanicCompareRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_original_mechanic_forge import (
+        make_program,distinguish,
+    )
+    try:
+        return {
+            "ok":True,**distinguish(
+                make_program(body.first),make_program(body.second))
+        }
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Mechanically distinct original game programs were not verified") from None
+
+
+@router.post("/native/production/worlds/originals/nucleus")
+def native_original_mechanics_nucleus(
+    body:NativeOriginalMechanicNucleusRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from dataclasses import asdict
+    from skeleton.ai.webcrawler.dragon_original_mechanic_forge import (
+        binary_nucleus,initial,choices,
+    )
+    program=binary_nucleus(body.original_nucleus)
+    return {
+        "ok":True,"original_nucleus":body.original_nucleus,
+        "program":asdict(program),
+        "real_initial_actions":choices(program,initial(program)),
+        "number_of_finished_games_claimed":0,
+        "claim":"exact mechanically separable gameplay rules, not completed authored titles",
+    }
+
+
+@router.post("/native/production/worlds/originals/campaign")
+def native_original_campaign_playthrough(
+    body:NativeOriginalCampaignRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from dataclasses import asdict
+    from skeleton.ai.webcrawler.dragon_original_campaign_forge import (
+        compose_journey,verify_journey,
+    )
+    try:
+        program=_original_mechanic_program(body)
+        journey=compose_journey(program,
+            route_intent=body.route_intent,
+            branch_seed=body.branch_seed,steps=body.steps)
+        return {
+            "ok":True,"journey":asdict(journey),
+            "verification":verify_journey(program,journey),
+        }
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Selected original gameplay journey could not be executed") from None
+
+
+@router.post("/native/production/worlds/originals/campaigns")
+def native_original_campaign_portfolio(
+    body:NativeOriginalCampaignPortfolioRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_original_campaign_forge import (
+        sample_experiences,
+    )
+    try:
+        return {
+            "ok":True,**sample_experiences(
+                _original_mechanic_program(body),
+                seed=body.branch_seed,limit=body.count,steps=body.steps,
+            ),
+        }
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original alternative journeys lack replayed gameplay evidence") from None
+
+
 class NativeIndexedLivingDesignRequest(BaseModel):
     """One actual generated design and a replayable route, never bulk minting."""
     model_config=ConfigDict(extra="forbid")
