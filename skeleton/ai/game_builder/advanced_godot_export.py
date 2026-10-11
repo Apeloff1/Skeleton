@@ -536,12 +536,15 @@ def archive_advanced_godot_package(package: NativeAdvancedGamePackage)->bytes:
     """Deterministic, bounded, fixed-path source archive for explicit studio download."""
     if not isinstance(package,NativeAdvancedGamePackage):
         raise AdvancedGodotExportError("typed original native game package required")
+    genre=package.manifest.get("native_editor")
+    if genre not in ("puzzle","platformer"):
+        raise AdvancedGodotExportError("only independently implemented native genres may be archived")
     output=BytesIO()
     with ZipFile(output,"w",compression=ZIP_DEFLATED,compresslevel=9) as archive:
         for path,data in sorted(package.files.items()):
             if path.startswith("/") or ".." in Path(path).parts or "\\\\" in path:
                 raise AdvancedGodotExportError("native source package contains unsafe path")
-            entry=ZipInfo("original-godot-puzzle/"+path,date_time=(1980,1,1,0,0,0))
+            entry=ZipInfo("original-godot-"+genre+"/"+path,date_time=(1980,1,1,0,0,0))
             entry.compress_type=ZIP_DEFLATED
             entry.external_attr=(0o100644<<16)
             archive.writestr(entry,data,compress_type=ZIP_DEFLATED,compresslevel=9)
