@@ -12,6 +12,7 @@ on:
       - "docs/ORIGINAL_WORLD_MECHANIC_ATLAS.md"
       - "docs/ORIGINAL_WORLD_FOUNDATIONS_10K.md"
       - "docs/ORIGINAL_WORLD_MILLION_FORGE.md"
+      - "docs/ORIGINAL_WORLD_TENFOLD_SPATIAL_FORGE.md"
       - ".github/workflows/original-world-atlas.yml"
   push:
     branches: [main]
@@ -23,6 +24,7 @@ on:
       - "docs/ORIGINAL_WORLD_MECHANIC_ATLAS.md"
       - "docs/ORIGINAL_WORLD_FOUNDATIONS_10K.md"
       - "docs/ORIGINAL_WORLD_MILLION_FORGE.md"
+      - "docs/ORIGINAL_WORLD_TENFOLD_SPATIAL_FORGE.md"
       - ".github/workflows/original-world-atlas.yml"
   workflow_dispatch:
 
@@ -158,5 +160,9 @@ jobs:
           python -m skeleton.game.generation.original_world_tenfold_cli --base 0 --form puzzle --architecture lattice --arc endless --actions-json '[{"layer":"spatial","verb":"extract","amount":2},{"layer":"spatial","verb":"travel","target":1},{"layer":"mode","verb":"toggle","target":0},{"layer":"causal","verb":"end_turn"}]' --show-map
           python -m skeleton.game.generation.original_world_tenfold_cli --base 4 --form puzzle --architecture phase --arc branching --actions-json '[{"layer":"spatial","verb":"stabilize"},{"layer":"mode","verb":"toggle","target":0},{"layer":"causal","verb":"end_turn"}]' --show-map
           python -m skeleton.game.generation.original_world_tenfold_cli --base 123 --form tactics --architecture orbit --arc roguelite --actions-json '[{"layer":"spatial","verb":"align"},{"layer":"mode","verb":"guard"},{"layer":"causal","verb":"end_turn"}]' --show-map
+      - name: Ensure original atlas can select new spatial world tiers
+        run: |
+          python -m skeleton.game.generation.original_world_cli --spatial-index 1023999 >/dev/null
+          python -m skeleton.game.generation.original_world_cli --tenfold-index 12287999 --brief >/dev/null
       - name: Confirm exact head
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
