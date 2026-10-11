@@ -82,7 +82,7 @@ ROWS = {
     ],
     "aging": [
         "Biological Clock|On elapsed world time|Advance distinct age-related capacities|Not all processes progress equally",
-        "Age Exchange|With consent and explicit rules|Transfer bounded age burdens|One partner must receive the burden",
+        "Aging Dividend|After mentoring across generations|Convert verified teaching work into a bounded shared recovery reserve|Benefit cannot reverse biological aging",
         "Intergenerational Handoff|When elders retire roles|Share practice-proven expertise|Not all tacit knowledge transfers",
         "Long Life Care|After repeated health assessments|Maintain well-being through habits and services|Care remains continuous",
         "Legacy Retirement|When an old institution completes its mission|Move expertise into future civic roles|Past structures lose authority",
