@@ -9,9 +9,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
+from io import BytesIO
 import json
 from pathlib import Path
 import tempfile
+from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
 from .advanced_gameplay_runtime import (
     run_advanced_session, verify_advanced_session, AdvancedRuntimeError,
@@ -530,6 +532,25 @@ def render_advanced_godot_package(session: dict,
     return NativeAdvancedGamePackage(files,manifest)
 
 
+def archive_advanced_godot_package(package: NativeAdvancedGamePackage)->bytes:
+    """Deterministic, bounded, fixed-path source archive for explicit studio download."""
+    if not isinstance(package,NativeAdvancedGamePackage):
+        raise AdvancedGodotExportError("typed original native game package required")
+    output=BytesIO()
+    with ZipFile(output,"w",compression=ZIP_DEFLATED,compresslevel=9) as archive:
+        for path,data in sorted(package.files.items()):
+            if path.startswith("/") or ".." in Path(path).parts or "\\\\" in path:
+                raise AdvancedGodotExportError("native source package contains unsafe path")
+            entry=ZipInfo("original-godot-puzzle/"+path,date_time=(1980,1,1,0,0,0))
+            entry.compress_type=ZIP_DEFLATED
+            entry.external_attr=(0o100644<<16)
+            archive.writestr(entry,data,compress_type=ZIP_DEFLATED,compresslevel=9)
+    blob=output.getvalue()
+    if not blob or len(blob)>512_000:
+        raise AdvancedGodotExportError("native offline source archive exceeds safe size")
+    return blob
+
+
 def write_advanced_godot_package(package: NativeAdvancedGamePackage,
                                  dest: str|Path, *, authorized: bool)->Path:
     if not authorized:
@@ -555,4 +576,4 @@ def write_advanced_godot_package(package: NativeAdvancedGamePackage,
 
 __all__=["NATIVE_SCHEMA","PROOF_SCHEMA","GODOT_PUZZLE","NativeAdvancedGamePackage",
          "AdvancedGodotExportError","render_advanced_godot_package",
-         "write_advanced_godot_package"]
+         "write_advanced_godot_package","archive_advanced_godot_package"]
