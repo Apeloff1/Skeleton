@@ -91,6 +91,48 @@ def require_stronger_standard(previous: PromotionStandard,
         raise PromotionError("industry quality thresholds cannot silently weaken")
 
 
+def propose_progressive_standard(current: PromotionStandard, *,
+                                 authorized: bool)->PromotionStandard:
+    """Deterministically propose the *next* non-weaker standard; never install it.
+
+    Future reviewers must supply NEW train, validation, test, usage and idle
+    projects to satisfy any newly raised independent evidence minima. In
+    particular, a favorable sealed-test result cannot change this standard
+    after the fact or become training material.
+    """
+    if not authorized:
+        raise PermissionError("raising original-game quality standards requires operator")
+    if not isinstance(current,PromotionStandard):
+        raise PromotionError("typed current progressive standard required")
+    head,sep,version=current.name.rpartition("_v")
+    if (not sep or not head or not version.isdecimal()
+            or not 1<=int(version)<10000):
+        raise PromotionError("explicit versioned progressive quality standard required")
+    from dataclasses import replace
+    next_standard=replace(
+        current,
+        name=f"{head}_v{int(version)+1}",
+        min_train_projects=min(500,current.min_train_projects+1),
+        min_validation_projects=min(500,current.min_validation_projects+1),
+        min_test_projects=min(500,current.min_test_projects+1),
+        min_per_class=min(500,current.min_per_class+4),
+        min_family_cases=min(500,current.min_family_cases+1),
+        min_balanced_accuracy=round(min(1.0,current.min_balanced_accuracy+0.005),6),
+        min_project_accuracy=round(min(1.0,current.min_project_accuracy+0.005),6),
+        min_wilson_recall=round(min(1.0,current.min_wilson_recall+0.01),6),
+        max_brier=round(max(0.0,current.max_brier-0.005),6),
+        max_generalization_drop=round(
+            max(0.0,current.max_generalization_drop-0.005),6),
+        min_counterfactual_accuracy=round(min(
+            1.0,max(0.98,current.min_counterfactual_accuracy+0.005)),6),
+    )
+    require_stronger_standard(current,next_standard)
+    if all(getattr(current,k)==getattr(next_standard,k)
+           for k in current.__dataclass_fields__ if k!="name"):
+        raise PromotionError("quality frontier exhausted; design a new measurable gate")
+    return next_standard
+
+
 def validate_policy(policy: dict):
     if type(policy) is not dict or set(policy)!={
         "weights","bias","threshold","feature_spec"
@@ -438,6 +480,6 @@ def evaluate_fresh_cohort(rows: tuple[TrainingCandidate,...],policy: dict,*,
 __all__=[
     "PromotionError","PromotionStandard","PromotionEvaluation",
     "validate_policy","predict_review","evaluate_candidate",
-    "require_stronger_standard",
+    "require_stronger_standard","propose_progressive_standard",
     "evaluate_fresh_cohort",
 ]
