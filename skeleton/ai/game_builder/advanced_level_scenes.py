@@ -70,7 +70,12 @@ def _cells(value, width, height, maximum, name):
 def _default_layout(engine, config, seed):
     if engine == "platformer":
         hazards, crystals, checkpoints = _layout(seed,config["level_width"])
-        return {"spawn_x":0,"exit_x":config["level_width"]-1,
+        exit_x=config["level_width"]-1
+        checkpoints=sorted(set(c for c in checkpoints if 0<c<exit_x))
+        hazards=sorted(set(x for x in hazards
+                           if 0<x<exit_x and x not in checkpoints))
+        crystals=sorted(set(x for x in crystals if 0<x<exit_x))
+        return {"spawn_x":0,"exit_x":exit_x,
                 "hazards":hazards,"collectibles":crystals,
                 "checkpoints":checkpoints}
     if engine == "tactics":
