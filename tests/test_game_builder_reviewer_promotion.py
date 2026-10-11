@@ -164,6 +164,8 @@ class ReviewerPromotionTests(unittest.TestCase):
         self.assertEqual(self.registry.read_state()["revision"],2)
         with self.assertRaises(PromotionError):
             self.registry.activate(authorized=True)
+        with self.assertRaises(PromotionError):
+            self.registry.propose_next_standard(authorized=True)
         # Source receipts are written to immutable SHA-256 linked files.
         receipt=json.loads((self.registry.root/"ledger"/"000002.json").read_text())
         self.assertEqual(receipt["previous"],json.loads(
@@ -197,6 +199,15 @@ class ReviewerPromotionTests(unittest.TestCase):
                         state["observations"]["idle"]["source_project_ids"]))
         active=ReviewerRegistry(self.workspace.root)
         self.assertEqual(active.read_state(),state)
+        preview=active.propose_next_standard(authorized=True)
+        self.assertEqual(preview["promoted_model"],staged["candidate"])
+        self.assertTrue(preview["active_standard_unchanged"])
+        self.assertTrue(preview["approval_and_separate_stage_required"])
+        self.assertGreater(preview["next_standard"]["min_per_class"],
+                           self.standards.min_per_class)
+        self.assertEqual(active.read_state(),state)
+        with self.assertRaises(PermissionError):
+            active.propose_next_standard(authorized=False)
         result=active.abort("Human reviewer requests safe rollback.",authorized=True)
         self.assertEqual(result["status"],"rolled_back")
         self.assertIsNone(result["active"])
