@@ -34,6 +34,10 @@ from .quest_scene_engine import DirectorWorld
 ROLES=("wiki","hoag","mirror","human","rights","device")
 
 
+class ReviewPreempted(PromotionError):
+    """Idle qualification halted before any model-state transition."""
+
+
 @dataclass(frozen=True,slots=True)
 class PromotionAttestation:
     role: str
@@ -353,11 +357,24 @@ class ReviewerRegistry:
                         advisory_only=True)
 
     def observe(self,worlds: tuple[DirectorWorld,...],*,mode: str,
-                authorized: bool,quest_key: str="quest_00"):
+                authorized: bool,quest_key: str="quest_00",
+                preempt_check=None):
         if not authorized:
             raise PermissionError("new independent game replay evidence requires operator authority")
         if mode not in {"usage","idle"} or type(worlds) is not tuple or not 2<=len(worlds)<=8:
             raise PromotionError("new usage or idle cohort of 2..8 original games required")
+        if preempt_check is not None and (
+                mode!="idle" or not callable(preempt_check)):
+            raise PromotionError("only bounded idle tests can receive a host preemption probe")
+        def _check_preemption():
+            if preempt_check is None:
+                return
+            stopped=preempt_check()
+            if type(stopped) is not bool:
+                raise PromotionError("host idle activity/thermal probe must be boolean")
+            if stopped:
+                raise ReviewPreempted("idle evaluation was preempted before state publication")
+        _check_preemption()
         ids=[w.digest for w in worlds if isinstance(w,DirectorWorld)]
         if len(ids)!=len(worlds) or len(set(ids))!=len(ids):
             raise PromotionError("real distinct authored test worlds required")
@@ -378,10 +395,13 @@ class ReviewerRegistry:
         cases=[]
         receipts=[]
         for world in worlds:
+            _check_preemption()
             game=test_game_personas(world,quest_key,
                                     max_personas=5,
                                     mutation_families=TEST_FAMILIES,
+                                    interrupt_check=(_check_preemption if mode=="idle" else None),
                                     authorized=True)
+            _check_preemption()
             if not game.passed:
                 raise PromotionError("playtested source is not a successful independent game replay")
             curriculum=build_game_tester_curriculum(game,authorized=True)
@@ -398,6 +418,7 @@ class ReviewerRegistry:
                          else state["previous"])
         champion=(self._candidate(champion_digest)["policy"]
                   if champion_digest is not None else None)
+        _check_preemption()
         result=evaluate_fresh_cohort(
             tuple(cases),policy,standard=standard,
             source_projects=tuple(prior),authorized=True,champion=champion)
@@ -408,6 +429,7 @@ class ReviewerRegistry:
             current=self.read_state()
             if current["revision"]!=state["revision"]:
                 raise PromotionError("cohort evaluated against stale active reviewer")
+            _check_preemption()
             observations=dict(current["observations"])
             observations[mode]=result
             phase=current["phase"]
@@ -568,5 +590,5 @@ class ReviewerRegistry:
                         last_incident=new["last_incident"])
 
 __all__=[
-    "ROLES","PromotionAttestation","ReviewerRegistry",
+    "ROLES","PromotionAttestation","ReviewerRegistry","ReviewPreempted",
 ]
