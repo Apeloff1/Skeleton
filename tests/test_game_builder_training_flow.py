@@ -16,6 +16,11 @@ from skeleton.ai.game_builder.game_training_flow import (
     materialize_training_flow,train_isolated_review_ranker,
 )
 from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
+from skeleton.ai.game_builder.game_learning_almanac import (
+    Curriculum,quarantine_curriculum,
+)
+from skeleton.ai.game_builder.game_training_flow import load_quarantined_batches
+from skeleton.ai.game_builder.game_workspace_cli import main as studio_cli
 
 
 def make_batches():
@@ -134,6 +139,37 @@ class FaultTolerantTrainingTests(unittest.TestCase):
         blocked=train_isolated_review_ranker(small,authorized=True)
         self.assertEqual(blocked["status"],"blocked")
         self.assertFalse(blocked["training_performed"])
+
+    def test_source_receipt_verification_and_train_dataset_cli(self):
+        import io
+        from contextlib import redirect_stdout
+        source=self.batches[0]
+        curriculum=Curriculum(
+            source.source_project,split_project(source.source_project),
+            source.original_almanac,source.examples,6,6,
+        )
+        receipt=quarantine_curriculum(curriculum,self.workspace.root,
+                                      authorized=True)
+        self.assertTrue(Path(receipt["path"]).is_file())
+        self.assertTrue(Path(receipt["path"]).with_suffix(".receipt.json").is_file())
+        self.assertEqual(load_quarantined_batches(
+            self.workspace.root,authorized=True)[0].source_project,
+            source.source_project)
+        out=io.StringIO()
+        with redirect_stdout(out):
+            self.assertEqual(studio_cli([
+                "train-dataset","--root",str(self.workspace.root),
+                "--trusted-local-operator","--shard-size","8",
+            ]),0)
+        result=__import__("json").loads(out.getvalue())
+        self.assertEqual(result["source_project_count"],1)
+        self.assertEqual(result["training_experiment"]["status"],"blocked")
+        self.assertFalse(result["permanent_core_AI_weights_changed"])
+        self.assertTrue(result["immutable_shards"])
+        with Path(receipt["path"]).open("ab") as file:
+            file.write(b"\n")
+        with self.assertRaises(TrainingFlowError):
+            load_quarantined_batches(self.workspace.root,authorized=True)
 
     def test_foreign_cross_split_or_per_project_repetition_is_rejected(self):
         first=self.batches[0]
