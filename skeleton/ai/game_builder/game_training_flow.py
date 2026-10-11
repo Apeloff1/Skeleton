@@ -166,6 +166,77 @@ def plan_training_flow(batches: tuple[CandidateBatch,...],*,
     )
 
 
+def load_quarantined_batches(workspace_root: str|Path,*,authorized: bool)->tuple[CandidateBatch,...]:
+    """Verify the original quarantine receipt and SHA of every prior project.
+
+    Files lacking an exact receipt are quarantined errors, not implicitly
+    trusted. Multiple separate curricula for a project are disallowed until
+    explicitly merged by an independent data steward.
+    """
+    if not authorized:
+        raise PermissionError("source-custody dataset loading requires owner authority")
+    work=GameWorkspace(workspace_root)
+    folder=work.root/"training"/"quarantine"
+    if folder.is_symlink() or not folder.is_dir():
+        raise TrainingFlowError("training original quarantine folder missing")
+    batches=[]
+    seen_projects=set()
+    files=sorted(folder.iterdir(),key=lambda p:p.name)
+    if len(files)>1024:
+        raise TrainingFlowError("quarantine exceeds consumer data intake budget")
+    for path in files:
+        if path.is_symlink():
+            raise TrainingFlowError("untrusted game dataset symlink")
+        if path.suffix==".json" and path.name.endswith(".receipt.json"):
+            continue
+        if not re.fullmatch(r"[0-9a-f]{64}\.jsonl",path.name) or not path.is_file():
+            raise TrainingFlowError("unknown or unreviewed file in original-game quarantine")
+        receipt_path=folder/(path.stem+".receipt.json")
+        if receipt_path.is_symlink() or not receipt_path.is_file():
+            raise TrainingFlowError("training evidence requires independent source receipt")
+        if path.stat().st_size>2_000_000 or receipt_path.stat().st_size>12000:
+            raise TrainingFlowError("training evidence exceeds bounded size")
+        try:
+            receipt=json.loads(receipt_path.read_text(encoding="utf-8"))
+            data=path.read_bytes()
+            if (receipt.get("schema")!="skeleton.game_builder.training_quarantine_receipt.v1"
+                or receipt.get("curriculum_digest")!=path.stem
+                or receipt.get("source_sha256")!=sha256(data).hexdigest()
+                or receipt.get("approved") is not False
+                or receipt.get("neural_training_performed") is not False):
+                raise TrainingFlowError("training source hash or publication status invalid")
+            records=[json.loads(line) for line in data.decode("utf-8","strict").splitlines()]
+            if len(records)!=receipt.get("examples") or not 2<=len(records)<=512:
+                raise TrainingFlowError("training example count disagrees with source receipt")
+            example_list=[]
+            for rec in records:
+                if rec.get("schema")!="skeleton.game_builder.adversarial_training_candidate.v1":
+                    raise TrainingFlowError("untyped game data in reviewed quarantine")
+                obj=TrainingCandidate(
+                    project_digest=rec["project_digest"],split=rec["split"],
+                    example_id=rec["example_id"],instruction=rec["instruction"],
+                    input=rec["input"],expected=rec["expected"],
+                    evidence=rec["evidence"],approval=rec["approval"])
+                if canonical_json(rec)!=canonical_json(obj.payload()):
+                    raise TrainingFlowError("unrecognized training candidate fields")
+                example_list.append(obj)
+        except (ValueError,UnicodeError,TypeError,KeyError) as exc:
+            raise TrainingFlowError("quarantine evidence is invalid JSON/source data") from exc
+        project=receipt.get("project_digest")
+        if project in seen_projects:
+            raise TrainingFlowError("multiple curricula from one project need explicit review merge")
+        if not isinstance(project,str) or not re.fullmatch(r"[a-f0-9]{64}",project):
+            raise TrainingFlowError("invalid project identity in quarantine")
+        if receipt.get("split")!=split_project(project):
+            raise TrainingFlowError("project-level split was rewritten")
+        batch=CandidateBatch(project,path.stem,tuple(example_list))
+        batches.append(batch)
+        seen_projects.add(project)
+    if not batches:
+        raise TrainingFlowError("no independently sealed original game datasets found")
+    return tuple(batches)
+
+
 def _atomic_write(path: Path,payload: bytes):
     if path.is_symlink():
         raise TrainingFlowError("untrusted symlink in training journal")
@@ -436,5 +507,6 @@ def train_isolated_review_ranker(plan: FlowPlan,*,authorized: bool,
 
 __all__=[
     "TrainingFlowError","CandidateBatch","FlowPlan","plan_training_flow",
+    "load_quarantined_batches",
     "materialize_training_flow","train_isolated_review_ranker",
 ]
