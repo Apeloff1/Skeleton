@@ -551,9 +551,8 @@ def restore_causal(serialized: str) -> CausalState:
         if set(envelope) != {"payload", "checksum"}:
             raise FoundationError("unknown save envelope")
         payload = envelope["payload"]
-        if (set(payload) != {"schema", "foundation", "state"} or
-                payload["schema"] != ENGINE_SCHEMA or
-                False):
+        if (set(payload) != {"schema", "foundation", "state"}
+                or payload["schema"] != ENGINE_SCHEMA):
             raise FoundationError("unknown causal save schema")
         if _digest(payload) != envelope["checksum"]:
             raise FoundationError("causal save integrity failed")
