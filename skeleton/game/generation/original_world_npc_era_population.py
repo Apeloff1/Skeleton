@@ -783,23 +783,32 @@ def fidelity_report(
     state: EraPopulation, people: PhysicalSociety, terrain: TerrainState,
     *, preset: str = "balanced",
 ) -> dict:
-    # Never implicitly simulate brains merely to compute public counters.
+    # No hidden higher-tier cap: report the exact same settings as the
+    # scheduler, local bodies, native renderer, and game architecture.
+    validate_population(state, people, terrain)
+    scheduled = min(
+        active_brain_budget(state.era, preset),
+        state.profile.brain_limit if state.profile else MAX_AGENTS,
+        len(people.inhabitants),
+    )
+    visual = min(
+        tuning(state.era, state.fidelity)[1],
+        state.profile.visual_proxy_limit if state.profile else MAX_IMPRESSIONS,
+        MAX_IMPRESSIONS,
+    )
     return {
         "era": state.era, "preset": preset,
+        "hardware": state.profile.platform if state.profile else "legacy",
+        "game_genre": state.profile.genre if state.profile else "unspecified",
         "named_physical_people": len(people.inhabitants),
-        "maximum_individual_brain_decisions_per_turn":
-            min(active_brain_budget(state.era, preset),
-                len(people.inhabitants)),
-        "local_passive_survival_bodies": max(
-            0, len(people.inhabitants) -
-            active_brain_budget(state.era, preset)),
+        "maximum_individual_brain_decisions_per_turn": scheduled,
+        "local_passive_survival_bodies": len(people.inhabitants) - scheduled,
         "regional_simplified_census": sum(d.population for d in state.districts),
         "regional_individual_cognitive_agents": 0,
-        "graphic_crowd_impressions_cap": min(
-            era_budget(state.era).render_budget, MAX_IMPRESSIONS),
+        "graphic_crowd_impressions_cap": visual,
         "guarantee": (
             "Only scheduled real residents run full per-person cognition; "
-            "passive bodies consume no magically created resources, "
-            "while remote district stocks are conserved independently."
+            "passive bodies cannot invent resources or labor, while remote "
+            "district stocks remain physically conserved."
         ),
     }
