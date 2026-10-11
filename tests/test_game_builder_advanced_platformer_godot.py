@@ -187,8 +187,13 @@ class NativePlatformerStudioTests(unittest.TestCase):
         forged=deepcopy(game);forged["state"]["finished"]=True
         self.assertEqual(self.post("/api/advanced-godot-package",{
             "session":forged,"settings":config})[0],400)
+        code,source=self.post("/api/advanced-godot-package",{
+            "session":run_advanced_session("racing")})
+        self.assertEqual(code,200)
+        self.assertEqual(source["engine"],"racing")
+        self.assertFalse(source["gameplay_native_verified_by_this_request"])
         self.assertEqual(self.post("/api/advanced-godot-package",{
-            "session":run_advanced_session("racing")})[0],400)
+            "session":run_advanced_session("survival")})[0],400)
 
     def test_visual_studio_has_native_download_control(self):
         html=render_workspace_html("B"*32).decode()
