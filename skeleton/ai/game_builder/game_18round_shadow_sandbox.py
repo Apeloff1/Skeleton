@@ -148,6 +148,11 @@ class SandboxVerification:
     strict_measured_gain: bool
     permission_to_stage: bool
     model_activation_performed: bool=False
+    verifier_id: str="unverified"
+    signature: str="0"*64
+
+    def signed_body(self):
+        return dict(self.payload(),verifier_id=self.verifier_id)
 
     @property
     def digest(self):return canonical_digest(self.payload())
@@ -166,6 +171,17 @@ class SandboxVerification:
                     model_activation_performed=self.model_activation_performed,
                     authorized_to_modify_core_llm_weights=False,
                     verified_not_installed=True)
+
+
+def sign_sandbox_verification(
+    result:SandboxVerification,
+    verifier:TrustedCompetitionJudge,
+)->SandboxVerification:
+    if (not isinstance(result,SandboxVerification) or
+            result.verifier_id not in {"unverified",verifier.judge_id}):
+        raise PromotionError("actual independent shadow verifier identity required")
+    candidate=replace(result,verifier_id=verifier.judge_id,signature="0"*64)
+    return replace(candidate,signature=_mac(candidate.signed_body(),verifier.key))
 
 
 def verify_shadow_in_sandbox(
@@ -283,5 +299,5 @@ def order_verified_hyperweights(
                                 used,task.budget_mb//4,len(selected),
                                 tuple(row.digest for row in tickets))
 __all__=["ModularShadowTicket","prepare_shadow_tickets","FreshSandboxEvidence",
-         "SandboxVerification","verify_shadow_in_sandbox",
+         "SandboxVerification","sign_sandbox_verification","verify_shadow_in_sandbox",
          "HyperweightLoadOrder","order_verified_hyperweights"]
