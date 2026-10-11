@@ -9,6 +9,9 @@ on:
       - "tests/test_game_builder_npc_witness_quests.py"
       - "tests/test_game_builder_competitive_mirror_training.py"
       - "tests/test_game_builder_project_workspace.py"
+      - "tests/test_game_builder_prompt_learning.py"
+      - "skeleton/ai/game_builder/game_prompt_router.py"
+      - "skeleton/ai/game_builder/game_learning_almanac.py"
       - ".github/workflows/game-builder-workbench-mirror.yml"
   workflow_dispatch:
 
@@ -47,6 +50,7 @@ jobs:
             tests/test_game_builder_npc_witness_quests.py
             tests/test_game_builder_competitive_mirror_training.py
             tests/test_game_builder_project_workspace.py
+            tests/test_game_builder_prompt_learning.py
       - name: Python 3.11
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
@@ -59,4 +63,4 @@ jobs:
       - name: Execute real witnesses, adversarial cases and local studio
         shell: bash
         run: |
-          python -m unittest tests.test_game_builder_npc_witness_quests tests.test_game_builder_competitive_mirror_training tests.test_game_builder_project_workspace -v
+          python -m unittest tests.test_game_builder_npc_witness_quests tests.test_game_builder_competitive_mirror_training tests.test_game_builder_project_workspace tests.test_game_builder_prompt_learning -v
