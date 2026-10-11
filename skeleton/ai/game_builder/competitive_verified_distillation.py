@@ -31,7 +31,8 @@ from .knowledge_rights_bridge import (
     ClearedResearchPacket,require_cleared_research_current,
 )
 from .rights import RightsLedger,UseKind,RightsState
-from .game_training_flow import CandidateBatch,plan_training_flow
+from .competitive_27page_pdf_campaign import CampaignPdf27Packet
+from .competitive_27page_approval import inspect_27page_packet
 
 
 @dataclass(frozen=True,slots=True)
@@ -161,6 +162,8 @@ def prepare_verified_learning_handoff(
     council: CampaignCouncilAudit,
     battle: ThreeRoundBattlePlan,
     decision: UserPacketDecision,
+    packet: CampaignPdf27Packet,
+    studio_root: str,
     session_key: bytes,
     wiki: ReviewedKnowledgeStore,
     brief: KnowledgeBrief,
@@ -176,6 +179,7 @@ def prepare_verified_learning_handoff(
             or not isinstance(council,CampaignCouncilAudit)
             or not isinstance(battle,ThreeRoundBattlePlan)
             or not isinstance(decision,UserPacketDecision)
+            or not isinstance(packet,CampaignPdf27Packet)
             or not isinstance(licensed,LicensedGameTrainingSources)
             or type(session_key) is not bytes or len(session_key)<32):
         raise ThreatRadarError("authenticated complete original-game experiment and legal training authority required")
@@ -199,9 +203,14 @@ def prepare_verified_learning_handoff(
             not battle.ready_for_pdf_review or
             battle.original_id!=catalog.original_id):
         raise ThreatRadarError("all three models must have fully reviewed empirical probes")
+    manifest=inspect_27page_packet(studio_root,packet.digest,authorized=True)
+    if (manifest["catalog_digest"]!=catalog.digest
+            or manifest["battle_digest"]!=battle.digest
+            or manifest["council_audit_digest"]!=canonical_digest(council.payload())):
+        raise ThreatRadarError("published 27-page packet not bound to exact complete game campaign")
     approval_body=decision.body()
     if (decision.decision!="approve"
-            or decision.packet_digest!=battle.packet_digest
+            or decision.packet_digest!=packet.digest
             or decision.reviewed_roles!=tuple(sorted(ROLES))
             or not hmac.compare_digest(
                 decision.signature,
