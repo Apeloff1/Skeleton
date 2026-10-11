@@ -266,11 +266,16 @@ def _npc_operation(
     elif action.verb == "council":
         if world.position != (0, 0) or world.provisions < 1:
             raise FoundationError("public council requires depot and one food offering")
-        if len(society.inhabitants) < 2:
-            raise FoundationError("a public council needs at least two living residents")
+        present = sorted(
+            p.id for p in society.inhabitants
+            if abs(p.x) + abs(p.y) <= 1 and p.health > 0
+        )
+        if len(present) < 2:
+            raise FoundationError("public council requires two physically present citizens")
         world = replace(world, provisions=world.provisions - 1)
         thinking = _bond_change(
-            thinking, 0, 1, affinity=1, trust=1, aid=1)
+            thinking, present[0], present[1],
+            affinity=1, trust=1, aid=1)
         thinking = replace(thinking, meetings=thinking.meetings + 1,
                            interventions=thinking.interventions + 1)
         living = session.living
