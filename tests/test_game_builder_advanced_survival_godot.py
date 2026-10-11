@@ -67,7 +67,7 @@ class NativeOpenWorldSurvivalTests(unittest.TestCase):
         cfg={"initial_wood":15,"starting_food":15,"starting_water":15}
         scene=authored(0,cfg)
         actions=["mine_stone","mine_stone","craft_tool","build_shelter",
-                 "mine_stone","mine_stone","build_shelter","rest","travel"]
+                 "mine_stone","build_shelter","rest","travel"]
         game=run_advanced_session("survival",cfg,actions,seed=0,scene=scene)
         self.assertIn("permanent_camp",game["state"]["milestones"])
         self.assertIn("self_sufficient_outpost",game["state"]["milestones"])
