@@ -408,13 +408,55 @@ class GameWorkspace:
                 "source_signature":signature,
                 "source_files":{row.path:row.sha256 for row in records},
                 "immutable_after_creation":True,
+                "archived_revision":self._metadata()["revision"]+1,
                 "demo":demo,
                 "human_approved":True,
             })+"\n")
         except BaseException:
             shutil.rmtree(destination,ignore_errors=True);raise
+        info=self._metadata()
+        info["revision"]+=1
+        info["project_history"].append(dict(
+            project=project,genre=selected,operation="demo" if demo else "archive",
+            ref=selected+"/"+name,
+        ))
+        self._write_metadata(info)
         return dict(ref=selected+"/"+name,tree=tree,
                     source_signature=signature,files=len(records))
+
+    def fork_reference(self,tree: str,reference: str,target_project: str,*,
+                       authorized: bool):
+        if not authorized:
+            raise PermissionError("forking historical original game requires human approval")
+        if tree not in {"previous","demos"}:
+            raise WorkspaceError("only immutable prior or demo projects may be forked")
+        _name(target_project)
+        source=self._tree_root(tree,reference)
+        snapshot=_json(_read(source/"snapshot.json",100000))
+        if snapshot.get("demo") != (tree=="demos"):
+            raise WorkspaceError("archive provenance disagrees with read-only project lane")
+        records=self.files(tree,reference)
+        if {row.path:row.sha256 for row in records}!=snapshot["source_files"]:
+            raise WorkspaceError("immutable original project source hashes failed")
+        target=self.root/"current"/target_project
+        if target.exists() or target.is_symlink():
+            raise WorkspaceError("fork requires a unique new current project")
+        target.mkdir()
+        try:
+            for row in records:
+                body=self.read(tree,reference,row.path)["content"]
+                if row.path=="project.json":
+                    item=_json(body)
+                    item["project"]=target_project
+                    body=canonical_json(item)+"\\n"
+                _newfile(target/row.path,body)
+            self.select_project(target_project,authorized=True)
+        except BaseException:
+            shutil.rmtree(target,ignore_errors=True);raise
+        return dict(forked_from=reference,source_lane=tree,
+                    active=target_project,
+                    source_signature=snapshot["source_signature"],
+                    files=len(records))
 
     def autoload_previous(self,genre: str,target_project: str,*,authorized: bool):
         if not authorized:
@@ -423,30 +465,17 @@ class GameWorkspace:
         entries=[p for p in self.projects("previous") if p.startswith(genre+"/")]
         if not entries:
             raise WorkspaceError("no original previous project for requested genre")
-        selected=entries[-1]
-        source=self._tree_root("previous",selected)
-        snapshot=_json(_read(source/"snapshot.json",100000))
-        rows=self.files("previous",selected)
-        if {r.path:r.sha256 for r in rows}!=snapshot["source_files"]:
-            raise WorkspaceError("prior original project integrity failed")
-        target=self.root/"current"/target_project
-        if target.exists() or target.is_symlink():
-            raise WorkspaceError("autoload requires a unique new current project")
-        target.mkdir()
-        try:
-            for row in rows:
-                body=self.read("previous",selected,row.path)["content"]
-                if row.path=="project.json":
-                    item=_json(body)
-                    item["project"]=target_project
-                    body=canonical_json(item)+"\n"
-                _newfile(target/row.path,body)
-            self.select_project(target_project,authorized=True)
-        except BaseException:
-            shutil.rmtree(target,ignore_errors=True);raise
-        return dict(autoloaded_from=selected,active=target_project,
-                    source_signature=snapshot["source_signature"],
-                    files=len(rows))
+        def rank(reference):
+            snapshot=_json(_read(
+                self._tree_root("previous",reference)/"snapshot.json",100000))
+            return (snapshot.get("archived_revision",0),reference)
+        selected=max(entries,key=rank)
+        output=self.fork_reference("previous",selected,target_project,authorized=True)
+        return dict(**output,autoloaded_from=selected)
+
+    def fork_demo(self,reference: str,target_project: str,*,authorized: bool):
+        return self.fork_reference("demos",reference,target_project,
+                                   authorized=authorized)
 
 __all__=[
     "WorkspaceError","GameWorkspace","FileVersion",
