@@ -346,3 +346,40 @@ def test_conservation_failure_never_produces_partial_state_changes() -> None:
     with pytest.raises(FoundationError):
         step_advanced(state, AdvancedAction("mode", "buy", amount=3))
     assert asdict(state) == before
+
+
+def test_platform_requires_safe_jump_or_consumed_brace_for_real_gap() -> None:
+    state = create_advanced(advanced_for(0, "platform", "sandbox").advanced_id)
+    state = advance(state, AdvancedAction("mode", "step", amount=3))
+    assert state.mode.course == 3
+    with pytest.raises(FoundationError):
+        advance(state, AdvancedAction("mode", "step"))
+    prepared = advance(state, AdvancedAction("mode", "brace"))
+    crossed = advance(prepared, AdvancedAction("mode", "step"))
+    assert crossed.mode.course == 4
+    assert crossed.mode.shield == 0
+    assert crossed.causal.supplies == prepared.causal.supplies
+    assert crossed.causal.energy < prepared.causal.energy
+
+
+def test_racing_requires_both_real_corners_and_sufficient_vehicle_condition() -> None:
+    state = create_advanced(advanced_for(0, "racing", "campaign").advanced_id)
+    state = advance(state, AdvancedAction("mode", "accelerate", amount=3))
+    state = advance(state, AdvancedAction("mode", "accelerate", amount=3))
+    state = advance(state, AdvancedAction("mode", "accelerate"))
+    assert state.mode.distance == 12
+    blocked = advance(state, AdvancedAction("mode", "accelerate"))
+    assert blocked.mode.distance == 12 and blocked.mode.laps == 0
+    state = advance(blocked, AdvancedAction("causal", "end_turn"))
+    state = advance(state, AdvancedAction("mode", "corner"))
+    assert state.mode.corners == 1 and state.mode.vehicle_integrity < 12
+    state = advance(state, AdvancedAction("mode", "accelerate"))
+    state = advance(state, AdvancedAction("mode", "accelerate"))
+    assert state.mode.distance == 28
+    state = advance(state, AdvancedAction("mode", "corner"))
+    assert state.mode.corners == 2
+    state = advance(state, AdvancedAction("causal", "end_turn"))
+    state = advance(state, AdvancedAction("mode", "accelerate"))
+    assert state.mode.distance >= 40
+    assert state.mode.laps == 1 and state.mode.cleared
+    assert state.mode.vehicle_integrity > 0
