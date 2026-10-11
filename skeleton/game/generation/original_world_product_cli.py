@@ -79,6 +79,17 @@ def parse_command(command: str, player: tuple[int, int]) -> ProductAction:
         except ValueError as exc:
             raise FoundationError("invalid terrain amount") from exc
         return ProductAction(layer, verb, amount=count, x=player[0], y=player[1])
+    if layer == "population" and verb == "recruit":
+        if len(parts) != 3:
+            raise FoundationError("usage: population recruit DISTRICT (when at its physical site)")
+        try:
+            return ProductAction(layer, "recruit", target=int(parts[2]))
+        except ValueError as exc:
+            raise FoundationError("invalid regional census identity") from exc
+    if layer == "population" and verb == "set_detail":
+        if len(parts) != 3:
+            raise FoundationError("usage: population set_detail economy|balanced|vivid|unrestricted")
+        return ProductAction(layer, "set_detail", option=parts[2])
     if layer == "population" and verb == "dispatch_food":
         if len(parts) not in (4, 5):
             raise FoundationError("usage: population dispatch_food DISTRICT to-region|to-player [1..3]")
@@ -241,6 +252,8 @@ def _interactive(state: ProductSession) -> ProductSession:
             print("npc council; minds (inspect actual plans and sworn statements)")
             print("districts (see distinct offscreen census and finite food)")
             print("population dispatch_food DISTRICT to-region|to-player [1..3]")
+            print("population recruit DISTRICT (physically visit district)")
+            print("population set_detail economy|balanced|vivid|unrestricted")
             continue
         try:
             action = parse_command(line, state.terrain.position)
