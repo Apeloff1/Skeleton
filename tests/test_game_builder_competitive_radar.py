@@ -23,6 +23,9 @@ from skeleton.ai.game_builder.competitive_delivery_gate import (
 )
 from skeleton.ai.game_builder.competitive_watch_book import CompetitionWatchBook
 from skeleton.ai.game_builder.competitive_watch_cli import main as watch_cli_main
+from skeleton.ai.game_builder.competitive_dragon_recrawl import (
+    ReviewedCrawlHistory,plan_dragon_competitor_recrawls,
+)
 from skeleton.ai.game_builder.competitive_watch_service import (
     compile_original_delivery_work,review_competitive_frontier,
 )
@@ -470,6 +473,65 @@ class WatchCLIIntegrationCases(CompetitiveDeliveryCases):
                     ["status","--root",str(root),"--original-id","original_world"]),2)
             self.assertIn("PermissionError",errors.getvalue())
 
+
+
+class DragonCompetitorRecrawlCases(CompetitorRadarCases):
+    def histories(self):
+        return tuple(ReviewedCrawlHistory(
+            link.source_id,1791622800,9000,0)
+            for link in self.links)
+
+    def plan(self,*,consent=True,host_safe=True,links=None,histories=None,
+             time="2026-10-13T12:00:00Z",packet=None):
+        return plan_dragon_competitor_recrawls(
+            self.db,self.brief,packet or self.packet,self.rights,
+            self.radar(),tuple(self.links) if links is None else links,
+            self.histories() if histories is None else histories,
+            as_of=time,authorized=True,crawl_consent=consent,
+            host_safe_to_work=host_safe)
+
+    def test_native_dragon_due_enemy_sources_are_proposed_not_automatically_crawled(self):
+        plan=self.plan()
+        self.assertEqual(len(plan.orders),4)
+        self.assertTrue(all(x.due for x in plan.orders))
+        self.assertEqual(len(plan.eligible_for_host_dispatch),4)
+        self.assertEqual(plan.payload()["actual_network_fetches"],0)
+        self.assertEqual(plan.payload()["actual_os_background_jobs_created"],0)
+        self.assertTrue(all(
+            not order.payload()["can_crawl_without_external_host_approval"]
+            and not order.payload()["new_verified_knowledge_revision_created"]
+            for order in plan.orders))
+        self.assertEqual(plan.owner,"game_studio")
+
+    def test_busy_thermal_or_missing_consent_preempts_without_claiming_acquisition(self):
+        for consent,safe,blocked in (
+            (False,True,"no_crawl_consent"),
+            (True,False,"host_busy_or_thermal_limit"),
+            (False,False,"no_crawl_consent"),
+        ):
+            with self.subTest(consent=consent,safe=safe):
+                queue=self.plan(consent=consent,host_safe=safe)
+                self.assertEqual(queue.eligible_for_host_dispatch,())
+                self.assertIn(blocked,queue.dispatch_deferred_reasons)
+                self.assertEqual(queue.payload()["actual_knowledge_promotions"],0)
+
+    def test_stale_versions_future_changes_and_partial_sources_rejected(self):
+        mismatch=replace(self.links[0],revision_digest="c"*64)
+        with self.assertRaises(ThreatRadarError):
+            self.plan(links=(mismatch,*self.links[1:]))
+        with self.assertRaises(ThreatRadarError):
+            self.plan(histories=self.histories()[:-1])
+        with self.assertRaises(ThreatRadarError):
+            self.plan(time="2026-10-01T12:00:00Z")
+        with self.assertRaises(ThreatRadarError):
+            self.plan(histories=tuple(replace(
+                h,last_changed_epoch=1999999999) for h in self.histories()))
+        with self.assertRaises(PermissionError):
+            plan_dragon_competitor_recrawls(
+                self.db,self.brief,self.packet,self.rights,
+                self.radar(),tuple(self.links),self.histories(),
+                as_of=T0,authorized=False,
+                crawl_consent=True,host_safe_to_work=True)
 
 
 if __name__=="__main__":
