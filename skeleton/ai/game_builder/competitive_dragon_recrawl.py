@@ -66,7 +66,7 @@ class DragonRecrawlDemand:
             urgency_bp=self.urgency_bp,priority=self.priority,
             source_evidence_digest=self.source_evidence_digest,
             can_crawl_without_external_host_approval=False,
-            is_verified_knowledge_revision_not_yet=False)
+            new_verified_knowledge_revision_created=False)
 
 
 @dataclass(frozen=True,slots=True)
