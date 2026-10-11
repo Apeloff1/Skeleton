@@ -23,7 +23,8 @@ from .original_world_npc_cognition_v2 import cognition_report
 
 SCHEMA = "original-npc-long-horizon-laboratory.v1"
 SCENARIOS = ("baseline", "food-shortage", "injured-community",
-             "social-isolation", "public-construction")
+             "social-isolation", "public-construction",
+             "civic-food-aid", "family-expansion")
 
 
 def _digest(data: object) -> str:
@@ -69,6 +70,27 @@ def prepare(
         state, _ = step_product(state, ProductAction(
             "npc", "project", option="hearth", x=0, y=0,
         ))
+    elif scenario == "civic-food-aid":
+        if population < 4:
+            raise FoundationError("civic majority demonstration requires four actual voters")
+        people = tuple(replace(p, hunger=4, energy=0)
+                       for p in state.society.inhabitants)
+        state = replace(state, society=replace(state.society, inhabitants=people))
+        state, _ = step_product(state, ProductAction(
+            "npc", "propose", target=0, option="food-aid",
+        ))
+    elif scenario == "family-expansion":
+        if population < 2 or population >= 32:
+            raise FoundationError("generational scenario needs capacity for another body")
+        # Earn physical shelter and mutual consent through four actual
+        # transactions before advancing any world clocks.
+        for command in (
+            ProductAction("terrain", "build_hearth", x=0, y=0),
+            ProductAction("npc", "council"),
+            ProductAction("npc", "council"),
+            ProductAction("npc", "household", target=0, option="1"),
+        ):
+            state, _ = step_product(state, command)
     validate_product(state)
     return state
 
@@ -130,6 +152,14 @@ def evaluate(
             ),
         },
         "social_ties": report["social_relationships"],
+        "real_public_mandate": state.cognition.civic.active_mandate,
+        "recorded_civic_voters": sum(
+            len(p.ballots) for p in state.cognition.civic.proposals
+        ),
+        "actually_funded_public_aid": len(state.cognition.civic.services),
+        "earned_professional_graduations": state.cognition.training.completed,
+        "physically_added_dependents": state.cognition.households.completed,
+        "dependent_ages": list(state.cognition.households.ages[population:]),
         "verified_observations": report["verified_world_observations"],
         "socially_shared_observations": report["socially_learned_material_observations"],
         "sworn_public_testimonies": len(state.cognition.testimonies),
