@@ -166,8 +166,18 @@ def compile_system_assembly(project_id: str,
         if path in seen_scenes:
             raise AssemblyError("duplicate authored scene identity in composite game")
         seen_scenes.add(path)
-        actions=advanced_smoke[editor]
-        proof=run_advanced_session(editor,configs[editor]["settings"],actions,
+        # A custom scene can disable tower slot 0, begin with an exhausted
+        # biome or place an obstacle at the default movement destination.
+        # Use legal, side-effectful baseline steps that work independently of
+        # tactical placement and resource availability; gameplay quality
+        # still requires separate player/mirror review.
+        scene_smoke={
+            "platformer":("wait",),"tactics":("end_turn",),
+            "tower_defense":("tick",),"racing":("coast",),
+            "survival":("rest",),
+        }
+        proof=run_advanced_session(editor,configs[editor]["settings"],
+                                   scene_smoke[editor],
                                    seed=source["seed"],scene=source)
         scene_evidence.append({
             "path":path,"editor":editor,"scene_digest":source["digest"],
