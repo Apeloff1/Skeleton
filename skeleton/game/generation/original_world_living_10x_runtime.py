@@ -519,6 +519,87 @@ def _autonomous(state: LivingState, law: LivingWorld) -> tuple[LivingState, tupl
     return replace(state, metrics=m, spatial=world), tuple(effects)
 
 
+def _propagate_world_consequences(
+    previous: LivingState, updated: LivingState, law: LivingWorld,
+) -> tuple[LivingState, tuple[str, ...]]:
+    """Pass earned gains and measurable failures into the original game.
+
+    These are explicit transfers and bounded setbacks, not additional
+    combinatorial worlds or unexplained rewards. Both source and living
+    state remain immutable until the whole action is validated.
+    """
+    system = law.foundation.system.system_id
+    m, space = updated.metrics, updated.spatial
+    game, causal = space.game, space.game.causal
+    mode = game.mode
+    effects = []
+    if system == "trophic":
+        if m.vegetation == 0 and space.danger < 100:
+            space = replace(space, danger=space.danger + 1)
+            effects.append("Collapsed plant stock raised actual wilderness travel danger")
+        elif law.source.advanced.mode.form.form_id == "colony" and (
+            m.grazers > 3 and updated.living_turns % 3 == 0
+            and mode.colony_food < 100
+        ):
+            m = _metrics_replace(m, grazers=-1)
+            mode = replace(mode, colony_food=mode.colony_food + 1)
+            effects.append("One physically harvested grazer became colony food")
+    elif system == "settlement":
+        if m.unrest >= 5 and causal.trust > 0:
+            causal = replace(causal, trust=causal.trust - 1)
+            effects.append("Unmet communal needs reduced actual civic legitimacy")
+    elif system == "caravans":
+        if (law.source.advanced.mode.form.form_id == "commerce"
+                and m.credit >= 12 and mode.wallet < 199):
+            m = _metrics_replace(m, credit=-2)
+            mode = replace(mode, wallet=mode.wallet + 2)
+            effects.append("Two earned caravan credits entered actual market capital")
+    elif system == "watershed":
+        if m.flood >= 3 and space.danger < 100:
+            space = replace(space, danger=space.danger + 1)
+            effects.append("Persistent floodwater raised traversable terrain risk")
+        elif (law.source.advanced.mode.form.form_id == "colony"
+              and updated.living_turns % 2 == 0 and m.soil >= 2
+              and mode.colony_food < 100):
+            m = _metrics_replace(m, soil=-1)
+            mode = replace(mode, colony_food=mode.colony_food + 1)
+            effects.append("Spent one unit of real field fertility for colony harvest")
+    elif system == "power":
+        if m.outages >= 2 and causal.trust > 0:
+            causal = replace(causal, trust=causal.trust - 1)
+            effects.append("A real blackout lowered trust in shared infrastructure")
+    elif system == "spores":
+        if m.affected >= 5 and causal.energy > 0:
+            causal = replace(causal, energy=causal.energy - 1)
+            effects.append("Fictional illness reduced available world labor stamina")
+    elif system == "fabrication":
+        if (law.source.advanced.mode.form.form_id == "colony"
+                and m.completed > 0 and mode.housing < 10):
+            m = _metrics_replace(m, completed=-1)
+            mode = replace(mode, housing=mode.housing + 1)
+            effects.append("One physically built robotic structure added colony housing")
+    elif system == "knowledge":
+        if m.shared >= 3 and causal.evidence < 100:
+            m = _metrics_replace(m, shared=-1)
+            causal = replace(causal, evidence=causal.evidence + 1)
+            effects.append("A published verified fact became one real gameplay evidence token")
+    elif system == "diplomacy":
+        if m.tension >= 8 and space.danger < 100:
+            space = replace(space, danger=space.danger + 1)
+            effects.append("Escalating valley disputes made world travel dangerous")
+    else:  # echoes
+        if (previous.metrics.queued_echoes > 0
+                and m.queued_echoes == 0
+                and causal.primary < 1000):
+            causal = replace(causal, primary=causal.primary + 1)
+            effects.append("One actually matured historical echo changed the causal world")
+    return replace(
+        updated,
+        metrics=m,
+        spatial=replace(space, game=replace(game, causal=causal, mode=mode)),
+    ), tuple(effects)
+
+
 def step_living(state: LivingState, action: LivingAction) -> tuple[LivingState, LivingReceipt]:
     law = validate_living(state)
     if state.events >= EVENT_LIMIT:
@@ -545,7 +626,8 @@ def step_living(state: LivingState, action: LivingAction) -> tuple[LivingState, 
         if action.layer == "causal" and action.verb == "end_turn":
             updated = replace(updated, living_turns=state.living_turns + 1)
             updated, additional = _autonomous(updated, law)
-            effects += additional
+            updated, propagated = _propagate_world_consequences(state, updated, law)
+            effects += additional + propagated
     event_hash = _digest({
         "version": SCHEMA, "world_design": law.design_id,
         "previous": state.event_head, "before": asdict(state),
