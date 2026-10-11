@@ -326,6 +326,8 @@ func _normalized_expected(field: String, raw: Variant) -> Variant:
         for enemy in raw:
             var parsed: Dictionary=enemy.duplicate(true)
             parsed["pos"]=_point(parsed["pos"])
+            for numeric in ["id","hp","armor"]:
+                parsed[numeric]=int(parsed[numeric])
             result.append(parsed)
         return result
     return raw
