@@ -113,6 +113,7 @@ def parser():
     analyze=sub.add_parser("analyze")
     analyze.add_argument("--evidence",required=True)
     analyze.add_argument("--trusted-reviewer",action="store_true")
+    analyze.add_argument("--previous-report")
     analyze.add_argument("--ledger")
     analyze.add_argument("--expected-head",default=None)
     delivery=sub.add_parser("signoff")
@@ -154,8 +155,9 @@ def main(argv=None):
                           for s in doc["signals"])
             benchmark=tuple(_typed(QualityMeasurement,q)
                             for q in doc["benchmarks"])
+            previous=_report(_file(a.previous_report)) if a.previous_report else None
             report=evaluate_convergence(
-                plan,rival,signals,benchmark,authorized=True)
+                plan,rival,signals,benchmark,previous=previous,authorized=True)
             result=report.payload()
             if a.ledger:
                 with CompetitiveLedger(a.ledger) as ledger:
