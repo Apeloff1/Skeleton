@@ -25,8 +25,14 @@ from .original_world_product_agents import (
     PhysicalSociety, create_society, npc_tick, validate_society,
     society_save, society_restore, Person, ROLES,
 )
+from .original_world_npc_cognition_v2 import (
+    CitizenIntelligence, make_intelligence, validate_intelligence,
+    smart_npc_tick, cognition_save, cognition_restore,
+    register_player_care, commission, cancel_order, _bond_change,
+)
 
-SCHEMA = "original-world-playable-product-session.v1"
+SCHEMA = "original-world-playable-product-session.v2"
+LEGACY_SCHEMA = "original-world-playable-product-session.v1"
 LIMIT = 2048
 SAVED_BYTES_LIMIT = 4194304
 BIOMES_BY_ARCH = {
@@ -56,6 +62,7 @@ class ProductSession:
     society: PhysicalSociety
     events: int = 0
     event_head: str = "0" * 64
+    cognition: CitizenIntelligence | None = None
 
 
 @dataclass(frozen=True)
@@ -87,6 +94,7 @@ def validate_product(state: ProductSession):
     if state.terrain.biome != BIOMES_BY_ARCH[law.source.spatial.architecture.architecture_id]:
         raise FoundationError("local landscape conflicts with selected world architecture")
     validate_society(state.society, state.terrain)
+    validate_intelligence(state.cognition, state.society, state.terrain)
     if state.society.tick != state.living.living_turns or state.terrain.turns != state.living.living_turns:
         raise FoundationError("source-world, landscape and actor clocks diverged")
     if type(state.events) is not int or not 0 <= state.events <= LIMIT:
@@ -101,8 +109,9 @@ def create_product(index: int, *, inhabitants: int = 12) -> ProductSession:
     physical = create_terrain(
         law.design_id, BIOMES_BY_ARCH[law.source.spatial.architecture.architecture_id])
     inhabitants_state = create_society(physical, inhabitants)
+    minds = make_intelligence(physical, inhabitants_state)
     game = ProductSession(law.world_id, create_living(index),
-                          physical, inhabitants_state)
+                          physical, inhabitants_state, cognition=minds)
     validate_product(game)
     return game
 
@@ -166,7 +175,9 @@ def _product_operation(
             relationships=min(20, person.relationships + action.amount),
         )
         society = replace(society, inhabitants=tuple(residents))
-        message = "Gave physically carried food to a nearby persistent NPC"
+        cognition = register_player_care(
+            session.cognition, society, action.target, food=action.amount)
+        message = "Delivered food and formed remembered trust with a physical resident"
     elif verb == "assign":
         if type(action.target) is not int or not 0 <= action.target < len(society.inhabitants):
             raise FoundationError("assignment requires a known physical resident")
@@ -191,7 +202,63 @@ def _product_operation(
     else:
         raise FoundationError("unsupported cross-economy/social studio operation")
     living = _spend_source_ap(living)
-    return replace(session, terrain=local, living=living, society=society), (message,)
+    return replace(session, terrain=local, living=living, society=society,
+                   cognition=cognition if verb == "gift" else session.cognition), (message,)
+
+
+def _npc_operation(
+    session: ProductSession, action: ProductAction,
+) -> tuple[ProductSession, tuple[str, ...]]:
+    """Authenticated-by-gameplay commands changing real person contracts.
+
+    Work orders cost one civic trust and one action point, and require face
+    contact or posting at the central depot. The player's order does not
+    create any resources: fulfillment is recorded only when an NPC physically
+    delivers stocks from depleted terrain deposits.
+    """
+    world, society = session.terrain, session.society
+    thinking = session.cognition
+    if action.verb == "commission":
+        if not 0 <= action.target < len(society.inhabitants):
+            raise FoundationError("contract must refer to an existing citizen")
+        actor = society.inhabitants[action.target]
+        if (world.position != (0, 0)
+                and abs(actor.x - world.position[0])
+                + abs(actor.y - world.position[1]) > 1):
+            raise FoundationError("commission must be posted at depot or in person")
+        causal = session.living.spatial.game.causal
+        if causal.trust < 1:
+            raise FoundationError("work contract requires civic legitimacy")
+        thinking = commission(thinking, society, world,
+                              citizen=action.target, material=action.option,
+                              quantity=action.amount)
+        previous = session.living.spatial
+        revised = replace(previous, game=replace(
+            previous.game, causal=replace(causal, trust=causal.trust - 1)))
+        living = replace(session.living, spatial=revised)
+        message = (
+            f"Citizen {action.target} accepted real-material {action.option} "
+            f"contract for {action.amount} goods; public trust paid")
+    elif action.verb == "cancel":
+        thinking = cancel_order(thinking, society, world, action.target)
+        living = session.living
+        message = f"Open work contract {action.target} cancelled without fabricating goods"
+    elif action.verb == "council":
+        if world.position != (0, 0) or world.provisions < 1:
+            raise FoundationError("public council requires depot and one food offering")
+        if len(society.inhabitants) < 2:
+            raise FoundationError("a public council needs at least two living residents")
+        world = replace(world, provisions=world.provisions - 1)
+        thinking = _bond_change(
+            thinking, 0, 1, affinity=1, trust=1, aid=1)
+        thinking = replace(thinking, meetings=thinking.meetings + 1,
+                           interventions=thinking.interventions + 1)
+        living = session.living
+        message = "Public council spent real provisions and strengthened a recorded civic tie"
+    else:
+        raise FoundationError("unrecognized cognitive command")
+    return replace(session, terrain=world, living=_spend_source_ap(living),
+                   cognition=thinking), (message,)
 
 
 def step_product(
@@ -201,7 +268,7 @@ def step_product(
     if state.events >= LIMIT:
         raise FoundationError("product receipt capacity exhausted")
     if not isinstance(action, ProductAction) or action.layer not in (
-        "terrain", "living", "spatial", "mode", "arc", "causal", "studio",
+        "terrain", "living", "spatial", "mode", "arc", "causal", "studio", "npc",
     ):
         raise FoundationError("invalid product command layer")
     if type(action.amount) is not int or not 1 <= action.amount <= 3:
@@ -227,6 +294,8 @@ def step_product(
         info = (f"Real physical tile action: {action.verb} ({action.x},{action.y})",)
     elif action.layer == "studio":
         new, info = _product_operation(state, action)
+    elif action.layer == "npc":
+        new, info = _npc_operation(state, action)
     else:
         living, evidence = step_living(
             state.living, LivingAction(action.layer, action.verb,
@@ -236,11 +305,14 @@ def step_product(
         if action.layer == "causal" and action.verb == "end_turn":
             terrain, _ = step_terrain(
                 state.terrain, TerrainAction("end_turn", 0, 0))
-            terrain, society, residents = npc_tick(terrain, state.society)
-            new = replace(new, terrain=terrain, society=society)
+            terrain, society, cognition, residents, thoughts = smart_npc_tick(
+                terrain, state.society, state.cognition)
+            new = replace(new, terrain=terrain, society=society,
+                          cognition=cognition)
             deliveries = sum(rec.quantity for rec in residents if rec.operation == "deliver")
-            info += (f"Autonomous citizens: {len(residents)} physically updated; "
-                     f"actual delivered resource units: {deliveries}",)
+            info += (f"Cognitive citizens: {len(residents)} decisions, "
+                     f"{deliveries} physically delivered resources; "
+                     f"{len(cognition.bonds)} tracked social relationships",)
     event_hash = _hash({
         "schema": SCHEMA, "world": law.design_id,
         "previous": state.event_head,
@@ -263,6 +335,7 @@ def product_save(state: ProductSession) -> str:
         "living": json.loads(save_living(state.living)),
         "terrain": json.loads(terrain_save(state.terrain)),
         "society": society_save(state.society),
+        "cognition": cognition_save(state.cognition),
         "events": state.events, "event_head": state.event_head,
     }
     return json.dumps(
