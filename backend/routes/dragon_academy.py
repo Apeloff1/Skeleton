@@ -1465,8 +1465,12 @@ def native_original_mechanics_catalog(
         capabilities,MECHANICS,
     )
     from skeleton.ai.webcrawler.dragon_original_campaign_forge import ROUTE_INTENTS
+    from skeleton.ai.webcrawler.dragon_original_prototype_factory import (
+        structurally_qualified_capacity,
+    )
     return {
         "ok":True,**capabilities(),
+        "prototype_viability_capacity":structurally_qualified_capacity(),
         "mechanics":[{
             "id":row[0],"domain":row[1],
             "cost_resource":row[2],"reward_resource":row[3],
