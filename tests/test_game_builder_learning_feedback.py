@@ -114,7 +114,7 @@ class AdversarialEvidencePromotionTests(unittest.TestCase):
     def test_live_family_coverage_and_missed_hazards_are_vetoes(self):
         rows=evidence_rows()
         result=evaluate_fresh_cohort(
-            rows, policy(bias=-2),standard=forgiving(min_family_cases=3),
+            rows, policy(bias=-2),standard=forgiving(min_family_cases=9),
             source_projects=(),authorized=True)
         self.assertFalse(result["passed"])
         self.assertEqual(result["candidate_digest"], canonical_digest(policy(-2)))
