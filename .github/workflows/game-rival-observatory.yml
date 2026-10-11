@@ -6,6 +6,7 @@ on:
       - "skeleton/ai/game_builder/rival_public_monitor.py"
       - "skeleton/ai/game_builder/rival_watch_cli.py"
       - "skeleton/ai/game_builder/rival_delivery_campaign.py"
+      - "skeleton/ai/game_builder/rival_trajectory.py"
       - "tests/test_game_builder_rival_convergence.py"
       - "tests/test_game_builder_rival_campaign_cli.py"
       - "docs/ai/game_rival_watchlist.json"
