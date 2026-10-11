@@ -138,6 +138,8 @@ def execute_round9_project_research(
 ):
     if not authorized or not consent:
         raise PermissionError("task-directed Dragon recrawl needs explicit consent")
+    if almanac.project_id!=state.task.original_id:
+        raise ThreatRadarError("post-weight research belongs to another original game")
     mission=plan_post_weight_dragon_research(
         current_post_weight,almanac,authorized=True,consent=True)
     return _advance(
@@ -196,8 +198,13 @@ def execute_round11_destinations(
     rights:RightsLedger,*,
     reviewer:TrustedCompetitionJudge,
     as_of:str,authorized:bool,
+    expected_crawler_brief_digest:str,
 )->tuple[EvolutionRun,tuple[CrawlerDestination,...]]:
     if not authorized:raise PermissionError("research destination lookup needs permission")
+    _sha(expected_crawler_brief_digest)
+    if (not state.rounds or state.rounds[-1].round_number!=10
+            or state.rounds[-1].report_digest!=expected_crawler_brief_digest):
+        raise ThreatRadarError("crawler destinations cannot escape reviewed round-ten target")
     if packet.project_id!=state.task.original_id:
         raise ThreatRadarError("crawler destination source rights belong to another original game")
     sources=derive_round11_reviewed_destinations(
