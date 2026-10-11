@@ -74,7 +74,7 @@ Every report includes source/candidate digests, precise counts, prioritized acti
 
 A host may invoke the existing `usage` or `idle-pass` commands with distinct reviewed original-world blueprints. The two modes are **separate** qualification obligations; one cannot stand in for the other.
 
-For deployment safety the current project exposes *bounded, operator-triggered evaluation*, not an invisible OS background service. Production idle detection, thermals/battery-aware budgets, consent, foreground preemption and pause/resume checkpointing require an explicit host-owned scheduler integration. Until then, the CLI's idle label means an independently requested idle cohort, not proof of OS user inactivity.
+For deployment safety the project exposes *bounded operator-triggered evaluation* and a new **opt-in, host-invoked idle dispatcher** (`game_idle_review_scheduler.py`), not an invisible OS background daemon. The host must provide explicit consent, a current user-idle probe, and an independent hardware-safety probe. Each cohort has a finite wall-time budget; cooperative interruption checks run between tester personas and adversarial fault mutations, and aborts do not publish model transitions. They are not a hard real-time OS preemption guarantee. A production host must still supply real idle/thermal/battery telemetry, service scheduling and pause/resume policy; these are not fabricated by the module. The CLI's `idle-pass` command alone does not prove OS inactivity.
 
 CLI sequence from the existing game-builder module:
 
@@ -93,11 +93,15 @@ Commands above require pre-existing original worlds, reviewed quarantine example
 
 ## 6. Fault matrix and observability
 
-The focused test suite injects unreviewed/duplicate sources, source overlap, unqualified or unauthorized operations, calibration/critical misses, insufficient family coverage, weak model shortcut resistance, champion regression, source-unsafe improvement outputs, standards weakening and active-model restaging. The registry tests also verify immutable chained receipts and recovery after interruption between ledger and state publication.
+The focused test suite injects unreviewed/duplicate sources, source overlap, unqualified or unauthorized operations, calibration/critical misses, insufficient family coverage, weak model shortcut resistance, champion regression, source-unsafe improvement outputs, standards weakening and active-model restaging. It additionally injects denied idle consent, user-present deferral, foreground activity occurring *mid-fault replay*, model journal non-mutation on preemption, cross-generation source reuse, and prior-cohort replay after the active display slots have been replaced. The registry tests also verify immutable chained receipts and recovery after interruption between ledger and state publication.
 
 The qualification workflow pins checkout to the PR's **exact SHA** and runs Python on Ubuntu and Windows. A workflow green signal confirms only these assertions; it does not independently measure commercial competitor quality, prove hardware-specific runtime behavior, certify rights, or qualify a large-language-model checkpoint.
 
-## 7. Next implementation acceptance work
+## 7. Scheduler invocation example
+
+An authorized local host can call `qualify_when_idle(registry, original_worlds, authorized=True, consent=True, host_is_idle=..., hardware_is_safe=..., budget=IdleEvaluationBudget(max_wall_seconds=300, max_worlds=4))`. The host functions are **real, current boolean signals**, not synthetic constants in production. The result is `deferred` on foreground/hardware pressure or a signed-state independent evaluation; the function never authorizes `activate()`.
+
+## 8. Next implementation acceptance work
 
 - Connect real host activity, CPU/memory/thermal and foreground-preemption signals to an owner-authorized idle coordinator. Suspend immediately on foreground activity and never infer consent from mere inactivity.
 - Track platform/genre/era-specific evaluation families and a protected, rotating adversarial holdout bank, with explicit minimum per-family and per-generation source counts.
