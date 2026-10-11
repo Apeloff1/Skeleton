@@ -14,6 +14,7 @@ on:
       - "docs/ORIGINAL_WORLD_MILLION_FORGE.md"
       - "docs/ORIGINAL_WORLD_TENFOLD_SPATIAL_FORGE.md"
       - "docs/ORIGINAL_WORLD_LIVING_122M.md"
+      - "docs/ORIGINAL_WORLD_PRODUCT_DELIVERY.md"
       - ".github/workflows/original-world-atlas.yml"
   push:
     branches: [main]
@@ -27,6 +28,7 @@ on:
       - "docs/ORIGINAL_WORLD_MILLION_FORGE.md"
       - "docs/ORIGINAL_WORLD_TENFOLD_SPATIAL_FORGE.md"
       - "docs/ORIGINAL_WORLD_LIVING_122M.md"
+      - "docs/ORIGINAL_WORLD_PRODUCT_DELIVERY.md"
       - ".github/workflows/original-world-atlas.yml"
   workflow_dispatch:
 
