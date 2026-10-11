@@ -50,6 +50,56 @@ class GameTesterAlmanacTests(unittest.TestCase):
         self.assertTrue(a.passed)
         self.assertGreater(a.unique_solution_patterns,1)
 
+    def test_gameplay_almanac_produces_actual_before_after_training_curriculum(self):
+        from skeleton.ai.game_builder.game_learning_almanac import (
+            build_game_tester_curriculum,
+        )
+        report=test_game_personas(self.world,"quest_00",
+                                  max_personas=3,
+                                  mutation_families=TEST_FAMILIES[:10],
+                                  authorized=True)
+        curriculum=build_game_tester_curriculum(report,authorized=True)
+        self.assertEqual(len(curriculum.examples),33)
+        self.assertEqual(curriculum.red_team_count,30)
+        self.assertEqual(curriculum.positive_controls,3)
+        first=curriculum.examples[0]
+        self.assertEqual(first.expected["decision"],"reject")
+        self.assertIn("before",first.input)
+        self.assertIn("after",first.input)
+        self.assertNotEqual(first.input["before"],first.input["after"])
+        self.assertEqual(first.evidence["game_tester_digest"],report.digest)
+        self.assertEqual(curriculum.examples[-1].expected["decision"],
+                         "accept_witnessed_incident_only")
+        with self.assertRaises(PermissionError):
+            build_game_tester_curriculum(report,authorized=False)
+
+    def test_gameplay_cli_creates_replay_almanac_and_quarantined_cases(self):
+        import io,json,tempfile
+        from contextlib import redirect_stdout
+        from pathlib import Path
+        from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
+        from skeleton.ai.game_builder.game_workspace_cli import main as studio_cli
+        with tempfile.TemporaryDirectory() as folder:
+            source=Path(folder)/"world.json"
+            source.write_text(json.dumps(self.world.payload()),encoding="utf-8")
+            studio=GameWorkspace.create(Path(folder)/"studio",authorized=True)
+            output=io.StringIO()
+            with redirect_stdout(output):
+                code=studio_cli([
+                    "playtest-game","--root",str(studio.root),
+                    "--director-blueprint",str(source),
+                    "--testers","3","--attack-families","8",
+                    "--quarantine-learning","--trusted-local-operator",
+                ])
+            self.assertEqual(code,0)
+            result=json.loads(output.getvalue())
+            self.assertEqual(result["report"]["tester_count"],3)
+            self.assertEqual(result["report"]["adversarial_attempts"],24)
+            self.assertEqual(result["candidate_examples"],27)
+            self.assertFalse(result["model_training_executed"])
+            self.assertIsNotNone(result["quarantined"])
+            self.assertEqual(studio.tree()["training_quarantine"],1)
+
     def test_testers_refuse_fabricated_family_or_insufficient_real_quest(self):
         with self.assertRaises(PlaytestError):
             test_game_personas(self.world,"phantom",authorized=True)
