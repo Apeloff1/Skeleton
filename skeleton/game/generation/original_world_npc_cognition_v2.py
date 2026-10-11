@@ -303,8 +303,10 @@ def validate_intelligence(
         _bounded(statement.confidence, 70, 100, "corroboration confidence")
         for coordinate in (statement.x, statement.y):
             _bounded(coordinate, -(1 << 20), 1 << 20, "reported location")
+        # A physical observation site is a unique evidence claim even when
+        # revisited; advancing time alone cannot mint duplicate public facts.
         key = (statement.citizen, statement.subject, statement.x,
-               statement.y, statement.observation_turn)
+               statement.y)
         if key in seen_evidence:
             raise FoundationError("duplicated testimony cannot mint game evidence")
         seen_evidence.add(key)
@@ -425,7 +427,7 @@ def interview_citizen(
                        m.subject, m.position),
     )
     archived = {
-        (t.citizen, t.subject, t.x, t.y, t.observation_turn)
+        (t.citizen, t.subject, t.x, t.y)
         for t in state.testimonies
     }
     for memory in records:
@@ -433,8 +435,7 @@ def interview_citizen(
             citizen, memory.subject, *memory.position,
             memory.turn, memory.value, memory.confidence,
         )
-        key = (claim.citizen, claim.subject, claim.x, claim.y,
-               claim.observation_turn)
+        key = (claim.citizen, claim.subject, claim.x, claim.y)
         if key not in archived:
             if len(state.testimonies) >= MAX_TESTIMONIES:
                 raise FoundationError("public witnessed-testimony ledger is full")
