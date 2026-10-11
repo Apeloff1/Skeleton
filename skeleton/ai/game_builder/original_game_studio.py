@@ -12,6 +12,9 @@ from hashlib import sha256
 import json
 
 from .contracts import canonical_digest
+from .companion_curriculum import (
+    PracticeInsight, measure_original_practice, validate_practice_cohort,
+)
 from .dual_runtime_export import (
     DualRuntimePackage, render_dual_runtime_package, export_dual_runtime_package,
 )
@@ -98,6 +101,8 @@ class CompanionPractice:
     proof_digest: str
     winning_steps: int
     capability_xp: int
+    insight_digest: str
+    challenge_score: int
     package_manifest_digest: str
     package_path: str
 
@@ -109,6 +114,8 @@ class CompanionPractice:
             "proof_digest": self.proof_digest,
             "winning_steps": self.winning_steps,
             "verified_capability_xp": self.capability_xp,
+            "machine_almanac_insight_digest": self.insight_digest,
+            "measured_challenge_score": self.challenge_score,
             "package_manifest_digest": self.package_manifest_digest,
             "package_path": self.package_path,
         }
@@ -220,6 +227,7 @@ def run_original_game_studio(
         raise StudioError("studio cannot execute blocked or externally unverified tools")
     execution_audit: dict[str, object]
     native_practice_packages: tuple[DualRuntimePackage, ...] | None = None
+    native_insights: tuple[PracticeInsight, ...] | None = None
     if research_enabled:
         from .playable_compiler import compile_game_from_reviewed_research
         # The canonical research bridge independently validates the library,
@@ -259,12 +267,17 @@ def run_original_game_studio(
             raise StudioError("tool plane failed to deliver a proved game")
         project, package, mirror = executed.project, executed.package, executed.mirror
         native_practice_packages = executed.practice_packages
+        native_insights = executed.practice_insights
         execution_audit = executed.to_payload()
     if not mirror.passed:
         raise StudioError("adversarial game mirror room found a failure")
     practice: list[CompanionPractice] = []
     practice_files: dict[str, bytes] = {}
     practice_intents = _practice_intents(intent, companion_practice_games)
+    diversity_count = validate_practice_cohort(practice_intents, parent=intent)
+    almanac_insights: list[PracticeInsight] = []
+    if native_insights is not None and len(native_insights) != len(practice_intents):
+        raise StudioError("tool execution produced an unexpected insight count")
     if native_practice_packages is not None and len(native_practice_packages) != len(practice_intents):
         raise StudioError("tool execution produced an unexpected practice game count")
     for index, sample in enumerate(practice_intents, 1):
@@ -272,12 +285,23 @@ def run_original_game_studio(
             candidate = compile_original_game(sample, authorized=True)
             practice_package = render_dual_runtime_package(candidate, authorized=True)
             winning_steps = candidate.proof.final_state.steps
+            insight = measure_original_practice(
+                candidate.world, candidate.proof, authorized=True,
+                distinct_themes=diversity_count,
+            )
         else:
             practice_package = native_practice_packages[index - 1]
+            insight = native_insights[index - 1]
             proof_data = json.loads(
                 practice_package.files["proof/verified_solution.json"].decode("utf-8")
             )
             winning_steps = len(proof_data["actions"])
+        if (insight.world_digest != practice_package.manifest["world_digest"]
+                or insight.proof_digest != practice_package.manifest["proof_digest"]
+                or insight.safe_solution_turns != winning_steps
+                or insight.intent_digest != canonical_digest(sample.to_payload())):
+            raise StudioError("companion almanac evidence conflicts with executable practice game")
+        almanac_insights.append(insight)
         if practice_package.manifest["project_id"] != sample.project_id:
             raise StudioError("companion practice package identity mismatch")
         if (practice_package.manifest["proof_status"]
@@ -292,7 +316,9 @@ def run_original_game_studio(
             world_digest=str(practice_package.manifest["world_digest"]),
             proof_digest=str(practice_package.manifest["proof_digest"]),
             winning_steps=winning_steps,
-            capability_xp=25 + sample.levels * 5,
+            capability_xp=insight.verified_experience,
+            insight_digest=insight.digest,
+            challenge_score=insight.challenge_score,
             package_manifest_digest=str(practice_package.manifest["manifest_digest"]),
             package_path=prefix,
         ))
@@ -352,6 +378,16 @@ def run_original_game_studio(
         "studio/executed_tool_receipts.json": execution_audit,
         "studio/mirror_room.json": mirror.to_payload(),
         "studio/consumer_gate.json": consumer.to_payload(),
+        "studio/companion_almanac.json": {
+            "schema": "skeleton.game_builder.companion_machine_almanac.v1",
+            "insights": [item.to_payload() for item in almanac_insights],
+            "parent_world_digest": project.world.digest,
+            "unique_themes": diversity_count,
+            "source_kind": "measured_local_original_gameplay",
+            "open_world_or_npc_quality_verified": False,
+            "human_playtests": False,
+            "trained_model_weights": False,
+        },
         "studio/companion_practice.json": {
             "schema": "skeleton.game_builder.companion_practice.v1",
             "games": [item.to_payload() for item in practice],
