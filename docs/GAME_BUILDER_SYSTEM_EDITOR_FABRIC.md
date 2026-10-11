@@ -188,6 +188,20 @@ godot --headless --path ./my-original-puzzle/godot -- --verify-advanced
 godot --path ./my-original-puzzle/godot
 ```
 
+The local Game Studio additionally offers an explicit **Download playable
+Godot 4 puzzle project** action for an active, fully replay-verified puzzle
+session. Its localhost-only endpoint validates the session and settings anew
+before returning a deterministic, content-addressed ZIP containing precisely
+the fixed exporter-owned source tree. It does not automatically commit,
+execute Godot, publish, fetch assets or certify native hardware. Non-puzzle
+genres deliberately receive an unsupported-native-adapter error.
+
+The Linux parity gate now exports and executes a genuine Linux desktop
+binary. The Windows lane also exports a Windows `.exe` and runs its
+console-capable companion against the independently verified Python puzzle
+state. Native executable success must be confirmed by an exact-head run, not
+just inferred from the presence of the workflow definition.
+
 The exact-head `game-builder-advanced-godot-native.yml` workflow builds
 five separate original puzzle modes on Linux and Windows, invokes their
 Godot source runtimes, compares actual native results to Python, and also
