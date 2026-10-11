@@ -27,8 +27,11 @@ small{color:#b9d0d3}.status{background:#254653;padding:.6rem;margin:.8rem 0;whit
 #system-fields label{margin:0}
 #system-fields input[type=checkbox]{width:auto;min-height:auto}
 #system-preview{max-height:170px;overflow:auto;white-space:pre-wrap;font:12px/1.4 ui-monospace,monospace}
-#system-canvas{width:100%;max-width:500px;height:auto;border:1px solid #537783;
+#system-canvas,#advanced-canvas{width:100%;max-width:500px;height:auto;border:1px solid #537783;
  background:#0b2331;border-radius:.4rem}
+#advanced-actions{display:flex;flex-wrap:wrap;gap:.3rem}
+#advanced-actions button{font-size:12px}
+#advanced-state{font:12px/1.5 ui-monospace,monospace;white-space:pre-wrap;max-height:220px;overflow:auto}
 #system-description{display:block;min-height:2.5rem}
 @media(max-width:940px){main{grid-template-columns:1fr}section{min-height:0}}
 """
@@ -444,6 +447,142 @@ $("system-stage").addEventListener("click",async()=>{
   status("System staged in source review. Use Review proposed edit, inspect diff, then explicitly approve commit.");
  }catch(error){status("System staging rejected: "+error.message);}
 });
+// The advanced playable reference runs stateless server-side. No client state
+// is trusted: every button submits the full transcript for independent replay.
+let advancedCommands=[],advancedSession=null,advancedSettings=null,advancedEditor=null;
+function drawAdvancedGame(session){
+ const canvas=$("advanced-canvas"),c=canvas.getContext("2d");
+ const W=canvas.width,H=canvas.height;
+ c.fillStyle="#0b2331";c.fillRect(0,0,W,H);
+ c.font="13px system-ui";c.fillStyle="#d8eef0";
+ if(!session){c.fillText("Start an advanced playable reference scenario",12,25);return;}
+ const state=session.state,editor=session.editor;
+ c.fillText(editor.toUpperCase()+" · turn "+session.validated_turn_count+
+  " · advanced floor",12,20);
+ if(editor==="platformer"){
+  const scale=(W-32)/Math.max(1,state.exit_x),floor=H-44;
+  c.strokeStyle="#799da8";c.lineWidth=2;c.beginPath();
+  c.moveTo(16,floor);c.lineTo(W-16,floor);c.stroke();
+  for(const x of state.spikes){
+   c.fillStyle="#ee827d";c.beginPath();c.moveTo(16+x*scale-5,floor);
+   c.lineTo(16+x*scale,floor-13);c.lineTo(16+x*scale+5,floor);c.fill();
+  }
+  for(const x of state.collectibles){
+   if(state.crystals.includes(x))continue;
+   c.fillStyle="#f5da77";c.fillRect(16+x*scale-3,floor-27,6,8);
+  }
+  for(const x of state.checkpoints){
+   c.fillStyle="#7ca4ee";c.fillRect(16+x*scale,floor-19,2,19);
+  }
+  c.fillStyle="#80ecc5";c.fillRect(12+state.x*scale,floor-22-Math.min(70,state.y),10,20);
+  c.fillStyle="#d8eef0";c.fillText("HP "+state.health+
+   " · crystals "+state.crystals.length+"/"+state.collectibles.length,15,H-9);
+ }else if(editor==="tactics"){
+  const dims=[Math.max(1,...state.enemies.map(x=>x.x+1),
+    ...state.units.map(x=>x.x+1),state.objective[0]+1),
+    Math.max(1,...state.enemies.map(x=>x.y+1),
+    ...state.units.map(x=>x.y+1),state.objective[1]+1)];
+  const size=Math.min(18,Math.floor((W-155)/dims[0]),Math.floor((H-60)/dims[1]));
+  const ox=15,oy=34;
+  c.strokeStyle="#4f7484";
+  for(let x=0;x<=dims[0];x++){
+   c.beginPath();c.moveTo(ox+x*size,oy);c.lineTo(ox+x*size,oy+dims[1]*size);c.stroke();
+  }
+  for(let y=0;y<=dims[1];y++){
+   c.beginPath();c.moveTo(ox,oy+y*size);c.lineTo(ox+dims[0]*size,oy+y*size);c.stroke();
+  }
+  for(const [x,y] of state.obstacles){
+   c.fillStyle="#728091";c.fillRect(ox+x*size+1,oy+y*size+1,size-2,size-2);
+  }
+  state.units.forEach((unit,index)=>{
+   if(unit.hp===0)return;
+   c.fillStyle=index===state.active_unit?"#70f1c7":"#66a4e2";
+   c.fillRect(ox+unit.x*size+3,oy+unit.y*size+3,Math.max(2,size-6),Math.max(2,size-6));
+  });
+  for(const enemy of state.enemies){
+   c.fillStyle="#f1997d";c.fillRect(ox+enemy.x*size+3,oy+enemy.y*size+3,
+                                   Math.max(2,size-6),Math.max(2,size-6));
+  }
+  c.fillStyle="#d8eef0";c.fillText("Round "+state.round,Math.min(W-125,ox+dims[0]*size+14),55);
+  c.fillText("AP "+state.action_points,Math.min(W-125,ox+dims[0]*size+14),76);
+  c.fillText("Enemies "+state.enemies.length,Math.min(W-125,ox+dims[0]*size+14),97);
+ }else if(editor==="tower_defense"){
+  const y=H-85,scale=(W-40)/Math.max(1,12);
+  c.strokeStyle="#799da8";c.lineWidth=4;c.beginPath();c.moveTo(20,y);
+  c.lineTo(W-20,y);c.stroke();
+  for(const enemy of state.enemies){
+   c.fillStyle=enemy.armor?"#faac80":"#ec797f";
+   c.fillRect(20+enemy.x*scale,y-8,13,15);
+  }
+  for(const tower of state.towers){
+   c.fillStyle=tower.level>1?"#eed27b":"#7be2c0";
+   c.fillRect(20+(tower.slot*3+2)*scale,y-38,12,30);
+  }
+  c.fillStyle="#d8eef0";c.fillText("Credits "+state.credits+" · Base "+state.base_hp,15,H-42);
+  c.fillText("Defeated "+state.defeated+" · Escaped "+state.escaped,15,H-18);
+ }
+ if(state.finished||state.failed){
+  c.fillStyle=state.finished?"#a2f5cb":"#ffaba6";
+  c.fillText(state.finished?"Completed":"Defeat",W-100,20);
+ }
+}
+function renderAdvancedActions(actions){
+ const target=$("advanced-actions");target.replaceChildren();
+ for(const action of actions){
+  const button=document.createElement("button");
+  button.type="button";button.textContent=action;button.value=action;
+  button.disabled=Boolean(advancedSession&&advancedSession.terminal);
+  button.addEventListener("click",()=>advanceAdvanced(action));
+  target.append(button);
+ }
+}
+function showAdvanced(reply){
+ advancedSession=reply.session;
+ $("advanced-state").textContent=JSON.stringify({
+   session_digest:advancedSession.digest,
+   turns:advancedSession.validated_turn_count,
+   state:advancedSession.state,
+   terminal:advancedSession.terminal,
+   native_hardware_verified:advancedSession.native_hardware_verified,
+ },null,2);
+ drawAdvancedGame(advancedSession);
+ renderAdvancedActions(reply.available_actions);
+}
+async function startAdvanced(){
+ try{
+  advancedEditor=systemEditor().id;advancedSettings=systemSettings();
+  const seedText=$("advanced-seed").value;
+  if(!/^[0-9]+$/.test(seedText))throw Error("Advanced seed must be an integer");
+  const seed=Number(seedText);
+  const reply=await api("/api/advanced-play",{
+   editor:advancedEditor,settings:advancedSettings,actions:[],seed});
+  advancedCommands=[];showAdvanced(reply);
+  status("Started deterministic advanced "+advancedEditor+" session. Commands are replay-audited.");
+ }catch(error){status("Advanced session blocked: "+error.message);}
+}
+async function advanceAdvanced(action){
+ try{
+  if(!advancedSession)throw Error("Start the advanced scenario first");
+  if(advancedEditor!==systemEditor().id)throw Error("Editor changed; start a fresh scenario");
+  const actions=[...advancedCommands,action];
+  const reply=await api("/api/advanced-play",{
+   editor:advancedEditor,settings:advancedSettings,
+   actions,seed:advancedSession.seed});
+  advancedCommands=actions;showAdvanced(reply);
+  status("Advanced action verified: "+action+" · "+reply.session.head_digest.slice(0,16));
+ }catch(error){status("Advanced action rejected: "+error.message);}
+}
+$("advanced-start").addEventListener("click",startAdvanced);
+$("advanced-verify").addEventListener("click",async()=>{
+ try{
+  if(!advancedSession)throw Error("Start an advanced reference game first");
+  const result=await api("/api/advanced-verify",{
+   session:advancedSession,settings:advancedSettings});
+  if(!result.verified)throw Error("Reference replay did not validate");
+  status("Advanced replay verified against full immutable action transcript.");
+ }catch(error){status("Replay evidence rejected: "+error.message);}
+});
+drawAdvancedGame(null);
 loadSystemEditors();
 refresh();
 """
@@ -503,6 +642,18 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <canvas id="system-canvas" width="470" height="210" role="img"
  aria-label="Validated genre-system mechanics preview"></canvas>
 <pre id="system-preview" role="status" aria-live="polite"></pre>
+<fieldset><legend>Advanced playable scenario · reference engine</legend>
+<p><small>Actual command-driven gameplay for platformer, tactics and tower defense.
+Other editor families remain authoring-only, not falsely certified engines.</small></p>
+<label>Scenario seed<input id="advanced-seed" type="number" min="0" max="2147483647" value="0"></label>
+<button id="advanced-start" type="button">Start advanced scenario</button>
+<button id="advanced-verify" type="button">Independently verify replay</button>
+<div id="advanced-actions" aria-label="Advanced gameplay actions"></div>
+<canvas id="advanced-canvas" width="470" height="250" role="img"
+ aria-label="Reference gameplay map and telemetry"></canvas>
+<pre id="advanced-state" role="status" aria-live="polite"></pre>
+<p><small>Advanced is the minimum design tier. Reference gameplay is not hardware certification.</small></p>
+</fieldset>
 <p><small>Playable preview where implemented; other editors validate authored system settings.
 All writes still require exact-file review and human approval.</small></p>
 </fieldset>
