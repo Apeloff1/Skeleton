@@ -153,8 +153,9 @@ def execute_local_tool_plan(
         )
     except (ValueError, PermissionError) as exc:
         raise ExecutionPlaneError("tool plan failed fresh authority check") from exc
-    if (checked.digest != plan.digest or checked.external_blocked
-            or checked.tool_digests != plan.tool_digests):
+    if checked.external_blocked:
+        raise ExecutionPlaneError("tool plan blocked or filesystem write grant missing")
+    if checked.digest != plan.digest or checked.tool_digests != plan.tool_digests:
         raise ExecutionPlaneError("tool grant changed, is blocked or was forged")
     if any(
         not isinstance(row, ToolRequest) or row.input_digest != anchored
