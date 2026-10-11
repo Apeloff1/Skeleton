@@ -13,6 +13,7 @@ import tempfile
 import unittest
 
 from skeleton.ai.game_builder.dual_runtime_cli import main
+from skeleton.ai.game_builder.playable_compiler import compile_authored_game
 from skeleton.ai.game_builder.dual_runtime_export import (
     DualRuntimeExportError,
     export_dual_runtime_package,
@@ -165,6 +166,49 @@ class DualRuntimeGameTests(unittest.TestCase):
             self.assertIn("NATIVE_REPLAY_OK", result.stdout + result.stderr)
             self.assertNotIn("SCRIPT ERROR", result.stdout + result.stderr)
             self.assertNotIn("Parse Error", result.stdout + result.stderr)
+
+
+    def test_optional_godot_authored_world_replays_native(self) -> None:
+        engine = shutil.which("godot") or shutil.which("godot4")
+        if engine is None:
+            self.skipTest("Godot 4 not installed")
+        authored = compile_authored_game(
+            self.intent, [list(level.rows) for level in self.compiled.world.levels],
+            human_reviewed=True, authorized=True,
+        )
+        bundle = render_dual_runtime_package(authored, authorized=True)
+        with tempfile.TemporaryDirectory() as temp:
+            output = export_dual_runtime_package(
+                bundle, Path(temp) / "authored", authorized=True
+            )
+            proc = subprocess.run(
+                [engine, "--headless", "--path", str(output / "godot"),
+                 "--quit-after", "200", "--", "--verify-proof"],
+                capture_output=True, text=True, timeout=45, check=False,
+            )
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+            self.assertIn("NATIVE_REPLAY_OK", proc.stdout + proc.stderr)
+
+    def test_optional_godot_tampered_proof_fails_closed(self) -> None:
+        engine = shutil.which("godot") or shutil.which("godot4")
+        if engine is None:
+            self.skipTest("Godot 4 not installed")
+        with tempfile.TemporaryDirectory() as temp:
+            output = export_dual_runtime_package(
+                self.bundle, Path(temp) / "game", authorized=True
+            )
+            trace = output / "godot" / "proof.json"
+            raw = json.loads(trace.read_text(encoding="utf-8"))
+            raw["final_state"]["score"] += 10000
+            trace.write_text(json.dumps(raw), encoding="utf-8")
+            proc = subprocess.run(
+                [engine, "--headless", "--path", str(output / "godot"),
+                 "--quit-after", "200", "--", "--verify-proof"],
+                capture_output=True, text=True, timeout=45, check=False,
+            )
+            self.assertNotEqual(proc.returncode, 0)
+            self.assertIn("NATIVE_REPLAY_ERROR", proc.stdout + proc.stderr)
+            self.assertIn("score", proc.stdout + proc.stderr)
 
 
 if __name__ == "__main__":
