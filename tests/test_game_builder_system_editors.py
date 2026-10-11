@@ -4,6 +4,8 @@ from __future__ import annotations
 import http.client
 import json
 from pathlib import Path
+from contextlib import redirect_stdout, redirect_stderr
+import io
 import tempfile
 import threading
 import unittest
@@ -14,6 +16,7 @@ from skeleton.ai.game_builder.system_editor_assembly import (
 )
 from skeleton.ai.game_builder.game_workspace_server import create_workspace_server
 from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html
+from skeleton.ai.game_builder.system_editor_cli import main as editor_cli_main
 from skeleton.ai.game_builder.system_editors import (
     SystemEditorError, catalog, editor_path, editor_source, make_editor_document,
     preview_editor, validate_editor_document,
@@ -194,6 +197,37 @@ class StudioIntegrationTests(unittest.TestCase):
                       "Review proposed edit","Content-Security-Policy"):
             self.assertIn(token,html)
         self.assertNotIn("https://",html)
+
+
+class OfflineEditorCliTests(unittest.TestCase):
+    def test_offline_templates_previews_and_fail_closed_cli(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output=io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(editor_cli_main(["list"]),0)
+            listed=json.loads(output.getvalue())
+            self.assertGreaterEqual(len(listed["editors"]),40)
+            output=io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(editor_cli_main(["template","--editor","racing"]),0)
+            document=json.loads(output.getvalue())
+            path=Path(tmp)/"racing.json"
+            path.write_text(json.dumps(document),encoding="utf-8")
+            output=io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(editor_cli_main(["validate","--document",str(path)]),0)
+            self.assertEqual(json.loads(output.getvalue()),document)
+            output=io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(editor_cli_main(["preview","--editor","platformer"]),0)
+            self.assertTrue(json.loads(output.getvalue())["simulation_executed"])
+            settings=Path(tmp)/"malicious.json"
+            settings.write_text('{"gravity":8,"gravity":9}',encoding="utf-8")
+            with redirect_stderr(io.StringIO()):
+                self.assertEqual(editor_cli_main(["preview","--editor","platformer",
+                                                  "--settings",str(settings)]),2)
+                self.assertEqual(editor_cli_main(["assembly","--root",tmp,
+                                                  "--project","fake"]),2)
 
 
 class AssemblyContractTests(unittest.TestCase):
