@@ -301,6 +301,23 @@ class GameWorkspace:
                                         tree=="current" and project==self.active()).payload(),
                     content=body)
 
+    def _validate_advanced_scene_source(self,project: str,relative: str,document):
+        from .advanced_level_scenes import validate_advanced_scene, scene_path
+        from .advanced_gameplay_runtime import ENGINES
+        if type(document) is not dict or document.get("editor") not in ENGINES:
+            raise WorkspaceError("advanced scene needs an executable game editor")
+        if relative!=scene_path(document):
+            raise WorkspaceError("advanced scene filename mismatches original game identity")
+        # Scenes bind the EXACT approved system source, not unsupervised UI
+        # parameters. An unapproved system proposal cannot authorize a scene.
+        editor=document["editor"]
+        config_path=self._file("current",project,"systems/"+editor+".json")
+        if not config_path.exists():
+            raise WorkspaceError("approve the authored system configuration before its scene")
+        from .system_editors import validate_editor_document
+        config=validate_editor_document(_json(_read(config_path)))
+        validate_advanced_scene(document,config["settings"])
+
     def propose(self,project: str,relative: str,text: str,*,expected_sha256: str,
                 reason: str,authorized: bool):
         if not authorized:
@@ -322,6 +339,8 @@ class GameWorkspace:
                 document = validate_editor_document(parsed)
                 if relative != editor_path(document["editor"]):
                     raise WorkspaceError("editor source path does not match typed system ID")
+            if relative.startswith("scenes/advanced_"):
+                self._validate_advanced_scene_source(project,relative,parsed)
         proposal=dict(
             schema="skeleton.game_builder.targeted_edit.v1",
             project=project,path=_relative(relative),reason=reason,
@@ -364,6 +383,8 @@ class GameWorkspace:
                 document = validate_editor_document(parsed)
                 if proposal["path"] != editor_path(document["editor"]):
                     raise WorkspaceError("editor document path mismatches its system identity")
+            if proposal["path"].startswith("scenes/advanced_"):
+                self._validate_advanced_scene_source(project,proposal["path"],parsed)
             if proposal["path"]=="game/director.json":
                 from .quest_scene_forge import compile_director_blueprint
                 compile_director_blueprint(_json(proposal["new_content"]),
