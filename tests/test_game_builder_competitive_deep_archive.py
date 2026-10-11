@@ -82,7 +82,7 @@ class DeepHistoryCases(DeepEnemyCases):
                     archive.record(
                         second_dossier,next_scan,self.deep_brief,self.deep_packet,
                         self.deep_db,self.deep_rights,
-                        as_of="2026-10-13T12:00:00Z",
+                        as_of=T1,
                         expected_parent_digest="0"*64,authorized=True)
             with DeepEnemyArchive(root) as reopened:
                 before=reopened.history(self.original.title_id,authorized=True)
