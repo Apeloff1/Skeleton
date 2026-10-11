@@ -71,8 +71,28 @@ async function refresh(){
   if(!selectedProject||!options.includes(selectedProject))selectedProject=options[0]||null;
   $("project-choice").value=selectedProject||"";
   await listFiles();
+  await refreshModel();
   status("Local studio ready · previous/demo are immutable until forked");
  }catch(error){status(error.message);}
+}
+async function refreshModel(){
+ try{
+  const state=await api("/api/model-status");
+  const rows=[
+    "Reviewer: "+state.phase+" · revision "+state.revision,
+    "Candidate staged: "+(state.candidate?"yes":"no"),
+    "Active local advisory reviewer: "+(state.active?"yes":"no"),
+    "Independent signoffs: "+state.signed_roles.join(", "),
+    "Fresh usage games verified: "+(state.usage_checked?"yes":"pending"),
+    "Independent idle games verified: "+(state.idle_checked?"yes":"pending"),
+    "Source projects: "+(state.source_project_count||0),
+    "Jeeves/Dragon neural weights unchanged",
+  ];
+  if(state.last_incident)rows.push("Last incident: "+state.last_incident);
+  $("model-progress").textContent=rows.join("\\n");
+ }catch(error){
+  $("model-progress").textContent="Review registry unavailable: "+error.message;
+ }
 }
 async function listFiles(){
  const target=$("files");target.replaceChildren();
@@ -159,6 +179,7 @@ $("project-choice").addEventListener("change",()=>{
  selectedProject=$("project-choice").value;selectedFile=null;listFiles();
 });
 $("refresh").addEventListener("click",refresh);
+$("model-refresh").addEventListener("click",refreshModel);
 $("propose").addEventListener("click",async()=>{
  if(!loaded||!loaded.version.editable)return;
  try{
@@ -277,6 +298,11 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <label>New exact source path (including subfolder)
 <input id="new-path" placeholder="missions/original_rival_arc.json"></label>
 <button id="new-file">Stage new source file</button>
+<fieldset><legend>Model progression and adversarial learning</legend>
+<p><small>Read-only model custody. Promotion requires separately reviewed CLI gates.</small></p>
+<pre id="model-progress" role="status" aria-live="polite"></pre>
+<button id="model-refresh" type="button">Refresh reviewer status</button>
+</fieldset>
 <p><small>Choose exact relative file location. Previous and demo entries stay read-only.</small></p>
 <div id="files" aria-label="Project file tree"></div>
 <p class="status" id="status" role="status"></p></section>
