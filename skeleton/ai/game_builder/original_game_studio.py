@@ -14,6 +14,9 @@ from pathlib import Path
 from typing import Mapping, Sequence
 
 from .contracts import canonical_digest
+from .living_story_runtime import StoryIntent
+from .living_story_export import StoryPackage
+from .living_story_mirror import StoryMirrorReport
 from .companion_curriculum import (
     PracticeInsight, measure_original_practice, validate_practice_cohort,
 )
@@ -137,6 +140,8 @@ class StudioRun:
     consumer: ConsumerReview
     practice: tuple[CompanionPractice, ...]
     package: DualRuntimePackage
+    narrative: StoryPackage | None = None
+    narrative_mirror: StoryMirrorReport | None = None
 
     @property
     def digest(self) -> str:
@@ -150,6 +155,8 @@ class StudioRun:
             "consumer_digest": canonical_digest(self.consumer.to_payload()),
             "practice_worlds": [p.world_digest for p in self.practice],
             "package_digest": self.package.manifest["manifest_digest"],
+            "living_world_digest": self.narrative.digest if self.narrative else None,
+            "living_mirror_digest": self.narrative_mirror.digest if self.narrative_mirror else None,
         })
 
 
@@ -173,6 +180,11 @@ def run_original_game_studio(
     human_research_approved: bool = False,
     mirror_attempts: int = 128,
     companion_practice_games: int = 2,
+    narrative_population: int = 0,
+    narrative_regions: int = 7,
+    narrative_mode: str = "postgame",
+    narrative_quests: int = 2,
+    narrative_ending: str = "stewardship",
     fabric: ToolFabric | None = None,
 ) -> StudioRun:
     """Execute actual offline work, rather than recording imaginary AI activity.
@@ -188,6 +200,26 @@ def run_original_game_studio(
         raise StudioError("companion practice batch must be 0 to 8 playable games")
     if type(mirror_attempts) is not int or not 64 <= mirror_attempts <= 512:
         raise StudioError("adversarial mirror attempts must be 64 to 512")
+    if type(narrative_population) is not int or (
+        narrative_population != 0 and not 6 <= narrative_population <= 128
+    ):
+        raise StudioError("living-world NPC budget must be zero or 6 to 128")
+    story_intent: StoryIntent | None = None
+    if narrative_population:
+        story_intent = StoryIntent(
+            project_id=intent.project_id[:95] + ".living-world",
+            title=("Living World: " + intent.title)[:120],
+            seed=int(canonical_digest({
+                "story_parent": intent.to_payload(),
+                "version": "skeleton.living_world.v1",
+            })[:15], 16),
+            regions=narrative_regions, population=narrative_population,
+            mode=narrative_mode, quests_to_finish=narrative_quests,
+        )
+    elif (narrative_regions, narrative_mode, narrative_quests, narrative_ending) != (
+        7, "postgame", 2, "stewardship"
+    ):
+        raise StudioError("living-world configuration needs enabled NPC population")
     if human_reviewed_tiles is None and tiled_sources is None and human_authored_approved:
         raise StudioError("authored approval cannot be applied to generated levels")
     if human_reviewed_tiles is not None and tiled_sources is not None:
@@ -204,6 +236,8 @@ def run_original_game_studio(
             raise StudioError("research requires reviewed library, brief, rights and human approval")
         if human_reviewed_tiles is not None or tiled_sources is not None:
             raise StudioError("authored editor and Tiled games need independent rights handoff")
+        if story_intent is not None:
+            raise StudioError("living-world research clearance needs an independent story rights lane")
     if (human_reviewed_tiles is not None or tiled_sources is not None) and not human_authored_approved:
         raise StudioError("manually authored geometry requires human review")
     if fabric is None:
@@ -226,6 +260,13 @@ def run_original_game_studio(
         (Actor.JEEVES, Phase.CONSUMER, "release.assess"),
         (Actor.JEEVES, Phase.CONSUMER, "package.source"),
     ]
+    if story_intent is not None:
+        work[4:4] = [
+            (Actor.DRAGON, Phase.ORIGINAL, "story.generate"),
+            (Actor.DRAGON, Phase.STEPPING_STONE, "story.simulate"),
+            (Actor.DRAGON, Phase.STEPPING_STONE, "story.native"),
+            (Actor.MIRROR, Phase.REVIEW, "story.mirror"),
+        ]
     if research_enabled:
         work[:0] = [
             (Actor.JEEVES, Phase.RESEARCH, "knowledge.search"),
@@ -245,6 +286,8 @@ def run_original_game_studio(
     native_insights: tuple[PracticeInsight, ...] | None = None
     native_mirrors: tuple[MirrorReport, ...] | None = None
     tiled_import_receipt: dict[str, object] | None = None
+    living_package: StoryPackage | None = None
+    living_mirror: StoryMirrorReport | None = None
     if research_enabled:
         from .playable_compiler import compile_game_from_reviewed_research
         # The canonical research bridge independently validates the library,
@@ -281,6 +324,7 @@ def run_original_game_studio(
             human_reviewed=human_authored_approved,
             mirror_attempts=mirror_attempts,
             companion_games=companion_practice_games,
+            story_intent=story_intent, story_ending=narrative_ending,
         )
         if executed.project is None or executed.package is None or executed.mirror is None:
             raise StudioError("tool plane failed to deliver a proved game")
@@ -288,6 +332,13 @@ def run_original_game_studio(
         native_practice_packages = executed.practice_packages
         native_insights = executed.practice_insights
         native_mirrors = executed.practice_mirror_reports
+        living_package = executed.story_package
+        living_mirror = executed.story_mirror
+        if story_intent is not None and (
+            living_package is None or living_mirror is None or not living_mirror.passed
+            or living_mirror.package_digest != living_package.digest
+        ):
+            raise StudioError("living-world RPG failed actual mirror-room production gates")
         if executed.tiled_conversion is not None:
             if executed.tiled_conversion.world_digest != project.world.digest:
                 raise StudioError("Tiled and original game geometry evidence diverged")
@@ -445,9 +496,30 @@ def run_original_game_studio(
     }
     if tiled_import_receipt is not None:
         metadata["studio/tiled_import.json"] = tiled_import_receipt
+    if living_package is not None and living_mirror is not None:
+        metadata["studio/living_story_mirror.json"] = living_mirror.payload()
+        metadata["studio/living_story_almanac.json"] = {
+            "schema": "skeleton.game_builder.living_story_almanac.v1",
+            "source_kind": "measured_original_simulation",
+            "world_digest": living_mirror.world_digest,
+            "proof_digest": living_mirror.proof_digest,
+            "package_digest": living_package.digest,
+            "mirror_digest": living_mirror.digest,
+            "NPC_count": living_package.manifest["npc_count"],
+            "region_count": living_package.manifest["regions"],
+            "quest_count": living_package.manifest["quest_count"],
+            "ending": living_package.manifest["ending"],
+            "world_mode": living_package.manifest["mode"],
+            "externally_trained_model": False,
+            "human_playtested": False,
+            "native_hardware_cleared": False,
+        }
     new_files = dict(package.files)
     new_files.pop("release.json")
     new_files.update(practice_files)
+    if living_package is not None:
+        for relative, payload in living_package.files.items():
+            new_files["living_story/" + relative] = payload
     for path, item in metadata.items():
         new_files[path] = _stable_bytes(item)
     if sum(len(data) for data in new_files.values()) > 16_000_000:
@@ -468,6 +540,7 @@ def run_original_game_studio(
         project=project, source=source, stages=stages,
         tool_plan=plan, mirror=mirror, consumer=consumer,
         practice=tuple(practice), package=enhanced,
+        narrative=living_package, narrative_mirror=living_mirror,
     )
     return run
 
