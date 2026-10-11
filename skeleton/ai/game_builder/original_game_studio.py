@@ -231,42 +231,81 @@ def run_original_game_studio(
     )
     if plan.external_blocked:
         raise StudioError("studio cannot execute blocked or externally unverified tools")
-    if human_reviewed_tiles is not None:
-        project = compile_authored_game(intent, human_reviewed_tiles,
-                                        human_reviewed=True, authorized=True)
-    elif research_enabled:
+    execution_audit: dict[str, object]
+    native_practice_packages: tuple[DualRuntimePackage, ...] | None = None
+    if research_enabled:
         from .playable_compiler import compile_game_from_reviewed_research
-        # The compiler independently verifies source revisions, RightsLedger
-        # decisions and project-bound reference-only authorization.
+        # The canonical research bridge independently validates the library,
+        # approved brief and RightsLedger. This is not a generic tool adapter.
         project = compile_game_from_reviewed_research(
             reviewed_library, research_brief, rights_ledger, intent,
             human_approved=True, authorized=True,
         )
+        package = render_dual_runtime_package(project, authorized=True)
+        mirror = review_playable_project(
+            project, package, authorized=True, attempts=mirror_attempts,
+        )
+        execution_audit = {
+            "schema": "skeleton.game_builder.studio_execution_binding.v1",
+            "mode": "canonical-research-rights-bridge",
+            "reviewed_game_receipt_digest": project.receipt()["receipt_digest"],
+            "mirror_digest": mirror.digest,
+            "delegated_external_tools": False,
+            "generic_tool_plane_executed": False,
+        }
     else:
-        project = compile_original_game(intent, authorized=True)
-    package = render_dual_runtime_package(project, authorized=True)
-    mirror = review_playable_project(project, package, authorized=True,
-                                    attempts=mirror_attempts)
+        from .studio_execution_plane import execute_local_tool_plan
+        # All local game-construction steps (except the final atomic write)
+        # are now *really executed* by Jeeves/Dragon/Companion/Mirror's
+        # freshly authorized tool plan, with a per-operation receipt chain.
+        local_plan = fabric.plan(
+            requests[:-1], authorized=True, allow_filesystem_write=False,
+        )
+        executed = execute_local_tool_plan(
+            intent, local_plan, authorized=True, fabric=fabric,
+            authored_levels=human_reviewed_tiles,
+            human_reviewed=human_authored_approved,
+            mirror_attempts=mirror_attempts,
+            companion_games=companion_practice_games,
+        )
+        if executed.project is None or executed.package is None or executed.mirror is None:
+            raise StudioError("tool plane failed to deliver a proved game")
+        project, package, mirror = executed.project, executed.package, executed.mirror
+        native_practice_packages = executed.practice_packages
+        execution_audit = executed.to_payload()
     if not mirror.passed:
         raise StudioError("adversarial game mirror room found a failure")
     practice: list[CompanionPractice] = []
     practice_files: dict[str, bytes] = {}
-    for index, sample in enumerate(_practice_intents(intent, companion_practice_games), 1):
-        candidate = compile_original_game(sample, authorized=True)
-        # Companion games are independently playable browser/Godot products,
-        # not just names and XP. Each receives a complete canonical package
-        # and a separate manifest, proof, editor and verified world.
-        practice_package = render_dual_runtime_package(candidate, authorized=True)
+    practice_intents = _practice_intents(intent, companion_practice_games)
+    if native_practice_packages is not None and len(native_practice_packages) != len(practice_intents):
+        raise StudioError("tool execution produced an unexpected practice game count")
+    for index, sample in enumerate(practice_intents, 1):
+        if native_practice_packages is None:
+            candidate = compile_original_game(sample, authorized=True)
+            practice_package = render_dual_runtime_package(candidate, authorized=True)
+            winning_steps = candidate.proof.final_state.steps
+        else:
+            practice_package = native_practice_packages[index - 1]
+            proof_data = json.loads(
+                practice_package.files["proof/verified_solution.json"].decode("utf-8")
+            )
+            winning_steps = len(proof_data["actions"])
+        if practice_package.manifest["project_id"] != sample.project_id:
+            raise StudioError("companion practice package identity mismatch")
+        if (practice_package.manifest["proof_status"]
+                != "python-simulated-winning-actions"):
+            raise StudioError("companion practice lacks canonical winning proof")
         prefix = f"practice/slot-{index:02d}"
         for relative, payload in practice_package.files.items():
             practice_files[f"{prefix}/{relative}"] = payload
         practice.append(CompanionPractice(
             seed=sample.seed,
             intent_digest=canonical_digest(sample.to_payload()),
-            world_digest=candidate.world.digest,
-            proof_digest=candidate.proof.digest,
-            winning_steps=candidate.proof.final_state.steps,
-            capability_xp=25 + len(candidate.world.levels) * 5,
+            world_digest=str(practice_package.manifest["world_digest"]),
+            proof_digest=str(practice_package.manifest["proof_digest"]),
+            winning_steps=winning_steps,
+            capability_xp=25 + sample.levels * 5,
             package_manifest_digest=str(practice_package.manifest["manifest_digest"]),
             package_path=prefix,
         ))
@@ -323,6 +362,7 @@ def run_original_game_studio(
             "not_automatically_published": True,
         },
         "studio/jeeves_dragon_tools.json": plan.to_payload(),
+        "studio/executed_tool_receipts.json": execution_audit,
         "studio/mirror_room.json": mirror.to_payload(),
         "studio/consumer_gate.json": consumer.to_payload(),
         "studio/companion_practice.json": {
