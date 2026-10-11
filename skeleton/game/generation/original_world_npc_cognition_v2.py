@@ -25,7 +25,12 @@ from .original_world_product_agents import (
     _specialty, _deliver, _acquire, validate_society, MAX_AGENTS,
 )
 from .original_world_npc_civics import (
-    CivicInstitutions, validate_civics, settle_civic, civic_report, civic_restore, SCHEMA as CIVIC_SCHEMA,
+    CivicInstitutions, validate_civics, settle_civic, civic_report,
+    civic_restore, SCHEMA as CIVIC_SCHEMA,
+)
+from .original_world_npc_apprenticeships import (
+    TeachingLedger, validate_teaching, settle_training, training_report,
+    training_restore, SCHEMA as TRAINING_SCHEMA,
 )
 
 VERSION = "original-npc-cognition.v2"
@@ -129,6 +134,7 @@ class CitizenIntelligence:
     next_project: int = 0
     testimonies: tuple[Testimony, ...] = ()
     civic: CivicInstitutions = field(default_factory=CivicInstitutions)
+    training: TeachingLedger = field(default_factory=TeachingLedger)
     day: int = 0
     meetings: int = 0
     interventions: int = 0
@@ -185,6 +191,7 @@ def validate_intelligence(
     if state.day != people.tick:
         raise FoundationError("inhabitant thought clock diverged from physical body")
     validate_civics(state.civic, people, world, state.day)
+    validate_teaching(state.training, people, world)
     if not isinstance(state.minds, tuple) or len(state.minds) != len(people.inhabitants):
         raise FoundationError("missing or extra persistent minds")
     for p, mind in zip(people.inhabitants, state.minds):
@@ -1007,11 +1014,15 @@ def smart_npc_tick(
     )
     current_world, next_people, civic, outcomes = settle_civic(
         result.civic, next_people, current_world, result.minds, next_people.tick)
+    training, next_people, current_world, lessons = settle_training(
+        result.training, next_people, current_world)
     result = replace(
-        result, civic=civic, event_head=_hash({
+        result, civic=civic, training=training, event_head=_hash({
             "prior-npc-day": result.event_head,
             "civic-state": asdict(civic),
             "civic-outcomes": outcomes,
+            "training-state": asdict(training),
+            "paid-lessons": lessons,
         }),
     )
     validate_intelligence(result, next_people, current_world)
@@ -1034,6 +1045,8 @@ def cognition_restore(data: dict, people: PhysicalSociety,
         allowed_fields = set(CitizenIntelligence.__dataclass_fields__)
         if data["checksum"] != _hash(raw) or set(raw) not in (
             allowed_fields, allowed_fields - {"civic"},
+            allowed_fields - {"training"},
+            allowed_fields - {"civic", "training"},
         ):
             raise FoundationError("cognitive memory integrity mismatch")
         minds = tuple(Mind(
@@ -1054,10 +1067,16 @@ def cognition_restore(data: dict, people: PhysicalSociety,
             "payload": raw["civic"],
             "checksum": _hash(raw["civic"]),
         }, people, world, people.tick) if "civic" in raw else CivicInstitutions())
+        training = (training_restore({
+            "schema": TRAINING_SCHEMA,
+            "payload": raw["training"],
+            "checksum": _hash(raw["training"]),
+        }, people, world) if "training" in raw else TeachingLedger())
         state = CitizenIntelligence(
             **{**raw, "minds": minds, "bonds": relationships,
                "orders": orders, "projects": projects,
-               "testimonies": testimonies, "civic": civic}
+               "testimonies": testimonies, "civic": civic,
+               "training": training}
         )
         validate_intelligence(state, people, world)
         return state
@@ -1077,6 +1096,7 @@ def cognition_report(state: CitizenIntelligence, people: PhysicalSociety,
         "civic_projects": [asdict(p) for p in state.projects],
         "first_hand_testimonies": [asdict(t) for t in state.testimonies],
         "public_institutions": civic_report(state.civic),
+        "earned_apprenticeships": training_report(state.training),
         "socially_learned_material_observations": sum(
             m.subject in STOCK and m.witness != mind.person_id
             for mind in state.minds for m in mind.memories
@@ -1150,6 +1170,10 @@ def npc_profile(
         "social_contacts": contacts,
         "personal_contracts": [
             asdict(o) for o in state.orders if o.citizen == person_id
+        ],
+        "mentorship_history": [
+            asdict(a) for a in state.training.records
+            if person_id in (a.mentor, a.apprentice)
         ],
         "construction_contributions": [
             asdict(p) for p in state.projects if person_id in p.contributors
