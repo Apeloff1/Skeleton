@@ -38,7 +38,7 @@ var config: Dictionary={}
 var layout: Dictionary={}
 var state: Dictionary={}
 var commands: Array=[]
-var ready: bool=false
+var ready_to_play: bool=false
 var notice: String="Original Tower Defense: build, defend, upgrade and survive"
 
 
@@ -68,7 +68,7 @@ func _ready() -> void:
         or layout["build_slots"].is_empty() or layout["build_slots"].size()>3):
         _fail("authored tower configuration outside bounded rules")
         return
-    ready=true
+    ready_to_play=true
     _reset()
     get_window().title="Skeleton Original Advanced Tower Defense"
     if PROOF_FLAG in OS.get_cmdline_user_args():
@@ -167,7 +167,7 @@ func _tick() -> Array:
 
 
 func _step(action: String) -> bool:
-    if (not ready or bool(state["finished"]) or bool(state["failed"])
+    if (not ready_to_play or bool(state["finished"]) or bool(state["failed"])
         or commands.size()>=MAX_ACTIONS or action not in ACTIONS):
         return false
     var events: Array=[]
@@ -345,7 +345,7 @@ func _notification(code: int) -> void:
 
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO,size),Color("#101b2b"))
-    if not ready:
+    if not ready_to_play:
         return
     _text(Vector2(18,29),"Original Tower Defense · Advanced",22,Color.WHITE)
     _text(Vector2(18,55),"Base %d HP  ·  Credits %d  ·  Wave %d/%d  ·  Tick %d" %
