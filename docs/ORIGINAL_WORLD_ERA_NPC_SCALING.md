@@ -21,9 +21,9 @@ more global full-depth Python objects.
 | Primordial Earth / Early Life | 1 compatibility observer | 1 | 0 | 0 |
 | Paleolithic | 8 | 6 | 24 | 2 |
 | Bronze Age | 11 | 9 | 384 | 8 |
-| Classical Antiquity | 14 | 12 | 768 | 14 |
+| Classical Antiquity | 14 | 12 | 1,152 | 14 |
 | Early Industrial | 20 | 18 | 4,800 | 26 |
-| Digital Network | 26 | 24 | 12,288 | 38 |
+| Digital Network | 26 | 24 | 12,544 | 38 |
 | Interstellar / Posthuman / Cosmic | 32 | 30 | 16,384 | 50 |
 
 *Two local body/memory slots are reserved for subsequent genuine births or
