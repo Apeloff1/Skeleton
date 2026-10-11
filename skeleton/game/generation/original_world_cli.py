@@ -69,7 +69,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "world": exp.blueprint.world.__dict__,
             "recipe_id": exp.blueprint.recipe_id,
             "experience_id": exp.experience_id,
-            "recipe_index": exp.blueprint.variant_index,
+            "recipe_index": str(exp.blueprint.variant_index),
             "recipe_capacity": str(TOTAL_VARIANTS),
             "mechanic_ids": [m.mechanic_id for m in exp.blueprint.mechanics],
             "unresolved_levers": exp.blueprint.unresolved_lever_count,
