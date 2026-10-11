@@ -69,6 +69,33 @@ function action(ev){
  render();
 }
 let timers=[];
+function applyCinematicCue(cue){
+ const stage=get("stage-screen"),subtitle=get("stage-subtitle");
+ const actor=[...get("stage-cast").children].find(
+  e=>e.dataset.actor===cue.target);
+ if(cue.kind==="camera_zoom"||cue.kind==="camera_dolly"){
+  stage.style.transform="scale(1.02)";
+ }else if(cue.kind==="camera_pan"||cue.kind==="camera_track"){
+  stage.style.transform="translateX(7px)";
+ }else if(cue.kind==="camera_cut"){
+  stage.style.transform="none";
+ }else if(cue.kind==="lighting"||cue.kind==="color_grade"){
+  stage.style.background=cue.value.includes("amber")?"#755836":
+   cue.value.includes("blue")?"#2c467c":"#294a59";
+ }else if(cue.kind==="actor_move"||cue.kind==="actor_enter"){
+  if(actor){actor.style.transform="translateX(20px)";actor.style.opacity="1";}
+ }else if(cue.kind==="actor_exit"){
+  if(actor)actor.style.opacity="0";
+ }else if(cue.kind==="actor_pose"||cue.kind==="actor_emote"||cue.kind==="animation"){
+  if(actor)actor.style.transform="translateY(-10px)";
+ }else if(cue.kind==="subtitle"||cue.kind==="dialogue"||cue.kind==="objective_reveal"){
+  subtitle.textContent=cue.value;
+ }else if(cue.kind==="fade"){
+  stage.style.opacity=".65";
+ }else if(cue.kind==="resume"){
+  stage.style.opacity="1";
+ }
+}
 function cinema(trigger){
  const cut=sceneMap[state.scene].cutscenes.find(x=>x.trigger===trigger);
  if(!cut)return;
@@ -81,6 +108,7 @@ function cinema(trigger){
    const item=document.createElement("p");
    item.textContent=cue.kind+" — "+cue.target+": "+cue.value;
    get("cues").append(item);
+   applyCinematicCue(cue);
   },cue.at);
   timers.push(timer);
  }
@@ -101,6 +129,15 @@ function drawChoices(){
 }
 function render(){
  const scene=sceneMap[state.scene];
+ const stage=get("stage-screen");
+ stage.style.transform="none";stage.style.opacity="1";
+ stage.style.background="#294a59";
+ get("stage-subtitle").textContent=scene.setting;
+ const cast=get("stage-cast");cast.replaceChildren();
+ for(const npc of scene.cast){
+  const actor=document.createElement("span");actor.textContent=npc;
+  actor.dataset.actor=npc;cast.append(actor);
+ }
  get("name").textContent=scene.title;
  get("set").textContent=scene.setting;
  get("visual").textContent="Camera "+scene.camera+" | Light "+scene.lighting+
