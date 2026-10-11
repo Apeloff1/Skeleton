@@ -316,7 +316,12 @@ class GameWorkspace:
         if _digest(existing.encode())!=expected_sha256:
             raise WorkspaceError("stale base SHA; re-open affected file before editing")
         if file.suffix==".json":
-            _json(text)
+            parsed = _json(text)
+            if relative.startswith("systems/"):
+                from .system_editors import validate_editor_document, editor_path
+                document = validate_editor_document(parsed)
+                if relative != editor_path(document["editor"]):
+                    raise WorkspaceError("editor source path does not match typed system ID")
         proposal=dict(
             schema="skeleton.game_builder.targeted_edit.v1",
             project=project,path=_relative(relative),reason=reason,
@@ -353,7 +358,12 @@ class GameWorkspace:
         if _digest(proposal["new_content"].encode())!=proposal["new_sha256"]:
             raise WorkspaceError("proposed artifact no longer matches human-reviewed text")
         if path.suffix==".json":
-            _json(proposal["new_content"])
+            parsed = _json(proposal["new_content"])
+            if proposal["path"].startswith("systems/"):
+                from .system_editors import validate_editor_document, editor_path
+                document = validate_editor_document(parsed)
+                if proposal["path"] != editor_path(document["editor"]):
+                    raise WorkspaceError("editor document path mismatches its system identity")
             if proposal["path"]=="game/director.json":
                 from .quest_scene_forge import compile_director_blueprint
                 compile_director_blueprint(_json(proposal["new_content"]),
