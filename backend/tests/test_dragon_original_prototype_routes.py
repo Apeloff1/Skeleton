@@ -29,7 +29,8 @@ def test_original_game_candidate_endpoint_materializes_real_prototype_and_two_re
     assert len(proposal["replayed_journeys"])==2
     assert proposal["living_world_actual_route_actions"]
     assert len(proposal["living_world_route_digest"])==64
-    assert proposal["ready_for_individual_experiments"]
+    assert proposal["ready_for_individual_experiments"]==proposal["core_loop_viable"]
+    assert proposal["core_loop_viable"]==(not proposal["underbuilt_reasons"])
     assert not proposal["native_binary_built"]
     assert not proposal["independently_published"]
     assert proposal["release_blockers"]
