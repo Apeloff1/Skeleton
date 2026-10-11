@@ -25,6 +25,7 @@ from .original_world_living_systems import SYSTEMS
 from .original_world_play_forms import PLAY_FORMS, PROGRESSION_LAWS
 from .original_world_tenfold_architectures import ARCHITECTURES
 from .original_world_tenfold_runtime import passages
+from .original_world_living_10x_objectives import living_objectives
 
 MAX_SCRIPT_BYTES = 65536
 
@@ -109,6 +110,7 @@ def render(state: LivingState) -> str:
         f"reservoir {m.reservoir}, power reserve {m.battery}",
         f"Automation: robots {m.builders}, orders {m.orders}, built {m.completed}; "
         f"facts {m.proven}, shared {m.shared}",
+        f"Next need: {living_objectives(state)['next_action']}",
         f"Society: treaty tension {m.tension}, obligations {m.promises}; "
         f"temporal echoes {m.queued_echoes}, debt {m.time_debt}",
         "This is a bounded living-systems reference game, not a native 3D release.",
@@ -118,7 +120,7 @@ def render(state: LivingState) -> str:
 def interactive(state: LivingState) -> LivingState:
     print("Living Original World Studio — autonomous systems and nested world play.")
     print("Commands: living VERB; spatial VERB; mode VERB; arc VERB;")
-    print("causal end_turn; help, status, quit.")
+    print("causal end_turn; goals, help, status, quit.")
     print(render(state))
     while True:
         try:
@@ -132,6 +134,9 @@ def interactive(state: LivingState) -> LivingState:
             continue
         if line in ("status", "map"):
             print(render(state))
+            continue
+        if line in ("goals", "objectives"):
+            print(json.dumps(living_objectives(state), sort_keys=True, indent=2))
             continue
         if line == "help":
             law = validate_living(state)
@@ -164,6 +169,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--system", choices=[x.system_id for x in SYSTEMS])
     parser.add_argument("--arc", choices=[x.arc_id for x in PROGRESSION_LAWS])
     parser.add_argument("--inventory", action="store_true")
+    parser.add_argument("--objectives", action="store_true",
+                        help="Show evidence-backed living-system goals and crises")
     parser.add_argument("--page", type=int)
     parser.add_argument("--limit", type=int, default=12)
     parser.add_argument("--actions-json", default="[]")
@@ -231,6 +238,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "world": law.as_dict(),
                     "world_state": json.loads(save_living(state))["payload"],
                     "implementation_status": "bounded-autonomous-world-simulation",
+                    "objectives": living_objectives(state) if args.objectives else None,
                     "note": "12.288e7 compositions do not imply separate full native games.",
                 }, ensure_ascii=False, sort_keys=True, indent=2))
     except (FoundationError, OSError, ValueError) as exc:
