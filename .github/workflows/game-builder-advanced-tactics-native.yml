@@ -118,7 +118,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          root="$RUNNER_TEMP/advanced-native-tacticss"
+          root="$RUNNER_TEMP/advanced-native-tactics"
           for mode in original squad_moves line_of_sight overwatch healing victory long_rounds; do
             project="$root/$mode/godot"
             echo "Native tactical combat case $mode"
@@ -131,19 +131,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          project="$RUNNER_TEMP/advanced-native-tacticss/victory/godot"
-          executable="$RUNNER_TEMP/advanced-native-tacticss/original-advanced-tactics.x86_64"
+          project="$RUNNER_TEMP/advanced-native-tactics/victory/godot"
+          executable="$RUNNER_TEMP/advanced-native-tactics/original-advanced-tactics.x86_64"
           godot --headless --path "$project" --export-release Linux "$executable"
           test -s "$executable"
           chmod +x "$executable"
-          "$executable" --headless -- --verify-tactics | tee "$RUNNER_TEMP/advanced-native-tacticss/linux-export-replay.log"
-          grep -q "NATIVE_ADVANCED_TACTICS_OK" "$RUNNER_TEMP/advanced-native-tacticss/linux-export-replay.log"
+          "$executable" --headless -- --verify-tactics | tee "$RUNNER_TEMP/advanced-native-tactics/linux-export-replay.log"
+          grep -q "NATIVE_ADVANCED_TACTICS_OK" "$RUNNER_TEMP/advanced-native-tactics/linux-export-replay.log"
       - name: Export actual Windows game and verify native console executable
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $root = Join-Path $env:RUNNER_TEMP 'advanced-native-tacticss'
+          $root = Join-Path $env:RUNNER_TEMP 'advanced-native-tactics'
           $project = Join-Path $root 'victory/godot'
           $binary = Join-Path $root 'original-advanced-tactics.exe'
           # The setup-godot Windows GUI editor can detach without a reliable
@@ -200,11 +200,11 @@ jobs:
         with:
           name: original-advanced-tactics-${{ matrix.os }}-${{ github.run_id }}
           path: |
-            ${{ runner.temp }}/advanced-native-tacticss/*/native-replay.log
-            ${{ runner.temp }}/advanced-native-tacticss/*/release.json
-            ${{ runner.temp }}/advanced-native-tacticss/linux-export-replay.log
-            ${{ runner.temp }}/advanced-native-tacticss/original-advanced-tactics.exe
-            ${{ runner.temp }}/advanced-native-tacticss/original-advanced-tactics.console.exe
-            ${{ runner.temp }}/advanced-native-tacticss/original-advanced-tactics.x86_64
+            ${{ runner.temp }}/advanced-native-tactics/*/native-replay.log
+            ${{ runner.temp }}/advanced-native-tactics/*/release.json
+            ${{ runner.temp }}/advanced-native-tactics/linux-export-replay.log
+            ${{ runner.temp }}/advanced-native-tactics/original-advanced-tactics.exe
+            ${{ runner.temp }}/advanced-native-tactics/original-advanced-tactics.console.exe
+            ${{ runner.temp }}/advanced-native-tactics/original-advanced-tactics.x86_64
           if-no-files-found: warn
           retention-days: 7
