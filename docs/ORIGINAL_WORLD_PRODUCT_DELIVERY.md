@@ -218,3 +218,29 @@ Do not fill the completion dashboard by counting game recipe
 permutations as completed separate games. **Progress should be
 measured by verified independent playable game releases and meaningful
 original authored gameplay, not address-space size.**
+
+
+## Completed cognitive NPC engine expansion
+
+`original_world_npc_cognition_v2.py` replaces the original fixed
+profession-only product tick with persistent per-person utility planning,
+bounded actual autobiographical observations, ten earned adaptive goal
+preferences, memory-directed physically reachable work, medical help,
+material-backed commissioning, escrowed multi-worker civic projects,
+consent-adjacent real social bonding, loneliness, historical knowledge
+transfer and unique witnessed oral testimony that can credit the actual
+causal game's evidence ledger. Players can inspect detailed personal
+history from the native interface or with `--npc-profile N`.
+
+`original_world_npc_laboratory.py` runs five reproducible real world
+scenarios: ordinary settlement, food deprivation, wounded citizens,
+social isolation and public construction. All metrics arise from game
+turns and persistent receipts; none are fabricated game completion
+counts or external AI performance comparisons.
+
+A careful limit remains: one active world session currently simulates
+1–32 physical bodies locally. Large-region millions-of-NPC distributed
+simulation, complex dialogue generation, multi-generation lives and
+cinematic high-performance 3D NPCs remain major pending work.
+See `docs/ORIGINAL_WORLD_NPC_COGNITION_V2.md` for executable commands,
+contracts, mechanics and invariants.
