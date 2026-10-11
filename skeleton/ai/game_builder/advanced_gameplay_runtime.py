@@ -7,10 +7,8 @@ runtime, not a native-engine, publication, or hardware certification.
 """
 from __future__ import annotations
 
-from copy import deepcopy
 from hashlib import sha256
 import json
-import re
 from typing import Mapping, Sequence
 
 from .system_editors import make_editor_document, SystemEditorError
@@ -504,6 +502,8 @@ def _survival_start(config,seed):
             "water_stock":(10,4,16,5)[profile],
             "stone_stock":(7,4,2,18)[profile],
             "game_stock":(5,7,4,2)[profile],
+            "merchant_food_stock":4,
+            "merchant_water_stock":4,
         })
     return {
         "tick":0,"day":1,"region":0,"regions":regions,
@@ -574,8 +574,13 @@ def _survival_step(state,config,action):
     elif action=="trade":
         if state["trade_tokens"]<=0:
             raise AdvancedRuntimeError("trade credits are exhausted")
-        state["trade_tokens"]-=1;state["food"]+=2;state["water"]+=2
-        events.append("market_trade")
+        if local["merchant_food_stock"]<2 or local["merchant_water_stock"]<2:
+            raise AdvancedRuntimeError("finite merchant stocks are exhausted")
+        state["trade_tokens"]-=1
+        local["merchant_food_stock"]-=2
+        local["merchant_water_stock"]-=2
+        state["food"]+=2;state["water"]+=2
+        events.append("finite_market_trade")
     elif action=="rest":
         state["energy"]=min(10,state["energy"]+5+state["shelter_level"])
         state["health"]=min(config["max_health"],state["health"]+
