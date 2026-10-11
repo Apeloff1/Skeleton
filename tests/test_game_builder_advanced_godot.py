@@ -213,8 +213,13 @@ class NativeStudioDownloadTests(unittest.TestCase):
         tampered["actions"]=["invalid"]
         self.assertEqual(self.post("/api/advanced-godot-package",{
             "session":tampered,"settings":settings})[0],400)
+        code,shooter=self.post("/api/advanced-godot-package",{
+            "session":run_advanced_session("shooter")})
+        self.assertEqual(code,200)
+        self.assertEqual(shooter["engine"],"shooter")
+        self.assertFalse(shooter["gameplay_native_verified_by_this_request"])
         self.assertEqual(self.post("/api/advanced-godot-package",{
-            "session":run_advanced_session("shooter")})[0],400)
+            "session":run_advanced_session("racing")})[0],400)
 
     def test_visual_studio_handoff_controls_present(self):
         html=render_workspace_html("A"*32).decode()
