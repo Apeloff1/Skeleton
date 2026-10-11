@@ -119,7 +119,11 @@ def test_real_world_renderers_show_actual_cells_and_resident_positions() -> None
     assert ascii_map.count("@") == 1
     assert len(ascii_map.splitlines()) == 7
     s2 = use(s, "terrain", "build_hearth")
-    assert "H" in ascii_render(s2.terrain, s2.society)
+    # The centered player sprite overlays the hearth glyph, but the building
+    # remains rendered and persists in the actual editable world state.
+    from skeleton.game.generation.original_world_product_terrain import cell_at
+    assert cell_at(s2.terrain, 0, 0).building == "hearth"
+    assert "#ffb55f" in svg_render(s2.terrain, s2.society)
 
 
 def test_cli_runs_actual_physical_turn_and_writes_real_svg_ppm_and_save(tmp_path, capsys) -> None:
