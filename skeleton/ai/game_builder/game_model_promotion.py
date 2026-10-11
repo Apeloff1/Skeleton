@@ -426,24 +426,43 @@ def evaluate_fresh_cohort(rows: tuple[TrainingCandidate,...],policy: dict,*,
                 raise PromotionError("independent observed project split unrecognized")
             splits[row.split].append(row)
         reports=[]
-        attempted=passed=0
+        attempted=passed=covered_cases=0
         for split,cases in sorted(splits.items()):
-            if len(cases)<2:
+            ordered=sorted(cases,key=lambda x:x.example_id)
+            if len(ordered)<2:
                 blockers.append("live_counterfactual_split_undercovered")
                 continue
-            report=challenge_reviewer(tuple(cases),policy,
-                                     authorized=True,max_examples=512)
-            attempted+=report.attempted
-            passed+=report.passed
-            reports.append(dict(split=split,report_digest=report.digest,
-                                attempted=report.attempted,passed=report.passed,
-                                by_family=[dict(family=f,attempted=n,passed=good)
-                                           for f,n,good in report.by_family]))
+            # No silent first-512 selection. Divide each cohort into
+            # bounded, near-equal shards of at most 512 cases; every source
+            # is challenged exactly once, even for the maximum 2048 cases.
+            shards=(len(ordered)+511)//512
+            width=(len(ordered)+shards-1)//shards
+            for start in range(0,len(ordered),width):
+                shard=tuple(ordered[start:start+width])
+                if len(shard)<2:
+                    blockers.append("live_counterfactual_split_undercovered")
+                    continue
+                report=challenge_reviewer(shard,policy,
+                                         authorized=True,max_examples=512)
+                covered_cases+=len(shard)
+                attempted+=report.attempted
+                passed+=report.passed
+                reports.append(dict(split=split,shard_index=start//width,
+                                    source_cases=len(shard),
+                                    report_digest=report.digest,
+                                    attempted=report.attempted,
+                                    passed=report.passed,
+                                    by_family=[dict(family=f,attempted=n,passed=good)
+                                               for f,n,good in report.by_family]))
         accuracy=passed/attempted if attempted else 0.0
         counterfactual=dict(attempted=attempted,passed=passed,
+                            expected_cases=len(rows),
+                            covered_cases=covered_cases,
+                            complete_coverage=covered_cases==len(rows),
                             accuracy=round(accuracy,6),by_split=reports,
                             training_performed=False)
-        if not attempted or accuracy<standard.min_counterfactual_accuracy:
+        if (covered_cases!=len(rows) or not attempted
+                or accuracy<standard.min_counterfactual_accuracy):
             blockers.append("live_counterfactual_shortcut_detection")
     leader=None
     if champion is not None:
