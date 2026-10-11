@@ -152,6 +152,53 @@ engines. It never equates successful reference simulation with a certified
 Godot export or native executable. Integration of the actual other 40
 game engines and producer-grade scene/node editors remains outstanding.
 
+## First real native adapter: original Godot 4 puzzle game
+
+The `advanced_godot_export.py` native exporter ports the **advanced puzzle**
+family to an independently implemented, playable **Godot 4.4.1+** GDScript
+game. This does not mean all eight advanced reference families have native
+adapters; shooter, deck battler, tactics, survival, racing, tower defense and
+platformer still require equivalent native-runtime implementations.
+
+The generated offline, original, asset-free Godot project contains:
+- `godot/project.godot`, `scenes/main.tscn` and the runnable
+  `scripts/main.gd` with original controls and grid rendering
+- `godot/game.json` with canonical typed settings and authored level geometry
+- `godot/proof.json` with the exact independently verified Python gameplay
+  action transcript and selected expected final-gameplay fields
+- A source hash manifest, fixed Linux/Windows export presets and local README
+
+Godot's GDScript independently executes switches, doors, pushable crates,
+circuits, timed phase gates, portal movement, rewind and victory predicates.
+It **does not read the Python final state as authoritative gameplay**.
+The headless `--verify-advanced` mode plays all actions using the real native
+simulation, then fails closed unless position, crate state, switch/circuit
+progress, phase, portal visitation, undo budget, time and terminal outcomes
+match the independently verified Python session. This is an integration
+proof, not a human playtest or claim about all desktop hardware.
+
+Usage (after explicitly reviewing the original authored puzzle and actions):
+
+```bash
+python -m skeleton.ai.game_builder.system_editor_cli godot-export \
+  --session reviewed-puzzle-session.json --settings puzzle-settings.json \
+  --output ./my-original-puzzle --trusted-local-operator
+godot --headless --path ./my-original-puzzle/godot --import
+godot --headless --path ./my-original-puzzle/godot -- --verify-advanced
+godot --path ./my-original-puzzle/godot
+```
+
+The exact-head `game-builder-advanced-godot-native.yml` workflow builds
+five separate original puzzle modes on Linux and Windows, invokes their
+Godot source runtimes, compares actual native results to Python, and also
+builds and executes an exported Linux desktop binary. Claims of native
+verification must reference successful GitHub workflow runs; a generated
+project alone is never proof it has executed.
+
+Original content is authored without external game code or third-party
+copyrighted assets. Rights clearance and distribution certification remain
+independent human-governed release stages.
+
 ## Advanced multi-genre expansion — 8 real reference engines
 
 The minimum **Advanced** design contract now has eight fully command-executing
