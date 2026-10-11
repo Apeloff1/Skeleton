@@ -27,7 +27,8 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--regions", type=int, default=7, help="Original connected regions, 4 to 12")
     p.add_argument("--mode", choices=("campaign", "postgame", "sandbox"),
                    default="postgame", help="Story ending behavior")
-    p.add_argument("--quests", type=int, default=2, help="Quests needed for ending, 1-3")
+    p.add_argument("--quests", type=int, default=2, help="Quests needed for ending, 1..arcs")
+    p.add_argument("--arcs", type=int, default=3, help="Authored faction story arcs, 3..24")
     p.add_argument("--trusted-local-operator", action="store_true",
                    help="Confirm operator authority before generating authoring files")
     return p
@@ -42,7 +43,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         parent = _intent(_read_json(args.intent, MAX_INPUT_BYTES))
         story_intent = derive_original_story_intent(
             parent, population=args.npcs, regions=args.regions,
-            mode=args.mode, quests=args.quests, authorized=True,
+            mode=args.mode, quests=args.quests, arcs=args.arcs, authorized=True,
         )
         world = original_story_world(story_intent, authorized=True)
         blueprint = blueprint_document(world, authorized=True)
