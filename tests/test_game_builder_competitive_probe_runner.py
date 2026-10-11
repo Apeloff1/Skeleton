@@ -82,7 +82,7 @@ class MeasuredGameProbeCases(DeepEnemyCases):
                     independent_telemetry_reviewed=independent)
         with self.assertRaises(ThreatRadarError):
             score_recorded_probe_batch(
-                script,rows[:15],self.judges[0],subject_id="original_world",
+                script,rows[:14],self.judges[0],subject_id="original_world",
                 as_of=T0,authorized=True,source_capture_consent=True,
                 independent_telemetry_reviewed=True,min_trials=10)
 
