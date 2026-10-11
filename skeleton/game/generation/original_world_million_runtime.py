@@ -215,8 +215,9 @@ def _mode_operation(
         raise FoundationError("mechanic unsupported in this gameplay form")
     if causal.action_points < 1:
         raise FoundationError("end turn to refresh control budget")
-    if mode.cleared:
-        raise FoundationError("form objective completed; continue world or storyline")
+    # Clearing a milestone is not permission to terminate an open world.
+    # Actions remain available after victory; arcs decide whether a chapter
+    # is closed, continued, replayed or forever unfinishable.
     n, option, target = action.amount, action.option, action.target
     causal = replace(causal, action_points=causal.action_points - 1)
     effects = []
@@ -365,11 +366,11 @@ def _mode_operation(
             good = target == expected
             mode = replace(mode, beat=mode.beat + 1,
                            combo=min(100, mode.combo + 1) if good else 0,
-                           music_score=mode.music_score + (2 if good else 0))
+                           music_score=min(1000, mode.music_score + (2 if good else 0)))
         elif action.verb == "hold":
             causal = _debit(causal, energy=2)
             mode = replace(mode, beat=mode.beat + n,
-                           music_score=mode.music_score + 1, combo=0)
+                           music_score=min(1000, mode.music_score + 1), combo=0)
         else:
             causal = _debit(causal, evidence=n)
             mode = replace(mode, shield=min(10, mode.shield + n))
@@ -465,8 +466,11 @@ def _arc_operation(
         arc = replace(arc, civic=min(100, arc.civic + n))
     elif name == "mystery":
         if arc.clues < 3 * n:
+            causal = _debit(causal, trust=n)
             arc = replace(arc, uncertainty=min(100, arc.uncertainty + n))
-            raise FoundationError("theory needs three independently spent clues")
+            return causal, mode, arc, (
+                "Unsupported conclusion recorded as uncertain and reduced public trust",
+            )
         arc = replace(arc, clues=arc.clues - 3 * n, chapter=arc.chapter + n)
     elif name == "seasonal":
         causal = _debit(causal, supplies=n)
