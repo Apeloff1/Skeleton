@@ -143,7 +143,8 @@ class ReviewerRegistry:
                     or entry.get("previous")!=previous):
                 raise PromotionError("immutable promotion audit chain was altered")
             previous=proof
-            latest=entry["state"]
+            latest=dict(entry["state"],ledger_head=proof,
+                        _previous_ledger_head=entry["previous"])
         return len(names),previous,latest
 
     def read_state(self):
@@ -153,7 +154,8 @@ class ReviewerRegistry:
             raise PromotionError("unsupported local review-model registry")
         if state.get("revision")!=length or state.get("ledger_head")!=head:
             raise PromotionError("interrupted promotion transaction; invoke explicit recovery")
-        if length and latest!=state:
+        if length and {k:v for k,v in latest.items()
+                       if k!="_previous_ledger_head"}!=state:
             raise PromotionError("registry and latest immutable review record disagree")
         return state
 
@@ -178,27 +180,13 @@ class ReviewerRegistry:
         if old.get("revision")!=self.read_state()["revision"]:
             raise PromotionError("stale concurrent reviewer promotion request")
         updated=dict(updated,revision=old["revision"]+1)
+        # The immutable ledger stores the next state without the digest
+        # pointer, so a circular SHA dependency cannot occur.
         entry=dict(number=updated["revision"],previous=old["ledger_head"],
-                   event=event)
-        # Content digest includes the next state excluding ledger head.
-        receipt=canonical_digest(dict(entry,state={
-            **updated,"ledger_head":None
-        }))
-        updated["ledger_head"]=receipt
-        entry["state"]=dict(updated)
-        # Digest of the entry itself authenticates its content, chain and
-        # resulting state. The next transition uses this exact digest.
-        entry["digest"]=canonical_digest(entry)
-        updated["ledger_head"]=entry["digest"]
-        entry["state"]["ledger_head"]=entry["digest"]
-        # Need one stable digest independent of circular state ledger_head.
-        canonical_entry=dict(entry)
-        canonical_entry["state"]=dict(updated,ledger_head=None)
-        canonical_entry["digest"]=canonical_digest({
-            k:v for k,v in canonical_entry.items() if k!="digest"
-        })
-        entry=canonical_entry
-        updated["ledger_head"]=entry["digest"]
+                   event=event,state=dict(updated,ledger_head=None))
+        digest=canonical_digest(entry)
+        entry["digest"]=digest
+        updated["ledger_head"]=digest
         _exclusive(self.root/"ledger"/f"{updated['revision']:06d}.json",entry)
         _atomic(self.root/"state.json",updated)
         return updated
