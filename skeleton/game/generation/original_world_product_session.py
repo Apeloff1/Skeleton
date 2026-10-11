@@ -124,7 +124,9 @@ def create_product(
     law = living_at(index)
     if era is not None:
         budget = era_budget(era)
-        count = budget.full_npc_limit if inhabitants is None else inhabitants
+        # Reserve two full-mind slots for physically founded future families.
+        count = (max(1, budget.full_npc_limit - 2)
+                 if inhabitants is None else inhabitants)
     else:
         count = 12 if inhabitants is None else inhabitants
     physical = create_terrain(
