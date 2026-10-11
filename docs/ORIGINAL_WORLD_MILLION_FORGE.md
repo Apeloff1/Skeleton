@@ -179,3 +179,53 @@ playtest and originality review; low-resource fallback profiles;
 and progressive rendering and streaming of enormous worlds. Until then,
 the literal claim is **a million addressable rule-composed abstract game
 configurations**, not a million finished products.
+
+
+## Systemic genre × world-law × narrative synergy
+
+`original_world_million_synergy.py` adds **160 explicitly governed
+cross-domain balancing cells**, connecting each of sixteen causal
+disciplines to each of ten actually executable gameplay modes. Twelve
+continuation policies translate physical difficulty pressure into
+long-run effects. That is **1,920 defined interaction pathways**, not
+1,920 more independent games.
+
+Every checkpoint evaluates physical state: a platformer's gaps and
+damage; a logic puzzle's unresolved switch circuit; a tactician's
+enemy pressure; a survivor's hydration and warmth; settlement food and
+housing deficits; actual vehicle wear; guard alertness; market
+liquidity; unrevealed reachable territory; and recorded offbeat
+performances.
+
+The authored world domain adjusts how those pressures matter.
+Continuation then determines the *kind of setback*: additional duties,
+hazards, lost public legitimacy or reserves, lingering uncertainty,
+generational responsibilities, and rescue needs. A high-pressure
+simulation world running an endangered colony can therefore generate
+a different measurable failure trajectory than a gentle governance
+world running the same initial player actions.
+
+The coefficients are **balancing hypotheses**, not claims of
+playtested optimality; they remain bounded, deterministic,
+inspectable, and excluded from the world count. They do not override
+player consent or conjure free physical resources.
+
+The real playable reference game additionally checks that a
+platformer's grounded path cannot skip a physical gap without a jump
+or consumed brace, and that racing requires completing two marked
+course bends with a still-functional vehicle rather than earning
+a lap merely by repeatedly accelerating. These constraints are
+critical to actually differentiating genres in execution.
+
+### Tests for cross-system fidelity
+
+```bash
+python -m pytest -q --noconftest \
+  tests/test_original_world_million_compiler.py \
+  tests/test_original_world_million_cli.py \
+  tests/test_original_world_million_objectives.py \
+  tests/test_original_world_million_synergy.py
+```
+
+The game-specific workflow also runs legacy atlas tests and actual
+scripted world demonstrations on the exact PR head.
