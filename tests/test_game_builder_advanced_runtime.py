@@ -167,6 +167,16 @@ class AdvancedSurvivalTests(unittest.TestCase):
         self.assertTrue(any("finite_resource_harvested" in x["events"]
                             for x in report["trace"]))
 
+    def test_trade_consumes_real_bounded_merchant_supply(self):
+        session=run_advanced_session("survival",actions=["trade","trade"])
+        local=session["state"]["regions"][0]
+        self.assertEqual(local["merchant_food_stock"],0)
+        self.assertEqual(local["merchant_water_stock"],0)
+        self.assertEqual(session["state"]["trade_tokens"],0)
+        self.assertTrue(verify_advanced_session(session))
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("survival",actions=["trade","trade","trade"])
+
     def test_no_free_fuel_resources_or_crafting_and_exhaustion_enforced(self):
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("survival",actions=["craft_tool"])
@@ -210,7 +220,7 @@ class AdvancedProofTests(unittest.TestCase):
                 with self.assertRaises(AdvancedRuntimeError):
                     verify_advanced_session(bad)
 
-    def test_no_fake_support_for_40_other_systems(self):
+    def test_no_fake_support_for_38_other_systems(self):
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("maze")
         with self.assertRaises(AdvancedRuntimeError):
