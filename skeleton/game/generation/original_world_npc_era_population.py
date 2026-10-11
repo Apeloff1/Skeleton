@@ -21,6 +21,9 @@ import json
 
 from .original_foundation_compiler import FoundationError
 from .original_world_era_runtime import ERA_LEVELS
+from .original_world_npc_platform_profiles import (
+    PopulationProfile, plan_population,
+)
 from .original_world_product_agents import (
     Person, PhysicalSociety, MAX_AGENTS, validate_society,
 )
@@ -126,6 +129,7 @@ class EraPopulation:
     total_deaths: int = 0
     updates: int = 0
     event_head: str = "0" * 64
+    profile: PopulationProfile | None = None
 
 
 def _hash(data: object) -> str:
@@ -209,22 +213,34 @@ def _allocation(people: int, count: int) -> tuple[int, ...]:
 def create_era_population(
     world: TerrainState, people: PhysicalSociety, era: str,
     *, fidelity: str = "balanced",
+    profile: PopulationProfile | None = None,
 ) -> EraPopulation:
     validate_society(people, world)
     budget = era_budget(era)
+    if profile is not None and (
+        not isinstance(profile, PopulationProfile)
+        or profile != plan_population(
+            era, profile.platform, profile.genre,
+            pc_generation=profile.pc_generation or None
+        )
+    ):
+        raise FoundationError("hardware/genre demographic profile is not canonical")
+    local_cap = profile.local_limit if profile is not None else budget.full_npc_limit
+    total_background = profile.regional_limit if profile is not None else budget.background_limit
+    district_count = profile.district_limit if profile is not None else budget.district_limit
     if fidelity not in FIDELITY_MODES:
         raise FoundationError("invalid local cognitive hardware budget")
-    if len(people.inhabitants) > budget.full_npc_limit:
-        raise FoundationError("requested detailed NPCs exceed era/CPU fidelity budget")
+    if len(people.inhabitants) > local_cap:
+        raise FoundationError("requested detailed NPCs exceed real hardware/era/genre budget")
     allowed_roles = permitted_roles(era)
     if any(p.profession not in allowed_roles for p in people.inhabitants):
         raise FoundationError("anachronistic NPC professions for selected technology era")
-    if budget.background_limit == 0:
+    if total_background == 0:
         result = EraPopulation(era, world.design_id, (), day=people.tick,
-                               fidelity=fidelity)
+                               fidelity=fidelity, profile=profile)
         validate_population(result, people, world)
         return result
-    allocations = _allocation(budget.background_limit, budget.district_limit)
+    allocations = _allocation(total_background, district_count)
     districts = []
     sites = set()
     for index, count in enumerate(allocations):
@@ -245,7 +261,7 @@ def create_era_population(
         districts.append(District(index, x, y, count, count * 6))
     result = EraPopulation(
         era, world.design_id, tuple(districts), day=people.tick,
-        fidelity=fidelity,
+        fidelity=fidelity, profile=profile,
     )
     validate_population(result, people, world)
     return result
@@ -258,10 +274,22 @@ def validate_population(
     if not isinstance(state, EraPopulation) or state.world_id != world.design_id:
         raise FoundationError("era population belongs to another physical world")
     budget = era_budget(state.era)
+    profile = state.profile
+    if profile is not None and (
+        not isinstance(profile, PopulationProfile)
+        or profile != plan_population(
+            state.era, profile.platform, profile.genre,
+            pc_generation=profile.pc_generation or None,
+        )
+    ):
+        raise FoundationError("altered platform/gameplay NPC baseline")
+    physical_limit = profile.local_limit if profile else budget.full_npc_limit
+    groups = profile.district_limit if profile else budget.district_limit
+    original_census = profile.regional_limit if profile else budget.background_limit
     if state.fidelity not in FIDELITY_MODES:
         raise FoundationError("unrecognized active-brain hardware preset")
-    if (len(people.inhabitants) > budget.full_npc_limit
-            or len(state.districts) != budget.district_limit
+    if (len(people.inhabitants) > physical_limit
+            or len(state.districts) != groups
             or any(p.profession not in permitted_roles(state.era)
                    for p in people.inhabitants)):
         raise FoundationError("era detailed and background budgets disagree")
@@ -319,7 +347,7 @@ def validate_population(
         deaths += d.deaths
         if d.days_simulated != d.last_day:
             raise FoundationError("district cannot conceal deferred simulated days")
-    if count + len(state.migrations) != budget.background_limit or deaths != state.total_deaths:
+    if count + len(state.migrations) != original_census or deaths != state.total_deaths:
         raise FoundationError("background census illegally creates or loses residents")
     if (not isinstance(state.caravans, tuple)
             or len(state.caravans) > MAX_CARAVANS):
@@ -366,7 +394,9 @@ def embody_regional_citizen(
     validate_population(state, people, world)
     if type(district) is not int or not 0 <= district < len(state.districts):
         raise FoundationError("missing district for individual embodiment")
-    if len(people.inhabitants) >= min(MAX_AGENTS, era_budget(state.era).full_npc_limit):
+    fidelity_limit = (state.profile.local_limit if state.profile
+                      else era_budget(state.era).full_npc_limit)
+    if len(people.inhabitants) >= min(MAX_AGENTS, fidelity_limit):
         raise FoundationError("no free high-fidelity NPC memory slot")
     place = state.districts[district]
     if place.population < 1:
@@ -462,7 +492,11 @@ def tick_population(
     deaths = state.total_deaths
     updated_count = 0
     if districts:
-        slots = min(tuning(state.era, state.fidelity)[0], len(districts))
+        slots = min(
+            tuning(state.era, state.fidelity)[0],
+            state.profile.district_update_limit if state.profile else MAX_DISTRICTS,
+            len(districts),
+        )
         for i in range(slots):
             index = (state.cursor + i) % len(districts)
             district = districts[index]
@@ -527,14 +561,20 @@ def population_restore(
             raise FoundationError("tampered or unsupported population save")
         raw = envelope["payload"]
         fields = set(EraPopulation.__dataclass_fields__)
-        if set(raw) not in (fields, fields - {"fidelity"}):
+        if set(raw) not in (
+            fields, fields - {"profile"}, fields - {"profile", "fidelity"},
+        ):
             raise FoundationError("unexpected population archive")
         districts = tuple(District(**d) for d in raw["districts"])
         caravans = tuple(Caravan(**c) for c in raw["caravans"])
         migrations = tuple(Migration(**m) for m in raw["migrations"])
+        p = raw.get("profile")
+        profile = PopulationProfile(**p) if isinstance(p, dict) else None
+        if p is not None and not isinstance(p, dict):
+            raise FoundationError("invalid authored NPC platform profile")
         result = EraPopulation(**{**raw, "districts": districts,
                                   "caravans": caravans,
-                                  "migrations": migrations})
+                                  "migrations": migrations, "profile": profile})
         validate_population(result, people, world)
         return result
     except (TypeError, KeyError, ValueError, AttributeError) as exc:
@@ -543,20 +583,32 @@ def population_restore(
 
 def population_report(state: EraPopulation, local: int) -> dict:
     b = era_budget(state.era)
+    p = state.profile
     count = sum(d.population for d in state.districts)
+    local_cap = p.local_limit if p else b.full_npc_limit
+    active_cap = (min(active_brain_budget(state.era, state.fidelity),
+                      p.brain_limit) if p else
+                  active_brain_budget(state.era, state.fidelity))
+    region_updates = min(tuning(state.era, state.fidelity)[0],
+                         p.district_update_limit) if p else tuning(state.era, state.fidelity)[0]
+    proxies = min(tuning(state.era, state.fidelity)[1],
+                  p.visual_proxy_limit) if p else tuning(state.era, state.fidelity)[1]
     return {
         "schema": SCHEMA, "era": b.era, "technology": b.technology,
+        "platform_genre_profile": p.as_dict() if p else None,
+        "legacy_high_density": p is None,
+        "regional_population_is_abstract": True,
+        "local_full_cognition_is_scheduled": True,
         "cognitive_preset": state.fidelity,
-        "full_local_brain_budget_per_turn": active_brain_budget(
-            state.era, state.fidelity),
+        "full_local_brain_budget_per_turn": active_cap,
         "full_personality_and_physics_NPCs": local,
-        "detailed_limit": b.full_npc_limit,
+        "detailed_limit": local_cap,
         "regional_aggregated_residents": count,
         "total_census": local + count,
         "background_loss_of_life": state.total_deaths,
         "districts": len(state.districts),
-        "limited_district_updates_per_turn": tuning(state.era, state.fidelity)[0],
-        "visible_proxy_budget": tuning(state.era, state.fidelity)[1],
+        "limited_district_updates_per_turn": region_updates,
+        "visible_proxy_budget": proxies,
         "detail_mode": state.fidelity,
         "promoted_to_full_cognition": len(state.migrations),
         "migrations": [asdict(record) for record in state.migrations],
@@ -608,6 +660,7 @@ def select_active_brains(
     """
     validate_population(state, society, terrain)
     limit = min(active_brain_budget(state.era, preset),
+                state.profile.brain_limit if state.profile else MAX_AGENTS,
                 len(society.inhabitants))
     here = terrain.position
     protected = set()
@@ -675,7 +728,10 @@ def ambient_impressions(
         raise FoundationError("invalid hardware-safe ambient viewport")
     # Every entry point, including explicit caller requests, must honor the
     # selected consumer-device render cap; visual requests cannot override it.
-    hardware_cap = min(MAX_IMPRESSIONS, tuning(state.era, state.fidelity)[1])
+    hardware_cap = min(
+        MAX_IMPRESSIONS, tuning(state.era, state.fidelity)[1],
+        state.profile.visual_proxy_limit if state.profile else MAX_IMPRESSIONS,
+    )
     if (max_visible is not None and
             (type(max_visible) is not int
              or not 0 <= max_visible <= MAX_IMPRESSIONS)):
