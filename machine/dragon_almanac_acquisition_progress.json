@@ -2,8 +2,8 @@
   "schema": "skeleton.dragon.almanac_acquisition_progress.v1",
   "registry_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
   "ordering": "source_id_ascending",
-  "next_source_offset": 192,
-  "reviewed_candidate_count": 192,
+  "next_source_offset": 224,
+  "reviewed_candidate_count": 224,
   "entries": [
     {
       "source_id": "source-0017fcb9b1445e4f0a6949fb81b3fe01159175a23ca300ff1350938c2b2a0974",
@@ -1731,6 +1731,294 @@
       "checked_at": "2026-10-11T08:18:53.559Z",
       "availability": "metadata_shell_returned",
       "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0006.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0b1247442a3ea806b33258cd3dddc1bdd3eedaf6b39d611ff1fb2c39170ee281",
+      "source_offset": 192,
+      "url": "http://codensuch.com/trap-labs-series/part0",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0b17199321d8e07a3a534795774da8ea99a847f8d9e6f4b6d23ad85800c2d5d0",
+      "source_offset": 193,
+      "url": "https://codeberg.org/svetogam/csconnector",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0b21c002b92b88ce58caca81448ba0a33aac46c90c99068199357da8d0629ee8",
+      "source_offset": 194,
+      "url": "http://ludology.libsyn.com/):",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0b260d4e04adab8121a7546bd93511da8d23ba65dbfabf494100dd6c7f57597d",
+      "source_offset": 195,
+      "url": "https://www.drpetter.se/project_sfxr.html",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0b2919a055e51bc034ca104d3c944720c9ac0f38a9c8ee964252208ebc9d1474",
+      "source_offset": 196,
+      "url": "https://github.com/mosra/magnum",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0b439de591e813409eeacd48403a10153b189f1b585641f2d263de21428ed7fc",
+      "source_offset": 197,
+      "url": "https://fgiesen.wordpress.com/",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0b46ce84578898bfce5c070ba54e2785c179fe5fd4d3c1a6b3f4c764ca355995",
+      "source_offset": 198,
+      "url": "https://github.com/Unity-Technologies/SuperScience",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0b5b856bc4fe76ac4ed6a4e5d07556c2228b12d8f0f284ea052976d1871ca902",
+      "source_offset": 199,
+      "url": "http://matthew-isidore.ovh/full-body-fps-controller-part-1-base-character-controller/",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0b5bee4f31897fd0657cf7766da364e1cba4df59058586f83fbdefc55d6f8ac8",
+      "source_offset": 200,
+      "url": "https://github.com/andyobtiva/glimmer",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0b798bc35dce79f7b961738b6cdb7301bd9c25a00981f135bcadcd60eab021f1",
+      "source_offset": 201,
+      "url": "https://cubebrush.co/",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0b965cb44d1d2635e36ce9a8801ec4b1293c75583464ea1b226ae1207e39fc72",
+      "source_offset": 202,
+      "url": "https://www.rpginabox.com/",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0ba5560a7b313e9633c774dea7a8ddacf22c4a91f0070e5833d3e1688a2dcf16",
+      "source_offset": 203,
+      "url": "https://www.youtube.com/playlist?list=PLa1F2ddGya_8V90Kd5eC5PeBjySbXWGK1",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "metadata_shell_only",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0bbf30525bd8fbc1453a5bcd2e32dc3acf7b4268490ea009a32690c77c373c4b",
+      "source_offset": 204,
+      "url": "https://github.com/mikeroyal/Qt-Guide",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0bc7c6f9a6d2b3fda7ebcf44709fdc14e70540d517e4061b6c9103664e341fae",
+      "source_offset": 205,
+      "url": "https://github.com/wxWidgets/wxWidgets",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0bd7f8cf96a1164ed0ab92f306e64a194b644f925d5e48e66a5fef124945cd1c",
+      "source_offset": 206,
+      "url": "https://youtu.be/dVgKpOYo-4Q",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0be7a234b42afaec1acfb819a0730e352031f71e12e0362e4252ddcde60bae19",
+      "source_offset": 207,
+      "url": "https://github.com/grayj/Jedi-Outcast",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0befaffc6211ba0129608d861b3d4f6bee2b0a4adc2d0258c77c392d3795fe77",
+      "source_offset": 208,
+      "url": "https://youtu.be/R7AJwlFHZ70",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0bf769f46a16573eae42046c26e961c8d7ece298a4ab9993f7fafc85a76bab72",
+      "source_offset": 209,
+      "url": "https://github.com/tavurth/godot-simple-state",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0c2f882ddc53d5948604c042c5915ba0a2e28cac0f14153141a56cee294660bb",
+      "source_offset": 210,
+      "url": "https://www.shadertoy.com/view/MllfDn",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0c39a15f7b733de78f75eb35618dd446b6b9b47262390e5b6095246431943770",
+      "source_offset": 211,
+      "url": "https://github.com/irrelon/ige",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0c44c6a296a554915d51ead9f4984c89258e957eb9c895bfeecba408e2bfa44f",
+      "source_offset": 212,
+      "url": "http://p1.untergrund.net/",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "metadata_shell_only",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0c4d58e9029473ea5d9479a1f390ac223b5ff68db07a8e860a19271f0f1ff9ea",
+      "source_offset": 213,
+      "url": "https://medium.com/@Fayer/kleptocats-post-mortem-english-59c28cff6193",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0c5041e512a59fde710f981aa9840fe1ae6b4b893b0c5d8ca43eda732438f6e5",
+      "source_offset": 214,
+      "url": "https://www.youtube.com/watch?v=6K7lN3i2K64",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0c57e7c0d94a4d17eb2caca2736933ebe9a3ab185021873e6d3e9407bbe7d523",
+      "source_offset": 215,
+      "url": "https://github.com/phoboslab/Ejecta",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0c58770d68d1665c8561e7c386e922f1d8f88b7d6eb9883c577e503c62e10de1",
+      "source_offset": 216,
+      "url": "https://youtu.be/tu-Qe66AvtY",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0c5b11da43e436ef527a342cdb455098dfa428e666510ad5361d72fca6f1923a",
+      "source_offset": 217,
+      "url": "https://github.com/gerstrong/Commander-Genius",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0c9e135c9fdca9dca705b6dfce83ac2e9c0249cbddbcce33c6182ceb95987482",
+      "source_offset": 218,
+      "url": "http://www.icons8.com/",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0ca1c91918adce26326ddcd8c644c76f2be482816386f0be0af373e86c34de2f",
+      "source_offset": 219,
+      "url": "https://www.youtube.com/watch?v=vWU8EltWTfM&list=PLlrATfBNZ98fqE45g3jZA_hLGUrD4bo6_",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0cd6ab62e57260587c44a5933c7889ca805eb8332f05f4855cb068754f86ed0a",
+      "source_offset": 220,
+      "url": "https://gamedevelopment.tutsplus.com/articles/forward-rendering-vs-deferred-rendering--gamedev-12342",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "redirect_to_non_target_index",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0cdd03ea6114bd060add8a1718018a43f9cf87c1ce692d0d268c0c451344f78d",
+      "source_offset": 221,
+      "url": "https://github.com/coderespawn/dock-spawn",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0ce5b9442bf771b691b88da81426ab809c52290ab2bd8f584cd1d0f7a6160ad6",
+      "source_offset": 222,
+      "url": "https://doc.qt.io/qtforpython-6/",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-0cef572a8b8cff3b2faafa9c3ee8d77b24a65cb7c4d16b7edfb07116bf4b7d9b",
+      "source_offset": 223,
+      "url": "http://www.dotnetcurry.com/csharp/1222/upgrade-existing-csharp-code-csharp-6",
+      "checked_at": "2026-10-11T09:17:20.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
       "approved": false
     }
   ],
