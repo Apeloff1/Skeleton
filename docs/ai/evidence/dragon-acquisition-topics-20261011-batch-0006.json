@@ -1,0 +1,901 @@
+{
+  "schema": "skeleton.dragon.acquisition_topic_triage.v1",
+  "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0006.json",
+  "independent_support_added": 0,
+  "canonical_admission": false,
+  "topics": [
+    {
+      "topic_path": [
+        "Just The Source"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-09463a84d900dc57acbced01c7b0653c119d1f453a87974e19cf7dda51696b96",
+          "url": "https://github.com/TTimo/doom3.gpl",
+          "representation_sha256": "4824c173c63929697520e7dff7ffdae61949b0a054599ca4c386505e12a88f92",
+          "source_revision": "aaa855815ab484d5bd095f347163194ac569abcc",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "The Doom 3 source release is GPL-3.0, excludes original game data governed by the original EULA, and enumerates excluded or separately licensed code.",
+            "span": "README.txt and COPYING.txt at recorded Git blobs",
+            "limitations": "Engine-source rights do not cover game data, names, media or every dependency; additional terms require legal review.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Unity**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-094c0e7ac04e9e101c25f46d0cfd11f14ce751457769c8d60d3b3154d5b88ef9",
+          "url": "https://www.youtube.com/watch?v=bUGbXThraVM",
+          "representation_sha256": "1c95010ae503594f127c943a9709ca7c69a11be4f80d2b15797008c69c95df57",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn104view0",
+          "observation": null
+        },
+        {
+          "source_id": "source-0affaabc2ebe16815ddfb75cdff7480c38348e1d47743c84fc5a0547738844d6",
+          "url": "https://medium.com/@wondrous_aqua_toad_341/top-7-hard-skills-for-unity-junior-developer-8a28124d14a2",
+          "representation_sha256": "d93518019f130b0a7d5448000fb90436d9ac8f12eef933306e3d31c2ed17b177",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn104view19",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-094c0e7ac04e9e101c25f46d0cfd11f14ce751457769c8d60d3b3154d5b88ef9",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        },
+        {
+          "source_id": "source-0affaabc2ebe16815ddfb75cdff7480c38348e1d47743c84fc5a0547738844d6",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Frameworks/Engines/Libraries"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-09678dd8906aade8557c49e22437bce2997a38f5ff4de77706b21d7e91271ae3",
+          "url": "https://github.com/INdT/Quasi-Engine",
+          "representation_sha256": "33c0035e296f9b4d81faf198176cf6150152812987458912b1e7380f09882413",
+          "source_revision": "7d496613c31b185a198f3d63a9f67030746ae2cd",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "Quasi Engine describes a Qt/Box2D-based 2D QML engine; root files include GPL-3.0, LGPL-3.0 and a project-specific license statement.",
+            "span": "README, LICENSE, COPYING and COPYING.LESSER at recorded Git blobs",
+            "limitations": "Applicable scope by component and dependency remains unresolved.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Code**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-09923f9d8547f6a6155c123996a02bd98aed09421425fd991c37bba7d6038a11",
+          "url": "https://www.youtube.com/watch?v=dn3y5KVxylQ",
+          "representation_sha256": "bd61bd8532259d46c6d233ed6b49257c9d1b4fba3d5a8cbaf0efea720f52911a",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn104view1",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-09923f9d8547f6a6155c123996a02bd98aed09421425fd991c37bba7d6038a11",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Design**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-099b5b394ff50240f671703621bf860068ff8e1a5f13e721e61c459f13f6915e",
+          "url": "https://medium.com/toge-productions/a-holistic-approach-to-game-making-3f2d8163e105",
+          "representation_sha256": "0936203bdc128fef12cd2c49dc645ab9d7fbc5fb2882745c0bc6d87f2ecc5987",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn104view2",
+          "observation": {
+            "statement": "The 2024 Toge Productions article proposes testing a game's purpose against creator motivation, capability, audience demand and differentiation, then validating with interviews, reviews, surveys and perceptual maps.",
+            "span": "turn104view2 lines 47–164",
+            "limitations": "Practitioner framework based on experience, not peer-reviewed or experimentally validated.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-09fce4412ee0d1bfd3d5b95ecfe729c4342dfc6773a435f80d8b771e5e396879",
+          "url": "https://medium.com/@hex3r_/the-damage-is-too-damn-high-or-achieving-the-perfect-balance-3ccccbe70756",
+          "representation_sha256": "1df35b010753d13834e1e93ce3da07bdd81dc62f509c1ceb3a73f0536fa636c7",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn104view4",
+          "observation": null
+        },
+        {
+          "source_id": "source-09fd6d7ec4e2c53ea3837e09c27398e87934cebf87a58f1335a933e640939ee5",
+          "url": "https://80.lv/articles/80-level-digest-great-books-for-aspiring-game-designers/",
+          "representation_sha256": "ff4158c741fe95889114a94cfa8adfe85bc681676b75b680d9e11dfa9cdb1df1",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn106view4",
+          "observation": {
+            "statement": "The 80 Level digest organizes books around iterative design, playtesting, game feel, mechanics modeling, emergence, emotion and narrative integration.",
+            "span": "turn106view4 lines 35–130",
+            "limitations": "Editorial secondary source; the books themselves were not accessed, licensed or independently evaluated.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-0a590118f26a218d617005248d16896dd0e5dbea97d0e57c7fcc0aea78fee0ca",
+          "url": "https://80.lv/articles/the-quest-to-enhance-design-in-video-games/",
+          "representation_sha256": "359ec0abcc5c07c758d9d80dff75a485deecc6b366fee3dcb3c326f66245bba9",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn106view3",
+          "observation": {
+            "statement": "The 80 Level article treats cross-device consistency, resolution testing, accessibility collaboration and cultural adaptation as separate UI/UX obligations.",
+            "span": "turn106view3 lines 30–90",
+            "limitations": "Practitioner commentary and examples; legal assertions and named product behaviors were not independently verified.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-09fce4412ee0d1bfd3d5b95ecfe729c4342dfc6773a435f80d8b771e5e396879",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Native",
+        "Strategy"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-099d0003f54eab7cceb780a5bf5ce237e4a2b0f32eb323db9db4054f812bf80d",
+          "url": "https://github.com/CorsixTH/CorsixTH",
+          "representation_sha256": "5bb9ead4b37d9583324fc6b69cd82e4cd02cee2f8f5691739ce7f6acf87b2cb3",
+          "source_revision": "06b42b221c8da5497f07504fd01039090ccdb3d5",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "CorsixTH is a modern reimplementation of Theme Hospital with custom campaigns and accessibility additions, but its README requires original or demo game data and says it uses original graphics, sound and other data.",
+            "span": "README.md, README.txt and LICENSE.txt at recorded Git blobs",
+            "limitations": "Open reimplementation code does not transfer rights in Theme Hospital data, brands or media.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "C"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-09c045634f6b78773a31b38c48e7bc6f8e1c44f18151b5309cad7146f590b510",
+          "url": "https://github.com/nothings/stb/blob/master/stb_truetype.h",
+          "representation_sha256": "ecd30b05e0dd4fea3a13c26810dd9e1992dc379049482c393d5a19e6b5090aab",
+          "source_revision": "2c980bb59875b0d32144a71867fbdebb2f77cd20",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "stb_truetype v1.26 parses and rasterizes TrueType glyphs under a choice of MIT or public-domain terms, while its header explicitly warns that untrusted fonts can cause arbitrary-memory reads because offsets lack range checking.",
+            "span": "stb_truetype.h blob 90a5c2e2b3fe563c98585294ca7a949876aec94c",
+            "limitations": "File-scoped observation only; security suitability requires independent audit and hostile-font tests.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Table of Contents",
+        "Bitmap Compression"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-09c96c87661b6a583a3b782ec15b44d08b9ab4b49f22f40e2f6d2ff54010973e",
+          "url": "http://pngmini.com/",
+          "representation_sha256": "8aa4b9989aa82fae4feb1e07e6fe13c1a52c59e42d788835ffd18bea9a357566",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn104view3",
+          "observation": {
+            "statement": "ImageAlpha reports lossy PNG8-plus-alpha compression, marks the Python 2 application unsupported, points to maintained alternatives and identifies the application as GPL-2.0 open source.",
+            "span": "turn104view3 lines 7–49",
+            "limitations": "Product documentation; compression-quality claims and downstream tool licenses were not independently measured.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Writing"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-09f1f356a165e7b5fed8bcf1b30481c60486107731ee0d6a595bdf788eb6d843",
+          "url": "https://github.com/etodd/dialogger",
+          "representation_sha256": "3119055dbe8239f8ff5356f5d213519d97c1a71b1676a4697b17a8c623bf4eb5",
+          "source_revision": "95440945dc1c86206c3d2bc3b2056a289d3717be",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "Dialogger saves dialogue graphs as JSON-based .dl and optimized .dlz formats and embeds an MIT license in its README.",
+            "span": "README.md at recorded Git blob",
+            "limitations": "Dependency and binary-distribution terms were not reviewed.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "JavaScript"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-09f7ff32ae06721f1c60ccf980310aafb1e7b3d46d73b4b95900b638384f81ee",
+          "url": "https://github.com/CreateJS/TweenJS",
+          "representation_sha256": "4924857d03169cc4dbc11437e065e5f6e96658a7654262197b3be144a784b324",
+          "source_revision": "6df2b9ce7e68d3d824cc490b67cab2bc3204810a",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "TweenJS identifies itself as a JavaScript tweening and animation library with a root MIT license.",
+            "span": "README.md and LICENSE.txt at recorded Git blobs",
+            "limitations": "Dependencies, bundled examples and current browser compatibility were not audited.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-0a93e0519934e3b72884411f337ec1ca6c05798d67b05e1ae3243fbeaada2695",
+          "url": "https://github.com/mrdoob/three.js/",
+          "representation_sha256": "641a2025a17c1eb31ec500ffeafc8812b93ffd0f93907ea2eaa10168893d2f85",
+          "source_revision": "11738a9d55e502fb484cefffcea3a66dc44e9fe9",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "Three.js identifies itself as a JavaScript 3D library and supplies a root MIT license.",
+            "span": "README.md and LICENSE at recorded Git blobs",
+            "limitations": "Examples, models, fonts and third-party dependencies can carry separate terms.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Art**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0a2049a24dceff1b475853e95c140361e4019cef4afb72d31ff5520bcd3d0ae9",
+          "url": "https://gumroad.com/timb",
+          "representation_sha256": "8f6223171ef3832abf9967a02ad7ca711c8e09350385f731f9ee843ebec6b542",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn104view6",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "C++"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0a32a4ca8afd62b0648ed9588007227525bf5fb1fa261037b6c386c92b45ffb5",
+          "url": "https://gitlab.com/eidheim/tiny-process-library",
+          "representation_sha256": "62fda3e785c1f9a11d617a868db4813818f6abd567d02628dbe2f4c9057bbc38",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn105view0",
+          "observation": {
+            "statement": "The GitLab project page describes a platform-independent C++ library for starting and stopping processes and piping stdin, stdout and stderr.",
+            "span": "turn105view0 lines 2–12",
+            "limitations": "Thin project-page representation; source, license and current API were not fetched.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-0aa6c8de225b4322d3f73ce5670d397191e686b1fda137bb885aebf9877337b3",
+          "url": "https://github.com/nlohmann/json",
+          "representation_sha256": "7e34011ff07e7ea337bdb9884aee8766dff294f26711d0b15f5ca9119c49b488",
+          "source_revision": "b38a2c9177bb6143b0352a55f79889a1ae6c0845",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "nlohmann/json identifies itself as JSON for modern C++ and supplies an MIT root license file.",
+            "span": "repository metadata and LICENSE.MIT at recorded revision/blob",
+            "limitations": "The large README and LICENSES directory were not fetched; dependency and subpath scope remain pending.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "Pascal"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0a35b5c4f0701cbb7b2041aa311f31888b33ff7220553482a65add2b0c65fcfa",
+          "url": "https://www.freepascal.org/",
+          "representation_sha256": "cc3bcc5eafa5adc1ed1724671af57f4285f8b8d4796d1ea71f2345e07ac8a78c",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn105view1",
+          "observation": {
+            "statement": "Free Pascal lists mature compiler targets spanning x86, PowerPC, ARM, MIPS, 68k, AVR, JVM and operating systems including desktop, DOS, Amiga, Atari and Nintendo GBA/DS/Wii; several newer targets are development-only.",
+            "span": "turn105view1 lines 29–31",
+            "limitations": "Homepage claim; target quality, toolchain completeness and current hardware legality were not tested.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Job Hunting and Career"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0a4b5e9ea43dab75e01952fcb29136ed3380f9afd9dcba27a5e6fec0e67debd7",
+          "url": "https://claudiasnotes.notion.site/claudiasnotes/Career-Advice-Collected-560272eab6ce4069ada95d0852dbb1c9",
+          "representation_sha256": "0711b2f0b6677d9b5c0c6bfacf88edf89b7ca44b918f4e08f78036aec5cf080a",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn104view9",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-0a4b5e9ea43dab75e01952fcb29136ed3380f9afd9dcba27a5e6fec0e67debd7",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Organization**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0a56fe4c2f100aa0dd89b7d3ecedb08b86845d56de624e925ca984fa319ca19b",
+          "url": "https://github.blog/2021-03-16-improving-large-monorepo-performance-on-github/",
+          "representation_sha256": "88e175c073eee717b7f3e87f47711bb7cff31ae8147737d44c7247e64c759731",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn104view10",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "Rust"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0a6e6cc20c9ad8d6e91cb53f89a46e677cde6d53f520bf1f83ce318069de8e40",
+          "url": "https://www.rust-lang.org/",
+          "representation_sha256": "8b8e7e35835d194ef0854e13601b493f31c68e3aa38925ea9f30d406844eb65f",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn105view4",
+          "observation": {
+            "statement": "The Rust homepage emphasizes no garbage collector/runtime, ownership-based memory and thread safety, integrated tooling, WebAssembly and embedded targets.",
+            "span": "turn105view4 lines 11–67",
+            "limitations": "Project-authored overview; performance and safety claims were not benchmarked in this batch.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Demos",
+        "Godot 2"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0a73267b283cf7f555bddc4759190fcba93dc8b0f16d58f24cfb268b35e67878",
+          "url": "https://github.com/FEDE0D/godot-pathfinding2d-demo",
+          "representation_sha256": "49b4a6c232c338bace033d4713dbe96b1977f0c9ceca5b7b7aea27e91a250491",
+          "source_revision": "b802996bb8106f16f5b399affb8995b23bbc75b2",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "The Godot demo identifies tilemap-based 2D pathfinding and supplies a root MIT license.",
+            "span": "README.md and LICENSE.md at recorded Git blobs",
+            "limitations": "A small historical demo; engine-version compatibility and asset provenance were not tested.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Commercial**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0a744b06b1c0355b5b8bd5e2e11fc7b0bc260c97ebe7e353c85779ecab013d7b",
+          "url": "http://gamasutra.com/blogs/AndyMoore/20130605/193717/Monster_Loves_You_By_The_Numbers.php",
+          "representation_sha256": "ba6e0e4606032f6998c2a276271f6035272d4a059b00af9754ecc07be017ea6e",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn104view13",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-0a744b06b1c0355b5b8bd5e2e11fc7b0bc260c97ebe7e353c85779ecab013d7b",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Talks [![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://github.com/sindres",
+        "Other Talks"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0aa52b9d787a6026b755532f9c58e7c24def6a4048031a70b86b729f013ef813",
+          "url": "https://www.youtube.com/watch?v=AJdEqssNZ-U%29%3A",
+          "representation_sha256": "998ff58bbfab0cfb80434223ee3d5474ab327429f643f098f91d0183bb794b7b",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn104view14",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-0aa52b9d787a6026b755532f9c58e7c24def6a4048031a70b86b729f013ef813",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Design"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0aadd691eb49f93cf2c5c12e0b98d3520d49df07cab4275b35a42ac8be6c18cc",
+          "url": "https://gameaccessibilityguidelines.com/",
+          "representation_sha256": "79824693525e6ecd423a60fc93315bbf9546c1853e5f36245e0a5e22efdb1c2e",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn105view5",
+          "observation": {
+            "statement": "Game Accessibility Guidelines separates guidance into basic, intermediate and advanced tiers and describes the reference as a collaboration among studios, specialists and academics.",
+            "span": "turn105view5 lines 2–36",
+            "limitations": "Homepage taxonomy only; individual recommendations and evidence bases were not fetched.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-0b0277674435e6d7d26dfc922d5af7d2d4f74b313c75c537c59eb3e7c181e6a7",
+          "url": "https://web.archive.org/web/20250808082816/https://designoriented.net/wheel",
+          "representation_sha256": "5edb72a55bb8f213aa1eaa7cffeb8f102c5947bc1f7be5e41734ba09038c9d1a",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn104view20",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-0b0277674435e6d7d26dfc922d5af7d2d4f74b313c75c537c59eb3e7c181e6a7",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Table of Contents",
+        "Engines and Frameworks"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0ada18e3b0a0112ac6419a58c5da782c0f8374451abb9b82edb21015d67d13fb",
+          "url": "http://flixel.org/index.html",
+          "representation_sha256": "9d8eb730cdbb3fff90c5d7e68366a9845c4459915f3a354dbeaa0ac9da83dad3",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn105view6",
+          "observation": {
+            "statement": "Flixel describes itself as an ActionScript 3 game-making library, free for personal or commercial use, and lists Canabalt and Mode as featured examples.",
+            "span": "turn105view6 lines 0–28",
+            "limitations": "Historical homepage claim; exact license file, current maintenance state and example-game rights were not independently reviewed.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Table of Contents",
+        "Vector/Image Editor"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0adcba263e1eeefaedcc85984a1b2668f586254b24ec237cd1c0b3b7745326cb",
+          "url": "http://www.pixelmator.com/",
+          "representation_sha256": "52c0da386731e2daf6a2149c9d78e18da41216b13a3d2085ed2bf086dc839ebe",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn105view7",
+          "observation": {
+            "statement": "The current destination for pixelmator.com is Apple's Pixelmator Pro page, which describes image editing on Mac and iPad with Apple Intelligence features.",
+            "span": "turn105view7 lines 29–40",
+            "limitations": "Commercial marketing page; subscription, generated-output and model-input terms were not reviewed.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Table of Contents",
+        "Blogs and Portals"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0aebc9e31797d8917723a1d878e3442e5e3f61d987e241812921690c11e619f8",
+          "url": "http://www.gamedev.net/page/index.html",
+          "representation_sha256": "c10771c17c285912890fc5e414d89b9f8443ce7c54f766453b07b6ddc433ddc2",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn105view8",
+          "observation": {
+            "statement": "GameDev.net exposes distinct news, research, tutorial, blog, shader, forum, portfolio, recruitment, studio and school directories.",
+            "span": "turn105view8 lines 2–78",
+            "limitations": "Portal taxonomy only; linked contributions have independent authors, dates and terms.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Tools / Software",
+        "Modeling Tools"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0afc75d0368fd73e6df9a947855d8008d240e6d63743ab6fb92edde024a94a04",
+          "url": "https://github.com/blender/blender",
+          "representation_sha256": "bfebfb0aefe0ee0821e497dc96e9ad9a0a65158dd94f9ded0611b64b31e93700",
+          "source_revision": "754ebe3c4b4e1402a159df6e1e58823cc93ef887",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "Blender describes a complete 3D creation pipeline and states that Blender as a whole is GPL-3.0 while individual files may use compatible licenses.",
+            "span": "README.md and COPYING at recorded Git blobs",
+            "limitations": "Software licensing does not determine rights in user-provided models, textures, plugins or generated project assets.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Marketing**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-0b0eb613076dd23c30e2ce2fe92fe6f744d87a850824b2576f399357a559015d",
+          "url": "https://steamcommunity.com/groups/steamworks/announcements/detail/2117195691992645419",
+          "representation_sha256": "e24aabb0c82e30b4dd35cfe31501db298e15b61cb701daa6fc32fb72d071f5e2",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn105view9",
+          "observation": {
+            "statement": "The Steamworks announcement title was resolved, but the returned page body contained only an image reference.",
+            "span": "turn105view9 line 0",
+            "limitations": "Metadata-shell observation; no release-performance statistics were available for extraction.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    }
+  ]
+}
