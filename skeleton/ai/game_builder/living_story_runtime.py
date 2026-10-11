@@ -251,7 +251,7 @@ def original_story_world(intent: StoryIntent, *, authorized: bool) -> StoryWorld
         quests.append(Quest(
             key=f"quest_{index:02d}", giver=leader.key,
             item=f"artifact_{index:02d}", source_region=source,
-            faction=leader.faction, reward=20 + index * 10,
+            faction=leader.faction, reward=20 + index * 5,
             premise=verbs[index % len(verbs)] + (
                 f" — chapter {index // len(verbs) + 1}"
                 if index >= len(verbs) else ""
