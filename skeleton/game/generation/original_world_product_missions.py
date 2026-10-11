@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from .original_foundation_compiler import FoundationError, REGIME_COUNT
 from .original_world_product_session import ProductSession, validate_product
-from .original_world_product_terrain import cell_at
+from .original_world_product_terrain import _base_cell
 
 MISSION_VERSION = "original-root-evidence-director.v1"
 
@@ -107,10 +107,10 @@ def _domain_progress(session: ProductSession, domain: str) -> int:
     if domain == "ecosphere":
         return min(m.habitat - 8, 5) if m.habitat >= 8 else 0
     if domain == "materials":
-        return sum(int(
-            cell_at(local, e.x, e.y).stone
-            < (1 + int(local.design_id[0], 16) % 6)
-        ) for e in local.edits if e.kind == "stone") + int(local.masonry > 3)
+        return sum(
+            _base_cell(local.design_id, local.biome, edit.x, edit.y).stone
+            - edit.stone for edit in local.edits
+        )
     if domain == "governance":
         return min(3, source.primary // 2)
     if domain == "community":
