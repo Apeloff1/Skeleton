@@ -48,7 +48,7 @@ def parser():
     )
     commands=cmd.add_subparsers(dest="action",required=True)
     for name in ("evaluate","stage","approve","usage","idle-pass",
-                 "activate","status","rollback","recover","predict"):
+                 "activate","status","rollback","recover","predict","next-standard"):
         p=commands.add_parser(name)
         p.add_argument("--root",required=True)
         if name!="status":
@@ -146,6 +146,8 @@ def main(argv=None):
                 evidence,game_digest=args.game_digest,authorized=True)
         elif args.action=="activate":
             result=registry.activate(authorized=True)
+        elif args.action=="next-standard":
+            result=registry.propose_next_standard(authorized=True)
         elif args.action=="rollback":
             result=registry.abort(args.reason,authorized=True)
         elif args.action=="recover":
