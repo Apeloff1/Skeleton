@@ -78,6 +78,40 @@ To use an original designer-authored level instead, create a complete
 Pass `--authored-world tiles.json --human-reviewed`; author approval does not
 mean automatic copyright, trademark or distribution clearance.
 
+## Rights-reviewed inspiration without copyrighted-expression copying
+
+The studio API now accepts the canonical `ReviewedKnowledgeStore`,
+`KnowledgeBrief` and `RightsLedger` as one indivisible research handoff:
+
+```python
+from skeleton.ai.game_builder import run_original_game_studio
+
+session = run_original_game_studio(
+    intent,
+    authorized=True,
+    reviewed_library=reviewed_library,
+    research_brief=reviewed_design_brief,
+    rights_ledger=canonical_rights_ledger,
+    human_research_approved=True,
+    mirror_attempts=128,
+    companion_practice_games=2,
+)
+```
+
+The knowledge store must have fresh reviewed citations in `design_reference`
+scope; every referenced source must independently match its RightsLedger
+revision, evidence and permitted use. The compiler generates original geometry
+and scripts before research clearance; research may inform design decisions but
+cannot turn a quotation, source code or game asset into runnable expression.
+Reference clearance has no model-training or consumer-publication authority.
+Missing approval or a mismatch stops the build before output.
+
+The new `tests.test_game_builder_studio_research` exercises complete
+knowledge/rights/game/replay/mirror/consumer handoff and its negative cases.
+The local CLI deliberately does not deserialize arbitrary rights or model
+objects from untrusted JSON; a trusted application integration must provide
+these typed owners.
+
 ## Mirror-room threat coverage
 
 Every probe actually invokes the canonical simulator, replay verifier or
