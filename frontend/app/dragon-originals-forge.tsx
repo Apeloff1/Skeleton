@@ -132,7 +132,8 @@ function Creator(){
     ?{program_index:manualIndex,parent_codex_index:parentCodex||null}
     :{program_index:'0',levels,parent_codex_index:parentCodex||null};
   const validExact=/^(0|[1-9]\d{0,19})$/.test(manualIndex)&&
-    BigInt(manualIndex)<18446744073709551616n;
+    (manualIndex.length<20||
+      (manualIndex.length===20&&manualIndex<'18446744073709551616'));
   const changeLevel=(index:number,value:number)=>{
     const next=[...levels];
     next[index]=value;
