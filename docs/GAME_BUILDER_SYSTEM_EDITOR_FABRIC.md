@@ -152,6 +152,48 @@ engines. It never equates successful reference simulation with a certified
 Godot export or native executable. Integration of the actual other 40
 game engines and producer-grade scene/node editors remains outstanding.
 
+## Fourth independent native engine: authored original Godot 4 arena shooter
+
+The `advanced_shooter_godot.py` adapter executes a playable, offline, original
+Godot 4 combat game **independently** of the Python source simulator. It has
+real 2D authored-grid movement, swept two-step dodge displacement and finite
+dodge charges, cover-blocked movement and line-of-sight targeting, integer
+Bresenham firing paths, proximity-and-identity-based target selection,
+weapon damage/armor, ammunition and reloading, cover stance, finite medkits,
+tactical pickups, bounded reinforcement waves, spatial enemy patrols and
+line-of-sight attacks, terminal defeat, mission score, and an actual
+enemy-clearance + extraction-tile victory condition. The user can play with
+WASD/arrows, F/Space to fire, R reload, C cover, H heal, Shift dodge east,
+Enter extract, Backspace restart or gamepad buttons.
+
+Every map uses canonical `advanced_level_scenes.py` geometry with exactly
+three spawn anchors, valid cover and collectible placements, reachable
+extraction and source/setting digests. Native JSON numerical coordinates are
+normalized into integer vectors at the source boundary. Replay witness mode
+`--verify-shooter` starts the native arena from its **own authored scene**,
+replays bounded commands using the GDScript combat rules (not Python output
+snapshots), then checks the full `PROOF_FIELDS` contract: position,
+dimensions, HP and supplies, evasion/cover, enemy states and positions,
+replacements, ammunition, pickups, wave and kill counts, score, event order,
+and win/loss state. Any mismatch is an execution failure.
+
+The local Game Studio and reviewed `godot-export` CLI now support a **fourth
+native project** (`shooter`) alongside `puzzle`, `platformer`, and
+`deck_battler`. Its ZIP uses a unique fixed `original-godot-shooter/` root,
+explicit operator authorization for writes, independently replay-verified
+Python session source, and immutable content hashes. A ZIP handoff does not
+claim the new Godot runtime was executed on the user's computer.
+
+The dedicated `.github/workflows/game-builder-advanced-shooter-native.yml`
+uses **nine authored arena scenarios on Ubuntu and Windows**: default combat,
+cover, dodge, movement, enemy tactics, firing + reload, multi-target
+elimination, a new reinforcement wave and completed extraction. The job
+runs each generated Godot project, requires exact native/Python parity, and
+then exports **and executes** real Linux and Windows desktop game binaries.
+Those native completion claims depend on the exact-head workflow result;
+source creation alone is not confirmation. Console certification, copyrighted
+assets and publication permissions remain separate human reviews.
+
 ## Third independent native engine: original Godot 4 deck battler
 
 The native adapter set has been extended beyond the original puzzle and
