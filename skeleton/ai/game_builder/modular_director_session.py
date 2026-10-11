@@ -187,8 +187,11 @@ def simulate_director(world: DirectorWorld,actions: Sequence[DirectorAction],*,
         raise PermissionError("original game director evaluation requires authorization")
     if not isinstance(actions,(tuple,list)) or len(actions)>512:
         raise IntegrationError("bounded complete original action trace required")
-    original=director_play(world,actions)
-    director_verify(world,original)
+    try:
+        original=director_play(world,actions)
+        director_verify(world,original)
+    except DirectorError as exc:
+        raise IntegrationError("submitted original game actions failed canonical replay") from exc
     session=open_director_session(world,population=population,tier=tier,authorized=True)
     checks=[]
     for action in actions:
