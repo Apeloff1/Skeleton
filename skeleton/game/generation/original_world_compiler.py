@@ -184,7 +184,7 @@ class OriginalWorldBlueprint:
     def as_dict(self) -> dict:
         return {
             "atlas_version": self.atlas_version,
-            "variant_index": self.variant_index,
+            "variant_index": str(self.variant_index),  # avoid JS number precision loss
             "recipe_id": self.recipe_id,
             "world": self.world.__dict__.copy(),
             "mechanics": [mechanic.__dict__.copy() for mechanic in self.mechanics],
