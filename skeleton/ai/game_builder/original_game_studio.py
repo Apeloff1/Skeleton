@@ -204,6 +204,13 @@ def run_original_game_studio(
         narrative_population != 0 and not 6 <= narrative_population <= 128
     ):
         raise StudioError("living-world NPC budget must be zero or 6 to 128")
+    if narrative_population and (
+        type(narrative_regions) is not int or not 4 <= narrative_regions <= 12
+        or narrative_mode not in {"campaign", "postgame", "sandbox"}
+        or type(narrative_quests) is not int or not 1 <= narrative_quests <= 3
+        or narrative_ending not in {"stewardship", "discovery", "independence"}
+    ):
+        raise StudioError("invalid living-world region, mode, quest or ending settings")
     story_intent: StoryIntent | None = None
     if narrative_population:
         story_intent = StoryIntent(
