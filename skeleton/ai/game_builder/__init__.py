@@ -330,6 +330,10 @@ _KNOWLEDGE_EXPORTS = {
     "plan_original_companion_intents": ".companion_curriculum",
     "measure_original_practice": ".companion_curriculum",
     "validate_practice_cohort": ".companion_curriculum",
+    "TiledImportError": ".tiled_map_import",
+    "TiledConversion": ".tiled_map_import",
+    "import_tiled_levels": ".tiled_map_import",
+    "write_tiled_authored_json": ".tiled_map_import",
 }
 
 
