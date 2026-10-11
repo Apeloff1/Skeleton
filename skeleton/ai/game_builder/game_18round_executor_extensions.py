@@ -26,6 +26,9 @@ from .game_post_weight_forensics import PostWeightReport,analyze_post_weight_cha
 from .game_training_flow import FlowPlan
 from .competitive_mirror_training import TrainingCandidate
 from .game_post_weight_dragon import PostWeightDragonMission
+from .game_idle_review_scheduler import IdleEvaluationBudget,qualify_when_idle
+from .game_reviewer_registry import ReviewerRegistry
+from .quest_scene_engine import DirectorWorld
 
 
 @dataclass(frozen=True,slots=True)
@@ -89,6 +92,51 @@ def execute_idle_round(
         host_idle=host_idle,thermal_safe=hardware_safe,
         host_consented=True)
     return after,item
+
+
+def execute_round5_actual_idle_gameplay(
+    state:EvolutionRun,
+    registry:ReviewerRegistry,
+    independent_original_worlds:tuple[DirectorWorld,...],*,
+    reviewer:TrustedCompetitionJudge,
+    as_of:str,
+    authorized:bool,
+    consent:bool,
+    host_idle,
+    hardware_safe,
+    budget:IdleEvaluationBudget=IdleEvaluationBudget(
+        max_wall_seconds=180,max_worlds=4),
+    quest_key:str="quest_00",
+):
+    """Dispatch real existing idle original-game reviewer evaluation.
+
+    No daemon, no synthesized telemetry, no unconsented background task.
+    If the host is active, hot, out of budget or the registry preempts,
+    return DEFERRED without consuming signed R5 or changing model weights.
+    """
+    if not authorized or not consent:
+        raise PermissionError("real game replay during idle requires explicit operator consent")
+    if not isinstance(state,EvolutionRun) or len(state.rounds)!=2:
+        raise ThreatRadarError("must complete R3 and R4 before idle model review")
+    result=qualify_when_idle(
+        registry,independent_original_worlds,
+        authorized=True,consent=True,
+        host_is_idle=host_idle,hardware_is_safe=hardware_safe,
+        budget=budget,quest_key=quest_key)
+    if result["status"]=="deferred":
+        return state,result
+    if (result.get("schema")!="skeleton.game_builder.idle_review_dispatch.v1"
+            or not isinstance(result.get("evaluation"),dict)
+            or result.get("new_weights_installed") is True
+            or result.get("model_weights_updated") is True):
+        raise PromotionError("idle reviewer result must contain authentic evaluated game cohort, not a weight install")
+    after=_advance(
+        state,5,"idle_assessed",canonical_digest(result),
+        (state.task.task_digest,result["source_cohort_digest"]),
+        reviewer,as_of,authorized=True,
+        host_idle=host_idle,thermal_safe=hardware_safe,
+        host_consented=True)
+    return after,result
 
 
 @dataclass(frozen=True,slots=True)
@@ -411,6 +459,7 @@ def execute_round17_report(
         reviewer,as_of,authorized=True),report
 
 __all__=["BoundedIdleBacklog","execute_idle_round",
+         "execute_round5_actual_idle_gameplay",
          "ModularEraProfile","execute_round7_era_profile",
          "IndustryEngineeringGate","execute_round8_engineering_gate",
          "ProjectCrawlerTargetBrief","execute_round10_crawler_brief",
