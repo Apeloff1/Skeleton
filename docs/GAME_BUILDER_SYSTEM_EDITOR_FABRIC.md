@@ -93,6 +93,53 @@ The same restricted loopback/CSRF-token protocol exposes `GET /api/editors`
 and `POST /api/editor-preview`. No action accepts arbitrary scripts or invokes
 a network provider; the server does not itself write a project during preview.
 
+## Advanced — mandatory minimum progression level (11 October 2026)
+
+Every listed editor now publishes a concrete **advanced design floor** with
+five or more discipline-specific capability requirements. Basic/novice
+progression is no longer a product milestone, and an authoring form alone
+does not count as a completed advanced engine. Editor maturity is one of:
+
+- `authoring_only`: validated advanced-design controls, **no playable runtime**.
+- `advanced_reference_runtime`: a real replayable, command-driven game engine
+  prototype with explicit evidence, not native hardware certification.
+
+Three engine families currently meet the second level:
+
+1. **Platformer**: swept tile traversal, integer jump physics, optional
+   double jump, finite dash cooldown, spike damage, checkpoint respawn,
+   collectibles and exit gating.
+2. **Tactics**: two independently controlled squad members, AP economy,
+   position/collision checks, deterministic integer-grid line of sight,
+   covered/enemy actions, guard, overwatch, medical consumables and terminal
+   squad/mission outcomes.
+3. **Tower defense**: three placeable/upgradable towers, finite costs,
+   targeting priorities, armor, slowing effects, deterministic waves,
+   enemy progress, kills, leaks and base damage.
+
+Run `Start advanced scenario` in the studio after selecting one of these
+three systems. Visible gameplay action buttons replay a **fully submitted
+bounded command transcript** through the local, token-authenticated backend,
+returning the same original seed, settings, per-turn state/event digests and
+chained receipt hashes. The interactive canvas renders the authoritative
+returned positions and resource state. Use `Independently verify replay` to
+regenerate every state from the original actions and reject altered credits,
+health, actions, evidence or event order.
+
+Programmatic access is also available offline:
+
+```bash
+python -m skeleton.ai.game_builder.system_editor_cli play \
+  --editor tactics --seed 7 --actions local-commands.json > local-evidence.json
+python -m skeleton.ai.game_builder.system_editor_cli verify-play \
+  --session local-evidence.json
+```
+
+The assembly graph includes reference-playable proof digests for these three
+engines. It never equates successful reference simulation with a certified
+Godot export or native executable. Integration of the actual other 40
+game engines and producer-grade scene/node editors remains outstanding.
+
 ## Composing an original hybrid game
 
 The newly implemented `system_editor_assembly` builds a content-addressed,
