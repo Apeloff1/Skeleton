@@ -32,6 +32,11 @@ from .original_world_npc_apprenticeships import (
     TeachingLedger, validate_teaching, settle_training, training_report,
     training_restore, SCHEMA as TRAINING_SCHEMA,
 )
+from .original_world_npc_households import (
+    HouseholdState, household_origin, validate_households, settle_households,
+    household_report, household_restore, CHILDCARE_TURNS,
+    SCHEMA as HOUSEHOLD_SCHEMA,
+)
 
 VERSION = "original-npc-cognition.v2"
 GOALS = frozenset(("work", "eat", "recover", "deliver", "scout", "care",
@@ -135,6 +140,7 @@ class CitizenIntelligence:
     testimonies: tuple[Testimony, ...] = ()
     civic: CivicInstitutions = field(default_factory=CivicInstitutions)
     training: TeachingLedger = field(default_factory=TeachingLedger)
+    households: HouseholdState = field(default_factory=HouseholdState)
     day: int = 0
     meetings: int = 0
     interventions: int = 0
@@ -177,7 +183,10 @@ def make_intelligence(world: TerrainState, society: PhysicalSociety) -> CitizenI
         ))
     # An older save can have an existing physically advanced town clock.
     # Seed new minds at that actual day, never invent past observations.
-    result = CitizenIntelligence(world.design_id, tuple(minds), day=society.tick)
+    result = CitizenIntelligence(
+        world.design_id, tuple(minds), day=society.tick,
+        households=household_origin(society),
+    )
     validate_intelligence(result, society, world)
     return result
 
@@ -192,6 +201,7 @@ def validate_intelligence(
         raise FoundationError("inhabitant thought clock diverged from physical body")
     validate_civics(state.civic, people, world, state.day)
     validate_teaching(state.training, people, world)
+    validate_households(state.households, people, world)
     if not isinstance(state.minds, tuple) or len(state.minds) != len(people.inhabitants):
         raise FoundationError("missing or extra persistent minds")
     for p, mind in zip(people.inhabitants, state.minds):
@@ -717,10 +727,26 @@ def smart_npc_tick(
     for person, mind in zip(people.inhabitants, thinking.minds):
         start = (person.x, person.y)
         goal, utility, reason, objective = _plan(person, mind, thinking, current_world)
+        if thinking.households.ages[person.id] < CHILDCARE_TURNS:
+            goal, utility, reason = (
+                "recover", 100, "dependent child prioritizes physical care and safety")
         p = replace(person, hunger=min(20, person.hunger + 1))
         operation, resource, quantity = "idle", "", 0
         if p.health == 0:
             operation = "incapacitated"
+        elif thinking.households.ages[p.id] < CHILDCARE_TURNS:
+            if p.hunger >= 6 and (p.x, p.y) == (0, 0) and current_world.provisions >= 1:
+                current_world = replace(
+                    current_world, provisions=current_world.provisions - 1)
+                p = replace(p, hunger=max(0, p.hunger - 6),
+                            health=min(20, p.health + 1),
+                            energy=min(20, p.energy + 1))
+                operation, resource, quantity = "feed-real-dependent", "food", 1
+            else:
+                p = replace(p, energy=min(20, p.energy + 2))
+                if p.hunger >= 15:
+                    p = replace(p, health=max(0, p.health - 1))
+                operation = "dependent-rests-near-family"
         elif p.hunger >= 7 or goal == "eat":
             at = cell_at(current_world, p.x, p.y)
             if p.cargo_kind == "food" and p.cargo:
@@ -1016,13 +1042,38 @@ def smart_npc_tick(
         result.civic, next_people, current_world, result.minds, next_people.tick)
     training, next_people, current_world, lessons = settle_training(
         result.training, next_people, current_world)
+    current_world, next_people, households, arrivals = settle_households(
+        result.households, next_people, current_world)
+    minds = list(result.minds)
+    for arrival in arrivals:
+        parent_a = minds[arrival.caregiver_a]
+        parent_b = minds[arrival.caregiver_b]
+        child = arrival.child_id
+        entropy = sha256(f"{current_world.design_id}:{child}:new-generation".encode()).digest()
+        def blend(attribute: str, i: int) -> int:
+            return max(1, min(10, (getattr(parent_a, attribute)
+                                  + getattr(parent_b, attribute)) // 2
+                                  + entropy[i] % 3 - 1))
+        minds.append(Mind(
+            child, ("steadfast", "tender", "inquisitive", "pragmatic")[entropy[0] % 4],
+            blend("curiosity", 1), blend("empathy", 2),
+            blend("discipline", 3), blend("prudence", 4), goal="recover",
+        ))
+        bonds = _bond_change(bonds, child, arrival.caregiver_a,
+                             trust=3, affinity=3, aid=1)
+        bonds = _bond_change(bonds, child, arrival.caregiver_b,
+                             trust=3, affinity=3, aid=1)
     result = replace(
-        result, civic=civic, training=training, event_head=_hash({
+        result, minds=tuple(minds), bonds=bonds.bonds,
+        civic=civic, training=training, households=households,
+        event_head=_hash({
             "prior-npc-day": result.event_head,
             "civic-state": asdict(civic),
             "civic-outcomes": outcomes,
             "training-state": asdict(training),
             "paid-lessons": lessons,
+            "household-state": asdict(households),
+            "new-dependent-ids": [a.child_id for a in arrivals],
         }),
     )
     validate_intelligence(result, next_people, current_world)
@@ -1047,6 +1098,10 @@ def cognition_restore(data: dict, people: PhysicalSociety,
             allowed_fields, allowed_fields - {"civic"},
             allowed_fields - {"training"},
             allowed_fields - {"civic", "training"},
+            allowed_fields - {"households"},
+            allowed_fields - {"households", "training"},
+            allowed_fields - {"households", "civic"},
+            allowed_fields - {"households", "training", "civic"},
         ):
             raise FoundationError("cognitive memory integrity mismatch")
         minds = tuple(Mind(
@@ -1072,11 +1127,17 @@ def cognition_restore(data: dict, people: PhysicalSociety,
             "payload": raw["training"],
             "checksum": _hash(raw["training"]),
         }, people, world) if "training" in raw else TeachingLedger())
+        households = (household_restore({
+            "schema": HOUSEHOLD_SCHEMA,
+            "payload": raw["households"],
+            "checksum": _hash(raw["households"]),
+        }, people, world) if "households" in raw
+            else household_origin(people))
         state = CitizenIntelligence(
             **{**raw, "minds": minds, "bonds": relationships,
                "orders": orders, "projects": projects,
                "testimonies": testimonies, "civic": civic,
-               "training": training}
+               "training": training, "households": households}
         )
         validate_intelligence(state, people, world)
         return state
@@ -1097,6 +1158,7 @@ def cognition_report(state: CitizenIntelligence, people: PhysicalSociety,
         "first_hand_testimonies": [asdict(t) for t in state.testimonies],
         "public_institutions": civic_report(state.civic),
         "earned_apprenticeships": training_report(state.training),
+        "generational_households": household_report(state.households),
         "socially_learned_material_observations": sum(
             m.subject in STOCK and m.witness != mind.person_id
             for mind in state.minds for m in mind.memories
@@ -1174,6 +1236,12 @@ def npc_profile(
         "mentorship_history": [
             asdict(a) for a in state.training.records
             if person_id in (a.mentor, a.apprentice)
+        ],
+        "age_in_world_turns": state.households.ages[person_id],
+        "dependent_caregivers": [
+            a.caregiver_a if a.caregiver_b != person_id else a.caregiver_b
+            for a in state.households.families
+            if a.status == "established" and a.child_id == person_id
         ],
         "construction_contributions": [
             asdict(p) for p in state.projects if person_id in p.contributors
