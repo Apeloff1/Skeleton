@@ -87,7 +87,7 @@ jobs:
               ("movement",{"player_health":60},["north","south","west","east"],None,11),
               ("tactical",{"player_health":70},["wait","wait","wait","wait"],None,17),
               ("fire",{"player_health":100,"weapon_damage":2,"enemy_count":3},
-               ["fire","reload"],[6,4],4),
+               ["fire","reload"],[8,4],4),
               ("eliminate",{"player_health":100,"weapon_damage":50,"enemy_count":3},
                ["fire","fire","fire"],[8,4],1),
               ("reinforcements",{"player_health":100,"weapon_damage":50,"enemy_count":4},
@@ -101,6 +101,7 @@ jobs:
               if player is not None:
                   layout=make_advanced_scene("shooter",cfg,seed=seed)["layout"]
                   layout["player_spawn"]=list(player)
+                  layout["enemy_spawns"]=[[8,2],[10,4],[8,6]]
               scene=make_advanced_scene("shooter",cfg,seed=seed,layout=layout)
               try:
                   game=run_advanced_session("shooter",cfg,actions,
