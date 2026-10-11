@@ -236,3 +236,41 @@ def test_cli_exposes_fidelity_selection_without_overwriting_loaded_saves(capsys,
     assert rp["hardware_fidelity"]["preset"] == "economy"
     assert rp["hardware_fidelity"]["maximum_individual_brain_decisions_per_turn"] == 3
     assert product_restore(save.read_text()).population.fidelity == "economy"
+
+
+def test_passive_body_eats_real_ration_without_spending_full_brain_slot():
+    from skeleton.game.generation.original_world_npc_cognition_v2 import (
+        smart_npc_tick,
+    )
+    baseline = create_product(living_for(
+        0, "puzzle", "lattice", "trophic", "sandbox").index,
+        inhabitants=2)
+    citizens = list(baseline.society.inhabitants)
+    citizens[0] = replace(citizens[0], hunger=8, health=18)
+    people = replace(baseline.society, inhabitants=tuple(citizens))
+    stores = baseline.terrain.provisions
+    terrain, after, brain, receipts, thoughts = smart_npc_tick(
+        baseline.terrain, people, baseline.cognition, active_ids=())
+    assert terrain.provisions == stores - 1
+    assert after.inhabitants[0].hunger < citizens[0].hunger
+    assert all(m.decisions == 0 for m in brain.minds)
+    assert receipts[0].operation == "passive-funded-depot-meal"
+    assert (after.inhabitants[0].x, after.inhabitants[0].y) == (0, 0)
+
+
+def test_hungry_passive_citizen_without_depot_stock_gets_no_magic_food():
+    from skeleton.game.generation.original_world_npc_cognition_v2 import (
+        smart_npc_tick,
+    )
+    baseline = create_product(living_for(
+        0, "puzzle", "lattice", "trophic", "sandbox").index,
+        inhabitants=2)
+    citizens = list(baseline.society.inhabitants)
+    citizens[0] = replace(citizens[0], hunger=8)
+    people = replace(baseline.society, inhabitants=tuple(citizens))
+    terrain, after, brain, receipts, _ = smart_npc_tick(
+        replace(baseline.terrain, provisions=0),
+        people, baseline.cognition, active_ids=())
+    assert terrain.provisions == 0
+    assert after.inhabitants[0].hunger == 9
+    assert receipts[0].operation == "passive-survival-no-cognition"
