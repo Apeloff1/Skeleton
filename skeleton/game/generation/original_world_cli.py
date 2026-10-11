@@ -11,6 +11,9 @@ import json
 from typing import Sequence
 
 from .original_world_compiler import TOTAL_VARIANTS, blueprint_at, blueprint_from_seed
+from .original_foundation_compiler import (
+    foundation_at, foundation_from_seed, provenance_report,
+)
 from .original_world_simulator import (
     WorldRuleAction, replay_rules, route_edges,
 )
@@ -25,6 +28,10 @@ def _parser() -> argparse.ArgumentParser:
     selector = parser.add_mutually_exclusive_group()
     selector.add_argument("--index", type=int, help="Exact zero-based recipe index")
     selector.add_argument("--seed", help="Reproducible design seed")
+    selector.add_argument("--foundation-index", type=int,
+                          help="Exact authorial cross-law foundation index [0,10239]")
+    selector.add_argument("--foundation-seed",
+                          help="Deterministically choose a causal foundation")
     parser.add_argument("--era", default="near-future")
     parser.add_argument("--chronology", default="fictional-history")
     parser.add_argument("--theology", default="none")
@@ -56,6 +63,35 @@ def main(argv: Sequence[str] | None = None) -> int:
             realism=args.realism,
             hardware_target=args.hardware_target,
         )
+        if args.foundation_index is not None or args.foundation_seed is not None:
+            law = (foundation_at(args.foundation_index)
+                   if args.foundation_index is not None
+                   else foundation_from_seed(args.foundation_seed))
+            result = {
+                "catalog": "causal-composed-foundations",
+                "foundation": law.as_dict() if not args.brief else {
+                    "foundation_id": law.foundation_id,
+                    "index": str(law.foundation_index),
+                    "title": law.title, "root_id": law.root.root_id,
+                    "regime_id": law.regime.regime_id,
+                    "coupling": law.coupling,
+                    "provenance": law.provenance,
+                },
+                "styling": styling.as_dict(),
+                "inventory": provenance_report(),
+                "realization_status": "bounded-generic-causal-prototype",
+                "play_command": "python -m skeleton.game.generation.original_foundation_cli --index "
+                                + str(law.foundation_index) + " --interactive",
+                "warning": "Causal composition is not individually handwritten, "
+                           "nor does a stylistic choice create a native playable build.",
+            }
+            if args.demo_rules:
+                result["warning"] += (
+                    " The legacy eight-rule demonstration is separate "
+                    "from this causal composition."
+                )
+            print(json.dumps(result, sort_keys=True, indent=2, ensure_ascii=False))
+            return 0
         blueprint = (
             blueprint_at(args.index) if args.index is not None
             else blueprint_from_seed(args.seed or "atlas-preview")
