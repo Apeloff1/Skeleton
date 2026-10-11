@@ -88,7 +88,7 @@ jobs:
                ["travel","forage","drink","trade","rest","travel"],
                1,"rain",0),
               ("camp",rich,["mine_stone","mine_stone","craft_tool",
-                            "build_shelter","mine_stone","mine_stone",
+                            "build_shelter","mine_stone",
                             "build_shelter","rest","travel"],
                0,"cold",0),
               ("cooking",{"initial_wood":4,"starting_food":12,"starting_water":12},
