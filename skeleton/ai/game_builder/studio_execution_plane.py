@@ -85,6 +85,7 @@ class ExecutionOutcome:
     mirror: MirrorReport | None
     practice_packages: tuple[DualRuntimePackage, ...]
     practice_insights: tuple[PracticeInsight, ...]
+    practice_mirror_reports: tuple[MirrorReport, ...]
     exported_path: Path | None
 
     @property
@@ -107,6 +108,7 @@ class ExecutionOutcome:
                 item.manifest["manifest_digest"] for item in self.practice_packages
             ],
             "practice_insight_digests": [item.digest for item in self.practice_insights],
+            "practice_mirror_digests": [item.digest for item in self.practice_mirror_reports],
             "exported": self.exported_path is not None,
             "external_code_executed": False,
             "trained_model": False,
@@ -209,6 +211,7 @@ def execute_local_tool_plan(
     mirror: MirrorReport | None = None
     practice: list[DualRuntimePackage] = []
     practice_insights: list[PracticeInsight] = []
+    practice_mirrors: list[MirrorReport] = []
     exported: Path | None = None
     receipts: list[ExecutedToolReceipt] = []
     consumed = set()
@@ -277,7 +280,17 @@ def execute_local_tool_plan(
             theme_count = validate_practice_cohort(variants, parent=intent)
             for practice_intent in variants:
                 practice_project = compile_original_game(practice_intent, authorized=True)
-                practice.append(render_dual_runtime_package(practice_project, authorized=True))
+                practice_package = render_dual_runtime_package(practice_project, authorized=True)
+                # Every stepping-stone title must survive attacks on its own
+                # replay, identity, source and manifest before learning XP.
+                inspection = review_playable_project(
+                    practice_project, practice_package,
+                    authorized=True, attempts=64,
+                )
+                if not inspection.passed:
+                    raise ExecutionPlaneError("companion practice failed independent mirror room")
+                practice.append(practice_package)
+                practice_mirrors.append(inspection)
                 practice_insights.append(measure_original_practice(
                     practice_project.world, practice_project.proof,
                     authorized=True, distinct_themes=theme_count,
@@ -287,6 +300,7 @@ def execute_local_tool_plan(
                     pkg.manifest["manifest_digest"] for pkg in practice
                 ],
                 "insights": [row.digest for row in practice_insights],
+                "mirror_reports": [row.digest for row in practice_mirrors],
             })
         elif row.tool_id == "release.assess":
             if mirror is None or not mirror.passed:
@@ -320,7 +334,8 @@ def execute_local_tool_plan(
         ))
     return ExecutionOutcome(
         anchored, plan.digest, tuple(receipts), world, project,
-        package, mirror, tuple(practice), tuple(practice_insights), exported,
+        package, mirror, tuple(practice), tuple(practice_insights),
+        tuple(practice_mirrors), exported,
     )
 
 
