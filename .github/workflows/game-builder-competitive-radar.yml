@@ -7,6 +7,8 @@ on:
       - "skeleton/ai/game_builder/competitive_watch_book.py"
       - "skeleton/ai/game_builder/competitive_watch_service.py"
       - "skeleton/ai/game_builder/competitive_watch_cli.py"
+      - "skeleton/ai/game_builder/competitive_dragon_recrawl.py"
+      - "skeleton/ai/webcrawler/dragon_mission_scheduler.py"
       - "tests/test_game_builder_competitive_radar.py"
       - "docs/ai/game_competitive_threat_radar_2026_10.md"
       - ".github/workflows/game-builder-competitive-radar.yml"
@@ -42,6 +44,7 @@ jobs:
             skeleton/ai/__init__.py
             skeleton/ai/capability_map.py
             skeleton/ai/game_builder/
+            skeleton/ai/webcrawler/
             tests/__init__.py
             tests/test_game_builder_competitive_radar.py
             tests/test_game_builder_knowledge_rights_bridge.py
