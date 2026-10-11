@@ -61,6 +61,7 @@ class Mind:
     objective: tuple[int, int] = (0, 0)
     morale: int = 10
     stress: int = 0
+    loneliness: int = 0
     memories: tuple[Memory, ...] = ()
     decisions: int = 0
 
@@ -161,7 +162,8 @@ def validate_intelligence(
             ("curiosity", 1, 10), ("empathy", 1, 10),
             ("discipline", 1, 10), ("prudence", 1, 10),
             ("goal_age", 0, MAX_HISTORY), ("morale", 0, 20),
-            ("stress", 0, 20), ("decisions", 0, MAX_HISTORY),
+            ("stress", 0, 20), ("loneliness", 0, 20),
+            ("decisions", 0, MAX_HISTORY),
         ):
             _bounded(getattr(mind, name), low, high, name)
         if not isinstance(mind.memories, tuple) or len(mind.memories) > MAX_MEMORY:
@@ -333,7 +335,7 @@ def _plan(person: Person, mind: Mind, state: CitizenIntelligence,
         "work": 12 + mind.discipline * 2,
         "scout": 4 + mind.curiosity * 3,
         "care": mind.empathy * 2 + (25 if nearby_hurt else 0),
-        "socialize": 3 + mind.empathy * 2 - mind.stress,
+        "socialize": 3 + mind.empathy * 2 + mind.loneliness * 4 - mind.stress,
         "construct": (15 if person.profession in ("builder", "engineer") else 0)
                      + mind.discipline,
         "guard": 4 + mind.prudence * 2,
@@ -541,6 +543,24 @@ def smart_npc_tick(
                 p = replace(p, x=dest[0], y=dest[1], energy=max(0, p.energy - 1),
                             discoveries=min(1000, p.discoveries + 1))
                 operation = "inspect-real-local-geography"
+        elif goal == "socialize":
+            company = sorted(
+                (x for x in people.inhabitants if x.id != p.id and x.health > 0),
+                key=lambda x: (abs(x.x - p.x) + abs(x.y - p.y), x.id),
+            )
+            if company:
+                friend = company[0]
+                if (p.x, p.y) == (friend.x, friend.y):
+                    operation = "spend-real-time-in-conversation"
+                else:
+                    p, moved = _physically_move(
+                        current_world, p,
+                        lambda px, py, q=friend: (px, py) == (q.x, q.y),
+                    )
+                    operation = ("seek-physical-company" if moved
+                                 else "social-route-blocked")
+            else:
+                operation = "isolated-alone"
         elif goal == "construct":
             at = cell_at(current_world, p.x, p.y)
             if (not at.building and not at.blocking
@@ -579,7 +599,9 @@ def smart_npc_tick(
             memory, goal=goal, goal_age=age, objective=(p.x, p.y),
             stress=max(0, min(20, memory.stress
                               + (2 if operation in ("cannot-reach-food",
-                                                   "patient-inaccessible") else -1))),
+                                                   "patient-inaccessible") or p.hunger >= 15
+                                 else -1))),
+            loneliness=min(20, memory.loneliness + 1),
             morale=max(0, min(20, memory.morale
                               + (1 if operation in ("deliver", "build-real-hearth") else 0))),
             decisions=min(MAX_HISTORY, memory.decisions + 1),
@@ -610,6 +632,15 @@ def smart_npc_tick(
             ):
                 continue
             bonds = _bond_change(bonds, a.id, b.id, affinity=1, trust=1)
+            for friend, witness in ((a, b), (b, a)):
+                remembered = updated_minds[friend.id]
+                updated_minds[friend.id] = _remember(
+                    replace(remembered,
+                            loneliness=max(0, remembered.loneliness - 6),
+                            morale=min(20, remembered.morale + 1)),
+                    Memory(thinking.day + 1, "friend",
+                           (friend.x, friend.y), 1, 100, witness.id),
+                )
     next_people = replace(
         people, tick=people.tick + 1,
         inhabitants=tuple(updated_people),
@@ -689,6 +720,7 @@ def cognition_report(state: CitizenIntelligence, people: PhysicalSociety,
                 "health": people.inhabitants[m.person_id].health,
                 "hunger": people.inhabitants[m.person_id].hunger,
                 "morale": m.morale, "stress": m.stress,
+                "loneliness": m.loneliness, "active_goal": m.goal,
             } for m in state.minds
         },
         "report_not_an_llm": True,
