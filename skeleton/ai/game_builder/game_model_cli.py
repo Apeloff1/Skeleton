@@ -46,7 +46,7 @@ def parser():
     )
     commands=cmd.add_subparsers(dest="action",required=True)
     for name in ("evaluate","stage","approve","usage","idle-pass",
-                 "activate","status","rollback","recover"):
+                 "activate","status","rollback","recover","predict"):
         p=commands.add_parser(name)
         p.add_argument("--root",required=True)
         if name!="status":
@@ -62,6 +62,9 @@ def parser():
             p.add_argument("--director-blueprints",nargs="+",required=True,
                            help="At least two new original projects distinct from train/validation/test and past cohorts")
             p.add_argument("--quest-key",default="quest_00")
+        elif name=="predict":
+            p.add_argument("--game-digest",required=True)
+            p.add_argument("--evidence-file",required=True)
         elif name=="rollback":
             p.add_argument("--reason",required=True)
     return cmd
@@ -124,6 +127,10 @@ def main(argv=None):
             result=registry.observe(
                 worlds,mode="usage" if args.action=="usage" else "idle",
                 quest_key=args.quest_key,authorized=True)
+        elif args.action=="predict":
+            evidence=_structured_file(args.evidence_file,max_bytes=12000)
+            result=registry.score_active_game(
+                evidence,game_digest=args.game_digest,authorized=True)
         elif args.action=="activate":
             result=registry.activate(authorized=True)
         elif args.action=="rollback":
