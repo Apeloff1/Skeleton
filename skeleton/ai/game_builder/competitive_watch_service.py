@@ -152,8 +152,8 @@ def compile_original_delivery_work(
             "Improve design, code, player experience and polish without reproducing rival IP.",
             "Retain all safety, accessibility, rights and platform hard gates.",
             "Do not report victory before every benchmark axis and originality audit pass.",
-            *("Resolve benchmark qualification blockers: "+", ".join(blocked),)
-              if blocked else (),
+            *(("Resolve benchmark qualification blockers: "+", ".join(blocked),)
+              if blocked else ()),
         )
         result.append(CompetitiveWorkOrder(
             planned.title_id,axis,rivals,demanding,
