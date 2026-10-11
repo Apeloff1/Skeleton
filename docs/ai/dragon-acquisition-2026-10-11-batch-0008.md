@@ -43,4 +43,4 @@ No external training or experiment was performed. No reviewed-note retrieval pac
 
 Registry shard SHA-256, cursor continuity, 256 unique source IDs, JSON/count consistency, 10 API blob identities and 10 locally reproduced Git blobs were checked. This batch completes the 128-entry second registry shard; continuation proceeds to the next manifest-ordered shard. Commit ancestry and remote readback remain publication gates. Runtime tests are not rerun because runtime code did not change.
 
-Next first-pass cursor: 256 / 4,405 (5.811%). Approval coverage: 0 / 4,405. Worldwide game/video/edition/provider coverage remains unknown.
+Next first-pass cursor: 256 / 4,405 (5.812%). Approval coverage: 0 / 4,405. Worldwide game/video/edition/provider coverage remains unknown.
