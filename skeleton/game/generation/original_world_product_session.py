@@ -29,7 +29,7 @@ from .original_world_npc_cognition_v2 import (
     CitizenIntelligence, make_intelligence, validate_intelligence,
     smart_npc_tick, cognition_save, cognition_restore,
     register_player_care, commission, cancel_order, _bond_change,
-    commission_project, cancel_project,
+    commission_project, cancel_project, interview_citizen,
 )
 
 SCHEMA = "original-world-playable-product-session.v2"
@@ -219,7 +219,28 @@ def _npc_operation(
     """
     world, society = session.terrain, session.society
     thinking = session.cognition
-    if action.verb == "commission":
+    if action.verb == "interview":
+        if not 0 <= action.target < len(society.inhabitants):
+            raise FoundationError("interviewee must be a real local citizen")
+        actor = society.inhabitants[action.target]
+        if abs(actor.x - world.position[0]) + abs(actor.y - world.position[1]) > 1:
+            raise FoundationError("verified testimony requires in-person discussion")
+        old = session.living.spatial
+        if old.game.causal.evidence >= 100:
+            raise FoundationError("public evidence register has reached capacity")
+        thinking, statement = interview_citizen(
+            thinking, society, world, citizen=action.target,
+            subject=action.option)
+        new_game = replace(old.game, causal=replace(
+            old.game.causal, evidence=old.game.causal.evidence + 1))
+        living = replace(session.living, spatial=replace(old, game=new_game))
+        message = (
+            f"Citizen {statement.citizen} gave first-hand evidence of "
+            f"{statement.value} {statement.subject} at ({statement.x},{statement.y}) "
+            f"on historical day {statement.observation_turn}; unique testimony "
+            "entered the real game evidence ledger"
+        )
+    elif action.verb == "commission":
         if not 0 <= action.target < len(society.inhabitants):
             raise FoundationError("contract must refer to an existing citizen")
         actor = society.inhabitants[action.target]
