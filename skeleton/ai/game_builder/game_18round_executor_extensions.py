@@ -18,6 +18,7 @@ from .game_18round_runtime import _advance
 from .game_18round_shadow_sandbox import (
     ModularShadowTicket,SandboxVerification,sign_sandbox_verification,
     verify_shadow_in_sandbox,order_verified_hyperweights,
+    verify_independent_sandbox_receipts,
 )
 from .game_reviewer_optimizer import OptimizationResult,OptimizerSchedule
 from .game_model_promotion import PromotionStandard,PromotionError
@@ -297,8 +298,10 @@ def execute_round15_structure(
     state:EvolutionRun,tickets:tuple[ModularShadowTicket,...],
     verified:tuple[SandboxVerification,...],*,
     reviewer:TrustedCompetitionJudge,as_of:str,authorized:bool,
+    verifiers:tuple[TrustedCompetitionJudge,...]=(),
 )->tuple[EvolutionRun,WeightStructureReport]:
     if not authorized:raise PermissionError("model structure needs approved original game review")
+    verify_independent_sandbox_receipts(verified,verifiers,authorized=True)
     by_id={x.ticket_id:x for x in verified}
     if len(by_id)!=len(verified):
         raise PromotionError("duplicate post-weight candidate proof is not extra competence")
@@ -331,9 +334,11 @@ def execute_round16_load_order(
     state:EvolutionRun,tickets:tuple[ModularShadowTicket,...],
     proofs:tuple[SandboxVerification,...],*,
     reviewer:TrustedCompetitionJudge,as_of:str,authorized:bool,
+    verifiers:tuple[TrustedCompetitionJudge,...]=(),
 ):
     if not authorized:raise PermissionError("priority-weight queue needs authorized user objective")
-    ordered=order_verified_hyperweights(state.task,tickets,proofs,authorized=True)
+    ordered=order_verified_hyperweights(state.task,tickets,proofs,
+                                        authorized=True,verifiers=verifiers)
     return _advance(
         state,16,"shadow_queued",
         canonical_digest(ordered.payload()),
