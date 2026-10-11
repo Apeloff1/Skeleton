@@ -331,6 +331,24 @@ async function loadSystemEditors(){
  }catch(error){status("System editor catalog unavailable: "+error.message);}
 }
 $("system-kind").addEventListener("change",renderSystemControls);
+$("system-assembly").addEventListener("click",async()=>{
+ try{
+  if(!model||selectedTree!=="current"||selectedProject!==model.active)
+   throw Error("Select the active current project for system composition");
+  const result=await api("/api/editor-assembly?project="+
+   encodeURIComponent(selectedProject));
+  const lines=[
+   "Assembly "+result.digest,
+   "Reviewed systems: "+result.source_system_count,
+   "Reference prototypes: "+result.prototype_evidence.length,
+   "Cross-system contracts to integrate: "+result.coupling_edges.length,
+   "Runtime adapters still required: "+result.unresolved_runtime_adapters.join(", "),
+   "Composition release-ready: "+result.ready_for_release,
+  ];
+  $("system-preview").textContent=lines.join("\n");
+  status("Reviewed authored-system assembly without writing any source.");
+ }catch(error){status("System assembly rejected: "+error.message);}
+});
 $("system-try").addEventListener("click",async()=>{
  try{
   const result=await api("/api/editor-preview",{
@@ -422,6 +440,7 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <div id="system-fields" aria-label="System-specific design settings"></div>
 <button id="system-try" type="button">Validate and simulate preview</button>
 <button id="system-stage" type="button">Stage system into source review</button>
+<button id="system-assembly" type="button">Review assembled current systems</button>
 <pre id="system-preview" role="status" aria-live="polite"></pre>
 <p><small>Playable preview where implemented; other editors validate authored system settings.
 All writes still require exact-file review and human approval.</small></p>
