@@ -294,7 +294,9 @@ func _verify_native_proof() -> void:
             push_error("NATIVE_REPLAY_ERROR: malformed expected item")
             get_tree().quit(1)
             return
-        expected_collected.append(str(item[0]) + "," + str(item[1]))
+        ## JSON.parse_string can return floating-point numeric Variants.
+        ## Coordinates are grid integers, so normalize before making keys.
+        expected_collected.append(str(int(item[0])) + "," + str(int(item[1])))
     expected_collected.sort()
     var valid: bool = (
         status == str(expected.get("status", "invalid"))
@@ -309,7 +311,23 @@ func _verify_native_proof() -> void:
         and status == "won"
     )
     if not valid:
-        push_error("NATIVE_REPLAY_ERROR: Godot and Python final states diverge")
+        var observed: Dictionary = {
+            "status": status, "level_index": level_index,
+            "x": hero.x, "y": hero.y, "score": score,
+            "steps": steps, "health": health,
+            "collected": actual_collected, "action_count": actions.size()
+        }
+        var intended: Dictionary = {
+            "status": expected.get("status"), "level_index": expected.get("level_index"),
+            "x": expected.get("x"), "y": expected.get("y"), "score": expected.get("score"),
+            "steps": expected.get("steps"), "health": expected.get("health"),
+            "collected": expected_collected, "action_count": sequence.size()
+        }
+        for field in observed:
+            if observed[field] != intended[field]:
+                push_error("NATIVE_REPLAY_ERROR: field " + str(field) +
+                    " differs: observed=" + str(observed[field]) +
+                    " expected=" + str(intended[field]))
         get_tree().quit(1)
         return
     print("NATIVE_REPLAY_OK " + str(world["world_digest"]) +
