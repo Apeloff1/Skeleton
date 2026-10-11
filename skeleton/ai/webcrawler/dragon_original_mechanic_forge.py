@@ -27,6 +27,7 @@ MECHANIC_LEVELS=4
 MECHANIC_COUNT=32
 PROGRAM_COUNT=MECHANIC_LEVELS**MECHANIC_COUNT
 MILLION_DISTINCT_ENABLE_PROFILES=2**24
+DIRECTED_MECHANIC_FUSIONS=MECHANIC_COUNT**2
 MAX_ACTIONS=128
 MAX_STATE=1_000_000
 # Distinct authored verbs with specific effects, domains, resource
@@ -242,6 +243,58 @@ def _action(program:OriginalProgram,state:OriginalPlay,index:int)->dict:
     }
 
 
+def _fusion(program:OriginalProgram,state:OriginalPlay,
+            source:int,target:int)->dict:
+    """Directed real action between distinct or self-specialized mechanics."""
+    a,b=source,target
+    name=f"fusion_{a:02d}_{b:02d}"
+    la,lb=program.intensities[a],program.intensities[b]
+    practiced=(state.mastery[a]>=la and state.mastery[b]>=lb and
+               (a!=b or state.mastery[a]>=la*2))
+    authored=la>0 and lb>0
+    price=1+(a+3*b)%4
+    gain=la*lb+(a%4)+2
+    material=RESOURCE_NAMES[(a+2*b)%6]
+    usable=authored and practiced and state.resources[6]>=price
+    return {
+        "id":name,"source":MECHANIC_IDS[a],
+        "destination":MECHANIC_IDS[b],
+        "source_axis":a,"destination_axis":b,
+        "available":usable,"requires_earned_mastery":True,
+        "cost_resource":"energy","cost":price,
+        "gain_resource":material,"gain":gain,
+        "position_effect":[a%5-2,b%5-2],
+        "domain_effects":[la,lb],
+        "reason":"not_in_rule_program" if not authored else
+                 "mastery_locked" if not practiced else
+                 "insufficient_energy" if state.resources[6]<price
+                 else "available",
+    }
+
+
+def interaction_catalog(program:OriginalProgram,state:OriginalPlay, *,
+                        offset:int=0,limit:int=32)->dict:
+    """Page 1024 directed, actually executable synthesis types."""
+    validate_program(program);validate_state(state)
+    if (type(offset) is not int or not 0<=offset<DIRECTED_MECHANIC_FUSIONS
+            or type(limit) is not int or not 1<=limit<=64):
+        raise ValueError("original interaction synthesis pagination invalid")
+    end=min(DIRECTED_MECHANIC_FUSIONS,offset+limit)
+    interactions=[
+        _fusion(program,state,n//MECHANIC_COUNT,n%MECHANIC_COUNT)
+        for n in range(offset,end)
+    ]
+    return {
+        "schema":SCHEMA,
+        "total_possible_directed_fusions":DIRECTED_MECHANIC_FUSIONS,
+        "offset":offset,"returned":len(interactions),
+        "interactions":interactions,
+        "actually_available":sum(item["available"] for item in interactions),
+        "proof":"each earned action has mastery gates, price, "
+                "specific movement and directed resource effects",
+    }
+
+
 def choices(program:OriginalProgram,state:OriginalPlay)->list[dict]:
     validate_program(program);validate_state(state)
     result=[_action(program,state,index)
@@ -275,8 +328,14 @@ def perform(program:OriginalProgram,state:OriginalPlay,action:str)->OriginalPlay
     validate_program(program);validate_state(state)
     if type(action) is not str or len(action)>130:
         raise ValueError("original game mechanic action outside bounded vocabulary")
-    selected=next((item for item in choices(program,state)
-                   if item["id"]==action),None)
+    fusion_match=re.fullmatch(r"fusion_([0-9]{2})_([0-9]{2})",action)
+    if fusion_match:
+        src,dst=int(fusion_match.group(1)),int(fusion_match.group(2))
+        selected=(_fusion(program,state,src,dst) if
+                  src<MECHANIC_COUNT and dst<MECHANIC_COUNT else None)
+    else:
+        selected=next((item for item in choices(program,state)
+                       if item["id"]==action),None)
     if selected is None or not selected["available"]:
         raise ValueError("player attempted an unavailable original mechanic")
     if state.turn>=MAX_STATE-1:
@@ -315,6 +374,21 @@ def perform(program:OriginalProgram,state:OriginalPlay,action:str)->OriginalPlay
             endings=_append(endings,ending,8)
         if identifier in ("postgame_repair","world_era_cycles"):
             era=min(MAX_STATE,era+row["level"])
+    elif fusion_match:
+        src,dst=int(fusion_match.group(1)),int(fusion_match.group(2))
+        resources[RESOURCE_INDEX["energy"]]-=selected["cost"]
+        pool=RESOURCE_INDEX[selected["gain_resource"]]
+        resources[pool]=min(MAX_STATE,resources[pool]+selected["gain"])
+        mastered[src]=min(MAX_STATE,mastered[src]+1)
+        mastered[dst]=min(MAX_STATE,mastered[dst]+1)
+        evolution[src]=min(MAX_STATE,evolution[src]+selected["gain"])
+        evolution[dst]=min(MAX_STATE,evolution[dst]+selected["gain"])
+        x+=selected["position_effect"][0]
+        y+=selected["position_effect"][1]
+        locations=_append(locations,
+            f"original_fusion_{src}_{dst}_x{x}_y{y}",64)
+        joins=_append(joins,action,16)
+        era=min(MAX_STATE,era+1)
     elif action.startswith("join_"):
         resources[RESOURCE_INDEX["energy"]]-=2
         resources[RESOURCE_INDEX["lore"]]=min(
@@ -428,6 +502,8 @@ def capabilities()->dict:
                     "resource cost/reward, world mutation and replay hash",
         "parent_environment":"optionally uses verified 128-axis World Codex",
         "possible_cross_mechanic_join_routes":16,
+        "directed_executable_mechanic_fusion_types":
+            DIRECTED_MECHANIC_FUSIONS,
         "real_games_materialized_in_report":0,
         "finished_unique_cleared_games":0,
         "not_claimed":"high address capacity is not millions of completed, "
