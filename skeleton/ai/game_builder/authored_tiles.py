@@ -59,6 +59,8 @@ def read_authored_document(
             object_pairs_hook=_no_duplicate_keys,
             parse_constant=_json_number_reject,
         )
+    except AuthoredGameError:
+        raise
     except (OSError, UnicodeError, ValueError, TypeError) as exc:
         raise AuthoredGameError("invalid authored JSON document") from exc
     if not isinstance(result, dict):
