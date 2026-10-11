@@ -243,7 +243,7 @@ def _identity_blockers(planned, proof, rights, standard, as_of):
         reasons.append("future_identity_review")
     if (_date(as_of)-_date(proof.reviewed_at)).days>standard.max_measurement_age_days:
         reasons.append("stale_identity_review")
-    if rights.unresolved_high_risk(proof.candidate_digest):
+    if rights.unresolved_high_risk(artifact_digest=proof.candidate_digest):
         reasons.append("unresolved_canonical_similarity_rights_gate")
     return reasons
 
