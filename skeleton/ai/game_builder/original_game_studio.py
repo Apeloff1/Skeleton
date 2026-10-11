@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 import json
+from pathlib import Path
+from typing import Mapping, Sequence
 
 from .contracts import canonical_digest
 from .companion_curriculum import (
@@ -162,6 +164,8 @@ def run_original_game_studio(
     *,
     authorized: bool,
     human_reviewed_tiles: tuple[object, ...] | list[object] | None = None,
+    tiled_sources: Sequence[str | Path] | None = None,
+    tiled_gid_palette: Mapping[int, str] | None = None,
     human_authored_approved: bool = False,
     reviewed_library: object | None = None,
     research_brief: object | None = None,
@@ -184,8 +188,12 @@ def run_original_game_studio(
         raise StudioError("companion practice batch must be 0 to 8 playable games")
     if type(mirror_attempts) is not int or not 64 <= mirror_attempts <= 512:
         raise StudioError("adversarial mirror attempts must be 64 to 512")
-    if human_reviewed_tiles is None and human_authored_approved:
+    if human_reviewed_tiles is None and tiled_sources is None and human_authored_approved:
         raise StudioError("authored approval cannot be applied to generated levels")
+    if human_reviewed_tiles is not None and tiled_sources is not None:
+        raise StudioError("Tiled input and authored editor JSON are mutually exclusive")
+    if tiled_gid_palette is not None and tiled_sources is None:
+        raise StudioError("Tiled GID mapping requires Tiled geometry source")
     research_enabled = any(
         value is not None for value in (reviewed_library, research_brief, rights_ledger)
     ) or human_research_approved
@@ -194,19 +202,22 @@ def run_original_game_studio(
                 or type(human_research_approved) is not bool
                 or not human_research_approved):
             raise StudioError("research requires reviewed library, brief, rights and human approval")
-        if human_reviewed_tiles is not None:
-            raise StudioError("authored editor games need independent rights handoff")
-    if human_reviewed_tiles is not None and not human_authored_approved:
+        if human_reviewed_tiles is not None or tiled_sources is not None:
+            raise StudioError("authored editor and Tiled games need independent rights handoff")
+    if (human_reviewed_tiles is not None or tiled_sources is not None) and not human_authored_approved:
         raise StudioError("manually authored geometry requires human review")
     if fabric is None:
         fabric = ToolFabric()
     if not isinstance(fabric, ToolFabric):
         raise StudioError("typed game-tool fabric required")
-    source = ("original-authored" if human_reviewed_tiles is not None
+    source = ("original-tiled" if tiled_sources is not None
+              else "original-authored" if human_reviewed_tiles is not None
               else "original-research-referenced" if research_enabled
               else "original-generated")
     work = [
-        (Actor.JEEVES, Phase.ORIGINAL, "world.authored" if human_reviewed_tiles is not None else "world.generate"),
+        (Actor.JEEVES, Phase.ORIGINAL,
+         "world.tiled" if tiled_sources is not None else
+         "world.authored" if human_reviewed_tiles is not None else "world.generate"),
         (Actor.DRAGON, Phase.STEPPING_STONE, "game.simulate"),
         (Actor.DRAGON, Phase.STEPPING_STONE, "game.browser"),
         (Actor.DRAGON, Phase.STEPPING_STONE, "game.godot"),
@@ -233,6 +244,7 @@ def run_original_game_studio(
     native_practice_packages: tuple[DualRuntimePackage, ...] | None = None
     native_insights: tuple[PracticeInsight, ...] | None = None
     native_mirrors: tuple[MirrorReport, ...] | None = None
+    tiled_import_receipt: dict[str, object] | None = None
     if research_enabled:
         from .playable_compiler import compile_game_from_reviewed_research
         # The canonical research bridge independently validates the library,
@@ -264,6 +276,8 @@ def run_original_game_studio(
         executed = execute_local_tool_plan(
             intent, local_plan, authorized=True, fabric=fabric,
             authored_levels=human_reviewed_tiles,
+            tiled_sources=tiled_sources,
+            tiled_gid_palette=tiled_gid_palette,
             human_reviewed=human_authored_approved,
             mirror_attempts=mirror_attempts,
             companion_games=companion_practice_games,
@@ -274,6 +288,10 @@ def run_original_game_studio(
         native_practice_packages = executed.practice_packages
         native_insights = executed.practice_insights
         native_mirrors = executed.practice_mirror_reports
+        if executed.tiled_conversion is not None:
+            if executed.tiled_conversion.world_digest != project.world.digest:
+                raise StudioError("Tiled and original game geometry evidence diverged")
+            tiled_import_receipt = executed.tiled_conversion.receipt()
         execution_audit = executed.to_payload()
     if not mirror.passed:
         raise StudioError("adversarial game mirror room found a failure")
@@ -425,6 +443,8 @@ def run_original_game_studio(
             "not_imported_game_expression": True,
         },
     }
+    if tiled_import_receipt is not None:
+        metadata["studio/tiled_import.json"] = tiled_import_receipt
     new_files = dict(package.files)
     new_files.pop("release.json")
     new_files.update(practice_files)
