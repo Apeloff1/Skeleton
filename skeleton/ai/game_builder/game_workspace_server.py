@@ -27,6 +27,7 @@ from .advanced_puzzle_solver import solve_advanced_puzzle
 from .advanced_godot_export import (
     render_advanced_godot_package, archive_advanced_godot_package,
 )
+from .advanced_platformer_godot import render_platformer_godot_package
 from .advanced_gameplay_save import (
     export_advanced_savegame, import_advanced_savegame, continue_advanced_savegame,
 )
@@ -188,15 +189,19 @@ class _StudioHandler(BaseHTTPRequestHandler):
         studio=self.server.workspace
         if path=="/api/advanced-godot-package":
             from base64 import b64encode
-            package=render_advanced_godot_package(
-                values["session"],values.get("settings"),authorized=True)
+            session=values["session"]
+            renderer=(render_platformer_godot_package
+                      if type(session) is dict and session.get("editor")=="platformer"
+                      else render_advanced_godot_package)
+            package=renderer(session,values.get("settings"),authorized=True)
             compressed=archive_advanced_godot_package(package)
+            genre=package.manifest["native_editor"]
             return self._json(200,{
-                "file_name":"original-godot-puzzle.zip",
+                "file_name":"original-godot-"+genre+".zip",
                 "zip_base64":b64encode(compressed).decode("ascii"),
                 "zip_sha256":__import__("hashlib").sha256(compressed).hexdigest(),
                 "source_session_digest":package.manifest["source_session_digest"],
-                "engine":"puzzle",
+                "engine":genre,
                 "gameplay_native_verified_by_this_request":False,
                 "source_project_mutated":False,
                 "requires_external_hardware_release_review":True,
