@@ -24,6 +24,7 @@ from .original_world_product_render import (
     ascii_render, ppm_render, svg_render,
 )
 from .original_world_product_missions import mission_report
+from .original_world_npc_cognition_v2 import cognition_report
 
 MAX_SCRIPT = 131072
 
@@ -55,7 +56,7 @@ def parse_command(command: str, player: tuple[int, int]) -> ProductAction:
         parts = shlex.split(command)
     except ValueError as exc:
         raise FoundationError("invalid input quotation") from exc
-    if not 2 <= len(parts) <= 4:
+    if not 2 <= len(parts) <= 5:
         raise FoundationError("expected LAYER VERB [AMOUNT|TARGET|CHOICE]")
     layer, verb = parts[:2]
     if layer == "terrain":
@@ -74,6 +75,22 @@ def parse_command(command: str, player: tuple[int, int]) -> ProductAction:
         except ValueError as exc:
             raise FoundationError("invalid terrain amount") from exc
         return ProductAction(layer, verb, amount=count, x=player[0], y=player[1])
+    if layer == "npc" and verb == "commission":
+        if len(parts) not in (4, 5):
+            raise FoundationError("NPC contract: npc commission CITIZEN food|wood|stone|water [1..3]")
+        try:
+            return ProductAction("npc", "commission",
+                                 amount=int(parts[4]) if len(parts) == 5 else 1,
+                                 target=int(parts[2]), option=parts[3])
+        except ValueError as exc:
+            raise FoundationError("invalid NPC order quantity/citizen") from exc
+    if layer == "npc" and verb == "cancel":
+        if len(parts) != 3:
+            raise FoundationError("NPC contract cancellation requires order ID")
+        try:
+            return ProductAction("npc", "cancel", target=int(parts[2]))
+        except ValueError as exc:
+            raise FoundationError("invalid NPC order identity") from exc
     if verb == "choose" or (layer == "studio" and verb == "assign"):
         if len(parts) not in (3, 4):
             raise FoundationError("choice requires option; assignment needs citizen id")
@@ -118,6 +135,10 @@ def _interactive(state: ProductSession) -> ProductSession:
         if line in ("missions", "quests"):
             print(json.dumps(mission_report(state), sort_keys=True, indent=2))
             continue
+        if line in ("npc", "people", "minds"):
+            print(json.dumps(cognition_report(state.cognition, state.society,
+                                              state.terrain), sort_keys=True, indent=2))
+            continue
         if line == "help":
             law = validate_product(state)
             print("Living world commands:", ", ".join(law.foundation.system.commands))
@@ -126,6 +147,8 @@ def _interactive(state: ProductSession) -> ProductSession:
             print("build_hearth, build_mill, build_beacon, rest, eat")
             print("World: causal end_turn; studio: deposit_wood, deposit_stone, share_food")
             print("Social: studio gift ID or studio assign ID PROFESSION")
+            print("NPC cognition: npc commission ID food|wood|stone|water [1..3];")
+            print("npc cancel ORDER_ID; npc council; minds (inspect all private plans)")
             continue
         try:
             action = parse_command(line, state.terrain.position)
@@ -159,6 +182,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--inhabitants", type=int, default=12)
     parser.add_argument("--actions-json", default="[]")
     parser.add_argument("--inventory", action="store_true")
+    parser.add_argument("--npc-report", action="store_true",
+                        help="Expose each physical resident's real plans, memory and work contracts")
     parser.add_argument("--missions", action="store_true",
                         help="Evidence-based missions for the selected authored original root")
     parser.add_argument("--interactive", action="store_true")
@@ -237,6 +262,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "local_energy": state.terrain.energy,
                     "physical_edits": len(state.terrain.edits),
                     "local_residents": len(state.society.inhabitants),
+                    "npc_cognition": cognition_report(state.cognition, state.society,
+                                                     state.terrain)
+                                     if args.npc_report else None,
                     "world_turn": state.living.living_turns,
                     "player_events": state.events,
                     "real_gameplay_not_native_release": True,
