@@ -399,6 +399,9 @@ def smart_npc_tick(
     receipts: list[NpcReceipt] = []
     thoughts: list[ThoughtReceipt] = []
     completed = {o.order_id: o for o in thinking.orders}
+    # Healing is scheduled against stable citizen identities and settled once
+    # after all actors act, independent of job/identity iteration order.
+    healing: dict[int, int] = {}
     bonds = thinking
     for person, mind in zip(people.inhabitants, thinking.minds):
         start = (person.x, person.y)
@@ -458,7 +461,10 @@ def smart_npc_tick(
                         current_world, freshwater=current_world.freshwater - 1)
                     # Target may not have acted yet: apply care into a stable
                     # previously recorded delta and settle it by target ID.
-                    operation, resource, quantity = "care-reserved", "water", 1
+                    healing[target.id] = healing.get(target.id, 0) + 2
+                    bonds = _bond_change(bonds, p.id, target.id,
+                                         affinity=1, trust=1, aid=1)
+                    operation, resource, quantity = "healed-named-patient", "water", 1
                 else:
                     p, moved = _physically_move(
                         current_world, p,
@@ -522,6 +528,11 @@ def smart_npc_tick(
         thoughts.append(ThoughtReceipt(
             p.id, goal, utility, reason, operation, resource, quantity,
         ))
+    if healing:
+        updated_people = [
+            replace(p, health=min(20, p.health + healing.get(p.id, 0)))
+            for p in updated_people
+        ]
     # The social bond graph updates only for physically co-located human
     # interactions. Each pair counts at most one meeting per day.
     for i, a in enumerate(updated_people):
