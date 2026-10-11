@@ -86,6 +86,11 @@ FACETS = {
         ("localization_narrative", "Do branches preserve intent across languages?", "cross-locale story choices and UI stress replay", "semantic parity and branching stability", "missing strings and changed choice semantics"),
     ),
 }
+# Stable v1 probes above are never removed or re-scored; new probes are additive.
+from .competitive_scrutiny_extension import EXTRA_FACETS
+FACETS = {axis: tuple(rows)+EXTRA_FACETS[axis] for axis,rows in FACETS.items()}
+if tuple(len(FACETS[axis]) for axis in ("gameplay","graphics","sound","storyline")) != (28,24,22,28):
+    raise RuntimeError("2026 competing-game scrutiny must contain exactly 102 facets")
 ALL_FACETS = {name:axis for axis,rows in FACETS.items() for name,*_ in rows}
 if len(ALL_FACETS)!=sum(map(len,FACETS.values())):
     raise RuntimeError("facet taxonomy contains duplicate IDs")
