@@ -15,6 +15,7 @@ import json
 
 from .contracts import canonical_digest, canonical_json
 from .quest_scene_engine import DirectorWorld, DirectorReplay, DirectorError, director_verify
+from .npc_society_runtime import Society
 from .npc_witness_quest_engine import (
     WitnessCampaign, WitnessReceipt, WitnessError,
     observe_story, validate_witness, audit_witness_campaign,
@@ -180,6 +181,7 @@ def run_mirror_competition(
     world: DirectorWorld,replay: DirectorReplay,campaign: WitnessCampaign,*,
     population: int,active_budget: int=40,ambient_budget: int=40,
     maximum_witnesses: int=128,attempts: int=72,authorized: bool,
+    starting_society: Society | None=None,
 )->CompetitionReport:
     if not authorized:
         raise PermissionError("competitive game mirrors require operator authority")
@@ -191,11 +193,13 @@ def run_mirror_competition(
     audit_witness_campaign(world,replay,campaign,population=population,
                            active_budget=active_budget,
                            ambient_budget=ambient_budget,
-                           maximum_witnesses=maximum_witnesses,authorized=True)
+                           maximum_witnesses=maximum_witnesses,
+                           starting_society=starting_society,authorized=True)
     expected=observe_story(world,replay,population=population,
                            active_budget=active_budget,
                            ambient_budget=ambient_budget,
-                           maximum_witnesses=maximum_witnesses,authorized=True)
+                           maximum_witnesses=maximum_witnesses,
+                           starting_society=starting_society,authorized=True)
     agreement=expected.digest==campaign.digest
     probes=[]
     for i in range(attempts):
