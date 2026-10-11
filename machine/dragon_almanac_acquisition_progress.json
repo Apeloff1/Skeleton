@@ -2,8 +2,8 @@
   "schema": "skeleton.dragon.almanac_acquisition_progress.v1",
   "registry_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
   "ordering": "source_id_ascending",
-  "next_source_offset": 320,
-  "reviewed_candidate_count": 320,
+  "next_source_offset": 352,
+  "reviewed_candidate_count": 352,
   "entries": [
     {
       "source_id": "source-0017fcb9b1445e4f0a6949fb81b3fe01159175a23ca300ff1350938c2b2a0974",
@@ -2884,33 +2884,321 @@
       "availability": "retrieval_failed",
       "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
       "approved": false
+    },
+    {
+      "source_id": "source-1209c53305487791335257c49fadf8fa805797d1dff14f594e7528d441cf5b59",
+      "source_offset": 320,
+      "url": "https://www.youtube.com/watch?v=CUOMyPotJE8",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-122506a97e0aff545b65ac6e7404749669b27dedba0b4564b252a2f3ca860df4",
+      "source_offset": 321,
+      "url": "https://github.com/creativelifeform/three-nebula",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-12274d2524f4c39843838334445f882438140c102f431efd1c6c3a674859e648",
+      "source_offset": 322,
+      "url": "https://threejs.org/editor/",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "metadata_shell_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-122883bb246aac89553c73745846f835233ab99813b6ee2a4346f96670366669",
+      "source_offset": 323,
+      "url": "https://github.com/tunabrain/tungsten",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-122fc16f576ad83837b7105a107a2d31b4fd991e8d158789101f94295c7b10cd",
+      "source_offset": 324,
+      "url": "http://hacknplan.com/project-planning-for-solo-game-developers/",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-12317c73a33698dac89e3b3dd43096f75a747e77a5c9aaf9bc2b02900cd1e2d6",
+      "source_offset": 325,
+      "url": "http://cocos2d-x.org/",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "metadata_shell_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-12369fefe517a0d66b7c103e8f2f58b40f96653fc62bd71cf5d7665dd94bd836",
+      "source_offset": 326,
+      "url": "https://github.com/AlmasB/FXGL",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-124af56c0d2bf150f8b50c1ba6948474708b1c68927c0e1b7f48fc8e721d20e5",
+      "source_offset": 327,
+      "url": "http://alex-charlton.com/posts/Dithering_on_the_GPU/",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-125910a94e1ed37bda03344f693f6062675d0c6b4de73cf25cbd8a590f79afcc",
+      "source_offset": 328,
+      "url": "https://github.com/fsprojects/awesome-fsharp",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-125a4602f9e72ab0edea74ac50c7dbf7099afbd4c56d9eec245ef1a3c618b3a7",
+      "source_offset": 329,
+      "url": "https://docs.google.com/spreadsheets/d/15AN1I1mB67AJkpMuUUfM5ZUALkQmrvrznnPYO5QbqD0",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-125c3ceeb03f961f87d3332ff5f8dfa99d9f6103d5f3ea78347791fe693f7b34",
+      "source_offset": 330,
+      "url": "http://jeromeetienne.github.io/threex.volumetricspotlight/examples/basic.html",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "metadata_shell_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-126d895c43f0654b63a0b4714abfbaa909c4a7f80ca39233d3cf843be0002f1c",
+      "source_offset": 331,
+      "url": "https://github.com/dialogic-godot/dialogic",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-12751273d8a2383321f327d8b6b53c3c544a7bcbe75c24bfda681fcf52c82682",
+      "source_offset": 332,
+      "url": "https://pngquant.org/PNGoo.0.1.1.zip",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1275ba48be5666ac085892414c3b7c01026176bd501afc2b430f02f59c5a913f",
+      "source_offset": 333,
+      "url": "https://github.com/ddionisio/game-off-2013",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-128402b76b9b58aefd8acb38ef6a7311e8f5e1780b9b6817d26e66ea6a8108ca",
+      "source_offset": 334,
+      "url": "https://github.com/graphitemaster/incbin",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1287ab21f8db07f11b2adf62376f83ff3e0bb2cb490e5bb961dc482cf1c7d2eb",
+      "source_offset": 335,
+      "url": "https://80.lv/articles/7-tips-for-animation-beginners/",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-12911e54a23675c745bcb330f0c88a1b283c5157c4ef6dc499a129e4063ec7de",
+      "source_offset": 336,
+      "url": "https://twitter.com/moreelen/status/1582401907142070272",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1299e5fc9868af8ba8e71ac56ea3a66d346c3cd3a4ddc681ba91318b6a1a122c",
+      "source_offset": 337,
+      "url": "https://github.com/SFTtech/openage",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-129d3b44fff1670c62be77fa2829b7b335acf8ced7bd15cc12b70c72597f1560",
+      "source_offset": 338,
+      "url": "https://learningmusic.ableton.com/",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-129e85316140fe3122ba8b4867cbf006881f616ea2916eed0a12917fdb5deeb6",
+      "source_offset": 339,
+      "url": "https://catlikecoding.com/unity/tutorials/",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-12a3fb6a65e79773b0da9d4b558616beb1b4a7cc76f9d6dfb2be9b6a2d357d3d",
+      "source_offset": 340,
+      "url": "https://hofk.de/main/discourse.threejs/",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "page_representation_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-12bcd73e9f77613f65ef6f0d4ea6396338f05e1f31f346157df40b686b1cc097",
+      "source_offset": 341,
+      "url": "https://github.com/mellinoe/veldrid",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-12c4fe0075d01171557840bc644fd248df6df403dc057fd58934662a47b971f3",
+      "source_offset": 342,
+      "url": "https://github.com/awesome-interactive/game-off-2013",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-12caf13c3d65d35e67bfd9041b6eb794dba331a440f36d5ea1ae4dfcdc3b3c59",
+      "source_offset": 343,
+      "url": "https://www.youtube.com/watch?v=yqAKONQxx4s",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-12cc71d2e5ef6291ad903ccac193446e311a73c71184be380ad99b993391db63",
+      "source_offset": 344,
+      "url": "https://github.com/WebGLSamples/WebGL2Samples",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-13048a3aa0067a298cb529ba97e17d38e29c325df8269f9498460c133197ad89",
+      "source_offset": 345,
+      "url": "https://github.com/ivansafrin/Polycode",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-13100854675986a2c928979c138a75f3bf4b5d8a0690c5c7bf1b24ed2d386cfe",
+      "source_offset": 346,
+      "url": "https://youtu.be/FCZ4dOEcBp0",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "metadata_shell_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-133ee0988cea777695125e979aebbbe81f8b36ded36b084f32e21284da273149",
+      "source_offset": 347,
+      "url": "http://games.myviews.pl/heal-em-all/",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-13426cea1fa72fcc09cd5bcd943e54b745b89969bc3719f9758be7606f252551",
+      "source_offset": 348,
+      "url": "https://www.slipseer.com/index.php?threads%2Fbals-quake-mapping-tips-tricks.100%2F=",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "redirect_to_non_target_index",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-136143049ecba74a06d3305dd5c1c4a9b54277d8fa31ace705b2faf12926740a",
+      "source_offset": 349,
+      "url": "https://www.youtube.com/watch?v=86JrNHAhtHg",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-13672496c90a067d1e60a074a4dce805423f3cf1385b0b2f4d46d59e9f575624",
+      "source_offset": 350,
+      "url": "http://hextris.io/",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "retrieval_failed",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
+    },
+    {
+      "source_id": "source-1367866a462f8e7cfa5db4d30c8ca34b663a684b05c8c2c7c492ee4a6ddb82f1",
+      "source_offset": 351,
+      "url": "https://github.com/los-cocos/cocos",
+      "checked_at": "2026-10-11T13:16:58.000Z",
+      "availability": "repository_metadata_returned",
+      "batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "approved": false
     }
   ],
   "whole_web_complete": false,
   "notes": "First-pass cursor counts candidate checks, not canonical approval. Every unresolved source remains blocked in its batch evidence. Registry unchanged; worldwide denominator unknown.",
-  "checked_candidate_count": 320,
+  "checked_candidate_count": 352,
   "approved_source_count": 0,
   "distilled_source_count": 0,
   "last_batch_counts": {
     "newly_checked": 32,
     "fetched_representations": 23,
-    "repository_metadata": 14,
-    "target_page_representations": 9,
-    "metadata_shells": 0,
-    "source_files": 1,
+    "repository_metadata": 13,
+    "target_page_representations": 6,
+    "metadata_shells": 4,
+    "source_files": 0,
     "retrieval_failed": 9,
     "blocked_from_admission": 32,
     "distilled": 0,
     "approved": 0,
-    "additional_license_files_fetched": 13,
+    "additional_license_files_fetched": 10,
     "license_file_fetch_failures": 3,
-    "exact_source_files_fetched": 1,
-    "auxiliary_identity_or_rights_files_fetched": 27,
-    "git_blob_identities_api_matched": 0,
-    "git_blobs_locally_reproduced": 28,
+    "exact_source_files_fetched": 0,
+    "auxiliary_identity_or_rights_files_fetched": 21,
+    "git_blob_identities_api_matched": 21,
+    "git_blobs_locally_reproduced": 21,
     "git_blobs_text_normalization_mismatch": 0
   },
-  "last_batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
-  "last_updated_at": "2026-10-11T12:11:03.000Z",
+  "last_batch_path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+  "last_updated_at": "2026-10-11T13:16:58.000Z",
   "reviewed_candidate_count_definition": "Legacy field counts first-pass candidate checks only; it does not mean independent source review or approval."
 }
