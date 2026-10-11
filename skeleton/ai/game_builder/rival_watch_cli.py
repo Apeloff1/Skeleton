@@ -40,6 +40,8 @@ def _file(path:str,maximum=900_000):
                        object_pairs_hook=unique,
                        parse_constant=lambda _: (_ for _ in ()).throw(
                            CompetitiveError("nonfinite public competitor input")))
+    except CompetitiveError:
+        raise
     except (UnicodeError,ValueError,TypeError) as exc:
         raise CompetitiveError("malformed evidence file") from exc
     if type(doc) is not dict:
