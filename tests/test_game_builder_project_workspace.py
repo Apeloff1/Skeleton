@@ -223,6 +223,8 @@ class OriginalGameWorkbenchTests(unittest.TestCase):
         self.assertIn('id="tree"',page)
         self.assertIn("Content-Security-Policy",page)
         self.assertIn("Review proposed edit",page)
+        self.assertIn("Model progression and adversarial learning",page)
+        self.assertIn('id="model-progress"',page)
         self.assertIn("Autoload previous genre",page)
         self.assertNotIn("https://",page)
         connection.request("GET","/api/tree",
@@ -230,6 +232,13 @@ class OriginalGameWorkbenchTests(unittest.TestCase):
         result=connection.getresponse()
         self.assertEqual(result.status,200)
         self.assertEqual(json.loads(result.read())["active"],"first_game")
+        connection.request("GET","/api/model-status",
+                           headers={"X-Game-Studio-Token":server.secret})
+        status=connection.getresponse()
+        self.assertEqual(status.status,200)
+        model=json.loads(status.read())
+        self.assertEqual(model["phase"],"unconfigured")
+        self.assertFalse(model["active"])
         connection.request("GET","/api/tree")
         denied=connection.getresponse();denied.read()
         self.assertEqual(denied.status,403)
