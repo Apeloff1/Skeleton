@@ -110,6 +110,8 @@ function Creator(){
   const [options,setOptions]=React.useState<Option[]>([]);
   const [history,setHistory]=React.useState<string[]>([]);
   const [portfolio,setPortfolio]=React.useState<Portfolio|null>(null);
+  const [fusionPage,setFusionPage]=React.useState(0);
+  const [fusions,setFusions]=React.useState<Option[]>([]);
   const [guided,setGuided]=React.useState<Campaign|null>(null);
   const [busy,setBusy]=React.useState(false);
   const [failure,setFailure]=React.useState('');
@@ -126,6 +128,7 @@ function Creator(){
     turn.current++;
     setPreview(null);setPlayer(null);setOptions([]);
     setHistory([]);setGuided(null);setPortfolio(null);
+    setFusionPage(0);setFusions([]);
     setBusy(false);setFailure('');setNotice('');
   };
   const body=useIndex
@@ -181,6 +184,7 @@ function Creator(){
         setPreview(response);setPlayer(response.initial_game_state);
         setOptions(response.playable_actions);
         setHistory([]);setPortfolio(null);setGuided(null);
+        setFusionPage(0);setFusions([]);
         setLevels(response.program.intensities);
         setManualIndex(response.program.decimal_index);
       }
@@ -191,7 +195,8 @@ function Creator(){
   };
   const play=async(action:string)=>{
     if(!preview||busy||!player||history.length>=128)return;
-    if(!options.some(option=>option.id===action&&option.available))return;
+    if(![...options,...fusions].some(
+        option=>option.id===action&&option.available))return;
     const ticket=++turn.current;
     setBusy(true);setFailure('');
     const moves=[...history,action];
@@ -207,7 +212,7 @@ function Creator(){
         throw new Error('Original rule program diverged during gameplay.');
       if(ticket===turn.current){
         setHistory(moves);setPlayer(response.current_game_state);
-        setOptions(response.available_actions);
+        setOptions(response.available_actions);setFusions([]);
         setNotice(response.current_game_state.endings.length
           ?'A story conclusion occurred; the world still allows further choices.'
           :'Real player action changed the original world.');
@@ -231,11 +236,38 @@ function Creator(){
       if(!response.ok)throw new Error('Original prior state did not replay.');
       if(ticket===turn.current){
         setHistory(moves);setPlayer(response.current_game_state);
-        setOptions(response.available_actions);setNotice('');
+        setOptions(response.available_actions);setFusions([]);
+        setNotice('');
       }
     }catch(e){if(ticket===turn.current)setFailure(
       e instanceof Error?e.message:'Failed to replay original world undo.');}
     finally{if(ticket===turn.current)setBusy(false);}
+  };
+  const discoverFusions=async(offset:number)=>{
+    if(!preview||!player||busy||history.length>128||offset<0||offset>=1024)return;
+    const ticket=++turn.current;
+    setBusy(true);setFailure('');
+    try{
+      const response=await post<{
+        ok:boolean;offset:number;returned:number;
+        total_possible_directed_fusions:number;interactions:Option[];
+        current_gameplay_digest:string;
+      }>('/interactions',{
+        program_index:preview.program.decimal_index,
+        parent_codex_index:preview.program.parent_codex_index,
+        moves:history,offset,limit:32,
+      });
+      if(!response.ok||response.offset!==offset||
+         response.current_gameplay_digest!==player.history_digest||
+         response.total_possible_directed_fusions!==1024)
+        throw new Error('Original cross-mechanic page does not match current player state.');
+      if(ticket===turn.current){
+        setFusionPage(offset);setFusions(response.interactions);
+      }
+    }catch(e){
+      if(ticket===turn.current)setFailure(
+        e instanceof Error?e.message:'Could not discover actual cross-mechanic interactions.');
+    }finally{if(ticket===turn.current)setBusy(false);}
   };
   const alternatives=async()=>{
     if(!preview||busy)return;
@@ -437,6 +469,48 @@ function Creator(){
               <Text style={s.actionText}>Restart original game</Text>
             </TouchableOpacity>
           </View>
+        </View>
+        <View style={s.panel}>
+          <Text style={s.heading}>1024 earned cross-mechanic interactions</Text>
+          <Text style={s.copy}>
+            Direction matters. Combining a river mechanic into a settlement
+            is a different playable action from using the settlement mechanic
+            to influence the river. Each interaction has real prerequisites,
+            an energy cost, resource effects and an altered world route.
+          </Text>
+          <TouchableOpacity style={[s.action,busy&&s.disabled]}
+            disabled={busy} onPress={()=>discoverFusions(fusionPage)}>
+            <Text style={s.actionText}>Discover actual earned interactions</Text>
+          </TouchableOpacity>
+          <View style={s.chips}>
+            <TouchableOpacity style={s.chip} disabled={busy||fusionPage===0}
+              onPress={()=>discoverFusions(fusionPage-32)}>
+              <Text style={s.copy}>Previous 32</Text>
+            </TouchableOpacity>
+            <Text style={s.copy}>Options {fusionPage+1}–{fusionPage+32} / 1024</Text>
+            <TouchableOpacity style={s.chip}
+              disabled={busy||fusionPage>=992}
+              onPress={()=>discoverFusions(fusionPage+32)}>
+              <Text style={s.copy}>Next 32</Text>
+            </TouchableOpacity>
+          </View>
+          {fusions.filter(x=>x.available).map(option=>(
+            <TouchableOpacity key={option.id} accessibilityRole="button"
+              disabled={busy||history.length>=128}
+              style={s.option} onPress={()=>play(option.id)}>
+              <Text style={s.actionText}>{pretty(option.id)}</Text>
+              <Text style={s.hint}>
+                Cost {option.cost} {option.cost_resource} ·
+                Earn {option.gain} {option.gain_resource} ·
+                Actual earned-gameplay synthesis
+              </Text>
+            </TouchableOpacity>
+          ))}
+          {!!fusions.length&&!fusions.some(x=>x.available)&&
+            <Text style={s.hint}>
+              Nothing unlocked on this page yet. Practice the indicated
+              source and destination mechanics before attempting a fusion.
+            </Text>}
         </View>
         <View style={s.panel}>
           <Text style={s.heading}>Actual alternative experiences</Text>
