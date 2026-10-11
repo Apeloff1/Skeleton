@@ -8,6 +8,11 @@ on:
       - "skeleton/ai/game_builder/competitive_watch_service.py"
       - "skeleton/ai/game_builder/competitive_watch_cli.py"
       - "skeleton/ai/game_builder/competitive_dragon_recrawl.py"
+      - "skeleton/ai/game_builder/competitive_deep_analysis.py"
+      - "skeleton/ai/game_builder/competitive_evolution_chain.py"
+      - "skeleton/ai/game_builder/competitive_counterproposals.py"
+      - "skeleton/ai/game_builder/competitive_deep_service.py"
+      - "tests/test_game_builder_competitive_deep.py"
       - "skeleton/ai/webcrawler/dragon_mission_scheduler.py"
       - "tests/test_game_builder_competitive_radar.py"
       - "docs/ai/game_competitive_threat_radar_2026_10.md"
@@ -47,6 +52,7 @@ jobs:
             skeleton/ai/webcrawler/
             tests/__init__.py
             tests/test_game_builder_competitive_radar.py
+            tests/test_game_builder_competitive_deep.py
             tests/test_game_builder_knowledge_rights_bridge.py
       - name: Python 3.11
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
@@ -60,4 +66,4 @@ jobs:
       - name: Adversarial competitor, originality and delivery gate tests
         shell: bash
         run: |
-          python -m unittest tests.test_game_builder_competitive_radar tests.test_game_builder_knowledge_rights_bridge -v
+          python -m unittest tests.test_game_builder_competitive_deep tests.test_game_builder_competitive_radar tests.test_game_builder_knowledge_rights_bridge -v
