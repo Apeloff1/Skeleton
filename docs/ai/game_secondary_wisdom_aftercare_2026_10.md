@@ -47,6 +47,10 @@ For each reviewed mechanic, three **different** tasks are created:
 
 Each of Dragon, Jeeves and Adversarial Mirror must sign **one substantive proofreading record per phase**, for nine separate actor-phase attestations. Every signature binds exact newly approved Wiki research, every task in the phase, a hashed **actual textual proofreading artifact**, quality score and the following six explicit proofread checks: evidence trace, legal source scope, logical consistency, measurement limitations, originality and test leakage. Missing tasks, unreviewed conflicts, unresolved objections, insufficient review score, invalid or shared credentials and forged text digests block approval. These are *cryptographic receipts for submissions*; real actor inference still requires the actual runtime to submit the review from its own configured identity, not self-asserted role strings.
 
+### Actual original-game evidence before any secondary gradients
+
+Every new TRAIN example must also be independently signed by the original-game replay authority and the adversarial mirror through the real double-attestation custody function. Both reviewers bind the same exact original project, case ID, mechanic, evidence revision and captured gameplay replay digest, using different operator-configured keys. Reused gameplay recordings cannot inflate sample counts; neither validation nor TEST cases may enter this custody path. Merely adding a mechanic tag to a record is never sufficient proof of original gameplay. Capturing authentic source gameplay and vetting reviewer identity remain obligations of the host.
+
 ### Secondary actual weight experiment
 
 If the first optimization has not independently qualified, return a **blocked review report** and do not train. If no fresh original game worlds exist, return a **research complete / new gameplay required** report. Neither circumstance is a success label.
