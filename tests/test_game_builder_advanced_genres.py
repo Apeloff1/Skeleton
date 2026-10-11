@@ -293,6 +293,15 @@ class StudioSmokeTests(unittest.TestCase):
         html=render_workspace_html("X"*32).decode()
         for genre in ("shooter","deck battler","puzzle"):
             self.assertIn(genre,html)
+        for token in (
+            'id="advanced-scene-grid"',
+            'id="advanced-paint-tool"',
+            "function paintSceneCell(point)",
+            "function renderSceneAuthoring()",
+            "Use Create / validate authored scene",
+        ):
+            self.assertIn(token,html)
+        self.assertNotIn("https://",html)
 
 
 if __name__=="__main__":
