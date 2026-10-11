@@ -15,11 +15,12 @@ from skeleton.ai.game_builder.game_dragon_peer_wisdom import (
     publish_dragon_almanac,
 )
 from skeleton.ai.game_builder.game_reviewer_optimizer import (
-    OptimizerSchedule,optimize_review_weights,
+    OptimizerSchedule,OptimizationResult,optimize_review_weights,
 )
 from skeleton.ai.game_builder.game_integrated_learning import run_integrated_learning_cycle
 from skeleton.ai.game_builder.game_reviewer_v2 import train_robust_game_reviewer
-from skeleton.ai.game_builder.game_model_promotion import PromotionError,PromotionStandard
+from skeleton.ai.game_builder.game_model_promotion import PromotionError,PromotionStandard,PromotionEvaluation
+from skeleton.ai.game_builder.game_model_cli import parser as model_parser
 from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
 from skeleton.ai.game_builder.game_training_flow import (
     CandidateBatch,plan_training_flow,TrainingFlowError,
@@ -65,6 +66,40 @@ class ActualWeightOptimizationTests(unittest.TestCase):
         self.assertFalse(result.payload()["independent_test_used_for_search"])
         self.assertEqual(result.payload(),optimize_review_weights(
             self.plan,schedule=schedule,authorized=True).payload())
+
+    def test_only_measured_non_regressing_champion_uplift_is_improvement(self):
+        metrics={"test":{"balanced_accuracy":0.95,"brier":0.04},
+                 "champion":{"test":{"balanced_accuracy":0.95,"brier":0.04}}}
+        equal=PromotionEvaluation("a"*64,"b"*64,"c"*64,
+                                  metrics,(),"d"*64,"e"*64)
+        result=OptimizationResult(
+            "f"*64,"1"*64,(),0,{"fitted_policy_digest":"a"*64},
+            equal,"d"*64)
+        self.assertFalse(result.candidate_improved)
+        self.assertFalse(result.ready_for_stage)
+        better=dict(metrics,test={"balanced_accuracy":0.96,"brier":0.03})
+        improved=replace(result,promotion_evaluation=replace(
+            equal,metrics=better))
+        self.assertTrue(improved.candidate_improved)
+        self.assertTrue(improved.ready_for_stage)
+        bootstrap=replace(result,champion_digest=None)
+        self.assertFalse(bootstrap.candidate_improved)
+        self.assertTrue(bootstrap.ready_for_stage)
+        worse=dict(metrics,test={"balanced_accuracy":0.96,"brier":0.05})
+        degraded=replace(result,promotion_evaluation=replace(
+            equal,metrics=worse))
+        self.assertFalse(degraded.candidate_improved)
+        self.assertFalse(degraded.ready_for_stage)
+        self.assertTrue(result.payload()["deployment_authorized"] is False)
+
+    def test_optimizer_cli_has_explicit_staging_not_active_deployment(self):
+        parsed=model_parser().parse_args([
+            "optimize-stage","--root","local-studio",
+            "--trusted-local-operator","--epoch-candidates","10",
+            "--learning-rates","0.12"])
+        self.assertEqual(parsed.action,"optimize-stage")
+        self.assertEqual(parsed.epoch_candidates,[10])
+        self.assertEqual(parsed.learning_rates,[0.12])
 
     def test_unqualified_or_partial_optimizer_configurations_fail_closed(self):
         with self.assertRaises(PromotionError):
