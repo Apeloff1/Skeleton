@@ -17,6 +17,9 @@ from .advanced_gameplay_runtime import (
 )
 from .system_editors import make_editor_document, SystemEditorError
 from .advanced_genre_engines import STARTS as GENRE_STARTS, CARDS, puzzle_default_layout
+from .advanced_farming_runtime import (default_layout as farm_layout,
+                                       normalize_layout as validate_farm_layout,
+                                       FarmingActionError)
 
 SCHEMA = "skeleton.game_builder.advanced_scene.v1"
 MAX_SCENE_BYTES = 64_000
@@ -111,12 +114,19 @@ def _default_layout(engine, config, seed):
                 "potions":state["potions"]}
     if engine == "puzzle":
         return puzzle_default_layout(config)
+    if engine == "farming":
+        return farm_layout(config,seed)
     raise SceneError("no advanced authored scene available for that engine")
 
 
 def _normalize_layout(engine, config, layout):
     if type(layout) is not dict:
         raise SceneError("authored layout must be a JSON object")
+    if engine=="farming":
+        try:
+            return validate_farm_layout(config,layout)
+        except FarmingActionError as exc:
+            raise SceneError(str(exc)) from exc
     if engine=="platformer":
         if set(layout)!={"spawn_x","exit_x","hazards","collectibles","checkpoints"}:
             raise SceneError("exact platformer scene layout fields required")
