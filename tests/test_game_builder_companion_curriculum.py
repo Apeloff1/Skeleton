@@ -68,6 +68,13 @@ class OriginalCompanionCurriculumTests(unittest.TestCase):
             companion_practice_games=5, mirror_attempts=64,
         )
         self.assertEqual(len(studio.practice), 5)
+        mirror_cohort = json.loads(studio.package.files["studio/companion_mirror_room.json"])
+        self.assertTrue(mirror_cohort["all_passed"])
+        self.assertEqual(len(mirror_cohort["reports"]), 5)
+        for summary in mirror_cohort["reports"]:
+            self.assertEqual(summary["attempts"], 64)
+            self.assertEqual(summary["failed_count"], 0)
+            self.assertEqual(summary["passed_count"], 64)
         almanac = json.loads(studio.package.files["studio/companion_almanac.json"])
         self.assertEqual(len(almanac["insights"]), 5)
         self.assertEqual(len({g["world_digest"] for g in almanac["insights"]}), 5)
@@ -81,6 +88,8 @@ class OriginalCompanionCurriculumTests(unittest.TestCase):
                              observation["challenge_score"])
             self.assertEqual(practice.winning_steps,
                              observation["safe_solution_turns"])
+            self.assertEqual(practice.mirror_attempts, 64)
+            self.assertEqual(len(practice.mirror_report_digest), 64)
             nested = json.loads(
                 studio.package.files[practice.package_path + "/release.json"])
             self.assertEqual(nested["world_digest"], observation["world_digest"])
