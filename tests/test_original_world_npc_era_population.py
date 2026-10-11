@@ -25,8 +25,23 @@ from skeleton.game.generation.original_world_product_cli import (
 
 
 def product(era="early-industrial", inhabitants=None):
+    # Explicit legacy-v3 scenario to guarantee old high-density saves and
+    # fixed historical census remain loadable; modern defaults are covered
+    # separately in test_original_world_npc_platform_profiles.py.
+    from skeleton.game.generation.original_world_npc_era_population import (
+        era_budget, create_era_population, inhabitant_role_profile,
+    )
+    from skeleton.game.generation.original_world_npc_cognition_v2 import make_intelligence
     index = living_for(0, "puzzle", "lattice", "trophic", "sandbox").index
-    return create_product(index, era=era, inhabitants=inhabitants)
+    b = era_budget(era)
+    count = (max(1, b.full_npc_limit - 2)
+             if inhabitants is None else inhabitants)
+    base = create_product(index, inhabitants=count)
+    people = inhabitant_role_profile(base.society, era)
+    return replace(
+        base, society=people, cognition=make_intelligence(base.terrain, people),
+        population=create_era_population(base.terrain, people, era),
+    )
 
 
 def step(state, verb="end_turn", layer="causal", **kwargs):
