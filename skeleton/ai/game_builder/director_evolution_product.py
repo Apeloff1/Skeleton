@@ -24,6 +24,7 @@ from .quest_pareto_planner import (
     PlannerBudget, PlannerError, find_quest_routes,
 )
 from .director_capability_graph import TIERS
+from .modular_scene_compositor import compose_scene, storyboard
 
 
 def _payload(obj):
@@ -96,6 +97,33 @@ def build_evolution_product(
             any(memory.origin=="rumor" for memory in m.memories) for m in rumored.minds),
         "dialogue_samples":list(sample),
         "provider_language_model_invoked":False,
+    })
+    frames=[
+        compose_scene(world,society,s.key,tier=tier,authorized=True).payload()
+        for s in world.scenes
+    ]
+    cinematic_witnesses=[]
+    for scene in world.scenes:
+        for cutscene in scene.cutscenes:
+            if len(cinematic_witnesses)>=16:
+                break
+            series=storyboard(world,society,scene.key,cutscene.key,
+                              tier=tier,authorized=True)
+            cinematic_witnesses.append({
+                "scene":scene.key,"cutscene":cutscene.key,
+                "sample_times":[frame.at_ms for frame in series],
+                "frame_digests":[frame.digest for frame in series],
+                "last_frame":series[-1].payload(),
+            })
+        if len(cinematic_witnesses)>=16:
+            break
+    files["systems/original_scene_frames.json"]=_payload({
+        "schema":"skeleton.game_builder.original_modular_scene_frames.v1",
+        "world_digest":world.digest,"tier":tier,
+        "sampled_scene_frames":frames,
+        "sampled_cinematic_storyboards":cinematic_witnesses,
+        "native_cinematic_renderer_verified":False,
+        "authored_audio_playback_verified":False,
     })
     files["systems/modular_missions.json"]=_payload(missions.payload())
     files["systems/quest_routes.json"]=_payload(
