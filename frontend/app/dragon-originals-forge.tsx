@@ -24,6 +24,12 @@ type Catalog={
   ok:boolean;actual_mechanic_verbs:number;
   mechanically_separable_binary_nuclei:number;
   full_original_32_mechanic_binary_nuclei:number;
+  prototype_viability_capacity?:{
+    exact_structurally_multi_domain_rulebooks:number;
+    thin_rulebooks_filtered:number;
+    min_active_mechanics:number;min_independent_domains:number;
+    finished_and_published_games_from_count:number;
+  };
   exact_original_rule_program_address_count:string;
   mechanics:Mechanic[];playable_route_intents:string[];
   finished_unique_cleared_games:number;
@@ -111,6 +117,7 @@ function Creator(){
     world_style:string;world_lifecycle:string;
     active_mechanics:string[];available_mechanic_count:number;
     biome:string;visible_landmark:string;
+    core_loop_viable:boolean;underbuilt_reasons:string[];
     living_world_actual_route_actions:string[];
     replayed_journeys:Array<{intent:string;actions:string[];trace_digest:string}>;
     release_blockers:string[];proof_digest:string;
@@ -197,6 +204,7 @@ function Creator(){
           world_style:string;world_lifecycle:string;
           active_mechanics:string[];available_mechanic_count:number;
           biome:string;visible_landmark:string;
+          core_loop_viable:boolean;underbuilt_reasons:string[];
           living_world_actual_route_actions:string[];
           replayed_journeys:Array<{intent:string;actions:string[];trace_digest:string}>;
           release_blockers:string[];proof_digest:string;
@@ -404,10 +412,19 @@ function Creator(){
           postgame, hardcore survival and world-era changes.
         </Text>
         <Text style={s.hint}>
-          One request generates a coherent original premise, compatible living
-          world and real playthroughs in both simulators. Neither the address
-          space nor generated titles constitute billions of released games.
+          One request generates an original premise, compatible living world
+          and real playthroughs in both simulators. Each candidate must pass
+          a four-mechanic/three-domain quality screen; thin programs are
+          explicitly marked as underbuilt. Neither these addresses nor
+          generated titles constitute billions of released games.
         </Text>
+        {catalog?.prototype_viability_capacity&&<Text style={s.copy}>
+          {catalog.prototype_viability_capacity.exact_structurally_multi_domain_rulebooks.toLocaleString()}
+          {' '}rulebooks meet the structural four-system/three-domain screen;
+          {' '}{catalog.prototype_viability_capacity.thin_rulebooks_filtered.toLocaleString()}
+          {' '}thin variants are filtered before core-loop review.
+          Quality and release certification are separate.
+        </Text>}
         <TextInput style={s.input} value={prototypeAddress} maxLength={10}
           editable={editor&&!busy} keyboardType="number-pad"
           accessibilityLabel="Full original 32-mechanic prototype index"
@@ -442,6 +459,11 @@ function Creator(){
               choices · proof {journey.trace_digest.slice(0,16)}…
             </Text>
           ))}
+          <Text style={prototype.core_loop_viable?s.success:s.warning}>
+            {prototype.core_loop_viable
+              ?'Core loop meets preliminary structure requirements.'
+              :'Underbuilt rules: '+prototype.underbuilt_reasons.map(pretty).join(', ')}
+          </Text>
           <Text style={s.warning}>
             Candidate only · {prototype.release_blockers.length}
             {' '}art, gameplay, platform, originality or legal approval gates
