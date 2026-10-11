@@ -6,6 +6,7 @@ from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import json
+import re
 import unittest
 import zipfile
 
@@ -43,6 +44,7 @@ class CompetitiveUserCouncilCases(DeepEnemyCases):
             TrustedCompetitionJudge("serv_jeeves",b"j"*32),
         )
         self.research_store=ReviewedKnowledgeStore(":memory:")
+        self.research_source_count=0
         self.addCleanup(self.research_store.close)
         self.research_rights=RightsLedger()
         with TemporaryDirectory() as t:
@@ -67,8 +69,8 @@ class CompetitiveUserCouncilCases(DeepEnemyCases):
         # roots grow with each round and all sources remain rights-cleared.
         for round_no in (1,2,3):
             required=(2,4,6)[round_no-1]*(1+epoch)
-            while len(self.research_store.sources("game_studio",authorized=True))<required:
-                i=len(self.research_store.sources("game_studio",authorized=True))
+            while self.research_source_count<required:
+                i=self.research_source_count
                 sid=f"round_game_source_{i:02d}"
                 text=f"Independent original game study {i} on input, play, visuals and audio."
                 doc=ReviewedDocument(
@@ -89,6 +91,7 @@ class CompetitiveUserCouncilCases(DeepEnemyCases):
                     doc,expected_parent_digest=None,authorized=True)
                 self.research_rights.register_source(record(
                     source_id=sid,digest=sha256(text.encode()).hexdigest()))
+                self.research_source_count+=1
             brief=self.research_store.build_brief(
                 "game_studio","games study",authorized=True,
                 max_hits=40,min_independent_groups=2)
@@ -221,10 +224,9 @@ class CompetitiveUserCouncilCases(DeepEnemyCases):
             packet=json.loads((folder/"manifest.json").read_text())
             self.assertEqual(set(packet["role_document_sha256"]),set(ROLES))
             self.assertEqual(packet["role_pages"],{r:3 for r in ROLES})
-            from pypdf import PdfReader
             for role in ROLES:
                 doc=folder/(role+".pdf")
-                self.assertEqual(len(PdfReader(str(doc)).pages),3)
+                self.assertEqual(len(re.findall(rb"/Type /Page\\b",doc.read_bytes())),3)
                 self.assertEqual(sha256(doc.read_bytes()).hexdigest(),
                                  packet["role_document_sha256"][role])
             with zipfile.ZipFile(folder/"complete-review-packet.zip") as z:
@@ -244,7 +246,7 @@ class CompetitiveUserCouncilCases(DeepEnemyCases):
             self.assertEqual(approved.user_decision,"user_approved")
 
     def test_user_rejection_enforces_more_sources_and_new_three_round_review(self):
-        state,_=self.complete_battle()
+        state,research_steps=self.complete_battle()
         with TemporaryDirectory() as d:
             root=Path(d)/"studio";GameWorkspace.create(root,authorized=True)
             packet,awaiting=publish_three_ai_pdfs(
@@ -258,8 +260,8 @@ class CompetitiveUserCouncilCases(DeepEnemyCases):
         self.assertEqual(revised.rounds,())
         with self.assertRaises(ThreatRadarError):
             admit_crawler_round(
-                self.research_store,self.research()[0][1],self.research()[0][2],
-                self.research_rights,epoch=1,round_number=1,
+                self.research_store,research_steps[-1][1],research_steps[-1][2],
+                self.research_rights,epoch=1,round_number=3,
                 as_of="2026-10-14T12:00:00Z",authorized=True)
 
 
