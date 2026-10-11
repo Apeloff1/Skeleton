@@ -1610,6 +1610,85 @@ def native_original_campaign_portfolio(
             detail="Original alternative journeys lack replayed gameplay evidence") from None
 
 
+class NativeOriginalPrototypeRequest(BaseModel):
+    """Exact 32-mechanic original game candidate, never counted as publication."""
+    model_config=ConfigDict(extra="forbid")
+    original_nucleus:StrictInt=Field(default=0,ge=0,lt=4_294_967_296)
+    branch_seed:StrictInt=Field(default=0,ge=0,le=0xffffffff)
+    routes:StrictInt=Field(default=4,ge=1,le=12)
+    steps:StrictInt=Field(default=16,ge=4,le=64)
+
+
+class NativeOriginalPrototypeBatchRequest(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    start:StrictInt=Field(default=0,ge=0,lt=4_294_967_296)
+    count:StrictInt=Field(default=4,ge=1,le=12)
+    branch_seed:StrictInt=Field(default=0,ge=0,le=0xffffffff)
+    routes:StrictInt=Field(default=2,ge=1,le=8)
+    steps:StrictInt=Field(default=12,ge=4,le=48)
+
+
+class NativeOriginalPrototypeCompareRequest(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    first:StrictInt=Field(ge=0,lt=4_294_967_296)
+    second:StrictInt=Field(ge=0,lt=4_294_967_296)
+
+
+@router.post("/native/production/worlds/originals/prototype")
+def native_original_game_prototype(
+    body:NativeOriginalPrototypeRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from dataclasses import asdict
+    from skeleton.ai.webcrawler.dragon_original_prototype_factory import (
+        materialize,verify_prototype,
+    )
+    try:
+        proposed=materialize(
+            body.original_nucleus,branch_seed=body.branch_seed,
+            routes=body.routes,steps=body.steps)
+        verified=verify_prototype(proposed,branch_seed=body.branch_seed)
+        return {"ok":True,"original_prototype":asdict(proposed),
+                "verification":verified}
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original game prototype could not execute both real gameplay layers") from None
+
+
+@router.post("/native/production/worlds/originals/prototypes")
+def native_original_game_prototype_batch(
+    body:NativeOriginalPrototypeBatchRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_original_prototype_factory import (
+        sample_prototypes,
+    )
+    try:
+        return {"ok":True,**sample_prototypes(
+            start=body.start,count=body.count,
+            branch_seed=body.branch_seed,
+            routes=body.routes,steps=body.steps,
+        )}
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Original prototype batch contains out-of-range or unplayable games") from None
+
+
+@router.post("/native/production/worlds/originals/prototypes/compare")
+def native_original_game_prototypes_difference(
+    body:NativeOriginalPrototypeCompareRequest,
+    owner:str=Depends(_native_source_editor),
+)->dict:
+    from skeleton.ai.webcrawler.dragon_original_prototype_factory import (
+        distinguish_prototypes,
+    )
+    try:
+        return {"ok":True,**distinguish_prototypes(body.first,body.second)}
+    except ValueError:
+        raise HTTPException(status_code=422,
+            detail="Two original candidate game rulebooks need distinct valid indexes") from None
+
+
 class NativeIndexedLivingDesignRequest(BaseModel):
     """One actual generated design and a replayable route, never bulk minting."""
     model_config=ConfigDict(extra="forbid")
