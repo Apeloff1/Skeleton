@@ -325,6 +325,11 @@ _KNOWLEDGE_EXPORTS = {
     "ExecutedToolReceipt": ".studio_execution_plane",
     "ExecutionOutcome": ".studio_execution_plane",
     "execute_local_tool_plan": ".studio_execution_plane",
+    "CompanionCurriculumError": ".companion_curriculum",
+    "PracticeInsight": ".companion_curriculum",
+    "plan_original_companion_intents": ".companion_curriculum",
+    "measure_original_practice": ".companion_curriculum",
+    "validate_practice_cohort": ".companion_curriculum",
 }
 
 
