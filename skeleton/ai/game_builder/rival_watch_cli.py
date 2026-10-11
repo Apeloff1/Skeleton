@@ -135,8 +135,6 @@ def main(argv=None):
             titles=tuple(_typed(CompetitorTitle,t) for t in cfg["titles"])
             if cfg["polling_enabled"] and not a.allow_network:
                 raise PermissionError("scheduled public polling needs explicit network permission")
-            if not cfg["polling_enabled"] and a.allow_network:
-                raise PermissionError("operator must opt into network in watch config")
             timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             result=poll_public_steam_titles(
                 titles if cfg["polling_enabled"] else (),
@@ -171,17 +169,14 @@ def main(argv=None):
                 raise CompetitiveError("exact delivery source evidence required")
             plan=_planned(doc["plan"])
             report=_report(doc["report"])
-            proof=_typed(DeliveryVerification,doc["delivery"],sequence=("measurements",))
+            raw=doc["delivery"]
+            if type(raw) is not dict or set(raw)!=set(DeliveryVerification.__dataclass_fields__):
+                raise CompetitiveError("complete delivery proof shape required")
+            if type(raw["measurements"]) is not list:
+                raise CompetitiveError("bounded measured gameplay receipt list required")
             proof=DeliveryVerification(
-                project_id=proof.project_id,plan_digest=proof.plan_digest,
-                protected_identity_digest=proof.protected_identity_digest,
-                independently_reviewed=proof.independently_reviewed,
-                protected_axes_passed=proof.protected_axes_passed,
-                originality_review_passed=proof.originality_review_passed,
-                rights_review_passed=proof.rights_review_passed,
-                measurements=tuple(_typed(QualityMeasurement,m) for m in
-                                   doc["delivery"]["measurements"]),
-                new_gameplay_evidence_digest=proof.new_gameplay_evidence_digest)
+                **{**raw,"measurements":tuple(
+                    _typed(QualityMeasurement,m) for m in raw["measurements"])})
             result=verify_delivery(plan,report,proof,authorized=True)
         print(canonical_json(result))
         return 0
