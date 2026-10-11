@@ -20,6 +20,7 @@ from .game_training_flow import (
     train_isolated_review_ranker,materialize_training_flow,
 )
 from .game_reviewer_v2 import train_robust_game_reviewer
+from .game_learning_feedback import feedback_from_evaluation
 from .game_model_promotion import (
     PromotionError,PromotionStandard,evaluate_candidate,
 )
@@ -116,6 +117,8 @@ def main(argv=None):
                     authorized=True)
                 result=dict(schema="skeleton.game_builder.review_evaluation_cli.v1",
                             evaluation=evaluation.payload(),
+                            improvement_ledger=feedback_from_evaluation(
+                                evaluation,authorized=True).payload(),
                             fit_executed=fit["training_performed"],
                             core_ai_model_changed=False)
             else:
