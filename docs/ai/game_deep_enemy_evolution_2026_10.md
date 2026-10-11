@@ -149,6 +149,14 @@ level-design expression is included in an implementation script. A problem
 shared by many genre ancestors is a *design opportunity*, not a license to
 appropriate a historical mechanic's unique expressive implementation.
 
+Outclassing claims now also require `SignedImplementationReview`: a
+separately configured HMAC signer binds the exact original new game build
+digest, the exact post-implementation facet verdict digest, the associated
+counterproposal identity and explicit protected-quality and originality QA
+decisions. Absent credentials or modified verdicts cannot be called delivered.
+This verifies configured key possession and data integrity, not real-world
+reviewer independence or publisher approval.
+
 Until evaluated, each counterproposal is still only an authored plan. The
 \`evaluate_original_counterproposal\` function demands a new original
 replayed build digest, nonregressing protected checks, an originality-review
