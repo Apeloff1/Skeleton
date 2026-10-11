@@ -16,6 +16,7 @@ from .original_foundation_compiler import (
     FoundationError, foundation_at, foundation_from_seed,
     iter_foundations, provenance_report,
 )
+from .original_foundation_discovery import search_foundations
 from .original_foundation_runtime import (
     ACTIONS, CausalAction, CausalState, create_causal,
     available_exits, restore_causal, save_causal, step_causal,
@@ -149,6 +150,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     selection.add_argument("--load", type=Path)
     parser.add_argument("--report", action="store_true",
                         help="Report provenance counts and authorship distinctions")
+    parser.add_argument("--find",
+                        help="Mechanic-first search across authored causal laws")
+    parser.add_argument("--domain", help="Filter search by causal discipline")
+    parser.add_argument("--operator", help="Filter search by consequence family")
+    parser.add_argument("--ending", help="Filter search by world continuity")
+    parser.add_argument("--no-diversify", action="store_true",
+                        help="Pure relevance ranking without family diversity")
     parser.add_argument("--page", type=int,
                         help="Stream starting index for a bounded foundation page")
     parser.add_argument("--limit", type=int, default=12)
@@ -160,6 +168,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.report:
             print(json.dumps(provenance_report(), sort_keys=True, indent=2))
+            return 0
+        if args.find is not None:
+            if args.page is not None or args.index is not None or args.seed is not None or args.load is not None:
+                raise FoundationError("search cannot be mixed with exact selectors")
+            hits = search_foundations(
+                args.find, domain=args.domain, operator=args.operator,
+                ending=args.ending, limit=args.limit,
+                diverse=not args.no_diversify,
+            )
+            print(json.dumps({
+                "source": "authored causal foundations",
+                "query": args.find,
+                "count": len(hits),
+                "matches": [hit.as_dict() for hit in hits],
+                "rank_label": "written-causal-text relevance, not game quality",
+            }, sort_keys=True, ensure_ascii=False, indent=2))
             return 0
         if args.page is not None:
             items = list(iter_foundations(start=args.page, limit=args.limit))
