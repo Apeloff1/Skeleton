@@ -268,6 +268,49 @@ class PromotionEvaluation:
                     core_llm_weights_changed=False)
 
 
+def _complete_metamorphic_evaluation(rows: tuple[TrainingCandidate,...],
+                                    policy: dict)->dict:
+    """Audit EVERY held-out case under a finite, lossless challenge budget.
+
+    The underlying challenge engine is intentionally bounded to 512 examples;
+    model selection must NEVER interpret its first-512 result as a full-set
+    evaluation. Shards are deterministic and cannot leave a 1-row remainder.
+    """
+    if (not isinstance(rows,tuple) or not 2<=len(rows)<=8192
+            or len({x.example_id for x in rows})!=len(rows)):
+        raise PromotionError("complete unique adversarial model evidence required")
+    from .game_learning_challenges import challenge_reviewer
+    ordered=sorted(rows,key=lambda x:x.example_id)
+    shards=(len(ordered)+511)//512
+    width=(len(ordered)+shards-1)//shards
+    receipts=[]
+    covered=passed=attempted=0
+    for start in range(0,len(ordered),width):
+        portion=tuple(ordered[start:start+width])
+        if not 2<=len(portion)<=512:
+            raise PromotionError("partial adversarial evaluation shard is not allowed")
+        report=challenge_reviewer(portion,policy,
+                                 authorized=True,max_examples=512)
+        covered+=len(portion)
+        attempted+=report.attempted
+        passed+=report.passed
+        receipts.append(dict(shard=start//width,
+                             source_examples=len(portion),
+                             report_digest=report.digest,
+                             attempted=report.attempted,passed=report.passed,
+                             by_family=[dict(family=family,attempted=n,passed=correct)
+                                        for family,n,correct in report.by_family]))
+    if covered!=len(rows) or attempted!=4*len(rows):
+        raise PromotionError("all independent adversarial counterfactuals must be evaluated")
+    return dict(schema="skeleton.game_builder.complete_metamorphic_qualification.v1",
+                expected_cases=len(rows),covered_cases=covered,
+                attempted=attempted,passed=passed,
+                accuracy=round(passed/attempted,6),
+                complete_coverage=True,shards=receipts,
+                model_weights_changed=False,
+                heldout_examples_used_for_training=False)
+
+
 def evaluate_candidate(plan: FlowPlan,fit: dict,*,
                        standard: PromotionStandard=PromotionStandard(),
                        champion: dict | None=None,
@@ -333,13 +376,10 @@ def evaluate_candidate(plan: FlowPlan,fit: dict,*,
         metrics["test"]["balanced_accuracy"]>standard.max_generalization_drop):
         blockers.append("heldout_generalization_gap")
     if standard.min_counterfactual_accuracy>0:
-        # Import after model module initialization to avoid a module cycle.
-        from .game_learning_challenges import challenge_reviewer
         for split in ("validation","test"):
-            redteam=challenge_reviewer(
-                grouped[split],policy,authorized=True,max_examples=512)
-            metrics["metamorphic_"+split]=redteam.payload()
-            if redteam.accuracy<standard.min_counterfactual_accuracy:
+            redteam=_complete_metamorphic_evaluation(grouped[split],policy)
+            metrics["metamorphic_"+split]=redteam
+            if redteam["accuracy"]<standard.min_counterfactual_accuracy:
                 blockers.append(split+":reviewer_shortcut_detection")
     if champion is not None:
         leader={s:_metric(grouped[s],champion) for s in ("validation","test")}
