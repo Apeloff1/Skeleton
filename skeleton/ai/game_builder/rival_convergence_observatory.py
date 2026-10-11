@@ -300,6 +300,7 @@ class DeliveryOrder:
     priority: int
     requirement: str
     benchmark_protocol_digest: str | None
+    benchmark_evaluator_id: str | None
     minimum_measured_score: float | None
     reference_evidence_digest: str
     protected_identity_digest: str
@@ -470,6 +471,7 @@ def evaluate_convergence(
             order_body=dict(project_id=plan.project_id,rival_title_id=rival.title_id,
                             axis=axis,kind=kind,priority=priority,
                             benchmark_protocol_digest=protocol,
+                            benchmark_evaluator_id=pairs[0][0][2] if pairs else None,
                             minimum_measured_score=floor,
                             reference_evidence_digest=reference,
                             protected_identity_digest=plan.distinctive_signature_digest)
@@ -477,7 +479,8 @@ def evaluate_convergence(
             orders.append(DeliveryOrder(order_id=oid,requirement=requirement,**order_body))
         order_body=dict(project_id=plan.project_id,rival_title_id=rival.title_id,
                         axis="originality",kind="protect_individuality",priority=100,
-                        benchmark_protocol_digest=None,minimum_measured_score=None,
+                        benchmark_protocol_digest=None,benchmark_evaluator_id=None,
+                        minimum_measured_score=None,
                         reference_evidence_digest=source_root,
                         protected_identity_digest=plan.distinctive_signature_digest)
         orders.append(DeliveryOrder(
@@ -539,7 +542,9 @@ def verify_delivery(plan: PlannedTitle,report: ConvergenceReport,
         if order.kind in {"outperform","differentiate_and_cap","defend_verified_lead"}:
             matching=[x for x in delivery.measurements if (
                 x.title_id==plan.project_id and x.axis==order.axis
-                and x.protocol_digest==order.benchmark_protocol_digest)]
+                and x.protocol_digest==order.benchmark_protocol_digest
+                and x.evaluator_id==order.benchmark_evaluator_id
+                and x.independently_reviewed)]
             if (len(matching)!=1 or
                     matching[0].score+1e-9<order.minimum_measured_score):
                 blockers.append(f"measured_competitor_target_unmet:{order.axis}")
