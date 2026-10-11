@@ -55,7 +55,11 @@ with every action included in the evidence digest:
   accuracy-based scoring and beat-period telemetry.
 - Deck battler — attack, block, energy, enemy health, turns and victory.
 
-The local UI also draws telemetry from the resulting immutable simulation state on a\nCanvas: jump paths, racing speed profiles, tactics position and numeric resource\nstates. This display never modifies or impersonates backend proof results.\n\nPreviews are *mechanics proofs only*. They do not render finished playable
+The local UI also draws telemetry from the resulting immutable simulation state on a
+Canvas: jump paths, racing speed profiles, tactics position and numeric resource
+states. This display never modifies or impersonates backend proof results.
+
+Previews are *mechanics proofs only*. They do not render finished playable
 games, certify physical correctness or demonstrate execution on target hardware.
 
 All other families return `authoring_only`, explicitly with
