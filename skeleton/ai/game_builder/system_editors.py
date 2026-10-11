@@ -2218,6 +2218,31 @@ CATALOG = json.loads(r'''[
     "preview": null
   }
 ]''')
+MINIMUM_PROGRESSION = "advanced"
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense"})
+ADVANCED_REQUIREMENTS = {
+    "World": ("persistent_state", "causal_events", "player_choice_consequences",
+              "branch_or_nonterminal_world", "evidence_and_fidelity"),
+    "Action": ("frame_bounded_input", "collision_resolution", "combat_or_traversal",
+               "resource_and_damage_budget", "replay_evidence"),
+    "Strategy": ("finite_resources", "adversarial_agent_turns", "spatial_constraints",
+                 "meaningful_economy_or_supply", "deterministic_replay"),
+    "Vehicle": ("physics_envelope", "environmental_response", "control_modes",
+                "collision_and_safety", "replay_evidence"),
+    "Simulation": ("conserved_resources", "time_evolution", "emergent_state",
+                   "system_feedback", "deterministic_replay"),
+    "Creative": ("authored_timing_or_branches", "stateful_player_interaction",
+                 "bounded_complexity", "accessibility", "source_and_replay_provenance"),
+    "Product": ("device_budget", "fault_tolerance", "user_accessibility",
+                "internationalization", "independent_release_assurance"),
+}
+for _editor in CATALOG:
+    _editor["progression_floor"] = MINIMUM_PROGRESSION
+    _editor["advanced_contract"] = list(ADVANCED_REQUIREMENTS[_editor["group"]])
+    _editor["runtime_maturity"] = (
+        "advanced_reference_runtime" if _editor["id"] in ADVANCED_ENGINE_IDS
+        else "authoring_only"
+    )
 INDEX = {entry["id"]: entry for entry in CATALOG}
 PREVIEW_ACTIONS = {
     "platformer": ("right", "right", "jump", "right", "right", "idle", "idle"),
@@ -2495,6 +2520,7 @@ def editor_path(editor_id: str) -> str:
 def editor_source(editor_id: str, settings: Mapping[str, object] | None = None) -> str:
     return _canonical(make_editor_document(editor_id,settings)) + "\n"
 
-__all__ = ["SCHEMA","CATALOG","SystemEditorError","catalog","editor_spec",
+__all__ = ["SCHEMA","CATALOG","MINIMUM_PROGRESSION","ADVANCED_ENGINE_IDS",
+           "ADVANCED_REQUIREMENTS","SystemEditorError","catalog","editor_spec",
            "editor_path","editor_source","make_editor_document",
            "validate_editor_document","preview_editor"]
