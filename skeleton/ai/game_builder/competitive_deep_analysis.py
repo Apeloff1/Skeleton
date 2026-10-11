@@ -301,6 +301,7 @@ class FacetVerdict:
                     gap_to_outperform_bp=self.gap_to_outperform_bp,
                     blockers=list(self.blockers),
                     reported_weakness_verified=self.status=="verified_weakspot",
+                    industry_weakness_means_signed_cohort_not_official_standard=True,
                     cannot_infer_absent_measurements_as_failure=True)
 
 
@@ -313,14 +314,14 @@ def score_deep_scripts(
     as_of: str, authorized: bool, margin_bp: int=150,
     independent_judges: int=2,
     max_age_days: int=180,
-    industry_floors: dict[str,int]|None=None,
+    industry_baselines: tuple[FacetMeasurement,...]=(),
 )->tuple[FacetVerdict,...]:
     """Full-coverage fail-closed scoring, no truncation or made-up superiority.
 
     Verified weakspot means rival's conservative upper CI is below an
     independently predeclared *industry benchmark floor*, not that a reviewer
     disliked its art. An unverified self-declared floor cannot be supplied
-    silently: without explicit benchmark levels, only 'gap' is reported.
+    silently: an actual independently evaluated industry control cohort is required.
     """
     if not authorized:
         raise PermissionError("scored competitor scripts require operator authority")
@@ -328,7 +329,9 @@ def score_deep_scripts(
             len({x.digest for x in scripts})!=len(scripts)
             or any(not isinstance(x,ScriptedProbe) for x in scripts)
             or type(measurements) is not tuple or len(measurements)>10000
-            or any(not isinstance(x,FacetMeasurement) for x in measurements)
+            or type(industry_baselines) is not tuple or len(industry_baselines)>10000
+            or any(not isinstance(x,FacetMeasurement)
+                   for x in (*measurements,*industry_baselines))
             or type(judges) is not tuple or
             any(not isinstance(x,TrustedCompetitionJudge) for x in judges)
             or len({x.judge_id for x in judges})!=len(judges)
@@ -342,8 +345,9 @@ def score_deep_scripts(
     scripts_by_digest={x.digest:x for x in scripts}
     by_script=defaultdict(lambda:defaultdict(list))
     seen=set()
-    for row in measurements:
-        if row.script_digest not in scripts_by_digest or row.subject_id not in {rival,original}:
+    for row in (*measurements,*industry_baselines):
+        if row.script_digest not in scripts_by_digest or row.subject_id not in {
+                rival,original,"industry_cohort"}:
             raise ThreatRadarError("facet score attempts cross-title or cross-script injection")
         signer=trusted.get(row.evaluator_id)
         if signer is None or not hmac.compare_digest(
@@ -352,17 +356,13 @@ def score_deep_scripts(
         when=_date(row.observed_at)
         if when>stamp or (stamp-when).days>max_age_days:
             raise ThreatRadarError("facet measurement stale or from future")
+        if (row.subject_id=="industry_cohort") != (row in industry_baselines):
+            raise ThreatRadarError("industry cohort cannot be passed off as real original/rival game")
         identity=(row.script_digest,row.subject_id,row.evaluator_id)
         if identity in seen:
             raise ThreatRadarError("duplicate evaluator replay cannot inflate independent coverage")
         seen.add(identity)
         by_script[row.script_digest][row.subject_id].append(row)
-    if industry_floors is not None and (
-            type(industry_floors) is not dict or
-            set(industry_floors)-{x.facet for x in scripts} or
-            any(type(v) is not int or not 0<=v<=10000
-                for v in industry_floors.values())):
-        raise ThreatRadarError("predeclared bounded external industry facet floors required")
     results=[]
     for script in scripts:
         ours=by_script[script.digest][original]
@@ -379,11 +379,15 @@ def score_deep_scripts(
         rival_upper=max((row.upper_bp for row in theirs),default=None)
         shortfall=(None if our_lower is None or rival_upper is None
                    else max(0,rival_upper+margin_bp-our_lower))
-        # Absolute weakness needs a separately provided industry bar; caller
-        # is responsible for provenance, and verdict never attests its accuracy.
-        floor=(industry_floors or {}).get(script.facet)
-        weakspot=(not blockers and floor is not None
-                  and rival_upper is not None and rival_upper<floor)
+        # Absolute weakness needs a separate independently signed industry
+        # control cohort, measured on the exact same script/protocol. This
+        # is a local cohort reference, not an official industry certification.
+        industry=by_script[script.digest]["industry_cohort"]
+        floor=(min(x.lower_bp for x in industry)
+               if len({x.evaluator_id for x in industry})>=independent_judges
+               else None)
+        weakspot=(not blockers and floor is not None and
+                  rival_upper is not None and rival_upper+margin_bp<=floor)
         if blockers:
             status="insufficient_evidence"
         elif weakspot:
