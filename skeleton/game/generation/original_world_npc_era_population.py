@@ -126,7 +126,6 @@ class EraPopulation:
     total_deaths: int = 0
     updates: int = 0
     event_head: str = "0" * 64
-    fidelity: str = "balanced"
 
 
 def _hash(data: object) -> str:
