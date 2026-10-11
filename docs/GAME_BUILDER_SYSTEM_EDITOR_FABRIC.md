@@ -146,6 +146,68 @@ engines. It never equates successful reference simulation with a certified
 Godot export or native executable. Integration of the actual other 40
 game engines and producer-grade scene/node editors remains outstanding.
 
+## Authored advanced levels, survival regions and real savegames
+
+Seed-only demos are no longer the sole option for the five advanced gameplay
+families. The `advanced_level_scenes` module creates, validates and binds
+original source scene documents to **the exact approved system configuration**:
+
+- **Platformer:** editable spawn/exit, damaging hazard tiles, collectibles and
+  checkpoints; source checks enforce bounds, uniqueness and safe separation
+  between checkpoints and hazards
+- **Tactics:** two squad starts, two enemy starts, occupied cover cells and
+  mission objective; duplicate occupation, impossible geometry and
+  disconnected objectives/enemy locations fail closed
+- **Tower defense:** designer-authorized construction slots and configurable
+  actual enemy-wave counts, enforced in the replay runtime
+- **Racing:** circuit corners, obstacle location, selected weather and starting
+  lane; vehicle physics and win conditions still execute the real runtime
+- **Survival:** two to eight authored biomes/regions with explicit finite
+  resources, merchant stocks and starting region/weather
+
+The studio's **Create / validate authored scene** button produces typed JSON
+that can be edited and revalidated. **Stage authored scene for review** sends
+it to the existing exact-file diff/propose/approve workflow. The author must
+first approve the parent `systems/<engine>.json`; changing that system after
+a scene proposal invalidates the scene's digest at commit time. The gameplay
+backend also checks the exact scene ID, source checksum, settings digest and
+seed before it starts or replays a game.
+
+`system_editor_assembly` now enumerates approved authored scenes and computes
+a replay proof for each. These are evidence of deterministic execution, **not**
+a claim that a level has been independently playtested, is enjoyable, or is
+certified for release.
+
+Portable `advanced_gameplay_save` files enable genuinely resumable sessions:
+download a game save from the studio, import it in another local session, and
+continue from the verified action transcript. Saves record typed settings,
+authored scene, seed and action history rather than trusting mutable health,
+resource or position state. Import re-executes all commands, compares
+cryptographic identities and rejects modifications, stale settings,
+counterfeit credits or resumed actions after a terminal game state.
+
+Offline CLI examples:
+
+```bash
+python -m skeleton.ai.game_builder.system_editor_cli scene-template \
+  --editor survival --seed 7 > survival-scene.json
+python -m skeleton.ai.game_builder.system_editor_cli play \
+  --editor survival --seed 7 --scene survival-scene.json \
+  --actions actions.json > survivor-session.json
+python -m skeleton.ai.game_builder.system_editor_cli save \
+  --session survivor-session.json > survivor-save.json
+python -m skeleton.ai.game_builder.system_editor_cli load-save \
+  --savegame survivor-save.json
+python -m skeleton.ai.game_builder.system_editor_cli continue-save \
+  --savegame survivor-save.json --actions next-actions.json > continued-save.json
+```
+
+All paths are local, command data are bounded and typed, and game state
+is restored through independent replay. No external models, arbitrary scripts
+or native publisher credentials are executed. The `tests.test_game_builder_advanced_scenes`
+suite exercises all five authored scenes, savegame tampering, continuation,
+source review and local HTTP integration under the Ubuntu/Windows gate.
+
 ## Composing an original hybrid game
 
 The newly implemented `system_editor_assembly` builds a content-addressed,
