@@ -149,6 +149,7 @@ def execute_local_tool_plan(
     mirror_attempts: int = 128,
     companion_games: int = 2,
     story_intent: StoryIntent | None = None,
+    authored_story_world: StoryWorld | None = None,
     story_ending: str = "stewardship",
 ) -> ExecutionOutcome:
     """Execute authorized plan in order, not arbitrary agent-supplied Python.
@@ -168,6 +169,12 @@ def execute_local_tool_plan(
         raise ExecutionPlaneError("companion batch must be bounded to 0 to 8 playable games")
     if story_intent is not None and not isinstance(story_intent, StoryIntent):
         raise ExecutionPlaneError("typed original narrative intent required")
+    if authored_story_world is not None and (
+        not isinstance(authored_story_world, StoryWorld)
+        or story_intent is None
+        or authored_story_world.intent != story_intent
+    ):
+        raise ExecutionPlaneError("authored NPC world must match the approved narrative intent")
     if story_ending not in {"stewardship", "discovery", "independence"}:
         raise ExecutionPlaneError("narrative ending must be an original supported path")
     if fabric is None:
@@ -278,7 +285,9 @@ def execute_local_tool_plan(
         before = (package.manifest["manifest_digest"] if package else
                   project.proof.digest if project else world.digest if world else anchored)
         if row.tool_id == "story.generate":
-            narrative = original_story_world(story_intent, authorized=True)
+            narrative = authored_story_world if authored_story_world is not None else (
+                original_story_world(story_intent, authorized=True)
+            )
             artifact_digest = narrative.digest
         elif row.tool_id == "story.simulate":
             if narrative is None:
