@@ -20,6 +20,9 @@ from .original_world_million_compiler import (
 from .original_world_tenfold_compiler import (
     tenfold_at, tenfold_from_seed, tenfold_inventory, spatial_at,
 )
+from .original_world_living_10x_compiler import (
+    living_at, living_from_seed, living_foundation_at, living_inventory,
+)
 from .original_world_simulator import (
     WorldRuleAction, replay_rules, route_edges,
 )
@@ -50,6 +53,12 @@ def _parser() -> argparse.ArgumentParser:
                           help="One of 12,288,000 world-space/genre/arc configurations")
     selector.add_argument("--tenfold-seed",
                           help="Deterministically sample actual spatial world rules")
+    selector.add_argument("--living-foundation-index", type=int,
+                          help="Exact authored law/genre/space/living-system foundation index")
+    selector.add_argument("--living-index", type=int,
+                          help="Exact 122,880,000 nested living-world configuration index")
+    selector.add_argument("--living-seed",
+                          help="Deterministic living-world rule configuration")
     parser.add_argument("--era", default="near-future")
     parser.add_argument("--chronology", default="fictional-history")
     parser.add_argument("--theology", default="none")
@@ -81,6 +90,41 @@ def main(argv: Sequence[str] | None = None) -> int:
             realism=args.realism,
             hardware_target=args.hardware_target,
         )
+        if args.living_foundation_index is not None:
+            foundation = living_foundation_at(args.living_foundation_index)
+            print(json.dumps({
+                "catalog": "living-systems-world-foundations",
+                "foundation": foundation.as_dict(),
+                "inventory": living_inventory(),
+                "styling_request_only": styling.as_dict(),
+                "warning": "Composed causal, genre, spatial and living rules do not "
+                           "constitute a separately handwritten or native released game.",
+            }, sort_keys=True, indent=2, ensure_ascii=False))
+            return 0
+        if args.living_index is not None or args.living_seed is not None:
+            world = (living_at(args.living_index)
+                     if args.living_index is not None
+                     else living_from_seed(args.living_seed))
+            print(json.dumps({
+                "catalog": "living-world-122880000-configurations",
+                "world": world.as_dict() if not args.brief else {
+                    "index": str(world.index),
+                    "world_id": world.world_id,
+                    "design_id": world.design_id,
+                    "living_system": world.foundation.system.system_id,
+                    "genre": world.source.advanced.mode.form.form_id,
+                    "architecture": world.source.spatial.architecture.architecture_id,
+                    "arc": world.source.advanced.arc.arc_id,
+                    "provenance": world.provenance,
+                },
+                "inventory": living_inventory(),
+                "styling_request_only": styling.as_dict(),
+                "play_command": "python -m skeleton.game.generation.original_world_living_10x_cli --index "
+                                + str(world.index) + " --interactive",
+                "warning": "122.88m lazy rule compositions do not equal "
+                           "122.88m individually written, native or finished games.",
+            }, sort_keys=True, indent=2, ensure_ascii=False))
+            return 0
         if args.spatial_index is not None:
             space = spatial_at(args.spatial_index)
             print(json.dumps({
