@@ -7,6 +7,8 @@ import sys
 from typing import Sequence
 
 from .authored_tiles import AUTHORED_SCHEMA, AuthoredGameError, read_authored_document
+from .living_story_authoring import StoryAuthoringError
+from .living_story_runtime import StoryError
 from .contracts import canonical_json
 from .dual_runtime_export import DualRuntimeExportError
 from .mirror_room_runtime import MirrorRoomError
@@ -43,6 +45,10 @@ def parser() -> argparse.ArgumentParser:
                        default="postgame", help="Story ends, lives on, or remains an open sandbox")
     entry.add_argument("--living-world-quests", type=int, default=2,
                        help="Required faction quests before an ending, 1..3")
+    entry.add_argument("--living-world-blueprint",
+                       help="Human-authored original NPC/region/quest blueprint JSON")
+    entry.add_argument("--living-world-human-reviewed", action="store_true",
+                       help="Confirm custom NPC and story content has independent human review")
     entry.add_argument("--living-world-ending",
                        choices=("stewardship", "discovery", "independence"),
                        default="stewardship", help="Which distinct narrative outcome to replay-prove")
@@ -95,9 +101,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             narrative_mode=args.living_world_mode,
             narrative_quests=args.living_world_quests,
             narrative_ending=args.living_world_ending,
+            narrative_blueprint=args.living_world_blueprint,
+            narrative_human_reviewed=args.living_world_human_reviewed,
         )
         output = export_studio_run(run, str(Path(args.output)), authorized=True)
-    except (StudioError, ToolFabricError, MirrorRoomError,
+    except (StudioError, StoryError, StoryAuthoringError, ToolFabricError, MirrorRoomError,
             AuthoredGameError, PlayableWorldError, PlayableCompilationError,
             GameplayError, DualRuntimeExportError, OSError) as exc:
         print(f"error: {type(exc).__name__}: {exc}", file=sys.stderr)
