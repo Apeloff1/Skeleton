@@ -30,8 +30,22 @@ from skeleton.game.generation.original_world_product_cli import main
 
 
 def original(era="digital-network", fidelity="balanced"):
+    # Explicit preserved v3 high-density save fixture, not a modern
+    # console/PC/genre world-generation default.
+    from skeleton.game.generation.original_world_npc_era_population import (
+        create_era_population, inhabitant_role_profile,
+    )
+    from skeleton.game.generation.original_world_npc_cognition_v2 import make_intelligence
     law = living_for(0, "puzzle", "lattice", "trophic", "sandbox")
-    return create_product(law.index, era=era, npc_fidelity=fidelity)
+    count = max(1, era_budget(era).full_npc_limit - 2)
+    base = create_product(law.index, inhabitants=count)
+    people = inhabitant_role_profile(base.society, era)
+    return replace(
+        base, society=people,
+        cognition=make_intelligence(base.terrain, people),
+        population=create_era_population(base.terrain, people, era,
+                                         fidelity=fidelity),
+    )
 
 
 def turn(session):
