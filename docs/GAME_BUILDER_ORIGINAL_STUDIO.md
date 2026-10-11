@@ -182,6 +182,52 @@ toolchains and debuggers, original music/sfx generators, more open-source game
 engines and emulators, plus modern hardware QA. These are *planned adapters*,
 not asserted as connected, licensed or executable by this patch.
 
+## Independent consumer qualification and sign-off
+
+The source package defaults to `release-blocked`. A new independent
+`consumer_release_assurance` layer verifies external review receipts before
+a caller can classify a candidate as ready for *authorized* publication:
+
+```python
+from datetime import datetime, timezone
+from skeleton.ai.game_builder.consumer_release_assurance import assess_consumer_release
+
+review = assess_consumer_release(
+    session,
+    externally_signed_evidence,     # Typed SignedReleaseEvidence entries
+    trusted_reviewer_keys,          # TrustedReviewer values held outside artifacts
+    now_utc=datetime.now(timezone.utc),
+    authorized=True,
+)
+assert not review.proof.blockers
+```
+
+This interface is a trust **verifier**, not a self-signing or self-clearing
+publication command. Nine independent authorities are required, one each for
+legal/rights, human playtests, native hardware, accessibility, localization,
+malware scanning, code signing, platform permission and publisher approval.
+Every receipt binds the exact source manifest digest and an independent
+evidence-content digest, authenticated with a locally configured HMAC-SHA256
+issuer key. Proofs for malware, platform QA, playtest and final publication
+carry specific freshness ceilings. Reviewers cannot approve outside their
+assigned role; publication is only accepted when all other independent checks
+exist and all nine reviewers are distinct.
+
+**Important limitation:** An HMAC establishes custody of a configured key,
+not whether the underlying legal conclusion, human test or platform
+certification was correct. Trust keys are external secrets, never delivered in
+the source bundle, and must come from a separately authenticated organization
+or platform verifier. A downstream release system must additionally bind the
+exact signed native executable and platform build provenance to the source
+manifest; this module does not itself cryptographically verify that mapping,
+claim vendor certification or upload to a commercial store.
+
+Windows CI now requests the official Godot release-mode **console wrapper**
+(`debug/export_console_wrapper=2`) to observe the native winning-replay
+receipt. Unlike mode 1, release mode 2 enables the wrapper when exporting
+`--export-release`. No proprietary SDK, rcedit resource editor, or code-sign
+credential is used.
+
 ## Roadmap to consumer-grade projects
 
 The existing puzzle world is a production **foundation**, not the limit of the
