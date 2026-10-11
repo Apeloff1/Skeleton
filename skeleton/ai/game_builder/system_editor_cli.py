@@ -25,6 +25,7 @@ from .advanced_godot_export import (
     render_advanced_godot_package, write_advanced_godot_package,
 )
 from .advanced_platformer_godot import render_platformer_godot_package
+from .advanced_deck_godot import render_deck_godot_package
 from .advanced_gameplay_save import (
     export_advanced_savegame, import_advanced_savegame, continue_advanced_savegame,
 )
@@ -125,6 +126,7 @@ def main(argv=None) -> int:
             receipt=_load(args.session)
             settings=_load(args.settings) if args.settings else None
             renderer=(render_platformer_godot_package if receipt.get("editor")=="platformer"
+                      else render_deck_godot_package if receipt.get("editor")=="deck_battler"
                       else render_advanced_godot_package)
             artifact=renderer(receipt,settings,authorized=args.trusted_local_operator)
             destination=write_advanced_godot_package(
