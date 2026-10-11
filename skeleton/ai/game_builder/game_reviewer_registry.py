@@ -124,6 +124,8 @@ class ReviewerRegistry:
         return dict(schema="skeleton.game_builder.local_reviewer_registry.v1",
                     revision=0,ledger_head=None,active=None,previous=None,
                     candidate=None,phase="idle",attestations=[],
+                    active_source_digest=None,previous_source_digest=None,
+                    candidate_source_digest=None,
                     observations={},source_projects=[],standard=None,
                     last_incident=None,
                     core_ai_parameters_modified=False)
@@ -157,6 +159,18 @@ class ReviewerRegistry:
         if length and {k:v for k,v in latest.items()
                        if k!="_previous_ledger_head"}!=state:
             raise PromotionError("registry and latest immutable review record disagree")
+        for model,record in (
+            ("active","active_source_digest"),
+            ("previous","previous_source_digest"),
+            ("candidate","candidate_source_digest"),
+        ):
+            digest=state[model]
+            if digest is not None:
+                doc=self._candidate(digest)
+                if canonical_digest(doc)!=state[record]:
+                    raise PromotionError("registered reviewer evidence was changed after signoff")
+            elif state[record] is not None:
+                raise PromotionError("model evidence pointer does not match registry state")
         return state
 
     def recover_interrupted(self,*,authorized: bool):
@@ -238,6 +252,7 @@ class ReviewerRegistry:
             else:
                 _exclusive(loc,doc)
             updated=dict(state,candidate=evaluation.candidate_digest,
+                         candidate_source_digest=canonical_digest(doc),
                          phase="staged",standard=standard.payload(),
                          source_projects=list(plan.source_projects),
                          observations={},attestations=[],
@@ -330,6 +345,7 @@ class ReviewerRegistry:
                 if phase=="active":
                     phase="rolled_back"
                     current=dict(current,active=current["previous"],
+                                 active_source_digest=current["previous_source_digest"],
                                  last_incident=dict(reason="live_quality_regressed",
                                                     mode=mode,cohort=result))
                 else:
@@ -357,8 +373,10 @@ class ReviewerRegistry:
                 raise PromotionError("fresh gameplay cohorts share original source projects")
             self._candidate(state["candidate"])
             updated=dict(state,previous=state["active"],
+                         previous_source_digest=state["active_source_digest"],
                          active=state["candidate"],
-                         candidate=None,phase="active",
+                         active_source_digest=state["candidate_source_digest"],
+                         candidate=None,candidate_source_digest=None,phase="active",
                          observations=dict(state["observations"]))
             new=self._transition(state,updated,"activate_local_advisory_model")
             return dict(status="active",active=new["active"],
@@ -379,7 +397,11 @@ class ReviewerRegistry:
             was_active=state["phase"]=="active"
             next_state=dict(state,phase="rolled_back",
                             active=state["previous"] if was_active else state["active"],
-                            candidate=None,last_incident=dict(reason=reason))
+                            active_source_digest=(
+                                state["previous_source_digest"] if was_active
+                                else state["active_source_digest"]),
+                            candidate=None,candidate_source_digest=None,
+                            last_incident=dict(reason=reason))
             new=self._transition(state,next_state,"operator_rollback")
             return dict(status="rolled_back",active=new["active"],
                         revision=new["revision"],
