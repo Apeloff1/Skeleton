@@ -187,6 +187,7 @@ def run_original_game_studio(
     narrative_regions: int = 7,
     narrative_mode: str = "postgame",
     narrative_quests: int = 2,
+    narrative_arcs: int = 3,
     narrative_ending: str = "stewardship",
     narrative_blueprint: str | Path | None = None,
     narrative_human_reviewed: bool = False,
@@ -212,7 +213,8 @@ def run_original_game_studio(
     if narrative_population and (
         type(narrative_regions) is not int or not 4 <= narrative_regions <= 12
         or narrative_mode not in {"campaign", "postgame", "sandbox"}
-        or type(narrative_quests) is not int or not 1 <= narrative_quests <= 3
+        or type(narrative_arcs) is not int or not 3 <= narrative_arcs <= 24
+        or type(narrative_quests) is not int or not 1 <= narrative_quests <= narrative_arcs
         or narrative_ending not in {"stewardship", "discovery", "independence"}
     ):
         raise StudioError("invalid living-world region, mode, quest or ending settings")
@@ -228,10 +230,11 @@ def run_original_game_studio(
         story_intent = derive_original_story_intent(
             intent, population=narrative_population,
             regions=narrative_regions, mode=narrative_mode,
-            quests=narrative_quests, authorized=True,
+            quests=narrative_quests, arcs=narrative_arcs, authorized=True,
         )
-    elif (narrative_regions, narrative_mode, narrative_quests, narrative_ending) != (
-        7, "postgame", 2, "stewardship"
+    elif (narrative_regions, narrative_mode, narrative_quests,
+          narrative_arcs, narrative_ending) != (
+        7, "postgame", 2, 3, "stewardship"
     ):
         raise StudioError("living-world configuration needs enabled NPC population")
     if narrative_blueprint is not None:
