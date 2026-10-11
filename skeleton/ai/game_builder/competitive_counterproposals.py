@@ -161,7 +161,8 @@ def propose_original_outclassing(
             "Require independent blind original/rival game replay on the same protected experiment script.",
             "Fail if accessibility, IP similarity, reproducibility, platform budget or original identity regress.",
         )
-        work=(
+        work=("Rebuild this facet using the title-owned signature: "+
+              ", ".join(planned.identity_pillars)+".",)+(
             ("First gather independently reviewed source and original-game experiment evidence.",)
             if unexplained else (
                 "Implement and test an original improvement to "+verdict.facet+
