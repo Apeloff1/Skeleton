@@ -79,7 +79,8 @@ def prepare_three_round_crawler_mission(
     for item in all_items:
         if item.facet not in {x.facet for x in candidates}:
             candidates.append(item)
-    count=ROUND_TOPICS[next_round-1]
+    count=min(20,ROUND_TOPICS[next_round-1]+
+              battle.epoch*(3 if next_round==1 else 4))
     chosen=candidates[:count]
     interests=[]
     for pos,item in enumerate(chosen):
