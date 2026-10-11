@@ -15,6 +15,7 @@ from typing import Mapping, Sequence
 
 from .contracts import canonical_digest
 from .living_story_runtime import StoryIntent
+from .living_story_authoring import AuthoredStory, read_story_blueprint
 from .living_story_export import StoryPackage
 from .living_story_mirror import StoryMirrorReport
 from .companion_curriculum import (
@@ -185,6 +186,8 @@ def run_original_game_studio(
     narrative_mode: str = "postgame",
     narrative_quests: int = 2,
     narrative_ending: str = "stewardship",
+    narrative_blueprint: str | Path | None = None,
+    narrative_human_reviewed: bool = False,
     fabric: ToolFabric | None = None,
 ) -> StudioRun:
     """Execute actual offline work, rather than recording imaginary AI activity.
@@ -211,7 +214,14 @@ def run_original_game_studio(
         or narrative_ending not in {"stewardship", "discovery", "independence"}
     ):
         raise StudioError("invalid living-world region, mode, quest or ending settings")
+    if narrative_blueprint is not None and (
+        not narrative_population or narrative_human_reviewed is not True
+    ):
+        raise StudioError("human-reviewed, enabled living-world source required for custom NPC authoring")
+    if narrative_blueprint is None and narrative_human_reviewed:
+        raise StudioError("author review requires an original living-world blueprint")
     story_intent: StoryIntent | None = None
+    authored_story: AuthoredStory | None = None
     if narrative_population:
         story_intent = StoryIntent(
             project_id=intent.project_id[:95] + ".living-world",
@@ -227,6 +237,11 @@ def run_original_game_studio(
         7, "postgame", 2, "stewardship"
     ):
         raise StudioError("living-world configuration needs enabled NPC population")
+    if narrative_blueprint is not None:
+        authored_story = read_story_blueprint(
+            story_intent, narrative_blueprint,
+            human_reviewed=True, authorized=True,
+        )
     if human_reviewed_tiles is None and tiled_sources is None and human_authored_approved:
         raise StudioError("authored approval cannot be applied to generated levels")
     if human_reviewed_tiles is not None and tiled_sources is not None:
@@ -331,7 +346,9 @@ def run_original_game_studio(
             human_reviewed=human_authored_approved,
             mirror_attempts=mirror_attempts,
             companion_games=companion_practice_games,
-            story_intent=story_intent, story_ending=narrative_ending,
+            story_intent=story_intent,
+            authored_story_world=(authored_story.world if authored_story is not None else None),
+            story_ending=narrative_ending,
         )
         if executed.project is None or executed.package is None or executed.mirror is None:
             raise StudioError("tool plane failed to deliver a proved game")
@@ -341,6 +358,11 @@ def run_original_game_studio(
         native_mirrors = executed.practice_mirror_reports
         living_package = executed.story_package
         living_mirror = executed.story_mirror
+        if authored_story is not None and (
+            executed.story_world is None or
+            executed.story_world.digest != authored_story.world.digest
+        ):
+            raise StudioError("custom human-authored living-world source differed from executed world")
         if story_intent is not None and (
             living_package is None or living_mirror is None or not living_mirror.passed
             or living_mirror.package_digest != living_package.digest
@@ -515,6 +537,8 @@ def run_original_game_studio(
     }
     if tiled_import_receipt is not None:
         metadata["studio/tiled_import.json"] = tiled_import_receipt
+    if authored_story is not None:
+        metadata["studio/living_story_authoring.json"] = authored_story.evidence()
     if living_package is not None and living_mirror is not None:
         metadata["studio/living_story_mirror.json"] = living_mirror.payload()
         metadata["studio/living_story_almanac.json"] = {
