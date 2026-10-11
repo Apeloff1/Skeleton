@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from hashlib import sha256
+import json
 import random
 from typing import Callable
 
@@ -120,6 +121,18 @@ def review_playable_project(
         raise MirrorRoomError("package belongs to another game")
     if set(package.manifest["files"]) | {"release.json"} != set(package.files):
         raise MirrorRoomError("package file inventory mismatch")
+    manifest_body = {
+        key: value for key, value in package.manifest.items()
+        if key != "manifest_digest"
+    }
+    if package.manifest.get("manifest_digest") != canonical_digest(manifest_body):
+        raise MirrorRoomError("release manifest metadata digest changed")
+    serialized_manifest = (
+        json.dumps(package.manifest, sort_keys=True, ensure_ascii=True,
+                   separators=(",", ":"), allow_nan=False) + "\\n"
+    ).encode("utf-8")
+    if package.files["release.json"] != serialized_manifest:
+        raise MirrorRoomError("serialized release manifest changed")
     for name, expected in package.manifest["files"].items():
         if _sha(package.files[name]) != expected:
             raise MirrorRoomError("package file changed before adversarial review")
