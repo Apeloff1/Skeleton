@@ -173,6 +173,7 @@ def score_task_knowledge(
     keys={x.judge_id:x for x in reviewers}
     grouped={s.topic_id:[] for s in subjects}
     seen_groups=set()
+    seen_original_projects=set()
     for row in observations:
         key=keys.get(row.signer_id)
         if (row.topic_id not in grouped or key is None or not hmac.compare_digest(
@@ -181,7 +182,11 @@ def score_task_knowledge(
         unique=(row.topic_id,row.independence_group)
         if unique in seen_groups:
             raise ThreatRadarError("duplicate independent publisher/project grouping artificially raises probability")
-        seen_groups.add(unique);grouped[row.topic_id].append(row)
+        unique_project=(row.topic_id,row.original_project_digest)
+        if unique_project in seen_original_projects:
+            raise ThreatRadarError("one original game cannot be relabeled as several independent usefulness studies")
+        seen_groups.add(unique);seen_original_projects.add(unique_project)
+        grouped[row.topic_id].append(row)
     lineage_stages={s.title_id:s for s in lineage.stages} if lineage else {}
     out=[]
     for subject in subjects:
