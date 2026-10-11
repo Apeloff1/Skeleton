@@ -62,7 +62,7 @@ python -m skeleton.game.generation.original_world_product_cli \
 
 # Replayable physical stress tests including actual votes and new dependents.
 python -m skeleton.game.generation.original_world_npc_laboratory \
-  --scenario civic-food-aid --turns 8 --population 12
+  --scenario civic-food-aid --turns 8 --population 8
 python -m skeleton.game.generation.original_world_npc_laboratory \
   --scenario family-expansion --turns 8 --population 12
 ```
