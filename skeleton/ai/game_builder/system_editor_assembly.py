@@ -16,6 +16,7 @@ from .system_editors import (
     SystemEditorError, validate_editor_document, preview_editor,
 )
 from .advanced_gameplay_runtime import run_advanced_session
+from .advanced_level_scenes import validate_advanced_scene, scene_path
 
 GROUP_ORDER = ("Product", "World", "Simulation", "Strategy", "Action", "Vehicle", "Creative")
 EDGES = (
@@ -65,7 +66,8 @@ def _digest(payload: object) -> str:
 
 def compile_system_assembly(project_id: str,
                             documents: Sequence[object], *,
-                            authorized: bool) -> dict:
+                            authorized: bool,
+                            scenes: Sequence[object] = ()) -> dict:
     if not authorized:
         raise PermissionError("system-assembly review requires explicit local authority")
     if type(project_id) is not str or not re.fullmatch(r"[a-z][a-z0-9_-]{1,63}", project_id):
@@ -149,12 +151,39 @@ def compile_system_assembly(project_id: str,
          "native_game_engine_certified": False}
         for name in ordered if name in ADVANCED_ENGINE_IDS
     ]
+    if type(scenes) not in (tuple,list) or len(scenes)>64:
+        raise AssemblyError("original authored scene collection must be bounded")
+    scene_evidence=[]
+    seen_scenes=set()
+    for raw_scene in scenes:
+        if type(raw_scene) is not dict:
+            raise AssemblyError("reviewed scene must use an exact typed JSON contract")
+        editor=raw_scene.get("editor")
+        if editor not in configs:
+            raise AssemblyError("authored scene has no approved parent editor settings")
+        source=validate_advanced_scene(raw_scene,configs[editor]["settings"])
+        path=scene_path(source)
+        if path in seen_scenes:
+            raise AssemblyError("duplicate authored scene identity in composite game")
+        seen_scenes.add(path)
+        actions=advanced_smoke[editor]
+        proof=run_advanced_session(editor,configs[editor]["settings"],actions,
+                                   seed=source["seed"],scene=source)
+        scene_evidence.append({
+            "path":path,"editor":editor,"scene_digest":source["digest"],
+            "settings_digest":source["settings_digest"],
+            "gameplay_session_digest":proof["digest"],
+            "release_certified":False,
+        })
+    scene_evidence.sort(key=lambda row:row["path"])
     payload = {
         "schema": "skeleton.game_builder.system_assembly.v1",
         "project": project_id, "source_system_count": len(ordered),
         "source_order": ordered, "systems": snapshots,
         "progression_floor": MINIMUM_PROGRESSION,
         "prototype_evidence": prototypes, "advanced_runtime_evidence":advanced_evidence,
+        "authored_scene_count":len(scene_evidence),
+        "authored_scene_evidence":scene_evidence,
         "coupling_edges": edges,
         "unresolved_runtime_adapters": ordered,
         "remaining_independent_reviews": list(REQUIRED_REVIEW),
@@ -173,6 +202,7 @@ def assemble_workspace_systems(workspace: object, project: str, *,
     if not isinstance(workspace, GameWorkspace) or workspace.active() != project:
         raise AssemblyError("system assembly must target the active reviewed current project")
     documents = []
+    scenes=[]
     for record in workspace.files("current", project):
         if record.path.startswith("systems/"):
             try:
@@ -184,7 +214,15 @@ def assemble_workspace_systems(workspace: object, project: str, *,
             if record.path != expected_path:
                 raise AssemblyError("workspace system path violates document identity")
             documents.append(document)
-    return compile_system_assembly(project, documents, authorized=True)
+        elif record.path.startswith("scenes/advanced_"):
+            try:
+                scene=json.loads(workspace.read("current",project,record.path)["content"])
+            except (ValueError, UnicodeError) as exc:
+                raise AssemblyError("invalid authored scene source") from exc
+            if type(scene) is not dict or record.path!=scene_path(scene):
+                raise AssemblyError("authored scene has mismatched on-disk source identity")
+            scenes.append(scene)
+    return compile_system_assembly(project, documents, authorized=True, scenes=scenes)
 
 
 __all__ = ["AssemblyError", "compile_system_assembly", "assemble_workspace_systems"]
