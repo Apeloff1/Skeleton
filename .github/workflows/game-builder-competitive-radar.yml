@@ -15,6 +15,12 @@ on:
       - "skeleton/ai/game_builder/competitive_ancestry_frontier.py"
       - "skeleton/ai/game_builder/competitive_probe_runner.py"
       - "skeleton/ai/game_builder/competitive_deep_archive.py"
+      - "skeleton/ai/game_builder/competitive_scrutiny_extension.py"
+      - "skeleton/ai/game_builder/competitive_user_critique.py"
+      - "skeleton/ai/game_builder/competitive_tri_council.py"
+      - "skeleton/ai/game_builder/competitive_pdf_pack.py"
+      - "tests/test_game_builder_competitive_council_pdfs.py"
+      - "docs/ai/game_competitive_tri_council_2026_10.md"
       - "tests/test_game_builder_competitive_deep_archive.py"
       - "docs/ai/game_deep_enemy_evolution_2026_10.md"
       - "tests/test_game_builder_competitive_probe_runner.py"
@@ -61,6 +67,7 @@ jobs:
             tests/test_game_builder_competitive_deep.py
             tests/test_game_builder_competitive_probe_runner.py
             tests/test_game_builder_competitive_deep_archive.py
+            tests/test_game_builder_competitive_council_pdfs.py
             tests/test_game_builder_knowledge_rights_bridge.py
       - name: Python 3.11
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
@@ -74,4 +81,4 @@ jobs:
       - name: Adversarial competitor, originality and delivery gate tests
         shell: bash
         run: |
-          python -m unittest tests.test_game_builder_competitive_deep_archive tests.test_game_builder_competitive_probe_runner tests.test_game_builder_competitive_deep tests.test_game_builder_competitive_radar tests.test_game_builder_knowledge_rights_bridge -v
+          python -m unittest tests.test_game_builder_competitive_council_pdfs tests.test_game_builder_competitive_deep_archive tests.test_game_builder_competitive_probe_runner tests.test_game_builder_competitive_deep tests.test_game_builder_competitive_radar tests.test_game_builder_knowledge_rights_bridge -v
