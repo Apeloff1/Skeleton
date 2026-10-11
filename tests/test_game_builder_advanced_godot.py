@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from hashlib import sha256
 import io
+from base64 import b64decode
+import http.client
 import json
+import threading
+from zipfile import ZipFile
 from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
 import tempfile
@@ -17,9 +21,13 @@ from skeleton.ai.game_builder.advanced_puzzle_solver import solve_advanced_puzzl
 from skeleton.ai.game_builder.advanced_godot_export import (
     AdvancedGodotExportError, NativeAdvancedGamePackage,
     render_advanced_godot_package, write_advanced_godot_package,
+    archive_advanced_godot_package,
     GODOT_PUZZLE, NATIVE_SCHEMA, PROOF_SCHEMA,
 )
 from skeleton.ai.game_builder.system_editor_cli import main as editor_cli
+from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
+from skeleton.ai.game_builder.game_workspace_server import create_workspace_server
+from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html
 
 
 class AdvancedGodotPackageTests(unittest.TestCase):
@@ -133,6 +141,20 @@ class AdvancedGodotPackageTests(unittest.TestCase):
             self.assertEqual(result["native_adapter"],"godot4_independent_puzzle")
             self.assertTrue((target/"godot/scripts/main.gd").is_file())
 
+    def test_content_addressed_offline_native_zip_is_reproducible(self):
+        settings,session=self.make_win("circuits")
+        pkg=render_advanced_godot_package(session,settings,authorized=True)
+        blob=archive_advanced_godot_package(pkg)
+        self.assertEqual(blob,archive_advanced_godot_package(pkg))
+        self.assertLess(len(blob),512000)
+        with ZipFile(io.BytesIO(blob)) as archive:
+            self.assertEqual(set(archive.namelist()),{
+                "original-godot-puzzle/"+path for path in pkg.files})
+            for path,data in pkg.files.items():
+                self.assertEqual(archive.read("original-godot-puzzle/"+path),data)
+        with self.assertRaises(AdvancedGodotExportError):
+            archive_advanced_godot_package("unsafe")
+
     def test_pure_game_script_has_no_network_or_third_party_eval(self):
         for prohibited in ("HTTPClient","HTTPRequest","OS.execute","eval(",
                            "preload(\"res://addons", "EditorPlugin"):
@@ -140,6 +162,66 @@ class AdvancedGodotPackageTests(unittest.TestCase):
         self.assertIn("NATIVE_ADVANCED_PUZZLE_OK",GODOT_PUZZLE)
         self.assertIn("match mode:",GODOT_PUZZLE)
         self.assertIn("JOY_BUTTON_DPAD_UP",GODOT_PUZZLE)
+
+
+class NativeStudioDownloadTests(unittest.TestCase):
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        ws=GameWorkspace.create(Path(self.temp.name)/"native-studio",authorized=True)
+        ws.create_project("original_puzzle","puzzle",authorized=True)
+        self.server=create_workspace_server(ws,port=0)
+        thread=threading.Thread(target=self.server.serve_forever,daemon=True)
+        thread.start()
+        self.addCleanup(self.server.server_close)
+        self.addCleanup(self.server.shutdown)
+        self.ws=ws
+
+    def post(self,route,data,auth=True):
+        conn=http.client.HTTPConnection("127.0.0.1",
+                 self.server.server_port,timeout=10)
+        headers={"Content-Type":"application/json"}
+        if auth:
+            headers["X-Game-Studio-Token"]=self.server.secret
+        conn.request("POST",route,json.dumps(data),headers)
+        response=conn.getresponse()
+        result=response.status,json.loads(response.read())
+        conn.close()
+        return result
+
+    def test_local_puzzle_native_project_can_be_downloaded_but_not_forged(self):
+        settings={"board_width":4,"board_height":4}
+        scene=make_advanced_scene("puzzle",settings)
+        receipt=run_advanced_session("puzzle",settings,
+                                    ["east","interact"],scene=scene)
+        status,payload=self.post("/api/advanced-godot-package",{
+            "session":receipt,"settings":settings})
+        self.assertEqual(status,200)
+        self.assertEqual(payload["engine"],"puzzle")
+        self.assertEqual(payload["file_name"],"original-godot-puzzle.zip")
+        self.assertFalse(payload["source_project_mutated"])
+        self.assertFalse(payload["gameplay_native_verified_by_this_request"])
+        blob=b64decode(payload["zip_base64"],validate=True)
+        self.assertEqual(sha256(blob).hexdigest(),payload["zip_sha256"])
+        with ZipFile(io.BytesIO(blob)) as archive:
+            source=json.loads(archive.read("original-godot-puzzle/godot/game.json"))
+        self.assertEqual(source["scene"]["digest"],scene["digest"])
+        self.assertFalse((self.ws.root/"current/original_puzzle/godot").exists())
+        self.assertEqual(self.post("/api/advanced-godot-package",{
+            "session":receipt,"settings":settings},auth=False)[0],403)
+        tampered=dict(receipt)
+        tampered["actions"]=["invalid"]
+        self.assertEqual(self.post("/api/advanced-godot-package",{
+            "session":tampered,"settings":settings})[0],400)
+        self.assertEqual(self.post("/api/advanced-godot-package",{
+            "session":run_advanced_session("shooter")})[0],400)
+
+    def test_visual_studio_handoff_controls_present(self):
+        html=render_workspace_html("A"*32).decode()
+        self.assertIn('id="advanced-godot-export"',html)
+        self.assertIn("/api/advanced-godot-package",html)
+        self.assertIn("Native Godot export requires a verified advanced puzzle",html)
+        self.assertIn("Content-Security-Policy",html)
 
 
 if __name__=="__main__":
