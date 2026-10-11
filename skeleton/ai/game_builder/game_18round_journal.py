@@ -104,6 +104,9 @@ class GameEvolutionJournal:
             if (state.rounds and
                     receipt.observed_at<=state.rounds[-1].observed_at):
                 raise ThreatRadarError("time-reversed game AI journal")
+            if bool(approved)!=(state.shadow_approved_for_stage or
+                                receipt.status=="verified_sandbox"):
+                raise ThreatRadarError("staged shadow authority cannot appear or disappear without a verified round")
             # Signed per-round review was separately qualified by
             # accept_round before append. Replayed receipt integrity
             # guarantees it cannot change retroactively.
