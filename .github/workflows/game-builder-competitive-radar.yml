@@ -29,6 +29,7 @@ on:
       - "skeleton/ai/game_builder/game_post_weight_forensics.py"
       - "skeleton/ai/game_builder/game_post_weight_dragon.py"
       - "skeleton/ai/game_builder/game_secondary_wisdom_loop.py"
+      - "skeleton/ai/game_builder/game_wisdom_report_archive.py"
       - "tests/test_game_builder_secondary_wisdom.py"
       - "docs/ai/game_secondary_wisdom_aftercare_2026_10.md"
       - "tests/test_game_builder_competitive_4080_campaign.py"
