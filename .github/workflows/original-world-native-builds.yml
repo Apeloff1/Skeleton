@@ -36,11 +36,19 @@ jobs:
       PYTHONPATH: .
       PYTHONIOENCODING: utf-8
     steps:
-      - name: Checkout exact code
+      - name: Enable long Windows git paths
+        if: runner.os == 'Windows'
+        shell: bash
+        run: git config --global core.longpaths true
+      - name: Checkout only original-game source, avoiding unrelated giant paths
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout: |
+            skeleton/game/generation/
+            scripts/original_world_native_launcher.py
+          sparse-checkout-cone-mode: false
       - name: Install pinned Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
