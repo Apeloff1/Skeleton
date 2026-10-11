@@ -25,6 +25,9 @@ from .competitive_evolution_chain import (
 from .competitive_counterproposals import (
     OriginalCounterproposal,propose_original_outclassing,
 )
+from .competitive_ancestry_frontier import (
+    AncestralCompetition,evaluate_ancestral_outclassing,
+)
 from .competitive_delivery_gate import TrustedCompetitionJudge
 from .reviewed_knowledge import ReviewedKnowledgeStore,KnowledgeBrief
 from .knowledge_rights_bridge import ClearedResearchPacket
@@ -37,6 +40,7 @@ class EnemyDeepDossier:
     enemy_id: str
     platform: str
     evolution: RivalEvolutionChain
+    ancestral_frontier: AncestralCompetition
     analysis_scripts: tuple[ScriptedProbe,...]
     facet_verdicts: tuple[FacetVerdict,...]
     counterproposals: tuple[OriginalCounterproposal,...]
@@ -52,6 +56,7 @@ class EnemyDeepDossier:
             original_id=self.original_id,enemy_id=self.enemy_id,
             platform=self.platform,
             evolution=self.evolution.payload(),
+            ancestral_frontier=self.ancestral_frontier.payload(),
             analysis_scripts=[x.payload() for x in self.analysis_scripts],
             facet_verdicts=[x.payload() for x in self.facet_verdicts],
             counterproposals=[x.payload() for x in self.counterproposals],
@@ -94,6 +99,7 @@ def examine_enemy_genre_portfolio(
     platform: str,
     measurements: Mapping[str,tuple[FacetMeasurement,...]]|None=None,
     industry_cohorts: Mapping[str,tuple[FacetMeasurement,...]]|None=None,
+    ancestral_measurements: Mapping[str,tuple[FacetMeasurement,...]]|None=None,
     judges: tuple[TrustedCompetitionJudge,...]=(),
     authorized: bool,
 )->DeepCompetitorPortfolio:
@@ -115,12 +121,15 @@ def examine_enemy_genre_portfolio(
         raise ThreatRadarError("typed original title and prior canonical watch run required")
     measurements={} if measurements is None else measurements
     industry_cohorts={} if industry_cohorts is None else industry_cohorts
+    ancestral_measurements={} if ancestral_measurements is None else ancestral_measurements
     enemy_ids={x.rival_id for x in current.assessments if x.status=="enemy"}
     supplied={x.title_id:x for x in rivals}
     if (enemy_ids-set(supplied) or
             set(measurements)-enemy_ids or set(industry_cohorts)-enemy_ids
+            or set(ancestral_measurements)-enemy_ids
             or any(type(x) is not tuple for x in
-                   (*measurements.values(),*industry_cohorts.values()))):
+                   (*measurements.values(),*industry_cohorts.values(),
+                    *ancestral_measurements.values()))):
         raise ThreatRadarError("all enemies require explicit separate known-title research")
     dossiers=[]
     for assessment in sorted(current.assessments,key=lambda x:x.rival_id):
@@ -140,14 +149,21 @@ def examine_enemy_genre_portfolio(
             measurements.get(rival.title_id,()),
             judges,as_of=current.as_of,authorized=True,
             industry_baselines=industry_cohorts.get(rival.title_id,()))
+        frontier=evaluate_ancestral_outclassing(
+            original,chain,scripts,verdicts,
+            ancestral_measurements.get(rival.title_id,()),judges,
+            as_of=current.as_of,authorized=True)
         proposals=propose_original_outclassing(
             original,assessment,chain,scripts,verdicts,authorized=True)
         remaining=list(chain.unresolved_ancestry)
         for verdict in verdicts:
             if verdict.status=="insufficient_evidence":
                 remaining.append("await_deep_signed_evidence:"+verdict.facet)
+        for study in frontier.studies:
+            if not study.proved_outclassing:
+                remaining.append("await_ancestry_outclassing:"+study.facet)
         dossiers.append(EnemyDeepDossier(
-            original.title_id,rival.title_id,platform,chain,
+            original.title_id,rival.title_id,platform,chain,frontier,
             scripts,verdicts,proposals,tuple(sorted(set(remaining)))))
     return DeepCompetitorPortfolio(
         original.title_id,canonical_digest(current.payload()),
