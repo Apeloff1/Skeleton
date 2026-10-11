@@ -13,6 +13,7 @@ on:
       - "skeleton/ai/game_builder/game_reviewer_v2.py"
       - "skeleton/ai/game_builder/game_reviewer_optimizer.py"
       - "skeleton/ai/game_builder/game_dragon_peer_wisdom.py"
+      - "skeleton/ai/game_builder/game_integrated_learning.py"
       - "tests/test_game_builder_optimizer_and_wisdom.py"
       - "tests/test_game_builder_reviewer_v2.py"
       - ".github/workflows/game-builder-model-promotion.yml"
