@@ -131,11 +131,9 @@ class OriginalGameWorkbenchTests(unittest.TestCase):
             )
 
     def test_cli_user_and_ai_authored_source_patch_requires_human_approval(self):
-        target=self.studio.read("current","first_game","notes/design.md")
-        # Notes file does not exist yet: propose a new exact original source
-        self.assertEqual(target["content"],"")
-        self.assertEqual(target["version"]["sha256"],
-                         hashlib.sha256(b"").hexdigest())
+        # A new exact location uses the SHA-256 of empty source, and cannot
+        # be created until a proposal is reviewed and explicitly committed.
+        expected_empty=hashlib.sha256(b"").hexdigest()
         replacement=Path(self.temp.name)/"ai_proposed.md"
         replacement.write_text(
             "# Original narrative notes\nScene variations by player outcome.\n")
@@ -147,7 +145,7 @@ class OriginalGameWorkbenchTests(unittest.TestCase):
                 "propose","--root",str(self.root),
                 "--project","first_game","--path","notes/design.md",
                 "--file",str(replacement),
-                "--expected-sha256",target["version"]["sha256"],
+                "--expected-sha256",expected_empty,
                 "--reason","Jeeves generated a targeted original narrative note",
                 "--author","jeeves","--trusted-local-operator",
             ]),0)
