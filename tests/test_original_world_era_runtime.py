@@ -64,10 +64,11 @@ def test_energy_grid_and_robots_require_real_resources_and_energy() -> None:
     automated = use(informed, "automation")
     assert automated.robots == 1
     assert automated.grid_power == 2
-    before_tile = automated.world.sectors[0].food
+    baseline, _ = styled_step(replace(automated, robots=0),
+                              CampaignAction("end_turn"))
     after, receipt = styled_step(automated, CampaignAction("end_turn"))
-    assert after.world.food == automated.world.food + 1
-    assert after.world.sectors[0].food == before_tile - 1
+    assert after.world.food == baseline.world.food + 1
+    assert after.world.sectors[0].food == baseline.world.sectors[0].food - 1
     assert after.grid_power == 1
     assert "Automated harvest" in " ".join(receipt.effects)
 
