@@ -11,7 +11,7 @@ from skeleton.ai.webcrawler.dragon_original_mechanic_forge import (
 )
 from skeleton.ai.webcrawler.dragon_original_prototype_factory import (
     SCHEMA,MAX_PREVIEW,materialize,verify_prototype,
-    sample_prototypes,distinguish_prototypes,
+    sample_prototypes,distinguish_prototypes,structurally_qualified_capacity,
 )
 
 
@@ -155,3 +155,42 @@ def test_full_four_billion_nuclei_cover_all_32_real_game_systems():
     before=full_binary_nucleus(FULL_BINARY_PROFILE_COUNT-2)
     after=full_binary_nucleus(FULL_BINARY_PROFILE_COUNT-1)
     assert distinguish(before,after)["distinguishable"]
+
+
+
+def test_exact_substantial_mechanic_count_is_computed_not_claimed_from_unique_seeds():
+    count=structurally_qualified_capacity()
+    assert count["full_binary_rulebook_addresses"]==2**32
+    assert count["min_active_mechanics"]==4
+    assert count["min_independent_domains"]==3
+    assert count["exact_structurally_multi_domain_rulebooks"]==4_294_961_625
+    assert count["thin_rulebooks_filtered"]==5_671
+    assert count["executable_journey_and_release_review_still_required"]
+    assert count["finished_and_published_games_from_count"]==0
+
+
+def test_useless_one_action_original_is_explicitly_marked_underbuilt_not_game_release():
+    source=materialize(0,routes=2,steps=12)
+    assert source.available_mechanic_count==0
+    assert source.independent_domain_count==0
+    assert not source.core_loop_viable
+    assert not source.ready_for_individual_experiments
+    assert "fewer_than_four_meaningful_mechanic_systems" in (
+        source.underbuilt_reasons)
+    assert "fewer_than_three_independent_gameplay_domains" in (
+        source.underbuilt_reasons)
+    assert "original_core_loop_quality_gate" in source.release_blockers
+    assert verify_prototype(source)["verified"]
+
+
+def test_really_multi_domain_original_can_qualify_for_experiments_but_not_release():
+    example=nucleus(0,1,4,6,8,16)
+    built=materialize(example,routes=4,steps=16)
+    assert built.available_mechanic_count==6
+    assert built.independent_domain_count>=3
+    assert built.compared_unique_action_sequences>=2
+    assert built.core_loop_viable
+    assert built.ready_for_individual_experiments
+    assert not built.underbuilt_reasons
+    assert not built.native_binary_built
+    assert not built.independently_published
