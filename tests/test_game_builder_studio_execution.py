@@ -64,6 +64,9 @@ class NativeGameToolExecutionTests(unittest.TestCase):
             self.assertTrue(outcome.mirror.passed)
             self.assertEqual(len(outcome.mirror.probes), 128)
             self.assertEqual(len(outcome.practice_packages), 2)
+            self.assertEqual(len(outcome.practice_mirror_reports), 2)
+            self.assertTrue(all(p.passed and len(p.probes) == 64
+                                for p in outcome.practice_mirror_reports))
             self.assertTrue(all("index.html" in p.files and
                                 "godot/scripts/main.gd" in p.files
                                 for p in outcome.practice_packages))
