@@ -5,6 +5,9 @@ from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from contextlib import redirect_stdout,redirect_stderr
+from io import StringIO
+import json
 import sqlite3
 import unittest
 
@@ -19,6 +22,7 @@ from skeleton.ai.game_builder.competitive_delivery_gate import (
     compare_competitive_delivery,ratchet_superiority_standard,
 )
 from skeleton.ai.game_builder.competitive_watch_book import CompetitionWatchBook
+from skeleton.ai.game_builder.competitive_watch_cli import main as watch_cli_main
 from skeleton.ai.game_builder.competitive_watch_service import (
     compile_original_delivery_work,review_competitive_frontier,
 )
@@ -423,6 +427,49 @@ class CompleteRadarIntegrationCases(CompetitiveDeliveryCases):
                             for x in orders))
         with self.assertRaises(PermissionError):
             compile_original_delivery_work(self.original,(first,),authorized=False)
+
+
+class WatchCLIIntegrationCases(CompetitiveDeliveryCases):
+    def test_cli_status_due_and_work_queue_are_grounded_in_saved_snapshots(self):
+        with TemporaryDirectory() as temporary:
+            root=Path(temporary)/"studio"
+            GameWorkspace.create(root,authorized=True)
+            with CompetitionWatchBook(root) as journal:
+                journal.record(self.original,(self.threat,),
+                               (self.duel(self.samples(own=7000)),),
+                               as_of=T0,authorized=True)
+            prefix=["--root",str(root),"--original-id","original_world",
+                    "--trusted-local-operator"]
+            stdout=StringIO()
+            with redirect_stdout(stdout):
+                self.assertEqual(watch_cli_main(["status",*prefix]),0)
+            snapshot=json.loads(stdout.getvalue())
+            self.assertEqual(snapshot["enemy_ids"],["other_atlas"])
+            self.assertEqual(snapshot["history_length"],1)
+            self.assertFalse(snapshot["background_monitor_running"])
+            stdout=StringIO()
+            with redirect_stdout(stdout):
+                self.assertEqual(watch_cli_main(["due",*prefix,
+                                                 "--at","2026-10-11T18:00:00Z"]),0)
+            self.assertFalse(json.loads(stdout.getvalue())["review_due"])
+            stdout=StringIO()
+            with redirect_stdout(stdout):
+                self.assertEqual(watch_cli_main(["due",*prefix,
+                                                 "--at","2026-10-12T00:00:00Z"]),0)
+            self.assertTrue(json.loads(stdout.getvalue())["review_due"])
+            stdout=StringIO()
+            with redirect_stdout(stdout):
+                self.assertEqual(watch_cli_main(["demands",*prefix]),0)
+            tasks=json.loads(stdout.getvalue())["outstanding_work"]
+            self.assertEqual(len(tasks),len(CORE_AXES))
+            self.assertTrue(all("handcrafted_encounters" in x["original_direction"]
+                                for x in tasks))
+            errors=StringIO()
+            with redirect_stderr(errors):
+                self.assertEqual(watch_cli_main(
+                    ["status","--root",str(root),"--original-id","original_world"]),2)
+            self.assertIn("PermissionError",errors.getvalue())
+
 
 
 if __name__=="__main__":
