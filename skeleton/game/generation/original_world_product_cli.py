@@ -23,6 +23,7 @@ from .original_world_product_session import (
 from .original_world_product_render import (
     ascii_render, ppm_render, svg_render,
 )
+from .original_world_product_missions import mission_report
 
 MAX_SCRIPT = 131072
 
@@ -114,6 +115,9 @@ def _interactive(state: ProductSession) -> ProductSession:
             print(f"Actions remaining: {state.living.spatial.game.causal.action_points}; "
                   f"World turn: {state.living.living_turns}; local energy: {state.terrain.energy}")
             continue
+        if line in ("missions", "quests"):
+            print(json.dumps(mission_report(state), sort_keys=True, indent=2))
+            continue
         if line == "help":
             law = validate_product(state)
             print("Living world commands:", ", ".join(law.foundation.system.commands))
@@ -155,6 +159,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--inhabitants", type=int, default=12)
     parser.add_argument("--actions-json", default="[]")
     parser.add_argument("--inventory", action="store_true")
+    parser.add_argument("--missions", action="store_true",
+                        help="Evidence-based missions for the selected authored original root")
     parser.add_argument("--interactive", action="store_true")
     parser.add_argument("--desktop", action="store_true",
                         help="Launch actual native tkinter GUI if available")
@@ -234,6 +240,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "world_turn": state.living.living_turns,
                     "player_events": state.events,
                     "real_gameplay_not_native_release": True,
+                    "missions": mission_report(state) if args.missions else None,
                 },
                 "saved": str(args.save) if args.save else None,
                 "renders": {
