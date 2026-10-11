@@ -165,3 +165,27 @@ def test_invalid_learned_utility_cannot_be_loaded_even_with_adjusted_memory_chec
     fake_cognition = replace(s.cognition, minds=(fake_mind,))
     with pytest.raises(FoundationError):
         validate_intelligence(fake_cognition, s.society, s.terrain)
+
+
+def test_revisiting_same_observation_site_never_mints_fresh_public_evidence():
+    state = product(1)
+    person = state.society.inhabitants[0]
+    observation = Memory(0, "food", (person.x, person.y), 3, 100, person.id)
+    state = replace(state, cognition=replace(
+        state.cognition, minds=(replace(
+            state.cognition.minds[0], memories=(observation,)),),
+    ))
+    state, _ = step_product(state, ProductAction(
+        "npc", "interview", target=0, option="food"))
+    initial = len(state.cognition.testimonies)
+    # The same NPC can witness the same exact place the next day. This
+    # does not constitute independently novel scientific evidence.
+    new_day = replace(state.cognition, day=1)
+    person_state = replace(state.society, tick=1)
+    next_observation = replace(observation, turn=1, value=2)
+    new_day = replace(new_day, minds=(replace(
+        new_day.minds[0], memories=(next_observation,)),))
+    with pytest.raises(FoundationError):
+        interview_citizen(new_day, person_state, state.terrain,
+                          citizen=0, subject="food")
+    assert initial == 1
