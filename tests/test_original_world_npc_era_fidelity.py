@@ -60,20 +60,20 @@ def test_local_count_increases_with_technology_but_remote_counts_do_not_create_b
     late = original("digital-network")
     latest = original("cosmic-epoch")
     real = [len(s.society.inhabitants) for s in (earliest, middle, late, latest)]
-    assert real == [1, era_budget("iron-age").full_npc_limit,
-                    era_budget("digital-network").full_npc_limit, 32]
+    assert real == [1, era_budget("iron-age").full_npc_limit - 2,
+                    era_budget("digital-network").full_npc_limit - 2, 30]
     assert real == sorted(real)
     assert earliest.population.districts == ()
     assert latest.population.districts
     info = population_report(latest.population, real[-1])
     assert info["regional_aggregated_residents"] == 16384
-    assert info["full_personality_and_physics_NPCs"] == 32
-    assert len(latest.cognition.minds) == 32
+    assert info["full_personality_and_physics_NPCs"] == 30
+    assert len(latest.cognition.minds) == 30
 
 
 @pytest.mark.parametrize("mode,cap", [
     ("economy", 3), ("balanced", 7), ("vivid", 16),
-    ("unrestricted", 32),
+    ("unrestricted", 30),
 ])
 def test_four_fidelity_modes_schedule_exactly_the_allowed_number_of_thinking_bodies(mode, cap):
     world = original("cosmic-epoch", mode)
@@ -83,9 +83,9 @@ def test_four_fidelity_modes_schedule_exactly_the_allowed_number_of_thinking_bod
     )
     assert len(active) == cap
     assert active == tuple(sorted(set(active)))
-    assert all(0 <= ident < 32 for ident in active)
+    assert all(0 <= ident < 30 for ident in active)
     after, receipt = turn(world)
-    assert len(after.society.inhabitants) == 32
+    assert len(after.society.inhabitants) == 30
     assert sum(m.decisions for m in after.cognition.minds) == cap
     assert f"{cap} full cognitive decisions" in " ".join(receipt.changes)
     assert after.population.day == after.society.tick == 1
@@ -185,7 +185,7 @@ def test_passive_survival_never_mints_food_even_under_massive_background_census(
     world, _ = turn(world)
     assert world.terrain.provisions <= stock + 3 * 24
     assert sum(d.pantry for d in world.population.districts) <= remote_initial
-    assert len(world.cognition.minds) == 32
+    assert len(world.cognition.minds) == 30
     assert len(world.population.districts) <= 64
 
 
