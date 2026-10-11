@@ -19,6 +19,9 @@ from skeleton.ai.game_builder.competitive_delivery_gate import (
     compare_competitive_delivery,ratchet_superiority_standard,
 )
 from skeleton.ai.game_builder.competitive_watch_book import CompetitionWatchBook
+from skeleton.ai.game_builder.competitive_watch_service import (
+    compile_original_delivery_work,review_competitive_frontier,
+)
 from skeleton.ai.game_builder.contracts import canonical_digest
 from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
 from skeleton.ai.game_builder.reviewed_knowledge import (
@@ -330,6 +333,96 @@ class CompetitiveWatchCases(CompetitiveDeliveryCases):
                     watch.record(self.original,(self.threat,), (another,),
                                  as_of=T0,authorized=True)
                 self.assertEqual(watch.history(self.original.title_id,authorized=True),())
+
+
+class CompleteRadarIntegrationCases(CompetitiveDeliveryCases):
+    def test_evaluate_live_wiki_write_snapshot_then_ratchet_next_review(self):
+        with TemporaryDirectory() as temporary:
+            path=Path(temporary)/"studio"
+            GameWorkspace.create(path,authorized=True)
+            with CompetitionWatchBook(path) as journal:
+                first=review_competitive_frontier(
+                    journal,self.original,(self.competitor,),tuple(self.links),
+                    self.brief,self.packet,self.db,self.rights,as_of=T0,
+                    measurements={self.competitor.title_id:self.samples(own=7200)},
+                    identity=self.proof,
+                    trusted_identity_reviewer=self.identity_judge,
+                    trusted_judges=self.judges,
+                    authorized=True)
+                self.assertEqual(first.watch_delta.new_enemies,("other_atlas",))
+                self.assertEqual(len(first.work_orders),len(CORE_AXES))
+                self.assertEqual(
+                    first.payload()["enemy_rivals_are_internal_benchmarks_only"],True)
+                self.assertTrue(all(
+                    x.protected_original_pillars==PILLARS for x in first.work_orders))
+                self.assertEqual(first.work_orders[0].minimum_quality_floor_bp,8550)
+                self.assertEqual(len(journal.history(self.original.title_id,authorized=True)),1)
+                improved=review_competitive_frontier(
+                    journal,self.original,(self.competitor,),tuple(self.links),
+                    self.brief,self.packet,self.db,self.rights,as_of=T1,
+                    measurements={self.competitor.title_id:self.samples(
+                        at=T1,own=9100)},
+                    identity=self.proof,
+                    trusted_identity_reviewer=self.identity_judge,
+                    trusted_judges=self.judges,
+                    authorized=True)
+                self.assertEqual(improved.watch_delta.still_enemies,("other_atlas",))
+                self.assertFalse(improved.work_orders)
+                self.assertTrue(improved.reports[0].qualified_to_claim_superiority)
+                self.assertTrue(all(
+                    row["target_floor_bp"]>=8550
+                    for row in improved.reports[0].quality_results))
+                self.assertEqual(len(journal.history(self.original.title_id,authorized=True)),2)
+
+    def test_without_signed_quality_scenario_still_creates_work_not_fake_win(self):
+        with TemporaryDirectory() as temporary:
+            path=Path(temporary)/"studio"
+            GameWorkspace.create(path,authorized=True)
+            with CompetitionWatchBook(path) as journal:
+                scan=review_competitive_frontier(
+                    journal,self.original,(self.competitor,),tuple(self.links),
+                    self.brief,self.packet,self.db,self.rights,as_of=T0,
+                    authorized=True)
+                self.assertEqual(scan.assessments[0].status,"enemy")
+                self.assertEqual(len(scan.work_orders),len(CORE_AXES))
+                self.assertFalse(scan.reports[0].qualified_to_claim_superiority)
+                self.assertIn("no_independent_original_identity_review",
+                              scan.reports[0].identity_blockers)
+                self.assertTrue(all(d.blocked_reason is not None
+                                    for d in scan.reports[0].demands))
+                self.assertEqual(scan.watch_delta.recorded_reports,1)
+
+    def test_untrusted_scores_abort_without_partial_journal_commit(self):
+        with TemporaryDirectory() as temporary:
+            path=Path(temporary)/"studio"
+            GameWorkspace.create(path,authorized=True)
+            with CompetitionWatchBook(path) as journal:
+                evidence=list(self.samples())
+                evidence[0]=replace(evidence[0],lower_bp=0)
+                with self.assertRaisesRegex(ThreatRadarError,"signature"):
+                    review_competitive_frontier(
+                        journal,self.original,(self.competitor,),
+                        tuple(self.links),self.brief,self.packet,
+                        self.db,self.rights,as_of=T0,
+                        measurements={self.competitor.title_id:tuple(evidence)},
+                        identity=self.proof,
+                        trusted_identity_reviewer=self.identity_judge,
+                        trusted_judges=self.judges,authorized=True)
+                self.assertEqual(journal.history(self.original.title_id,authorized=True),())
+
+    def test_duplicate_rival_pressure_merges_highest_requirements(self):
+        first=self.duel(self.samples(own=7000,rival=8200))
+        other=replace(first,rival_id="other_benchmark")
+        orders=compile_original_delivery_work(
+            self.original,(first,other),authorized=True)
+        self.assertEqual(len(orders),len(CORE_AXES))
+        self.assertTrue(all(x.benchmark_ids==("other_atlas","other_benchmark")
+                            for x in orders))
+        self.assertTrue(all(x.minimum_quality_floor_bp==8550 for x in orders))
+        self.assertTrue(all(x.payload()["requires_human_authored_solution"]
+                            for x in orders))
+        with self.assertRaises(PermissionError):
+            compile_original_delivery_work(self.original,(first,),authorized=False)
 
 
 if __name__=="__main__":
