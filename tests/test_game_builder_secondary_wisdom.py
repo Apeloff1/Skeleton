@@ -18,6 +18,10 @@ from skeleton.ai.game_builder.game_wisdom_report_archive import (
     publish_secondary_wisdom_report,verify_secondary_wisdom_report,
 )
 from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
+from skeleton.ai.game_builder.game_second_train_replay_custody import (
+    OriginalReplayTrainingAttestation,sign_train_replay,
+    qualify_second_original_game_replays,
+)
 from skeleton.ai.game_builder.game_secondary_wisdom_loop import (
     ANGLES,ROLES,_full_tasks,WisdomPassAttestation,sign_wisdom_pass,
     run_secondary_wisdom_cycle,
@@ -135,7 +139,8 @@ class SecondaryWisdomIntegrationTests(ActualPeerWisdomTests):
         return tasks,tuple(rows),keys
 
     def process(self,first,mission,brief,packet,reviews,keys,
-                second_games=None,first_post=None):
+                second_games=None,first_post=None,replay_receipts=(),
+                replay_keys=()):
         return run_secondary_wisdom_cycle(
             first_almanac=first,
             first_post_weight=first_post or self.post,
@@ -146,6 +151,7 @@ class SecondaryWisdomIntegrationTests(ActualPeerWisdomTests):
             rights=self.ledger,media=tuple(self.medium),
             reviews=reviews,reviewer_keys=keys,
             second_original_games=second_games,
+            replay_attestations=replay_receipts,replay_reviewers=replay_keys,
             authorized=True,standard=self.standard,schedule=self.schedule)
 
     def test_actual_sgd_post_weight_report_and_source_safe_dragon_repeat(self):
@@ -277,13 +283,65 @@ class SecondaryWisdomIntegrationTests(ActualPeerWisdomTests):
             set(plan.source_projects)&set(self.plan.source_projects))
         return plan
 
+    def independently_signed_train_receipts(self,plan):
+        reviewers=(
+            ("independent_gameplay",TrustedCompetitionJudge(
+                "gameplay_replay_authority",b"g"*32)),
+            ("adversarial_mirror",TrustedCompetitionJudge(
+                "adversarial_game_replay",b"m"*32)),
+        )
+        attestations=[]
+        for case in plan.selected:
+            if case.split!="train":
+                continue
+            for role,reviewer in reviewers:
+                replay=sha256(
+                    f"independent_playback:{case.project_digest}:{case.example_id}".encode()
+                ).hexdigest()
+                attestation=OriginalReplayTrainingAttestation(
+                    case.example_id,case.project_digest,
+                    canonical_digest(case.evidence),"platforming",
+                    replay,role,reviewer.judge_id,
+                    "2026-10-11T18:00:00Z","0"*64)
+                attestations.append(sign_train_replay(attestation,reviewer))
+        return tuple(attestations),reviewers
+
+    def test_signed_replay_custody_rejects_forged_or_heldout_game_evidence(self):
+        plan=self.independent_second_projects()
+        attestations,keys=self.independently_signed_train_receipts(plan)
+        proof=qualify_second_original_game_replays(
+            plan,attestations,trusted_reviewers=keys,authorized=True)
+        self.assertEqual(proof.covered_examples,
+                         sum(x.split=="train" for x in plan.selected))
+        self.assertEqual(proof.reviewer_roles,
+                         ("adversarial_mirror","independent_gameplay"))
+        forged=list(attestations)
+        forged[0]=replace(forged[0],mechanic="wrong_mechanic")
+        with self.assertRaises(PromotionError):
+            qualify_second_original_game_replays(
+                plan,tuple(forged),trusted_reviewers=keys,
+                authorized=True)
+        with self.assertRaises(PromotionError):
+            qualify_second_original_game_replays(
+                plan,attestations[:-1],trusted_reviewers=keys,
+                authorized=True)
+        heldout=next(x for x in plan.selected if x.split=="test")
+        attack=replace(attestations[0],example_id=heldout.example_id)
+        with self.assertRaises(PromotionError):
+            qualify_second_original_game_replays(
+                plan,(attack,*attestations[1:]),
+                trusted_reviewers=keys,authorized=True)
+
     def test_real_secondary_sgd_only_if_first_shadow_and_new_games_qualify(self):
         first,mission=self.context()
         brief,packet,second=self.expand_sources()
         _,reviews,keys=self.reviews(first,second,mission,packet)
         fresh=self.independent_second_projects()
+        attestations,reviewers=self.independently_signed_train_receipts(fresh)
         result=self.process(first,mission,brief,packet,reviews,keys,
-                            second_games=fresh)
+                            second_games=fresh,replay_receipts=attestations,
+                            replay_keys=reviewers)
+        self.assertIsNotNone(result.second_gameplay_custody_digest)
         self.assertTrue(result.new_train_worlds_independent)
         if self.post.shadow_fit_qualified:
             self.assertIsNotNone(result.second_training)
