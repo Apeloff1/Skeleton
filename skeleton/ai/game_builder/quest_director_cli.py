@@ -40,6 +40,10 @@ def parser():
     cli.add_argument("--mirror-attempts", type=int, default=128)
     cli.add_argument("--evolve", action="store_true",
                      help="Build full modular NPC + mission + original scene director product")
+    cli.add_argument("--npc-blueprint",
+                     help="Fully authored original NPC profiles, schedules, relationships and backstories")
+    cli.add_argument("--npc-human-reviewed", action="store_true",
+                     help="Confirm separate review of all custom NPC authorship")
     cli.add_argument("--society-npcs", type=int, default=96,
                      help="Persistent individual citizens, 3..512")
     cli.add_argument("--target-tier",
@@ -95,6 +99,8 @@ def main(argv=None):
                 build_evolution_product(
                     world, authorized=True,
                     population=args.society_npcs, tier=args.target_tier,
+                    npc_blueprint=args.npc_blueprint,
+                    npc_human_reviewed=args.npc_human_reviewed,
                     deep_route_search=not args.no_deep_search,
                     mirror_attempts=args.mirror_attempts,
                 ) if args.evolve else build_earned_story_product(
