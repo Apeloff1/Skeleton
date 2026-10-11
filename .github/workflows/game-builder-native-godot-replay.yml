@@ -131,7 +131,7 @@ jobs:
             --intent "$RUNNER_TEMP/game-builder/intent.json" \
             --output "$RUNNER_TEMP/game-builder/project" \
             --companion-practice 1 --mirror-attempts 64 \
-            --living-world-npcs 24 --living-world-regions 7 \
+            --living-world-npcs 64 --living-world-regions 9 --living-world-arcs 24 --living-world-quests 8 \
             --living-world-mode postgame --trusted-local-operator
           test -s "$RUNNER_TEMP/game-builder/project/living_story/godot/project.godot"
           test -s "$RUNNER_TEMP/game-builder/project/godot/export_presets.cfg"
@@ -247,7 +247,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $root | Out-Null
           $json = '{"project_id":"skeleton-windows-native-studio-2026","title":"Original Windows Homebrew","subtitle":"Offline consumer QA candidate.","seed":471126,"width":11,"height":11,"levels":1,"collectibles_per_level":1,"hazards_per_level":1,"theme":"arcade","starting_health":4}'
           [IO.File]::WriteAllText((Join-Path $root 'intent.json'), $json)
-          python -m skeleton.ai.game_builder.original_game_studio_cli --intent (Join-Path $root 'intent.json') --output (Join-Path $root 'project') --mirror-attempts 64 --companion-practice 1 --living-world-npcs 24 --living-world-regions 7 --living-world-mode postgame --trusted-local-operator
+          python -m skeleton.ai.game_builder.original_game_studio_cli --intent (Join-Path $root 'intent.json') --output (Join-Path $root 'project') --mirror-attempts 64 --companion-practice 1 --living-world-npcs 64 --living-world-regions 9 --living-world-arcs 24 --living-world-quests 8 --living-world-mode postgame --trusted-local-operator
           if ($LASTEXITCODE -ne 0) { throw "Original two-genre studio project failed" }
           $gate = Get-Content (Join-Path $root 'project/studio/consumer_gate.json') -Raw | ConvertFrom-Json
           if ($gate.status -ne 'release-blocked') { throw "Missing consumer publication safeguards" }
