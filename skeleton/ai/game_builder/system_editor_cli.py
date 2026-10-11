@@ -21,6 +21,9 @@ from .system_editor_assembly import assemble_workspace_systems
 from .advanced_gameplay_runtime import run_advanced_session, verify_advanced_session
 from .advanced_level_scenes import make_advanced_scene
 from .advanced_puzzle_solver import solve_advanced_puzzle
+from .advanced_godot_export import (
+    render_advanced_godot_package, write_advanced_godot_package,
+)
 from .advanced_gameplay_save import (
     export_advanced_savegame, import_advanced_savegame, continue_advanced_savegame,
 )
@@ -55,6 +58,11 @@ def parser() -> argparse.ArgumentParser:
     solve.add_argument("--settings")
     solve.add_argument("--max-states",type=int,default=12000)
     solve.add_argument("--max-depth",type=int,default=96)
+    native=commands.add_parser("godot-export",help="Real offline native Godot 4 puzzle source, proof and export presets")
+    native.add_argument("--session",required=True)
+    native.add_argument("--settings")
+    native.add_argument("--output",required=True,help="New local destination; existing paths never overwritten")
+    native.add_argument("--trusted-local-operator",action="store_true")
     save = commands.add_parser("save",help="Save a verified advanced game receipt")
     save.add_argument("--session",required=True)
     save.add_argument("--settings")
@@ -112,6 +120,13 @@ def main(argv=None) -> int:
                 _load(args.scene),
                 _load(args.settings) if args.settings else None,
                 max_states=args.max_states,max_depth=args.max_depth)
+        elif args.operation == "godot-export":
+            artifact=render_advanced_godot_package(
+                _load(args.session),_load(args.settings) if args.settings else None,
+                authorized=args.trusted_local_operator)
+            destination=write_advanced_godot_package(
+                artifact,args.output,authorized=args.trusted_local_operator)
+            output={**artifact.manifest,"local_output_path":str(destination)}
         elif args.operation == "save":
             output = export_advanced_savegame(_load(args.session),
                 _load(args.settings) if args.settings else None)
