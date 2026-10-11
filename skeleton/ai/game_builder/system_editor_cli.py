@@ -30,6 +30,7 @@ from .advanced_shooter_godot import render_shooter_godot_package
 from .advanced_tactics_godot import render_tactics_godot_package
 from .advanced_defense_godot import render_defense_godot_package
 from .advanced_racing_godot import render_racing_godot_package
+from .advanced_survival_godot import render_survival_godot_package
 from .advanced_gameplay_save import (
     export_advanced_savegame, import_advanced_savegame, continue_advanced_savegame,
 )
@@ -135,6 +136,7 @@ def main(argv=None) -> int:
                       else render_tactics_godot_package if receipt.get("editor")=="tactics"
                       else render_defense_godot_package if receipt.get("editor")=="tower_defense"
                       else render_racing_godot_package if receipt.get("editor")=="racing"
+                      else render_survival_godot_package if receipt.get("editor")=="survival"
                       else render_advanced_godot_package)
             artifact=renderer(receipt,settings,authorized=args.trusted_local_operator)
             destination=write_advanced_godot_package(
