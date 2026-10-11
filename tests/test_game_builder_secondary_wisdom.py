@@ -242,7 +242,7 @@ class SecondaryWisdomIntegrationTests(ActualPeerWisdomTests):
             self.process(first,mission,brief,packet,reviews[:-1],keys)
         with self.assertRaises(PromotionError):
             self.process(first,mission,brief,packet,reviews,keys,
-                         first_post=replace(self.post,shadow_fit_qualified=True))
+                         first_post=replace(self.post,shadow_fit_qualified=not self.post.shadow_fit_qualified))
         with self.assertRaises(PromotionError):
             self.process(first,mission,brief,packet,reviews,keys,
                          second_games=self.plan)
