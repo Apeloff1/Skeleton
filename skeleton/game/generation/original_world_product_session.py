@@ -40,6 +40,7 @@ from .original_world_npc_era_population import (
     population_save, population_restore, population_report,
     select_active_brains,
     permitted_roles, inhabitant_role_profile,
+    adjust_fidelity, embody_regional_citizen,
 )
 
 SCHEMA = "original-world-playable-product-session.v3"
@@ -432,20 +433,56 @@ def _regional_operation(
 ) -> tuple[ProductSession, tuple[str, ...]]:
     if state.population is None:
         raise FoundationError("era-region action needs an explicitly selected era")
-    if state.terrain.position != (0, 0):
-        raise FoundationError("regional food logistics originate at the real depot")
-    if state.living.spatial.game.causal.action_points <= 0:
-        raise FoundationError("regional logistics require one real player action")
+    if action.verb == "set_detail":
+        changed = adjust_fidelity(state.population, action.option)
+        return replace(state, population=changed), (
+            "NPC hardware budget changed to " + changed.fidelity
+            + "; persistent regional people, goods and historical actions retained",
+        )
+    if action.verb == "recruit":
+        causal = state.living.spatial.game.causal
+        if causal.trust < 1:
+            raise FoundationError("individual regional migration requires civic trust")
+        region, people = embody_regional_citizen(
+            state.population, state.society, state.terrain, district=action.target)
+        new_mind = make_intelligence(state.terrain, people).minds[-1]
+        thinking = replace(
+            state.cognition,
+            minds=state.cognition.minds + (new_mind,),
+            households=replace(
+                state.cognition.households,
+                ages=state.cognition.households.ages + (24,),
+            ),
+        )
+        source = state.living.spatial
+        living = replace(
+            state.living, spatial=replace(
+                source, game=replace(
+                    source.game, causal=replace(causal, trust=causal.trust - 1))))
+        return replace(
+            state, society=people, population=region,
+            cognition=thinking, living=_spend_source_ap(living),
+        ), (
+            f"Actual resident {people.inhabitants[-1].id} embodied from "
+            f"district {action.target}; census debited, personal mind and "
+            "work capability added, public trust expended",
+        )
     if action.verb != "dispatch_food":
-        raise FoundationError("unsupported regional physical logistics command")
+        raise FoundationError("unknown era-scale physical operation")
+    if state.terrain.position != (0, 0):
+        raise FoundationError("regional caravans originate at actual player depot")
+    if state.living.spatial.game.causal.action_points <= 0:
+        raise FoundationError("regional logistics require one player action")
     population, terrain = dispatch_food(
         state.population, state.society, state.terrain,
         district=action.target, amount=action.amount, direction=action.option)
-    living = _spend_source_ap(state.living)
-    return (replace(state, terrain=terrain, living=living, population=population),
-            (f"Dispatched {action.amount} real food to regional route "
-             f"{action.target}; arrival requires world time",))
-
+    return replace(
+        state, terrain=terrain,
+        living=_spend_source_ap(state.living), population=population,
+    ), (
+        f"Dispatched {action.amount} real food from physical stores on route "
+        f"{action.target}; material stays in transit until valid arrival",
+    )
 
 def step_product(
     state: ProductSession, action: ProductAction,
