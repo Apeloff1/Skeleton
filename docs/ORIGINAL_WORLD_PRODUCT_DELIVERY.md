@@ -1,7 +1,7 @@
 # Original Worlds — Actual Game Product Delivery
 
-**Architecture:** `original-world-product.v1` (2026-10-11).  
-**Repository:** `Apeloff1/Skeleton`, draft PR #3641.  
+**Architecture:** `original-world-product.v1` (2026-10-11).
+**Repository:** `Apeloff1/Skeleton`, draft PR #3641.
 **Product claim:** A real, offline, playable Python desktop/reference game, with
 persistent physical terrain, active inhabitants, executable game mechanics,
 original causal world laws, vector/raster visual outputs and a reproducible
