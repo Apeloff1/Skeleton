@@ -20,6 +20,7 @@ from .system_editors import (
 from .system_editor_assembly import assemble_workspace_systems
 from .advanced_gameplay_runtime import run_advanced_session, verify_advanced_session
 from .advanced_level_scenes import make_advanced_scene
+from .advanced_puzzle_solver import solve_advanced_puzzle
 from .advanced_gameplay_save import (
     export_advanced_savegame, import_advanced_savegame, continue_advanced_savegame,
 )
@@ -49,6 +50,11 @@ def parser() -> argparse.ArgumentParser:
     scene.add_argument("--scene-id",default="scene_01")
     scene.add_argument("--settings")
     scene.add_argument("--layout",help="Optional JSON authored geometry and resource map")
+    solve=commands.add_parser("solve-puzzle",help="Bounded original puzzle reachability proof")
+    solve.add_argument("--scene",required=True)
+    solve.add_argument("--settings")
+    solve.add_argument("--max-states",type=int,default=12000)
+    solve.add_argument("--max-depth",type=int,default=96)
     save = commands.add_parser("save",help="Save a verified advanced game receipt")
     save.add_argument("--session",required=True)
     save.add_argument("--settings")
@@ -101,6 +107,11 @@ def main(argv=None) -> int:
                 _load(args.settings) if args.settings else None,
                 seed=args.seed,scene_id=args.scene_id,
                 layout=_load(args.layout) if args.layout else None)
+        elif args.operation == "solve-puzzle":
+            output = solve_advanced_puzzle(
+                _load(args.scene),
+                _load(args.settings) if args.settings else None,
+                max_states=args.max_states,max_depth=args.max_depth)
         elif args.operation == "save":
             output = export_advanced_savegame(_load(args.session),
                 _load(args.settings) if args.settings else None)
