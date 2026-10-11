@@ -75,6 +75,21 @@ def parse_command(command: str, player: tuple[int, int]) -> ProductAction:
         except ValueError as exc:
             raise FoundationError("invalid terrain amount") from exc
         return ProductAction(layer, verb, amount=count, x=player[0], y=player[1])
+    if layer == "npc" and verb == "household":
+        if len(parts) != 4:
+            raise FoundationError("usage: npc household CAREGIVER_A CAREGIVER_B")
+        try:
+            return ProductAction("npc", "household",
+                                 target=int(parts[2]), option=str(int(parts[3])))
+        except ValueError as exc:
+            raise FoundationError("household requires two known resident IDs") from exc
+    if layer == "npc" and verb == "cancel_household":
+        if len(parts) != 3:
+            raise FoundationError("usage: npc cancel_household FAMILY_ID")
+        try:
+            return ProductAction("npc", "cancel_household", target=int(parts[2]))
+        except ValueError as exc:
+            raise FoundationError("invalid family contract identity") from exc
     if layer == "npc" and verb == "mentor":
         if len(parts) != 4:
             raise FoundationError("usage: npc mentor MASTER APPRENTICE")
