@@ -26,6 +26,11 @@ on:
       - "skeleton/ai/game_builder/competitive_4080_role_reviews.py"
       - "skeleton/ai/game_builder/competitive_27page_pdf_campaign.py"
       - "skeleton/ai/game_builder/competitive_27page_approval.py"
+      - "skeleton/ai/game_builder/game_post_weight_forensics.py"
+      - "skeleton/ai/game_builder/game_post_weight_dragon.py"
+      - "skeleton/ai/game_builder/game_secondary_wisdom_loop.py"
+      - "tests/test_game_builder_secondary_wisdom.py"
+      - "docs/ai/game_secondary_wisdom_aftercare_2026_10.md"
       - "tests/test_game_builder_competitive_4080_campaign.py"
       - "docs/ai/game_competitive_4080_campaign_2026_10.md"
       - "skeleton/ai/webcrawler/dragon_research_missions.py"
@@ -80,6 +85,9 @@ jobs:
             tests/test_game_builder_competitive_deep_archive.py
             tests/test_game_builder_competitive_council_pdfs.py
             tests/test_game_builder_competitive_4080_campaign.py
+            tests/test_game_builder_secondary_wisdom.py
+            tests/test_game_builder_optimizer_and_wisdom.py
+            tests/test_game_builder_reviewer_promotion.py
             tests/test_game_builder_knowledge_rights_bridge.py
       - name: Python 3.11
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
@@ -93,4 +101,4 @@ jobs:
       - name: Adversarial competitor, originality and delivery gate tests
         shell: bash
         run: |
-          python -m unittest tests.test_game_builder_competitive_4080_campaign tests.test_game_builder_competitive_council_pdfs tests.test_game_builder_competitive_deep_archive tests.test_game_builder_competitive_probe_runner tests.test_game_builder_competitive_deep tests.test_game_builder_competitive_radar tests.test_game_builder_knowledge_rights_bridge -v
+          python -m unittest tests.test_game_builder_secondary_wisdom tests.test_game_builder_competitive_4080_campaign tests.test_game_builder_competitive_council_pdfs tests.test_game_builder_competitive_deep_archive tests.test_game_builder_competitive_probe_runner tests.test_game_builder_competitive_deep tests.test_game_builder_competitive_radar tests.test_game_builder_knowledge_rights_bridge -v
