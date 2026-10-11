@@ -12,7 +12,7 @@ from .original_foundation_compiler import FoundationError
 from .original_world_product_render import COLORS, BUILDING_COLORS
 from .original_world_product_terrain import cell_at
 from .original_world_product_missions import mission_report
-from .original_world_npc_cognition_v2 import cognition_report
+from .original_world_npc_cognition_v2 import cognition_report, npc_profile
 from .original_world_product_session import (
     ProductAction, ProductSession, product_save, step_product, validate_product,
 )
@@ -38,6 +38,7 @@ def launch_desktop(state: ProductSession, *, save_path: str | None = None) -> No
     window.title("Original World Studio · " + rule.foundation.system.title)
     window.configure(bg="#16222a")
     session = [state]
+    inspected = [0]
     visible = SIDE * TILE_SIZE
     frame = tk.Frame(window, bg="#16222a", padx=13, pady=12)
     frame.pack(fill="both", expand=True)
@@ -53,6 +54,11 @@ def launch_desktop(state: ProductSession, *, save_path: str | None = None) -> No
     info = tk.Label(panel, textvariable=status, fg="#bfd8d4", bg="#16222a",
                     wraplength=330, justify="left")
     info.pack(anchor="w", pady=(0, 10))
+    profile_info = tk.StringVar(value="Click a resident marker to inspect individual thinking.")
+    profile = tk.Label(panel, textvariable=profile_info, fg="#bce9dc", bg="#16222a",
+                       font=("TkDefaultFont", 9), wraplength=340,
+                       justify="left")
+    profile.pack(anchor="w", pady=(0, 8))
 
     def draw() -> None:
         current = session[0]
@@ -152,6 +158,31 @@ def launch_desktop(state: ProductSession, *, save_path: str | None = None) -> No
         except (OSError, FoundationError) as exc:
             status.set("Save rejected: " + str(exc))
 
+    def select_person(event) -> None:
+        current = session[0]
+        px, py = current.terrain.position
+        cx = px + event.x // TILE_SIZE - VIEW_RADIUS
+        cy = py + event.y // TILE_SIZE - VIEW_RADIUS
+        residents = [person for person in current.society.inhabitants
+                     if (person.x, person.y) == (cx, cy)]
+        if not residents:
+            return
+        person = min(residents, key=lambda x: x.id)
+        inspected[0] = person.id
+        profile = npc_profile(current.cognition, current.society,
+                              current.terrain, person.id)
+        profile_info.set(
+            f"Citizen {person.id}: {person.profession} / {profile['temperament']}\n"
+            f"Goal: {profile['current_goal']}; "
+            f"health {person.health}, hunger {person.hunger}\n"
+            f"Memories {len(profile['observation_memory'])}, "
+            f"social contacts {len(profile['social_contacts'])}, "
+            f"contracts {len(profile['personal_contracts'])}\n"
+            "Use interview or commission below to interact."
+        )
+
+    canvas.bind("<Button-1>", select_person)
+
     def button(title: str, handler) -> None:
         tk.Button(panel, text=title, command=handler, width=29,
                   bg="#27414a", fg="#eef7ee", activebackground="#3b6471",
@@ -175,6 +206,10 @@ def launch_desktop(state: ProductSession, *, save_path: str | None = None) -> No
                              session[0].terrain))[:500]))
     button("Fund public council (one food)", lambda: perform(
         ProductAction("npc", "council")))
+    button("Interview selected citizen for witnessed facts", lambda: perform(
+        ProductAction("npc", "interview", target=inspected[0])))
+    button("Commission selected citizen: harvest food", lambda: perform(
+        ProductAction("npc", "commission", target=inspected[0], option="food")))
     for verb in rule.foundation.system.commands:
         button("Living-system: " + verb, lambda cmd=verb: perform(
             ProductAction("living", cmd)))
