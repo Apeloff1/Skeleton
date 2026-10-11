@@ -554,6 +554,79 @@ function drawAdvancedGame(session){
   c.fillStyle="#e2edf0";c.fillText(
    "Milestones: "+(state.milestones.join(", ")||"open-ended"),16,H-18);
  }
+ else if(editor==="shooter"){
+  const tile=Math.min(14,Math.floor((W-140)/state.width),Math.floor((H-60)/state.height));
+  const ox=12,oy=39;
+  c.strokeStyle="#315869";c.lineWidth=1;
+  for(let y=0;y<=state.height;y++){
+   c.beginPath();c.moveTo(ox,oy+y*tile);
+   c.lineTo(ox+state.width*tile,oy+y*tile);c.stroke();
+  }
+  for(let x=0;x<=state.width;x++){
+   c.beginPath();c.moveTo(ox+x*tile,oy);
+   c.lineTo(ox+x*tile,oy+state.height*tile);c.stroke();
+  }
+  function dot(point,color,margin=3){
+   c.fillStyle=color;c.fillRect(ox+point[0]*tile+margin,
+    oy+point[1]*tile+margin,Math.max(2,tile-margin*2),
+    Math.max(2,tile-margin*2));
+  }
+  for(const point of state.cover)dot(point,"#607a8a",1);
+  for(const point of state.pickups)dot(point,"#eccb79",4);
+  for(const foe of state.enemies)dot(foe.pos,"#e9837d",2);
+  dot(state.extraction,"#688ed9",3);dot(state.player,"#74e3b1",2);
+  const left=Math.min(W-105,ox+state.width*tile+12);
+  c.fillStyle="#deedf0";
+  c.fillText("HP "+state.hp,left,55);
+  c.fillText("Ammo "+state.ammo,left,77);
+  c.fillText("Wave "+state.wave,left,99);
+  c.fillText("Kills "+state.defeated,left,121);
+  c.fillText("Dodge "+state.dashes,left,143);
+ }else if(editor==="deck_battler"){
+  c.fillStyle="#dbecef";c.fillText("Enemy HP "+state.enemy_hp+
+     " / "+state.enemy_max_hp+"   Shield "+state.enemy_block,16,46);
+  c.fillText("Player HP "+state.hp+"   Block "+state.block+
+     "   Energy "+state.energy,16,68);
+  c.fillText("Turn "+state.round+"   Intent "+state.enemy_intent+
+     "   Poison "+state.poison,16,90);
+  c.fillText("Draw "+state.draw_pile.length+"   Discard "+state.discard.length+
+     "   Potions "+state.potions,16,112);
+  state.hand.forEach((card,i)=>{
+   const x=14+(i%5)*92;
+   c.fillStyle="#294b61";c.fillRect(x,134,86,60);
+   c.strokeStyle="#80b5ac";c.strokeRect(x,134,86,60);
+   c.fillStyle="#e7eef0";c.fillText(card.slice(0,11),x+5,157);
+   c.fillText("play:"+i,x+5,177);
+  });
+  c.fillStyle="#dbecef";
+  c.fillText("Finite deck / active-hand rules",16,H-14);
+ }else if(editor==="puzzle"){
+  const t=Math.max(3,Math.min(17,Math.floor((W-24)/state.width),
+     Math.floor((H-55)/state.height)));
+  const ox=16,oy=36;
+  c.strokeStyle="#3a6374";c.lineWidth=1;
+  for(let x=0;x<=state.width;x++){
+   c.beginPath();c.moveTo(ox+x*t,oy);c.lineTo(ox+x*t,oy+state.height*t);c.stroke();
+  }
+  for(let y=0;y<=state.height;y++){
+   c.beginPath();c.moveTo(ox,oy+y*t);c.lineTo(ox+state.width*t,oy+y*t);c.stroke();
+  }
+  const block=(p,color)=>{
+   c.fillStyle=color;
+   c.fillRect(ox+p[0]*t+2,oy+p[1]*t+2,Math.max(1,t-4),Math.max(1,t-4));
+  };
+  state.walls.forEach(p=>block(p,"#637483"));
+  state.doors.forEach(p=>block(p,"#c48178"));
+  state.targets.forEach(p=>block(p,"#8dbbcb"));
+  state.switches.forEach(p=>block(p,"#e9c57b"));
+  state.nodes.forEach(p=>block(p,"#8bcee1"));
+  state.phase_gates.forEach(p=>block(p,"#b6a1ec"));
+  state.crates.forEach(p=>block(p,"#b58a65"));
+  state.portals.forEach(pair=>pair.forEach(p=>block(p,"#a27ee6")));
+  block(state.exit,"#73cda5");block(state.player,"#f5f3df");
+  c.fillStyle="#dbecef";
+  c.fillText(state.mode+"  ·  undo "+state.undo_available,16,H-12);
+ }
  if(state.finished||state.failed){
   c.fillStyle=state.finished?"#a2f5cb":"#ffaba6";
   c.fillText(state.finished?"Completed":"Defeat",W-100,20);
@@ -691,19 +764,7 @@ $("advanced-load").addEventListener("change",async()=>{
   $("advanced-seed").value=String(session.seed);
   $("advanced-scene-json").value=session.scene?JSON.stringify(session.scene,null,2):"";
   if(session.scene)$("advanced-scene-id").value=session.scene.scene_id;
-  showAdvanced({session,available_actions:session.editor==="platformer"?
-    ["left","right","jump","jump_left","jump_right","wait","dash_left","dash_right"]:
-    session.editor==="tactics"?
-    ["north","south","west","east","attack:0","attack:1","guard",
-     "overwatch","heal","switch","end_turn"]:
-    session.editor==="tower_defense"?
-    ["tick","tick:4","build:0","build:1","build:2",
-     "upgrade:0","upgrade:1","upgrade:2","sell:0","sell:1","sell:2",
-     "priority:first","priority:strong"]:
-    session.editor==="racing"?
-    ["accelerate","brake","coast","steer_left","steer_right","boost","pit"]:
-    ["forage","gather_wood","mine_stone","drink","hunt","cook",
-     "craft_tool","light_fire","build_shelter","trade","travel","rest"]});
+  showAdvanced({session,available_actions:restored.available_actions});
   status("Savegame replay verified; exact original settings and command history restored.");
  }catch(error){status("Savegame import blocked: "+error.message);}
  finally{$("advanced-load").value="";}
@@ -779,7 +840,7 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
  aria-label="Validated genre-system mechanics preview"></canvas>
 <pre id="system-preview" role="status" aria-live="polite"></pre>
 <fieldset><legend>Advanced playable scenario · reference engine</legend>
-<p><small>Actual command-driven gameplay for platformer, tactics, tower defense, racing and survival.
+<p><small>Command-driven original gameplay in eight advanced reference engines: platformer, tactics, tower defense, racing, survival, shooter, deck battler and puzzle.
 Other editor families remain authoring-only, not falsely certified engines.</small></p>
 <label>Scenario seed<input id="advanced-seed" type="number" min="0" max="2147483647" value="0"></label>
 <label>Original authored scene ID<input id="advanced-scene-id" value="scene_01"></label>
