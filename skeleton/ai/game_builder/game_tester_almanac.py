@@ -262,7 +262,8 @@ def _mutation_excerpt(before: DirectorReplay,after: DirectorReplay):
 
 def test_game_personas(world: DirectorWorld, quest_key: str,*,
                        authorized: bool,max_personas: int=5,
-                       mutation_families: tuple[str,...]=TEST_FAMILIES) -> GameTesterAlmanac:
+                       mutation_families: tuple[str,...]=TEST_FAMILIES,
+                       interrupt_check=None) -> GameTesterAlmanac:
     if not authorized:
         raise PermissionError("original game tester almanac needs operator authority")
     if not isinstance(world,DirectorWorld) or type(max_personas) is not int or not 3<=max_personas<=5:
@@ -272,6 +273,10 @@ def test_game_personas(world: DirectorWorld, quest_key: str,*,
         len(set(mutation_families))!=len(mutation_families) or
         any(k not in TEST_FAMILIES for k in mutation_families)):
         raise PlaytestError("only independently implemented tester fault families allowed")
+    if interrupt_check is not None and not callable(interrupt_check):
+        raise PlaytestError("trusted cooperative interruption callback required")
+    if interrupt_check is not None:
+        interrupt_check()
     quest=next((q for q in world.quests if q.key==quest_key),None)
     if quest is None or quest.requires_quests:
         raise PlaytestError("tester needs a playable quest without unmet dependencies")
@@ -281,6 +286,8 @@ def test_game_personas(world: DirectorWorld, quest_key: str,*,
     probes=[]
     methods=set()
     for persona,strategy,optional in TESTER_PERSONAS[:max_personas]:
+        if interrupt_check is not None:
+            interrupt_check()
         witness=solve_quest(world,quest_key,strategy=strategy,optional=optional,
                             authorized=True)
         replay=director_play(world,witness.replay.actions)
@@ -312,6 +319,8 @@ def test_game_personas(world: DirectorWorld, quest_key: str,*,
             parity,world.bible.invariant_goal,
         ))
         for family in mutation_families:
+            if interrupt_check is not None:
+                interrupt_check()
             changed=_corrupt(replay,family,len(probes))
             # Explicit positive/negative control: the original must be valid,
             # the modified source must differ, and its proof must be rejected.
@@ -328,6 +337,8 @@ def test_game_personas(world: DirectorWorld, quest_key: str,*,
                 canonical_digest(changed.payload()),caught,
                 field,original_value,mutated_value,
             ))
+    if interrupt_check is not None:
+        interrupt_check()
     gaps=[]
     if len(set(observed))<len(world.scenes):
         gaps.append("not_all_authored_scenes_exercised")
