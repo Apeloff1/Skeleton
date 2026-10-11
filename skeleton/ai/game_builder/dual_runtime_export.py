@@ -85,6 +85,8 @@ func _ready() -> void:
     get_window().title = str(world["intent"].get("title", "Original Game"))
     ready_to_play = true
     _reset()
+    if "--verify-proof" in OS.get_cmdline_user_args():
+        _verify_native_proof()
 
 func _reset() -> void:
     if not ready_to_play:
@@ -252,6 +254,60 @@ func _load_actions() -> void:
     notice = "Local actions replayed; external verification still required."
     queue_redraw()
 
+func _verify_native_proof() -> void:
+    ## Headless replay proof is an integration check, never proof of human play.
+    var source: String = FileAccess.get_file_as_string("res://proof.json")
+    if source.is_empty() or source.length() > 200000:
+        push_error("NATIVE_REPLAY_ERROR: missing or oversized proof")
+        get_tree().quit(1)
+        return
+    var proof: Variant = JSON.parse_string(source)
+    if typeof(proof) != TYPE_DICTIONARY or proof.get("world_digest") != world["world_digest"]:
+        push_error("NATIVE_REPLAY_ERROR: proof identity mismatch")
+        get_tree().quit(1)
+        return
+    var sequence: Variant = proof.get("actions")
+    var expected: Variant = proof.get("final_state")
+    if typeof(sequence) != TYPE_ARRAY or sequence.size() > MAX_ACTIONS:
+        push_error("NATIVE_REPLAY_ERROR: invalid replay actions")
+        get_tree().quit(1)
+        return
+    if typeof(expected) != TYPE_DICTIONARY:
+        push_error("NATIVE_REPLAY_ERROR: invalid expected state")
+        get_tree().quit(1)
+        return
+    for direction in sequence:
+        if typeof(direction) != TYPE_STRING or not _step(direction):
+            push_error("NATIVE_REPLAY_ERROR: action rejected")
+            get_tree().quit(1)
+            return
+    var actual_collected: Array = []
+    for key in collected:
+        var xy: PackedStringArray = str(key).split(",")
+        actual_collected.append([int(xy[0]), int(xy[1])])
+    actual_collected.sort()
+    var expected_collected: Array = expected.get("collected", [])
+    expected_collected.sort()
+    var valid: bool = (
+        status == str(expected.get("status", "invalid"))
+        and level_index == int(expected.get("level_index", -1))
+        and hero.x == int(expected.get("x", -1))
+        and hero.y == int(expected.get("y", -1))
+        and score == int(expected.get("score", -1))
+        and steps == int(expected.get("steps", -1))
+        and health == int(expected.get("health", -1))
+        and actual_collected == expected_collected
+        and actions.size() == sequence.size()
+        and status == "won"
+    )
+    if not valid:
+        push_error("NATIVE_REPLAY_ERROR: Godot and Python final states diverge")
+        get_tree().quit(1)
+        return
+    print("NATIVE_REPLAY_OK " + str(world["world_digest"]) +
+        " actions=" + str(sequence.size()))
+    get_tree().quit(0)
+
 func _unhandled_key_input(event: InputEvent) -> void:
     if not event is InputEventKey or not event.pressed or event.echo:
         return
@@ -402,7 +458,7 @@ F5 local save, F9 local load. Local save stores actions rather than
 trusting serialized game state, and binds them to the source world digest.
 It is unverified until replayed by the Python reference simulator.
 
-proof/verified_solution.json is a canonical reference *winning trace*,
+godot/proof.json is an engine-readable copy of the same winning trace.\nA locally installed Godot 4 can replay it with:\n  godot --headless --path godot -- --verify-proof\nThe process exits unsuccessfully on state divergence and prints NATIVE_REPLAY_OK\nonly after exact expected final state comparison.\n\nproof/verified_solution.json is a canonical reference *winning trace*,
 not an actual human playtest. release.json includes SHA-256 hashes of every
 packaged file except itself and the content digests for the verified world
 and Python replay. Source exists; native executable build, emulator,
@@ -476,6 +532,7 @@ def render_dual_runtime_package(
         "godot/scenes/main.tscn": _SCENE.encode("utf-8"),
         "godot/scripts/main.gd": _GODOT_SCRIPT.encode("utf-8"),
         "godot/world.json": _json_bytes(native_world),
+        "godot/proof.json": _json_bytes(proof),
         "README.md": README.encode("utf-8"),
         "proof/verified_solution.json": _json_bytes(proof),
     }
