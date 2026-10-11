@@ -102,7 +102,7 @@ def test_original_spool_rollback_preserves_entire_batch_on_conflicting_candidate
 def test_prototype_production_rejects_unbounded_cpu_memory_and_bad_indexes(bad):
     with sqlite3.connect(":memory:") as db:
         with pytest.raises(ValueError):
-            materialize_batch(db,start=0,count=1,**bad)
+            materialize_batch(db,**{**{"start":0,"count":1},**bad})
 
 
 def test_source_candidates_are_unpublished_even_when_they_are_playable():
