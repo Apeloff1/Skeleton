@@ -43,6 +43,7 @@ established by the caller: it is not a login check.
 | Output | Purpose |
 | --- | --- |
 | index.html | Fully standalone CSP-restricted game; works offline |
+| tile-editor.html | Offline multi-level visual map painter, route preview and JSON export |
 | godot/project.godot | Open with Godot 4.2+ to edit/run a native 2D project |
 | godot/scenes/main.tscn | Concrete launchable game scene |
 | godot/scripts/main.gd | Original Godot runtime implementing turn rules and renderer |
@@ -54,6 +55,21 @@ established by the caller: it is not a login check.
 
 No packaged ROMs, BIOSes, commercial game assets, scraped text, model weights,
 SDK keys or external scripts are required or shipped.
+
+## Visual editor packaged with every game
+
+Open tile-editor.html in a modern browser to author or change original geometry
+without a provider, server or additional editor installation. Choose a level,
+paint walls/floors/spawns/exits/crystals/hazards using pointer/touch input or
+keyboard navigation, use undo, import a previous authored JSON document, edit
+the accessible text grid, and preview a hazard-free all-collectibles route.
+The browser keeps all edits local and does **not** send telemetry.
+
+Export blocks invalid border rows, missing or duplicate spawns/exits,
+inconsistent collectible/hazard budgets, unreachable end states, unsupported
+tiles and overlarge documents. This browser-side verification is provisional:
+every imported file must still pass the canonical Python-authored-world solver.
+Nothing is implicitly published, licensed, trained or sent to a model.
 
 ## Optional designer-authored maps: an actual editing path
 
