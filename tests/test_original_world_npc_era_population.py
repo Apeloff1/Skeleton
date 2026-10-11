@@ -296,7 +296,9 @@ def test_cli_era_report_and_real_transport_commands_and_loaded_save(tmp_path, ca
     assert save.exists()
     assert main(["--load", str(save), "--population-report"]) == 0
     again = json.loads(capsys.readouterr().out)
-    assert again["product"]["regional_population"]["total_census"] > 32
+    assert 1 <= again["product"]["regional_population"]["total_census"] <= 168
+    assert not again["product"]["regional_population"]["legacy_high_density"]
+    assert again["product"]["regional_population"]["platform_genre_profile"]["genre"] == "puzzle"
     assert main(["--inventory"]) == 0
     catalog = json.loads(capsys.readouterr().out)
     assert len(catalog["era_population_capabilities"]) == 40
