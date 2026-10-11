@@ -46,7 +46,7 @@ class DeepHistoryCases(DeepEnemyCases):
                     as_of=T0,expected_parent_digest=None,authorized=True)
                 self.assertEqual(first.revision,0)
                 self.assertEqual(first.enemy_ids,("other_atlas",))
-                self.assertEqual(len(dossier.enemy_dossiers[0].analysis_scripts),51)
+                self.assertEqual(len(dossier.enemy_dossiers[0].analysis_scripts),102)
                 output=StringIO()
                 with redirect_stdout(output):
                     self.assertEqual(competitor_cli([
@@ -58,7 +58,7 @@ class DeepHistoryCases(DeepEnemyCases):
                     "genre_ancestry_generations"],3)
                 self.assertEqual(parsed["active_enemy_dossiers"][0][
                     "domain_facet_counts"],{
-                        "gameplay":14,"graphics":12,"sound":11,"storyline":14})
+                        "gameplay":28,"graphics":24,"sound":22,"storyline":28})
                 self.assertEqual(parsed["active_enemy_dossiers"][0][
                     "verified_weakspots"],[])
                 self.assertFalse(parsed["active_enemy_dossiers"][0][
