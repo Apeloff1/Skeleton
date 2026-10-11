@@ -26,6 +26,10 @@ from .quest_pareto_planner import (
 from .director_capability_graph import TIERS
 from .modular_scene_compositor import compose_scene, storyboard
 from .npc_authoring import read_npc_roster
+from .npc_witness_quest_engine import observe_story
+from .npc_event_quest_runtime import replay_witness_quests
+from .competitive_mirror_training import run_mirror_competition,training_jsonl
+from .game_learning_almanac import build_curriculum
 
 
 def _payload(obj):
@@ -40,6 +44,7 @@ def build_evolution_product(
     mirror_attempts: int = 128,
     npc_blueprint: str | None = None,
     npc_human_reviewed: bool = False,
+    witness_training: bool = True,
     authorized: bool,
 ) -> DirectorStudioProduct:
     if not authorized:
@@ -48,6 +53,8 @@ def build_evolution_product(
         raise DirectorError("typed original designed game required")
     if tier not in TIERS or type(population) is not int or not 3<=population<=512:
         raise DirectorError("unknown hardware tier or actual population budget")
+    if type(witness_training) is not bool:
+        raise DirectorError("witness and mirror training must be explicitly enabled/disabled")
     if type(deep_route_search) is not bool:
         raise DirectorError("deep route exploration must be explicitly enabled")
     if (npc_blueprint is None and npc_human_reviewed) or (
@@ -137,6 +144,57 @@ def build_evolution_product(
         "native_cinematic_renderer_verified":False,
         "authored_audio_playback_verified":False,
     })
+    if witness_training:
+        agent_active=min(TIERS[tier].actor_budget,population)
+        agent_ambient=min(TIERS[tier].ambient_budget,population)
+        agent_limit=min(128,population*2)
+        incident=observe_story(
+            world,proof.replay,population=population,
+            active_budget=agent_active,ambient_budget=agent_ambient,
+            maximum_witnesses=agent_limit,authorized=True,
+            starting_society=approved.society if approved is not None else None,
+        )
+        files["systems/npc_witnessed_story.json"]=_payload(incident.payload())
+        if incident.opportunities:
+            # The scene/quest reviewer and the competitive witness mirror are
+            # separate controls; neither performs user data exfiltration or
+            # automatically updates model parameters.
+            evolving=replay_witness_quests(
+                world,proof.replay,incident,population=population,
+                active_budget=agent_active,ambient_budget=agent_ambient,
+                maximum_witnesses=agent_limit,authorized=True,
+            ) if approved is None else None
+            verified=run_mirror_competition(
+                world,proof.replay,incident,population=population,
+                active_budget=agent_active,ambient_budget=agent_ambient,
+                maximum_witnesses=agent_limit,attempts=36,authorized=True,
+            ) if approved is None else None
+            if verified is not None and not verified.passed:
+                raise DirectorError("emergent NPC training mirror did not reject all attacks")
+            if evolving is not None and verified is not None:
+                curriculum=build_curriculum(verified,incident,authorized=True)
+                files["systems/npc_emergent_quests.json"]=_payload(evolving.payload())
+                files["review/npc_competitive_mirror.json"]=_payload(verified.payload())
+                files["training/quarantined_witness_curriculum.jsonl"]=training_jsonl(
+                    curriculum.examples,authorized=True,
+                )
+            else:
+                # Custom authored societies require a social-origin verifier
+                # that accepts their source initial state. Do not silently
+                # certify a procedural baseline in place of reviewed actors.
+                files["review/npc_custom_roster_mirror_boundary.json"]=_payload({
+                    "schema":"skeleton.game_builder.custom_npc_mirror_boundary.v1",
+                    "witness_events":len(incident.witnessed),
+                    "human_authored_initial_state":True,
+                    "independent_competition_completed":False,
+                    "training_dataset_available":False,
+                })
+        else:
+            files["review/npc_witness_gap.json"]=_payload({
+                "schema":"skeleton.game_builder.npc_witness_gap.v1",
+                "reason":"no_actionable_witnessed_incident_or_scene_methods",
+                "not_fabricated":True,"requires_new_authoring":True,
+            })
     files["systems/modular_missions.json"]=_payload(missions.payload())
     files["systems/quest_routes.json"]=_payload(
         plan.payload() if plan else {
@@ -177,6 +235,10 @@ def build_evolution_product(
         "target_tier":tier,
         "integration_evidence":session.digest,
         "deep_route_search":bool(plan),
+        "npc_witness_review_requested":witness_training,
+        "npc_witnessed_training_available":(
+            "training/quarantined_witness_curriculum.jsonl" in files
+        ),
         "consumer_publication_authorized":False,
         "files":{name:sha256(data).hexdigest()
                  for name,data in sorted(files.items())},
