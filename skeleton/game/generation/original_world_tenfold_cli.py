@@ -24,6 +24,9 @@ from .original_world_tenfold_runtime import (
     validate_tenfold,
 )
 from .original_world_play_forms import PLAY_FORMS, PROGRESSION_LAWS
+from .original_world_tenfold_navigation import (
+    MODES, plan_tenfold_route, execute_tenfold_route,
+)
 
 MAX_INPUT = 65536
 
@@ -117,7 +120,7 @@ def render(state: TenfoldState) -> str:
 def _interactive(game: TenfoldState) -> TenfoldState:
     print("Original Tenfold World Forge — spatial/genre/progression simulator.")
     print("Commands: spatial travel N, spatial extract, spatial INTERVENTION,")
-    print("mode VERB, arc VERB, causal end_turn; help, status, exits, quit.")
+    print("mode VERB, arc VERB, causal end_turn; route N, go N, help, status, exits, quit.")
     print(render(game))
     while True:
         try:
@@ -139,6 +142,21 @@ def _interactive(game: TenfoldState) -> TenfoldState:
             print("Available links:", passages(game))
             continue
         try:
+            if text.startswith("route ") or text.startswith("go "):
+                words = text.split()
+                if len(words) != 2:
+                    raise FoundationError("route expects one numbered destination")
+                try:
+                    destination = int(words[1])
+                except ValueError as exc:
+                    raise FoundationError("route destination must be an integer") from exc
+                plan = plan_tenfold_route(game, destination)
+                print(json.dumps(plan.as_dict(), sort_keys=True))
+                if words[0] == "go":
+                    game, receipts = execute_tenfold_route(game, plan)
+                    print("Visited planned corridor using", len(receipts), "real moves")
+                print(render(game))
+                continue
             game, receipt = step_tenfold(game, parse_command(text))
             print(" | ".join(receipt.changes))
             print(render(game))
@@ -164,6 +182,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--page", type=int)
     parser.add_argument("--limit", type=int, default=16)
     parser.add_argument("--actions-json", default="[]")
+    parser.add_argument("--route-target", type=int,
+                        help="Safest or shortest currently feasible route to a sector")
+    parser.add_argument("--route-priority", choices=MODES, default="balanced")
+    parser.add_argument("--execute-route", action="store_true",
+                        help="Execute an entire preflighted route if the remaining AP permit")
     parser.add_argument("--show-map", action="store_true")
     parser.add_argument("--interactive", action="store_true")
     parser.add_argument("--save", type=Path)
@@ -210,6 +233,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             game = create_tenfold(world.index)
         for action in script_actions(args.actions_json):
             game, _ = step_tenfold(game, action)
+        route_plan = None
+        route_receipts = ()
+        if args.execute_route and args.route_target is None:
+            raise FoundationError("--execute-route requires --route-target")
+        if args.route_target is not None:
+            route_plan = plan_tenfold_route(
+                game, args.route_target, priority=args.route_priority)
+            if args.execute_route:
+                game, route_receipts = execute_tenfold_route(game, route_plan)
         if args.interactive:
             game = _interactive(game)
         if args.save is not None:
@@ -229,6 +261,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "current_passages": passages(game),
                     "mineral_reserve_at_current_site": available_material(game),
                     "implementation_status": "bounded-spatial-genre-simulation",
+                    "planned_route": route_plan.as_dict() if route_plan else None,
+                    "executed_route_event_ids": list(route_receipts),
                     "note": "Indexing 12.288m gameplay compositions does not create 12.288m bespoke games.",
                 }, sort_keys=True, indent=2))
     except (FoundationError, OSError, ValueError) as exc:
