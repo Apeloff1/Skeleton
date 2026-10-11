@@ -204,11 +204,8 @@ class CompetitiveUserCouncilCases(DeepEnemyCases):
             deliberate_verified_round(
                 self.critique,research,tuple(forged),
                 self.reviewers,authorized=True)
-        bad=replace(forged[0],reviewed_facets=tuple(sorted(ALL_FACETS))[:-1])
         with self.assertRaises(ThreatRadarError):
-            deliberate_verified_round(
-                self.critique,research,(bad,*forged[1:]),
-                self.reviewers,authorized=True)
+            replace(forged[0],reviewed_facets=tuple(sorted(ALL_FACETS))[:-1])
 
     def test_exact_three_page_pdf_per_role_and_multipart_manifest(self):
         state,_=self.complete_battle()
@@ -226,7 +223,7 @@ class CompetitiveUserCouncilCases(DeepEnemyCases):
             self.assertEqual(packet["role_pages"],{r:3 for r in ROLES})
             for role in ROLES:
                 doc=folder/(role+".pdf")
-                self.assertEqual(len(re.findall(rb"/Type /Page\\b",doc.read_bytes())),3)
+                self.assertEqual(doc.read_bytes().count(b"/Type /Page /Parent"),3)
                 self.assertEqual(sha256(doc.read_bytes()).hexdigest(),
                                  packet["role_document_sha256"][role])
             with zipfile.ZipFile(folder/"complete-review-packet.zip") as z:
