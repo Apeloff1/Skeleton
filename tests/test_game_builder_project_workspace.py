@@ -94,6 +94,31 @@ class OriginalGameWorkbenchTests(unittest.TestCase):
             self.studio.autoload_previous("rpg","second_original_game",
                                           authorized=True)
 
+    def test_demo_forks_to_full_editable_new_game_without_changing_immutable_demo(self):
+        demo=self.studio.archive("first_game",demo=True,authorized=True)
+        original=self.studio.read("demos",demo["ref"],"game/director.json")
+        result=self.studio.fork_demo(demo["ref"],"remastered_demo",authorized=True)
+        self.assertEqual(result["source_lane"],"demos")
+        self.assertEqual(self.studio.active(),"remastered_demo")
+        writable=self.studio.read("current","remastered_demo","game/director.json")
+        self.assertTrue(writable["version"]["editable"])
+        self.assertEqual(original["content"],writable["content"])
+        data=json.loads(writable["content"])
+        data["scenes"][0]["title"]="Original enhanced console edition"
+        proposal=self.studio.propose(
+            "remastered_demo","game/director.json",json.dumps(data),
+            expected_sha256=writable["version"]["sha256"],
+            reason="Use new original scene for evolved demo with author supervision.",
+            authorized=True)
+        self.studio.commit(proposal["proposal_id"],human_approved=True,authorized=True)
+        still=self.studio.read("demos",demo["ref"],"game/director.json")
+        self.assertEqual(still["content"],original["content"])
+        self.assertNotEqual(self.studio.read(
+            "current","remastered_demo","game/director.json")["content"],
+            still["content"])
+        with self.assertRaises(WorkspaceError):
+            self.studio.fork_demo(demo["ref"],"remastered_demo",authorized=True)
+
     def test_proposal_path_traversal_binary_source_and_stale_file_rejected(self):
         file=self.studio.read("current","first_game","project.json")
         hash=file["version"]["sha256"]
@@ -160,6 +185,26 @@ class OriginalGameWorkbenchTests(unittest.TestCase):
             ]),0)
         self.assertIn("Scene variations",self.studio.read(
             "current","first_game","notes/design.md")["content"])
+
+    def test_workbench_ui_javascript_is_syntactically_valid_and_offline(self):
+        import shutil
+        import subprocess
+        import re
+        from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html
+        html=render_workspace_html("a"*32).decode()
+        js=re.findall(r"<script>(.*?)</script>",html,re.DOTALL)
+        self.assertEqual(len(js),1)
+        self.assertIn("game studio",html.lower())
+        self.assertIn("Fork demo into current",html)
+        self.assertIn("Plan affected modules",html)
+        self.assertIn("Content-Security-Policy",html)
+        self.assertNotIn("https://",html)
+        if shutil.which("node"):
+            script=Path(self.temp.name)/"workspace-ui.js"
+            script.write_text(js[0],encoding="utf-8")
+            checked=subprocess.run(["node","--check",str(script)],
+                                   capture_output=True,text=True,timeout=10)
+            self.assertEqual(checked.returncode,0,checked.stderr)
 
     def test_actual_local_browser_interface_and_authenticated_api(self):
         server=create_workspace_server(self.studio,port=0)
