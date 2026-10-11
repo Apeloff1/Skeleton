@@ -135,6 +135,43 @@ class TiledDataOnlyHomebrewTests(unittest.TestCase):
                          (studio_out / "index.html").read_text(encoding="utf-8"))
         self.assertTrue((studio_out / "proof/verified_solution.json").is_file())
 
+    def test_jeeves_dragon_native_studio_executes_tiled_tool_directly(self):
+        intent_file = self.root / "intent.json"
+        intent_file.write_text(json.dumps(self.intent.to_payload()), encoding="utf-8")
+        output = self.root / "original-tiled-game"
+        args = [
+            "--intent", str(intent_file),
+            "--tiled-level", str(self.inputs[0]),
+            "--tiled-level", str(self.inputs[1]),
+            "--output", str(output), "--human-reviewed",
+            "--companion-practice", "1", "--mirror-attempts", "64",
+            "--trusted-local-operator",
+        ]
+        with redirect_stdout(io.StringIO()) as report:
+            self.assertEqual(studio_main(args), 0)
+        info = json.loads(report.getvalue())
+        self.assertEqual(info["mirror_failures"], 0)
+        self.assertTrue((output / "godot/world.json").is_file())
+        self.assertTrue((output / "studio/tiled_import.json").is_file())
+        tiled = json.loads((output / "studio/tiled_import.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(tiled["source_sha256"]), 2)
+        self.assertEqual(tiled["ignored_tileset_metadata_count"], 2)
+        self.assertEqual(tiled["world_digest"], info["world_digest"])
+        self.assertFalse(tiled["third_party_expressions_copied"])
+        pipeline = json.loads((output / "studio/pipeline.json").read_text(encoding="utf-8"))
+        self.assertEqual(pipeline["source"], "original-tiled")
+        executed = json.loads(
+            (output / "studio/executed_tool_receipts.json").read_text(encoding="utf-8"))
+        self.assertEqual(executed["receipts"][0]["tool_id"], "world.tiled")
+        self.assertEqual(executed["tiled_import_digest"],
+                         import_tiled_levels(
+                            self.intent, self.inputs,
+                            human_reviewed=True, authorized=True).digest)
+        self.assertEqual(len(executed["practice_mirror_digests"]), 1)
+        self.assertFalse(executed["external_code_executed"])
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(studio_main(args), 2)  # never overwrite consumer game
+
     def test_import_rejects_tiled_flip_compression_or_unrecognized_layer(self):
         doc = self.map_json(self.project.world.levels[0])
         for change in ("flip", "object", "infinite", "compression", "size", "gid"):
