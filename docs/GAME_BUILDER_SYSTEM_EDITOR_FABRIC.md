@@ -152,6 +152,43 @@ engines. It never equates successful reference simulation with a certified
 Godot export or native executable. Integration of the actual other 40
 game engines and producer-grade scene/node editors remains outstanding.
 
+## Seventh native candidate: standalone original Godot 4 circuit racing
+
+`advanced_racing_godot.py` adds an independently executing, original
+Godot 4 race game, beyond the previous Python-only racing simulation. Its
+GDScript physics simulates real authored circuit position, lap crossing,
+acceleration, braking, coasting and three-lane steering, finite nitro,
+pit crew/service capacity, fuel expenditure and fuel starvation, weather
+grip (dry/wet/storm), corner understeer tire and engine damage, center-lane
+obstacle collisions, tire wear, mechanical limp mode, terminal engine
+destruction, checkpoint-style lap accounting and championship scoring.
+The player uses WASD/arrows, Space, B, P, R, or gamepad controls.
+
+A playable, original rendered circuit includes race direction, player lane,
+authored corners/obstacle, live speed/laps/fuel, car/engine integrity and
+results. Gameplay uses **native integer-step GDScript**, not Python-generated
+frame playback. The reviewed source `game.json`, signed scene/settings
+hashes and `proof.json` bind every authored variant to the source model.
+When invoked with `--verify-racing`, Godot independently reexecutes all
+approved commands and compares all **22** gameplay fields including
+unmodified scene weather, exact corner/obstacle identity, tire/engine/fuel,
+pit/nitro costs, lap crossing event order and win/fail results.
+
+The authorized offline `godot-export` CLI and local token-gated visual
+studio now produce a seventh distinct fixed-path native source bundle
+`original-godot-racing/`. ZIP generation is source delivery, **not**
+evidence of Godot execution or a hardware/publication certificate.
+
+`.github/workflows/game-builder-advanced-racing-native.yml` is a
+separate exact-head native proof lane: eight genuine original circuits on
+Ubuntu/Windows (all three weather classes, steering, pit, boost, damage,
+multi-lap completion and terminal finish) and exported game-binary execution
+on both operating systems. Native racing **is only verified after both OS
+jobs and real exported binaries succeed**. The full advanced reference
+regression suite includes the source-custody, command-replay, forge-rejection,
+offline CLI and Game Studio race tests. Until native CI succeeds, count
+racing as implemented but unverified.
+
 ## Sixth independent native adapter: original Godot 4 tower defense
 
 The `advanced_defense_godot.py` native game now executes the **actual**
