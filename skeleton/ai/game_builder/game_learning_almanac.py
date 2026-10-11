@@ -299,14 +299,30 @@ def quarantine_curriculum(curriculum: Curriculum,workspace_root: str|Path,*,
     target=studio.root/"training/quarantine"/(curriculum.digest+".jsonl")
     if target.is_symlink() or target.exists():
         raise AlmanacError("identical training data already quarantined")
-    with target.open("xb") as handle:
-        handle.write(data)
-    return dict(schema="skeleton.game_builder.training_quarantine_receipt.v1",
-                path=str(target),project_digest=curriculum.project_digest,
-                split=curriculum.split,examples=len(curriculum.examples),
-                source_sha256=sha256(data).hexdigest(),
-                curriculum_digest=curriculum.digest,
-                approved=False,neural_training_performed=False)
+    sidecar=target.with_suffix(".receipt.json")
+    if sidecar.exists() or sidecar.is_symlink():
+        raise AlmanacError("a signed source receipt already exists")
+    receipt=dict(schema="skeleton.game_builder.training_quarantine_receipt.v1",
+                 path=str(target),project_digest=curriculum.project_digest,
+                 split=curriculum.split,examples=len(curriculum.examples),
+                 source_sha256=sha256(data).hexdigest(),
+                 curriculum_digest=curriculum.digest,
+                 approved=False,neural_training_performed=False)
+    # The receipt is committed last. If a partial write fails, do not leave
+    # it looking approved or silently allow a different source at that path.
+    try:
+        with target.open("xb") as handle:
+            handle.write(data);handle.flush()
+            import os
+            os.fsync(handle.fileno())
+        with sidecar.open("xb") as handle:
+            handle.write((canonical_json(receipt)+"\n").encode("utf-8"))
+            handle.flush();os.fsync(handle.fileno())
+    except BaseException:
+        target.unlink(missing_ok=True)
+        sidecar.unlink(missing_ok=True)
+        raise
+    return receipt
 
 
 __all__=[
