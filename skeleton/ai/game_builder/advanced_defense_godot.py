@@ -119,7 +119,7 @@ func _tick() -> Array:
         var strongest: int=-2147483647
         var best_id: int=2147483647
         for enemy in state["enemies"]:
-            var position: int=int(tower["slot"])*maxi(1,int(config["lane_length"])/3)+2
+            var position: int=int(tower["slot"])*maxi(1,int(int(config["lane_length"])/3))+2
             if absi(int(enemy["x"])-position)>int(config["tower_range"]):
                 continue
             var score: int=(int(enemy["hp"]) if state["priority"]=="strong"
