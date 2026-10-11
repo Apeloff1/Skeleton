@@ -96,11 +96,14 @@ def validate_nexus(state: NexusState) -> None:
         raise CampaignError("invalid active realm")
     if not isinstance(state.realms, tuple) or len(state.realms) != 4:
         raise CampaignError("invalid realm inventory")
-    if any(realm.world_id != REALM_IDS[i] or not realm.seed.endswith(
-            ":realm:" + str(i)) for i, realm in enumerate(state.realms)):
+    if any(realm.world_id != REALM_IDS[i] or
+           realm.seed != state.seed + ":realm:" + str(i)
+           for i, realm in enumerate(state.realms)):
         raise CampaignError("world identity mismatch")
-    for world in state.realms:
+    for i, world in enumerate(state.realms):
         validate_state(world)
+        if i != state.current_realm and any(_portable(world).values()):
+            raise CampaignError("portable inventory exists in an inactive world")
     if type(state.charges) is not int or not 0 <= state.charges <= 64:
         raise CampaignError("portal charges outside budget")
     if (not isinstance(state.completed_realms, tuple)
@@ -171,7 +174,7 @@ def act(state: NexusState, action: CampaignAction
         for i, world in enumerate(state.realms):
             if i != at:
                 evolved, _ = step(world, CampaignAction("end_turn"))
-                updates[i] = evolved
+                updates[i] = _park(evolved)
     realms = _updated_realms(state, updates)
     completed = tuple(sorted(set(state.completed_realms) |
                              {i for i, world in enumerate(realms)
