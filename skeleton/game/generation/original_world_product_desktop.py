@@ -13,6 +13,7 @@ from .original_world_product_render import COLORS, BUILDING_COLORS
 from .original_world_product_terrain import cell_at
 from .original_world_product_missions import mission_report
 from .original_world_npc_cognition_v2 import cognition_report, npc_profile
+from .original_world_npc_era_population import population_report
 from .original_world_npc_era_population import (
     ambient_impressions, population_report, active_brain_budget,
 )
@@ -100,6 +101,26 @@ def launch_desktop(state: ProductSession, *, save_path: str | None = None) -> No
                 canvas.create_oval(x0+10, y0+10, x0+16, y0+16,
                                    fill="#82b8d7", outline="#274865",
                                    tags=("render-only-background-crowd",))
+        if current.population is not None:
+            budget = population_report(
+                current.population, len(current.society.inhabitants))
+            shown = 0
+            for region in current.population.districts:
+                dx, dy = region.x - px, region.y - py
+                if region.population <= 0 or abs(dx) > VIEW_RADIUS or abs(dy) > VIEW_RADIUS:
+                    continue
+                if shown >= budget["visible_proxy_budget"]:
+                    break
+                x0 = (dx + VIEW_RADIUS) * TILE_SIZE
+                y0 = (dy + VIEW_RADIUS) * TILE_SIZE
+                canvas.create_rectangle(
+                    x0 + 3, y0 + 3, x0 + TILE_SIZE - 3,
+                    y0 + TILE_SIZE - 3, fill="#c39bfa", outline="#493469")
+                canvas.create_text(
+                    x0 + TILE_SIZE//2, y0 + TILE_SIZE//2,
+                    text="R", font=("TkDefaultFont", 9, "bold"),
+                    fill="#151326")
+                shown += 1
         for person in current.society.inhabitants:
             dx, dy = person.x - px, person.y - py
             if abs(dx) > VIEW_RADIUS or abs(dy) > VIEW_RADIUS:
@@ -125,7 +146,12 @@ def launch_desktop(state: ProductSession, *, save_path: str | None = None) -> No
             f"Local energy {landscape.energy}",
             f"Food {landscape.provisions} / Water {landscape.freshwater}",
             f"Lumber {landscape.lumber} / Masonry {landscape.masonry}",
-            f"Citizens: {len(current.society.inhabitants)}",
+            f"Detailed citizens: {len(current.society.inhabitants)}",
+            ("Era: " + current.population.era
+             + " | Remote census: " +
+             str(sum(d.population for d in current.population.districts))
+             if current.population is not None else
+             "Era cohorts: legacy individual-only game"),
             (f"Era {current.population.era}; "
              f"{active_brain_budget(current.population.era, current.population.fidelity)} "
              f"thinking each day; {sum(d.population for d in current.population.districts)} "
