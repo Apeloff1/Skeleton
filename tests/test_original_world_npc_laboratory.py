@@ -169,6 +169,13 @@ def test_family_expansion_scenario_requires_real_town_build_consent_and_food():
     assert r["citizen_decisions"] > 96
 
 
+def test_wide_settlement_rejects_under_quorum_policy_without_phantom_votes():
+    r = evaluate("civic-food-aid", turns=2, population=12)
+    assert 0 < r["recorded_civic_voters"] < 4
+    assert r["real_public_mandate"] == ""
+    assert r["actually_funded_public_aid"] == 0
+
+
 def test_public_ration_policy_scenario_records_actual_representative_votes():
     # A genuine eight-person town needs three in-person votes; the wider
     # twelve-person control case legitimately rejects an under-quorum vote.
