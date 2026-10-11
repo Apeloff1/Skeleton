@@ -6,6 +6,7 @@ on:
       - "skeleton/ai/game_builder/competitive_delivery_gate.py"
       - "skeleton/ai/game_builder/competitive_watch_book.py"
       - "skeleton/ai/game_builder/competitive_watch_service.py"
+      - "skeleton/ai/game_builder/competitive_watch_cli.py"
       - "tests/test_game_builder_competitive_radar.py"
       - "docs/ai/game_competitive_threat_radar_2026_10.md"
       - ".github/workflows/game-builder-competitive-radar.yml"
