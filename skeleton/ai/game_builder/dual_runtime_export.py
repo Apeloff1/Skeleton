@@ -262,7 +262,7 @@ func _verify_native_proof() -> void:
         get_tree().quit(1)
         return
     var proof: Variant = JSON.parse_string(source)
-    if typeof(proof) != TYPE_DICTIONARY or proof.get("world_digest") != world["world_digest"]:
+    if typeof(proof) != TYPE_DICTIONARY or proof.get("schema") != "skeleton.game_builder.solution_trace.v1" or proof.get("world_digest") != world["world_digest"]:
         push_error("NATIVE_REPLAY_ERROR: proof identity mismatch")
         get_tree().quit(1)
         return
@@ -281,12 +281,20 @@ func _verify_native_proof() -> void:
             push_error("NATIVE_REPLAY_ERROR: action rejected")
             get_tree().quit(1)
             return
-    var actual_collected: Array = []
-    for key in collected:
-        var xy: PackedStringArray = str(key).split(",")
-        actual_collected.append([int(xy[0]), int(xy[1])])
+    var actual_collected: Array = collected.keys()
     actual_collected.sort()
-    var expected_collected: Array = expected.get("collected", [])
+    var expected_collected: Array = []
+    var expected_items: Variant = expected.get("collected", [])
+    if typeof(expected_items) != TYPE_ARRAY:
+        push_error("NATIVE_REPLAY_ERROR: expected collected list absent")
+        get_tree().quit(1)
+        return
+    for item in expected_items:
+        if typeof(item) != TYPE_ARRAY or item.size() != 2:
+            push_error("NATIVE_REPLAY_ERROR: malformed expected item")
+            get_tree().quit(1)
+            return
+        expected_collected.append(str(item[0]) + "," + str(item[1]))
     expected_collected.sort()
     var valid: bool = (
         status == str(expected.get("status", "invalid"))
