@@ -54,6 +54,61 @@ established by the caller: it is not a login check.
 No packaged ROMs, BIOSes, commercial game assets, scraped text, model weights,
 SDK keys or external scripts are required or shipped.
 
+## Optional designer-authored maps: an actual editing path
+
+Besides procedural mazes, creators can draw an original tile level as a list
+of equal-length strings. Only # wall, . floor, S spawn, G exit, C collectible,
+and H hazard are accepted. No scripting language or third-party assets are
+imported. For example, place the following exact JSON into authored.json:
+
+~~~json
+{
+  "schema": "skeleton.game_builder.authored_tiles.v1",
+  "intent": {
+    "project_id": "my-cave",
+    "title": "Original Cave",
+    "subtitle": "A hand-edited original map.",
+    "seed": 42,
+    "width": 9,
+    "height": 9,
+    "levels": 1,
+    "collectibles_per_level": 2,
+    "hazards_per_level": 1,
+    "theme": "arcade",
+    "starting_health": 3
+  },
+  "levels": [[
+    "#########",
+    "#S..C...#",
+    "#.#####.#",
+    "#.......#",
+    "#...H...#",
+    "#.......#",
+    "#..C..G.#",
+    "#.......#",
+    "#########"
+  ]]
+}
+~~~
+
+Supply the identical intent object as a separate intent.json, then run:
+
+~~~bash
+python -m skeleton.ai.game_builder.dual_runtime_cli \
+  --intent intent.json --authored-world authored.json \
+  --human-reviewed --trusted-local-operator \
+  --output ./my-authored-game
+~~~
+
+The importer requires exact schema, intent identity and explicit review;
+rejects malformed geometry, extra fields, duplicate JSON keys, oversized
+files, symlinks, missing goals, wrong item counts and unsolvable exits;
+recomputes a hazard-free winning trace with the canonical BFS solver; then
+compiles browser/Godot gameplay with the **same** simulator and release
+receipt as generated levels. The manifest records the authored algorithm,
+not the procedurally generated one. The reviewed flag only acknowledges
+geometry review: it does not grant an intellectual-property license.
+
 ## Two runtimes, one gameplay contract
 
 Both outputs implement the **same reference behavior**:
@@ -78,7 +133,7 @@ accessible text map and optional downloadable browser action logs.
 Run:
 
 ~~~bash
-python -m unittest tests.test_game_builder_dual_runtime -v
+python -m unittest tests.test_game_builder_dual_runtime tests.test_game_builder_authored_tiles -v
 python -m unittest tests.test_game_builder_playable_world \
   tests.test_game_builder_playable_export -v
 python scripts/check_architecture_map.py
