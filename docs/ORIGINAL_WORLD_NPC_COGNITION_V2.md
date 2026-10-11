@@ -82,7 +82,8 @@ The player can use `npc interview ID [wood|stone|food|water]` to obtain
 a fresh, unused, truly first-hand statement from a nearby person.
 Each authorized interview consumes an actual player action and credits
 at most one world evidence token. Identical testimony
-(person, material, position, observation time) is deduplicated.
+(speaker, material, physical location) is deduplicated across
+all dates, even when a citizen revisits the same site the following day.
 Repeat questioning cannot mint unbounded evidence; second-hand
 reports are not promoted as independent eyewitness claims.
 
