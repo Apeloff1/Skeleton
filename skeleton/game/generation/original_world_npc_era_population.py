@@ -176,14 +176,21 @@ def _site(world: TerrainState, index: int) -> tuple[int, int]:
 
 
 def tuning(era: str, mode: str) -> tuple[int, int]:
+    """(District updates per day, visible proxy cap), always bounded.
+
+    Compatibility aliases eco/rich map to economy/vivid, without changing
+    old serialized saves. Brains and remote districts use the same preset.
+    """
     b = era_budget(era)
-    if mode == "eco":
+    if mode in ("eco", "economy"):
         return min(1, b.district_updates), min(4, b.render_budget)
     if mode == "balanced":
         return b.district_updates, b.render_budget
-    if mode == "rich":
+    if mode in ("rich", "vivid"):
         return min(b.district_limit, 8), min(64, b.render_budget * 2)
-    raise FoundationError("NPC detail mode must be eco, balanced or rich")
+    if mode == "unrestricted":
+        return min(b.district_limit, 8), min(64, b.render_budget * 3)
+    raise FoundationError("unsupported bounded game NPC resource budget")
 
 
 def adjust_fidelity(state: EraPopulation, mode: str) -> EraPopulation:
@@ -564,7 +571,8 @@ def population_report(state: EraPopulation, local: int) -> dict:
 # Adaptive resource fidelity: budget is per active local *brain*, not the
 # regional cohort count. All 32 local bodies still exist and age each turn.
 # Four levels are available for testing and user-selected consumer hardware.
-FIDELITY_MODES = ("economy", "balanced", "vivid", "unrestricted")
+FIDELITY_MODES = ("economy", "balanced", "vivid", "unrestricted",
+                  "eco", "rich")
 MAX_IMPRESSIONS = 64
 
 
@@ -572,8 +580,8 @@ def active_brain_budget(era: str, preset: str = "balanced") -> int:
     b = era_budget(era)
     if preset not in FIDELITY_MODES:
         raise FoundationError("unknown NPC hardware fidelity preset")
-    limits = {"economy": 3, "balanced": 7,
-              "vivid": 16, "unrestricted": MAX_AGENTS}
+    limits = {"economy": 3, "eco": 3, "balanced": 7,
+              "vivid": 16, "rich": 16, "unrestricted": MAX_AGENTS}
     return min(b.full_npc_limit, limits[preset])
 
 
