@@ -16,6 +16,7 @@ from skeleton.ai.game_builder.competitive_evolution_chain import (
 )
 from skeleton.ai.game_builder.competitive_counterproposals import (
     propose_original_outclassing,evaluate_original_counterproposal,
+    SignedImplementationReview,sign_implementation_review,
 )
 from skeleton.ai.game_builder.competitive_ancestry_frontier import evaluate_ancestral_outclassing
 from skeleton.ai.game_builder.competitive_deep_service import (
@@ -279,11 +280,29 @@ class DeepEnemyCases(CompetitorRadarCases):
             protected_quality_gates_passed=True,authorized=True)
         self.assertFalse(fail.fulfilled)
         self.assertIn("no_implemented_original_game_replay",fail.reasons)
-        passed=evaluate_original_counterproposal(
+        unsigned=evaluate_original_counterproposal(
             focus,old,new,replay_implementation_digest="b"*64,
             originality_review_passed=True,
             protected_quality_gates_passed=True,authorized=True)
+        self.assertFalse(unsigned.fulfilled)
+        self.assertIn("no_signed_build_and_measurement_qualification",unsigned.reasons)
+        qa=TrustedCompetitionJudge("separate_qa",b"q"*32)
+        reviewed=sign_implementation_review(SignedImplementationReview(
+            focus.digest,"b"*64,canonical_digest(new.payload()),
+            qa.judge_id,T0,True,True,"0"*64),qa)
+        passed=evaluate_original_counterproposal(
+            focus,old,new,replay_implementation_digest="b"*64,
+            originality_review_passed=True,
+            protected_quality_gates_passed=True,authorized=True,
+            implementation_review=reviewed,trusted_evaluator=qa)
         self.assertTrue(passed.fulfilled)
+        with self.assertRaisesRegex(ThreatRadarError,"signed"):
+            evaluate_original_counterproposal(
+                focus,old,new,replay_implementation_digest="b"*64,
+                originality_review_passed=True,
+                protected_quality_gates_passed=True,authorized=True,
+                implementation_review=replace(reviewed,build_digest="c"*64),
+                trusted_evaluator=qa)
         self.assertEqual(passed.quality_gain_bp,2500)
         self.assertFalse(passed.payload()["game_release_authorized"])
 
