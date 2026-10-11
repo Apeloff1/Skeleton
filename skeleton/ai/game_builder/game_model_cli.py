@@ -18,8 +18,8 @@ from .game_project_workspace import GameWorkspace
 from .game_training_flow import (
     TrainingFlowError,load_quarantined_batches,plan_training_flow,
     train_isolated_review_ranker,materialize_training_flow,
-from .game_reviewer_v2 import train_robust_game_reviewer
 )
+from .game_reviewer_v2 import train_robust_game_reviewer
 from .game_model_promotion import (
     PromotionError,PromotionStandard,evaluate_candidate,
 )
