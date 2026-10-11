@@ -512,6 +512,8 @@ def _one_action(state: CampaignState, action: CampaignAction
             raise CampaignError("anchoring is specific to the Blindside District")
         if target not in neighbors(state) or n != 1:
             raise CampaignError("anchor requires adjacent target")
+        if abs(state.position - target) in (1, ROOM_COUNT - 1):
+            raise CampaignError("cycle-backbone corridors are already permanent")
         edge = tuple(sorted((state.position, target)))
         if edge in state.anchors:
             raise CampaignError("route already stabilized")
