@@ -165,3 +165,111 @@ preconditions and effects; mutation-safe streaming terrain; persistent
 NPC societies across realms; world-level quests with divergent outcomes;
 era-realization and theological causal adapters; budgeted physics/render
 capability tiers; platform-native playable artifacts.
+
+
+## Mass implementation: disk-backed, sparsely generated frontier
+
+`original_world_frontier.py` implements a deterministic top-down frontier
+with 16×16 addressing chunks. Each coordinate uses a signed 32-bit value
+on each axis: the addressable grid has **2^64 possible locations**, not
+2^64 stored tiles or individually authored games. The Python game never
+pre-allocates this space. SHA-256 keyed by seed and coordinates derives
+repeatable terrain, food, wood, stone, water, animal abundance, fertility
+and biome classification only when queried.
+
+SQLite stores player state, visits, actual resource depletion, crops,
+construction, and event-chain history. Reopening the same database and seed
+resumes in the same location with the same modified terrain. The engine uses
+parameterized statements, atomic action transactions, negative and
+positive coordinates, finite action points, bounded individual resource
+storage, and a lazily recovered per-tile resource budget. Population-level
+and full ecological simulation across billions of unsurveyed tiles is
+**not** implied.
+
+The same four original world laws have frontier variants: Blindside
+District has phase-shifting vertical passages and permanently traversable
+east/west corridors; Rain Eaters transfers a conserved 12-unit rainfall
+reserve; Town of Unfinished Oaths gates settlements behind honored vows;
+The Unfinished Quilt offers nonterminal comfort crafting. Each currently
+supports **20 actionable commands and end_turn**, including directional
+travel, local extraction, food production, construction, repair, care,
+promises, and seasonal advancement.
+
+```bash
+# Interactive; the database itself is a durable local savegame.
+python -m skeleton.game.generation.original_world_frontier_cli \
+  --db my-frontier.sqlite3 --world ecology-03 --seed my-seed --interactive
+
+# Scripted expedition with persistent terrain edits.
+python -m skeleton.game.generation.original_world_frontier_cli \
+  --db my-frontier.sqlite3 --world ecology-03 --seed my-seed \
+  --actions-json '[{"verb":"redirect_rain","option":"west","amount":2},{"verb":"move","option":"east"},{"verb":"end_turn"}]' \
+  --show-map
+```
+
+Disk space, CPU, real time, and coordinate bounds remain finite. Open-ended
+survival is supported without a global win condition; gameplay diversity
+must still be evaluated beyond raw coordinate cardinality.
+
+## Mass implementation: era, theological and time-setting rules
+
+`original_world_era_runtime.py` implements **10 resource-backed technology
+actions** with explicit era thresholds for all 40 registered eras. The
+capability steps range from hand-knapping and crop domestication to metal
+smelting (which has a pollution side effect), watermills, steamworks,
+electrical grids, autonomous harvesting robots, exploration drones,
+adaptive shelters and expensive localized terraforming. Physical resources,
+available energy and researched knowledge constrain outcomes.
+
+Twenty-four invented theological models explicitly authorize different
+subsets of six original ceremonial interactions: reflection, communal
+ritual, ancestor remembrance, constrained rainfall invocation, civic
+covenants and fallible oracles. The supernatural actions operate only
+within their fictional world's declared law model, spend tangible resources,
+and cannot generate rainfall without debiting another region. Secular
+models retain voluntary social rituals but reject inappropriate miracle
+calls.
+
+Styling now has selected *playable* effects: high comfort reduces routine
+hunger pressure, low comfort intensifies it, and time-loop/cyclical-time
+chronologies reset a temporary maze phase every eight world turns while
+keeping world history. Other chronology forms remain design choices, not
+evidence of fully simulated time travel. Requested hyperreal rendering
+is not equated to scientific precision.
+
+```bash
+# Resource-backed historical metallurgy.
+python -m skeleton.game.generation.original_world_era_cli \
+  --world serenity-05 --era iron-age \
+  --actions-json '[{"tech":"smelt"},{"verb":"end_turn"}]' --show-map
+
+# An explicitly invented faith model with a conserved rain interaction.
+python -m skeleton.game.generation.original_world_era_cli \
+  --world ecology-03 --theology faith-as-power \
+  --actions-json '[{"ritual":"weather_invocation"},{"verb":"end_turn"}]' --show-map
+
+# Low-pressure cozy adaptation.
+python -m skeleton.game.generation.original_world_era_cli \
+  --world serenity-05 --tone ultra-snuggly --comfort 100 --interactive
+```
+
+## Exact-head verification additions
+
+```bash
+python -m pytest -q --noconftest \
+  tests/test_original_world_frontier.py \
+  tests/test_original_world_frontier_cli.py \
+  tests/test_original_world_era_runtime.py \
+  tests/test_original_world_era_cli.py
+```
+
+The focused Original World Atlas workflow reported **202 passing tests** on
+commit `fe50210c0e2775224b1d1f85a759ef9318ce847a` before this
+documentation update. Tests cover on-demand terrain determinism, saved
+chunk mutations, cross-chunk movement, depletion/regrowth, exactly
+conserved rainfall, transit passage rules, era-specific authorization,
+energy-consuming automation, theological limits, time loops, uncertainty
+receipts, and the active game terminals.
+
+**No native-renderer, console-ROM, emulator-device or installed-app
+certification follows from these Python tests.**
