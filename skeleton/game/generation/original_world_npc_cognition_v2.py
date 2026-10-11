@@ -703,18 +703,36 @@ def smart_npc_tick(
         if p.health == 0:
             operation = "incapacitated"
         elif p.hunger >= 7 or goal == "eat":
-            if (p.x, p.y) == (0, 0) and current_world.provisions > 0:
-                current_world = replace(current_world,
-                                        provisions=current_world.provisions - 1)
+            at = cell_at(current_world, p.x, p.y)
+            if p.cargo_kind == "food" and p.cargo:
+                p = replace(p, hunger=max(0, p.hunger - 7),
+                            cargo=p.cargo - 1,
+                            cargo_kind="" if p.cargo == 1 else "food",
+                            health=min(20, p.health + 1))
+                operation, resource, quantity = "consume-owned-carried-food", "food", 1
+            elif (p.x, p.y) == (0, 0) and current_world.provisions > 0:
+                current_world = replace(
+                    current_world, provisions=current_world.provisions - 1)
                 p = replace(p, hunger=max(0, p.hunger - 7),
                             health=min(20, p.health + 1))
                 operation, resource, quantity = "eat-supplied-food", "food", 1
+            elif at.food:
+                current_world = _write_cell(
+                    current_world, replace(at, food=at.food - 1))
+                p = replace(p, hunger=max(0, p.hunger - 7),
+                            health=min(20, p.health + 1))
+                operation, resource, quantity = "eat-actual-wild-harvest", "food", 1
+            elif current_world.provisions == 0:
+                current_world, p, operation, resource, quantity = (
+                    _gather_from_known_world(current_world, p, mind, "food"))
+                if operation == "gather":
+                    operation = "emergency-food-procurement"
             else:
-                p, walked = _physically_move(current_world, p,
-                                            lambda x, y: (x, y) == (0, 0))
+                p, walked = _physically_move(
+                    current_world, p, lambda x, y: (x, y) == (0, 0))
                 operation = "seek-real-meal" if walked else "cannot-reach-food"
-                if p.hunger >= 15:
-                    p = replace(p, health=max(0, p.health - 1))
+            if p.hunger >= 15 and quantity == 0:
+                p = replace(p, health=max(0, p.health - 1))
         elif goal == "recover" or p.energy <= 2:
             p = replace(p, energy=min(20, p.energy + 4))
             operation = "recover-physically"
@@ -866,7 +884,9 @@ def smart_npc_tick(
             "verified-distinct-citizen-construction-labor",
             "cooperatively-completed-funded-civic-project",
             "build-real-hearth", "spend-real-time-in-conversation",
-            "eat-supplied-food", "follow-individual-resource-memory",
+            "eat-supplied-food", "consume-owned-carried-food",
+            "eat-actual-wild-harvest", "emergency-food-procurement",
+            "follow-individual-resource-memory",
             "move-to-observed-stock", "inspect-real-local-geography",
         }
         failed_experiments = {
