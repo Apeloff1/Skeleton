@@ -25,6 +25,10 @@ from .original_world_product_render import (
 )
 from .original_world_product_missions import mission_report
 from .original_world_npc_cognition_v2 import cognition_report, npc_profile
+from .original_world_npc_platform_profiles import (
+    platform_inventory, plan_population, PC_GENERATIONS,
+)
+from .world_styling import HARDWARE_TARGETS
 from .original_world_npc_era_population import (
     era_budget, population_report, fidelity_report,
     FIDELITY_MODES, ERA_LEVELS,
@@ -289,7 +293,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                         default="balanced",
                         help="Limit expensive per-person thinking to 3, 7, 16 or 32 slots per world turn")
     parser.add_argument("--era", choices=tuple(ERA_LEVELS),
-                        help="Scale physical NPCs and offscreen resident districts by any of 40 eras")
+                        help="World history stage (one of 40 original-era policies)")
+    parser.add_argument("--hardware-target", choices=HARDWARE_TARGETS,
+                        default=None,
+                        help="Select any of 41 original homebrew, console, PC and portable targets")
+    parser.add_argument("--pc-generation", choices=PC_GENERATIONS,
+                        help="Actual PC hardware period/tier, supported on pc-* only")
     parser.add_argument("--population-report", action="store_true",
                         help="Inspect era fidelity budgets, remote census and actual supply/caravan ledger")
     parser.add_argument("--actions-json", default="[]")
@@ -316,15 +325,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "era_npc_hardware_presets": {
                     "economy": 3, "balanced": 7,
                     "vivid": 16, "unrestricted": 32,
+                    "note": "Only per-frame requested max; actual genre/platform ceilings are lower",
                 },
+                "realistic_npc_platform_profiles": platform_inventory(),
+                "default_npc_policy": plan_population(
+                    "digital-network", "pc-windows", "exploration"
+                ).as_dict(),
                 "era_population_capabilities": {
-                    era: {
-                        "named_physically_simulated_NPCs": era_budget(era).full_npc_limit,
-                        "real_aggregated_census": era_budget(era).background_limit,
-                        "districts": era_budget(era).district_limit,
-                        "bounded_district_updates": era_budget(era).district_updates,
-                        "rendered_region_badges": era_budget(era).render_budget,
-                    } for era in ERA_LEVELS
+                    era: plan_population(era, "pc-windows", "exploration").as_dict()
+                    for era in ERA_LEVELS
                 },
                 "product": {
                     "local_terrain_chunk_size": 32,
@@ -340,8 +349,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             }, indent=2, sort_keys=True))
             return 0
         if args.load is not None:
-            if args.era is not None or args.npc_fidelity != "balanced":
-                raise FoundationError("saved game era and NPC fidelity cannot be overwritten")
+            if (args.era is not None or args.npc_fidelity != "balanced"
+                    or args.hardware_target is not None
+                    or args.pc_generation is not None):
+                raise FoundationError("saved game hardware, genre, era and fidelity cannot be overwritten")
             if not args.load.is_file() or args.load.stat().st_size > 4194304:
                 raise FoundationError("missing or oversized saved game")
             state = product_restore(args.load.read_text(encoding="utf-8"))
@@ -350,14 +361,22 @@ def main(argv: Sequence[str] | None = None) -> int:
                 raise FoundationError("--base requires form, architecture, system and arc")
             law = living_for(args.base, args.form, args.architecture,
                              args.system, args.arc)
-            state = create_product(law.index, inhabitants=args.inhabitants,
-                                   era=args.era, npc_fidelity=args.npc_fidelity)
+            state = create_product(
+                law.index, inhabitants=args.inhabitants, era=args.era,
+                npc_fidelity=args.npc_fidelity,
+                hardware_target=args.hardware_target or "pc-windows",
+                pc_generation=args.pc_generation,
+            )
         else:
             if any((args.form, args.architecture, args.system, args.arc)):
                 raise FoundationError("specify --base to select game dimensions")
-            state = create_product(args.index if args.index is not None else 0,
-                                   inhabitants=args.inhabitants, era=args.era,
-                                   npc_fidelity=args.npc_fidelity)
+            state = create_product(
+                args.index if args.index is not None else 0,
+                inhabitants=args.inhabitants, era=args.era,
+                npc_fidelity=args.npc_fidelity,
+                hardware_target=args.hardware_target or "pc-windows",
+                pc_generation=args.pc_generation,
+            )
         for action in parse_script(args.actions_json):
             state, _ = step_product(state, action)
         if args.interactive:
