@@ -12,6 +12,7 @@ from .original_foundation_compiler import FoundationError
 from .original_world_product_render import COLORS, BUILDING_COLORS
 from .original_world_product_terrain import cell_at
 from .original_world_product_missions import mission_report
+from .original_world_npc_cognition_v2 import cognition_report
 from .original_world_product_session import (
     ProductAction, ProductSession, product_save, step_product, validate_product,
 )
@@ -105,6 +106,9 @@ def launch_desktop(state: ProductSession, *, save_path: str | None = None) -> No
             f"Food {landscape.provisions} / Water {landscape.freshwater}",
             f"Lumber {landscape.lumber} / Masonry {landscape.masonry}",
             f"Citizens: {len(current.society.inhabitants)}",
+            f"NPC bonds: {len(current.cognition.bonds)}; "
+            f"work orders: {len(current.cognition.orders)}",
+            f"NPC recorded memories: {sum(len(m.memories) for m in current.cognition.minds)}",
             f"World action points: {current.living.spatial.game.causal.action_points}",
             f"Original root: {quest['authored_root_id']}",
             f"Story proofs: {quest['verified_local_milestones']}/3",
@@ -166,6 +170,11 @@ def launch_desktop(state: ProductSession, *, save_path: str | None = None) -> No
     button("Advance whole world + NPC clock", lambda: perform(
         ProductAction("causal", "end_turn")))
     button("Save current world", save)
+    button("Open NPC mind/relationship ledger", lambda: status.set(
+        str(cognition_report(session[0].cognition, session[0].society,
+                             session[0].terrain))[:500]))
+    button("Fund public council (one food)", lambda: perform(
+        ProductAction("npc", "council")))
     for verb in rule.foundation.system.commands:
         button("Living-system: " + verb, lambda cmd=verb: perform(
             ProductAction("living", cmd)))
