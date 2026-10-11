@@ -452,6 +452,7 @@ $("system-stage").addEventListener("click",async()=>{
 // The advanced playable reference runs stateless server-side. No client state
 // is trusted: every button submits the full transcript for independent replay.
 let advancedCommands=[],advancedSession=null,advancedSettings=null,advancedEditor=null;
+let advancedScene=null;
 function drawAdvancedGame(session){
  const canvas=$("advanced-canvas"),c=canvas.getContext("2d");
  const W=canvas.width,H=canvas.height;
@@ -586,8 +587,11 @@ async function startAdvanced(){
   const seedText=$("advanced-seed").value;
   if(!/^[0-9]+$/.test(seedText))throw Error("Advanced seed must be an integer");
   const seed=Number(seedText);
+  advancedScene=$("advanced-scene-json").value.trim()?
+   JSON.parse($("advanced-scene-json").value):null;
   const reply=await api("/api/advanced-play",{
-   editor:advancedEditor,settings:advancedSettings,actions:[],seed});
+   editor:advancedEditor,settings:advancedSettings,actions:[],seed,
+   scene:advancedScene});
   advancedCommands=[];showAdvanced(reply);
   status("Started deterministic advanced "+advancedEditor+" session. Commands are replay-audited.");
  }catch(error){status("Advanced session blocked: "+error.message);}
@@ -599,11 +603,111 @@ async function advanceAdvanced(action){
   const actions=[...advancedCommands,action];
   const reply=await api("/api/advanced-play",{
    editor:advancedEditor,settings:advancedSettings,
-   actions,seed:advancedSession.seed});
+   actions,seed:advancedSession.seed,scene:advancedScene});
   advancedCommands=actions;showAdvanced(reply);
   status("Advanced action verified: "+action+" · "+reply.session.head_digest.slice(0,16));
  }catch(error){status("Advanced action rejected: "+error.message);}
 }
+async function reviewedSceneTemplate(){
+ const editor=systemEditor().id,settings=systemSettings();
+ const input=$("advanced-scene-json").value.trim();
+ const authored=input?JSON.parse(input):null;
+ const seedText=$("advanced-seed").value;
+ if(!/^[0-9]+$/.test(seedText))throw Error("Advanced seed must be an integer");
+ const values={
+  editor,settings,seed:Number(seedText),
+  scene_id:$("advanced-scene-id").value,
+  layout:authored?authored.layout:null,
+ };
+ return api("/api/advanced-scene-template",values);
+}
+$("advanced-scene-template").addEventListener("click",async()=>{
+ try{
+  const template=await reviewedSceneTemplate();
+  $("advanced-scene-json").value=JSON.stringify(template.scene,null,2);
+  status("Authored scene template validated. Modify terrain/regions, then validate again.");
+ }catch(error){status("Authored scene rejected: "+error.message);}
+});
+$("advanced-scene-stage").addEventListener("click",async()=>{
+ try{
+  if(!model||selectedTree!=="current"||selectedProject!==model.active)
+   throw Error("An active current original project is required");
+  const validated=await reviewedSceneTemplate();
+  const file=validated.path;
+  $("advanced-scene-json").value=JSON.stringify(validated.scene,null,2);
+  let prior={content:"",version:{
+   sha256:"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   editable:true}};
+  const list=await api("/api/files?tree=current&project="+encodeURIComponent(selectedProject));
+  if(list.files.some(x=>x.path===file))
+   prior=await api("/api/file?tree=current&project="+encodeURIComponent(selectedProject)+
+                   "&path="+encodeURIComponent(file));
+  loaded=prior;selectedFile=file;proposal=null;
+  $("editor").value=validated.content;$("editor").readOnly=false;
+  $("file-name").textContent="AUTHORED SCENE: current/"+selectedProject+"/"+file;
+  $("hash").textContent="SHA-256 "+prior.version.sha256;
+  $("reason").value="Review authored "+validated.scene.editor+
+   " geometry and resource layout before local original-game commit";
+  $("propose").disabled=false;$("commit").disabled=true;
+  $("proposal").textContent="";
+  diff();
+  status("Authored scene staged: review source and commit. Its system configuration must already be approved.");
+ }catch(error){status("Scene staging blocked: "+error.message);}
+});
+$("advanced-save").addEventListener("click",async()=>{
+ try{
+  if(!advancedSession)throw Error("Start a game to create a savegame");
+  const result=await api("/api/advanced-save",{
+   session:advancedSession,settings:advancedSettings});
+  const source=JSON.stringify(result.savegame,null,2)+"\n";
+  const blob=new Blob([source],{type:"application/json"});
+  const url=URL.createObjectURL(blob),link=document.createElement("a");
+  link.href=url;link.download="original-"+advancedSession.editor+"-game-save.json";
+  document.body.append(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),0);
+  status("Exported replay-verified portable savegame; it contains no executable source.");
+ }catch(error){status("Savegame export rejected: "+error.message);}
+});
+$("advanced-load").addEventListener("change",async()=>{
+ try{
+  const file=$("advanced-load").files[0];
+  if(!file)return;
+  if(file.size>280000)throw Error("Game save file exceeds bounded import size");
+  const data=JSON.parse(await file.text());
+  const restored=await api("/api/advanced-load",{savegame:data});
+  const session=restored.session;
+  const select=$("system-kind");
+  if(!systemCatalog.some(x=>x.id===session.editor))
+   throw Error("Savegame editor is not available in this studio");
+  select.value=session.editor;renderSystemControls();
+  for(const field of systemEditor().fields){
+   const input=[...$("system-fields").querySelectorAll("[data-system-field]")]
+    .find(x=>x.dataset.systemField===field.key);
+   if(field.kind==="bool")input.checked=restored.settings[field.key];
+   else input.value=String(restored.settings[field.key]);
+  }
+  advancedEditor=session.editor;advancedSettings=restored.settings;
+  advancedScene=session.scene;advancedCommands=session.actions.slice();
+  $("advanced-seed").value=String(session.seed);
+  $("advanced-scene-json").value=session.scene?JSON.stringify(session.scene,null,2):"";
+  if(session.scene)$("advanced-scene-id").value=session.scene.scene_id;
+  showAdvanced({session,available_actions:session.editor==="platformer"?
+    ["left","right","jump","jump_left","jump_right","wait","dash_left","dash_right"]:
+    session.editor==="tactics"?
+    ["north","south","west","east","attack:0","attack:1","guard",
+     "overwatch","heal","switch","end_turn"]:
+    session.editor==="tower_defense"?
+    ["tick","tick:4","build:0","build:1","build:2",
+     "upgrade:0","upgrade:1","upgrade:2","sell:0","sell:1","sell:2",
+     "priority:first","priority:strong"]:
+    session.editor==="racing"?
+    ["accelerate","brake","coast","steer_left","steer_right","boost","pit"]:
+    ["forage","gather_wood","mine_stone","drink","hunt","cook",
+     "craft_tool","light_fire","build_shelter","trade","travel","rest"]});
+  status("Savegame replay verified; exact original settings and command history restored.");
+ }catch(error){status("Savegame import blocked: "+error.message);}
+ finally{$("advanced-load").value="";}
+});
 $("advanced-start").addEventListener("click",startAdvanced);
 $("advanced-verify").addEventListener("click",async()=>{
  try{
@@ -678,7 +782,15 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <p><small>Actual command-driven gameplay for platformer, tactics, tower defense, racing and survival.
 Other editor families remain authoring-only, not falsely certified engines.</small></p>
 <label>Scenario seed<input id="advanced-seed" type="number" min="0" max="2147483647" value="0"></label>
+<label>Original authored scene ID<input id="advanced-scene-id" value="scene_01"></label>
+<button id="advanced-scene-template" type="button">Create / validate authored scene</button>
+<button id="advanced-scene-stage" type="button">Stage authored scene for review</button>
+<label>Editable scene geometry and resource JSON
+<textarea id="advanced-scene-json" rows="6" spellcheck="false"
+ placeholder="Generate an advanced authored scene, then edit its layout."></textarea></label>
 <button id="advanced-start" type="button">Start advanced scenario</button>
+<button id="advanced-save" type="button">Download verified savegame</button>
+<label>Restore portable savegame<input id="advanced-load" type="file" accept=".json,application/json"></label>
 <button id="advanced-verify" type="button">Independently verify replay</button>
 <div id="advanced-actions" aria-label="Advanced gameplay actions"></div>
 <canvas id="advanced-canvas" width="470" height="250" role="img"
