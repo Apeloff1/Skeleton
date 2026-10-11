@@ -22,6 +22,7 @@ from skeleton.ai.game_builder.advanced_gameplay_save import (
     continue_advanced_savegame,
 )
 from skeleton.ai.game_builder.game_project_workspace import GameWorkspace, WorkspaceError
+from skeleton.ai.game_builder.system_editor_assembly import assemble_workspace_systems
 from skeleton.ai.game_builder.game_workspace_server import create_workspace_server
 from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html
 from skeleton.ai.game_builder.system_editor_cli import main as editor_cli
@@ -105,6 +106,19 @@ class AuthoredSceneTests(unittest.TestCase):
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("survival",scene=custom,
                                  actions=["gather_wood","gather_wood"])
+
+    def test_compact_platformer_default_scenes_preserve_safe_checkpoints(self):
+        for width in (16,17,18,21,30):
+            for seed in (0,1,2,3,7,12):
+                with self.subTest(width=width,seed=seed):
+                    authored=make_advanced_scene("platformer",
+                         {"level_width":width},seed=seed)
+                    positions=authored["layout"]
+                    self.assertFalse(set(positions["hazards"]) &
+                                     set(positions["checkpoints"]))
+                    self.assertTrue(verify_advanced_session(
+                        run_advanced_session("platformer",
+                           {"level_width":width},seed=seed,scene=authored)))
 
     def test_fail_closed_geometry_and_configuration_binding(self):
         scene=make_advanced_scene("platformer")
@@ -223,6 +237,23 @@ class ReviewedSceneWorkspaceTests(unittest.TestCase):
         demo=self.ws.archive("original_a",authorized=True,demo=True)
         self.assertEqual(json.loads(self.ws.read(
             "demos",demo["ref"],path)["content"]),scene)
+
+    def test_assembled_hybrid_reports_actual_authored_scene_replay(self):
+        self.approve_system("tower_defense")
+        scene=make_advanced_scene("tower_defense",
+                    layout={"build_slots":[1],"waves":2})
+        proposal=self.ws.propose("original_a",scene_path(scene),json.dumps(scene),
+                expected_sha256=EMPTY_SHA,
+                reason="Review custom wave count and slot permissions",authorized=True)
+        self.ws.commit(proposal["proposal_id"],authorized=True,human_approved=True)
+        report=assemble_workspace_systems(self.ws,"original_a",authorized=True)
+        self.assertEqual(report["authored_scene_count"],1)
+        evidence=report["authored_scene_evidence"][0]
+        self.assertEqual(evidence["scene_digest"],scene["digest"])
+        self.assertEqual(evidence["path"],scene_path(scene))
+        self.assertEqual(len(evidence["gameplay_session_digest"]),64)
+        self.assertFalse(evidence["release_certified"])
+        self.assertFalse(report["ready_for_release"])
 
     def test_stale_scene_proposal_cannot_commit_after_system_changes(self):
         self.approve_system("platformer")
