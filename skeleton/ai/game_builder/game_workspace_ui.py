@@ -853,6 +853,7 @@ document.addEventListener("keydown",event=>{
  const mode=event.shiftKey?"sprint":event.ctrlKey?"crouch":"move";
  advanceAdvanced(mode+"_"+direction);
 });
+let originalRoguelikeLongrunRecord=null;
 let selectedSandboxCell=0;
 let selectedCityParcel=0;
 function renderAdvancedActions(actions){
@@ -876,7 +877,52 @@ function renderAdvancedActions(actions){
   target.append(submit);
   const hint=document.createElement("small");
   hint.textContent="Arrow keys move one tile; Shift+arrow spends stamina on dash; enemy blocks physical movement. A boss must actually fall before final extraction.";
-  target.append(hint);return;
+  target.append(hint);
+  const marathonLabel=document.createElement("label");
+  marathonLabel.textContent="Long-run original dungeon transcript (JSON array of legitimate actions)";
+  const marathonInput=document.createElement("textarea");
+  marathonInput.id="roguelike-longrun-actions";
+  marathonInput.setAttribute("aria-label","Enter additional legal original roguelike commands as JSON");
+  marathonInput.placeholder='["move_east","strike_east","take_stairs"]';
+  marathonInput.rows=3;marathonLabel.append(marathonInput);
+  target.append(marathonLabel);
+  const marathon=document.createElement("button");
+  marathon.type="button";
+  marathon.id="roguelike-longrun-submit";
+  marathon.textContent="Verify / continue long-run dungeon";
+  const result=document.createElement("pre");
+  result.id="roguelike-longrun-proof";
+  result.setAttribute("role","status");
+  result.setAttribute("aria-live","polite");
+  marathon.addEventListener("click",async()=>{
+   try{
+    const actions=JSON.parse(marathonInput.value);
+    if(!Array.isArray(actions))throw Error("Commands must be an array");
+    if(advancedEditor!==systemEditor().id)
+      throw Error("Restart dungeon before submitting a changed editor");
+    const answer=await api("/api/roguelike-marathon",{
+      settings:advancedSettings,actions,seed:advancedSession.seed,
+      scene:advancedScene,prior:originalRoguelikeLongrunRecord,
+      checkpoint_interval:64
+    });
+    originalRoguelikeLongrunRecord=answer.record;
+    result.textContent=JSON.stringify({
+      floor:answer.record.state.floor,
+      turns:answer.record.turn_count,
+      checkpoint_count:answer.record.checkpoint_count,
+      head_digest:answer.record.head_digest,
+      independently_verified:answer.independently_verified,
+      victory:answer.record.victory,
+      terminal:answer.record.terminal,
+      game_files_mutated:answer.game_files_mutated,
+      native_executable_certified:answer.native_executable_certified
+    },null,2);
+    marathonInput.value="[]";
+    status("Long-run dungeon replayed from original source and checked in bounded segments. No checkpoint bypass or native certification.");
+   }catch(error){status("Roguelike longrun rejected: "+error.message);}
+  });
+  target.append(marathon);target.append(result);
+  return;
  }
 
  if(advancedSession?.editor==="sandbox"){
@@ -1094,7 +1140,7 @@ async function startAdvanced(){
   const reply=await api("/api/advanced-play",{
    editor:advancedEditor,settings:advancedSettings,actions:[],seed,
    scene:advancedScene});
-  advancedCommands=[];showAdvanced(reply);
+  advancedCommands=[];originalRoguelikeLongrunRecord=null;showAdvanced(reply);
   status("Started deterministic advanced "+advancedEditor+" session. Commands are replay-audited.");
  }catch(error){status("Advanced session blocked: "+error.message);}
 }
