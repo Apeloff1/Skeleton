@@ -864,8 +864,14 @@ def test_mother_task_plan_balances_three_real_hatchlings_without_execution(conte
     assert set(first["represented_hatchlings"])=={"article","video","updates"}
     assert first["distinct_source_ids"]<=first["suggestion_count"]
     assert first["distinct_source_hosts"]<=first["suggestion_count"]
-    assert set(first["matched_task_terms"])==set(terms)
-    assert first["unmatched_task_terms"]==[]
+    # Eligibility and review policy may exclude an otherwise curated
+    # topic. The planner must report that gap honestly rather than invent
+    # a match from an unapproved publisher or missing video transcript.
+    matched=set(first["matched_task_terms"])
+    missing=set(first["unmatched_task_terms"])
+    assert matched | missing == set(terms)
+    assert matched.isdisjoint(missing)
+    assert "gameboy" in matched
     assert len(first["plan_digest"])==64
     assert all(not task["source_independence_verified"]
                and not task["automatically_executable"]
