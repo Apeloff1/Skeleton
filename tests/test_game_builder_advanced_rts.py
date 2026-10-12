@@ -29,13 +29,13 @@ class OriginalLiveStrategyTests(unittest.TestCase):
     def rules(**changes):
         return {**{"enemy_ai":False,"enemy_waves":False},**changes}
 
-    def test_seventeenth_family_real_62_axis_editor_with_registered_actions(self):
+    def test_seventeenth_family_real_72_axis_editor_with_registered_actions(self):
         self.assertIn("rts",ENGINES)
         self.assertEqual(set(ACTIONS),set(ACTION_HELP["rts"]))
         spec=next(x for x in catalog() if x["id"]=="rts")
         self.assertEqual(spec["runtime_maturity"],"advanced_reference_runtime")
         self.assertEqual(spec["progression_floor"],"advanced")
-        self.assertEqual(len(spec["fields"]),63)
+        self.assertEqual(len(spec["fields"]),72)
         self.assertGreater(len(ACTIONS),500)
         self.assertEqual(len(set(ACTIONS)),len(ACTIONS))
 
@@ -185,6 +185,7 @@ class OriginalLiveStrategyTests(unittest.TestCase):
         scene=make_advanced_scene("rts",self.rules(),seed=3)
         for mutation in (
            lambda x:x["nodes"][0].update(stock=True),
+           lambda x:x["nodes"][0].update(stock=cfg["wood_stock"]+1),
            lambda x:x["nodes"][0].update(type="gold"),
            lambda x:x["nodes"][0].update(id=2),
            lambda x:x.update(enemy_base=x["friendly_base"]),
@@ -269,6 +270,87 @@ class OriginalLiveStrategyTests(unittest.TestCase):
         travel=run_advanced_session("rts",rules,["select:1","move:62"])
         self.assertNotEqual(travel["state"]["units"][1]["cell"],62)
         self.assertTrue(verify_advanced_session(travel,rules))
+
+
+    def test_actual_combat_medic_needs_barracks_and_finite_energy(self):
+        cfg=make_editor_document("rts",self.rules(
+            medic_heal=6,medic_energy_cost=3,medic_range=2,
+        ))["settings"]
+        state=start(cfg,0)
+        with self.assertRaises(RTSActionError):
+            step(state,cfg,"train:medic")
+        step(state,cfg,"construct:barracks:2")
+        step(state,cfg,"move:9")
+        step(state,cfg,"train:medic")
+        medic=next(x for x in state["units"] if x["kind"]=="medic")
+        self.assertEqual(medic["cell"],1)
+        soldier=state["units"][1]
+        soldier["hp"]-=8  # isolated tactical injury, not a fabricated replay receipt
+        previous_energy=state["energy"]
+        step(state,cfg,"inspect")
+        self.assertEqual(soldier["hp"],soldier["max_hp"]-2)
+        self.assertEqual(state["energy"],previous_energy-3)
+        self.assertIn("actual_nearby_original_combat_medic_spent_energy_healing",
+                      state["events"])
+        state["energy"]=0
+        soldier["hp"]-=2
+        step(state,cfg,"inspect")
+        self.assertEqual(soldier["hp"],soldier["max_hp"]-4)
+        state["selected"]=medic["id"]
+        with self.assertRaises(RTSActionError):
+            step(state,cfg,"attack:54")
+
+    def test_original_stances_change_real_autonomous_engagement(self):
+        cfg=make_editor_document("rts",self.rules(
+            fog_of_war=False,defensive_radius=2,
+            aggressive_radius=6,soldier_attack=8,
+        ))["settings"]
+        state=start(cfg,0)
+        unit=state["units"][1]
+        unit["cell"]=53
+        state["selected"]=1
+        enemy=state["enemies"][0]
+        before=enemy["hp"]
+        step(state,cfg,"hold")
+        self.assertEqual(enemy["hp"],before)
+        step(state,cfg,"aggressive")
+        self.assertLess(enemy["hp"],before)
+        self.assertIn("original_owned_unit_stance_selected_real_opponent",
+                      state["events"])
+
+    def test_defeated_real_enemy_causes_bounded_veteran_progress(self):
+        cfg=make_editor_document("rts",self.rules(
+            fog_of_war=False,veterancy_threshold=2,max_veterancy=2,
+            kill_experience=3,veterancy_damage_bonus=4,
+        ))["settings"]
+        state=start(cfg,0)
+        unit=state["units"][1]
+        unit["cell"]=53
+        state["selected"]=1
+        foe=state["enemies"][0]
+        foe["hp"]=3  # isolated short combat, not a fabricated source/play proof
+        step(state,cfg,"attack:54")
+        self.assertEqual(foe["hp"],0)
+        self.assertEqual(unit["kills"],1)
+        self.assertEqual(unit["veterancy"],1)
+        self.assertEqual(unit["experience"],1)
+        self.assertIn("actually_defeated_original_enemy_awarded_veteran_level",
+                      state["events"])
+
+    def test_siege_bonus_applies_only_to_hostile_real_structures(self):
+        cfg=make_editor_document("rts",self.rules(
+            fog_of_war=False,siege_attack=6,siege_structure_bonus=7,
+        ))["settings"]
+        state=start(cfg,0)
+        unit=state["units"][1]
+        unit["cell"]=62
+        unit["kind"]="siege"  # isolated type-specific damage, not a replay claim
+        state["selected"]=1
+        command=state["buildings"][1]
+        health=command["hp"]
+        step(state,cfg,"attack:63")
+        self.assertEqual(command["hp"],health-13)
+        self.assertEqual(state["buildings"][0]["hp"],cfg["friendly_base_health"])
 
     def test_original_hybrid_source_and_offline_cli_produce_true_gameplay(self):
         cfg=self.rules()
