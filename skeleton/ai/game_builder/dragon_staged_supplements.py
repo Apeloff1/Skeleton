@@ -129,7 +129,13 @@ def build_catalog_supplements(
             if url in retained:
                 if len(retained[url]["discoveries"]) >= 32:
                     raise ValueError("excessive catalog provenance for one URL")
-                retained[url]["discoveries"].append(origin)
+                prior = retained[url]
+                prior["discoveries"].append(origin)
+                if raw < prior["url"]:
+                    prior["url"] = raw
+                    prior["source_id"] = (
+                        "source-" + sha256(raw.encode("utf-8")).hexdigest()
+                    )
                 skipped["same_canonical_new_link"] += 1
                 continue
             retained[url] = {
@@ -154,6 +160,11 @@ def build_catalog_supplements(
     rows = sorted(retained.values(), key=lambda row: (
         canonical_source_url(row["url"]), row["url"]
     ))
+    for row in rows:
+        row["discoveries"].sort(key=lambda o: (
+            o["repository"], o["commit_sha"], o["readme_blob_sha"],
+            o["exact_url"], o["line"], tuple(o["headers"])
+        ))
     batch_count = (len(rows) + batch_size - 1) // batch_size
     if len(accepted) + batch_count > MAX_SUPPLEMENTS:
         raise ValueError("source campaign exceeds finite evidence-chain budget")
