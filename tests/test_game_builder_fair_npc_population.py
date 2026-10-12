@@ -79,6 +79,46 @@ class HigherCapacityNPCSimulationTests(unittest.TestCase):
             self.assertLessEqual(citizen["longest_deferral"],24)
             self.assertGreaterEqual(citizen["eligible_deferred_ticks"],0)
 
+    def test_player_tile_is_physically_reserved_for_all_citizens(self):
+        from skeleton.ai.game_builder.advanced_chunked_npc_world import (
+            _act,_neighbors,
+        )
+        for chunks in (3,5):
+            for seed in (0,1,7):
+                with self.subTest(chunks=chunks,seed=seed):
+                    base=run_chunked_npc_world(
+                        ["wait"]*5,seed=seed,options=rules(chunks=chunks))
+                    state=base["state"]
+                    self.assertNotIn(state["player"],
+                                     {a["position"] for a in state["actors"]})
+                    self.assertEqual(
+                        len({a["position"] for a in state["actors"]}),128)
+                    self.assertTrue(verify_chunked_npc_world(base))
+        # Explicitly attempt to enter a resident's cell using the actual
+        # player-movement rule. It must reject without spending stamina.
+        original=run_chunked_npc_world([])
+        state=deepcopy(original["state"])
+        p=state["player"];side=state["side"]
+        allowed={
+            "north":p-side,"south":p+side,"west":p-1,"east":p+1,
+        }
+        for direction,target in allowed.items():
+            if target not in set(_neighbors(p,side)):
+                continue
+            if target in state["obstacles"]:
+                continue
+            if any(a["position"]==target for a in state["actors"]):
+                continue
+            state["actors"][4]["position"]=target
+            before=state["inventory"]["stamina"]
+            with self.assertRaises(ChunkWorldError):
+                _act(state,original["settings"],original["options"],
+                     "move:"+direction,[])
+            self.assertEqual(state["player"],p)
+            self.assertEqual(state["inventory"]["stamina"],before)
+            return
+        self.fail("original generated NPC world needs at least one adjacent traversable test cell")
+
     def test_window_fidelity_never_simulates_remote_residents(self):
         source=run_chunked_npc_world(["wait"]*12,
               options=rules(citizens=96,chunks=5,active=6,radius=0))
