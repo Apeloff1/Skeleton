@@ -367,10 +367,26 @@ class ShadowWeightAutomation:
                     verdict.benchmark_count, verdict.before_hits,
                     verdict.after_hits, verdict.improved, verdict.regressed, verdict.accepted,
                 )
-                if verdict.candidate_id != cid or verdict.result_digest != _hash(fields):
+                if (verdict.candidate_id != cid or verdict.result_digest != _hash(fields)
+                        or any(not isinstance(x, str) or HEX.fullmatch(x) is None
+                               for x in (verdict.suite_digest, verdict.baseline_digest,
+                                         verdict.result_digest))
+                        or type(verdict.benchmark_count) is not int
+                        or not 5 <= verdict.benchmark_count <= 256
+                        or any(type(x) is not int or not 0 <= x <= verdict.benchmark_count
+                               for x in (verdict.before_hits, verdict.after_hits,
+                                         verdict.improved, verdict.regressed))
+                        or type(verdict.accepted) is not bool
+                        or verdict.after_hits - verdict.before_hits != (
+                            verdict.improved - verdict.regressed)
+                        or verdict.accepted != (
+                            verdict.improved >= 1 and verdict.regressed == 0
+                            and verdict.after_hits > verdict.before_hits)):
                     raise ValueError("benchmark receipt mismatch")
-            if (stage in ("tested", "active") and (verdict is None or not verdict.accepted)
-                    or stage == "active" and not _hex(approval)):
+            if ((stage in ("tested", "active") and (verdict is None or not verdict.accepted))
+                    or (stage == "active" and not _hex(approval))
+                    or (stage == "shadow" and (verdict is not None or approval))
+                    or (stage == "tested" and approval)):
                 raise ValueError("approved weights missing validation")
             rows = self.db.execute(
                 "SELECT seq,payload FROM dragon_shadow_weight_events "
@@ -378,6 +394,14 @@ class ShadowWeightAutomation:
             )
             events = []
             parent = "0" * 64
+            previous_stage = "absent"
+            last_at = shadow.at
+            transitions = {
+                ("absent", "shadow"),
+                ("shadow", "tested"), ("shadow", "revoked"),
+                ("tested", "active"), ("tested", "revoked"),
+                ("active", "revoked"),
+            }
             for expected, (seq, item) in enumerate(rows, 1):
                 if expected > 32 or seq != expected or len(item) > 1200:
                     raise ValueError("shadow journal sequence or budget failed")
@@ -390,7 +414,13 @@ class ShadowWeightAutomation:
                                  entry.improvement, parent)
                 if entry != control:
                     raise ValueError("shadow audit digest chain failed")
+                if (entry.action != "transition"
+                        or entry.before != previous_stage
+                        or (entry.before, entry.after) not in transitions
+                        or entry.at < last_at):
+                    raise ValueError("shadow audit illegal transition or timestamp rollback")
                 events.append(entry)
+                previous_stage, last_at = entry.after, entry.at
                 parent = entry.digest
             if not events or parent != head or events[-1].after != stage:
                 raise ValueError("shadow event history and signed stage disagree")
