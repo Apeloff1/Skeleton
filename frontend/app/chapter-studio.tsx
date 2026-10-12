@@ -28,13 +28,13 @@ type ChapterForm = {
   title: string; synopsis: string; notes: string; historical_setting: string;
   palette_rules: string; costume_rules: string; voice_rules: string;
   era_id: string; style_id: string; palette_id: string;
-  voice_cast: string; transition_reason: string;
+  voice_cast: string; face_cast: string; transition_reason: string;
 };
 function blankChapter(): ChapterForm {
   return {
     title: '', synopsis: '', notes: '', historical_setting: '', palette_rules: '',
     costume_rules: '', voice_rules: '', era_id: '', style_id: '',
-    palette_id: '', voice_cast: '', transition_reason: '',
+    palette_id: '', voice_cast: '', face_cast: '', transition_reason: '',
   };
 }
 function chapterForm(value: ChapterNote): ChapterForm {
@@ -44,6 +44,7 @@ function chapterForm(value: ChapterNote): ChapterForm {
     costume_rules: value.costume_rules, voice_rules: value.voice_rules,
     era_id: value.era_id, style_id: value.style_id, palette_id: value.palette_id,
     voice_cast: Object.entries(value.voice_cast || {}).map(([c, v]) => c + '=' + v).join('\n'),
+    face_cast: Object.entries(value.face_cast || {}).map(([c, v]) => c + '=' + v).join('\n'),
     transition_reason: value.transition_reason || '',
   };
 }
@@ -158,7 +159,7 @@ export default function ChapterStudioScreen() {
       palette_rules: f.palette_rules.trim(), costume_rules: f.costume_rules.trim(),
       voice_rules: f.voice_rules.trim(), era_id: slug(f.era_id, 'Era'),
       style_id: slug(f.style_id, 'Style'), palette_id: slug(f.palette_id, 'Palette'),
-      voice_cast: voiceCast(f.voice_cast),
+      voice_cast: voiceCast(f.voice_cast), face_cast: voiceCast(f.face_cast),
       transition_reason: f.transition_reason.trim() || null,
       source_message_id: ID.test(sourceId) ? sourceId : null,
     };
@@ -404,6 +405,7 @@ export default function ChapterStudioScreen() {
         {field('style_id', 'Canonical art style ID', 96)}
         {field('palette_id', 'Canonical palette ID', 96)}
         {field('voice_cast', 'Immutable voices — character_id=voice_id per line', 4000, true)}
+        {field('face_cast', 'Immutable facial identities — character_id=face_asset_id per line', 4000, true)}
         {field('transition_reason', 'Approved era/style/palette transition rationale (only if needed)', 1200, true)}
         <View style={styles.wrap}>
           <Action icon="save-outline" label="Save chapter notes" disabled={busy}
