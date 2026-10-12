@@ -1603,6 +1603,74 @@ function renderAdvancedActions(actions){
    }
   });
   target.append(runFusion);target.append(fusionStatus);
+  const worldLabel=document.createElement("label");
+  worldLabel.textContent="Unified NPC World · single canonical spatial map and monotonic clock";
+  const worldInput=document.createElement("textarea");
+  worldInput.id="original-unified-npc-actions";
+  worldInput.rows=5;
+  worldInput.setAttribute("aria-label","Bounded registered unified-world actions");
+  worldInput.value=JSON.stringify([
+    "move:south","move:east","discover:0",
+    "speak:0","support:0",
+    "followup:0","followup:0","followup:0",
+    "followup:0","followup:0","resolve:0"
+  ],null,1);
+  worldLabel.append(worldInput);target.append(worldLabel);
+  const runWorld=document.createElement("button");
+  runWorld.type="button";
+  runWorld.textContent="Execute and replay canonical NPC world";
+  const worldPanel=document.createElement("pre");
+  worldPanel.id="original-unified-world-proof";
+  worldPanel.setAttribute("role","status");
+  worldPanel.setAttribute("aria-live","polite");
+  runWorld.addEventListener("click",async()=>{
+    try{
+      const actions=JSON.parse(worldInput.value);
+      if(!Array.isArray(actions)||actions.length>96||
+         !actions.every(x=>typeof x==="string"&&x.length<=64))
+         throw Error("Only up to 96 original bounded NPC world commands are allowed");
+      const outcome=await api("/api/unified-npc-world",{actions,seed:0});
+      if(!outcome.independently_verified||outcome.source_files_mutated||
+         outcome.native_unified_engine_executed)
+         throw Error("Shared world is not source-verified or made unsupported release claims");
+      const proof=await api("/api/unified-npc-world-verify",{record:outcome.record});
+      if(!proof.verified)throw Error("Complete same-world replay failed source checks");
+      const world=outcome.record.state;
+      worldPanel.textContent=JSON.stringify({
+        common_world_digest:outcome.record.digest,
+        canonical_map_side:world.map_side,
+        player_tile:world.player,
+        world_tick:world.tick,
+        real_actors:world.actors.map(actor=>({
+          source_id:actor.id,position:actor.position,home:actor.home,
+          work:actor.work,schedule:actor.schedule_phase,
+          steps_walked:actor.movement_steps,
+          name:actor.authored_name,trust:actor.trust,bond:actor.bond,
+          patience:actor.patience,eyewitness_history:actor.witness_memories,
+          firsthand_accounts:actor.heard_firsthand
+        })),
+        verified_physical_events:world.events_ledger,
+        real_quests:world.quests,
+        dialogue:world.dialogues,
+        paid_social_choices:world.choices,
+        resources:world.resources,
+        resolved_quests:world.resolved_count,
+        ordered_action_receipts:outcome.record.event_frames.map(x=>({
+          action:x.action,tick:x.tick,npc_moves:x.npc_moves,
+          recorded_events:x.source_events,state_digest:x.after
+        })),
+        one_physical_authority:true,
+        prior_separate_engines_not_simultaneously_executed:true,
+        independent_replay:true,
+        file_mutations:false,model_weights_promoted:false
+      },null,2);
+      status("Shared physical NPC authority was independently replayed; no project or AI weights mutated.");
+    }catch(error){
+      worldPanel.textContent="";
+      status("Unified NPC World rejected: "+error.message);
+    }
+  });
+  target.append(runWorld);target.append(worldPanel);
   return;
  }
  if(advancedSession?.editor==="economy"){
