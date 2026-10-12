@@ -59,8 +59,10 @@ def normalize_layout(config, layout):
         raise SailingActionError("original maritime route title is unsafe")
     if type(layout["sea"]) is not str or layout["sea"] not in SEAS:
         raise SailingActionError("unsupported original seascape")
-    if type(layout["start"]) is not list or layout["start"] != [0, 0]:
-        raise SailingActionError("vessel must depart original chart origin")
+    if (type(layout["start"]) is not list or len(layout["start"]) != 2
+        or any(type(coord) is not int for coord in layout["start"])
+        or layout["start"] != [0, 0]):
+        raise SailingActionError("vessel must depart exact integer chart origin")
     length = config["route_length"]
     limit = length - config["harbor_length"]
     if (_int(layout["harbor_start"], 1, length - 1, "harbor start") != limit
