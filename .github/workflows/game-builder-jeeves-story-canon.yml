@@ -20,6 +20,7 @@ on:
       - "tests/test_game_builder_story_workspace.py"
       - "tests/test_game_builder_jeeves_production.py"
       - "tests/test_game_builder_story_continuity_assurance.py"
+      - "docs/JEEVES_100_ACT_9999_SCENE_CONSISTENCY_LAW.md"
       - ".github/workflows/game-builder-jeeves-story-canon.yml"
   workflow_dispatch:
 permissions:
