@@ -682,14 +682,86 @@ function drawAdvancedGame(session){
   c.fillStyle="#e9d8aa";
   c.fillText("Select a parcel below, then issue a reviewed city command.",12,232);
  }
+
+ if(editor==="stealth"){
+  const ox=15,oy=36,cell=23;
+  const mark=(p,color,label="")=>{
+   c.fillStyle=color;c.fillRect(ox+p[0]*cell+1,oy+p[1]*cell+1,cell-2,cell-2);
+   if(label){c.fillStyle="#071b28";c.fillText(label,ox+p[0]*cell+6,oy+p[1]*cell+17);}
+  };
+  c.fillStyle="#c5dedf";c.fillText("Original infiltration 10×8",15,32);
+  for(let y=0;y<8;y++)for(let x=0;x<10;x++)
+   mark([x,y],"#173e4e");
+  for(const p of state.shadows)mark(p,"#2b4e66");
+  for(const p of state.vents)mark(p,"#4f7282","v");
+  for(const p of state.walls)mark(p,"#7d8592");
+  for(const p of state.doors)mark(p,state.open_doors.some(q=>q[0]===p[0]&&q[1]===p[1])?"#7bb3b1":"#b46f63","D");
+  for(const p of state.keycards)mark(p,"#e6cc80","K");
+  for(const p of state.intel)mark(p,"#ad9bdd","I");
+  for(const p of state.cameras)
+   if(p.active)mark(p.position,"#d7a977","C");
+  for(const g of state.guards)
+   mark(g.position,g.disabled?"#869493":"#e58683",g.disabled?"z":"G");
+  mark(state.terminal,"#8db8e6","T");
+  mark(state.objective,state.archive?"#5e9882":"#d9bb79","A");
+  mark(state.extraction,"#83c99e","E");
+  mark(state.player,"#83ecc0","P");
+  c.fillStyle="#ddede6";
+  c.fillText("HP "+state.hp+"/"+state.max_hp+" · alarm "+state.alarm+
+    " · stamina "+state.stamina,253,59);
+  c.fillText("Cards "+state.keycards_owned+" · hack "+state.hacking,253,83);
+  c.fillText("Stuns "+state.stun_charges+" · smoke "+state.smoke_charges+
+    " · EMP "+state.emp_charges,253,107);
+  c.fillText("Guards "+state.guards.length+" · cameras "+
+    state.cameras.filter(x=>x.active).length,253,131);
+  c.fillText("Archive "+(state.archive?"secured":"pending")+
+    " · intel "+state.intel_collected,253,155);
+  c.fillText("Patrols use real rays, hearing and cover.",253,179);
+  c.fillText("Score "+state.score+" · extracted "+state.extracted,253,203);
+  c.fillText("No player-issued teleport or hidden native execution.",15,247);
+ }
  if(state.finished||state.failed){
   c.fillStyle=state.finished?"#a2f5cb":"#ffaba6";
   c.fillText(state.finished?"Completed":"Defeat",W-100,20);
  }
 }
+
+document.addEventListener("keydown",event=>{
+ if(!advancedSession||advancedSession.editor!=="stealth"||advancedSession.terminal)return;
+ if(event.target && (["INPUT","TEXTAREA","SELECT"].includes(event.target.tagName)||
+     event.target.isContentEditable))return;
+ const direction={ArrowUp:"north",ArrowDown:"south",
+  ArrowLeft:"west",ArrowRight:"east"}[event.key];
+ if(!direction)return;
+ event.preventDefault();
+ const mode=event.shiftKey?"sprint":event.ctrlKey?"crouch":"move";
+ advanceAdvanced(mode+"_"+direction);
+});
 let selectedCityParcel=0;
 function renderAdvancedActions(actions){
  const target=$("advanced-actions");target.replaceChildren();
+ if(advancedSession?.editor==="stealth"){
+  const group=document.createElement("label");
+  group.textContent="Infiltration move / cover / gadget";
+  const select=document.createElement("select");
+  select.id="stealth-player-command";
+  select.setAttribute("aria-label","Select original stealth action");
+  for(const action of actions){
+   const option=document.createElement("option");
+   option.value=action;option.textContent=action.replaceAll("_"," ");
+   select.append(option);
+  }
+  group.append(select);target.append(group);
+  const submit=document.createElement("button");
+  submit.type="button";submit.textContent="Execute verified stealth action";
+  submit.disabled=Boolean(advancedSession.terminal);
+  submit.addEventListener("click",()=>advanceAdvanced(select.value));
+  target.append(submit);
+  const hint=document.createElement("small");
+  hint.textContent="Arrow keys move; shift + arrow sprints; ctrl + arrow crouches. Map is a visualization, not a teleport.";
+  target.append(hint);
+  return;
+ }
  if(advancedSession?.editor==="city_builder"){
   const parcelLabel=document.createElement("label");
   parcelLabel.textContent="Selected urban parcel";
@@ -806,6 +878,9 @@ const PAINT_TOOLS={
          "food_plus","food_minus","water_plus","water_minus",
          "biome_next","make_start","threat_up","threat_down",
          "caravan_plus","caravan_minus"],
+ stealth:["walls","shadows","vents","doors","cameras","keycards",
+          "intel","patrol_route","spawn","extraction","objective",
+          "terminal","erase","lighting_next","alarm_up","alarm_down"],
  city_builder:["terrain_plain","terrain_forest","terrain_hill",
                "terrain_wetland","terrain_water","road_hub",
                "aquifer_plus","aquifer_minus","flood_up","flood_down",
@@ -833,6 +908,7 @@ function paintPalette(){
 }
 function sceneGridShape(source){
  const kind=source.editor,layout=source.layout;
+ if(kind==="stealth")return [10,8];
  if(kind==="shooter")return [layout.width,layout.height];
  if(kind==="puzzle")return [systemSettings().board_width,systemSettings().board_height];
  if(kind==="tactics")return [systemSettings().board_width,systemSettings().board_height];
@@ -851,6 +927,36 @@ function renderSceneAuthoring(){
   if(source.editor!==systemEditor()?.id)throw Error("Editor and scene family differ");
   shape=sceneGridShape(source);
  }catch(_){ctx.fillText("Invalid or mismatched scene JSON: use Validate.",12,24);return;}
+
+ if(source.editor==="stealth"){
+  const layout=source.layout;
+  const step=23,ox=12,oy=31;
+  const tile=(cell,color,label="")=>{
+   const x=ox+cell[0]*step,y=oy+cell[1]*step;
+   ctx.fillStyle=color;ctx.fillRect(x+1,y+1,step-2,step-2);
+   if(label){ctx.fillStyle="#102637";ctx.fillText(label,x+5,y+16);}
+  };
+  ctx.fillText("Draw original 10×8 stealth terrain · review changes before playing",12,17);
+  for(let y=0;y<8;y++)for(let x=0;x<10;x++)tile([x,y],"#284555");
+  for(const p of layout.shadows)tile(p,"#3e6478");
+  for(const p of layout.vents)tile(p,"#699bb0","v");
+  for(const p of layout.walls)tile(p,"#7d8490");
+  for(const p of layout.doors)tile(p,"#d09a83","D");
+  for(const p of layout.cameras)tile(p,"#d8c17f","C");
+  for(const p of layout.keycards)tile(p,"#f2d66f","K");
+  for(const p of layout.intel)tile(p,"#b3a0e3","I");
+  for(const r of layout.guard_routes)for(const p of r)tile(p,"#c88783","G");
+  tile(layout.spawn,"#83ebc2","P");
+  tile(layout.extraction,"#9cbfda","E");
+  tile(layout.objective,"#e7c783","A");
+  tile(layout.terminal,"#77b5db","T");
+  ctx.fillStyle="#d5e7e8";
+  ctx.fillText("Patrols "+layout.guard_routes.length+
+    " · lighting "+layout.lighting+" · alarm budget "+layout.alarm_budget,256,57);
+  ctx.fillText("Shadows, vents, guards, doors, intel and cameras are authored.",256,82);
+  ctx.fillText("A revised grid is UNSIGNED until exact digest validation.",256,108);
+  return;
+ }
  if(source.editor==="city_builder"){
   const terrain=source.layout.terrain||[];
   const ink={plain:"#395c4b",forest:"#327b51",hill:"#837653",
@@ -932,6 +1038,36 @@ function renderSceneAuthoring(){
   (layout.portals||[]).forEach(pair=>pair.forEach(p=>draw(p,"portal_a")));
   draw(layout.exit,"exit");draw(layout.spawn,"spawn");
  }
+}
+
+function paintStealthCell([x,y]){
+ const doc=JSON.parse($("advanced-scene-json").value);
+ if(doc.editor!=="stealth"||doc.editor!==systemEditor().id)
+  throw Error("Stealth scene must belong to the selected editor");
+ const layout=doc.layout,tool=$("advanced-paint-tool").value,p=[x,y];
+ const eq=q=>Array.isArray(q)&&q[0]===x&&q[1]===y;
+ const arrays=["walls","shadows","vents","doors","cameras","keycards","intel"];
+ for(const key of arrays)layout[key]=layout[key].filter(q=>!eq(q));
+ if(tool==="erase"){
+  layout.guard_routes=layout.guard_routes.filter(r=>!r.some(eq));
+ }else if(arrays.includes(tool)){
+  layout[tool].push(p);
+ }else if(["spawn","extraction","objective","terminal"].includes(tool)){
+  layout[tool]=p;
+ }else if(tool==="patrol_route"){
+  const second=[x<9?x+1:x-1,y];
+  layout.guard_routes=layout.guard_routes.filter(r=>!r.some(eq));
+  layout.guard_routes.push([p,second]);
+ }else if(tool==="lighting_next"){
+  const choices=["day","night","storm"];
+  layout.lighting=choices[(choices.indexOf(layout.lighting)+1)%choices.length];
+ }else if(tool==="alarm_up"||tool==="alarm_down"){
+  layout.alarm_budget=Math.min(30,Math.max(1,layout.alarm_budget+
+   (tool==="alarm_up"?1:-1)));
+ }else throw Error("Unknown original stealth scene painter tool");
+ $("advanced-scene-json").value=JSON.stringify(doc,null,2);
+ renderSceneAuthoring();
+ status("Stealth geography changed. Validate entire route and scene digest before play.");
 }
 function paintCityCell(index){
  const document=JSON.parse($("advanced-scene-json").value);
@@ -1035,6 +1171,15 @@ $("advanced-scene-grid").addEventListener("click",event=>{
   if(!text)throw Error("Generate a scene document first");
   const doc=JSON.parse(text),shape=sceneGridShape(doc);
   const canvas=$("advanced-scene-grid"),rect=canvas.getBoundingClientRect();
+  if(doc.editor==="stealth"){
+   const px=(event.clientX-rect.left)*canvas.width/rect.width;
+   const py=(event.clientY-rect.top)*canvas.height/rect.height;
+   const x=Math.floor((px-12)/23),y=Math.floor((py-31)/23);
+   if(x<0||x>=10||y<0||y>=8||
+      px>12+x*23+23||py>31+y*23+23)return;
+   paintStealthCell([x,y]);
+   return;
+  }
   if(doc.editor==="city_builder"){
    const px=(event.clientX-rect.left)*canvas.width/rect.width;
    const py=(event.clientY-rect.top)*canvas.height/rect.height;
