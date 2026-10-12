@@ -187,6 +187,12 @@ export function compactPlayerContext(
     'Open threads: ' + (outcome?.unresolved_threads.join(',') || 'unknown'),
     'Current ending: ' + (outcome?.ending_id || 'undecided'),
     'Selected outcome variations: ' + (outcome?.ending_variants_selected || []).join(', '),
+    'ACTUAL ENDING EPILOGUE: ' + (outcome?.ending?.epilogue || 'NOT YET REACHED').slice(0, 850),
+    'ACTUAL ENDING CONSEQUENCES: ' + (outcome?.ending?.consequences || 'UNDECIDED').slice(0, 650),
+    'NPC ENDING FATES: ' + JSON.stringify(outcome?.ending?.character_conclusions || {}).slice(0, 600),
+    'PLACE ENDING FATES: ' + JSON.stringify(outcome?.ending?.place_conclusions || {}).slice(0, 450),
+    'QUEST ENDING FATES: ' + JSON.stringify(outcome?.ending?.quest_conclusions || {}).slice(0, 450),
+    'FACTION/LAW ENDING FATES: ' + JSON.stringify(outcome?.ending?.faction_conclusions || {}).slice(0, 450),
     'Do not invent proof of unseen alternative branches or resolve a missing source by fiat.',
   ].join('\n');
   return body.slice(0, 4000);
