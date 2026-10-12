@@ -48,7 +48,7 @@ class FarmingReferenceAndNativeTests(unittest.TestCase):
         for seed in (0,1,2,8):
             cfg={"crop_types":3,"field_tiles":4}
             source=designed_farm(cfg,seed)
-            actions=["plant:0","plant:1","water:0","advance",
+            actions=["plant:0","plant:1","advance","water:0",
                      "advance:4","harvest:1","sell"]
             game=run_advanced_session("farming",cfg,actions,seed=seed,scene=source)
             self.assertTrue(verify_advanced_session(game,cfg))
@@ -119,6 +119,9 @@ class FarmingReferenceAndNativeTests(unittest.TestCase):
     def test_weather_growing_irrigation_and_livestock_are_actual_events(self):
         cfg={"field_tiles":4,"growth_days":4,"livestock":True}
         scene=designed_farm(cfg)
+        layout=deepcopy(scene["layout"])
+        layout["plots"][0]["soil"]=3
+        scene=make_advanced_scene("farming",cfg,layout=layout)
         moves=["plant:0","plant:1","advance:4","collect",
                "irrigate","buy_seeds","compost:0","sell"]
         game=run_advanced_session("farming",cfg,moves,scene=scene)
