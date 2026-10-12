@@ -73,7 +73,7 @@ def test_hundred_matrix_missing_conflicted_expired_or_bad_signature_stays_closed
     assert not no["shadow_review_proposal_eligible"]
     assert failed.matrix_id in no["failed_matrix_ids"]
     with pytest.raises(ValueError,match="duplicate"):
-        scrutinize_one_hundred("studio","a"*64,records+(records[0],),**kwargs)
+        scrutinize_one_hundred("studio","a"*64,records[:-1]+(records[0],),**kwargs)
     with pytest.raises(PermissionError,match="signature"):
         scrutinize_one_hundred(
             "studio","a"*64,(replace(records[0],evidence_digest="f"*64),)+records[1:],**kwargs)
@@ -124,7 +124,7 @@ def test_two_signed_sandboxes_and_jeeves_fast_index_with_rollback():
         evaluator_public_key=eval_pub,evaluator="independent-mirror",
         evaluator_key_id="eval-1",operator_public_key=op_pub,
         operator="operator",key_id="operator-1",now=150)
-    with pytest.raises(PermissionError,match="signature"):
+    with pytest.raises(PermissionError,match="holdout"):
         router.activate(expected_generation=0,**{
             **args,"evaluation":replace(signed,holdout_excluded_from_training=False)})
     status=router.activate(expected_generation=0,**args)
