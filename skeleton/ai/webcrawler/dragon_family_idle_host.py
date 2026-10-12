@@ -60,6 +60,58 @@ class DragonIdleHostPolicy:
             raise ValueError("invalid consent lifetime ceiling")
 
 
+def read_idle_host_projection(db: sqlite3.Connection, owner: str, *,
+                              at: float, authorized: bool) -> dict[str, object]:
+    """Read-only, authenticated UI projection; never enrolls a device worker.
+
+    A deployed backend is not necessarily the user's local desktop. This
+    endpoint reports *consent and past durable work*, never live OS activity.
+    No schema creation, worker activation, or fresh consent issuance occurs.
+    """
+    _owner(owner)
+    if not authorized:
+        raise PermissionError("authenticated Dragon idle status required")
+    at=_epoch(at)
+    has_sessions=db.execute("""SELECT 1 FROM sqlite_master
+      WHERE type='table' AND name='dragon_family_idle_host_sessions'""").fetchone()
+    row=(db.execute("""SELECT consent_id,scope_digest,task_topics_json,
+      adjacent_topics_json,active,generation,changed_at,next_tick_at
+      FROM dragon_family_idle_host_sessions WHERE owner=?""",(owner,)).fetchone()
+      if has_sessions else None)
+    has_ledger=db.execute("""SELECT 1 FROM sqlite_master
+      WHERE type='table' AND name='dragon_consent'""").fetchone()
+    valid=False
+    expires_at=None
+    if row and row[4] and has_ledger:
+        record=db.execute("""SELECT capture,analysis,issued_at,expires_at,
+          revoked_at,scope_digest FROM dragon_consent
+          WHERE owner=? AND consent_id=?""",(owner,row[0])).fetchone()
+        try:
+            primary=tuple(json.loads(row[2]))
+            adjacent=tuple(json.loads(row[3]))
+            valid=bool(
+                record and record[0] == 1 and record[1] == 1 and
+                record[4] is None and
+                0 <= at-record[2] < record[3]-record[2] <= 30*86400 and
+                record[5]==row[1] and
+                idle_consent_scope(owner,primary,adjacent)==row[1]
+            )
+            if valid:
+                expires_at=_utc(record[3])
+        except (ValueError,TypeError,OverflowError,KeyError):
+            valid=False
+    has_usage=db.execute("""SELECT 1 FROM sqlite_master
+      WHERE type='table' AND name='dragon_family_idle_daily_usage'""").fetchone()
+    usage=dict(db.execute("""SELECT role,started
+        FROM dragon_family_idle_daily_usage WHERE owner=? AND day_utc=?""",
+        (owner,int(at//86400))).fetchall()) if has_usage else {}
+    return dict(schema=SCHEMA,configured=bool(row),active=valid,
+                host_idle_now=None,requires_os_idle_observer=True,
+                daily_attempts=sum(usage.values()),daily_by_specialist=usage,
+                consent_expires_at=expires_at,
+                next_tick_at=_utc(row[7]) if row and valid else None)
+
+
 class DragonIdleHostControl:
     """Canonical host's opt-in/revoke/tick integration for one authenticated owner.
 
