@@ -76,11 +76,17 @@ class DragonResearchSessionFactory:
     def open(self):
         # Recheck existence: an operator must never move the file after boot
         # and accidentally cause SQLite to create a new empty research vault.
-        if not self.knowledge_path.is_file() or not self.nest_path.is_file():
+        if (not self.knowledge_path.is_file() or not self.nest_path.is_file()
+            or self.knowledge_path.is_symlink() or self.nest_path.is_symlink()):
             raise ValueError("canonical research storage disappeared")
-        with ReviewedKnowledgeStore(self.knowledge_path) as library:
-            nest_db=sqlite3.connect(str(self.nest_path),timeout=5)
+        # Both handles enforce SQLite's mode=ro/query_only. Constructors use
+        # CREATE ... IF NOT EXISTS for schema checks; if a table or index is
+        # missing, fail rather than silently migrating a live GET request.
+        with ReviewedKnowledgeStore(self.knowledge_path, read_only=True) as library:
+            nest_db=sqlite3.connect(
+                self.nest_path.as_uri()+"?mode=ro",uri=True,timeout=5)
             try:
+                nest_db.execute("PRAGMA query_only=ON")
                 nest_db.execute("PRAGMA busy_timeout=5000")
                 nest=DragonNestStore(nest_db,signing_key=self._nest_key)
                 almanacs=DragonAlmanacs(library)
@@ -90,8 +96,19 @@ class DragonResearchSessionFactory:
                 video=DragonVideoTranscriptLedger(
                     feed,review_public_key=self._review_key,
                     issuer=self._issuer,key_id=self._key_id)
-                yield DragonThreeHatchlingCoordinator(
-                    DragonArticleHatchling(captures),video,
-                    DragonSourceDeltaLedger(captures),nest)
+                deltas=DragonSourceDeltaLedger(captures)
+                # Explicit read transactions pin each existing SQLite
+                # snapshot for the duration of this request. They do not
+                # prove atomic consistency ACROSS the two separate files.
+                library.db.execute("BEGIN")
+                nest_db.execute("BEGIN")
+                try:
+                    library.db.execute("SELECT COUNT(*) FROM sqlite_master").fetchone()
+                    nest_db.execute("SELECT COUNT(*) FROM sqlite_master").fetchone()
+                    yield DragonThreeHatchlingCoordinator(
+                        DragonArticleHatchling(captures),video,deltas,nest)
+                finally:
+                    nest_db.rollback()
+                    library.db.rollback()
             finally:
                 nest_db.close()
