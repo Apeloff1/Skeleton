@@ -164,8 +164,8 @@ def _init_world(rules, sources, options, seed):
     for datum in source["npcs"]:
         idx = datum["id"]
         origin_cell = translate(datum["cell"], middle, middle)
-        if origin_cell in blocked or origin_cell in used:
-            raise ChunkWorldError("authored NPC source cannot instantiate occupied tile")
+        if origin_cell in blocked or origin_cell in used or origin_cell == origin:
+            raise ChunkWorldError("authored NPC source cannot overlap another body or player spawn")
         used.add(origin_cell)
         alias = dialogue["speakers"][idx] if idx < len(dialogue["speakers"]) else None
         actors.append({
@@ -184,7 +184,7 @@ def _init_world(rules, sources, options, seed):
             "heard": [], "memories": [], "bond": 0, "supported": 0,
         })
     positions = _placement(seed, options["citizens"]-len(actors),
-                           side, blocked, used)
+                           side, blocked, used | {origin})
     sites = []
     for i, original in enumerate(source["sites"]):
         sites.append({
@@ -308,6 +308,8 @@ def _act(state, rules, opts, command, active):
         target = _cell(nx,ny,side)
         if target in state["obstacles"]:
             raise ChunkWorldError("authored original obstacle blocks physical player")
+        if any(a["position"] == target for a in state["actors"]):
+            raise ChunkWorldError("player cannot phase through an embodied original NPC")
         _charge(state,"stamina",q["movement_stamina"])
         state["player"] = target
         events.append("original_player_walked_one_global_tile")
@@ -463,7 +465,9 @@ def _schedule(state,rules,opts):
             current = actor["position"]
             occupied.remove(current)
             goal = actor["work"] if working else actor["home"]
-            target = _step(current,goal,obstacles,occupied,state["side"])
+            target = _step(
+                current, goal, obstacles, occupied | {state["player"]}, state["side"]
+            )
             actor["position"] = target
             actor["phase"] = "work" if working else "home"
             actor["detailed_ticks"] += 1
@@ -484,8 +488,9 @@ def _schedule(state,rules,opts):
         else:
             actor["memories"] = [m for m in actor["memories"]
                                 if state["tick"]-m["tick"]<lifetime][-32:]
-    if len(occupied) != len(state["actors"]):
-        raise ChunkWorldError("two original NPCs cannot occupy one physical tile")
+    if (len(occupied) != len(state["actors"]) or
+        state["player"] in occupied):
+        raise ChunkWorldError("physical actor collision with another citizen or player")
     state["scheduler"]["deferred_actor_turns"] += len(state["actors"])-len(ids)
     state["loaded_chunks"] = chunks
     state["detailed_actor_ids"] = [a["id"] for a in active]
