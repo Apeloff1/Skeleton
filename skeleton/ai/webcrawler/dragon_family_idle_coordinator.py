@@ -392,19 +392,21 @@ class DragonIdleCoordinator:
                 self._finish(owner,role,sid,key,after.now,status)
                 stats[status] += 1
             except PermissionError:
-                # A loss of consent/activity/lease must never award progress;
-                # the host may explicitly resume on a later idle tick.
+                # Losing consent/foreground/lease is terminal for this tick.
+                # Re-invoking a consent-checked observer here can itself deny,
+                # leaving a dangling lease and masking the safe interruption.
+                # The last verified observation is the only trusted clock
+                # available after an opt-out. The next idle tick may recover.
                 stats["paused"]=True
-                self._finish(owner,role,sid,key,_epoch(idle_state().now),"paused")
+                self._finish(owner,role,sid,key,before.now,"paused")
                 break
             except Exception:
-                # Do not disclose adapter exceptions in the user-facing game.
-                # Surface aggregate errors for operators; bound retries.
+                # A generic adapter failure cannot be confused with a valid
+                # completion, nor may a failure callback bypass revoked consent.
+                # Audit at the last known trusted time; never call the adapter
+                # or permission gate again just to record the failure.
                 stats["failed"] += 1
-                current=idle_state()
-                if not isinstance(current,IdleWindow):
-                    raise PermissionError("idle host observer failed")
-                self._finish(owner,role,sid,key,_epoch(current.now),"failed")
+                self._finish(owner,role,sid,key,before.now,"failed")
         return stats
 
     def health(self, owner: str, *, authorized: bool) -> dict[str,object]:
