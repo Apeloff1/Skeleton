@@ -227,6 +227,7 @@ def compile_system_assembly(project_id: str,
             "npc_society":("inspect",),
             "ecosystem":("inspect",),
             "economy":("inspect",),
+            "dialogue":("inspect",),
         }
         if set(scene_smoke) != set(ADVANCED_ENGINE_IDS):
             raise AssemblyError("every playable editor needs a source-bound scene proof")
