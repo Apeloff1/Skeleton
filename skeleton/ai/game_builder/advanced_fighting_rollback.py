@@ -231,7 +231,27 @@ def reconcile_peer_prediction(settings,blue_actions,remote_predictions,
         raise FightingRollbackError("original netcode correction budget exceeded")
     if any(len(blue)-index>window for index in corrections):
         raise FightingRollbackError("unconfirmed remote input aged outside bounded rollback window")
-    predicted=run_peer_fight(rules,blue,estimated,seed=seed,scene=scene)
+    predicted_terminal_truncated=False
+    try:
+        predicted=run_peer_fight(rules,blue,estimated,seed=seed,scene=scene)
+    except FightingRollbackError as exc:
+        # A wrong prediction may kill a fighter prematurely. A genuine late
+        # authoritative defensive command is allowed to invalidate that
+        # speculative knockout, so replay only the predicted prefix through
+        # its actually reached terminal frame. Never accept arbitrary
+        # malformed predicted input as a valid rollback alternative.
+        if "after real arena match is terminal" not in str(exc):
+            raise
+        predicted=None
+        for limit in range(1,len(blue)+1):
+            prior=run_peer_fight(rules,blue[:limit],estimated[:limit],
+                                seed=seed,scene=scene)
+            if prior["terminal"]:
+                predicted=prior
+                predicted_terminal_truncated=True
+                break
+        if predicted is None:
+            raise FightingRollbackError("no legitimate terminal predicted prefix") from exc
     actual=run_peer_fight(rules,blue,authoritative,seed=seed,scene=scene)
     proof={
         "schema":"skeleton.game_builder.fighting_rollback_correction_v1",
@@ -242,6 +262,8 @@ def reconcile_peer_prediction(settings,blue_actions,remote_predictions,
         "reconciled_indices":corrections,
         "rollback_window_frames":window,
         "predicted_match_digest":predicted["digest"],
+        "predicted_frames_executed":predicted["frames"],
+        "prediction_terminal_truncated":predicted_terminal_truncated,
         "authoritative_match":actual,
         "prediction_is_authoritative":False,
         "remote_client_state_trusted":False,
