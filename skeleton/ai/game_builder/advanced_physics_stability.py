@@ -36,7 +36,7 @@ def is_sleeping(body,state,config):
         body["sleep"]>=config["sleep_frames"] and
         max(abs(v) for v in body["velocity"])==0 and
         body["angular_velocity"]==0 and
-        not state["fan"] and not state["magnet"] and
+        not ((state["fan"] or state["magnet"]) and state["battery"]>0) and
         has_support(body,state)
     )
 
@@ -47,7 +47,7 @@ def settle(state,config,events):
         if body["broken"]:
             body["sleep"]=0
             continue
-        stable=(not state["fan"] and not state["magnet"] and
+        stable=(not ((state["fan"] or state["magnet"]) and state["battery"]>0) and
                 max(abs(v) for v in body["velocity"])<=config["rest_speed"] and
                 abs(body["angular_velocity"])<=config["rest_spin"] and
                 has_support(body,state))
