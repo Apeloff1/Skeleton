@@ -415,8 +415,16 @@ class ShadowWeightAutomation:
         if len(original_ids) >= MAX_ITEMS:
             raise ValueError("shadow queue budget exhausted")
         prior_revisions = {rev for sid, rev, _ in original_ids if sid == source_id}
+        identity = _hash((
+            owner, root, source_id, source["revision_digest"],
+            note_id, normalized_knowledge_id,
+        ))
+        existing_exact = self._read(owner, identity)
+        if existing_exact is not None and existing_exact[1] == "revoked":
+            raise PermissionError("revoked shadow identity cannot be reinstated")
         newer = bool(prior_revisions - {source["revision_digest"]})
-        novel = (source_id, source["revision_digest"], note_id) not in original_ids
+        novel = ((source_id, source["revision_digest"], note_id) not in original_ids
+                 or existing_exact is not None)
         blockers = {
             "conflicting": bool(brief.conflicts) or note["stance"] != "supports",
             "retracted": source["status"] != "active",
@@ -450,10 +458,6 @@ class ShadowWeightAutomation:
             raise PermissionError("shadow admission denied: " + ",".join(decision.reasons))
         if source["revision_digest"] != hit.revision_digest:
             raise ValueError("source changed during scrutiny")
-        identity = _hash((
-            owner, root, source_id, source["revision_digest"],
-            note_id, normalized_knowledge_id,
-        ))
         shadow = ShadowWeight(
             owner, identity, source_id, source["revision_digest"], note_id,
             normalized_knowledge_id, root, verdict.fingerprint,
@@ -527,6 +531,7 @@ class ShadowWeightAutomation:
                 raise PermissionError("canonical memory-promotion receipt required")
             decision = self.reviews.get(owner, _hex(review_id), authorized=True)
             if (not decision.approved or decision.review_id != review_id
+                    or memory_promotion.receipt.input_fingerprints != (review_id,)
                     or decision.adversarial_fingerprint != shadow.adversarial_digest
                     or not any(
                         p.knowledge_id == shadow.knowledge_id
