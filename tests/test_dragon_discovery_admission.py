@@ -483,3 +483,46 @@ def test_extended_catalog_batch_hashes_and_parent_history_are_exact(baseline, ch
             raw_urls.add(entry["url"])
         paths.append(path)
     assert len(raw_urls) == 8372
+
+
+def test_seven_more_pinned_retro_and_editor_catalogs_join_one_chain(baseline, chain):
+    """The new 2,398 raw links increase source diversity without approval."""
+    historical = [*chain, _supplement(
+        ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json")]
+    resumed = [_supplement(path) for path in RECONCILED_BATCHES]
+    specialized = [_supplement(path) for path in EXTENDED_BATCHES]
+    latest = _supplement(
+        ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0042.json")
+    assert latest[1]["status"] == "raw_discovery_only_not_ingested_into_canonical_queue"
+    assert latest[1]["counts"]["previous_raw_provisional_urls"] == 12777
+    assert latest[1]["counts"]["new_raw_candidate_urls"] == 2398
+    assert latest[1]["counts"]["raw_provisional_urls"] == 15175
+    assert len(latest[1]["catalogs"]) == 7
+    assert latest[1]["parents"] == [
+        name for name, _ in (*historical, *resumed, *specialized)]
+    snapshot = validate_discovery_chain(
+        baseline, [*historical, *resumed, *specialized, latest])
+    assert snapshot["raw_new"] == 10770
+    assert snapshot["raw_total_discovered"] == 15175
+    assert snapshot["total_discovered"] <= 15175
+    assert all(entry["training_authorized"] is False and
+               entry["rights"] == "not_assessed"
+               for entry in snapshot["sources"].values())
+
+
+def test_seven_catalog_batch_cannot_substitute_a_fork_or_claim_license(baseline, chain):
+    original = [*chain, _supplement(
+        ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json")]
+    existing = [_supplement(path) for path in (*RECONCILED_BATCHES, *EXTENDED_BATCHES)]
+    latest = _supplement(
+        ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0042.json")
+    with pytest.raises(ValueError):
+        validate_discovery_chain(baseline, [*original, *existing[:-1], latest])
+    tampered = deepcopy(latest)
+    tampered[1]["candidates"][0]["training_authorized"] = True
+    with pytest.raises(ValueError, match="authority"):
+        validate_discovery_chain(baseline, [*original, *existing, tampered])
+    tampered = deepcopy(latest)
+    tampered[1]["candidates"][0]["discoveries"][0]["readme_blob_sha"] = "f" * 40
+    with pytest.raises(ValueError, match="pinned"):
+        validate_discovery_chain(baseline, [*original, *existing, tampered])
