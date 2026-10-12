@@ -25,8 +25,8 @@ PLANNER_ACTIONS=(
     "run","sprint","jump","double_jump","vault","slide","wall_run","grapple",
     "swing","climb","mantle","roll","lane_left","lane_right","recover","rest",
 )
-DEFAULT_MAX_STATES=12000
-DEFAULT_BEAM_WIDTH=90
+DEFAULT_MAX_STATES=20000
+DEFAULT_BEAM_WIDTH=64
 
 
 class ParkourPlanningError(ValueError):
