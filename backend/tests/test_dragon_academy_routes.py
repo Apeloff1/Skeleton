@@ -61,6 +61,44 @@ def test_principal_is_tenant_scoped_and_not_request_controllable():
         route._principal({"email":"alice@example.test","tenant_id":123,"role":"viewer"})
 
 
+
+def test_nest_read_api_requires_secret_and_never_mints_progress(tmp_path, monkeypatch):
+    from fastapi import Response
+    from skeleton.ai.webcrawler.dragon_nest_store import DragonNestStore
+    owner=identity()
+    db_path=tmp_path/"nest.sqlite"
+    monkeypatch.setenv("SKL_DRAGON_PRACTICE_DB_PATH",str(db_path))
+    monkeypatch.delenv("SKL_DRAGON_NEST_SIGNING_KEY_HEX",raising=False)
+    with pytest.raises(HTTPException) as missing:
+        route.academy_nest(Response(),owner=owner)
+    assert missing.value.status_code==503
+    key=b"signed-unique-nest-testing-key-32bytes"
+    monkeypatch.setenv("SKL_DRAGON_NEST_SIGNING_KEY_HEX",key.hex())
+    empty=route.academy_nest(Response(),owner=owner)
+    assert empty=={"ok":True,"nest":None}
+    with sqlite3.connect(db_path) as db:
+        store=DragonNestStore(db,signing_key=key)
+        store.initialize(owner,("source-1",),focus_tags=("game-code",),
+                         at="2026-10-12T12:00:00Z",authorized=True)
+    headers=Response()
+    first=route.academy_nest(headers,owner=owner)
+    assert headers.headers["cache-control"]=="private, no-store"
+    assert first["nest"]["stage"]=="egg"
+    assert first["nest"]["sources_consumed"]==0
+    assert route.academy_nest(Response(),owner=identity("bob@example.test"))["nest"] is None
+    with sqlite3.connect(db_path) as db:
+        assert db.execute("SELECT COUNT(*) FROM dragon_nest_history").fetchone()[0]==1
+        db.execute("UPDATE dragon_nest_state SET head=? WHERE owner=?",
+                   ("f"*64,owner))
+        db.commit()
+    with pytest.raises(HTTPException) as corruption:
+        route.academy_nest(Response(),owner=owner)
+    assert corruption.value.status_code==409
+    assert not any(r.path.endswith("/nest/create") or r.path.endswith("/nest/grow")
+                   for r in route.router.routes)
+
+
+
 def test_storage_is_fail_closed(monkeypatch):
     monkeypatch.delenv("SKL_DRAGON_PRACTICE_DB_PATH",raising=False)
     with pytest.raises(HTTPException) as exc:
