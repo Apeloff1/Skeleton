@@ -742,3 +742,32 @@ def test_signed_audit_cannot_be_rewritten_to_illegal_transition(setup):
     db.commit()
     with pytest.raises(ValueError, match="verified|transition"):
         automation.registry_health(OWNER, authorized=True)
+
+
+def test_adversarial_scrutiny_receipt_must_replay_finding_by_finding(setup):
+    automation, library, _, _ = setup
+    record, receipts, adversarial = scrutiny("alpha")
+    tampered = replace(adversarial, findings=())
+    with pytest.raises(ValueError, match="deterministic replay"):
+        automation.stage_shadow(
+            OWNER, brief(library), "alpha", "note-alpha",
+            normalized_knowledge_id=record.knowledge_id,
+            normalized_records=(record,), receipts=receipts,
+            adversarial_output=tampered,
+            adversarial_dispatch=adversarial_dispatch_for(receipts),
+            at=T1, idle_since=T0, hardware=sample(), hardware_now=1000,
+            consented=True, authorized=True, privacy_clear=True,
+        )
+    wrong_dispatch = replace(adversarial_dispatch_for(receipts),
+                             worker_version="falsified")
+    with pytest.raises(ValueError, match="deterministic replay"):
+        automation.stage_shadow(
+            OWNER, brief(library), "alpha", "note-alpha",
+            normalized_knowledge_id=record.knowledge_id,
+            normalized_records=(record,), receipts=receipts,
+            adversarial_output=adversarial,
+            adversarial_dispatch=wrong_dispatch,
+            at=T1, idle_since=T0, hardware=sample(), hardware_now=1000,
+            consented=True, authorized=True, privacy_clear=True,
+        )
+    assert automation.active_weights(OWNER, authorized=True) == ()
