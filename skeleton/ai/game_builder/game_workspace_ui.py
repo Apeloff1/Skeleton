@@ -1302,6 +1302,73 @@ function renderAdvancedActions(actions){
     "Keys, walls and hazards use the original authored geometry. "+
     "Moving walls change with simulated turns, not clock time.";
   target.append(legend);
+  const planButton=document.createElement("button");
+  planButton.type="button";
+  planButton.textContent="AI: prove an original maze escape";
+  planButton.disabled=Boolean(advancedSession.terminal);
+  const report=document.createElement("pre");
+  report.id="maze-original-route-proof";
+  report.setAttribute("role","status");
+  report.setAttribute("aria-live","polite");
+  planButton.addEventListener("click",async()=>{
+   try{
+    if(advancedEditor!=="maze"||systemEditor().id!=="maze")
+     throw Error("Original maze editor changed; start a new source session");
+    const source=advancedScene||(await reviewedSceneTemplate()).scene;
+    if(source.seed!==advancedSession.seed)
+     throw Error("Authored maze source uses a different game seed");
+    const result=await api("/api/maze-plan",{
+      scene:source,settings:advancedSettings,
+      max_states:8000,max_depth:80,beam_width:64
+    });
+    const plan=result.plan;
+    report.textContent=JSON.stringify({
+      topology:plan.topology,
+      result:plan.status,earned_actions:plan.actions,
+      keys:plan.actual_keys??plan.best_partial_keys,
+      expanded_transitions:plan.expanded_transitions,
+      source_digest:plan.source_digest,
+      independent_replay_verified:plan.independent_replay_verified,
+      native_hardware_certified:false,proof_digest:plan.digest
+    },null,2);
+    target.querySelector("#maze-adopt-proven-route")?.remove();
+    if(plan.status!=="replay_verified_exit"){
+      status("Search was inconclusive. The original labyrinth is NOT certified impossible.");
+      return;
+    }
+    const adopt=document.createElement("button");
+    adopt.type="button";adopt.id="maze-adopt-proven-route";
+    adopt.textContent="Play the independently proven authored maze route";
+    adopt.addEventListener("click",async()=>{
+     try{
+      if(advancedEditor!=="maze"||systemEditor().id!=="maze"||
+         advancedSession.seed!==source.seed||advancedCommands.length!==0)
+        throw Error("Verified route requires a fresh unchanged original maze");
+      const accepted=await api("/api/maze-plan-verify",{
+        record:plan,scene:source,settings:advancedSettings
+      });
+      if(!accepted.verified)throw Error("Source-bound maze route recheck failed");
+      const played=await api("/api/advanced-play",{
+        editor:"maze",settings:advancedSettings,
+        actions:plan.actions,seed:source.seed,scene:source
+      });
+      if(played.session.digest!==plan.gameplay_receipt_digest||
+         !played.session.state.finished||played.session.state.failed)
+        throw Error("Original maze did not actually reach the earned exit");
+      advancedCommands=plan.actions.slice();
+      advancedScene=source;
+      showAdvanced(played);
+      status("Real authored maze exit replayed and verified. No untrusted state or automatic game-file mutation.");
+     }catch(error){status("Maze route adoption blocked: "+error.message);}
+    });
+    target.append(adopt);
+    status("A full original maze path passed independent replay; review its steps before adoption.");
+   }catch(error){
+    report.textContent="";
+    status("Original maze route planner rejected: "+error.message);
+   }
+  });
+  target.append(planButton);target.append(report);
   return;
  }
  if(advancedSession?.editor==="sports"){
