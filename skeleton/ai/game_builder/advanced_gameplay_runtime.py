@@ -12,6 +12,9 @@ import json
 from typing import Mapping, Sequence
 
 from .system_editors import make_editor_document, SystemEditorError
+from .advanced_roguelike_runtime import (ACTIONS as ROGUE_ACTIONS, RoguelikeActionError,
+                                         start as rogue_start, step as rogue_step,
+                                         apply_scene as apply_rogue_scene)
 from .advanced_sandbox_runtime import (ACTIONS as SANDBOX_ACTIONS, SandboxActionError,
                                        start as sandbox_start, step as sandbox_step,
                                        apply_scene as apply_sandbox_scene)
@@ -39,7 +42,7 @@ from .advanced_genre_engines import (
 )
 
 SCHEMA = "skeleton.game_builder.advanced_session.v1"
-ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox")
+ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike")
 MAX_TURNS = 128
 MAX_SEED = 2**31 - 1
 
@@ -63,6 +66,7 @@ ACTION_HELP = {
     "stealth": STEALTH_ACTIONS,
     "metroidvania": EXPLORE_ACTIONS,
     "sandbox": SANDBOX_ACTIONS,
+    "roguelike": ROGUE_ACTIONS,
     **GENRE_ACTIONS,
 }
 
@@ -671,12 +675,13 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
         "stealth":stealth_start,
         "metroidvania":explore_start,
         "sandbox":sandbox_start,
+        "roguelike":rogue_start,
         **GENRE_STARTS,
     }
     try:
         state=starts[editor](rules,seed)
     except (GenreActionError,FarmingActionError,FactoryActionError,
-            ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError) as exc:
+            ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError) as exc:
         raise AdvancedRuntimeError(str(exc)) from exc
     if scene is not None:
         from .advanced_level_scenes import validate_advanced_scene
@@ -720,6 +725,8 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             apply_explore_scene(state,rules,layout)
         elif editor=="sandbox":
             apply_sandbox_scene(state,rules,layout)
+        elif editor=="roguelike":
+            apply_rogue_scene(state,rules,layout)
         else:
             apply_genre_scene(editor,state,layout)
     baseline=_digest({"editor":editor,"configuration":config["digest"],"seed":seed,
@@ -743,11 +750,12 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             "stealth":stealth_step,
             "metroidvania":explore_step,
             "sandbox":sandbox_step,
+            "roguelike":rogue_step,
             **GENRE_STEPS,
         }
         try:
             events=steps[editor](state,rules,action)
-        except (GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError) as exc:
+        except (GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError) as exc:
             raise AdvancedRuntimeError(str(exc)) from exc
         state["events"]=events
         receipt={"index":index,"action":action,"events":events,
