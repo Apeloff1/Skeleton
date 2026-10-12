@@ -194,6 +194,10 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "model_training_or_deployment_running":False,
                 "core_llm_weights_changed":False,
             })
+        if path=="/api/story-status":
+            from .story_workspace import story_workspace_status
+            return self._json(200,story_workspace_status(
+                self.server.workspace,params["project"]))
         if path=="/api/editors":
             return self._json(200,{"schema":"skeleton.game_builder.system_editor_catalog.v1",
                                    "editors":system_editor_catalog()})
@@ -219,6 +223,29 @@ class _StudioHandler(BaseHTTPRequestHandler):
         path=urlsplit(self.path).path
         values=self._body()
         studio=self.server.workspace
+        if path=="/api/story-foundation-template":
+            from .story_canon_fabric import story_bible_template
+            return self._json(200,{"path":"game/story_bible.json",
+                                   "document":story_bible_template(values["project"]),
+                                   "model_inference_performed":False,
+                                   "write_authorized":False})
+        if path=="/api/story-scene-template":
+            from .story_workspace import next_story_scene_template
+            return self._json(200,next_story_scene_template(
+                studio,values["project"],values["act"],values["scene"]))
+        if path=="/api/story-brief":
+            from .story_workspace import story_workspace_brief
+            return self._json(200,story_workspace_brief(
+                studio,values["project"],cast=values["cast"],
+                region=values["region"],prompt=values["prompt"],
+                max_bookmarks=values.get("max_bookmarks",48)))
+        if path=="/api/story-verify":
+            from .story_workspace import validate_story_workspace_source
+            evidence=validate_story_workspace_source(studio,values["project"],
+                        values["path"],values["document"])
+            return self._json(200,{"evidence":evidence,
+                                   "source_project_mutated":False,
+                                   "source_commit_requires_human_review":True})
         if path=="/api/advanced-godot-package":
             from base64 import b64encode
             session=values["session"]

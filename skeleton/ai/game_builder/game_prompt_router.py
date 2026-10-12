@@ -36,8 +36,11 @@ class AuthoringAxis:
 
 
 AXES=(
+    AuthoringAxis("production_continuity",("continuity","visual canon","palette","scene 500","story bible","Jeeves","character index","story index","consistency","scene by scene"),
+                  ("game/story_bible.json","notes/story.md"),"story_production",105,"wiki",
+                  ("story.foundation","story.cast","story.design","story.index","story.canon_gate")),
     AuthoringAxis("story_continuity",("story","lore","arc","ending","canon","plot","narrative","epilogue"),
-                  ("game/director.json","notes/story.md"),"director",98,"wiki",
+                  ("game/story_bible.json","notes/story.md"),"director",98,"wiki",
                   ("mission.endings","scene.data")),
     AuthoringAxis("quest_solver",("quest","puzzle","solution","objective","mission","reward","victory","time trial","escort"),
                   ("game/director.json","missions/solution_branches.json"),"mission",100,"mirror",
@@ -46,7 +49,7 @@ AXES=(
                   ("game/director.json","cinematics/shot_list.json"),"scene",90,"human",
                   ("scene.cinematic",)),
     AuthoringAxis("npc_behavior",("npc","citizen","character","personality","emotion","memory","routine","needs"),
-                  ("npcs/original_roster.json","npcs/behavior_notes.md"),"npc",96,"wiki",
+                  ("game/story_bible.json","npcs/behavior_notes.md"),"npc",96,"wiki",
                   ("npc.needs","npc.memory")),
     AuthoringAxis("npc_story_witness",("witness","witnessed","saw","rumor","gossip","testimony","reactive quest","reaction"),
                   ("npcs/witness_rules.json","missions/witness_outcomes.json"),"npc",100,"mirror",
@@ -70,7 +73,7 @@ AXES=(
                   ("engine/device_profile.json","notes/performance.md"),"director",93,"mirror",
                   ("director.synergy",)),
     AuthoringAxis("legal_provenance",("rights","copyright","license","attribution","plagiarism","homebrew"),
-                  ("reviews/source_rights.json","notes/originality.md"),"product",100,"human",
+                  ("game/story_bible.json","reviews/source_rights.json"),"product",100,"human",
                   ("product.browser",)),
     AuthoringAxis("training_review",("learn","training","mirror","adversarial","distill","knowledge","almanac"),
                   ("reviews/mirror_plan.json","almanacs/learning_plan.json"),"mirror",100,"wiki",

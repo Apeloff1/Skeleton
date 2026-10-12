@@ -181,6 +181,54 @@ $("plan").addEventListener("click",async()=>{
          "Choose a target and submit an explicit source proposal.");
  }catch(error){status("Prompt routing failed: "+error.message);}
 });
+
+function storyProject(){
+ if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
+  throw Error("Jeeves story editing requires an active current project");
+ return selectedProject;
+}
+function storyShow(data){
+ $("story-evidence").textContent=JSON.stringify(data,null,2).slice(0,30000);
+}
+$("story-foundation").addEventListener("click",async()=>{
+ try{
+  const response=await api("/api/story-foundation-template",
+                            {project:storyProject()});
+  storyShow(response);
+  status("Fill story/world, then advance cast and design phases using human-reviewed exact-file proposals.");
+ }catch(error){status("Foundation blocked: "+error.message);}
+});
+$("story-next").addEventListener("click",async()=>{
+ try{
+  const response=await api("/api/story-scene-template",{
+   project:storyProject(),
+   act:Number($("story-act").value),scene:Number($("story-scene").value)});
+  storyShow(response);
+  status("Next original scene scaffold prepared against the reviewed history. No source committed.");
+ }catch(error){status("Scene authoring blocked: "+error.message);}
+});
+$("story-context").addEventListener("click",async()=>{
+ try{
+  const response=await api("/api/story-brief",{
+   project:storyProject(),
+   cast:$("story-cast").value.split(",").map(x=>x.trim()).filter(Boolean),
+   region:$("story-region").value.trim(),
+   prompt:$("story-instruction").value.trim()});
+  storyShow(response);
+  status(response.pair_history_complete_in_brief?
+    "Canon context assembled; Jeeves still needs a model and reviewed source.":
+    "Only the latest context page is shown. Earlier history is bookmarked, not silently forgotten.");
+ }catch(error){status("Jeeves history lookup blocked: "+error.message);}
+});
+$("story-check").addEventListener("click",async()=>{
+ try{
+  const response=await api("/api/story-verify",{
+   project:storyProject(),path:selectedFile,
+   document:JSON.parse($("editor").value)});
+  storyShow(response);
+  status("Historical consistency verified. Explicit proposal and commit are still required.");
+ }catch(error){status("Story consistency rejected: "+error.message);}
+});
 $("editor").addEventListener("input",diff);
 $("tree").addEventListener("change",()=>{
  selectedTree=$("tree").value;selectedProject=null;selectedFile=null;refresh();
@@ -3815,6 +3863,23 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <label>Natural-language original game design prompt
 <textarea id="user-prompt" rows="4" placeholder="Create a branching escort storyline with eyewitness reactions, alternative endings, NPC memories and cinematic staging..."></textarea></label>
 <button id="plan">Plan affected modules and targets</button>
+<fieldset><legend>Jeeves: story-first AI game production</legend>
+<p><small>Foundation → cast → world/asset design → scene-by-scene review. The
+canon index reads approved history and verifies recurring character and
+regional appearance. It does not invent model output or write hidden files.</small></p>
+<button id="story-foundation" type="button">Show blank story/world foundation</button>
+<label>Next act<input type="number" id="story-act" min="1" max="100" value="1"></label>
+<label>Next scene within act<input type="number" id="story-scene" min="1" max="999999" value="1"></label>
+<button id="story-next" type="button">Prepare next canon-bound scene</button>
+<label>Cast IDs, comma-separated<input id="story-cast" placeholder="alina,boren"></label>
+<label>Approved region ID<input id="story-region" placeholder="lantern_city"></label>
+<label>Jeeves creative instruction<textarea id="story-instruction" rows="3"
+ placeholder="Write the next scene and preserve prior character relationships, visual identities, palette, lore and original events."></textarea></label>
+<button id="story-context" type="button">Retrieve historical Jeeves context</button>
+<button id="story-check" type="button">Verify current authored source</button>
+<pre id="story-evidence" role="status" aria-live="polite"></pre>
+</fieldset>
+
 <pre id="plan-results"></pre>
 <label>New exact source path (including subfolder)
 <input id="new-path" placeholder="missions/original_rival_arc.json"></label>
