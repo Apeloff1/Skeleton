@@ -3254,8 +3254,98 @@ function refreshUnifiedGenreQueue(){
    mapped_sites:entry.bindings.map(b=>b.site_id)
   })),null,2);
 }
+$("advanced-unified-save-export").addEventListener("click",async()=>{
+ try{
+  if(!lastUnifiedGenreProof || !episodicLastScene ||
+     !verifiedSourceEpisodes.length || !verifiedGenreEvents.length)
+   throw Error("Replay a unified original multi-engine NPC world before saving");
+  const reply=await api("/api/advanced-unified-genre-save-export",{
+   physical_episodes:verifiedSourceEpisodes,
+   genre_sessions:verifiedGenreEvents,
+   world_scene:episodicLastScene,
+   world_actions:unifiedWorldFollowups
+  });
+  const saved=reply.save;
+  if(!saved || reply.original_project_mutated || reply.native_device_certified ||
+     reply.automatic_publication ||
+     saved.campaign_digest!==lastUnifiedGenreProof.digest)
+   throw Error("Combined original source save identity mismatch");
+  const json=JSON.stringify(saved);
+  if(new TextEncoder().encode(json).length>3000000)
+   throw Error("Combined source campaign exceeds 3 MB portable save budget");
+  const blob=URL.createObjectURL(new Blob([json],{type:"application/json"}));
+  const link=document.createElement("a");
+  link.href=blob;
+  link.download="original-unified-game-"+saved.digest.slice(0,12)+".json";
+  document.body.append(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(blob),0);
+  $("advanced-unified-save-receipt").textContent=JSON.stringify({
+   verified_source_save_digest:saved.digest,
+   physics_episodes:saved.physical_episode_count,
+   original_genre_sessions:saved.genre_session_count,
+   genuine_cross_genre_events:saved.genre_event_count,
+   world_quest_actions:saved.world_actions.length,
+   complete_replay_required:true,
+   no_original_project_write:true
+  },null,2);
+  status("Portable combined original game/NPC source history exported without gameplay-state trust");
+ }catch(error){status("Mixed original game save export rejected: "+error.message);}
+});
+$("advanced-unified-save-import").addEventListener("change",async()=>{
+ try{
+  const input=$("advanced-unified-save-import");
+  const file=input.files?.[0];if(!file)return;
+  if(file.size>3000000)throw Error("Oversized original combined save refused");
+  const text=await file.text();
+  if(new TextEncoder().encode(text).length>3000000)
+   throw Error("Oversized source document rejected");
+  const authored=JSON.parse(text);
+  const imported=await api("/api/advanced-unified-genre-save-import",{
+   save:authored
+  });
+  const verified=imported.restored;
+  if(!verified?.verified || verified.save_digest!==authored.digest ||
+     imported.original_project_mutated || imported.native_device_certified ||
+     imported.automatic_publication ||
+     verified.replayed_campaign.world_scene_digest!==verified.world_scene.digest)
+   throw Error("Combined original physical and genre campaign could not independently replay");
+  // Physical-world investigator routines need the authenticated PHYSICAL
+  // prefix, not a forged or mis-typed unified genre-world state.
+  const physical=await api("/api/advanced-physics-episodic-npc",{
+   episodes:verified.physical_episodes,world_scene:verified.world_scene
+  });
+  if(!physical.proof ||
+     physical.proof.digest!==verified.replayed_campaign.physical_campaign_digest)
+   throw Error("Restored original physical world prefix identity mismatch");
+  verifiedSourceEpisodes=verified.physical_episodes;
+  verifiedGenreEvents=verified.genre_sessions;
+  episodicLastScene=verified.world_scene;
+  episodicLastProof=physical.proof;
+  unifiedWorldFollowups=verified.world_actions;
+  lastUnifiedGenreProof=verified.replayed_campaign;
+  verifiedInvestigationRoute=null;
+  refreshUnifiedGenreQueue();
+  refreshNPCQuestRouteChoices(episodicLastProof);
+  drawNPCForensicMap(lastUnifiedGenreProof.world_state);
+  $("advanced-unified-proof").textContent=JSON.stringify({
+   verified_original_world:lastUnifiedGenreProof.world_state,
+   genre_events:lastUnifiedGenreProof.genre_history,
+   world_replay_digest:lastUnifiedGenreProof.digest,
+   original_files_unchanged:true
+  },null,2);
+  $("advanced-unified-save-receipt").textContent=JSON.stringify({
+   verified:true,save_digest:verified.save_digest,
+   original_genre_sessions:verified.genre_sessions.length,
+   remaining_genre_sessions:verified.remaining_genre_sessions,
+   remaining_world_commands:verified.remaining_world_actions,
+   reexecuted_all_original_games:true
+  },null,2);
+  status("Original physical and multi-genre NPC campaign independently restored from source inputs");
+ }catch(error){status("Untrusted mixed original world save rejected: "+error.message);}
+ finally{$("advanced-unified-save-import").value="";}
+});
 $("advanced-genre-queue-clear").addEventListener("click",()=>{
- verifiedGenreEvents=[];lastUnifiedGenreProof=null;
+ verifiedGenreEvents=[];lastUnifiedGenreProof=null;unifiedWorldFollowups=[];
  $("advanced-genre-queue-list").textContent="";
  $("advanced-unified-proof").textContent="";
  status("Unpublished genre source acquisitions cleared without modifying original saves");
@@ -3307,7 +3397,7 @@ $("advanced-unified-run").addEventListener("click",async()=>{
    physical_episodes:verifiedSourceEpisodes,
    genre_sessions:verifiedGenreEvents,
    world_scene:episodicLastScene,
-   world_actions:[]
+   world_actions:unifiedWorldFollowups
   });
   const proof=result.proof;
   if(!proof || result.source_project_files_modified ||
@@ -3409,6 +3499,7 @@ $("advanced-npc-rule-commit").addEventListener("click",async()=>{
 });
 let verifiedGenreEvents=[];
 let lastUnifiedGenreProof=null;
+let unifiedWorldFollowups=[];
 let verifiedSourceEpisodes=[];
 let episodicLastProof=null,episodicLastScene=null;
 let verifiedInvestigationRoute=null;
@@ -3618,7 +3709,7 @@ $("advanced-episodic-save-import").addEventListener("change",async()=>{
 });
 $("advanced-episodic-clear").addEventListener("click",()=>{
  verifiedSourceEpisodes=[];
- verifiedGenreEvents=[];lastUnifiedGenreProof=null;
+ verifiedGenreEvents=[];lastUnifiedGenreProof=null;unifiedWorldFollowups=[];
  $("advanced-genre-queue-list").textContent="";
  $("advanced-unified-proof").textContent="";
  episodicLastProof=null;episodicLastScene=null;verifiedInvestigationRoute=null;
@@ -4058,6 +4149,17 @@ local until typed revalidation and an explicit human-approved file commit.</smal
       </button>
       <pre id="advanced-genre-queue-list" role="status" aria-live="polite"></pre>
       <pre id="advanced-unified-proof" role="status" aria-live="polite"></pre>
+      <fieldset aria-label="Portable mixed-source campaign save">
+        <legend>Save / restore combined physical + genre NPC world</legend>
+        <button id="advanced-unified-save-export" type="button">
+          Export replay-verified unified campaign
+        </button>
+        <label>Import source-verified unified save (3 MB maximum)
+          <input id="advanced-unified-save-import" type="file"
+            accept=".json,application/json"/>
+        </label>
+        <pre id="advanced-unified-save-receipt" role="status" aria-live="polite"></pre>
+      </fieldset>
     </fieldset>
   </fieldset>
   </fieldset>
