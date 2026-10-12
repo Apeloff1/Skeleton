@@ -41,6 +41,23 @@ SOURCE_CHECK = '''
                 original["interop"]["interop_digest"])):
             _fault("independent original source custody mismatch")
             return
+        if (typeof(linked.get("original_authored_scene"))!=TYPE_DICTIONARY
+            or str(linked["original_authored_scene"].get("digest",""))!=
+                    str(linked["source_scene_digest"])
+            or str(linked["original_authored_scene"].get("editor",""))!=
+                    str(linked["source_editor"])):
+            _fault("original authored scene is not bound to physical provenance")
+            return
+        var witnesses: Array=linked["physical_witnesses"]
+        var actual_fixtures: Array=original["scene"]["layout"]["fixtures"]
+        if witnesses.size()!=actual_fixtures.size():
+            _fault("authored fixture count differs from original witnesses")
+            return
+        for k in range(witnesses.size()):
+            if (int(witnesses[k]["x"])!=int(actual_fixtures[k]["position"][0])
+                or int(witnesses[k]["layer"])!=int(actual_fixtures[k]["layer"])):
+                _fault("physical collision fixture not mapped to source identity")
+                return
 '''
 
 
