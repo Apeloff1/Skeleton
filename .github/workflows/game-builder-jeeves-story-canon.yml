@@ -45,6 +45,7 @@ jobs:
           sparse-checkout: |
             skeleton/__init__.py
             skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
             skeleton/ai/game_builder/
             tests/__init__.py
             tests/test_game_builder_story_canon_fabric.py
