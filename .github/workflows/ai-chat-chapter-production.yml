@@ -7,6 +7,12 @@ on:
     paths:
       - "backend/core/chapter_continuity.py"
       - "backend/core/story_production_manifest.py"
+      - "backend/core/story_tapestry.py"
+      - "backend/core/story_review_matrices.py"
+      - "backend/routes/story_review.py"
+      - "backend/tests/test_story_tapestry.py"
+      - "backend/tests/test_story_review_matrices.py"
+      - "backend/tests/test_story_review_routes.py"
       - "backend/tests/test_story_production_manifest.py"
       - "backend/routes/chapter_studio.py"
       - "backend/routes/game_kb.py"
@@ -60,16 +66,25 @@ jobs:
           python -m compileall -q
           backend/core/chapter_continuity.py
           backend/core/story_production_manifest.py
+          backend/core/story_tapestry.py
+          backend/core/story_review_matrices.py
+          backend/routes/story_review.py
           backend/routes/chapter_studio.py
           backend/routes/game_kb.py
           backend/tests/test_chapter_continuity.py
           backend/tests/test_story_production_manifest.py
+          backend/tests/test_story_tapestry.py
+          backend/tests/test_story_review_matrices.py
+          backend/tests/test_story_review_routes.py
           backend/tests/test_chapter_studio_routes.py
       - name: Test chapter revision, scene production and proof receipts
         run: >-
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           backend/tests/test_chapter_continuity.py
           backend/tests/test_story_production_manifest.py
+          backend/tests/test_story_tapestry.py
+          backend/tests/test_story_review_matrices.py
+          backend/tests/test_story_review_routes.py
           backend/tests/test_chapter_studio_routes.py
           backend/tests/test_story_continuity.py
           backend/tests/test_story_index_routes.py
