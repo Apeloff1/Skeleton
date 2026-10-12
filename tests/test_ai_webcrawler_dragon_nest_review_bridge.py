@@ -1,4 +1,5 @@
 """The real reviewed-knowledge ledger is the Dragon egg/XP input authority."""
+from dataclasses import replace
 import sqlite3
 
 import pytest
@@ -80,10 +81,18 @@ def test_reviewed_source_history_grows_exactly_three_hatchlings(setup_review):
         OWNER, brief, "video-b", lane="video", at=T1, idle_since=T0,
         consented=True, background_allowed=True, authorized=True,
     )
+    latest = library.history(OWNER, "article-a", authorized=True)[-1]
+    library.import_document(
+        replace(setup_review[3]("article-a", "research.example.org", "group-a",
+                                at=T1),
+                text="Movement engines in original games."),
+        expected_parent_digest=latest.revision_digest, authorized=True,
+    )
+    revised_brief = verified_brief(library)
     third = bridge.feed_idle(
-        OWNER, brief, "article-a", lane="updates", at=T1, idle_since=T0,
+        OWNER, revised_brief, "article-a", lane="updates", at=T1, idle_since=T0,
         consented=True, background_allowed=True, authorized=True,
-        published_at="2026-10-11T00:00:00Z",
+        published_at="2026-10-12T12:05:00Z",
     )
     assert [child.level for child in third.children] == [1, 1, 1]
     assert nest.read(OWNER, authorized=True) == third
@@ -92,6 +101,32 @@ def test_reviewed_source_history_grows_exactly_three_hatchlings(setup_review):
         OWNER, brief, "article-a", lane="article", at=T1, idle_since=T0,
         consented=True, background_allowed=True, authorized=True,
     ) == third
+
+
+def test_updates_require_a_genuinely_changed_reviewed_source_revision(setup_review):
+    bridge, nest, library, document, receipts = setup_review
+    adult(bridge, nest, library)
+    initial_brief = verified_brief(library)
+    with pytest.raises(ValueError, match="changed reviewed"):
+        bridge.feed_idle(
+            OWNER, initial_brief, "article-a", lane="updates", at=T1,
+            idle_since=T0, consented=True,
+            background_allowed=True, authorized=True,
+            published_at="2026-10-12T12:05:00Z",
+        )
+    # A rereview that changes metadata but not bytes is not an update.
+    library.import_document(
+        document("article-a", "research.example.org", "group-a", at=T1),
+        expected_parent_digest=receipts[0].revision_digest, authorized=True,
+    )
+    with pytest.raises(ValueError, match="changed reviewed"):
+        bridge.feed_idle(
+            OWNER, verified_brief(library), "article-a", lane="updates",
+            at="2026-10-12T12:20:00Z", idle_since=T0, consented=True,
+            background_allowed=True, authorized=True,
+            published_at="2026-10-12T12:05:00Z",
+        )
+    assert nest.read(OWNER, authorized=True).children[2].level == 0
 
 
 def test_no_cross_media_or_no_independent_review(setup_review):
