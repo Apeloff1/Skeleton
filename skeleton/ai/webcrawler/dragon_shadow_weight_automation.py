@@ -481,7 +481,9 @@ class ShadowWeightAutomation:
         if (record is None or record.knowledge_id != canonical_knowledge_id(record)
                 or record.evidence_fingerprint != receipts[7].output_fingerprint
                 or record.verdict != "supported"
-                or record.contradiction_state == "unresolved"
+                or record.contradiction_state != "resolved_support"
+                or type(record.probability) not in (int, float)
+                or not 0.9 <= record.probability <= 1.0
                 or record.probability_semantics != "empirically_calibrated_probability"):
             raise ValueError("unsupported, uncalibrated or unbound normalized knowledge")
         self.library.require_fresh_brief(brief, authorized=True)
