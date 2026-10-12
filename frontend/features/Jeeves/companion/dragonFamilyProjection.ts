@@ -85,7 +85,7 @@ export function validateDragonFamily(input:unknown):DragonFamilyProjection|null 
        typeof e.dragon==='string'&&e.dragon.length<=25&&
        ['collected','wiki_verified','shadow_validated','weight_handoff'].includes(e.stage)&&
        utc(e.last_acquired_at)&&Array.isArray(e.topics)&&e.topics.length<=24&&
-       e.topics.every(t=>typeof t==='string'&&t.length<=64)&&
+       e.topics.every((t:unknown)=>typeof t==='string'&&t.length<=64)&&
        (e.measured_gain===null||(typeof e.measured_gain==='number'&&
        Number.isFinite(e.measured_gain)&&e.measured_gain>=0&&e.measured_gain<=1)))||
       !Array.isArray(a.history)||a.history.length>25||
