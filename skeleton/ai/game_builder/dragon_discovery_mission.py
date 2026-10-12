@@ -128,10 +128,10 @@ class MissionSourceScout:
                 if topic is not None else ""
             )
             sql = (
-                "SELECT s.source,s.body,s.digest,j.stage,j.state FROM dragon_almanac_sources s "
+                "SELECT s.source,s.body,s.digest,j.stage,j.state,j.input_digest "
+                "FROM dragon_almanac_sources s "
                 "JOIN dragon_almanac_jobs j ON j.owner=s.owner AND j.source=s.source "
                 "WHERE s.owner=? AND j.stage=0 AND j.state IN ('pending','blocked') "
-                "AND j.input_digest=s.digest "
                 + condition + " ORDER BY s.source LIMIT ?"
             )
             params = [owner]
@@ -143,7 +143,7 @@ class MissionSourceScout:
             index_health is not None and not index_health["coverage_complete"])
         found_terms = set()
         candidates = []
-        for sid, raw, digest, stage, state in rows[:mission.scan_budget]:
+        for sid, raw, digest, stage, state, job_input in rows[:mission.scan_budget]:
             if not isinstance(raw, str) or len(raw) > _MAX_METADATA:
                 raise ValueError("corrupt source metadata size")
             source = json.loads(raw)
@@ -155,6 +155,10 @@ class MissionSourceScout:
                 raise ValueError("corrupt source identity")
             if state not in {"pending", "blocked"} or stage != 0:
                 raise ValueError("invalid scout source stage")
+            # Validate persistent source integrity before suppressing a stale
+            # policy input. Forged metadata must not disappear silently.
+            if job_input != digest:
+                continue
             refs = self.db.execute(
                 "SELECT body,digest FROM dragon_almanac_supplement_receipts_v2 "
                 "WHERE owner=? AND normalized_source=? "
