@@ -3191,8 +3191,73 @@ $("advanced-interop-godot").addEventListener("click",async()=>{
  }catch(error){status("Native original physical encounter export blocked: "+error.message);}
 });
 let verifiedSourceEpisodes=[];
+let episodicLastProof=null,episodicLastScene=null;
+let verifiedInvestigationRoute=null;
+
+function drawNPCForensicMap(world){
+ const canvas=$("advanced-npc-world-canvas");
+ const ctx=canvas.getContext("2d");
+ const w=canvas.width,h=canvas.height;
+ ctx.fillStyle="#0c2230";ctx.fillRect(0,0,w,h);
+ ctx.font="12px system-ui";ctx.fillStyle="#d5e7ec";
+ if(!world){ctx.fillText("Run an original NPC campaign to inspect its world",14,22);return;}
+ const pad=18,step=42,side=7;
+ const center=(cell)=>[pad+(cell%side)*step+step/2,
+                       pad+Math.floor(cell/side)*step+step/2];
+ const obstacles=new Set(world.world.obstacles);
+ for(let id=0;id<49;id++){
+  const [x,y]=center(id);
+  ctx.fillStyle=obstacles.has(id)?"#394858":"#173747";
+  ctx.fillRect(x-step/2+1,y-step/2+1,step-2,step-2);
+  ctx.strokeStyle="#547582";ctx.strokeRect(x-step/2+1,y-step/2+1,step-2,step-2);
+ }
+ for(const site of world.sites){
+  const [x,y]=center(site.cell);
+  ctx.fillStyle=site.integrity>0?"#e3af5b":"#bc4f5a";
+  ctx.fillRect(x-14,y-14,28,28);
+  ctx.fillStyle="#142633";ctx.textAlign="center";
+  ctx.fillText("S"+site.id,x,y+4);
+ }
+ for(const npc of world.npcs){
+  const [x,y]=center(npc.cell);
+  ctx.beginPath();ctx.arc(x,y,11,0,Math.PI*2);
+  ctx.fillStyle=npc.memories.length?"#a5e69f":
+    npc.heard.length?"#b4a5ef":"#a8bbc4";
+  ctx.fill();
+  ctx.fillStyle="#132433";ctx.textAlign="center";
+  ctx.fillText("N"+npc.id,x,y+4);
+ }
+ const [px,py]=center(world.player);
+ ctx.beginPath();ctx.arc(px,py,8,0,Math.PI*2);
+ ctx.fillStyle="#f8f5e8";ctx.fill();ctx.strokeStyle="#163545";
+ ctx.lineWidth=2;ctx.stroke();
+ ctx.fillStyle="#dce8ee";ctx.textAlign="left";
+ ctx.fillText("Day "+world.day+" · tick "+world.tick,14,336);
+ ctx.fillText("S: sites · N: NPC",312,32);
+ ctx.fillText("Green: saw",312,50);
+ ctx.fillText("Purple: rumor",312,68);
+ ctx.fillText("White: player",312,86);
+}
+function refreshNPCQuestRouteChoices(proof){
+ const choice=$("advanced-npc-route-quest");
+ const previous=choice.value;
+ choice.replaceChildren();
+ for(const q of proof.world_state.quests){
+  if(q.origin_actor!=="external:physics" || q.status!=="active")continue;
+  const item=document.createElement("option");
+  item.value=String(q.id);
+  item.textContent="Quest "+q.id+" · site "+q.site_id+
+    " · testimony "+q.testimonies.length;
+  choice.append(item);
+ }
+ if([...choice.options].some(opt=>opt.value===previous))choice.value=previous;
+}
+
 $("advanced-episodic-clear").addEventListener("click",()=>{
  verifiedSourceEpisodes=[];
+ episodicLastProof=null;episodicLastScene=null;verifiedInvestigationRoute=null;
+ drawNPCForensicMap(null);
+ $("advanced-npc-route-proof").textContent="";
  $("advanced-episodic-queue").textContent="";
  $("advanced-episodic-proof").textContent="";
  status("Unpublished original physical episodes cleared; no source game files changed");
@@ -3235,6 +3300,8 @@ $("advanced-episodic-add").addEventListener("click",async()=>{
     world_actions:worldActions
   };
   verifiedSourceEpisodes.push(episode);
+  episodicLastProof=null;episodicLastScene=null;verifiedInvestigationRoute=null;
+  $("advanced-npc-route-proof").textContent="";
   $("advanced-episodic-queue").textContent=JSON.stringify(
     verifiedSourceEpisodes.map((ep,i)=>({
      episode:i+1,source:ep.source_session.editor,
@@ -3262,6 +3329,10 @@ $("advanced-episodic-play").addEventListener("click",async()=>{
      proof.world_scene_digest!==realWorld.scene.digest ||
      proof.episode_count!==verifiedSourceEpisodes.length)
    throw Error("Persistent game and physical NPC replay receipt failed custody");
+  episodicLastProof=proof;episodicLastScene=realWorld.scene;
+  verifiedInvestigationRoute=null;
+  refreshNPCQuestRouteChoices(proof);
+  drawNPCForensicMap(proof.world_state);
   $("advanced-episodic-proof").textContent=JSON.stringify({
    episode_count:proof.episode_count,
    source_chronology:proof.episodes,
@@ -3569,6 +3640,22 @@ local until typed revalidation and an explicit human-approved file commit.</smal
   <button id="advanced-episodic-clear" type="button">Reset unpublished episodes</button>
   <pre id="advanced-episodic-queue" role="status" aria-live="polite"></pre>
   <pre id="advanced-episodic-proof" role="status" aria-live="polite"></pre>
+  <fieldset aria-label="Forensic NPC route navigator">
+   <legend>Playable eyewitness and physical investigation routes</legend>
+   <canvas id="advanced-npc-world-canvas" width="380" height="350"
+    aria-label="Current authored seven by seven NPC world map"></canvas>
+   <label>Source-verified causal quest<select id="advanced-npc-route-quest"></select></label>
+   <label>Original gameplay objective<select id="advanced-npc-route-objective">
+    <option value="testimony">Reach and interview a real eyewitness</option>
+    <option value="repair">Walk to and repair actual damage</option>
+    <option value="resolve">Resolve proven material quest outcome</option>
+   </select></label>
+   <button id="advanced-npc-route" type="button">Compute and replay investigation route</button>
+   <button id="advanced-npc-route-apply" type="button">
+    Add verified route actions to campaign and replay
+   </button>
+   <pre id="advanced-npc-route-proof" role="status" aria-live="polite"></pre>
+  </fieldset>
 </fieldset>
 </fieldset>
 <button id="advanced-interop-godot" type="button">Download original physical encounter for Godot 4</button>
