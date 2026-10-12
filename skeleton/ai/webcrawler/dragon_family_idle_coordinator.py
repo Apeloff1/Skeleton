@@ -108,14 +108,16 @@ def read_idle_family_health(db: sqlite3.Connection, owner: str, *,
     rows=db.execute("""SELECT role,COUNT(*),
         SUM(last_outcome='failed'),SUM(last_outcome='running'),
         SUM(last_outcome='changed'),SUM(last_outcome='unchanged'),
+        SUM(last_outcome='policy_blocked'),SUM(last_outcome='rate_limited'),
         MIN(CASE WHEN next_due>0 THEN next_due ELSE NULL END)
         FROM dragon_family_idle_leases
         WHERE owner=? GROUP BY role ORDER BY role""", (owner,)).fetchall()
     details={role:dict(known_sources=n,failed=failed or 0,
             incomplete_leases=running or 0,
             last_changes=changed or 0,unchanged=unchanged or 0,
+            policy_blocked=blocked or 0,rate_limited=limited or 0,
             earliest_due_at=_utc(due) if due is not None else None)
-            for role,n,failed,running,changed,unchanged,due in rows}
+            for role,n,failed,running,changed,unchanged,blocked,limited,due in rows}
     history=read_idle_family_history(db,owner,authorized=True,limit=15)
     return dict(schema="skeleton.ai.dragon.idle_status.v1",configured=True,
                 workers=details,history=history,idle_only=True,
