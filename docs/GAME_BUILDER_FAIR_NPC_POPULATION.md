@@ -77,3 +77,32 @@ starvation-free proof for arbitrary maps. This milestone does not certify
 native Godot execution, million-NPC games, multi-world memory import,
 commercial release, or automatic AI weight improvement. PR stack remains
 draft and unmerged until integration validation.
+
+
+## Exact per-turn fidelity custody (added 2026-10-12)
+
+The source event frame now records an explicit LOD fidelity receipt on
+**every turn**, not only a final counter. It includes each selected original
+physical NPC identity, how many bodies received actual schedule updates, how
+many were deferred, how many nearby eligible residents remained unserved,
+the actual loaded chunks, cumulative maximum deferral streak, and the
+zero-phantom-work count.
+
+Runtime conservation: actually_detailed + deferred = physical_actor_count
+on every frame, with no duplicate selected actor IDs. This is a source
+evidence constraint rather than a rendering estimate.
+
+The trusted fast-fork engine uses the identical receipt calculation. Its
+branch must equal complete from-genesis canonical game history, including
+per-turn NPC selection, physical movement and deferred work. Source
+reexecution rejects altered cohort IDs or unearned simulation credits.
+
+The Studio exposes each turn's factual selected/deferred work and the
+source chain digest. This distinguishes catalog existence from actual
+detailed execution.
+
+2026-10-12 — Added per-turn original actor selection and deferral custody
+(improved deterministic fairness scrutiny and work accounting).
+
+2026-10-12 — Propagated exact fidelity receipts to optimized fast forks
+(prevents a second replay pathway from omitting actual simulated work).
