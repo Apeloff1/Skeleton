@@ -19,7 +19,7 @@ export interface DragonIdleFamilyProjection {
  host_state:'not_connected'|'not_observed';
  max_tasks_per_tick:number;
  history:readonly {sequence:number;at:string;dragon:DragonFamilyRole;
-   source_id:string;outcome:'changed'|'unchanged'|'failed'|'paused';
+   source_id:string;outcome:'changed'|'unchanged'|'failed'|'paused'|'recovered';
    change:string;digest:string}[];
  workers:Partial<Record<DragonFamilyRole,{
    known_sources:number;failed:number;incomplete_leases:number;
@@ -144,7 +144,7 @@ export function validateDragonFamily(input:unknown):DragonFamilyProjection|null 
       !w.history.every((e,i)=>e&&count(e.sequence)&&e.sequence>0&&utc(e.at)&&
         ['article','video','monitor'].includes(e.dragon)&&
         typeof e.source_id==='string'&&e.source_id.length<=128&&
-        ['changed','unchanged','failed','paused'].includes(e.outcome)&&
+        ['changed','unchanged','failed','paused','recovered'].includes(e.outcome)&&
         typeof e.change==='string'&&e.change.length<=200&&
         HEX.test(e.digest)&&(i===0||e.sequence<w.history[i-1].sequence))||
       !w.workers||typeof w.workers!=='object'||Array.isArray(w.workers)||
