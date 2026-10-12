@@ -3,7 +3,7 @@
 The previous independent batch 0024 and orphaned batch 0030 do not form a
 consecutive custody chain. Their pinned catalog discoveries were reconciled
 into audited consecutive batches 0031..0037; further, twelve new source
-catalogs extend this custody lineage through 0038..0041. Excluded orphans
+catalogs extend this custody lineage through 0038..0042, including seven\nmore retro, Godot, Unity and game-editor reference collections. Excluded orphans
 never appear as asserted ancestors or training grants.
 """
 from __future__ import annotations
@@ -15,12 +15,12 @@ from .dragon_discovery_admission import (
     DragonDiscoveryAdmission, _supplement, validate_discovery_chain,
 )
 
-EXPECTED_RAW_TOTAL = 12_777
+EXPECTED_RAW_TOTAL = 15_175
 SOURCE_BATCHES = (
     "docs/ai/evidence/dragon-source-expansion-20261011-batch-0020.json",
     *(
         f"docs/ai/evidence/dragon-source-expansion-20261012-batch-{n:04d}.json"
-        for n in (21, 22, 23, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41)
+        for n in (21, 22, 23, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42)
     ),
 )
 EXCLUDED_ORPHANS = (
