@@ -176,6 +176,8 @@ class DragonTechnicalSources:
             sid="source-"+sha256(seed["url"].encode()).hexdigest()
             history=self._history(owner,sid)
             if not history: continue
+            if history[-1]["seed"]!=seed:
+                raise ValueError("updated editorial seed must be imported before planning")
             terms=set(seed["topics"])|{seed["family"]}
             direct=sorted(words & terms)
             adjacent=sorted((near & terms)-set(direct))

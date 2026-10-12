@@ -1,6 +1,6 @@
 # Dragon advanced technical source atlas — 2026-10-12
 
-This source-ingestion work adds **55 editorial entry-point leads** in 12 families: game engines/editors, native runtime, graphics APIs, audio, homebrew/retro hardware, programming/compiler debugging, software security, AI, research, accessibility, delivery and intellectual property. This is a *separately measured* source shortlist, **not** an increase of 55 independently reviewed websites over the pre-existing 12,777 raw discovery-lead chain. Many curated URLs may overlap that chain.
+This source-ingestion work adds **55 editorial entry-point leads** in 12 families: game engines/editors, native runtime, graphics APIs, audio, homebrew/retro hardware, programming/compiler debugging, software security, AI, research, accessibility, delivery and intellectual property. This is a *separately measured* source shortlist, **not** an increase of 55 independently reviewed websites over the existing 19,228 / 44,050 accepted raw-link ledger (43.65%). Many curated URLs may overlap that chain.
 
 ## Technical workflow
 
