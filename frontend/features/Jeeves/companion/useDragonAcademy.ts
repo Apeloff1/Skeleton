@@ -17,7 +17,7 @@ import {
 } from './dragonProgression';
 import type {CompanionAcademyInput,CompanionTelemetry} from './DragonCompanionPanel';
 import {type NativeAttempt,type NativeTarget,type NativeCurriculum,normalizeNativeAttempts,normalizeNativeTargets,normalizeNativeCurriculum} from './dragonNativeTargets';
-import {type DragonFamilyProjection,validateDragonFamily} from './DragonFamilyNest';
+import {type DragonFamilyProjection,validateDragonFamily} from './dragonFamilyProjection';
 import {EMPTY_COMPANION_JOURNAL,reduceDragonJournal,type CompanionJournal,type WireDragonEvent} from './dragonJournal';
 
 type Snapshot={
