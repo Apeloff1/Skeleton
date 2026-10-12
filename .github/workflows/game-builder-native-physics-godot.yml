@@ -1,0 +1,133 @@
+name: Game Builder Native Physics Godot Replay
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_physics_godot.py"
+      - "skeleton/ai/game_builder/advanced_physics_runtime.py"
+      - "skeleton/ai/game_builder/advanced_physics_dynamics.py"
+      - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
+      - "skeleton/ai/game_builder/advanced_level_scenes.py"
+      - "skeleton/ai/game_builder/advanced_godot_export.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_advanced_physics_godot.py"
+      - ".github/workflows/game-builder-native-physics-godot.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: native-physics-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  independently-execute:
+    name: Independent original physics Godot on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    timeout-minutes: 23
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Checkout exact authored PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_advanced_physics_godot.py
+      - name: Use supported Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Official Godot 4.4.1 runtime and editor
+        uses: chickensoft-games/setup-godot@f166999204a4f2722c6fe042fbaa3b3ea0d9c789
+        with:
+          version: "4.4.1"
+          use-dotnet: false
+          include-templates: true
+          cache: true
+      - name: Python contracts and exact source proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          godot --version
+          python -m py_compile skeleton/ai/game_builder/advanced_physics_godot.py
+          python -m unittest tests.test_game_builder_advanced_physics_godot -v
+      - name: Create multiple signed original physical games
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from skeleton.ai.game_builder.advanced_level_scenes import make_advanced_scene
+          from skeleton.ai.game_builder.advanced_gameplay_runtime import run_advanced_session,verify_advanced_session
+          from skeleton.ai.game_builder.advanced_physics_runtime import default_layout
+          from skeleton.ai.game_builder.system_editors import make_editor_document
+          from skeleton.ai.game_builder.advanced_physics_godot import render_physics_godot_package
+          from skeleton.ai.game_builder.advanced_godot_export import write_advanced_godot_package
+          root=Path(os.environ["RUNNER_TEMP"])/"original-native-physics"
+          root.mkdir()
+          base={"dimension":"2d","collision_geometry":"aabb","max_bodies":1,
+                "gravity":0,"substeps":1,"initial_battery":0}
+          cases=(
+            ("impulses",{},["push:east","step:4","push:west","brake"],0,False),
+            ("signed_negative",{"impulse_strength":157,"air_drag":5},
+             ["push:west","push:up","step","torque:ccw","brake"],3,False),
+            ("earned_victory",{"goal_radius":70,"goal_speed":300},
+             ["push:east"],4,True),
+            ("infinite_sandbox",{"goal_radius":70,"goal_speed":300,
+                                 "completion_mode":"sandbox"},
+             ["push:east","step"],7,True),
+          )
+          for label,deltas,actions,seed,near_goal in cases:
+              settings={**base,**deltas}
+              chart=default_layout(make_editor_document("physics",settings)["settings"],seed)
+              chart["fixtures"]=[]
+              if near_goal: chart["goal"]=[300,960,0]
+              scene=make_advanced_scene("physics",settings,seed=seed,layout=chart)
+              session=run_advanced_session("physics",settings,actions,seed=seed,scene=scene)
+              assert verify_advanced_session(session,settings)
+              package=render_physics_godot_package(session,settings,authorized=True)
+              assert not package.manifest["godot_executed"]
+              write_advanced_godot_package(package,root/label,authorized=True)
+              print("NATIVE_PHYSICS_SOURCE_READY",label,
+                    scene["digest"],"turns",session["validated_turn_count"])
+          PY
+      - name: Execute independent native GDScript parity for all scenarios
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/original-native-physics"
+          for profile in impulses signed_negative earned_victory infinite_sandbox; do
+            game="$root/$profile/godot"
+            godot --headless --path "$game" --import
+            godot --headless --path "$game" -- --verify-physics >"$root/$profile/native.log" 2>&1 || {
+              cat "$root/$profile/native.log"
+              exit 1
+            }
+            cat "$root/$profile/native.log"
+            grep -q "NATIVE_ADVANCED_PHYSICS_OK" "$root/$profile/native.log"
+          done
+      - name: Upload exact native parity evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-physics-${{ matrix.os }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/original-native-physics/*/native.log
+            ${{ runner.temp }}/original-native-physics/*/release.json
+          if-no-files-found: warn
+          retention-days: 7
