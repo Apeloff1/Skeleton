@@ -205,10 +205,10 @@ func _step(action: String) -> bool:
             int(physical["vx"])*(100-int(cfg["brake_strength"])),100)
         physical["vy"]=_floor_div(
             int(physical["vy"])*(100-int(cfg["brake_strength"])),100)
-        # Python uses truncation towards zero for signed angular braking.
-        physical["angular_velocity"]=int(
-            float(int(physical["angular_velocity"])*
-            (100-int(cfg["brake_strength"])))/100.0)
+        # Python gameplay uses signed floor division for source braking.
+        physical["angular_velocity"]=_floor_div(
+            int(physical["angular_velocity"])*
+            (100-int(cfg["brake_strength"])),100)
     physical["tick"]=int(physical["tick"])+1
     var iterations: int=4 if action=="step:4" else 1
     for _i in range(iterations):
