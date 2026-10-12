@@ -1828,7 +1828,9 @@ function showAdvanced(reply){
    advancedSettings?.max_bodies===1 && advancedSettings?.dimension==="2d" &&
    advancedSettings?.collision_geometry==="aabb" && advancedSettings?.substeps===1 &&
    advancedSettings?.initial_battery===0 &&
-   authored?.bodies?.length===1 && authored?.fixtures?.length===0 &&
+   authored?.bodies?.length===1 &&
+   authored?.fixtures?.length<=8 &&
+   authored.fixtures.every(fixture=>fixture.orientation===0) &&
    authored.water_y>authored.floor_y &&
    advancedSession.actions.every(action=>physicsActions.has(action)));
  const nativeReady=nativeSourceFamilies.has(advancedSession.editor)&&physicsNativeReady;
@@ -1836,7 +1838,7 @@ function showAdvanced(reply){
  $("advanced-godot-export").title=nativeReady?
   "Package independent original Godot source; real native replay and hardware review remain separate":
   advancedSession.editor==="physics"?
-  "Physics Godot export requires an authored one-body 2D AABB scene without fixtures, substeps=1, battery=0 and supported actions":
+  "Physics Godot export requires an authored one-body 2D AABB scene with at most 8 axis-aligned fixtures, substeps=1, battery=0 and supported actions":
   "This family has no independently running native Godot source adapter";
  $("advanced-state").textContent=JSON.stringify({
    session_digest:advancedSession.digest,
@@ -3081,7 +3083,8 @@ $("advanced-physics-native").addEventListener("click",async()=>{
    editor:"physics",settings,seed,scene_id:"native_physics_demo"
   });
   const layout=JSON.parse(JSON.stringify(template.scene.layout));
-  layout.fixtures=[];
+  layout.fixtures=[{"position":[430,900,0],
+                    "half_size":[10,100,40],"layer":3}];
   const approved=await api("/api/advanced-scene-template",{
    editor:"physics",settings,seed,layout,scene_id:"native_physics_demo"
   });
