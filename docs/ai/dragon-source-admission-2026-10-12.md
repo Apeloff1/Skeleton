@@ -80,3 +80,32 @@ python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-receipts --datab
 ```
 
 `discovery-topics` returns the direct children of an observed heading path, with inherited source counts. `discovery-sources` returns one canonical acquisition identity per URL, its existing policy-stage job state and the total count of unreviewed raw provenance receipts. `discovery-receipts` returns the exact original link, catalog evidence path, observed heading paths, pinned identifiers and receipt digest. Each view validates stored source or evidence digests before presentation and carries explicit `training_authorized: false` and `scope: discovery_metadata_only` fields. Pagination is bounded to 100 rows and all queries require an explicit owner. The CLI is a local operator interface, **not** an HTTP endpoint and **not** a new runtime permission.
+
+## Four-batch raw discovery and mission-directed source scouting
+
+The discovered evidence chain now contains four consecutive supplements. The first three retain their original `partial_discovery_only_not_ingested_into_canonical_queue` status and the fourth records `raw_discovery_only_not_ingested_into_canonical_queue`. Both are explicitly **non-authorizing** states; neither can mark a URL fetched, independent, rights-cleared or training-approved. The import bridge validates both historical and current count-field conventions before making any database writes.
+
+A trusted local operator can feed all four supplements, in exact sequence, into an isolated SQLite library:
+
+```sh
+python -m skeleton.ai.game_builder.dragon_almanac_cli import-supplements \
+  --database dragon.sqlite --owner studio --trusted-local-operator \
+  --supplement docs/ai/evidence/dragon-source-expansion-20261011-batch-0020.json \
+  --supplement docs/ai/evidence/dragon-source-expansion-20261012-batch-0021.json \
+  --supplement docs/ai/evidence/dragon-source-expansion-20261012-batch-0022.json \
+  --supplement docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json
+```
+
+The owner-scoped `mission-scout` command ranks **unreviewed discovery metadata**, allowing the next human or policy worker to focus on a specific console, genre, era, mechanics editor or port target. For example:
+
+```sh
+python -m skeleton.ai.game_builder.dragon_almanac_cli mission-scout \
+  --database dragon.sqlite --owner studio --trusted-local-operator \
+  --query "gameboy homebrew input collision physics" \
+  --platform "Game Boy" --genre "platformer" --era "1990s" \
+  --limit 25 --scan-budget 4000
+```
+
+This is an explainable, deterministic **proposal**. It scores intersections between goal terms and URL paths, observed catalog headings and repository names, then displays host-diverse candidates. It does not claim different hosts are independent originals; it never treats a ROM, BIOS, dump or download link as automatically lawful; it **never** starts the durable policy queue or fetches media. Rights-risk indicators require manual review. `scan_truncated` and unmatched terms disclose when the bounded metadata scan cannot cover the entire source corpus.
+
+Progress denominators are not interchangeable: **5,438** records are raw URL leads toward the **44,050** raw target (12.35%), whereas **736 / 4,405** represents sequential first-pass acquisitions of the original registry. Neither measure demonstrates 5,438 usable or independent sources. Canonical deduplicated totals are computed at ingestion, and all discoveries remain unapproved for training.
