@@ -106,6 +106,7 @@ class AcquiredKnowledge:
     # An update candidate must have a dated source revision, not merely
     # be rediscovered from an unchanged search result.
     published_at: str | None = None
+    kind: str = "article"
 
 
 def _record(state: DragonNest, *, at: str, action: str,
@@ -190,6 +191,8 @@ def learn_when_idle(state: DragonNest, lane: str, evidence: AcquiredKnowledge, *
     if not isinstance(evidence, AcquiredKnowledge):
         raise ValueError("verified acquisition required")
     _id(evidence.source_id)
+    if evidence.kind != lane:
+        raise ValueError("source media kind cannot be assigned to a different hatchling")
     if not isinstance(evidence.content_sha256, str) or _HEX.fullmatch(evidence.content_sha256) is None:
         raise ValueError("content identity required")
     if evidence.reviewed is not True or evidence.lawful is not True:
