@@ -163,6 +163,7 @@ def test_source_receipts_are_verified_during_idempotent_replay(tmp_path, baselin
                             SET body='{"forged":true}'
                             WHERE rowid=(SELECT MIN(rowid)
                                          FROM dragon_almanac_supplement_receipts_v2)""")
+        store.db.commit()
         with pytest.raises(ValueError, match="corrupt"):
             ingress.import_chain("owner", baseline, chain, authorized=True)
         assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_supplement_receipts_v2").fetchone()[0] == 964
