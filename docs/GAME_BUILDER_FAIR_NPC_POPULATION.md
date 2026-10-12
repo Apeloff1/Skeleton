@@ -106,3 +106,21 @@ detailed execution.
 
 2026-10-12 — Propagated exact fidelity receipts to optimized fast forks
 (prevents a second replay pathway from omitting actual simulated work).
+
+
+## Physical occupant collision exclusion (added 2026-10-12)
+
+The source-world expanded spawn planner now reserves the player's actual
+starting cell as well as every NPC's cell. The actor scheduler pathfinder
+reserves the player's CURRENT tile before each NPC one-tile step. A player
+movement command also refuses to enter an embodied resident's tile before
+it spends stamina. Post-schedule collision checks reject any NPC overlapping
+the player or another resident. This applies to both 21x21 and 35x35
+environments, all configured citizen counts and either LOD policy.
+
+Tests exercise multiple seeds with 128 residents in both world sizes and
+perform a deliberately invalid player-into-NPC move against the real movement
+rule. Success means the command is rejected with no resource debit.
+
+2026-10-12 — Prevented NPC/player occupancy conflicts in spawning,
+pathfinding and movement (improved physical-world consistency).
