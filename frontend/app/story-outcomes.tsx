@@ -463,6 +463,9 @@ export default function StoryOutcomesStudio() {
               {simulation.ending_accepted ? 'All recorded causal obligations closed' :
                 'Unresolved consequences block narrative acceptance'}
             </Text>
+            {!!simulation.ending_variants_selected?.length && <Text style={styles.label}>
+              Conditional ending variations: {simulation.ending_variants_selected.join(', ')}
+            </Text>}
             <Text style={styles.text}>{simulation.ending.epilogue}</Text>
             <Text style={styles.muted}>{simulation.ending.consequences}</Text>
             {Object.entries(simulation.ending.character_conclusions).map(([id, fate]) =>
