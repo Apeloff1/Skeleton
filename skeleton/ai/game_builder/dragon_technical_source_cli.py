@@ -21,7 +21,8 @@ def main():
                                                   "capture-history","capture-review",
                                                   "capture-census","glean-preview","glean-handoff",
                                                   "operations-inspect","operations-review","operations-ready",
-                                                  "policy-renewal-pending","refresh-inspect"))
+                                                  "policy-renewal-pending","refresh-inspect",
+                                                  "refresh-census"))
     parser.add_argument("--database",required=True)
     parser.add_argument("--owner",required=True)
     parser.add_argument("--trusted-local-operator",action="store_true")
@@ -63,9 +64,14 @@ def main():
             captures=DragonSourceCaptures(atlas.a)
             if args.command in ("operations-inspect","operations-review",
                                 "operations-ready","policy-renewal-pending",
-                                "refresh-inspect"):
+                                "refresh-inspect","refresh-census"):
                 operations=DragonSourceOperations(captures)
-                if args.command=="policy-renewal-pending":
+                if args.command=="refresh-census":
+                    if args.now is None: parser.error("--now required")
+                    report=DragonSourceRefreshPlanner(operations).scan(
+                        args.owner,now=args.now,authorized=True,
+                        limit=args.limit)
+                elif args.command=="policy-renewal-pending":
                     report=DragonSourcePolicyRenewal(operations).pending(
                         args.owner,authorized=True,limit=args.limit)
                 elif args.command=="refresh-inspect":

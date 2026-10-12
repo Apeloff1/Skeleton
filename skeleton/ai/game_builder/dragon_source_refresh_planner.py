@@ -81,3 +81,36 @@ class DragonSourceRefreshPlanner:
             "network_requests":0,"rights_granted":False,
             "training_authorized":False,
         }
+
+
+    def scan(self, owner: str, *, now: int, authorized: bool,
+             limit: int=100) -> dict:
+        """Bounded, owner-wide refresh inventory; no network, jobs, or grants."""
+        _auth(owner,authorized)
+        _integer(now,"refresh census clock",0,4_102_444_800)
+        _integer(limit,"refresh scan limit",1,100)
+        rows=self.db.execute(
+            "SELECT source FROM dragon_source_ops_heads_v1 "
+            "WHERE owner=? ORDER BY source LIMIT ?",(owner,limit+1)
+        ).fetchall()
+        if len(rows)>limit:
+            raise ValueError("refresh scan exceeds bounded page; narrow owner batch")
+        items=[self.assess(owner,sid,now=now,authorized=True) for (sid,) in rows]
+        def priority(x):
+            return (0 if x["reason"]=="policy_expired_requires_recheck"
+                    else 1 if x["reason"]=="reviewed_source_revisit_due"
+                    else 2 if x["reason"]=="manual_site_policy_hold"
+                    else 3, x["source_id"])
+        items.sort(key=priority)
+        return {
+            "schema":"skeleton.dragon.source_refresh_census.v1",
+            "owner":owner,"tracked_sources":len(items),
+            "operator_revalidation_due":sum(
+                bool(x["operator_revalidation_required"]) for x in items),
+            "policy_expired":sum(
+                x["reason"]=="policy_expired_requires_recheck" for x in items),
+            "manual_holds":sum(
+                x["reason"]=="manual_site_policy_hold" for x in items),
+            "items":items,"network_requests":0,
+            "queue_modified":False,"training_authorized":False,
+        }

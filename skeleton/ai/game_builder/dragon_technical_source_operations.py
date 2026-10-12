@@ -557,7 +557,14 @@ class DragonSourceOperations:
             ).fetchone():
                 continue
             registered,_=self.captures._source(owner,sid)
-            self.captures._policy(owner,sid,registered["url"],observed_at=now)
+            try:
+                self.captures._policy(
+                    owner,sid,registered["url"],observed_at=now)
+            except PermissionError:
+                # Expired or denied rights are NOT a global outage. Leave
+                # this source unscheduled; the renewal queue can report it.
+                # ValueError from corrupt lineage must still fail closed.
+                continue
             row=self.db.execute(
                 """SELECT stage,state FROM dragon_almanac_jobs
                    WHERE owner=? AND source=?""",(owner,sid)

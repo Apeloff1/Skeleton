@@ -659,3 +659,37 @@ def test_refresh_planner_surfaces_permission_expiry_without_auto_approval(lab):
     assert lab[6].inspect(OWNER,lab[7],authorized=True)["state"]=="scheduled"
     with pytest.raises(ValueError,match="unregistered"):
         planner.assess("unrelated",lab[7],now=START+3601,authorized=True)
+
+
+
+def test_expired_candidate_is_skipped_not_allowed_or_global_queue_fatal(lab):
+    schedule(lab)
+    sid=lab[7]
+    expiry=START+3601
+    # The source is still in the durable schedule, but its separately
+    # reviewed acquisition permission has expired.
+    assert lab[6].ready_candidates(
+        OWNER,now=expiry,authorized=True)==()
+    census=DragonSourceRefreshPlanner(lab[6]).scan(
+        OWNER,now=expiry,authorized=True,limit=10)
+    assert census["tracked_sources"]==1
+    assert census["policy_expired"]==1
+    assert census["operator_revalidation_due"]==1
+    assert census["items"][0]["source_id"]==sid
+    assert census["items"][0]["reason"]=="policy_expired_requires_recheck"
+    assert not census["queue_modified"] and not census["training_authorized"]
+    assert lab[6].inspect(OWNER,sid,authorized=True)["state"]=="scheduled"
+
+
+def test_refresh_census_strict_tenant_and_budget(lab):
+    schedule(lab)
+    planner=DragonSourceRefreshPlanner(lab[6])
+    snapshot=planner.scan(OWNER,now=NOW,authorized=True,limit=1)
+    assert snapshot["tracked_sources"]==1
+    assert snapshot["operator_revalidation_due"]==0
+    assert snapshot["network_requests"]==0
+    assert planner.scan("another-tenant",now=NOW,authorized=True)["items"]==[]
+    with pytest.raises(PermissionError):
+        planner.scan(OWNER,now=NOW,authorized=False)
+    with pytest.raises(ValueError,match="scan limit"):
+        planner.scan(OWNER,now=NOW,authorized=True,limit=101)
