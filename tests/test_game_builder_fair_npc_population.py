@@ -111,6 +111,57 @@ class HigherCapacityNPCSimulationTests(unittest.TestCase):
                         abs(a%side-b%side)+abs(a//side-b//side),1)
                     self.assertTrue(move["one_tile"])
 
+    def test_every_turn_proves_exact_selected_actor_ids_and_full_work_accounting(self):
+        record=run_chunked_npc_world(["wait"]*9,
+             options=rules(citizens=96,active=8,chunks=5,radius=0))
+        self.assertTrue(verify_chunked_npc_world(record))
+        actors=record["state"]["actors"]
+        indexed={actor["id"]:actor for actor in actors}
+        counts={actor["id"]:0 for actor in actors}
+        detailed_total=0
+        for frame in record["trace"]:
+            proof=frame["lod_fidelity"]
+            self.assertLessEqual(proof["actually_detailed"],8)
+            self.assertEqual(proof["actually_detailed"],
+                             len(proof["selected_actor_ids"]))
+            self.assertEqual(len(set(proof["selected_actor_ids"])),
+                             len(proof["selected_actor_ids"]))
+            self.assertEqual(proof["actually_detailed"]+proof["deferred"],96)
+            self.assertGreaterEqual(proof["deferred"],
+                                    proof["eligible_but_deferred"])
+            self.assertEqual(proof["phantom_updates"],0)
+            self.assertEqual(proof["currently_loaded_chunks"],[[2,2]])
+            for identity in proof["selected_actor_ids"]:
+                self.assertIn(identity,indexed)
+                counts[identity]+=1
+            detailed_total+=proof["actually_detailed"]
+        self.assertEqual(detailed_total,
+            record["state"]["scheduler"]["detailed_updates"])
+        self.assertEqual({a["id"]:a["detailed_ticks"] for a in actors},counts)
+        self.assertEqual(sum(x["lod_fidelity"]["deferred"]
+                         for x in record["trace"]),
+                         record["state"]["scheduler"]["deferred_actor_turns"])
+
+    def test_fast_forks_match_full_replay_including_exact_per_turn_fidelity(self):
+        from skeleton.ai.game_builder.advanced_fast_chunk_snapshot import (
+            prepare_verified_chunk_snapshot,
+        )
+        from skeleton.ai.game_builder.advanced_chunked_world_timeline import (
+            make_chunked_bookmarks,continue_chunked_world,
+        )
+        base=make_chunked_bookmarks(run_chunked_npc_world(
+             ["wait"]*8,options=rules(citizens=64,active=8)))
+        prepared=prepare_verified_chunk_snapshot(base,cursor=8)
+        for suffix in (["wait"],["move:west","move:east"],
+                       ["wait","wait","wait"]):
+            with self.subTest(suffix=suffix):
+                fast=prepared.fork(suffix)
+                reference=continue_chunked_world(base,suffix,cursor=8)
+                self.assertEqual(fast,reference)
+                self.assertTrue(verify_chunked_continuation(fast))
+                self.assertEqual([x["lod_fidelity"] for x in fast["result"]["trace"]],
+                                 [x["lod_fidelity"] for x in reference["result"]["trace"]])
+
     def test_population_option_and_lod_policy_are_strict_typed(self):
         for bad in (
             {"citizens":129}, {"citizens":True}, {"citizens":7},
@@ -129,6 +180,8 @@ class HigherCapacityNPCSimulationTests(unittest.TestCase):
         record=run_chunked_npc_world(["wait"]*6,options=rules(citizens=64))
         for change in (
             lambda r:r["state"]["actors"][3].__setitem__("deferred_streak",100),
+            lambda r:r["trace"][0]["lod_fidelity"]["selected_actor_ids"].append("original_chunk_npc:999"),
+            lambda r:r["trace"][0]["lod_fidelity"].__setitem__("actually_detailed",64),
             lambda r:r["state"]["actors"][12].__setitem__("eligible_deferred_ticks",500),
             lambda r:r["state"]["scheduler"].__setitem__("eligible_deferred_actor_turns",0),
             lambda r:r["state"]["scheduler"].__setitem__("max_deferral_streak",0),
