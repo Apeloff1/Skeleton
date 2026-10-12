@@ -9,7 +9,7 @@ from skeleton.ai.game_builder.advanced_level_scenes import make_advanced_scene
 from skeleton.ai.game_builder.advanced_unified_genre_campaign import (
     UnifiedWorldError,run_unified_game_campaign,verify_unified_game_campaign,
 )
-from tests.test_game_builder_advanced_genre_npc_world import TrueGenreEventToNPCWorldTests
+from tests import test_game_builder_advanced_genre_npc_world as original_genre_fixtures
 
 
 class UnifiedGenreWorldTests(unittest.TestCase):
@@ -35,7 +35,7 @@ class UnifiedGenreWorldTests(unittest.TestCase):
 
     @staticmethod
     def addition(kind="farming",site=1):
-        helper=TrueGenreEventToNPCWorldTests
+        helper=original_genre_fixtures.TrueGenreEventToNPCWorldTests
         source,cfg=getattr(helper,{"farming":"farm","sailing":"sailing",
                                    "flight":"flight"}[kind])()
         mapping=helper.bind(source,site)
