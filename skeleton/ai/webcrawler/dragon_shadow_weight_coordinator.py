@@ -19,7 +19,7 @@ from .dragon_nest_progression import _id, _iso
 from .dragon_nest_research_scheduler import IdleResearchPlan
 from .dragon_resource_session import HardwareSample
 from .dragon_shadow_weight_automation import (
-    ShadowWeightAutomation, BenchmarkCase,
+    ShadowWeightAutomation, SealedHoldoutSuite,
 )
 
 
@@ -32,7 +32,7 @@ class ReviewedAcquisition:
     normalized_records: tuple[NormalizedKnowledge, ...]
     analysis_receipts: tuple[LayerReceipt, ...]
     adversarial_output: AdversarialReviewOutput
-    benchmark: tuple[BenchmarkCase, ...] = ()
+    benchmark: SealedHoldoutSuite | None = None
     promoted_memory: MemoryPromotionOutput | None = None
     human_review_id: str = ""
 
@@ -121,7 +121,7 @@ def run_shadow_automation(
                 authorized=True, privacy_clear=privacy_clear,
             )
             staged += 1
-            if not candidate.benchmark:
+            if candidate.benchmark is None:
                 items.append(ShadowAutomationItem(
                     candidate.source_id, candidate.note_id, "shadow",
                     "awaiting_independent_holdout", shadow.candidate_id,
