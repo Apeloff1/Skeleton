@@ -95,7 +95,14 @@ def resolve_moving_pairs(state, config, previous, events):
                 continue
             toi, axis, normal = time
             relative_speed = first["velocity"][axis] - second["velocity"][axis]
-            if relative_speed * normal >= 0:
+            relative_travel = (
+                first["position"][axis] - previous[first["id"]][axis] -
+                second["position"][axis] + previous[second["id"]][axis])
+            # The trajectories establish impact even if drag zeroed the end
+            # velocities; otherwise fast damped bodies could still tunnel.
+            approach = max(0, -relative_travel * normal,
+                           -relative_speed * normal)
+            if approach == 0:
                 continue
             for body in (first, second):
                 before = previous[body["id"]]
@@ -110,7 +117,7 @@ def resolve_moving_pairs(state, config, previous, events):
                 min(config["material_restitution"],
                     {"wood":35,"metal":20,"rubber":80,"glass":15}[first["material"]],
                     {"wood":35,"metal":20,"rubber":80,"glass":15}[second["material"]]))
-            impulse = (-relative_speed * normal) * (100 + restitution) // 100
+            impulse = approach * (100 + restitution) // 100
             change_a = impulse * second["mass"] // total
             change_b = impulse - change_a
             first["velocity"][axis] += normal * change_a
