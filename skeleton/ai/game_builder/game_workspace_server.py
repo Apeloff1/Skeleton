@@ -40,6 +40,8 @@ from .advanced_godot_export import (
 from .advanced_platformer_godot import render_platformer_godot_package
 from .advanced_npc_evidence_navigation import (navigate_verified_investigation,
     verify_investigation_navigation)
+from .advanced_npc_conditional_world import (run_npc_conditional_rules,
+    verify_npc_conditional_rules)
 from .advanced_physics_episodic_save import (export_episodic_savegame,
     import_episodic_savegame,continue_episodic_savegame)
 from .advanced_physics_episodic_world import (run_episodic_physics_world,
@@ -437,6 +439,24 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "original_game_changed":False,
                 "automatic_quest_reward_granted":False,
                 "native_hardware_verified":False,
+            })
+        if path=="/api/advanced-npc-conditional-world":
+            mode=values.get("mode","preview")
+            if mode not in ("preview","commit") or type(mode) is not str:
+                raise ValueError("unreviewed NPC trigger execution mode")
+            report=run_npc_conditional_rules(
+                values["episodes"],values["world_scene"],values["rules"],
+                values.get("world_settings"),mode=mode,
+                authorized=mode=="commit")
+            if not verify_npc_conditional_rules(
+                    report,values["episodes"],values["world_scene"],
+                    values.get("world_settings")):
+                raise ValueError("NPC world conditional replay verification failed")
+            return self._json(200,{
+                "report":report,
+                "original_project_files_modified":False,
+                "native_hardware_verified":False,
+                "automatic_promotion_approved":False,
             })
         if path=="/api/advanced-physics-episodic-save-export":
             document=export_episodic_savegame(
