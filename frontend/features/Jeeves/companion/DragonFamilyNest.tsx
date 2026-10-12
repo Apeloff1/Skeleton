@@ -72,6 +72,25 @@ export default function DragonFamilyNest({family}:{family?:DragonFamilyProjectio
    </View>}
    <Text style={s.privacy}>Only the trusted host can attest idle time and authorize new research. Pending leases are not proof that anything is running now.</Text>
   </View>}
+  {f.glean&&<View style={s.details} accessibilityLabel="Mother Dragon Glean Matrix">
+   <Text style={s.title}>🔍 Mother Dragon · Glean Matrix</Text>
+   <Text style={s.muted}>Cross-source evidence lenses · {f.glean.lenses_used} active lens families</Text>
+   <View style={s.top}>
+    <Text style={s.role}>Hypotheses: {f.glean.insights}</Text>
+    <Text style={s.role}>For Wiki: {f.glean.counts.wiki_candidate}</Text>
+    <Text style={s.role}>Disputed: {f.glean.counts.contested}</Text>
+    <Text style={s.role}>Need sources: {f.glean.counts.needs_independent_sources}</Text>
+   </View>
+   {f.glean.cells.length===0&&<Text style={s.muted}>No independently verified cross-source insights yet. Hatchling discoveries do not automatically become hypotheses.</Text>}
+   {f.glean.cells.slice(0,5).map(cell=><View key={cell.lens+cell.proposition_digest} style={s.event}>
+    <Text style={s.title}>{cell.status==='contested'?'⚠️':cell.status==='wiki_candidate'?'📚':'🔎'} {cell.lens.replaceAll('_',' ')}</Text>
+    <Text style={s.muted}>{cell.exemplar}</Text>
+    <Text style={s.role}>Sources: {cell.source_count} · Independent supporters: {cell.support_groups} · Challenges: {cell.challenge_sources}</Text>
+    <Text style={s.when}>{safeDate(cell.latest_at)} · {cell.priority.replaceAll('_',' ')}</Text>
+   </View>)}
+   {f.glean.stale_observations>0&&<Text style={s.muted}>Superseded or revoked observations: {f.glean.stale_observations} (excluded from active insight counts)</Text>}
+   <Text style={s.privacy}>Gleaned insights are hypotheses, not verified AI improvement. Disagreements trigger further scrutiny; only separate Wiki and holdout decisions can authorize weight handoff.</Text>
+  </View>}
   {f.almanakk&&<View style={s.details} accessibilityLabel="Almanakk verified research pipeline">
    <Text style={s.title}>📚 Almanakk · Wiki knowledge journey</Text>
    <Text style={s.muted}>Dragon → Almanakk → Wiki → HOAG/Jeeves → Game Builder</Text>
