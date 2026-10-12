@@ -42,6 +42,15 @@ class ReviewSubmission(BaseModel):
     reviewed_and_approved_by_creator: bool = False
 
 
+class AdoptCandidateIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    branch_id: str = Field(default="main", pattern=r"^[A-Za-z0-9:_-]{1,96}$")
+    scene_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    matrix_id: str = Field(min_length=5, max_length=100)
+    level: int = Field(ge=1, le=100)
+    candidate_receipt: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
 def _review_id(scope: dict, branch: str, scene: int, digest: str,
                matrix: str, level: int) -> str:
     return sha256("|".join((scope["tenant_id"], scope["owner_id"],
@@ -237,3 +246,44 @@ async def finalize_scene_matrices(
     except (PyMongoError, OSError):
         logger.exception("Final matrix coverage could not be saved")
         raise HTTPException(status_code=503, detail="Matrix review persistence unavailable")
+
+
+
+@router.post("/{pid}/scenes/{scene}/matrix-review/approve-candidate")
+async def approve_model_candidate(
+    pid: str, scene: int, body: AdoptCandidateIn,
+    user=Depends(require_role("editor")),
+):
+    """Human acceptance of an immutable Jeeves candidate, without rewriting it."""
+    scope = _scope(pid, user)
+    try:
+        draft = await _authoritative_scene(scope, body.branch_id, scene)
+        if draft["digest"] != body.scene_digest:
+            raise HTTPException(status_code=409, detail="Scene changed since model review")
+        if body.matrix_id not in MATRIX_IDS:
+            raise HTTPException(status_code=422, detail="Unknown story matrix")
+        rid = _review_id(scope, body.branch_id, scene, body.scene_digest,
+                         body.matrix_id, body.level)
+        candidate = await _db.game_story_reviews.find_one({"_id": rid, **scope})
+        if not candidate or candidate.get("review_digest") != body.candidate_receipt:
+            raise HTTPException(status_code=404, detail="Matching model critique not found")
+        if candidate.get("provenance") != "jeeves_model_candidate":
+            raise HTTPException(status_code=409, detail="Only model candidates use this approval route")
+        if candidate.get("creator_approved") is True:
+            return {"ok": True, "replayed": True, "review_receipt": body.candidate_receipt,
+                    "verdict": candidate["verdict"], "creator_approved": True}
+        updated = await _db.game_story_reviews.update_one(
+            {"_id": rid, **scope, "review_digest": body.candidate_receipt,
+             "creator_approved": False, "provenance": "jeeves_model_candidate"},
+            {"$set": {"creator_approved": True,
+                      "approved_by": sha256(scope["owner_id"].encode()).hexdigest()[:24]}},
+        )
+        if updated.matched_count != 1:
+            raise HTTPException(status_code=409, detail="Candidate changed during review")
+        return {"ok": True, "replayed": False,
+                "review_receipt": body.candidate_receipt,
+                "verdict": candidate["verdict"], "creator_approved": True}
+    except HTTPException:
+        raise
+    except (PyMongoError, OSError):
+        raise HTTPException(status_code=503, detail="Model-review approval storage unavailable")
