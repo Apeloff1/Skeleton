@@ -1,0 +1,93 @@
+name: Original NPC Historical Spatial Lens
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_historical_spatial_lens.py"
+      - "skeleton/ai/game_builder/advanced_chunk_residency_index.py"
+      - "skeleton/ai/game_builder/advanced_chunked_npc_world.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_historical_spatial_lens.py"
+      - ".github/workflows/game-builder-historical-spatial-lens.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: original-spatial-time-lens-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  authentic-past-worlds:
+    name: Actual physical NPC history and independent replay (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    timeout-minutes: 24
+    env:
+      PYTHONUTF8: "1"
+      PYTHONPATH: "."
+      EXPECTED_SOURCE: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Exact original source checkout without persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_historical_spatial_lens.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Confirm exact source head and compile original replay authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE"
+          python -m py_compile \
+            skeleton/ai/game_builder/advanced_historical_spatial_lens.py \
+            skeleton/ai/game_builder/advanced_chunk_residency_index.py \
+            skeleton/ai/game_builder/advanced_chunked_npc_world.py \
+            skeleton/ai/game_builder/system_editor_cli.py \
+            skeleton/ai/game_builder/game_workspace_server.py \
+            skeleton/ai/game_builder/game_workspace_ui.py \
+            tests/test_game_builder_historical_spatial_lens.py
+      - name: Verify actual NPC previous locations and anti-interpolation receipts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_game_builder_historical_spatial_lens -v
+      - name: Eight source-linked history reconstructions across authored source seeds
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from skeleton.ai.game_builder.advanced_chunked_npc_world import run_chunked_npc_world
+          from skeleton.ai.game_builder.advanced_historical_spatial_lens import (
+              analyze_original_spatial_epochs,verify_original_spatial_epochs,
+          )
+          for seed in (0,1,5,9):
+              for chunks in (3,5):
+                  game=run_chunked_npc_world(["wait"]*6,seed=seed,options={
+                      "chunks_per_side":chunks,"citizens":64,
+                      "active_limit":8,"lod_policy":"fair","chunk_radius":1,
+                  })
+                  history=analyze_original_spatial_epochs(game,[0,3,6],query={
+                      "center_chunk":[chunks//2,chunks//2],
+                      "radius":0,"limit":8,
+                  })
+                  assert verify_original_spatial_epochs(history)
+                  assert history["historical_epoch_count"]==3
+                  assert history["epochs"][-1]["actual_source_head"]==game["head_digest"]
+                  assert not history["model_weights_promoted"]
+                  print("SOURCE_HISTORICAL_NPC_POSITION_OK",seed,chunks,history["digest"])
+          PY
