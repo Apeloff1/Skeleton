@@ -126,6 +126,8 @@ def start(config, seed):
         "speakers": [_speaker(voice, config) for voice in source["speakers"]],
         "active_speakers": _count(config),
         "unmodeled_speakers": config["speakers"] - _count(config),
+        "text_delivery": config["text_delivery"],
+        "social_choices_enabled": config["choice_consequences"],
         "direct_statements": [], "corroborations": [],
         "history": [], "choices": [],
         "influence": config["starting_influence"],
@@ -211,6 +213,8 @@ def step(state, config, action):
             _remember(speaker, config, "first_hand_speech", state["tick"])
             events.append("original_direct_testimony_heard_at_real_position")
         elif verb == "support":
+            if not config["choice_consequences"]:
+                raise DialogueActionError("authored world disabled binding interpersonal choices")
             if speaker["heard"] < 1:
                 raise DialogueActionError("support must follow real local conversation")
             if state["influence"] < config["support_cost"]:
@@ -229,6 +233,8 @@ def step(state, config, action):
             _remember(speaker, config, "paid_source_support", state["tick"])
             events.append("finite_cost_original_support_raised_real_trust")
         else:
+            if not config["choice_consequences"]:
+                raise DialogueActionError("authored world disabled binding interpersonal choices")
             if speaker["heard"] < 1:
                 raise DialogueActionError("challenge requires an actual authored statement")
             if state["influence"] < config["challenge_cost"]:
@@ -282,6 +288,14 @@ def step(state, config, action):
     else:
         raise DialogueActionError("dialogue command lacks actual causal behavior")
     state["tick"] += 1
+    if action.startswith(("speak:", "support:", "challenge:", "compare:")):
+        state["attention_spent"] += 1
+    if config["memory_turns"] > 0:
+        state["history"].append({
+            "turn": state["tick"], "action": action,
+            "events": list(events), "speaker_source_bound": True,
+        })
+        state["history"] = state["history"][-min(64, config["memory_turns"]):]
     _decay(state, config)
     state["events"] = events
     return events
