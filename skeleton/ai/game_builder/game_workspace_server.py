@@ -38,6 +38,8 @@ from .advanced_godot_export import (
     render_advanced_godot_package, archive_advanced_godot_package,
 )
 from .advanced_platformer_godot import render_platformer_godot_package
+from .advanced_physics_multi_incident_world import (run_multi_incident_world,
+    verify_multi_incident_world)
 from .advanced_physics_witness_world import (run_physical_witness_world,
     verify_physical_witness_world)
 from .advanced_physics_interop_godot import render_interop_godot_package
@@ -413,6 +415,20 @@ class _StudioHandler(BaseHTTPRequestHandler):
             return self._json(200,{
                 "game":game,"source_file_mutated":False,
                 "native_hardware_verified":False,"promotion_approved":False,
+            })
+        if path=="/api/advanced-physics-multi-npc":
+            proof=run_multi_incident_world(
+                values["session"],values["world_scene"],
+                values.get("settings"),values.get("world_settings"),
+                physics_actions=values.get("physics_actions",["push:east"]*8),
+                bindings=values["bindings"],world_actions=values.get("world_actions",[]))
+            if not verify_multi_incident_world(
+                    proof,values["session"],values["world_scene"],
+                    values.get("settings"),values.get("world_settings")):
+                raise ValueError("ordered multi-incident physics/NPC proof rejected")
+            return self._json(200,{
+                "proof":proof,"source_project_mutated":False,
+                "native_certified":False,"automatic_quest_rewards_granted":False,
             })
         if path=="/api/advanced-physics-npc-witness":
             proof=run_physical_witness_world(
