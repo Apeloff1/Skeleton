@@ -54,7 +54,11 @@ class UnifiedOriginalWorldTests(unittest.TestCase):
                          report["settings"]["dialogue"]["starting_influence"]-
                          report["settings"]["dialogue"]["support_cost"])
         self.assertEqual(state["sites"][0]["aid_received"],
-                         report["settings"]["quest_director"]["help_supplies"]*6)
+                         report["settings"]["quest_director"]["help_supplies"]*5)
+        # The sixth supply payment is original direct assistance to the
+        # embodied citizen and is independently recorded in choice receipts.
+        self.assertEqual(state["choices"][0]["supplies_paid"],
+                         report["settings"]["quest_director"]["help_supplies"])
         self.assertEqual(report["canonical_physical_actor_count"],
                          len(state["actors"]))
         self.assertFalse(report["legacy_engines_simultaneously_executed"])
@@ -121,7 +125,7 @@ class UnifiedOriginalWorldTests(unittest.TestCase):
     def test_real_locality_and_an_observed_speech_are_mandatory(self):
         for actions in (
             ["speak:0"],["support:0"],["resolve:0"],
-            ["move:east","move:east"],["move:north"],
+            ["move:east"]*7,["move:north"],
             ["discover:0"],["move:south","support:0"],
             ["move:south","move:east","discover:0","support:0"],
             ["move:south","move:east","discover:0",
