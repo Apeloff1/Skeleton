@@ -181,7 +181,9 @@ def test_replay_failure_wrong_owner_invalid_signature_and_history_tamper():
     db,_,lane,_=setup()
     with pytest.raises(PermissionError):
         lane.wiki_review(OWNER,"article","article-1",D,wiki(),authorized=False)
-    with pytest.raises(PermissionError,match="reviewer"):
+    # Unknown owner is fenced at canonical source custody *before* the
+    # independent Wiki callback can inspect or attest another tenant's data.
+    with pytest.raises(ValueError,match="missing or superseded"):
         lane.wiki_review("other","article","article-1",D,wiki(),authorized=True)
     lane.wiki_review(OWNER,"article","article-1",D,wiki(),authorized=True)
     with pytest.raises(PermissionError,match="signed authorization"):
