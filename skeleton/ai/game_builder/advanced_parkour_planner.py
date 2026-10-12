@@ -45,7 +45,7 @@ def _signature(s):
         s["stamina"],s["health"],s["grip"],s["grapple_charges"],
         s["wall_run_remaining"],s["cooldown"],s["checkpoint"],
         s["checkpoint_lane"],tuple(s["medals_collected"]),
-        s["falls"],s["tick"]%4,
+        s["falls"],s["tick"],
     )
 
 
@@ -57,9 +57,10 @@ def _priority(s,actions):
     )
 
 
-def _unrecoverably_missed_medal(s):
-    # This original route never permits running backward. A medal passed in
-    # another lane without collection cannot be won by wishful route search.
+def _passed_unearned_medal(s):
+    # The planner deliberately omits damage-induced checkpoint backtracking.
+    # A passed medal is dead for THIS search branch, not a proof that the
+    # authored course is impossible for an actual player.
     earned=set(s["medals_collected"])
     return any(m["x"]<s["x"] and m["x"] not in earned for m in s["medals"])
 
@@ -132,7 +133,7 @@ def plan_parkour_route(scene,settings=None,*,max_states=DEFAULT_MAX_STATES,
                     step(candidate,rules,action)
                 except ParkourActionError:
                     continue
-                if candidate["failed"] or _unrecoverably_missed_medal(candidate):
+                if candidate["failed"] or _passed_unearned_medal(candidate):
                     continue
                 signature=_signature(candidate)
                 if signature in visited:
@@ -176,3 +177,26 @@ def plan_parkour_route(scene,settings=None,*,max_states=DEFAULT_MAX_STATES,
         "publication_certified":False,
     }
     return {**report,"digest":_hash(report)}
+
+
+def verify_parkour_plan(record,scene,settings=None):
+    """Re-search original state and independently re-play any claimed win.
+
+    Both positive and inconclusive reports are verified as deterministic
+    bounded-search receipts; neither can mint player state or claim completeness.
+    """
+    if type(record) is not dict or record.get("schema")!=SCHEMA:
+        raise ParkourPlanningError("exact original course planner receipt required")
+    rebuilt=plan_parkour_route(
+        scene,settings,max_states=record.get("max_states"),
+        max_depth=record.get("max_depth"),beam_width=record.get("beam_width"),
+    )
+    if rebuilt!=record:
+        raise ParkourPlanningError("planner actions, budgets or evidence were altered")
+    return True
+
+
+__all__=[
+    "SCHEMA","ParkourPlanningError","PLANNER_ACTIONS",
+    "plan_parkour_route","verify_parkour_plan",
+]
