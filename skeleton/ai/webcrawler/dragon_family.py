@@ -127,11 +127,15 @@ class DragonFamily:
     """
     def __init__(self, db: sqlite3.Connection,
                  approval: Callable[[SourceReceipt], bool] | None = None,
-                 *, min_idle_seconds: float = 300, max_events: int = 100000):
+                 *, min_idle_seconds: float = 300, max_events: int = 100000,
+                 owner_scope: str | None = None):
         if not isfinite(min_idle_seconds) or not 60 <= min_idle_seconds <= 86400:
             raise ValueError("invalid idle policy")
         if type(max_events) is not int or not 100 <= max_events <= 1000000:
             raise ValueError("invalid audit budget")
+        if owner_scope is not None:
+            _owner(owner_scope)
+        self.owner_scope = owner_scope
         self.db = db
         self.approval = approval
         self.min_idle_seconds = min_idle_seconds
@@ -159,6 +163,11 @@ class DragonFamily:
           details TEXT NOT NULL, previous_hash TEXT NOT NULL, event_hash TEXT NOT NULL,
           PRIMARY KEY(owner,sequence))""")
         db.commit()
+
+    def _assert_owner(self, owner: str) -> None:
+        _owner(owner)
+        if self.owner_scope is not None and owner != self.owner_scope:
+            raise PermissionError("Dragon Family producer is bound to another owner")
 
     def _writer(self, receipt: SourceReceipt | None, *, authorized: bool) -> None:
         if not authorized or self.approval is None:
@@ -195,7 +204,7 @@ class DragonFamily:
     def enroll(self, owner: str, sources: tuple[SourceSeed, ...], *,
                authorized: bool, now: float) -> int:
         """Register bounded source inventory; existing identities are immutable."""
-        _owner(owner)
+        self._assert_owner(owner)
         self._writer(None, authorized=authorized)
         at = _epoch(now)
         if not isinstance(sources, tuple) or not 1 <= len(sources) <= 500:
@@ -241,7 +250,7 @@ class DragonFamily:
         Sources discovered *after* the brood is born enter its idle research
         catalog, never changing the completed parent's original quest.
         """
-        _owner(owner)
+        self._assert_owner(owner)
         self._writer(None, authorized=authorized)
         at = _epoch(now)
         self.db.execute("BEGIN IMMEDIATE")
@@ -276,7 +285,7 @@ class DragonFamily:
     def consume(self, owner: str, receipt: SourceReceipt, *,
                 authorized: bool) -> bool:
         """Parent only consumes approved unique inventory once. No reread farming."""
-        _owner(owner)
+        self._assert_owner(owner)
         self._writer(receipt, authorized=authorized)
         at = _epoch(receipt.observed_at)
         self.db.execute("BEGIN IMMEDIATE")
@@ -342,7 +351,7 @@ class DragonFamily:
         No fetching is performed here. `monitor` only accepts real revisions to
         previously consumed versions; article/video may accept new discoveries.
         """
-        _owner(owner)
+        self._assert_owner(owner)
         if dragon not in ROLES:
             raise ValueError("unknown hatchling")
         self._writer(receipt, authorized=authorized)
@@ -406,7 +415,7 @@ class DragonFamily:
         return True
 
     def history(self, owner: str, *, authorized: bool, limit: int = 30) -> list[dict[str, object]]:
-        _owner(owner)
+        self._assert_owner(owner)
         if not authorized:
             raise PermissionError("family journal requires authentication")
         if type(limit) is not int or not 1 <= limit <= 100:
@@ -428,7 +437,7 @@ class DragonFamily:
         return result[-limit:][::-1]
 
     def snapshot(self, owner: str, *, authorized: bool, limit: int = 20) -> dict[str, object]:
-        _owner(owner)
+        self._assert_owner(owner)
         # Validate integrity before showing gamified progress.
         history = self.history(owner, authorized=authorized, limit=limit)
         total, consumed = self.db.execute("""SELECT COUNT(*),COUNT(NULLIF(parent_digest,''))
@@ -480,7 +489,7 @@ class IdleBroodRunner:
     def tick(self, owner: str, tasks: Iterable[tuple[str, Callable[[], SourceReceipt]]], *,
              authorized: bool, idle_state: Callable[[], IdleWindow],
              task_topics: tuple[str, ...], adjacent_topics: tuple[str, ...] = ()) -> dict[str, int | bool]:
-        _owner(owner)
+        self.family._assert_owner(owner)
         self.family._writer(None, authorized=authorized)
         stats = {"attempted": 0, "grown": 0, "paused": False}
         dispatched: set[str] = set()
