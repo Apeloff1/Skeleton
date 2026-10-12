@@ -60,6 +60,7 @@ def production_manifest(
     approved = 0
     proofed = 0
     plotted = 0
+    matrix_reviewed = 0
     for record in sorted(scenes, key=lambda x: x.get("scene", 0)):
         number = record.get("scene")
         act = record.get("act")
@@ -89,6 +90,12 @@ def production_manifest(
             approved += 1
         else:
             fault("not_approved", number, "Human scene sign-off is absent.")
+        matrix_summary = record.get("matrix_review") or {}
+        if (matrix_summary.get("scene_digest") == record.get("digest")
+            and matrix_summary.get("cells_approved") == 10000
+            and isinstance(matrix_summary.get("receipt_digest"), str)
+            and len(matrix_summary["receipt_digest"]) == 64):
+            matrix_reviewed += 1
         proof = record.get("proof") or {}
         if (proof.get("status") == "machine_checks_passed"
             and proof.get("inspections_executed") == PROOFREAD_INSPECTIONS
@@ -137,7 +144,9 @@ def production_manifest(
         "tapestry": tapestry,
         "plot_closure_ready": bool(complete) and tapestry["closure_ready"],
         "matrix_review_required_per_scene": REVIEW_MATRIX_COUNT * REVIEW_LEVELS,
-        "matrix_quality_coverage_verified": False,
+        "matrix_quality_coverage_verified": bool(complete) and matrix_reviewed == MAX_SCENES,
+        "all_narrative_review_gates_ready": bool(complete) and
+            tapestry["closure_ready"] and matrix_reviewed == MAX_SCENES,
         "final_production_quality_certified": False,
         "continuity_100_percent_guaranteed": False,
         "human_creative_quality_review_required": True,
@@ -151,6 +160,7 @@ def production_manifest(
             "scenes_approved": approved,
             "scenes_proofed": proofed,
             "scenes_plot_marked": plotted,
+            "scenes_with_approved_100x100_matrix": matrix_reviewed,
             "structural_completion_pct": round(
                 100 * (len(by_chapter) + len(seen_acts) + proofed) /
                 (MAX_CHAPTERS + MAX_ACTS + MAX_SCENES), 4,
