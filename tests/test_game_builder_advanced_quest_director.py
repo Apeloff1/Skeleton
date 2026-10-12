@@ -42,7 +42,7 @@ class LivingOriginalQuestTests(unittest.TestCase):
         editor=next(e for e in catalog() if e["id"]=="quest_director")
         self.assertEqual(editor["runtime_maturity"],"advanced_reference_runtime")
         self.assertEqual(editor["progression_floor"],"advanced")
-        self.assertEqual(len(editor["fields"]),61)
+        self.assertEqual(len(editor["fields"]),62)
         self.assertEqual(len(ACTIONS),len(set(ACTIONS)))
         self.assertEqual(CELLS,49)
 
@@ -290,6 +290,56 @@ class LivingOriginalQuestTests(unittest.TestCase):
         self.assertEqual(one["state"]["quests"][0]["rule_id"],0)
         self.assertGreater(sample["state"]["quests"][0]["rule_id"],0)
         self.assertNotEqual(sample["state"]["gold"],one["state"]["gold"])
+
+
+    def test_suspicion_risk_and_authored_climate_change_real_witness_reliability(self):
+        # An adversarial eyewitness can be physically present but too
+        # suspicious to offer trustworthy, first-hand testimony.
+        risk=self.rules(starting_trust=5,testimony_trust_floor=1,
+                        harm_suspicion=10,harm_trust_loss=0,
+                        testimony_suspicion_tolerance=0)
+        exposed=run_advanced_session("quest_director",risk,
+                                    ["south","east","harm:0"])
+        self.assertEqual(exposed["state"]["quests"][0]["witnesses"],[0])
+        self.assertEqual(exposed["state"]["npcs"][0]["suspicion"],10)
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("quest_director",risk,
+                                 ["south","east","harm:0","speak:0"])
+
+        # The same real NPC is visible in open highland air and concealed
+        # by original rainforest geometry at otherwise identical positions.
+        rules=self.rules(npc_count=1,npc_perception=2,witness_radius=3)
+        default=make_advanced_scene("quest_director",rules,seed=0)
+        changes=deepcopy(default["layout"])
+        changes["npcs"][0]["cell"]=17
+        changes["climate"]="highland"
+        clear=make_advanced_scene("quest_director",rules,layout=changes)
+        open_world=run_advanced_session("quest_director",rules,
+                             ["south","east","collect:0"],scene=clear)
+        self.assertEqual(open_world["state"]["events_log"][0]["direct_witnesses"],[0])
+        changes["climate"]="rainforest"
+        rainforest=make_advanced_scene("quest_director",rules,layout=changes)
+        hidden=run_advanced_session("quest_director",rules,
+                             ["south","east","collect:0"],scene=rainforest)
+        self.assertEqual(hidden["state"]["events_log"][0]["direct_witnesses"],[])
+        self.assertNotEqual(open_world["scene_digest"],hidden["scene_digest"])
+
+    def test_forged_hearsay_cannot_promote_to_direct_memory_and_npc_quest_evidence(self):
+        settings=self.rules(npc_perception=1,rumor_radius=2)
+        source=run_advanced_session("quest_director",settings,
+                ["south","east","collect:0","wait"])
+        self.assertTrue(verify_advanced_session(source,settings))
+        fabricated=deepcopy(source)
+        fabricated["state"]["npcs"][1]["memories"].append({
+            "event_id":0,"site_id":0,"kind":"discover",
+            "observed_tick":3,"source":"eyewitness"
+        })
+        with self.assertRaises(AdvancedRuntimeError):
+            verify_advanced_session(fabricated,settings)
+        fabricated=deepcopy(source)
+        fabricated["state"]["events_log"][0]["direct_witnesses"].append(1)
+        with self.assertRaises(AdvancedRuntimeError):
+            verify_advanced_session(fabricated,settings)
 
     def test_studio_original_witness_map_and_provenance_preserving_painter(self):
         from skeleton.ai.game_builder.game_workspace_ui import (
