@@ -115,6 +115,7 @@ def run_world_whatif_lab(physical,genres,scene,scenarios,settings=None,
         raise WorldWhatIfError("choose distinct reviewed comparable gameplay outcomes")
     selected=tuple(axes)
     identifiers=set()
+    schedule_identities=set()
     invariant=None
     for item in scenarios:
         if (type(item) is not dict or set(item)!={"id","timeline"} or
@@ -125,6 +126,10 @@ def run_world_whatif_lab(physical,genres,scene,scenarios,settings=None,
             raise WorldWhatIfError("scenario IDs must be unique bounded source labels")
         identifiers.add(item["id"])
         timeline=item["timeline"]
+        digest=_canon_schedule(timeline)
+        if digest in schedule_identities:
+            raise WorldWhatIfError("each candidate must have a distinct real authored schedule")
+        schedule_identities.add(digest)
         signature=_equivalence_key(timeline)
         if invariant is None:
             invariant=signature
