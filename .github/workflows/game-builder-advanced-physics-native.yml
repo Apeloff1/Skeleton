@@ -4,6 +4,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/ai/game_builder/advanced_physics_godot.py"
+      - "docs/GAME_BUILDER_NATIVE_PHYSICS_LAB.md"
       - "skeleton/ai/game_builder/advanced_physics_runtime.py"
       - "skeleton/ai/game_builder/advanced_godot_export.py"
       - "skeleton/ai/game_builder/game_workspace_server.py"
