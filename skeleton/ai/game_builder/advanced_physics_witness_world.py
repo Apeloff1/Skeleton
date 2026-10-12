@@ -59,19 +59,20 @@ def run_physical_witness_world(source_session,quest_scene,
         authored_world=validate_advanced_scene(quest_scene,world_cfg)
         proof=rehearse_physics_encounter(source_session,source_cfg,physics_actions)
         verify_physics_encounter(proof,source_session,source_cfg)
-        solid=[item for item in proof["witnesses"]
-               if (item["layer"] & proof["physics_scene"]["layout"]["bodies"][0]["mask"])!=0]
         contacts=proof["observed_fixture_impacts"]
+        # Exact canonical Physics fixture IDs remove the ambiguity that
+        # previously prevented multi-obstacle authored worlds.
+        matched=[hit for hit in proof["source_fixture_impacts"]
+                 if hit["source_id"]==binding["source_id"]]
+        if len(matched)>1:
+            raise PhysicalWitnessError("ambiguous repeated original object identity")
+        bound_contacts=matched[0]["impacts"] if matched else 0
         world=quest_start(world_cfg,authored_world["seed"])
         quest_apply(world,world_cfg,authored_world["layout"])
         incident=None
-        if contacts:
-            # Fixture ids are not present in baseline Physics event receipts.
-            # With >1 solid origin we CANNOT know which source object collided.
-            # Refuse, rather than attributing an event to an arbitrary quest.
-            if len(solid)!=1 or solid[0]["source_id"]!=binding["source_id"]:
-                raise PhysicalWitnessError(
-                    "physical collision lacks unique source-object attribution")
+        if bound_contacts:
+            # Source-object identity comes from real contact receipts; other
+            # collided objects do not create an event at this chosen site.
             receipt={
                 "interop_digest":proof["digest"],
                 "source_editor":proof["source_editor"],
@@ -79,7 +80,7 @@ def run_physical_witness_world(source_session,quest_scene,
             }
             incident=apply_verified_external_physical_incident(
                 world,world_cfg,binding["site_id"],receipt,
-                impact_severity=min(3,contacts))
+                impact_severity=min(3,bound_contacts))
         timeline=[]
         for action in world_actions:
             quest_step(world,world_cfg,action)
@@ -105,6 +106,8 @@ def run_physical_witness_world(source_session,quest_scene,
             "physical_actions":list(physics_actions),
             "world_actions":list(world_actions),
             "actual_source_impacts":contacts,
+            "actual_bound_impacts":bound_contacts,
+            "source_fixture_impacts":proof["source_fixture_impacts"],
             "incident":incident,
             "direct_witnesses":list(direct),
             "physical_origin_quest_ids":linked_quests,
