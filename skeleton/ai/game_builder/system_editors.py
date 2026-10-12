@@ -3131,285 +3131,317 @@ CATALOG = json.loads(r'''[
     "title": "Sailing & Maritime",
     "description": "Wind, navigation, buoyancy and sea-state response.",
     "fields": [
-          {
-            "key": "wind_speed",
-            "kind": "int",
-            "default": 20,
-            "minimum": 0,
-            "maximum": 100,
-            "options": []
-          },
-          {
-            "key": "sea_state",
-            "kind": "int",
-            "default": 3,
-            "minimum": 0,
-            "maximum": 12,
-            "options": []
-          },
-          {
-            "key": "hull_integrity",
-            "kind": "int",
-            "default": 100,
-            "minimum": 1,
-            "maximum": 100,
-            "options": []
-          },
-          {
-            "key": "crew_size",
-            "kind": "int",
-            "default": 8,
-            "minimum": 1,
-            "maximum": 200,
-            "options": []
-          },
-          {
-            "key": "dynamic_currents",
-            "kind": "bool",
-            "default": true,
-            "minimum": null,
-            "maximum": null,
-            "options": []
-          },
-          {
-            "key": "ship_mass",
-            "kind": "int",
-            "default": 24,
-            "minimum": 4,
-            "maximum": 120,
-            "options": []
-          },
-          {
-            "key": "cargo_capacity",
-            "kind": "int",
-            "default": 4,
-            "minimum": 1,
-            "maximum": 12,
-            "options": []
-          },
-          {
-            "key": "passenger_capacity",
-            "kind": "int",
-            "default": 2,
-            "minimum": 0,
-            "maximum": 8,
-            "options": []
-          },
-          {
-            "key": "starting_supplies",
-            "kind": "int",
-            "default": 30,
-            "minimum": 1,
-            "maximum": 200,
-            "options": []
-          },
-          {
-            "key": "starting_coins",
-            "kind": "int",
-            "default": 20,
-            "minimum": 0,
-            "maximum": 200,
-            "options": []
-          },
-          {
-            "key": "ration_period",
-            "kind": "int",
-            "default": 4,
-            "minimum": 1,
-            "maximum": 16,
-            "options": []
-          },
-          {
-            "key": "sail_efficiency",
-            "kind": "int",
-            "default": 7,
-            "minimum": 1,
-            "maximum": 10,
-            "options": []
-          },
-          {
-            "key": "oar_power",
-            "kind": "int",
-            "default": 1,
-            "minimum": 0,
-            "maximum": 3,
-            "options": []
-          },
-          {
-            "key": "current_force",
-            "kind": "int",
-            "default": 1,
-            "minimum": 0,
-            "maximum": 2,
-            "options": []
-          },
-          {
-            "key": "weather_period",
-            "kind": "int",
-            "default": 6,
-            "minimum": 2,
-            "maximum": 24,
-            "options": []
-          },
-          {
-            "key": "storm_damage",
-            "kind": "int",
-            "default": 3,
-            "minimum": 0,
-            "maximum": 20,
-            "options": []
-          },
-          {
-            "key": "collision_damage",
-            "kind": "int",
-            "default": 12,
-            "minimum": 1,
-            "maximum": 40,
-            "options": []
-          },
-          {
-            "key": "reef_damage",
-            "kind": "int",
-            "default": 8,
-            "minimum": 1,
-            "maximum": 40,
-            "options": []
-          },
-          {
-            "key": "starvation_damage",
-            "kind": "int",
-            "default": 3,
-            "minimum": 1,
-            "maximum": 25,
-            "options": []
-          },
-          {
-            "key": "repair_cost",
-            "kind": "int",
-            "default": 3,
-            "minimum": 1,
-            "maximum": 20,
-            "options": []
-          },
-          {
-            "key": "repair_amount",
-            "kind": "int",
-            "default": 25,
-            "minimum": 1,
-            "maximum": 50,
-            "options": []
-          },
-          {
-            "key": "repairs_available",
-            "kind": "int",
-            "default": 4,
-            "minimum": 0,
-            "maximum": 12,
-            "options": []
-          },
-          {
-            "key": "port_provisions",
-            "kind": "int",
-            "default": 8,
-            "minimum": 0,
-            "maximum": 30,
-            "options": []
-          },
-          {
-            "key": "provisions_per_purchase",
-            "kind": "int",
-            "default": 5,
-            "minimum": 1,
-            "maximum": 20,
-            "options": []
-          },
-          {
-            "key": "supply_price",
-            "kind": "int",
-            "default": 1,
-            "minimum": 1,
-            "maximum": 20,
-            "options": []
-          },
-          {
-            "key": "dock_fee",
-            "kind": "int",
-            "default": 1,
-            "minimum": 0,
-            "maximum": 20,
-            "options": []
-          },
-          {
-            "key": "cargo_sale_price",
-            "kind": "int",
-            "default": 6,
-            "minimum": 1,
-            "maximum": 30,
-            "options": []
-          },
-          {
-            "key": "fishing_yield",
-            "kind": "int",
-            "default": 2,
-            "minimum": 1,
-            "maximum": 6,
-            "options": []
-          },
-          {
-            "key": "fishing_gear",
-            "kind": "int",
-            "default": 3,
-            "minimum": 0,
-            "maximum": 8,
-            "options": []
-          },
-          {
-            "key": "pirate_speed",
-            "kind": "int",
-            "default": 1,
-            "minimum": 0,
-            "maximum": 2,
-            "options": []
-          },
-          {
-            "key": "pirate_damage",
-            "kind": "int",
-            "default": 2,
-            "minimum": 0,
-            "maximum": 20,
-            "options": []
-          },
-          {
-            "key": "rescue_distance",
-            "kind": "int",
-            "default": 1,
-            "minimum": 1,
-            "maximum": 3,
-            "options": []
-          },
-          {
-            "key": "mission_type",
-            "kind": "enum",
-            "default": "mixed",
-            "minimum": null,
-            "maximum": null,
-            "options": [
-              "mixed",
-              "trade",
-              "rescue"
-            ]
-          },
-          {
-            "key": "completion_mode",
-            "kind": "enum",
-            "default": "expedition",
-            "minimum": null,
-            "maximum": null,
-            "options": [
-              "expedition",
-              "endless"
-            ]
-          }
+      {
+        "key": "wind_speed",
+        "kind": "int",
+        "default": 20,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "sea_state",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "hull_integrity",
+        "kind": "int",
+        "default": 100,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "crew_size",
+        "kind": "int",
+        "default": 8,
+        "minimum": 1,
+        "maximum": 200,
+        "options": []
+      },
+      {
+        "key": "dynamic_currents",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "ship_mass",
+        "kind": "int",
+        "default": 24,
+        "minimum": 4,
+        "maximum": 120,
+        "options": []
+      },
+      {
+        "key": "cargo_capacity",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "passenger_capacity",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 8,
+        "options": []
+      },
+      {
+        "key": "starting_supplies",
+        "kind": "int",
+        "default": 30,
+        "minimum": 1,
+        "maximum": 200,
+        "options": []
+      },
+      {
+        "key": "starting_coins",
+        "kind": "int",
+        "default": 20,
+        "minimum": 0,
+        "maximum": 200,
+        "options": []
+      },
+      {
+        "key": "ration_period",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 16,
+        "options": []
+      },
+      {
+        "key": "sail_efficiency",
+        "kind": "int",
+        "default": 7,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "oar_power",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 3,
+        "options": []
+      },
+      {
+        "key": "current_force",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 2,
+        "options": []
+      },
+      {
+        "key": "weather_period",
+        "kind": "int",
+        "default": 6,
+        "minimum": 2,
+        "maximum": 24,
+        "options": []
+      },
+      {
+        "key": "storm_damage",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "collision_damage",
+        "kind": "int",
+        "default": 12,
+        "minimum": 1,
+        "maximum": 40,
+        "options": []
+      },
+      {
+        "key": "reef_damage",
+        "kind": "int",
+        "default": 8,
+        "minimum": 1,
+        "maximum": 40,
+        "options": []
+      },
+      {
+        "key": "starvation_damage",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 25,
+        "options": []
+      },
+      {
+        "key": "repair_cost",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "repair_amount",
+        "kind": "int",
+        "default": 25,
+        "minimum": 1,
+        "maximum": 50,
+        "options": []
+      },
+      {
+        "key": "repairs_available",
+        "kind": "int",
+        "default": 4,
+        "minimum": 0,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "port_provisions",
+        "kind": "int",
+        "default": 8,
+        "minimum": 0,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "provisions_per_purchase",
+        "kind": "int",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "supply_price",
+        "kind": "int",
+        "default": 1,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "dock_fee",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "cargo_sale_price",
+        "kind": "int",
+        "default": 6,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "fishing_yield",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 6,
+        "options": []
+      },
+      {
+        "key": "fishing_gear",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 8,
+        "options": []
+      },
+      {
+        "key": "pirate_speed",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 2,
+        "options": []
+      },
+      {
+        "key": "pirate_damage",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "rescue_distance",
+        "kind": "int",
+        "default": 1,
+        "minimum": 1,
+        "maximum": 3,
+        "options": []
+      },
+      {
+        "key": "mission_type",
+        "kind": "enum",
+        "default": "mixed",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "mixed",
+          "trade",
+          "rescue"
+        ]
+      },
+      {
+        "key": "completion_mode",
+        "kind": "enum",
+        "default": "expedition",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "expedition",
+          "endless"
+        ]
+      },
+      {
+        "key": "buoyancy_capacity",
+        "kind": "int",
+        "default": 130,
+        "minimum": 40,
+        "maximum": 400,
+        "options": []
+      },
+      {
+        "key": "leak_threshold",
+        "kind": "int",
+        "default": 12,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "pump_capacity",
+        "kind": "int",
+        "default": 6,
+        "minimum": 1,
+        "maximum": 50,
+        "options": []
+      },
+      {
+        "key": "overload_damage",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 25,
+        "options": []
+      }
     ],
     "preview": null
   },
