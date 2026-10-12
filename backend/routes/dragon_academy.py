@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 
 from routes.gameforge_auth import get_current_user
 from skeleton.ai.webcrawler.dragon_practice_lab import DragonPracticeLab
+from skeleton.ai.webcrawler.dragon_family import DragonFamily
 from skeleton.ai.webcrawler.dragon_practice_cycles import DragonPracticeCycles
 from skeleton.ai.webcrawler.dragon_session_projection import DragonSessionProjection
 from skeleton.ai.webcrawler.dragon_native_practice import DragonNativePracticeLab
@@ -99,6 +100,7 @@ def _snapshot(lab: DragonPracticeLab, cycles: DragonPracticeCycles,
     return {
         "ok": True,
         "progress": asdict(lab.progress(owner,authorized=True)),
+        "family": DragonFamily(lab.db).snapshot(owner,authorized=True,limit=25),
         "attempts": [asdict(a) for a in lab.attempts(owner,authorized=True,limit=50)],
         "native_attempts": [asdict(a) for a in DragonNativePracticeLab(lab.db,lab).list(owner,authorized=True)],
         "subscription": asdict(cycles.status(owner,authorized=True)),
