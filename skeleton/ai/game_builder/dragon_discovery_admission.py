@@ -39,7 +39,14 @@ def _supplement(path: str | Path) -> tuple[str, dict]:
     doc = json.loads(raw)
     if not isinstance(doc, dict) or doc.get("schema") != SCHEMA or doc.get("status") != STATUS:
         raise ValueError("unreviewed discovery supplement required")
-    return file.as_posix(), doc
+    root = Path(__file__).resolve().parents[3]
+    try:
+        evidence_path = file.resolve().relative_to(root).as_posix()
+    except ValueError as exc:
+        raise ValueError("supplement must belong to the checked-out repository") from exc
+    if not evidence_path.startswith("docs/ai/evidence/dragon-source-expansion-"):
+        raise ValueError("supplement path is outside the discovery evidence lane")
+    return evidence_path, doc
 
 
 def validate_discovery_chain(registry: dict, named_documents: list[tuple[str, dict]]) -> dict:
