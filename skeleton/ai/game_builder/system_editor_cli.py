@@ -21,6 +21,8 @@ from .system_editor_assembly import assemble_workspace_systems
 from .advanced_gameplay_runtime import run_advanced_session, verify_advanced_session
 from .advanced_level_scenes import make_advanced_scene
 from .advanced_puzzle_solver import solve_advanced_puzzle
+from .advanced_rhythm_runtime import default_layout as original_rhythm_chart
+from .advanced_rhythm_audio import render_original_beat_wav,original_audio_receipt
 from .advanced_roguelike_longrun import (replay_long_roguelike,
     verify_long_roguelike,continue_long_roguelike)
 from .advanced_world_planner import plan_original_world
@@ -100,6 +102,15 @@ def parser() -> argparse.ArgumentParser:
     marathon_more.add_argument("--record",required=True)
     marathon_more.add_argument("--actions",required=True)
     marathon_more.add_argument("--settings")
+    rhythm_audio=commands.add_parser("rhythm-audio",
+        help="Render fully original bounded local WAV from signed chart without borrowed samples")
+    rhythm_audio.add_argument("--scene")
+    rhythm_audio.add_argument("--settings")
+    rhythm_audio.add_argument("--seed",type=int,default=0)
+    rhythm_audio.add_argument("--from-ms",type=int,default=0)
+    rhythm_audio.add_argument("--duration-ms",type=int,default=10000)
+    rhythm_audio.add_argument("--output",required=True)
+    rhythm_audio.add_argument("--trusted-local-operator",action="store_true")
     native=commands.add_parser("godot-export",help="Real offline native Godot 4 puzzle source, proof and export presets")
     native.add_argument("--session",required=True)
     native.add_argument("--settings")
@@ -172,6 +183,28 @@ def main(argv=None) -> int:
                 _load(args.scene),
                 _load(args.settings) if args.settings else None,
                 max_states=args.max_states,max_actions=args.max_actions)
+        elif args.operation == "rhythm-audio":
+            if not args.trusted_local_operator:
+                raise SystemEditorError("offline WAV materialization requires explicit local operator approval")
+            settings=make_editor_document("rhythm",
+                _load(args.settings) if args.settings else None)["settings"]
+            if args.scene:
+                scene=validate_advanced_scene(_load(args.scene),settings)
+                if scene["editor"]!="rhythm" or scene["seed"]!=args.seed:
+                    raise SystemEditorError("rhythm audio source/seed identity mismatched")
+                layout=scene["layout"]
+            else:
+                layout=original_rhythm_chart(settings,args.seed)
+            audio=render_original_beat_wav(layout,settings,from_ms=args.from_ms,
+                                             duration_ms=args.duration_ms)
+            destination=Path(args.output)
+            if not destination.parent.is_dir() or destination.parent.is_symlink():
+                raise SystemEditorError("WAV must be authored into existing ordinary local folder")
+            with destination.open("xb") as soundfile:
+                soundfile.write(audio)
+            output=original_audio_receipt(layout,settings,from_ms=args.from_ms,
+                                           duration_ms=args.duration_ms)
+            output["output_path"]=str(destination)
         elif args.operation == "roguelike-marathon":
             output=replay_long_roguelike(
                 _load(args.settings) if args.settings else None,
