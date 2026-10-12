@@ -1,6 +1,6 @@
 # Dragon source research: reconciled eleven-batch evidence chain
 
-**Date:** 2026-10-12  
+**Date:** 2026-10-12
 **Scope:** Game creator research discovery only; no source-use, copying, training or license authority.
 
 ## Quantified raw discovery
