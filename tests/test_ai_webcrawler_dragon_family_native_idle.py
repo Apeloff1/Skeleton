@@ -131,6 +131,12 @@ def test_wayland_xwayland_never_claims_all_screen_input(monkeypatch):
     monkeypatch.delenv("DISPLAY")
     with pytest.raises(NativeIdleUnavailable,match="X11"):
         _linux_x11_idle_seconds()
+    monkeypatch.setenv("DISPLAY","localhost:10.0")
+    with pytest.raises(NativeIdleUnavailable,match="remote X11"):
+        _linux_x11_idle_seconds()
+    monkeypatch.setenv("DISPLAY","remote.example.org:0")
+    with pytest.raises(NativeIdleUnavailable,match="remote X11"):
+        _linux_x11_idle_seconds()
 
 
 def test_unknown_operating_system_fails_closed(monkeypatch):
