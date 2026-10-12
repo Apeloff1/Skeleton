@@ -45,9 +45,9 @@ class OriginalParkourTests(unittest.TestCase):
 
     def test_technique_clears_real_obstacle_where_running_collides(self):
         clear = run_advanced_session("parkour",
-                                     actions=["run"]*4+["jump"], seed=0)
+                                     actions=["run"]*3+["jump"], seed=0)
         strike = run_advanced_session("parkour",
-                                      actions=["run"]*5, seed=0)
+                                      actions=["run"]*4, seed=0)
         self.assertTrue(verify_advanced_session(clear))
         self.assertTrue(verify_advanced_session(strike))
         self.assertIn("technique_cleared_gap", clear["state"]["events"])
