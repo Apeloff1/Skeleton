@@ -15,11 +15,12 @@ import sys
 
 from .system_editors import (
     catalog, editor_source, preview_editor, validate_editor_document,
+    make_editor_document,
     SystemEditorError,
 )
 from .system_editor_assembly import assemble_workspace_systems
 from .advanced_gameplay_runtime import run_advanced_session, verify_advanced_session
-from .advanced_level_scenes import make_advanced_scene
+from .advanced_level_scenes import make_advanced_scene,validate_advanced_scene
 from .advanced_puzzle_solver import solve_advanced_puzzle
 from .advanced_rhythm_runtime import default_layout as original_rhythm_chart
 from .advanced_rhythm_audio import render_original_beat_wav,original_audio_receipt
