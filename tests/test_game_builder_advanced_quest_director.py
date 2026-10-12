@@ -42,7 +42,7 @@ class LivingOriginalQuestTests(unittest.TestCase):
         editor=next(e for e in catalog() if e["id"]=="quest_director")
         self.assertEqual(editor["runtime_maturity"],"advanced_reference_runtime")
         self.assertEqual(editor["progression_floor"],"advanced")
-        self.assertEqual(len(editor["fields"]),62)
+        self.assertEqual(len(editor["fields"]),70)
         self.assertEqual(len(ACTIONS),len(set(ACTIONS)))
         self.assertEqual(CELLS,49)
 
@@ -340,6 +340,79 @@ class LivingOriginalQuestTests(unittest.TestCase):
         fabricated["state"]["events_log"][0]["direct_witnesses"].append(1)
         with self.assertRaises(AdvancedRuntimeError):
             verify_advanced_session(fabricated,settings)
+
+
+    def test_opt_in_npc_mobility_walks_one_real_tile_and_pays_energy(self):
+        cfg=self.rules(npc_count=1,npc_mobility=True,
+                       npc_patrol_interval=1,npc_walk_budget=1,
+                       npc_pursues_evidence=False,npc_autonomy=False,
+                       npc_move_energy_cost=2,npc_energy=5,
+                       rumor_enabled=False)
+        scene=make_advanced_scene("quest_director",cfg)
+        modified=deepcopy(scene["layout"])
+        modified["npcs"][0]["cell"]=10
+        authored=make_advanced_scene("quest_director",cfg,layout=modified)
+        result=run_advanced_session("quest_director",cfg,["wait","wait"],
+                                    scene=authored)
+        s=result["state"];npc=s["npcs"][0]
+        self.assertEqual(npc["home"],10)
+        self.assertEqual(npc["cell"],9)
+        self.assertEqual(npc["walks"],1)
+        self.assertEqual(s["npc_walks"],1)
+        self.assertEqual(npc["energy"],3)
+        self.assertEqual(npc["memories"],[])
+        self.assertEqual(s["forensic_edges"],[])
+        self.assertTrue(verify_advanced_session(result,cfg))
+        inactive=run_advanced_session("quest_director",
+               {**cfg,"npc_mobility":False},["wait","wait"],
+               scene=make_advanced_scene("quest_director",
+                 {**cfg,"npc_mobility":False},layout=modified))
+        self.assertEqual(inactive["state"]["npcs"][0]["cell"],10)
+        self.assertEqual(inactive["state"]["npc_walks"],0)
+
+    def test_post_event_npc_investigation_can_never_become_direct_witness(self):
+        cfg=self.rules(npc_count=1,npc_mobility=True,
+            npc_pursues_evidence=True,npc_lead_radius=12,
+            npc_perception=1,npc_patrol_interval=1,npc_walk_budget=32,
+            npc_energy=30,npc_act_interval=64,
+            rumor_enabled=False,day_ticks=100,quest_ttl=256,
+            memory_decay_ticks=0)
+        default=make_advanced_scene("quest_director",cfg)
+        layout=deepcopy(default["layout"])
+        layout["npcs"][0]["cell"]=33
+        original=make_advanced_scene("quest_director",cfg,layout=layout)
+        actions=["south","east","collect:0"]+["wait:4"]*7
+        report=run_advanced_session("quest_director",cfg,
+                         actions,scene=original)
+        state=report["state"]
+        self.assertEqual(state["events_log"][0]["direct_witnesses"],[])
+        self.assertTrue(state["forensic_edges"])
+        self.assertEqual(state["forensic_edges"][0]["event_id"],0)
+        self.assertEqual(state["forensic_edges"][0]["authority"],
+                         "forensic_after_event_not_eyewitness")
+        self.assertFalse(state["npcs"][0]["memories"])
+        self.assertFalse(state["quests"])
+        self.assertGreater(state["npcs"][0]["walks"],0)
+        self.assertTrue(verify_advanced_session(report,cfg))
+        forged=deepcopy(report)
+        forged["state"]["events_log"][0]["direct_witnesses"].append(0)
+        with self.assertRaises(AdvancedRuntimeError):
+            verify_advanced_session(forged,cfg)
+        forged=deepcopy(report)
+        forged["state"]["forensic_edges"][0]["authority"]="eyewitness"
+        with self.assertRaises(AdvancedRuntimeError):
+            verify_advanced_session(forged,cfg)
+
+    def test_autonomous_event_receipt_carries_npc_actor_not_fake_player_causation(self):
+        cfg=self.rules(npc_act_interval=1,npc_count=1,
+                       npc_autonomy=True,npc_mobility=False)
+        result=run_advanced_session("quest_director",cfg,["wait"])
+        entry=result["state"]["events_log"][0]
+        self.assertEqual(entry["actor"],"npc:0")
+        self.assertEqual(entry["original_source"],
+                         "physical_npc_world_action")
+        self.assertEqual(result["state"]["reputation"],0)
+        self.assertTrue(verify_advanced_session(result,cfg))
 
     def test_studio_original_witness_map_and_provenance_preserving_painter(self):
         from skeleton.ai.game_builder.game_workspace_ui import (
