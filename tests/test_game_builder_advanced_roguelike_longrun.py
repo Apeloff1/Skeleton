@@ -29,6 +29,7 @@ class OriginalMarathonDungeonTests(unittest.TestCase):
           "foe_attack":0,"boss_health":1,"boss_health_growth":0,
           "boss_attack":1,"boss_armor":0,"enemy_patrol":False,
           "trap_damage":0,"attack_power":16,"starting_health":100,
+          "floor_damage_cap":0,"poison_enabled":False,
         }
 
     @staticmethod
