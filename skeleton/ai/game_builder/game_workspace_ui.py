@@ -722,6 +722,10 @@ const PAINT_TOOLS={
          "food_plus","food_minus","water_plus","water_minus",
          "biome_next","make_start","threat_up","threat_down",
          "caravan_plus","caravan_minus"],
+ city_builder:["terrain_plain","terrain_forest","terrain_hill",
+               "terrain_wetland","terrain_water","road_hub",
+               "aquifer_plus","aquifer_minus","flood_up","flood_down",
+               "timber_plus","stone_plus"],
 };
 const GRID_COLORS={
  cover:"#7690a3",medkits:"#e1c76f",enemy_spawns:"#ef9691",
@@ -763,6 +767,26 @@ function renderSceneAuthoring(){
   if(source.editor!==systemEditor()?.id)throw Error("Editor and scene family differ");
   shape=sceneGridShape(source);
  }catch(_){ctx.fillText("Invalid or mismatched scene JSON: use Validate.",12,24);return;}
+ if(source.editor==="city_builder"){
+  const terrain=source.layout.terrain||[];
+  const ink={plain:"#395c4b",forest:"#327b51",hill:"#837653",
+   wetland:"#367a86",water:"#2662a5"};
+  ctx.fillText("Original urban terrain 4×4 · select tool and click an authored cell",12,18);
+  terrain.forEach((kind,i)=>{
+   const x=16+(i%4)*108,y=34+Math.floor(i/4)*48;
+   ctx.fillStyle=ink[kind]||"#555b66";
+   ctx.fillRect(x,y,102,43);
+   ctx.fillStyle="#f3f4ea";
+   ctx.fillText((i===source.layout.road_hub?"★ ":"")+
+    i+" "+kind.slice(0,8),x+6,y+23);
+  });
+  ctx.fillStyle="#bedbec";
+  ctx.fillText("Aquifer "+source.layout.aquifer+
+   " · lumber "+source.layout.timber_reserve+
+   " · stone "+source.layout.stone_reserve+
+   " · flood "+source.layout.flood_risk,12,245);
+  return;
+ }
  if(source.editor==="colony"){
   const zones=source.layout.districts||[];
   ctx.fillText("Colony geography draft · select a district and paint a resource rule",12,17);
@@ -824,6 +848,34 @@ function renderSceneAuthoring(){
   (layout.portals||[]).forEach(pair=>pair.forEach(p=>draw(p,"portal_a")));
   draw(layout.exit,"exit");draw(layout.spawn,"spawn");
  }
+}
+function paintCityCell(index){
+ const document=JSON.parse($("advanced-scene-json").value);
+ if(document.editor!=="city_builder"||document.editor!==systemEditor().id)
+  throw Error("City terrain editing needs a matching source document");
+ const layout=document.layout,tool=$("advanced-paint-tool").value;
+ if(!Number.isInteger(index)||index<0||index>=16)
+  throw Error("Original city cell must be within the reviewed 4×4 grid");
+ if(tool.startsWith("terrain_")){
+  layout.terrain[index]=tool.slice(8);
+ }else if(tool==="road_hub"){
+  if(["water","wetland"].includes(layout.terrain[index]))
+   throw Error("Cannot relocate origin road hub onto water/wetland");
+  layout.road_hub=index;
+ }else if(tool==="aquifer_plus"||tool==="aquifer_minus"){
+  layout.aquifer=Math.max(0,Math.min(100000,
+   layout.aquifer+(tool.endsWith("plus")?10:-10)));
+ }else if(tool==="flood_up"||tool==="flood_down"){
+  layout.flood_risk=Math.max(0,Math.min(8,
+   layout.flood_risk+(tool==="flood_up"?1:-1)));
+ }else if(tool==="timber_plus"||tool==="stone_plus"){
+  const field=tool==="timber_plus"?"timber_reserve":"stone_reserve";
+  layout[field]=Math.min(100000,layout[field]+5);
+ }else throw Error("Unknown registered original city map tool");
+ // Source stays deliberately unapproved until exact backend revalidation.
+ $("advanced-scene-json").value=JSON.stringify(document,null,2);
+ renderSceneAuthoring();
+ status("City geography changed: revalidate, inspect diff and authorize source before play.");
 }
 function paintColonyDistrict(index){
  const document=JSON.parse($("advanced-scene-json").value);
@@ -899,6 +951,15 @@ $("advanced-scene-grid").addEventListener("click",event=>{
   if(!text)throw Error("Generate a scene document first");
   const doc=JSON.parse(text),shape=sceneGridShape(doc);
   const canvas=$("advanced-scene-grid"),rect=canvas.getBoundingClientRect();
+  if(doc.editor==="city_builder"){
+   const px=(event.clientX-rect.left)*canvas.width/rect.width;
+   const py=(event.clientY-rect.top)*canvas.height/rect.height;
+   const col=Math.floor((px-16)/108),row=Math.floor((py-34)/48);
+   if(col<0||col>3||row<0||row>3||px>16+col*108+102
+      ||py>34+row*48+43)return;
+   paintCityCell(row*4+col);
+   return;
+  }
   if(doc.editor==="colony"){
    const px=(event.clientX-rect.left)*canvas.width/rect.width;
    const py=(event.clientY-rect.top)*canvas.height/rect.height;
