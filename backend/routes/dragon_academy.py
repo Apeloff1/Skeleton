@@ -22,7 +22,8 @@ from pydantic import BaseModel, Field
 
 from routes.gameforge_auth import get_current_user
 from skeleton.ai.webcrawler.dragon_practice_lab import DragonPracticeLab
-from skeleton.ai.webcrawler.dragon_family import DragonFamily
+from skeleton.ai.webcrawler.dragon_family_custody_bridge import DragonFamilyCustodyBridge
+from skeleton.ai.webcrawler.dragon_family_glean_matrix import DragonGleanMatrix
 from skeleton.ai.webcrawler.dragon_family_almanakk import DragonAlmanakkLane
 from skeleton.ai.webcrawler.dragon_family_idle_coordinator import read_idle_family_health
 from skeleton.ai.webcrawler.dragon_practice_cycles import DragonPracticeCycles
@@ -99,11 +100,16 @@ def _lab() -> Iterator[tuple[DragonPracticeLab,DragonPracticeCycles]]:
 
 def _snapshot(lab: DragonPracticeLab, cycles: DragonPracticeCycles,
               owner: str) -> dict:
+    # The public route never owns insight-review callbacks. It projects only
+    # canonical reviewed evidence under the authenticated user's owner scope.
+    custody=DragonFamilyCustodyBridge(lab.db,owner)
+    family=custody.family()
     return {
         "ok": True,
         "progress": asdict(lab.progress(owner,authorized=True)),
         "family": {
-            **DragonFamily(lab.db).snapshot(owner,authorized=True,limit=25),
+            **family.snapshot(owner,authorized=True,limit=25),
+            "glean": DragonGleanMatrix(family).projection(owner,authorized=True,limit=12),
             "almanakk": DragonAlmanakkLane(lab.db).projection(owner,authorized=True,limit=15),
             "idle_work": read_idle_family_health(lab.db,owner,authorized=True),
         },
