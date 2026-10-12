@@ -708,6 +708,14 @@ def policy_signer(lab):
 
 def real_pilot_grant(lab, *, signer=None, expire=None):
     signer=signer or policy_signer(lab)
+    existing=signer.control_state(OWNER,authorized=True)
+    if not existing["enabled"]:
+        signer.set_pilot_enabled(
+            OWNER,enabled=True,now=NOW-1,
+            expected_head_digest=existing["head_digest"],
+            reason="explicit offline test pilot approval",
+            authorized=True,trusted_issuer=True,
+            owner_consent_verified=True)
     grant=signer.issue(
         OWNER,lab[7],reviewer="external-human-reviewer",
         evidence_digest="c"*64,now=NOW,expires_at=expire or NOW+120,
@@ -896,3 +904,85 @@ def test_no_policy_grant_can_be_issued_after_canonical_rights_expiry(lab):
             reference_retention_verified=True,
         )
     assert signer.audit(OWNER,now=NOW,authorized=True)["grants"]==[]
+
+
+
+def test_pilot_kill_switch_defaults_off_and_cannot_be_guessed(lab):
+    signer=policy_signer(lab)
+    state=signer.control_state(OWNER,authorized=True)
+    assert state["enabled"] is False and state["generation"]==0
+    grant=signer.issue(
+        OWNER,lab[7],reviewer="external-human-reviewer",
+        evidence_digest="c"*64,now=NOW,expires_at=NOW+60,
+        authorized=True,trusted_issuer=True,identity_verified=True,
+        external_rights_verified=True,robots_verified=True,
+        terms_verified=True,reference_retention_verified=True)
+    with pytest.raises(PermissionError,match="kill switch"):
+        signer.verify(grant,owner=OWNER,source_id=lab[7],
+                      now=NOW,authorized=True)
+    with pytest.raises(PermissionError,match="owner consent"):
+        signer.set_pilot_enabled(
+            OWNER,enabled=True,now=NOW,
+            expected_head_digest=None,reason="no verified consent",
+            authorized=True,trusted_issuer=True)
+    with pytest.raises(PermissionError,match="issuer"):
+        signer.set_pilot_enabled(
+            OWNER,enabled=True,now=NOW,
+            expected_head_digest=None,reason="untrusted issuer",
+            authorized=True,trusted_issuer=False,
+            owner_consent_verified=True)
+    assert signer.control_state(OWNER,authorized=True)["enabled"] is False
+
+
+def test_kill_switch_blocks_future_requests_and_preserves_worker_stop(lab):
+    schedule(lab)
+    signer,grant=real_pilot_grant(lab)
+    pilot=DragonResearchPilot(
+        DragonResearchSupervisor(lab[6],lab[3]),signer)
+    state=signer.control_state(OWNER,authorized=True)
+    def disable_on_robots():
+        signer.set_pilot_enabled(
+            OWNER,enabled=False,now=NOW,
+            expected_head_digest=state["head_digest"],
+            reason="supervisor emergency research shutdown",
+            authorized=True,trusted_issuer=True)
+    fetcher,visited=offline_pilot_fetcher(lab,on_robots=disable_on_robots)
+    outcome=invoke_pilot(lab,pilot,grant,fetcher)
+    assert outcome is not None and not outcome.captured
+    assert len(visited)==1 and visited[0].endswith("/robots.txt")
+    assert lab[4].active_grants()==()
+    assert lab[6].inspect(OWNER,lab[7],authorized=True)["state"]=="retry_wait"
+    assert not signer.control_state(OWNER,authorized=True)["enabled"]
+    other=policy_signer(lab)
+    with pytest.raises(PermissionError,match="kill switch"):
+        other.verify(grant,owner=OWNER,source_id=lab[7],
+                     now=NOW,authorized=True)
+    with pytest.raises(ValueError,match="compare-and-swap"):
+        other.set_pilot_enabled(
+            OWNER,enabled=True,now=NOW+1,
+            expected_head_digest=state["head_digest"],
+            reason="stale restart rejected",
+            authorized=True,trusted_issuer=True,owner_consent_verified=True)
+
+
+def test_pilot_switch_events_are_append_only_and_tampering_fails_closed(lab):
+    signer,grant=real_pilot_grant(lab)
+    status=signer.control_state(OWNER,authorized=True)
+    assert status["enabled"] and status["generation"]==1
+    stopped=signer.set_pilot_enabled(
+        OWNER,enabled=False,now=NOW,
+        expected_head_digest=status["head_digest"],
+        reason="owner explicitly paused research",
+        authorized=True,trusted_issuer=True)
+    assert stopped["generation"]==2
+    with pytest.raises(ValueError,match="real state transition"):
+        signer.set_pilot_enabled(
+            OWNER,enabled=False,now=NOW+1,
+            expected_head_digest=stopped["head_digest"],
+            reason="duplicate event",
+            authorized=True,trusted_issuer=True)
+    lab[0].db.execute(
+        "UPDATE dragon_source_pilot_control_events_v1 SET body='{}' "
+        "WHERE owner=? AND sequence=0",(OWNER,))
+    with pytest.raises(ValueError,match="lineage"):
+        signer.control_state(OWNER,authorized=True)

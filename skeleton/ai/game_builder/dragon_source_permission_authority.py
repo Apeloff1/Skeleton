@@ -80,6 +80,13 @@ class DragonSourcePermissionAuthority:
             owner TEXT NOT NULL, grant_digest TEXT NOT NULL,
             body TEXT NOT NULL, issued_at INTEGER NOT NULL,
             PRIMARY KEY(owner,grant_digest))""")
+        self.db.execute("""CREATE TABLE IF NOT EXISTS dragon_source_pilot_control_events_v1(
+            owner TEXT NOT NULL, sequence INTEGER NOT NULL,
+            body TEXT NOT NULL, digest TEXT NOT NULL,
+            PRIMARY KEY(owner,sequence))""")
+        self.db.execute("""CREATE TABLE IF NOT EXISTS dragon_source_pilot_control_heads_v1(
+            owner TEXT PRIMARY KEY, sequence INTEGER NOT NULL,
+            digest TEXT NOT NULL)""")
         self.db.execute("""CREATE TABLE IF NOT EXISTS dragon_source_grant_revocations_v1(
             owner TEXT NOT NULL, grant_digest TEXT NOT NULL,
             at INTEGER NOT NULL, reason TEXT NOT NULL,
@@ -170,6 +177,8 @@ class DragonSourcePermissionAuthority:
             or grant.expires_at>grant.issued_at+3600
             or len(grant.nonce)!=32):
             raise PermissionError("source permit identity or expiry invalid")
+        if not self.control_state(owner,authorized=True)["enabled"]:
+            raise PermissionError("owner pilot kill switch disabled")
         if not hmac.compare_digest(grant.signature,self._mac(grant.body())):
             raise PermissionError("source permit signature invalid")
         record=self.db.execute(
@@ -282,4 +291,111 @@ class DragonSourcePermissionAuthority:
             "active_scope_count":sum(x["state"]=="live_scope" for x in items),
             "revoked_count":sum(x["state"]=="revoked" for x in items),
             "network_requests":0,"model_training_authorized":False,
+        }
+
+
+    def _control_events(self,owner:str)->list[dict]:
+        rows=self.db.execute(
+            "SELECT sequence,body,digest FROM "
+            "dragon_source_pilot_control_events_v1 "
+            "WHERE owner=? ORDER BY sequence LIMIT 257",(owner,)
+        ).fetchall()
+        if len(rows)>256:
+            raise ValueError("pilot control audit capacity exhausted")
+        records=[];prev=None
+        for i,(seq,raw,digest) in enumerate(rows):
+            if type(raw) is not str or len(raw.encode())>2000:
+                raise ValueError("corrupt owner pilot control event")
+            event=json.loads(raw)
+            if (not isinstance(event,dict)
+                or seq!=i or event.get("sequence")!=i
+                or event.get("owner")!=owner
+                or event.get("parent_digest")!=prev
+                or canonical_digest(event)!=digest
+                or event.get("schema")!="skeleton.dragon.pilot_control.v1"
+                or type(event.get("enabled")) is not bool
+                or type(event.get("at")) is not int
+                or (records and event["at"]<records[-1]["at"])
+                or event.get("training_authorized") is not False):
+                raise ValueError("owner pilot control lineage corrupt")
+            records.append({**event,"digest":digest})
+            prev=digest
+        head=self.db.execute(
+            "SELECT sequence,digest FROM dragon_source_pilot_control_heads_v1 "
+            "WHERE owner=?",(owner,)).fetchone()
+        if bool(head)!=bool(records):
+            raise ValueError("pilot control head missing or forged")
+        if records and head!=(records[-1]["sequence"],records[-1]["digest"]):
+            raise ValueError("pilot control head does not match append-only events")
+        return records
+
+    def control_state(self,owner:str,*,authorized:bool)->dict:
+        """Default OFF even when source metadata and signed grants exist."""
+        _auth(owner,authorized)
+        rows=self._control_events(owner)
+        return {
+            "schema":"skeleton.dragon.pilot_control_status.v1",
+            "owner":owner,
+            "enabled":rows[-1]["enabled"] if rows else False,
+            "generation":len(rows),
+            "head_digest":rows[-1]["digest"] if rows else None,
+            "network_requests":0,"model_training_authorized":False,
+        }
+
+    def set_pilot_enabled(self,owner:str,*,enabled:bool,now:int,
+                          expected_head_digest:str|None,reason:str,
+                          authorized:bool,trusted_issuer:bool,
+                          owner_consent_verified:bool=False)->dict:
+        """Only the sealed issuer may change the cross-process kill switch.
+
+        Never infer owner consent from a network source or a source grant.
+        Disabled is the absence/default state; disabling needs no new consent.
+        """
+        _auth(owner,authorized)
+        _integer(now,"pilot control clock",0,_MAX_EPOCH)
+        if trusted_issuer is not True:
+            raise PermissionError("trusted source pilot issuer required")
+        if type(enabled) is not bool:
+            raise ValueError("explicit pilot enabled flag required")
+        if enabled and owner_consent_verified is not True:
+            raise PermissionError("independently verified pilot owner consent required")
+        if not isinstance(reason,str) or not 1<=len(reason)<=160:
+            raise ValueError("bounded owner pilot control reason required")
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            rows=self._control_events(owner)
+            prev=rows[-1]["digest"] if rows else None
+            if expected_head_digest!=prev:
+                raise ValueError("stale pilot kill-switch compare-and-swap")
+            if len(rows)>=256:
+                raise ValueError("pilot control event retention capacity reached")
+            if rows and now<rows[-1]["at"]:
+                raise ValueError("pilot control clock rollback")
+            if rows and rows[-1]["enabled"]==enabled:
+                raise ValueError("pilot control requires a real state transition")
+            event={
+                "schema":"skeleton.dragon.pilot_control.v1",
+                "owner":owner,"sequence":len(rows),
+                "parent_digest":prev,"enabled":enabled,
+                "at":now,"reason":reason,
+                "training_authorized":False,
+            }
+            digest=canonical_digest(event)
+            self.db.execute(
+                "INSERT INTO dragon_source_pilot_control_events_v1 "
+                "VALUES(?,?,?,?)",
+                (owner,len(rows),canonical_json(event),digest))
+            self.db.execute(
+                "INSERT INTO dragon_source_pilot_control_heads_v1 "
+                "VALUES(?,?,?) ON CONFLICT(owner) DO UPDATE SET "
+                "sequence=excluded.sequence,digest=excluded.digest",
+                (owner,len(rows),digest))
+            self.db.execute("COMMIT")
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
+        return {
+            "owner":owner,"enabled":enabled,"head_digest":digest,
+            "generation":len(rows)+1,
+            "network_requests":0,"training_authorized":False,
         }
