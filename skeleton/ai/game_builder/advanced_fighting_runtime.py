@@ -55,10 +55,10 @@ def default_layout(config,seed):
     width=config["arena_width"]
     hazards=(
         [{"x":width//2,"lane":1,"damage":config["hazard_damage"]}]
-        if config["hazards_enabled"] else []
+        if config["hazards_enabled"] and config["hazard_count"]>0 else []
     )
     cover=[{"x":max(3,width//2),"lane":2,"hp":config["cover_health"]}] if (
-        config["cover_enabled"] and width>=8) else []
+        config["cover_enabled"] and config["cover_count"]>0 and width>=8) else []
     return {
         "width":width,"lanes":LANES,"player_spawn":[1,1],
         "enemy_spawn":[width-2,1],
@@ -137,6 +137,8 @@ def apply_scene(state,config,layout):
 
 def start(config,seed):
     _int(seed,0,2**31-1,"seed")
+    if config["starting_meter"]>config["meter_cap"]:
+        raise FightingActionError("original fighter cannot begin above authored special meter capacity")
     state={
        "seed":seed,"arena":{},"player":{},"opponent":{},
        "turn":0,"clock_frames":0,"round":1,
@@ -253,18 +255,23 @@ def _hit(state,config,attacker,defender,name,events):
         defender["stun"]+=config["hitstun_frames"]
         events.append("actual_original_hitbox_resolved_combat_damage")
         if config["knockback"] and name in ("cross","kick","uppercut","special"):
-            displacement=config["knockback"]
+            # Push the target cell by cell: intermediate cover and the
+            # opposing fighter are solid, so momentum cannot tunnel through.
             direction=_facing(attacker,defender)
-            destination=defender["x"]+direction*displacement
-            if destination<0 or destination>=state["arena"]["width"]:
-                if config["ring_outs"]:
-                    defender["hp"]=0
-                    attacker["ringouts"]+=1
-                    state["ringouts"]+=1
-                    events.append("true_original_arena_edge_ringout")
-                else:
-                    defender["x"]=max(0,min(state["arena"]["width"]-1,destination))
-            elif not _occupied(state,destination,defender["lane"],defender):
+            for _ in range(config["knockback"]):
+                destination=defender["x"]+direction
+                if destination<0 or destination>=state["arena"]["width"]:
+                    if config["ring_outs"]:
+                        defender["hp"]=0
+                        attacker["ringouts"]+=1
+                        state["ringouts"]+=1
+                        events.append("true_original_arena_edge_ringout")
+                    else:
+                        events.append("original_arena_boundary_stopped_knockback")
+                    break
+                if _occupied(state,destination,defender["lane"],defender):
+                    events.append("physical_original_stage_cover_blocked_knockback")
+                    break
                 defender["x"]=destination
                 events.append("original_contact_knockback_changed_real_location")
     attacker["damage_done"]+=damage
