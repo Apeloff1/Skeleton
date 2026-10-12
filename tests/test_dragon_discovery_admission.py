@@ -337,3 +337,49 @@ def test_latest_batch_cannot_claim_approval_or_fork_history(baseline, chain):
     bad[1]["counts"]["raw_provisional_urls"] += 1
     with pytest.raises(ValueError):
         validate_discovery_chain(baseline, [*chain, bad])
+
+
+RECONCILED_BATCHES = tuple(
+    ROOT / f"docs/ai/evidence/dragon-source-expansion-20261012-batch-{number:04d}.json"
+    for number in range(31, 38)
+)
+
+
+def test_pinned_five_catalog_expansion_has_complete_importable_lineage(baseline, chain):
+    """Machine-extracted URLs remain raw leads until independent policy review."""
+    authoritative = [*chain, _supplement(
+        ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json")]
+    resumed = [_supplement(path) for path in RECONCILED_BATCHES]
+    assert all(doc["status"] == "raw_discovery_only_not_ingested_into_canonical_queue"
+               for _, doc in resumed)
+    assert all(len(doc["candidates"]) <= 850 for _, doc in resumed)
+    result = validate_discovery_chain(baseline, [*authoritative, *resumed])
+    assert result["baseline"] == 4405
+    assert result["raw_new"] == 6146
+    assert result["raw_total_discovered"] == 10551
+    assert result["new"] <= result["raw_new"]
+    assert result["total_discovered"] == 4405 + result["new"]
+    assert result["sources"]
+    assert all(item["training_authorized"] is False
+               and item["rights"] == "not_assessed"
+               and item["independence"] == "not_assessed"
+               for item in result["sources"].values())
+
+
+def test_orphan_batches_do_not_silently_satisfy_reconciled_chain(baseline, chain):
+    historical = [*chain, _supplement(
+        ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json")]
+    resumed = [_supplement(path) for path in RECONCILED_BATCHES]
+    # Batch 24 had an independent acquisition provenance format; batch 30
+    # refers to missing batches 25-29. Neither is eligible to masquerade
+    # as the parent of the reconciled 31-37 sequence.
+    with pytest.raises(ValueError):
+        validate_discovery_chain(baseline, [*historical, resumed[1]])
+    poisoned = deepcopy(resumed)
+    poisoned[-1][1]["candidates"][0]["training_authorized"] = True
+    with pytest.raises(ValueError, match="authority"):
+        validate_discovery_chain(baseline, [*historical, *poisoned])
+    poisoned = deepcopy(resumed)
+    poisoned[2][1]["counts"]["raw_provisional_urls"] += 1
+    with pytest.raises(ValueError):
+        validate_discovery_chain(baseline, [*historical, *poisoned])
