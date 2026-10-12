@@ -84,13 +84,62 @@ def observations(contract,bible,scene, *, extra_items=None, transfers=None):
             "items":extra_items or [],"transfers":transfers or []}
 
 
+
+def chapter_scene(bible,sequence=1,previous=None):
+    """Source-authored act/chapter fixture with explicit real plot bookmarks."""
+    from skeleton.ai.game_builder.story_chapter_context import (
+        storytelling_template,HIGHLIGHT_PALETTE)
+    raw=scene_source(bible,sequence,previous)
+    raw["chapter"]=(sequence-1)//100+1
+    raw["act"]=(sequence-1)//10+1
+    raw["scene"]=(sequence-1)%10+1
+    chapter=raw["chapter"]
+    start=(chapter-1)*100+1
+    ending=sequence%100==0 or sequence==9999
+    resolved=ending and chapter%2==0
+    form=("prelude" if chapter%2==0 else "prologue") if sequence==start else (
+          "interlude" if (sequence-start)%50==49 else "main")
+    story=storytelling_template(chapter,form=form)
+    story.update(
+        chapter_title=f"The Lantern Chapter {chapter:03d}",
+        pacing="rising" if sequence%2 else "aftermath",
+        tension_before=5+(sequence-1)%2,
+        tension_after=5+sequence%2,
+        stakes="The travelers must protect an original historical trade route.",
+        dramatic_question="Who can be trusted to preserve the original navigation ledger?",
+        hook="The next annotated map reveals a troubling original clue.",
+        chapter_outcome=("resolution" if resolved else "cliffhanger")
+                        if ending else "ongoing",
+        plot_highlights=[{
+            "id":f"highlight_{sequence}","kind":"foreshadowing",
+            "reference":f"visit_{sequence}",
+            "color":HIGHLIGHT_PALETTE["foreshadowing"],
+            "importance":5 if ending else 2,
+            "note":"A source-linked clue echoes the cause of this original chapter.",
+        }],
+        closed_highlights=[f"highlight_{start}"] if resolved else [],
+        editorial={
+            "camera":"over_shoulder",
+            "cut":"match_cut",
+            "performance":"Subtle pauses reveal cautious trust and uncertainty.",
+            "soundscape":"Original softly resonant lantern chimes and distant wind.",
+            "continuity_notes":[
+                "Retain original camera axis and canonical character clothing.",
+                "Keep accent, mouth shapes and identity reference unchanged."],
+        },
+    )
+    raw["storytelling"]=story
+    return sign(raw,SCENE)
+
+
 class MeticulousProductionContinuityTests(unittest.TestCase):
     def setUp(self):
         self.bible=canonical_bible()
         self.contract=original_contract(self.bible)
 
-    def test_exact_hundred_acts_and_9999_stage_contract_is_locked(self):
-        self.assertEqual(ACT_TARGET,100)
+    def test_hundred_chapters_thousand_acts_and_9999_scenes_locked(self):
+        self.assertEqual(ACT_TARGET,1000)
+        self.assertEqual(self.contract["chapter_target"],100)
         self.assertEqual(SCENE_TARGET,9999)
         self.assertGreaterEqual(len(QC_GATES),15)
         altered=deepcopy(self.contract)
@@ -107,10 +156,10 @@ class MeticulousProductionContinuityTests(unittest.TestCase):
             validate_contract(sign(altered,CONTRACT),self.bible)
 
     def test_one_scene_at_a_time_with_full_reparse_receipts(self):
-        s1=scene_source(self.bible,1)
+        s1=chapter_scene(self.bible,1)
         first=seal_production_scene(self.bible,self.contract,[],s1,
                                     observations(self.contract,self.bible,s1))
-        s2=scene_source(self.bible,2,first)
+        s2=chapter_scene(self.bible,2,first)
         second=seal_production_scene(self.bible,self.contract,[first],s2,
                                      observations(self.contract,self.bible,s2))
         check=verify_production_history(self.bible,self.contract,[first,second])
@@ -131,7 +180,7 @@ class MeticulousProductionContinuityTests(unittest.TestCase):
             verify_production_history(self.bible,self.contract,[broken,second])
 
     def test_immutable_voice_face_clothes_and_emotional_dialogue(self):
-        scene=scene_source(self.bible,1)
+        scene=chapter_scene(self.bible,1)
         expected=observations(self.contract,self.bible,scene)
         for attack in ("voice","voice_hash","face","geometry",
                        "outfit","color","expression","line","era","architecture"):
@@ -152,7 +201,7 @@ class MeticulousProductionContinuityTests(unittest.TestCase):
 
     def test_actual_historical_item_transfer_is_backlinked_to_story_event(self):
         contract=original_contract(self.bible,with_item=True)
-        scene=scene_source(self.bible)
+        scene=chapter_scene(self.bible)
         scene["events"][0]["kind"]="item_transfer"
         scene["events"][0]["summary"]=(
             "The historical_table passes from Alina to Boren under a witnessed transfer.")
@@ -189,13 +238,13 @@ class MeticulousProductionContinuityTests(unittest.TestCase):
             for phase in stages():
                 write_reviewed(workspace,"game/story_bible.json",phase)
             write_reviewed(workspace,"game/continuity_contract.json",self.contract)
-            source=scene_source(self.bible,1)
+            source=chapter_scene(self.bible,1)
             with self.assertRaises(StoryCanonError):
                 write_reviewed(workspace,
-                    "story/scenes/act_0001/scene_000001.json",source)
+                    "story/chapters/chapter_001/acts/act_0001/scene_000001.json",source)
             signed=seal_production_scene(self.bible,self.contract,[],source,
                                          observations(self.contract,self.bible,source))
-            write_reviewed(workspace,"story/scenes/act_0001/scene_000001.json",signed)
+            write_reviewed(workspace,"story/chapters/chapter_001/acts/act_0001/scene_000001.json",signed)
             verified=confirm_stage(workspace,"worldforge")
             self.assertEqual(verified["accepted_scenes"],1)
             page=detail_timeline(workspace,"worldforge",character="alina")
@@ -255,17 +304,17 @@ class MeticulousProductionContinuityTests(unittest.TestCase):
                     "project":"worldforge","act":1,"scene":1})
                 self.assertEqual(status,200)
                 self.assertEqual(draft["next_global_sequence"],1)
-                source=scene_source(self.bible)
+                source=chapter_scene(self.bible)
                 seen=observations(self.contract,self.bible,source)
                 altered=deepcopy(seen)
                 altered["cast"][0]["voice_id"]="unapproved_voice"
                 self.assertEqual(request("/api/story-sign",{
                     "project":"worldforge",
-                    "path":"story/scenes/act_0001/scene_000001.json",
+                    "path":"story/chapters/chapter_001/acts/act_0001/scene_000001.json",
                     "document":source,"observations":altered})[0],400)
                 status,approved_scene=request("/api/story-sign",{
                     "project":"worldforge",
-                    "path":"story/scenes/act_0001/scene_000001.json",
+                    "path":"story/chapters/chapter_001/acts/act_0001/scene_000001.json",
                     "document":source,"observations":seen})
                 self.assertEqual(status,200)
                 self.assertEqual(approved_scene["document"]["assurance"]["sequence"],1)
@@ -284,7 +333,7 @@ class MeticulousProductionContinuityTests(unittest.TestCase):
                 server.server_close()
                 thread.join(timeout=3)
 
-    def test_9999_linked_receipts_span_exactly_100_acts(self):
+    def test_9999_receipts_span_100_chapters_and_1000_acts(self):
         # Stream-authored regression fixture: avoid quadratic per-commit replay
         # during construction, then independently verify *all* 9999 sources,
         # receipt links, character looks and dialogue intent in one full pass.
@@ -295,11 +344,7 @@ class MeticulousProductionContinuityTests(unittest.TestCase):
         root=_history_root(self.bible,self.contract)
         scenes=[]
         for sequence in range(1,SCENE_TARGET+1):
-            act=(sequence-1)//100+1
-            number_in_act=(sequence-1)%100+1
-            plain=scene_source(self.bible,sequence,previous)
-            plain["act"]=act;plain["scene"]=number_in_act
-            plain=sign(plain,SCENE)
+            plain=chapter_scene(self.bible,sequence,previous)
             seen=observations(self.contract,self.bible,plain)
             receipt=_receipt(self.contract,plain,seen,prior_receipt,
                              state,state,items,items,root)
@@ -310,8 +355,11 @@ class MeticulousProductionContinuityTests(unittest.TestCase):
             previous=sealed
         result=verify_production_history(self.bible,self.contract,scenes)
         self.assertEqual(result["accepted_scenes"],9999)
-        self.assertEqual(scenes[-1]["act"],100)
-        self.assertEqual(scenes[-1]["scene"],99)
+        self.assertEqual(scenes[-1]["chapter"],100)
+        self.assertEqual(scenes[-1]["act"],1000)
+        self.assertEqual(scenes[-1]["scene"],9)
+        self.assertEqual(result["closed_chapters"],100)
+        self.assertEqual(result["indexed_plot_highlighters"],9999)
         self.assertTrue(result["fully_completed"])
         self.assertEqual(result["verified_receipt_head"],prior_receipt)
         self.assertEqual(result["verified_chain_head"],root)
