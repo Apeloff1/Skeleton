@@ -1,6 +1,6 @@
 """Original advanced interconnected-exploration reference game.
 
-A bounded twelve-region authored world has persistent enemy injuries, finite
+A bounded twenty-four-region authored world has persistent enemy injuries, finite
 treasure and healing, collectible movement abilities, bidirectional locks,
 sequence-breaking risks, fast travel and a real boss. No client-owned state,
 external game assets, generative shell execution or native-game claims.
@@ -10,13 +10,13 @@ from collections import deque
 
 POWERS=("dash","grapple","phase","swim","resonance")
 BIOMES=("moss","ruins","canopy","cavern","water","spire","ash")
-ROOM_LIMIT=12
+ROOM_LIMIT=24
 ACTIONS=(
     tuple(f"travel:{i}" for i in range(ROOM_LIMIT))+
     tuple(f"break:{i}" for i in range(ROOM_LIMIT))+
     tuple(f"fast:{i}" for i in range(ROOM_LIMIT))+
     ("attack","heavy","guard","evade","rest","claim",
-     "search","heal","camp","craft","focus","inspect")
+     "search","reveal","heal","camp","craft","focus","inspect")
 )
 
 
@@ -78,7 +78,7 @@ def normalize_layout(config,layout):
         raise ExplorationActionError("authored world needs exact typed rooms and portals")
     source=layout["rooms"]
     if type(source) is not list or not 2<=len(source)<=min(ROOM_LIMIT,config["regions"]):
-        raise ExplorationActionError("authored world must contain 2..12 bounded regions")
+        raise ExplorationActionError("authored world must contain 2..24 bounded regions")
     n=len(source)
     rooms=[];powers=set()
     for i,r in enumerate(source):
@@ -105,7 +105,7 @@ def normalize_layout(config,layout):
     if sum(r["anchor"] for r in rooms)>config["fast_travel_nodes"]:
         raise ExplorationActionError("authored fast-travel network exceeds editor budget")
     passages=layout["passages"]
-    if type(passages) is not list or not n-1<=len(passages)<=24:
+    if type(passages) is not list or not n-1<=len(passages)<=48:
         raise ExplorationActionError("world portals must form a bounded connected graph")
     edges=[];seen=set();gate_count=0
     for e in passages:
@@ -379,6 +379,14 @@ def step(state,config,action):
         state["shards"]+=room["cache"]
         state["tonics"]+=config["cache_tonics"]
         events.append("authored_region_finite_supplies_claimed")
+    elif action=="reveal":
+        if battle or not room["secret"] or room["secret_found"]:
+            raise ExplorationActionError("unrevealed regional secret needs a cleared, authored hiding place")
+        _spend(state,"stamina",config["focus_cost"],"secret discovery")
+        room["secret_found"]=True
+        state["secrets_found"]+=1
+        state["shards"]+=config["secret_reward"]
+        events.append("finite_original_region_secret_recovered")
     elif action=="heal":
         if state["health"]>=state["max_health"]:
             raise ExplorationActionError("health potion cannot be consumed at full health")
@@ -399,7 +407,7 @@ def step(state,config,action):
         if battle:
             raise ExplorationActionError("cannot forge movement gear under direct attack")
         _spend(state,"shards",config["craft_cost"],"crafting")
-        state["attack_power"]=min(config["max_attack"],state["attack_power"]+config["craft_gain"])
+        state["attack_power"]=max(state["attack_power"],min(config["max_attack"],state["attack_power"]+config["craft_gain"]))
         events.append("finite_materials_reinforced_original_weapon")
     elif action=="inspect":
         # Inspect is a benign timed examination; danger still retaliates.
