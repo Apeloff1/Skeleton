@@ -175,6 +175,9 @@ class MissionSourceScout:
                 "genre_overlap": round(coverage(genre_tokens), 6),
                 "era_overlap": round(coverage(era_tokens), 6),
             }
+            if (not any(factors.values()) and not (
+                    mission.prefer_video and source.get("kind") == "video_candidate")):
+                continue
             score = round(min(1.0, 0.58 * factors["goal_overlap"] +
                               0.22 * factors["platform_overlap"] +
                               0.12 * factors["genre_overlap"] +
