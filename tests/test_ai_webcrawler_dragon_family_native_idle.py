@@ -139,19 +139,28 @@ def test_unknown_operating_system_fails_closed(monkeypatch):
         os_input_idle_seconds()
 
 
-def test_native_idle_probe_can_drive_existing_host_without_network(monkeypatch):
-    # This is a pure adapter contract, not a live OS claim or acquisition.
-    import tests.test_ai_webcrawler_dragon_family_idle_host as fixture
-    db,bridge,family,host,grant=fixture.make()
-    fixture.activate(host,grant)
+def test_native_idle_probe_can_drive_existing_host_without_network():
+    # Host with valid consent, no parent inventory or fetch callbacks:
+    # the local OS observer can drive safe zero-work ticks.
+    from skeleton.ai.webcrawler.dragon_family_custody_bridge import DragonFamilyCustodyBridge
+    from skeleton.ai.webcrawler.dragon_family_idle_host import idle_consent_scope
+    from skeleton.ai.webcrawler.dragon_consent_ledger import DragonConsentLedger
+    owner="native-host-owner"
+    db=sqlite3.connect(":memory:")
+    bridge=DragonFamilyCustodyBridge(db,owner)
+    host=DragonIdleHostControl(bridge)
+    topics=("game_design",)
+    scope=idle_consent_scope(owner,topics,())
+    grant=DragonConsentLedger(db).issue(owner,capture=True,analysis=True,
+        issued_at=NOW+100,expires_at=NOW+4000,
+        policy_version="native-activity",scope_digest=scope,authorized=True)
+    host.activate(consent_id=grant.consent_id,task_topics=topics,
+                  at=NOW+500,authorized=True)
     live=NativeDragonIdleProbe(
-        clock=lambda:fixture.T+720,
-        monotonic_clock=lambda:1.,
-        input_idle_seconds=lambda:620.,
-        host_signals=flags,
-    )
+        clock=lambda:NOW+720,monotonic_clock=lambda:1.,
+        input_idle_seconds=lambda:620.,host_signals=flags)
     observed=host.tick(authorized=True,host_idle_state=live.observe)
     assert observed["attempted"]==0 and observed["changed"]==0
-    assert host.status(at=fixture.T+721,authorized=True)["active"]
-    assert family.snapshot(fixture.OWNER,authorized=True)["children"][0]["discoveries"]==0
+    assert observed["reason"]=="parent_source_quest_incomplete"
+    assert host.status(at=NOW+721,authorized=True)["active"]
     db.close()
