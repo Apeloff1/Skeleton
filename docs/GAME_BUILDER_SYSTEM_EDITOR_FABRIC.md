@@ -1277,3 +1277,105 @@ NPC personality, thousands of moral/social behaviors, sophisticated
 acoustical ray tracing, learned agent policy, authored voice acting,
 full quest dialogue production or cross-game canonical memory.
 Those are independent extensions and verification obligations.
+
+
+## Sixteenth original advanced family — Roguelike Runs (12 October 2026)
+
+The World-family Roguelike Runs editor is now a genuinely executable
+deterministic offline reference game, not a form with parameters.
+**16/43 = 37.2%** of the catalog have originally authored playable
+reference runtimes; **27/43 remain authoring-only**. No native Godot
+roguelike or commercial binary certification is implied.
+
+### Procedural dungeons, real combat and bounded encounter density
+
+This original implementation independently generates successive compact
+6×6 tactical floors from the authored seed, depth, configured topology,
+enemy budget, trap density, finite treasure and changing environmental
+ambience. The author may change the *first floor's* exact wall, obstacle,
+entry/exit, security, merchant, shrine, treasure, trap and enemy-source
+placement under the normal content-addressed scene review protocol.
+Subsequent floors are procedurally and deterministically constructed
+and keep the same procedural seed lineage.
+
+Physical walking and stamina-expensive two-cell dashes must traverse
+real adjacent clear tiles; walls, active enemies and map edges block
+unauthorized movement. Actual floor enemies have original IDs, HP,
+armor, attacks, ranged tactics, bounded shortest-path pursuit, poison,
+stun, hit-point depletion and one-time loot awards. A player can make
+directional melee strikes, spend finite arrows for real line-of-sight
+shots, use ranged mana-powered magic with finite poison/stun effects,
+block an actual attack, rest, consume food/potions and earn experience
+from genuinely defeated enemies. Enemies respond autonomously within
+configurable local threat ranges, and no arbitrary state-editing attack
+or fabricated completion command is registered.
+
+Original game choices include finding traps and spending energy
+to disarm them, opening spatially adjacent one-use finite treasure
+chests, seeking shrine blessings, purchasing consumables or permanent
+gear upgrades from a physically reached merchant, and investing earned
+relics for one of two different original run-progression benefits.
+Procedural chest loot responds to the bounded original item-pool axis.
+A player may kill an original elite for its one-time physical key or
+consume a finite lockpick at the correct physical exit. The last floor
+requires an actual defeated guardian as well, even when the door has
+already been unlocked. Campaign success demands reaching the final
+exit in the live persistent state, not simply issuing a win command.
+
+A high encounter budget of up to 60 does not create 60 overlapping
+entities in the thirty-six-cell room. A bounded live roster and
+**finite physical reserve spawns** represent overstrength dungeons.
+Reserve creatures materialize only at actual unoccupied authorized
+tactical locations, preserving finite enemy accounting, rather than
+being a free or invented crowd simulation.
+
+### Permadeath, progression and meaningful rewards
+
+The typed editor can enforce permadeath: a defeated player produces
+a terminal and independently re-created lost-run receipt. A separately
+authored no-permadeath mode may resurrect using actual previously
+earned relics, returning to the floor entry and surrendering some
+finite funds. This remains a paid finite choice, not a cheat.
+Earned XP levels health and attack; enemies/chests/shrines provide
+nonrepeatable rewards; meta progression can be disabled, configured
+as practical unlock rewards, or invested into real incremental upgrades
+during a run. The run transcript records all resource changes, enemy
+deaths, stair transitions and the actual final guardian milestone.
+
+The editor now offers **77 strongly typed gameplay-affecting controls**
+(including the original five), including level count, encounter density,
+item pool, permadeath, meta policy, hero health/mana/stamina, melee/ranged
+abilities, enemy patrol and aggression, enemy HP, armor, damage scaling,
+guardian stats, room wall/trap/chest budgets, finite money/loot,
+potions, EXP pacing, shrine enchantments, merchant prices, player
+equipment, lockpicks, poison, stun, food and optional revival cost.
+
+### Studio and integrity
+
+The original Studio displays the actual current floor's signed tiles,
+traps, shops, enemies, finite chests, guardian, player and staircase.
+The live HUD shows health, mana, stamina, armor, gold, relics,
+keys, lockpicks, treasure and finite encounter reserves. The accessible
+action composer and arrow/Shift+arrow shortcuts use registered actions,
+not a free teleport. The separate signed source painter supports
+19 named room-authoring operations for geometry, traps, treasure,
+spawn, stair/merchant/shrine positions, original enemy placement
+and stats, guardian assignment, visual theme and finite reserves.
+Changing source does not grant approval or create a new signed digest.
+
+A dedicated replay/scene/adversarial suite validates complete original
+multi-floor victory, actual directional strikes, physical key or
+lockpick exits, one-use chests, earned original loot, merchant proximity,
+paid revival versus permadeath, distinct relic economics,
+finite reserve waves, authentic first-floor scene geometry,
+save/continuation, forged result detection, offline CLI and reviewed
+cross-family hybrid assembly. It is included in the Linux and Windows
+advanced-reference CI gate alongside previous editor families.
+
+**Important limitations:** The reference session is bounded to
+128 player actions; arbitrary 200-floor campaigns require a separately
+verified long-run checkpointed execution mechanism rather than
+pretending a 128-step proof covers the entire game. No native Godot
+roguelike is implemented or hardware-published here, and this
+compact original floor generator does not claim fully featured
+commercial-level content generation or a modern multiplayer dungeon.
