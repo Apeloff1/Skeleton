@@ -4143,6 +4143,7 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <textarea id="jeeves-app-args" spellcheck="false" rows="5">{}</textarea></label>
 <button id="jeeves-app-execute" type="button">Run bounded Jeeves capability</button>
 <button id="jeeves-app-use-editor" type="button">Jeeves: stage current editor settings for review</button>
+<p><small>For governed self-improvement, select <code>model.improvement</code> and provide baseline/candidate source digests, measurable benchmarks and rollback. This stages review only; neural weights cannot be promoted here.</small></p>
 <pre id="jeeves-app-results" role="status" aria-live="polite"></pre>
 </fieldset>
 <fieldset><legend>Jeeves: story-first AI game production</legend>
