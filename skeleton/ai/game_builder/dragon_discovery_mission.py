@@ -105,10 +105,21 @@ class MissionSourceScout:
         index_health = None
         if indexed:
             from .dragon_discovery_facets import DiscoveryFacetIndex
+            # Retrieval priority mirrors the final mission coverage weights,
+            # preventing lower-value generic terms from hiding a goal match.
+            weights = {}
+            for terms, strength in (
+                (goal_tokens, 580_000), (platform_tokens, 220_000),
+                (genre_tokens, 120_000), (era_tokens, 80_000),
+            ):
+                if terms:
+                    contribution = max(1, strength // len(terms))
+                    for term in terms:
+                        weights[term] = weights.get(term, 0) + contribution
             rows, index_health = DiscoveryFacetIndex(
                 self._almanacs).matching_rows(
-                    owner, goal_tokens | platform_tokens | genre_tokens | era_tokens,
-                    authorized=True, topic=topic,
+                    owner, frozenset(weights),
+                    authorized=True, topic=topic, weights=weights,
                     limit=mission.scan_budget + 1)
         else:
             condition = (
@@ -120,6 +131,7 @@ class MissionSourceScout:
                 "SELECT s.source,s.body,s.digest,j.stage,j.state FROM dragon_almanac_sources s "
                 "JOIN dragon_almanac_jobs j ON j.owner=s.owner AND j.source=s.source "
                 "WHERE s.owner=? AND j.stage=0 AND j.state IN ('pending','blocked') "
+                "AND j.input_digest=s.digest "
                 + condition + " ORDER BY s.source LIMIT ?"
             )
             params = [owner]
