@@ -1246,6 +1246,94 @@ CATALOG = json.loads(r'''[
         "minimum": 10,
         "maximum": 1000,
         "options": []
+      },
+      {
+        "key": "witness_radius",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 8,
+        "options": []
+      },
+      {
+        "key": "sound_radius",
+        "kind": "int",
+        "default": 4,
+        "minimum": 0,
+        "maximum": 14,
+        "options": []
+      },
+      {
+        "key": "observation_limit",
+        "kind": "int",
+        "default": 24,
+        "minimum": 1,
+        "maximum": 64,
+        "options": []
+      },
+      {
+        "key": "quest_limit",
+        "kind": "int",
+        "default": 8,
+        "minimum": 0,
+        "maximum": 32,
+        "options": []
+      },
+      {
+        "key": "civic_grant_reserve",
+        "kind": "int",
+        "default": 60,
+        "minimum": 0,
+        "maximum": 1000,
+        "options": []
+      },
+      {
+        "key": "quest_reward",
+        "kind": "int",
+        "default": 8,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "sapling_days",
+        "kind": "int",
+        "default": 3,
+        "minimum": 2,
+        "maximum": 8,
+        "options": []
+      },
+      {
+        "key": "sapling_wood_yield",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "relief_food",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "relief_water",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "donation_amount",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
       }
     ],
     "preview": null
