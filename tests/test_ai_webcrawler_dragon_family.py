@@ -240,6 +240,42 @@ class DragonFamilyTests(unittest.TestCase):
         self.assertEqual([c["discoveries"] for c in self.family.snapshot(
             OWNER, authorized=True)["children"]], [1, 0, 0])
 
+    def test_admission_rechecks_canonical_consent_inside_write_transaction(self) -> None:
+        counter = {"calls": 0}
+
+        def one_time_approval(proof: SourceReceipt) -> bool:
+            counter["calls"] += 1
+            return counter["calls"] == 1
+
+        db = sqlite3.connect(":memory:")
+        family = DragonFamily(db, approval=one_time_approval)
+        family.enroll(OWNER, (seed("web-1"),), authorized=True, now=BASE)
+        family.seal_inventory(OWNER, authorized=True, now=BASE + 1)
+        with self.assertRaisesRegex(PermissionError, "approval changed"):
+            family.consume(OWNER, receipt("web-1", "original", BASE + 2), authorized=True)
+        status = family.snapshot(OWNER, authorized=True)
+        self.assertEqual(status["parent"]["consumed"], 0)
+        self.assertFalse(status["parent"]["complete"])
+        self.assertEqual(sum(x["action"] == "consumed" for x in status["history"]), 0)
+        db.close()
+
+    def test_bounded_idle_runner_fairly_dispatches_distinct_specialists(self) -> None:
+        self.complete(seed("web-1"), seed("vid-1", "video"))
+        calls = []
+        def capture(label, source, contents):
+            calls.append(label)
+            return receipt(source, contents)
+        output = IdleBroodRunner(self.family, max_per_tick=3).tick(
+            OWNER, (
+                ("article", lambda: capture("first article", "web-1", "rev-1")),
+                ("article", lambda: capture("duplicate article", "web-1", "rev-2")),
+                ("video", lambda: capture("video", "vid-1", "rev-1")),
+            ), authorized=True, idle_state=idle, task_topics=("game",))
+        self.assertEqual(output, {"attempted": 2, "grown": 2, "paused": False})
+        self.assertEqual(calls, ["first article", "video"])
+        self.assertEqual([c["discoveries"] for c in self.family.snapshot(
+            OWNER, authorized=True)["children"]], [1, 1, 0])
+
     def test_invalid_input_and_no_progress_from_old_receipt(self) -> None:
         self.complete(seed("web-1"))
         with self.assertRaises(ValueError):
