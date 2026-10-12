@@ -22,6 +22,8 @@ from .system_editor_assembly import assemble_workspace_systems
 from .advanced_gameplay_runtime import run_advanced_session, verify_advanced_session
 from .advanced_level_scenes import make_advanced_scene,validate_advanced_scene
 from .advanced_puzzle_solver import solve_advanced_puzzle
+from .advanced_fighting_rollback import (run_peer_fight,verify_peer_fight,
+    reconcile_peer_prediction,verify_peer_reconciliation)
 from .advanced_rhythm_longrun import (run_long_rhythm,verify_long_rhythm,continue_long_rhythm)
 from .advanced_rhythm_runtime import default_layout as original_rhythm_chart
 from .advanced_rhythm_audio import render_original_beat_wav,original_audio_receipt
@@ -104,6 +106,29 @@ def parser() -> argparse.ArgumentParser:
     marathon_more.add_argument("--record",required=True)
     marathon_more.add_argument("--actions",required=True)
     marathon_more.add_argument("--settings")
+    versus=commands.add_parser("fighting-peer-replay",
+        help="Replay original fully signed two-player arena inputs without trusting client state")
+    versus.add_argument("--blue-actions",required=True)
+    versus.add_argument("--red-actions",required=True)
+    versus.add_argument("--settings")
+    versus.add_argument("--scene")
+    versus.add_argument("--seed",type=int,default=0)
+    versus_check=commands.add_parser("fighting-peer-verify",
+        help="Rebuild two real peers' deterministic arena inputs from original source")
+    versus_check.add_argument("--record",required=True)
+    versus_check.add_argument("--settings")
+    rollback=commands.add_parser("fighting-rollback",
+        help="Safely reconcile a late peer input prediction within authored frame budget")
+    rollback.add_argument("--blue-actions",required=True)
+    rollback.add_argument("--predicted-red",required=True)
+    rollback.add_argument("--authoritative-red",required=True)
+    rollback.add_argument("--settings")
+    rollback.add_argument("--scene")
+    rollback.add_argument("--seed",type=int,default=0)
+    rollback_check=commands.add_parser("fighting-rollback-verify",
+        help="Recalculate the full authoritative match and correction digest")
+    rollback_check.add_argument("--record",required=True)
+    rollback_check.add_argument("--settings")
     full_song=commands.add_parser("rhythm-longrun",
         help="Run 256 authored beats with replay-certified chronological checkpoints")
     full_song.add_argument("--actions",required=True)
@@ -201,6 +226,23 @@ def main(argv=None) -> int:
                 _load(args.scene),
                 _load(args.settings) if args.settings else None,
                 max_states=args.max_states,max_actions=args.max_actions)
+        elif args.operation == "fighting-peer-replay":
+            output=run_peer_fight(
+                _load(args.settings) if args.settings else None,
+                _load(args.blue_actions),_load(args.red_actions),
+                seed=args.seed,scene=_load(args.scene) if args.scene else None)
+        elif args.operation == "fighting-peer-verify":
+            output={"verified":verify_peer_fight(
+                _load(args.record),_load(args.settings) if args.settings else None)}
+        elif args.operation == "fighting-rollback":
+            output=reconcile_peer_prediction(
+                _load(args.settings) if args.settings else None,
+                _load(args.blue_actions),_load(args.predicted_red),
+                _load(args.authoritative_red),seed=args.seed,
+                scene=_load(args.scene) if args.scene else None)
+        elif args.operation == "fighting-rollback-verify":
+            output={"verified":verify_peer_reconciliation(
+                _load(args.record),_load(args.settings) if args.settings else None)}
         elif args.operation == "rhythm-longrun":
             output=run_long_rhythm(
                 _load(args.settings) if args.settings else None,
