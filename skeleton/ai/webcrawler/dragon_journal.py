@@ -112,14 +112,6 @@ class DragonEventJournal:
         try:
             data = dict(payload) if payload is not None else {}
             _bounded_json_tree(data)
-        except ValueError:
-            # Keep bounded-tree failure categories visible to test and operators.
-            # In particular a self-referential mapping is rejected by the finite
-            # node/depth budget before recursive JSON serialization.
-            raise
-        except (TypeError, UnicodeError, OverflowError, RecursionError) as exc:
-            raise ValueError("journal payload must be canonical finite JSON") from exc
-        try:
             encoded = _canonical(data)
             size = len(encoded.encode("utf-8", errors="strict"))
         except (TypeError, ValueError, UnicodeError, OverflowError, RecursionError) as exc:
