@@ -124,6 +124,8 @@ def chapter_context(
              f"Palette rules: {chapter['palette_rules']}\n"
              f"Costume rules: {chapter['costume_rules']}\n"
              f"Voice rules: {chapter['voice_rules']}\n"
+             f"Permanently pinned voices: {canonical(chapter.get('voice_cast', {}))}\n"
+             f"Permanently pinned faces: {canonical(chapter.get('face_cast', {}))}\n"
              f"Continuity notes: {chapter['notes']}\n")
     parts.append(intro[:max_chars])
     remaining = max_chars - len(parts[0])
