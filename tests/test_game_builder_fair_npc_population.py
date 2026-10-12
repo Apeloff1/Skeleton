@@ -79,6 +79,33 @@ class HigherCapacityNPCSimulationTests(unittest.TestCase):
             self.assertLessEqual(citizen["longest_deferral"],24)
             self.assertGreaterEqual(citizen["eligible_deferred_ticks"],0)
 
+    def test_authored_quest_route_remains_playable_under_full_population(self):
+        story=["move:south","move:east","harvest:0",
+               "speak:0","support:0"]+["repair:0"]*5+["claim:0"]
+        for chunks in (3,5):
+            for count in (16,64,128):
+                with self.subTest(chunks=chunks,citizens=count):
+                    cfg=rules(chunks=chunks,citizens=count,active=8)
+                    record=run_chunked_npc_world(story,options=cfg)
+                    self.assertTrue(verify_chunked_npc_world(record))
+                    world=record["state"]
+                    self.assertEqual(world["completed"],1)
+                    self.assertEqual(world["quests"][0]["ending"],"restored")
+                    self.assertEqual(world["quests"][0]["followups"],5)
+                    self.assertEqual(world["dialogues"][0]["source"],
+                                     "firsthand_physical_witness")
+                    self.assertNotIn(world["player"],
+                                     {a["position"] for a in world["actors"]})
+                    site_cells={site["cell"] for site in world["sites"]}
+                    self.assertTrue(site_cells.isdisjoint(
+                        {a["position"] for a in world["actors"]}))
+                    middle=chunks//2
+                    center=(middle,middle)
+                    for actor in world["actors"][4:]:
+                        if actor["detailed_ticks"]==0:
+                            x,y=actor["position"]%world["side"],actor["position"]//world["side"]
+                            self.assertNotEqual((x//7,y//7),center)
+
     def test_player_tile_is_physically_reserved_for_all_citizens(self):
         from skeleton.ai.game_builder.advanced_chunked_npc_world import (
             _act,_neighbors,
