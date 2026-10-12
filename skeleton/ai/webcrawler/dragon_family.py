@@ -346,7 +346,8 @@ class DragonFamily:
     def digest_idle(self, owner: str, dragon: str, receipt: SourceReceipt, *,
                     authorized: bool, window: IdleWindow,
                     task_topics: tuple[str, ...], adjacent_topics: tuple[str, ...] = (),
-                    lease_guard: Callable[[], bool] | None = None) -> bool:
+                    lease_guard: Callable[[], bool] | None = None,
+                    completion_hook: Callable[[bool], None] | None = None) -> bool:
         """Hatch/grow only from novel content under current verified idle admission.
 
         No fetching is performed here. `monitor` only accepts real revisions to
@@ -358,6 +359,8 @@ class DragonFamily:
         self._writer(receipt, authorized=authorized)
         if not isinstance(window, IdleWindow) or not window.permitted(min_idle_seconds=self.min_idle_seconds):
             raise PermissionError("idle-only brood paused: foreground, activity, capacity or consent")
+        if completion_hook is not None and not callable(completion_hook):
+            raise ValueError("invalid atomic idle completion hook")
         current = _tokens(task_topics)
         adjacent = _tokens(adjacent_topics)
         at = _epoch(receipt.observed_at)
@@ -392,20 +395,28 @@ class DragonFamily:
                 (owner, receipt.source_id)).fetchone()
             baseline = latest[0] if latest else parent_digest
             if baseline == receipt.content_digest:
+                if completion_hook is not None:
+                    completion_hook(False)
                 return False
             if latest and at <= latest[1]:
                 raise ValueError("source observation must advance its revision clock")
             if dragon == "monitor" and not baseline:
                 # Source has never been acquired; an update cannot be claimed.
+                if completion_hook is not None:
+                    completion_hook(False)
                 return False
             previous = self.db.execute("""SELECT 1 FROM dragon_family_readings
                 WHERE owner=? AND source_id=? AND content_digest=?""",
                 (owner, receipt.source_id, receipt.content_digest)).fetchone()
             if previous:
+                if completion_hook is not None:
+                    completion_hook(False)
                 return False
             # Reject content replays already known to the parent even if the child
             # has not read them yet, and never mint progress from metadata-only rechecks.
             if receipt.content_digest == parent_digest:
+                if completion_hook is not None:
+                    completion_hook(False)
                 return False
             improved = bool(baseline and receipt.improvement.strip())
             note = ("(improved: " + receipt.improvement.strip() + ")") if improved else (
@@ -419,6 +430,11 @@ class DragonFamily:
                 WHERE owner=? AND dragon=?""", (owner, dragon)).fetchone()[0]
             self._event(owner, at, dragon, "hatched" if count == 1 else "grew",
                         receipt.source_id, f"{relation} task knowledge {note}")
+            # Commit the worker's terminal lease, cooldown and audit event in
+            # the *same* SQLite transaction as verified family advancement.
+            # Failure of either record rolls back the entire acquisition.
+            if completion_hook is not None:
+                completion_hook(True)
         return True
 
     def history(self, owner: str, *, authorized: bool, limit: int = 30) -> list[dict[str, object]]:
