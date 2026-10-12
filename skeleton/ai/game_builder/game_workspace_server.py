@@ -40,6 +40,8 @@ from .advanced_godot_export import (
 from .advanced_platformer_godot import render_platformer_godot_package
 from .advanced_npc_evidence_navigation import (navigate_verified_investigation,
     verify_investigation_navigation)
+from .advanced_interleaved_save import (export_interleaved_save,
+    import_interleaved_save,continue_interleaved_save)
 from .advanced_interleaved_world import (run_interleaved_world,
     verify_interleaved_world)
 from .advanced_unified_genre_save import (export_unified_world_save,
@@ -447,6 +449,35 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "original_game_changed":False,
                 "automatic_quest_reward_granted":False,
                 "native_hardware_verified":False,
+            })
+        if path=="/api/advanced-interleaved-save-export":
+            saved=export_interleaved_save(
+                values["physical_episodes"],values["genre_sessions"],
+                values["world_scene"],values["timeline"],
+                values.get("world_settings"))
+            return self._json(200,{
+                "save":saved,"original_files_changed":False,
+                "native_full_world_certified":False,
+                "automatic_publishing_approved":False,
+            })
+        if path=="/api/advanced-interleaved-save-import":
+            restored=import_interleaved_save(values["save"])
+            return self._json(200,{
+                "restored":restored,"original_files_changed":False,
+                "native_full_world_certified":False,
+                "automatic_publishing_approved":False,
+            })
+        if path=="/api/advanced-interleaved-save-continue":
+            saved=continue_interleaved_save(
+                values["save"],
+                additional_physical=values.get("additional_physical",[]),
+                additional_genre=values.get("additional_genre",[]),
+                additional_timeline=values.get("additional_timeline",[]))
+            restored=import_interleaved_save(saved)
+            return self._json(200,{
+                "save":saved,"restored":restored,
+                "original_files_changed":False,
+                "automatic_publishing_approved":False,
             })
         if path=="/api/advanced-interleaved-world":
             report=run_interleaved_world(
