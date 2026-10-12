@@ -107,6 +107,7 @@ ACTION_DEFS = (
     ("jeeves.director", "Plan a phase-correct original Jeeves game production task", "plan", False),
     ("jeeves.chapter_chat", "Recall approved chapter history and prepare one governed chat turn", "plan", False),
     ("forge.kinds", "Inspect the real registered universal forge component kinds", "read", False),
+    ("forge.graph", "Compose and structurally verify an original universal forge graph", "simulate", False),
     ("tool.fabric", "Inspect actual game tool contracts versus executable handlers", "read", False),
     ("tool.plan", "Validate a finite typed Jeeves tool plan without executing it", "plan", True),
     ("companion.simulate", "Rehearse consent-bound Dragon growth and idle state transitions", "simulate", False),
@@ -303,6 +304,49 @@ def _simulate_companion(args):
             "persistent_companion_state_changed":False}
 
 
+def _review_forge_graph(args):
+    """Actual Universal Forge component/port/type/cycle checking, no build writes."""
+    _exact(args,("name","components","wires"),"original forge blueprint")
+    name=_plain(args["name"],"original forge blueprint name",120)
+    components=args["components"]
+    wires=args["wires"]
+    if type(components) is not list or not 1<=len(components)<=64:
+        raise JeevesAppCapabilityError("finite original forge components required")
+    if type(wires) is not list or len(wires)>128:
+        raise JeevesAppCapabilityError("bounded forge port connections required")
+    from skeleton.ai.forge.universal import Forge, Blueprint
+    forge=Forge()
+    # Pure, ephemeral graph; no new on-disk project, no event bus.
+    blueprint=Blueprint(blueprint_id="jeeves_ephemeral",name=name,created_at=0.0)
+    for item in components:
+        _exact(item,("id","kind","config"),"original forge component")
+        _name(item["id"],"forge instance")
+        if type(item["kind"]) is not str or item["kind"] not in forge.available_kinds():
+            raise JeevesAppCapabilityError("forge kind absent from installed component registry")
+        if type(item["config"]) is not dict or len(item["config"])>32:
+            raise JeevesAppCapabilityError("bounded typed forge configuration needed")
+        forge.instantiate(blueprint,item["kind"],item["id"],config=item["config"])
+    for wire in wires:
+        if type(wire) is not list or len(wire)!=4:
+            raise JeevesAppCapabilityError("forge wire needs four exact port endpoints")
+        for end in wire:
+            _name(end,"forge connection endpoint")
+        blueprint.connect((wire[0],wire[1]),(wire[2],wire[3]))
+    problems=blueprint.validate()
+    report={
+        "schema":"skeleton.game_builder.jeeves_forge_graph_review.v1",
+        "source_graph_digest":canonical_digest(args),
+        "component_count":len(components),"connection_count":len(wires),
+        "valid":not problems,"problems":problems,
+        "component_ports":{key:[
+            {"name":p.name,"port_type":p.port_type,"direction":p.direction}
+            for p in component.ports]
+            for key,component in sorted(blueprint.components.items())},
+        "game_build_executed":False,"source_project_modified":False,
+    }
+    return {**report,"digest":canonical_digest(report)}
+
+
 def _tool_contracts():
     fabric=ToolFabric()
     plans=[]
@@ -437,6 +481,8 @@ def dispatch_app_action(workspace,project,action,args,*,authorized=False):
         from skeleton.ai.forge.universal import Forge
         result={"component_kinds":Forge().available_kinds(),
                 "blueprint_materialization_executed":False}
+    elif action=="forge.graph":
+        result=_review_forge_graph(args)
     elif action=="tool.fabric":
         _exact(args,(),"existing typed tool fabric")
         result={"tools":_tool_contracts(),
