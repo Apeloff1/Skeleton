@@ -41,7 +41,7 @@ def make(*, complete=True, min_idle_seconds=300):
         for i,item in enumerate(sources):
             family.consume(OWNER,receipt(item.source_id,ORIGINAL,NOW+i+2),
                            authorized=True)
-    return db,family,DragonIdleCoordinator(family)
+    return db,family,DragonIdleCoordinator(family,policy=IdleCoordinatorPolicy(min_idle_seconds=min_idle_seconds))
 
 
 def idle(at=NOW+720, *, busy=0, foreground=False, consent=True, resources=True):
