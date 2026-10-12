@@ -227,7 +227,7 @@ class NativeFarmingStudioTests(unittest.TestCase):
 
     def test_visual_studio_supports_nine_native_game_families(self):
         html=render_workspace_html("G"*32).decode()
-        self.assertIn('"survival","farming"].includes(advancedSession.editor)',html)
+        self.assertIn('"survival","farming","factory"].includes(advancedSession.editor)',html)
         self.assertIn("Download playable Godot 4 game project",html)
 
 
