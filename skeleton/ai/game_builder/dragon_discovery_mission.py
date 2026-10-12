@@ -72,6 +72,8 @@ class MissionSourceScout:
     def __init__(self, almanacs: DragonAlmanacs) -> None:
         if not isinstance(almanacs, DragonAlmanacs):
             raise TypeError("canonical DragonAlmanacs required")
+        from .dragon_discovery_admission import DragonDiscoveryAdmission
+        DragonDiscoveryAdmission(almanacs)  # schema for imported raw receipts
         self.db = almanacs.db
 
     def propose(self, owner: str, mission: SourceMission, *, authorized: bool,
