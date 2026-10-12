@@ -1072,3 +1072,136 @@ Original reference-only City, Stealth and Interconnected World editor
 sessions deliberately disable their Godot export UI until a real
 separately implemented native engine is ready. The native source
 support of previously implemented families remains intact.
+
+
+## Fifteenth original advanced family — Open-ended Sandbox (12 October 2026)
+
+The World-family Open-ended Sandbox editor now implements a **genuinely
+executable offline creative/survival reference game** instead of only
+configuration settings. This raises the forty-three-family catalog to
+**15/43 = 34.9% reference-playable** and leaves **28/43 authoring-only**.
+It does NOT count as native Godot or console execution.
+
+### Persistent streamed world, not arbitrary billion-cell allocation
+
+A world contains between 1 and 4096 deterministic logical regions. The
+original simulation materializes a bounded **8×8 tile chunk per actually
+visited region**, rather than allocating all 262,144 potential tiles at
+startup. Terrain materialization is derived from seed and region identity;
+previously entered regions retain their *actual separately mutated
+64-cell maps*, including depleted stocks, cultivated crops, construction,
+wildlife, pollution, aquifer water and fire. Returning to a region restores
+its exact persistent state, never a fresh map with free materials.
+Every local action requires physically adjacent tiles, and open water
+requires a real bridge to cross.
+
+The signed initial authored scene has an exact 64-cell terrain map,
+safe entry, prescribed local fauna and settler spawns, credit reserve,
+weather and a safe original region name. Each cell individually contains
+its unique canonical ID, biome, building and upgrade level, finite
+wood/stone/clay/ore/forage/fish/water quantities, soils, crops, moisture,
+wildlife/taming status, active fire and pollution. Validation checks
+integer bounds, illegal land usage, finite stock identity, wildlife counts,
+crop/soil coherence, authentic settler spawn locations and a safe player
+entry. Every source-drafted alteration invalidates the prior SHA-256
+content receipt until exact backend validation and human file review.
+
+### Physical building, crafting and ecological feedback
+
+- **Six original terrain families:** grassland, forest, ridge, sand,
+  wetland and lake. Materials cannot be extracted from an unconnected
+  tile or unsuitable deposit even under the unlimited supply policy.
+  Finite resources physically deplete; renewable forests, water and fish
+  regenerate only under the authored renewable policy and bounded
+  weather/ecology settings. Unlimited supply is a separate explicit rule.
+- **Eleven construction types** operate on real locations: housing
+  supplies living capacity; paths reduce physical movement cost; bridges
+  make water crossable; farms accelerate crop growth; wells withdraw
+  *finite real adjoining aquifer* water for the community; workshops and
+  kilns enable appropriate material conversions; fences block wildfire;
+  beacons allow energy-funded region travel; generators consume real
+  finite fuel and generate energy/emissions; storehouses increase the
+  allowed physical inventory budget.
+- Crafting has genuine resource bills and corresponding machines:
+  milling timber into planks, firing clay to bricks, forging tools from
+  ore and planks, producing fuel and processing finite food. Survival
+  construction costs real wood, stone and planks plus a bounded municipal
+  fee; creative-mode building and authorized terraforming are distinct
+  explicit options. A creative user can design freely, but cannot forge
+  arbitrary API actions, rewrite player-inhabited tiles or use game state
+  to certify a native executable.
+- Farming requires real prepared soil, finite seed, soil moisture or
+  rain, elapsed growth ticks and a harvestable crop. Irrigation consumes
+  carried water. Harvesting awards finite food and recovered seed. The
+  non-creative player must manage energy, hunger, thirst, exposure, food
+  and water; creative worlds default to nonlethal design work unless
+  the author explicitly enables creative hazards.
+- Ecological evolution includes deterministic climate cycling, seasons,
+  bounded forest and aquifer replenishment, finite fish stocks,
+  wildlife movement into viable adjacent habitat, renewable wildlife
+  population growth under a cap, localized ignition/fire spread, actual
+  wood destruction, pollution and paid extinguishing. Burning wildlife
+  sites, crop fields or populated construction cannot be silently
+  overwritten by terrain tools.
+
+### Real working settlements and nonterminal player worlds
+
+Settlers have persistent ID, **home region**, map location, job, health,
+morale, accumulated skill and work count. The author can define the
+initial population, recruit only into **actual local housing**, physically
+co-locate for assignments, and release individual residents. Roles
+include idle, farm labor, lumber production, mining, ranching,
+workshop construction and guard work. Actual daily tasks consume
+nearby finite trees, ore, seeds and crop yield and mutate persistent
+regional inventory. Workers left in a previous chunk cannot magically
+harvest the newly visited region. Communities consume real communal
+food/water, and unmet needs reduce health and morale; built adjoining
+wells can replenish water by depleting a real map source.
+
+Original game modes differ: an open-ended creative world defaults to
+**perpetual play, no mandatory boss or scripted win**, whereas the
+explicit author-disabled-perpetual policy may end after a physically
+qualified housing/population settlement milestone. Survival and
+creative modes are separate editorial choices, including independent
+resource finite/renewable/unlimited policies.
+
+The original editor expands from five to **65 typed gameplay-affecting
+controls** covering world size, game duration, resource policy,
+creative/survival, physical movement and labor energy, available NPCs,
+regional job radius, ecological regeneration, finite resources,
+animal behavior, weather, wildfire, farming, hunger/exposure,
+transportation, generator output/fuel, crafting bills, trading prices,
+storage capacity, town milestones and optional terraforming.
+
+### Game Studio, replay and validation
+
+The local Studio renders the actual visited region's eight-by-eight
+terrain, structures, crops, animals, fire, player location and health,
+energy, food/water, mined and crafted supplies, seasons, community,
+power, credits and achievements. An accessible tile picker replaces
+thousands of unmanageable resource/building buttons with **selected-cell
+actions** plus independent global operations. Clicking the canvas
+chooses the cell, but never teleports the player or bypasses proximity.
+A separate **29-operation local authored-scene painter** edits
+original biomes, water/ore/wood/fish/forage, animals and taming,
+crop/soil, buildings, settlements, player spawn, starting credits,
+fire/pollution and climate, all under typed scene review.
+
+New source: advanced_sandbox_runtime.py. Dedicated regression:
+tests/test_game_builder_advanced_sandbox.py. Verification checks
+cross-platform deterministic sessions, legitimate ecological
+simulation, typed scene-source identity, finite material budgets,
+world region revisit permanence, worker locality, legal movement,
+market/credit anti-forgery, actual agriculture/wells/workshops,
+optional nonterminal/campaign outcomes, portable save and replay
+tampering, offline CLI, supervised graphical authoring and genuine
+source-bound hybrid game assembly.
+
+**Delivery boundaries:** this is a real but bounded original Python
+simulation and Studio frontend, not a complete 3D voxel universe,
+MMO, every wildlife species, a commercial crafting sandbox, a native
+Godot implementation, a verified physical console binary or
+store-ready publisher asset. Each future engine, content, platform,
+frame-time and asset claim requires separate independent evidence.
+Source projects are built only from original material with the
+existing human-reviewed, fail-closed offline custody workflow.
