@@ -48,7 +48,7 @@ function chapterForm(value: ChapterNote): ChapterForm {
     transition_reason: value.transition_reason || '',
   };
 }
-function draftPoints(points: PlotPoint[]) { return JSON.stringify(points, null, 2); }
+function draftPoints(points: unknown[]) { return JSON.stringify(points, null, 2); }
 
 const HIGHLIGHT_COLORS: Record<PlotKind, string> = {
   setup: '#354454', payoff: '#19644a', foreshadow: '#554477',
