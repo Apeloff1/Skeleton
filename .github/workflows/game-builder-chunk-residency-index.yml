@@ -1,0 +1,94 @@
+name: Original Source-Verified NPC Chunk Residency
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_chunk_residency_index.py"
+      - "skeleton/ai/game_builder/advanced_chunked_npc_world.py"
+      - "skeleton/ai/game_builder/advanced_fast_chunk_snapshot.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_chunk_residency_index.py"
+      - ".github/workflows/game-builder-chunk-residency-index.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: source-npc-chunk-residency-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  source-chunk-map:
+    name: Original physical NPC residency and source replay (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    timeout-minutes: 24
+    env:
+      PYTHONUTF8: "1"
+      PYTHONPATH: "."
+      SOURCE_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Exact-head original game checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_chunk_residency_index.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Original exact-source identity and source syntax compilation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          python -m py_compile \
+            skeleton/ai/game_builder/advanced_chunk_residency_index.py \
+            skeleton/ai/game_builder/advanced_chunked_npc_world.py \
+            skeleton/ai/game_builder/advanced_fast_chunk_snapshot.py \
+            skeleton/ai/game_builder/system_editor_cli.py \
+            skeleton/ai/game_builder/game_workspace_server.py \
+            skeleton/ai/game_builder/game_workspace_ui.py \
+            tests/test_game_builder_chunk_residency_index.py
+      - name: Replay authentic NPC chunk neighborhoods and reject altered actor evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_game_builder_chunk_residency_index -v
+      - name: Prove original source spatial index for four seeds and both map sizes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from skeleton.ai.game_builder.advanced_chunked_npc_world import run_chunked_npc_world
+          from skeleton.ai.game_builder.advanced_chunk_residency_index import (
+              build_original_chunk_index, verify_original_chunk_index,
+              query_original_chunk_index, verify_original_chunk_query,
+          )
+          for seed in (0,1,5,9):
+              for chunks in (3,5):
+                  game=run_chunked_npc_world(["wait"]*4,seed=seed,options={
+                      "chunks_per_side":chunks,"citizens":64,
+                      "active_limit":8,"chunk_radius":1,"lod_policy":"fair",
+                  })
+                  source=build_original_chunk_index(game)
+                  assert verify_original_chunk_index(source)
+                  page=query_original_chunk_index(source,query={
+                      "center_chunk":[0,0],"radius":0,"limit":16,
+                  })
+                  assert verify_original_chunk_query(page)
+                  assert page["candidate_actor_entries_examined"]<=64
+                  assert source["physical_actor_count"]==64
+                  print("ORIGINAL_CHUNK_RESIDENCY_VERIFIED",seed,chunks,source["digest"])
+          PY
