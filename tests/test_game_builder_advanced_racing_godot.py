@@ -188,7 +188,7 @@ class NativeRacingStudioTests(unittest.TestCase):
 
     def test_studio_whitelist_allows_race_but_not_unported_survival(self):
         html=render_workspace_html("D"*32).decode()
-        self.assertIn('"tower_defense","racing","survival","farming"].includes(advancedSession.editor)',html)
+        self.assertIn('"tower_defense","racing","survival","farming","factory"].includes(advancedSession.editor)',html)
         self.assertIn("Download playable Godot 4 game project",html)
 
 
