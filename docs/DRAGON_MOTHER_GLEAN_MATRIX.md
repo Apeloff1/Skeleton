@@ -85,7 +85,7 @@ Existing research producer (owner-scoped, human-reviewed source evidence)
   evidence lenses, last observation, provenance freshness, and verified
   source-group counts. A UI or HTTP caller cannot submit a glean, award XP,
   create new model weights, or trigger a crawler.
-  
+
 ## Producer integration
 
 ```python
