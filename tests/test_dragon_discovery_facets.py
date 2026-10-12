@@ -278,3 +278,73 @@ def test_index_audit_refuses_forged_posting_without_rebuild(indexed_studio):
         index.audit("studio", authorized=False)
     with pytest.raises(ValueError):
         index.audit("studio", authorized=True, limit=1001)
+
+
+def test_receipt_mutation_invalidates_facets_until_provenance_reindex(indexed_studio):
+    store, almanacs, _, rows = indexed_studio
+    idx = DiscoveryFacetIndex(almanacs)
+    _populate(idx)
+    sid, url = rows[0]
+    receipt = {
+        "candidate": {
+            "url": url, "source_id": sid,
+            "discoveries": [{"repository": "project/reference",
+                             "headers": ["raycast original renderer"]}],
+        },
+        "normalized_source_id": sid, "normalized_url": url,
+        "supplement_digest": "a"*64,
+        "authority": "unreviewed_discovery_only",
+    }
+    def query():
+        return MissionSourceScout(almanacs).propose(
+            "studio", SourceMission("raycast renderer", limit=4),
+            authorized=True, indexed=True)
+    store.db.execute(
+        "INSERT INTO dragon_almanac_supplement_receipts_v2 VALUES(?,?,?,?,?,?)",
+        ("studio", sid, sid, "a"*64,
+         canonical_json(receipt), canonical_digest(receipt)))
+    store.db.commit()
+    assert idx.health("studio", authorized=True)["unindexed_or_changed"] == 1
+    assert sid not in {x["source_id"] for x in query()["selection"]}
+    assert idx.audit("studio", authorized=True, limit=100)["stale"] == 1
+    _populate(idx)
+    assert sid in {x["source_id"] for x in query()["selection"]}
+    assert idx.health("studio", authorized=True)["coverage_complete"]
+
+    receipt["candidate"]["discoveries"][0]["headers"] = ["new cavern light shader"]
+    store.db.execute(
+        "UPDATE dragon_almanac_supplement_receipts_v2 SET body=?,digest=? "
+        "WHERE owner='studio' AND origin_source=?",
+        (canonical_json(receipt), canonical_digest(receipt), sid))
+    store.db.commit()
+    assert idx.health("studio", authorized=True)["unindexed_or_changed"] == 1
+    assert sid not in {x["source_id"] for x in query()["selection"]}
+    _populate(idx)
+    assert sid not in {x["source_id"] for x in query()["selection"]}
+    result = MissionSourceScout(almanacs).propose(
+        "studio", SourceMission("cavern shader", limit=3),
+        authorized=True, indexed=True)
+    assert sid in {x["source_id"] for x in result["selection"]}
+
+    store.db.execute(
+        "DELETE FROM dragon_almanac_supplement_receipts_v2 "
+        "WHERE owner='studio' AND origin_source=?", (sid,))
+    store.db.commit()
+    assert idx.health("studio", authorized=True)["unindexed_or_changed"] == 1
+    _populate(idx)
+    assert idx.health("studio", authorized=True)["coverage_complete"]
+    assert sid not in {x["source_id"] for x in result["selection"]
+                       if x["source_id"] != sid}  # no new fetch, no approval
+
+
+def test_discovery_facet_trigger_creation_keeps_caller_transaction(indexed_studio):
+    store, almanacs, _, rows = indexed_studio
+    store.db.execute("BEGIN")
+    store.db.execute(
+        "INSERT INTO dragon_almanac_topics VALUES(?,?,?,?)",
+        ("studio", "topic-temp", None, '["Ephemeral"]'))
+    DiscoveryFacetIndex(almanacs)
+    store.db.execute("ROLLBACK")
+    assert store.db.execute(
+        "SELECT 1 FROM dragon_almanac_topics WHERE owner='studio' "
+        "AND topic='topic-temp'").fetchone() is None
