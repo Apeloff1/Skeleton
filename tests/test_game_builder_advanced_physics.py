@@ -231,5 +231,53 @@ class AdvancedOriginalPhysicsTests(unittest.TestCase):
         self.assertFalse(assembly["ready_for_release"])
 
 
+    def test_high_speed_moving_object_cannot_tunnel_through_thin_fixture(self):
+        cfg = {"impulse_strength": 500, "speed_limit": 400}
+        layout = default_layout(self.cfg(**cfg), 0)
+        layout["fixtures"] = [
+            {"position": [430, 900, 0], "half_size": [10, 100, 40],
+             "layer": 3}
+        ]
+        scene = self.scene(cfg, layout)
+        report = run_advanced_session(
+            "physics", cfg, ("push:east", "push:east"), scene=scene
+        )
+        self.assertTrue(verify_advanced_session(report, cfg))
+        self.assertTrue(any("swept_fixture_contact" in frame["events"]
+                            for frame in report["trace"]))
+        self.assertLess(report["state"]["bodies"][0]["position"][0], 430)
+
+    def test_one_body_resource_configuration_runs_without_phantom_crates(self):
+        cfg = {"max_bodies": 1}
+        scene = self.scene(cfg)
+        report = run_advanced_session("physics", cfg, ("inspect", "push:east"), scene=scene)
+        self.assertEqual(len(report["state"]["bodies"]), 1)
+        self.assertTrue(verify_advanced_session(report, cfg))
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("physics", cfg, ("select:1",), scene=scene)
+
+    def test_six_eight_selectors_admit_only_real_reviewed_body_ids(self):
+        cfg = self.cfg()
+        layout = default_layout(cfg, 0)
+        for idx in range(2, 8):
+            layout["bodies"].append({
+                "id": "body_" + str(idx),
+                "position": [200 + idx*140, 500, 0],
+                "velocity": [0, 0, 0],
+                "radius": 20,
+                "mass": idx+1,
+                "material": "rubber",
+                "layer": 2,
+                "mask": 3,
+                "break_threshold": 400,
+            })
+        scene = self.scene(layout=layout)
+        result = run_advanced_session(
+            "physics", actions=("select:7", "push:east"), scene=scene
+        )
+        self.assertEqual(result["state"]["selected"], 7)
+        self.assertTrue(verify_advanced_session(result))
+
+
 if __name__ == "__main__":
     unittest.main()
