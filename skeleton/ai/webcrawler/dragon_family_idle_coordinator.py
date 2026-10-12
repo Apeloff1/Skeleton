@@ -228,10 +228,11 @@ class DragonIdleCoordinator:
                     continue
                 if role == "monitor" and not revision:
                     continue
-                lease = self.db.execute("""SELECT next_due,lease_expires,attempts
+                lease = self.db.execute("""SELECT next_due,lease_expires,attempts,last_outcome
                     FROM dragon_family_idle_leases WHERE owner=? AND role=? AND source_id=?""",
                     (owner,role,sid)).fetchone()
-                if lease and (lease[0] > now or lease[1] > now):
+                if lease and (lease[0] > now or lease[1] > now or
+                              lease[3]=="policy_blocked"):
                     continue
                 ordinal = lease[2] if lease else 0
                 # Direct relevance > adjacent, then least tried, then least
@@ -254,17 +255,19 @@ class DragonIdleCoordinator:
         key = token_hex(24)
         self.db.execute("BEGIN IMMEDIATE")
         with self.db:
-            row = self.db.execute("""SELECT next_due,lease_expires,attempts
+            row = self.db.execute("""SELECT next_due,lease_expires,attempts,last_outcome
                 FROM dragon_family_idle_leases WHERE owner=? AND role=? AND source_id=?""",
                 (owner,role,sid)).fetchone()
-            if row and (row[0] > start or row[1] > start):
+            if row and (row[0] > start or row[1] > start or
+                        row[3]=="policy_blocked"):
                 return None
             # Different siblings on different processes must not acquire the
             # same source revision in overlapping leases. This fence spans
             # ALL specialist roles and is checked under the SQLite writer lock.
             if self.db.execute("""SELECT 1 FROM dragon_family_idle_leases
                 WHERE owner=? AND source_id=? AND
-                  (lease_expires>? OR (next_due>? AND last_outcome IN
+                  (last_outcome='policy_blocked' OR lease_expires>?
+                   OR (next_due>? AND last_outcome IN
                      ('changed','unchanged','paused','recovered'))) LIMIT 1""",
                 (owner,sid,start,start)).fetchone():
                 # A sibling cannot instantly recrawl the same reviewed
@@ -304,6 +307,7 @@ class DragonIdleCoordinator:
             "recovered": "(recovered: interrupted or crashed worker lease expired; no XP granted)",
             "policy_blocked": "(blocked: source rights, robots, destination or capture approval denied; manual review required)",
             "rate_limited": "(deferred: source requested bounded Retry-After; no acquisition accepted)",
+            "review_cleared": "(approved: policy block cleared by independent host rights reviewer)",
         }
         if outcome not in notes:
             raise ValueError("unknown idle research outcome")
@@ -354,6 +358,47 @@ class DragonIdleCoordinator:
                     raise RuntimeError("idle cancellation lost source fence")
                 self._record_attempt(owner,role,sid,at,"paused")
         return len(rows)
+
+    def clear_source_policy_block(self, owner: str, source_id: str, *,
+                                  authorized: bool, at: float,
+                                  review: Callable[[str,str], bool]) -> int:
+        """Require an independent new rights/policy review before retry.
+
+        This operation never grants source XP or issues capture consent. It
+        clears only the stored source-wide policy blockade on the canonical
+        owner. The next idle tick still needs opt-in, lease, topical fit,
+        robots/network rights and normal evidence review.
+        """
+        self.family._assert_owner(owner)
+        if not authorized:
+            raise PermissionError("authenticated source policy review required")
+        _source_id(source_id)
+        at=_epoch(at)
+        if not callable(review):
+            raise PermissionError("independent host source rights review required")
+        self.db.execute("BEGIN IMMEDIATE")
+        with self.db:
+            if not self.db.execute("""SELECT 1 FROM dragon_family_sources
+                WHERE owner=? AND source_id=?""",(owner,source_id)).fetchone():
+                raise PermissionError("source not in current authorized catalog")
+            blocked=self.db.execute("""SELECT role FROM dragon_family_idle_leases
+                WHERE owner=? AND source_id=? AND last_outcome='policy_blocked'
+                ORDER BY role""",(owner,source_id)).fetchall()
+            if not blocked:
+                return 0
+            if review(owner,source_id) is not True:
+                raise PermissionError("source rights reviewer did not approve retry")
+            for (role,) in blocked:
+                changed=self.db.execute("""UPDATE dragon_family_idle_leases
+                    SET last_outcome='review_cleared',next_due=?,
+                        last_completed=?,failures=0
+                    WHERE owner=? AND source_id=? AND role=?
+                      AND last_outcome='policy_blocked'""",
+                    (at,at,owner,source_id,role)).rowcount
+                if changed!=1:
+                    raise RuntimeError("source policy clearance lost owner fence")
+                self._record_attempt(owner,role,source_id,at,"review_cleared")
+        return len(blocked)
 
     def reconcile_expired_leases(self, owner: str, *, authorized: bool,
                                  at: float, max_recover: int = 100) -> int:
