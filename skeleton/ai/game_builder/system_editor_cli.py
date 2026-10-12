@@ -38,6 +38,9 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_npc_mission_mirror import (
+    analyze_original_npc_missions, verify_original_npc_mission_mirror,
+)
 from .advanced_npc_waypoint_mission import (
     run_original_npc_waypoint_mission, verify_original_npc_waypoint_mission,
 )
@@ -219,6 +222,13 @@ def parser() -> argparse.ArgumentParser:
     ecology_verify.add_argument("--record",required=True)
     ecology_verify.add_argument("--scene",required=True)
     ecology_verify.add_argument("--settings")
+    mirror=commands.add_parser("analyze-original-npc-missions",
+        help="Compare only genuine source-replayed NPC mission contenders and rejected shortcuts")
+    mirror.add_argument("--record",required=True)
+    mirror.add_argument("--candidates",required=True)
+    mirror_verify=commands.add_parser("verify-original-npc-mission-mirror",
+        help="Independently replay every actual mission and refuse forged Pareto source rankings")
+    mirror_verify.add_argument("--record",required=True)
     mission=commands.add_parser("plan-original-npc-mission",
         help="Earn material original quest milestones through multiple physical NPC world objectives")
     mission.add_argument("--record",required=True)
@@ -542,6 +552,11 @@ def main(argv=None) -> int:
             output={"verified":verify_original_ecology_plan(
                 _load(args.record),_load(args.scene),
                 _load(args.settings) if args.settings else None)}
+        elif args.operation == "analyze-original-npc-missions":
+            output=analyze_original_npc_missions(
+                _load(args.record),_load(args.candidates))
+        elif args.operation == "verify-original-npc-mission-mirror":
+            output={"verified":verify_original_npc_mission_mirror(_load(args.record))}
         elif args.operation == "plan-original-npc-mission":
             output=run_original_npc_waypoint_mission(
                 _load(args.record),_load(args.waypoints),
