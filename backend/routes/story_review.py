@@ -175,3 +175,65 @@ async def get_matrix_coverage(
     except (PyMongoError, OSError):
         logger.exception("Matrix audit coverage unavailable")
         raise HTTPException(status_code=503, detail="Matrix coverage unavailable")
+
+
+
+@router.post("/{pid}/scenes/{scene}/matrix-finalize")
+async def finalize_scene_matrices(
+    pid: str, scene: int,
+    branch_id: str = Query("main", pattern=r"^[A-Za-z0-9:_-]{1,96}$"),
+    user=Depends(require_role("editor")),
+):
+    """Compute one compact, replay-safe receipt for 10,000 independent cells.
+
+    Production inventory may read this summary, instead of scanning up to
+    100 million individual review documents for the entire 9,999-scene game.
+    A human-reviewed PASS in every cell is required; model candidates,
+    failures, missing cells, duplicate indexes and stale scripts fail closed.
+    """
+    scope = _scope(pid, user)
+    try:
+        draft = await _authoritative_scene(scope, branch_id, scene)
+        rows = await _db.game_story_reviews.find({
+            **scope, "branch_id": branch_id, "scene": scene,
+            "scene_digest": draft["digest"],
+        }).limit(REQUIRED_CELLS + 1).to_list(length=REQUIRED_CELLS + 1)
+        if len(rows) > REQUIRED_CELLS:
+            raise HTTPException(status_code=409, detail="Matrix cell count exceeds capacity")
+        result = coverage(rows, scene_digest=draft["digest"])
+        if not result["fully_reviewed"]:
+            raise HTTPException(status_code=409, detail={
+                "reason": "Matrix review incomplete or contradicted",
+                "coverage": result,
+            })
+        canonical_rows = sorted(
+            (x["matrix_id"], x["level"], x["review_digest"]) for x in rows
+        )
+        review_receipt = sha256(json.dumps(
+            {"scene_digest": draft["digest"], "rows": canonical_rows},
+            separators=(",", ":"), ensure_ascii=False,
+        ).encode("utf-8")).hexdigest()
+        current = (draft.get("matrix_review") or {}).get("receipt_digest")
+        if current == review_receipt:
+            return {"ok": True, "replayed": True,
+                    "scene_receipt": draft["digest"],
+                    "matrix_review_receipt": review_receipt, "coverage": result}
+        updated = await _db.game_story_scenes.update_one({
+            "_id": draft["_id"], **scope, "revision": draft["revision"],
+            "digest": draft["digest"],
+        }, {"$set": {"matrix_review": {
+            "receipt_digest": review_receipt,
+            "scene_digest": draft["digest"],
+            "cells_approved": REQUIRED_CELLS,
+            "model_output_independently_guaranteed": False,
+        }}})
+        if updated.matched_count != 1:
+            raise HTTPException(status_code=409, detail="Scene changed during matrix finalization")
+        return {"ok": True, "replayed": False,
+                "scene_receipt": draft["digest"],
+                "matrix_review_receipt": review_receipt, "coverage": result}
+    except HTTPException:
+        raise
+    except (PyMongoError, OSError):
+        logger.exception("Final matrix coverage could not be saved")
+        raise HTTPException(status_code=503, detail="Matrix review persistence unavailable")
