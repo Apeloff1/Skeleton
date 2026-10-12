@@ -718,6 +718,10 @@ const PAINT_TOOLS={
           "objective","erase"],
  puzzle:["walls","spawn","exit","doors","switches","crates","targets",
          "nodes","phase_gates","portal_a","portal_b","erase"],
+ colony:["wood_plus","wood_minus","stone_plus","stone_minus",
+         "food_plus","food_minus","water_plus","water_minus",
+         "biome_next","make_start","threat_up","threat_down",
+         "caravan_plus","caravan_minus"],
 };
 const GRID_COLORS={
  cover:"#7690a3",medkits:"#e1c76f",enemy_spawns:"#ef9691",
@@ -759,6 +763,28 @@ function renderSceneAuthoring(){
   if(source.editor!==systemEditor()?.id)throw Error("Editor and scene family differ");
   shape=sceneGridShape(source);
  }catch(_){ctx.fillText("Invalid or mismatched scene JSON: use Validate.",12,24);return;}
+ if(source.editor==="colony"){
+  const zones=source.layout.districts||[];
+  ctx.fillText("Colony geography draft · select a district and paint a resource rule",12,17);
+  zones.forEach((d,i)=>{
+   const x=12+(i%2)*230,y=33+Math.floor(i/2)*67;
+   const start=i===source.layout.starting_district;
+   ctx.fillStyle=start?"#236678":"#2d4556";
+   ctx.fillRect(x,y,218,61);
+   ctx.fillStyle="#ecf6f4";
+   ctx.fillText((i+1)+" · "+d.biome+(start?" · START":""),x+7,y+17);
+   ctx.fillStyle="#aee0c2";
+   ctx.fillRect(x+7,y+22,Math.min(203,(d.food+d.water+d.wood+d.stone)/2),5);
+   ctx.fillStyle="#e8dec4";
+   ctx.fillText("wood "+d.wood+" · stone "+d.stone+
+    " · food "+d.food+" · water "+d.water,x+7,y+45);
+  });
+  ctx.fillStyle="#b7cbd9";
+  ctx.fillText("Raid "+source.layout.threat_level+
+   " · caravan "+source.layout.caravan_stock+
+   " · Validate edited layout before gameplay",12,245);
+  return;
+ }
  if(!shape){ctx.fillText("This system uses the detailed typed source editor.",12,24);return;}
  const [cols,rows]=shape;
  const step=Math.max(2,Math.min(23,Math.floor(448/cols),Math.floor(240/rows)));
@@ -798,6 +824,35 @@ function renderSceneAuthoring(){
   (layout.portals||[]).forEach(pair=>pair.forEach(p=>draw(p,"portal_a")));
   draw(layout.exit,"exit");draw(layout.spawn,"spawn");
  }
+}
+function paintColonyDistrict(index){
+ const document=JSON.parse($("advanced-scene-json").value);
+ if(document.editor!=="colony"||document.editor!==systemEditor().id)
+  throw Error("Colony geography tool requires the matching editor");
+ const layout=document.layout,sector=layout.districts[index];
+ if(!sector)throw Error("Select one of the authored finite districts");
+ const tool=$("advanced-paint-tool").value;
+ const stocks=["wood","stone","food","water"];
+ if(stocks.some(key=>tool===key+"_plus"||tool===key+"_minus")){
+  const key=stocks.find(k=>tool.startsWith(k+"_"));
+  const delta=tool.endsWith("_plus")?5:-5;
+  sector[key]=Math.max(0,Math.min(100000,sector[key]+delta));
+ }else if(tool==="biome_next"){
+  const biomes=["river","forest","ridge","grassland","wetland","highland"];
+  sector.biome=biomes[(biomes.indexOf(sector.biome)+1)%biomes.length];
+ }else if(tool==="make_start"){
+  layout.starting_district=index;
+ }else if(tool==="threat_up"||tool==="threat_down"){
+  layout.threat_level=Math.max(0,Math.min(8,
+   layout.threat_level+(tool==="threat_up"?1:-1)));
+ }else if(tool==="caravan_plus"||tool==="caravan_minus"){
+  layout.caravan_stock=Math.max(0,Math.min(100000,
+   layout.caravan_stock+(tool==="caravan_plus"?5:-5)));
+ }else throw Error("Unknown original colony geography edit");
+ // Deliberately retain stale digest until backend schema + rights review.
+ $("advanced-scene-json").value=JSON.stringify(document,null,2);
+ renderSceneAuthoring();
+ status("Changed local colony source; Create / validate authored scene before playing or staging.");
 }
 function paintSceneCell(point){
  const text=$("advanced-scene-json").value.trim();
@@ -843,9 +898,19 @@ $("advanced-scene-grid").addEventListener("click",event=>{
   const text=$("advanced-scene-json").value.trim();
   if(!text)throw Error("Generate a scene document first");
   const doc=JSON.parse(text),shape=sceneGridShape(doc);
-  if(!shape)throw Error("Graphical cell painting is supported for shooter, tactics and puzzles");
-  const [cols,rows]=shape;
   const canvas=$("advanced-scene-grid"),rect=canvas.getBoundingClientRect();
+  if(doc.editor==="colony"){
+   const px=(event.clientX-rect.left)*canvas.width/rect.width;
+   const py=(event.clientY-rect.top)*canvas.height/rect.height;
+   const col=Math.floor((px-12)/230),row=Math.floor((py-33)/67);
+   const index=row*2+col;
+   if(col<0||col>1||row<0||row>2||px>12+col*230+218
+      ||py>33+row*67+61||index>=doc.layout.districts.length)return;
+   paintColonyDistrict(index);
+   return;
+  }
+  if(!shape)throw Error("Graphical scene painting supports shooter, tactics and puzzles; colony uses the district designer");
+  const [cols,rows]=shape;
   const scaleX=canvas.width/rect.width,scaleY=canvas.height/rect.height;
   const step=Math.max(2,Math.min(23,Math.floor(448/cols),Math.floor(240/rows)));
   const x=Math.floor(((event.clientX-rect.left)*scaleX-12)/step);
