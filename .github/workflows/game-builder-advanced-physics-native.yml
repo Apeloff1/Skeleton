@@ -87,11 +87,16 @@ jobs:
              ("push:east",),4,True),
             ("open_ended",{"goal_radius":70,"goal_speed":300,"completion_mode":"sandbox"},
              ("push:east","step"),7,True),
+            ("gravity_drop",{"gravity":8,"tick_hz":40,"air_drag":0,
+                              "wall_restitution":0,"floor_friction":0},
+             ("step:4",)*6,2,False),
           )
           for name,extra,commands,seed,win in cases:
               settings={**common,**extra}
               layout=default_layout(make_editor_document("physics",settings)["settings"],seed)
               layout["fixtures"]=[]
+              if name=="gravity_drop":
+                  layout["bodies"][0]["position"]=[200,500,0]
               if win:
                   layout["goal"]=[300,960,0]
               scene=make_advanced_scene("physics",settings,seed=seed,layout=layout)
@@ -106,7 +111,7 @@ jobs:
         run: |
           set -euo pipefail
           root="$RUNNER_TEMP/native-original-physics"
-          for scenario in movement signed_impulses real_goal open_ended; do
+          for scenario in movement signed_impulses real_goal open_ended gravity_drop; do
             project="$root/$scenario/godot"
             godot --headless --path "$project" --import
             godot --headless --path "$project" -- --verify-physics | tee "$root/$scenario/native.log"
