@@ -195,7 +195,7 @@ export default function StoryIndexScreen() {
         <Section title="Deterministic continuity audit" subtitle={status}>
           <Text style={styles.muted}>
             Indexed events are creator-reviewed fiction, not automatically verified canon.
-            Branches never share implied knowledge. Scans of more than 2,000 events report incomplete coverage.
+            Branches never share implied knowledge. Audits stream up to 100,000 events in story order; larger histories report incomplete coverage.
           </Text>
           {audit && <>
             <Text style={styles.label}>{audit.event_count} events scanned · {audit.issue_count || 0} issues · {audit.open_threads?.length || 0} open promises</Text>
