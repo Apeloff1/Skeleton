@@ -107,6 +107,24 @@ def test_two_independent_publishers_corroborate_one_hypothesis():
     db.close()
 
 
+def test_shadow_queue_fails_closed_when_almanakk_is_not_installed():
+    db,family,matrix=setup()
+    record_corroborated(matrix)
+    assert not db.execute("""SELECT 1 FROM sqlite_master
+        WHERE name='dragon_almanakk_reviews'""").fetchone()
+    verifier_calls=[]
+    with pytest.raises(PermissionError,match="independent Wiki review"):
+        matrix.queue_shadow_candidate(
+            OWNER,"game_mechanics",PROP,authorized=True,
+            at=NOW+200,
+            wiki_claim_verify=lambda *args:verifier_calls.append(args) or True)
+    assert verifier_calls==[]
+    assert matrix.shadow_queue(OWNER,authorized=True)==[]
+    assert not db.execute("""SELECT 1 FROM sqlite_master
+        WHERE name='dragon_almanakk_reviews'""").fetchone()
+    db.close()
+
+
 def test_cross_media_contradiction_triggers_research_instead_of_promotion():
     db,_,matrix=setup()
     record_corroborated(matrix)
