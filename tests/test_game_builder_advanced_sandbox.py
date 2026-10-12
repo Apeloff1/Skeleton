@@ -255,6 +255,7 @@ class OriginalEndlessSandboxTests(unittest.TestCase):
             lambda x:x.update(wildlife_population=500),
             lambda x:x.update(settler_spawns=[2,2]),
             lambda x:x["tiles"][1].update(id=3),
+            lambda x:x["tiles"][1].update(sapling=1),
         ):
             altered=deepcopy(baseline)
             change(altered)
@@ -506,6 +507,9 @@ class OriginalEndlessSandboxTests(unittest.TestCase):
         self.assertEqual(q["region"],0)
         self.assertEqual(q["witness_id"],0)
         self.assertTrue(q["observation_digest"])
+        self.assertEqual(len(session["state"]["witness_head"]),64)
+        self.assertEqual(session["state"]["observations"][1]["previous_witness_digest"],
+                         session["state"]["observations"][0]["digest"])
         forged=deepcopy(session)
         forged["state"]["quests"][0]["paid_from_fund"]=100
         with self.assertRaises(AdvancedRuntimeError):
