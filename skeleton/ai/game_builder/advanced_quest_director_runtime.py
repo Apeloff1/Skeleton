@@ -224,7 +224,7 @@ def _remember(npc,event,config,*,direct):
     return True
 
 
-def _emit(state,config,kind,site,events,*,actor="player",physical_source=None):
+def _emit(state,config,kind,site,events,*,actor="player",physical_source=None,gameplay_source=None):
     if len(state["events_log"])>=config["event_budget"]:
         raise QuestDirectorError("authored finite event memory ledger is full")
     witnesses=[]
@@ -239,11 +239,14 @@ def _emit(state,config,kind,site,events,*,actor="player",physical_source=None):
         "actor":actor,"direct_witnesses":witnesses,
         "rumored_to":[],"original_source":(
             "signed_external_physical_incident" if physical_source is not None else
+            "signed_external_genre_gameplay_event" if gameplay_source is not None else
             "physical_player_world_action" if actor=="player" else
             "physical_npc_world_action"),
     }
     if physical_source is not None:
         entry["physical_source"]=dict(physical_source)
+    if gameplay_source is not None:
+        entry["gameplay_source"]=dict(gameplay_source)
     state["events_log"].append(entry);state["next_event"]+=1
     for n in state["npcs"]:
         if n["id"] in witnesses:
@@ -696,5 +699,55 @@ def apply_verified_external_physical_incident(state,config,site_id,source_receip
     return proof
 
 
+def apply_verified_external_gameplay_event(state,config,site_id,receipt,kind):
+    """Mutate only the real NPC world after separately proven genre trace.
+
+    This is an internal trusted reducer. The caller MUST independently verify
+    the complete original source session, scene and exact action-index event.
+    External game genre results never take player credit, award free gold or
+    bypass the NPC sight and quest rule engine.
+    """
+    _integer(site_id,0,len(state["sites"])-1,"external game-site binding")
+    if state["finished"] or state["failed"]:
+        raise QuestDirectorError("terminal NPC world cannot accept external genre events")
+    if kind not in ("help","discover") or type(kind) is not str:
+        raise QuestDirectorError("external genre source action is not approved")
+    if (type(receipt) is not dict or set(receipt)!={
+          "source_session_digest","source_editor","source_event","trace_index"
+        } or type(receipt["source_editor"]) is not str or
+        receipt["source_editor"] not in ("farming","sailing","flight") or
+        type(receipt["trace_index"]) is not int or
+        not 0<=receipt["trace_index"]<256 or
+        type(receipt["source_event"]) is not str or
+        receipt["source_event"] not in (
+            "mature_crop_harvested","original_cargo_delivered",
+            "runway_landing_confirmed") or
+        type(receipt["source_session_digest"]) is not str or
+        len(receipt["source_session_digest"])!=64 or
+        any(c not in "0123456789abcdef" for c in
+            receipt["source_session_digest"])):
+        raise QuestDirectorError("exact original game event source custody required")
+    if len(state["events_log"])>=config["event_budget"]:
+        raise QuestDirectorError("original NPC world event budget exceeded")
+    site=_site(state,site_id)
+    events=[]
+    # A real cargo shipment may replenish one finite site-stock unit, up to
+    # its actual authored storage capacity. Farm harvests and aircraft
+    # landings create source-backed discovery, not fictitious free supplies.
+    real_stock=0
+    if kind=="help" and site["stock"]<config["site_stock"]:
+        site["stock"]+=1
+        real_stock=1
+        events.append("verified_original_cargo_unit_delivered_to_world_site")
+    entry=_emit(state,config,kind,site,events,actor="external:genre",
+                gameplay_source=receipt)
+    entry["real_world_stock_transferred"]=real_stock
+    _tick(state,config,events,1)
+    state["turn"]+=1
+    state["events"]=events
+    return entry
+
+
 __all__=["SIDE","CELLS","KINDS","ROLES","EVENTS","ACTIONS","QuestDirectorError",
-         "default_layout","normalize_layout","start","apply_scene","step","apply_verified_external_physical_incident"]
+         "default_layout","normalize_layout","start","apply_scene","step","apply_verified_external_physical_incident",
+         "apply_verified_external_gameplay_event"]
