@@ -11,6 +11,9 @@
     "app/jeeves-workbench.tsx",
     "app/jeeves-chat.tsx",
     "app/story-index.tsx",
+    "app/chapter-studio.tsx",
+    "features/Jeeves/chapterStudio.ts",
+    "features/Jeeves/ChatChapterActions.tsx",
     "features/Jeeves/ChatStoryActions.tsx",
     "features/Jeeves/storyContext.ts",
     "expo-env.d.ts"
