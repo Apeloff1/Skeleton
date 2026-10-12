@@ -71,8 +71,11 @@ def test_creates_real_lineage_and_distinct_url_delta(starting_point, pinned_read
     assert len(doc["catalogs"][0]["content_sha256"]) == 64
     validated = validate_discovery_chain(baseline, [
         *previous, ("docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json", doc)])
-    assert validated["new"] == 966
-    assert validated["total_discovered"] == 5371
+    original = validate_discovery_chain(baseline, previous)
+    assert validated["raw_new"] == 966
+    assert validated["raw_total_discovered"] == 5371
+    assert validated["new"] == original["new"] + 2
+    assert validated["total_discovered"] == original["total_discovered"] + 2
 
 
 def test_pinned_catalog_rejects_modified_bytes(pinned_readme):
