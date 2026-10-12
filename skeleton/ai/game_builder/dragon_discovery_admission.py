@@ -1,0 +1,499 @@
+"""Fail-closed admission of Dragon's *discovered* source supplements.
+
+This bridge makes the catalog-expansion evidence operational without treating a
+found hyperlink as a fetch grant, a rights grant, an approved fact or a training
+sample. No network access is performed here. Source-line identities and Git
+identities are preserved as *claims in discovery evidence*, not attested facts.
+"""
+from __future__ import annotations
+
+from hashlib import sha256
+import json
+import os
+import stat
+from pathlib import Path
+import re
+from urllib.parse import urlsplit
+
+from .contracts import canonical_digest, canonical_json
+from .dragon_almanacs import DragonAlmanacs, _auth
+from .dragon_almanac_sequence import SequentialAlmanacWorker
+from .dragon_source_catalog import canonical_source_url
+from .reviewed_knowledge import _id, _integer
+
+
+SCHEMA = "skeleton.dragon.source_discovery_supplement.v1"
+STATUS = "partial_discovery_only_not_ingested_into_canonical_queue"
+SHA40 = re.compile(r"[0-9a-f]{40}\Z")
+REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
+MAX_SUPPLEMENTS = 32
+MAX_CANDIDATES = 50_000
+MAX_BYTES = 8_000_000
+
+
+def _strict_object(pairs: list[tuple[str, object]]) -> dict:
+    body = {}
+    for key, value in pairs:
+        if key in body:
+            raise ValueError("duplicate evidence JSON object key")
+        body[key] = value
+    return body
+
+
+def _supplement(path: str | Path) -> tuple[str, dict]:
+    file = Path(path)
+    if file.suffix != ".json":
+        raise ValueError("a JSON discovery supplement file is required")
+    # Keep the original path identity across opening and reading. A symlink or
+    # concurrently replaced file cannot silently become a source of authority.
+    try:
+        before = file.lstat()
+        if not stat.S_ISREG(before.st_mode) or not 1 <= before.st_size <= MAX_BYTES:
+            raise ValueError("regular bounded discovery evidence required")
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+        fd = os.open(file, flags)
+        with os.fdopen(fd, "rb") as stream:
+            opened = os.fstat(stream.fileno())
+            raw = stream.read(MAX_BYTES + 1)
+            after = os.fstat(stream.fileno())
+        now = file.lstat()
+    except OSError as exc:
+        raise ValueError("evidence path changed or is not readable") from exc
+    if (not stat.S_ISREG(opened.st_mode)
+            or (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino)
+            or (now.st_dev, now.st_ino) != (opened.st_dev, opened.st_ino)
+            or (opened.st_size, opened.st_mtime_ns) != (after.st_size, after.st_mtime_ns)
+            or len(raw) != opened.st_size or len(raw) > MAX_BYTES):
+        raise ValueError("evidence file identity changed or byte budget exceeded")
+    try:
+        doc = json.loads(raw.decode("utf-8", "strict"),
+                         object_pairs_hook=_strict_object,
+                         parse_constant=lambda _: (_ for _ in ()).throw(ValueError("nonfinite evidence number")))
+    except (UnicodeError, ValueError, TypeError, RecursionError) as exc:
+        raise ValueError("malformed, duplicate-key or nonfinite evidence JSON") from exc
+    if not isinstance(doc, dict) or doc.get("schema") != SCHEMA or doc.get("status") != STATUS:
+        raise ValueError("unreviewed discovery supplement required")
+    root = Path(__file__).resolve().parents[3]
+    try:
+        evidence_path = file.resolve().relative_to(root).as_posix()
+    except ValueError as exc:
+        raise ValueError("supplement must belong to the checked-out repository") from exc
+    if not evidence_path.startswith("docs/ai/evidence/dragon-source-expansion-"):
+        raise ValueError("supplement path is outside the discovery evidence lane")
+    return evidence_path, doc
+
+
+def validate_discovery_chain(registry: dict, named_documents: list[tuple[str, dict]]) -> dict:
+    """Validate the full, consecutive evidence chain before *any* DB write.
+
+    The supplements are a non-authoritative expansion of the pinned baseline,
+    not an additional catalog of verified sources.
+    """
+    if not 1 <= len(named_documents) <= MAX_SUPPLEMENTS:
+        raise ValueError("bounded nonempty supplement chain required")
+    source_rows = registry["sources"]
+    baseline = {row["url"] for row in source_rows}
+    baseline_size = registry["unique_urls"]
+    if (len(baseline) != baseline_size
+            or baseline_size != len(source_rows)
+            or canonical_digest({k: v for k, v in registry.items()
+                                 if k != "catalog_digest"}) != registry["catalog_digest"]):
+        raise ValueError("canonical baseline invalid")
+    existing = set(baseline)
+    raw_seen = set()
+    seen_paths = []
+    collected: dict[str, dict] = {}
+    for name, doc in named_documents:
+        if name in seen_paths or not isinstance(name, str) or len(name) > 4096:
+            raise ValueError("duplicate or invalid supplement path")
+        if (doc.get("schema") != SCHEMA or doc.get("status") != STATUS
+                or doc.get("baseline_registry_digest") != registry["catalog_digest"]
+                or doc.get("requested_total_urls") != baseline_size * 10):
+            raise ValueError("supplement baseline or target mismatch")
+        parents = doc.get("parents", [])
+        if "parent_supplement" in doc:
+            parents = [doc["parent_supplement"]]
+        if not isinstance(parents, list) or parents != seen_paths:
+            raise ValueError("supplement chain is missing, reordered or forked")
+        candidates, catalogs, counts = doc.get("candidates"), doc.get("catalogs"), doc.get("counts")
+        if (not isinstance(candidates, list) or len(candidates) > MAX_CANDIDATES
+                or not isinstance(catalogs, list) or not 1 <= len(catalogs) <= 256
+                or not isinstance(counts, dict)):
+            raise ValueError("invalid supplement structure")
+        new_count = counts.get("new_candidate_urls")
+        if type(new_count) is not int or new_count != len(candidates):
+            raise ValueError("supplement count differs from entries")
+        previous = counts.get("previous_provisional_total_urls")
+        if previous is None and "previous_new_candidate_urls" in counts:
+            previous = baseline_size + counts["previous_new_candidate_urls"]
+        if previous is None:
+            previous = doc.get("baseline_urls")
+        if type(previous) is not int or previous != baseline_size + len(raw_seen):
+            raise ValueError("nonconsecutive discovery totals")
+        known_sources = set()
+        for catalog in catalogs:
+            if not isinstance(catalog, dict) or not REPO.fullmatch(catalog.get("repository", "")):
+                raise ValueError("invalid catalog repository identity")
+            if "commit_sha" in catalog:
+                if not SHA40.fullmatch(catalog["commit_sha"]) or not SHA40.fullmatch(catalog.get("readme_blob_sha", "")):
+                    raise ValueError("invalid pinned Git identity")
+                known_sources.add((catalog["repository"], catalog["commit_sha"], catalog["readme_blob_sha"]))
+            else:
+                if not SHA40.fullmatch(catalog.get("git_blob_sha", "")):
+                    raise ValueError("invalid catalog blob")
+                known_sources.add((catalog["url"], catalog["git_blob_sha"]))
+        for row in candidates:
+            if not isinstance(row, dict):
+                raise ValueError("invalid candidate")
+            raw_url = row["url"]
+            url = canonical_source_url(raw_url)
+            if raw_url in raw_seen:
+                raise ValueError("duplicate raw discovery link")
+            # Historical supplements hashed raw links, including URL fragments and
+            # bare hostnames. Preserve those IDs as evidence, never as queue IDs.
+            if row.get("source_id") != "source-" + sha256(raw_url.encode("utf-8")).hexdigest():
+                raise ValueError("raw discovery ID does not bind recorded URL")
+            sid = "source-" + sha256(url.encode("utf-8")).hexdigest()
+            if (row.get("availability") != "not_checked"
+                    or row.get("rights") != "not_assessed"
+                    or row.get("independence") != "not_assessed"
+                    or row.get("training_authorized") is not False
+                    or row.get("canonical_admission") is not False):
+                raise ValueError("discovery cannot confer use or training authority")
+            if (not isinstance(row.get("discoveries"), list)
+                    or not 1 <= len(row["discoveries"]) <= 256):
+                raise ValueError("each source needs discovery lineage")
+            repositories = set()
+            for origin in row["discoveries"]:
+                if not isinstance(origin, dict):
+                    raise ValueError("invalid discovery origin")
+                _evidence_headers(origin)
+                if "repository" in origin:
+                    key = (origin.get("repository"), origin.get("commit_sha"), origin.get("readme_blob_sha"))
+                    if key not in known_sources or canonical_source_url(origin.get("exact_url", "")) != url:
+                        raise ValueError("discovery not tied to pinned repository")
+                    repositories.add(key[0])
+                else:
+                    key = (origin.get("catalog_url"), origin.get("catalog_blob"))
+                    if key not in known_sources or canonical_source_url(origin.get("exact_link", "")) != url:
+                        raise ValueError("discovery not tied to pinned catalog")
+                    if (type(origin.get("line")) is not int or not 1 <= origin["line"] <= 1_000_000
+                            or not isinstance(origin.get("headers"), list)
+                            or not origin["headers"] or len(origin["headers"]) > 16):
+                        raise ValueError("invalid catalog line or headers")
+                    repositories.add(next(c["repository"] for c in catalogs
+                                          if c.get("url") == key[0] and c.get("git_blob_sha") == key[1]))
+            if len(repositories) > 32:
+                raise ValueError("too many claimed discoveries per URL")
+            if url not in existing:
+                collected[url] = {"source_id": sid, "url": url,
+                                  "host": urlsplit(url).hostname,
+                                  "kind": "video_candidate" if urlsplit(url).hostname in
+                                      {"www.youtube.com", "youtube.com", "youtu.be", "vimeo.com", "www.vimeo.com"}
+                                      else "web_candidate",
+                                  "availability": "not_checked", "rights": "not_assessed",
+                                  "independence": "not_assessed", "training_authorized": False,
+                                  "discoveries": [], "provisional_discovery": True}
+            raw_seen.add(raw_url)
+            if len(raw_seen) > 100_000:
+                raise ValueError("global raw discovery candidate budget exceeded")
+            existing.add(url)
+        if counts.get("provisional_total_urls") != baseline_size + len(raw_seen):
+            raise ValueError("raw provisional total differs from recorded link count")
+        seen_paths.append(name)
+    return {"baseline": baseline_size, "new": len(collected),
+            "raw_new": len(raw_seen), "raw_total_discovered": baseline_size + len(raw_seen),
+            "total_discovered": len(existing), "sources": collected}
+
+
+def _evidence_headers(origin: dict) -> tuple[str, ...]:
+    """Represent observed heading lineage, never an inferred topic.
+
+    Historical source lists may include long markdown links as headings. A
+    stable suffix prevents collisions from truncation without storing arbitrary
+    unbounded markdown in topic paths. Empty lineage means repository-only.
+    """
+    raw = origin.get("headers", ())
+    if not isinstance(raw, (list, tuple)) or len(raw) > 12:
+        raise ValueError("invalid discovery header lineage")
+    result = []
+    for title in raw:
+        if (not isinstance(title, str) or not title.strip() or len(title) > 2048
+                or any(ord(c) < 32 or ord(c) == 127 for c in title)):
+            raise ValueError("invalid catalog header")
+        normalized = " ".join(title.split())
+        if len(normalized) > 150:
+            normalized = normalized[:136] + "-" + sha256(normalized.encode("utf-8")).hexdigest()[:12]
+        result.append(normalized)
+    return tuple(result)
+
+
+class DragonDiscoveryAdmission:
+    """Owner-isolated metadata-only ingress to the canonical sequential queue."""
+
+    def __init__(self, almanacs: DragonAlmanacs):
+        if not isinstance(almanacs, DragonAlmanacs):
+            raise TypeError("DragonAlmanacs required")
+        self.almanacs = almanacs
+        self.db = almanacs.db
+        self.worker = SequentialAlmanacWorker(almanacs)
+        # v2 keys by *original* recorded link ID. Several distinct historical
+        # fragment URLs collapse to the same canonical acquisition destination.
+        self.db.execute("""CREATE TABLE IF NOT EXISTS dragon_almanac_supplement_receipts_v2 (
+            owner TEXT NOT NULL, origin_source TEXT NOT NULL,
+            normalized_source TEXT NOT NULL, supplement_digest TEXT NOT NULL,
+            body TEXT NOT NULL, digest TEXT NOT NULL,
+            PRIMARY KEY (owner, origin_source, supplement_digest))""")
+        self.db.execute("""CREATE INDEX IF NOT EXISTS dragon_supplement_receipt_normalized_v2
+                           ON dragon_almanac_supplement_receipts_v2(owner, normalized_source)""")
+
+    def import_chain(self, owner: str, registry: dict,
+                     named_documents: list[tuple[str, dict]], *, authorized: bool) -> dict:
+        if not isinstance(owner, str) or not 1 <= len(owner) <= 128 or authorized is not True:
+            raise PermissionError("authenticated owner required")
+        parsed = validate_discovery_chain(registry, named_documents)
+        if len(parsed["sources"]) + registry["unique_urls"] > 100_000:
+            raise ValueError("canonical source budget exceeded")
+        inserted = receipts = 0
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            for name, doc in named_documents:
+                supplement_digest = canonical_digest(doc)
+                for item in doc["candidates"]:
+                    url = canonical_source_url(item["url"])
+                    sid = "source-" + sha256(url.encode("utf-8")).hexdigest()
+                    canonical = parsed["sources"].get(url)
+                    if canonical is None:
+                        canonical = {
+                            "source_id": sid, "url": url,
+                            "host": urlsplit(url).hostname,
+                            "kind": "video_candidate" if urlsplit(url).hostname in
+                                {"www.youtube.com", "youtube.com", "youtu.be", "vimeo.com", "www.vimeo.com"}
+                                else "web_candidate",
+                            "availability": "not_checked", "rights": "not_assessed",
+                            "independence": "not_assessed", "training_authorized": False,
+                            "discoveries": [], "provisional_discovery": True}
+                    old = self.db.execute(
+                        "SELECT body,digest FROM dragon_almanac_sources WHERE owner=? AND source=?",
+                        (owner, sid)).fetchone()
+                    if old and canonical_digest(json.loads(old[0])) != old[1]:
+                        raise ValueError("existing source metadata is corrupt")
+                    if old is None:
+                        body = canonical_json(canonical)
+                        self.db.execute("INSERT INTO dragon_almanac_sources VALUES (?,?,?,?)",
+                                        (owner, sid, body, canonical_digest(canonical)))
+                        inserted += 1
+                    claimed = {"evidence_path": name, "candidate": item,
+                               "normalized_url": url, "normalized_source_id": sid,
+                               "supplement_digest": supplement_digest,
+                               "authority": "unreviewed_discovery_only"}
+                    raw = canonical_json(claimed)
+                    digest = canonical_digest(claimed)
+                    previous = self.db.execute(
+                        """SELECT body,digest FROM dragon_almanac_supplement_receipts_v2
+                           WHERE owner=? AND origin_source=? AND supplement_digest=?""",
+                        (owner, item["source_id"], supplement_digest)).fetchone()
+                    if previous:
+                        try:
+                            previously_stored = json.loads(previous[0])
+                            valid_stored = canonical_digest(previously_stored) == previous[1]
+                        except (TypeError, ValueError, UnicodeError, RecursionError):
+                            valid_stored = False
+                        if not valid_stored or previous[1] != digest:
+                            raise ValueError("corrupt or conflicting supplemental receipt")
+                    if previous is None:
+                        self.db.execute(
+                            "INSERT INTO dragon_almanac_supplement_receipts_v2 VALUES(?,?,?,?,?,?)",
+                            (owner, item["source_id"], sid, supplement_digest, raw, digest))
+                        receipts += 1
+                    for origin in item["discoveries"]:
+                        repo = origin.get("repository")
+                        if repo is None:
+                            repo = next(c["repository"] for c in doc["catalogs"]
+                                        if c.get("url") == origin["catalog_url"]
+                                        and c["git_blob_sha"] == origin["catalog_blob"])
+                        topic = self.almanacs.ensure_topic(
+                            owner, ("Sources", "Provisional", repo,
+                                    *_evidence_headers(origin)), authorized=True)
+                        while topic:
+                            self.db.execute(
+                                "INSERT OR IGNORE INTO dragon_almanac_members VALUES(?,?,?)",
+                                (owner, topic, sid))
+                            topic = self.db.execute(
+                                "SELECT parent FROM dragon_almanac_topics WHERE owner=? AND topic=?",
+                                (owner, topic)).fetchone()[0]
+            count = self.db.execute(
+                "SELECT COUNT(*) FROM dragon_almanac_sources WHERE owner=?", (owner,)).fetchone()[0]
+            if count > 100_000:
+                raise ValueError("owner source capacity exceeded")
+            queued = self.worker.seed(owner, authorized=True)
+            self.db.execute("COMMIT")
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
+        return {"new_discovery_sources": inserted, "new_provenance_receipts": receipts,
+                "new_policy_stage_jobs": queued, "canonical_discovered_urls": parsed["total_discovered"],
+                "raw_provisional_urls": parsed["raw_total_discovered"],
+                "normalized_new_against_baseline": parsed["new"],
+                "approved_sources": 0, "training_authorized": False,
+                "status": "policy_review_required_before_any_network_fetch"}
+
+
+    def topic_page(self, owner: str, *, authorized: bool, parent: str | None = None,
+                   limit: int = 100, offset: int = 0) -> dict:
+        """Browse direct child almanacs with counted, unreviewed source membership.
+
+        This is a metadata view, not an approval signal or a crawler execution
+        endpoint. Owner isolation and bounded deterministic pagination apply.
+        """
+        _auth(owner, authorized)
+        _integer(limit, "topic page limit", 1, 100)
+        _integer(offset, "topic page offset", 0, 100_000)
+        if parent is not None:
+            _id(parent, "parent topic")
+            if not self.db.execute(
+                    "SELECT 1 FROM dragon_almanac_topics WHERE owner=? AND topic=?",
+                    (owner, parent)).fetchone():
+                raise ValueError("unknown owner topic")
+        rows = self.db.execute(
+            """SELECT t.topic,t.parent,t.path,
+              (SELECT COUNT(*) FROM dragon_almanac_members m
+               WHERE m.owner=t.owner AND m.topic=t.topic)
+              FROM dragon_almanac_topics t
+              WHERE t.owner=? AND t.parent IS ?
+              ORDER BY t.path,t.topic LIMIT ? OFFSET ?""",
+            (owner, parent, limit + 1, offset),
+        ).fetchall()
+        children = []
+        for topic, ancestor, path, count in rows[:limit]:
+            if not isinstance(path, str) or len(path) > 4096:
+                raise ValueError("corrupt topic path")
+            titles = json.loads(path)
+            if (not isinstance(titles, list) or not titles or
+                    topic != "topic-" + canonical_digest(titles) or
+                    ancestor != ("topic-" + canonical_digest(titles[:-1]) if len(titles) > 1 else None)):
+                raise ValueError("invalid topic lineage")
+            children.append({"topic": topic, "parent": ancestor,
+                             "headers": titles, "source_count": count,
+                             "knowledge_authorized": False})
+        return {"owner": owner, "parent": parent, "topics": children,
+                "next_offset": offset + limit if len(rows) > limit else None,
+                "training_authorized": False, "scope": "discovery_metadata_only"}
+
+    def source_page(self, owner: str, topic: str, *, authorized: bool,
+                    limit: int = 100, offset: int = 0) -> dict:
+        """Expose canonical URL, policy progress and raw provenance counts.
+
+        A normalized URL may have several distinct raw-source receipts. Showing
+        the receipt count separately avoids confusing raw leads with acquisitions.
+        All source and job digests are checked before presenting their status.
+        """
+        _auth(owner, authorized)
+        _id(topic, "topic")
+        _integer(limit, "source page limit", 1, 100)
+        _integer(offset, "source page offset", 0, 100_000)
+        if not self.db.execute(
+                "SELECT 1 FROM dragon_almanac_topics WHERE owner=? AND topic=?",
+                (owner, topic)).fetchone():
+            raise ValueError("unknown owner topic")
+        rows = self.db.execute(
+            """SELECT m.source,s.body,s.digest,j.stage,j.state,j.input_digest,
+                 (SELECT COUNT(*) FROM dragon_almanac_supplement_receipts_v2 r
+                  WHERE r.owner=m.owner AND r.normalized_source=m.source)
+               FROM dragon_almanac_members m
+               JOIN dragon_almanac_sources s
+                 ON s.owner=m.owner AND s.source=m.source
+               LEFT JOIN dragon_almanac_jobs j
+                 ON j.owner=m.owner AND j.source=m.source
+               WHERE m.owner=? AND m.topic=? ORDER BY m.source LIMIT ? OFFSET ?""",
+            (owner, topic, limit + 1, offset),
+        ).fetchall()
+        sources = []
+        for sid, raw, digest, stage, state, input_digest, receipts in rows[:limit]:
+            if not isinstance(raw, str) or len(raw) > 32_768:
+                raise ValueError("source metadata exceeds read budget")
+            body = json.loads(raw)
+            url = body.get("url")
+            if (canonical_digest(body) != digest
+                    or sid != body.get("source_id")
+                    or sid != "source-" + sha256(canonical_source_url(url).encode("utf-8")).hexdigest()
+                    or url != canonical_source_url(url)):
+                raise ValueError("corrupt canonical discovery source")
+            if (stage is not None and (type(stage) is not int or not 0 <= stage <= 5
+                    or state not in {"pending", "leased", "blocked", "reviewed"}
+                    or (state == "reviewed") != (stage == 5)
+                    or not isinstance(input_digest, str) or not re.fullmatch(r"[0-9a-f]{64}", input_digest))):
+                raise ValueError("invalid acquisition job state")
+            sources.append({
+                "source_id": sid, "url": url, "kind": body.get("kind"),
+                "raw_provenance_receipts": receipts,
+                "stage_index": stage, "stage_state": state,
+                "rights": body.get("rights", "not_assessed"),
+                "availability": body.get("availability", "not_checked"),
+                "training_authorized": False,
+                "reviewed_knowledge_inferred": False,
+            })
+        return {"owner": owner, "topic": topic, "sources": sources,
+                "next_offset": offset + limit if len(rows) > limit else None,
+                "training_authorized": False, "scope": "discovery_metadata_only"}
+
+
+    def provenance_page(self, owner: str, source_id: str, *, authorized: bool,
+                        limit: int = 100, offset: int = 0) -> dict:
+        """Read independently recorded raw links behind one normalized source.
+
+        This view supports adversarial audits of duplicates and exact claimed
+        catalog lines without promoting any link into approved source content.
+        """
+        _auth(owner, authorized)
+        _id(source_id, "source")
+        _integer(limit, "provenance page limit", 1, 100)
+        _integer(offset, "provenance page offset", 0, 100_000)
+        source = self.db.execute(
+            "SELECT body,digest FROM dragon_almanac_sources WHERE owner=? AND source=?",
+            (owner, source_id)).fetchone()
+        if source is None:
+            raise ValueError("unknown owner source")
+        record = json.loads(source[0])
+        if (canonical_digest(record) != source[1] or
+                record.get("source_id") != source_id or
+                canonical_source_url(record.get("url")) != record.get("url")):
+            raise ValueError("corrupt source identity")
+        rows = self.db.execute(
+            """SELECT origin_source,supplement_digest,body,digest
+               FROM dragon_almanac_supplement_receipts_v2
+               WHERE owner=? AND normalized_source=?
+               ORDER BY supplement_digest,origin_source LIMIT ? OFFSET ?""",
+            (owner, source_id, limit + 1, offset)).fetchall()
+        entries = []
+        for origin_id, parent_digest, raw, digest in rows[:limit]:
+            if not isinstance(raw, str) or len(raw) > 262_144:
+                raise ValueError("provenance receipt size exceeded")
+            body = json.loads(raw)
+            candidate = body.get("candidate")
+            if (not isinstance(candidate, dict)
+                    or canonical_digest(body) != digest
+                    or body.get("supplement_digest") != parent_digest
+                    or body.get("normalized_source_id") != source_id
+                    or body.get("normalized_url") != record["url"]
+                    or body.get("authority") != "unreviewed_discovery_only"
+                    or candidate.get("source_id") != origin_id
+                    or origin_id != "source-" + sha256(candidate.get("url", "").encode("utf-8")).hexdigest()
+                    or canonical_source_url(candidate["url"]) != record["url"]):
+                raise ValueError("corrupt source provenance lineage")
+            entries.append({
+                "raw_source_id": origin_id, "raw_url": candidate["url"],
+                "discovery_origins": candidate.get("discoveries", []),
+                "supplement_digest": parent_digest, "receipt_digest": digest,
+                "evidence_path": body.get("evidence_path"),
+                "training_authorized": False, "approved": False,
+            })
+        return {"owner": owner, "source_id": source_id, "provenance": entries,
+                "next_offset": offset + limit if len(rows) > limit else None,
+                "training_authorized": False, "scope": "discovery_metadata_only"}
+
+
+def import_supplement_files(almanacs: DragonAlmanacs, owner: str, registry: dict,
+                            paths: list[str | Path], *, authorized: bool) -> dict:
+    return DragonDiscoveryAdmission(almanacs).import_chain(
+        owner, registry, [_supplement(path) for path in paths], authorized=authorized)
