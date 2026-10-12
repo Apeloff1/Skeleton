@@ -48,6 +48,13 @@ class JeevesProductionContractTests(unittest.TestCase):
         fourth=work_order(self.ws,"worldforge",
                   "Write the first dramatic original scene with all correct dialogue.",
                   cast=["alina","boren"],region="lantern_city")
+        self.assertEqual(fourth["stage"],"continuity_lock")
+        self.assertEqual(fourth["target_path"],"game/continuity_contract.json")
+        from tests.test_game_builder_story_continuity_assurance import original_contract
+        write_reviewed(self.ws,"game/continuity_contract.json",original_contract(design))
+        fourth=work_order(self.ws,"worldforge",
+                  "Write the first dramatic original scene with all correct dialogue.",
+                  cast=["alina","boren"],region="lantern_city")
         self.assertEqual(fourth["stage"],"scene")
         self.assertEqual(fourth["target_path"],
                          "story/scenes/act_0001/scene_000001.json")
