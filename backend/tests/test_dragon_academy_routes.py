@@ -99,6 +99,45 @@ def test_nest_read_api_requires_secret_and_never_mints_progress(tmp_path, monkey
 
 
 
+
+def test_mother_glean_read_is_tenant_private_and_requires_signed_custody(tmp_path,monkeypatch):
+    from fastapi import Response
+    from skeleton.ai.webcrawler.dragon_mother_glean_ledger import MotherGleanLedger
+    owner=identity()
+    db_path=tmp_path/"mother.sqlite"
+    monkeypatch.setenv("SKL_DRAGON_PRACTICE_DB_PATH",str(db_path))
+    monkeypatch.delenv("SKL_DRAGON_MOTHER_SIGNING_KEY_HEX",raising=False)
+    with pytest.raises(HTTPException) as missing:
+        route.academy_mother_glean(Response(),owner=owner)
+    assert missing.value.status_code==503
+    key=b"mother-route-key-is-separated-32bytes-long"
+    monkeypatch.setenv("SKL_DRAGON_MOTHER_SIGNING_KEY_HEX",key.hex())
+    response=Response()
+    assert route.academy_mother_glean(response,owner=owner)=={"ok":True,"glean":None}
+    assert response.headers["cache-control"]=="private, no-store"
+    assert route.academy_mother_glean(Response(),owner=identity(
+        "bob@example.test"))=={"ok":True,"glean":None}
+    with sqlite3.connect(db_path) as db:
+        MotherGleanLedger(db,signing_key=key)
+        db.execute(
+            "INSERT INTO dragon_mother_glean "
+            "(owner,seq,acquisition_key,payload,previous_head,head,mac) "
+            "VALUES(?,?,?,?,?,?,?)",
+            (owner,1,"a"*64,"{}","0"*64,"b"*64,"c"*64),
+        )
+        db.commit()
+    with pytest.raises(HTTPException) as tampered:
+        route.academy_mother_glean(Response(),owner=owner)
+    assert tampered.value.status_code==409
+    assert route.academy_mother_glean(Response(),owner=identity(
+        "bob@example.test"))=={"ok":True,"glean":None}
+    assert not any(
+        r.path.endswith("/mother-glean/promote")
+        or r.path.endswith("/mother-glean/acquire")
+        for r in route.router.routes
+    )
+
+
 def test_storage_is_fail_closed(monkeypatch):
     monkeypatch.delenv("SKL_DRAGON_PRACTICE_DB_PATH",raising=False)
     with pytest.raises(HTTPException) as exc:
