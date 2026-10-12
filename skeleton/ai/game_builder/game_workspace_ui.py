@@ -3086,7 +3086,10 @@ $("advanced-physics-native").addEventListener("click",async()=>{
    editor:"physics",settings,seed,layout,scene_id:"native_physics_demo"
   });
   $("advanced-scene-json").value=JSON.stringify(approved.scene,null,2);
+  advancedSession=null;
   await startAdvanced();
+  if(!advancedSession || advancedSession.scene_digest!==approved.scene.digest)
+   throw Error("Authenticated authored native profile was not replayed");
   status("Original native physics demo prepared and replayed. Export stays supervised; device validation is separate.");
  }catch(error){status("Native physics preparation blocked: "+error.message);}
 });
