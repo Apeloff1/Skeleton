@@ -36,6 +36,23 @@ class OriginalEcosystemTests(unittest.TestCase):
         self.assertEqual(game["state"]["dormant_species"],420)
         self.assertTrue(verify_advanced_session(game,params))
 
+    def test_distant_species_consume_finite_food_through_sparse_cohorts(self):
+        settings={"species":500,"predators":100,"cohort_period":2}
+        report=run_advanced_session("ecosystem",settings,["wait"]*2)
+        state=report["state"]
+        self.assertEqual(len(state["species"]),80)
+        self.assertEqual(state["dormant_species"],420)
+        self.assertEqual(state["background_batches"],1)
+        self.assertGreater(state["background_food_consumed"],0)
+        self.assertGreater(state["dormant_population"],0)
+        self.assertEqual(state["births"],
+                         sum(s["births"] for s in state["species"])+
+                         state["background_births"])
+        self.assertEqual(state["deaths"],
+                         sum(s["deaths"] for s in state["species"])+
+                         state["background_deaths"])
+        self.assertTrue(verify_advanced_session(report,settings))
+
     def test_ecological_scene_requires_exact_original_habitats(self):
         for seed in (0,1,2,9,31):
             config=make_editor_document("ecosystem")["settings"]
