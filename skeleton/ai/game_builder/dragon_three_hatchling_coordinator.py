@@ -12,6 +12,7 @@ import re
 from skeleton.ai.webcrawler.dragon_nest_store import DragonNestStore
 
 from .contracts import canonical_digest
+from .dragon_evidence_disagreement import three_way_evidence_risks
 from .dragon_almanacs import _auth
 from .dragon_article_hatchling import DragonArticleHatchling
 from .dragon_source_delta_ledger import DragonSourceDeltaLedger
@@ -219,6 +220,10 @@ class DragonThreeHatchlingCoordinator:
                             "revision lineage rather than independent sources?",
                         ],
                         "source_agreement_verified": False,
+                        "risk_lenses": three_way_evidence_risks(
+                            article_quote, cue["text"], after["exact_quote"],
+                            tuple(three_way),
+                        ),
                         "requires_independent_wiki_review": True,
                     }
                     hypotheses.append({
