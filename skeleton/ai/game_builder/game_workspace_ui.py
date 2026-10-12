@@ -3329,6 +3329,74 @@ $("advanced-npc-world-canvas").addEventListener("click",event=>{
   status("Selected genuine physical quest "+q.id+" at authored site "+site.id);
  }
 });
+$("advanced-episodic-save-export").addEventListener("click",async()=>{
+ try{
+  if(!verifiedSourceEpisodes.length || !episodicLastScene)
+   throw Error("Replay a source-verified original campaign before exporting");
+  const reply=await api("/api/advanced-physics-episodic-save-export",{
+   episodes:verifiedSourceEpisodes,world_scene:episodicLastScene
+  });
+  if(!reply.save || reply.original_source_modified ||
+      reply.native_hardware_certified || reply.automatic_publication_approved ||
+      reply.save.campaign_digest!==episodicLastProof?.digest)
+   throw Error("Original source campaign save custody mismatch");
+  const json=JSON.stringify(reply.save,null,2);
+  if(new TextEncoder().encode(json).length>2000000)
+   throw Error("Episodic save exceeds 2 MB browser export budget");
+  const url=URL.createObjectURL(new Blob([json],{type:"application/json"}));
+  const link=document.createElement("a");link.href=url;
+  link.download="original-npc-physics-campaign-"+reply.save.digest.slice(0,12)+".json";
+  document.body.append(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),0);
+  $("advanced-episodic-save-receipt").textContent=JSON.stringify({
+   source_save_digest:reply.save.digest,
+   episode_count:reply.save.episode_count,
+   original_world_actions:reply.save.total_world_actions,
+   replay_required:true,original_game_files_modified:false
+  },null,2);
+  status("Portable original NPC campaign input log exported; all rewards remain replay-verified.");
+ }catch(error){status("Original campaign export blocked: "+error.message);}
+});
+$("advanced-episodic-save-import").addEventListener("change",async()=>{
+ try{
+  const input=$("advanced-episodic-save-import"),file=input.files?.[0];
+  if(!file) return;
+  if(file.size>2000000)throw Error("Oversized original world save rejected");
+  const raw=await file.text();
+  if(new TextEncoder().encode(raw).length>2000000)throw Error("Oversized save rejected");
+  const document=JSON.parse(raw);
+  const response=await api("/api/advanced-physics-episodic-save-import",{
+   save:document
+  });
+  const imported=response.restored;
+  if(!imported?.verified || imported.save_digest!==document.digest ||
+      response.original_source_modified || response.native_hardware_certified ||
+      response.automatic_publication_approved ||
+      imported.campaign.world_scene_digest!==imported.world_scene.digest)
+   throw Error("Original episodic save failed independent source replay");
+  verifiedSourceEpisodes=imported.episodes;
+  episodicLastScene=imported.world_scene;
+  episodicLastProof=imported.campaign;
+  verifiedInvestigationRoute=null;
+  $("advanced-npc-route-proof").textContent="";
+  refreshNPCQuestRouteChoices(episodicLastProof);
+  drawNPCForensicMap(episodicLastProof.world_state);
+  $("advanced-episodic-proof").textContent=JSON.stringify({
+   restored_world:episodicLastProof.world_state,
+   source_episodes:verifiedSourceEpisodes.length,
+   reconstructed_game_digest:episodicLastProof.digest,
+   original_saves_untouched:true
+  },null,2);
+  $("advanced-episodic-save-receipt").textContent=JSON.stringify({
+   verified:true,source_save_digest:imported.save_digest,
+   remaining_episodes:imported.remaining_episode_budget,
+   remaining_actions:imported.remaining_action_budget,
+   independently_replayed:true
+  },null,2);
+  status("Episodic original game and NPC world independently reconstructed from imported action log.");
+ }catch(error){status("Untrusted original save rejected: "+error.message);}
+ finally{$("advanced-episodic-save-import").value="";}
+});
 $("advanced-episodic-clear").addEventListener("click",()=>{
  verifiedSourceEpisodes=[];
  episodicLastProof=null;episodicLastScene=null;verifiedInvestigationRoute=null;
@@ -3717,6 +3785,15 @@ local until typed revalidation and an explicit human-approved file commit.</smal
   <button id="advanced-episodic-clear" type="button">Reset unpublished episodes</button>
   <pre id="advanced-episodic-queue" role="status" aria-live="polite"></pre>
   <pre id="advanced-episodic-proof" role="status" aria-live="polite"></pre>
+  <fieldset aria-label="Replay-verifiable episodic campaign saves">
+    <legend>Durable original campaign save / restore</legend>
+    <button id="advanced-episodic-save-export" type="button">Export verified campaign save</button>
+    <label>Import authored campaign save (2 MB maximum)
+      <input id="advanced-episodic-save-import" type="file"
+       accept=".json,application/json"/>
+    </label>
+    <pre id="advanced-episodic-save-receipt" role="status" aria-live="polite"></pre>
+  </fieldset>
   <fieldset aria-label="Forensic NPC route navigator">
    <legend>Playable eyewitness and physical investigation routes</legend>
    <canvas id="advanced-npc-world-canvas" width="380" height="350"
