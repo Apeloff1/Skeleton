@@ -132,6 +132,21 @@ def test_no_children_until_complete_parent_and_owner_locked():
     db.close()
 
 
+def test_source_revision_commit_fails_closed_without_current_lease():
+    db,family,worker=make()
+    with pytest.raises(PermissionError,match="source lease lost"):
+        family.digest_idle(OWNER,"article",receipt("article-1",ART,NOW+719),
+            authorized=True,window=idle(),task_topics=("game_engine",),
+            lease_guard=lambda:False)
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==0
+    admitted=worker.run_once(OWNER,authorized=True,idle_state=idle,
+         gatherers={"article":lambda task:receipt(task.source_id,ART,NOW+719)},
+         task_topics=("game_engine",))
+    assert admitted["changed"]==1
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==1
+    db.close()
+
+
 def test_idle_attempt_journal_is_utc_timestamped_and_tamper_evident():
     db,family,worker=make()
     outcome=worker.run_once(OWNER,authorized=True,idle_state=idle,
