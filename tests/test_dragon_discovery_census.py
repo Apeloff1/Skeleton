@@ -8,7 +8,7 @@ import pytest
 from skeleton.ai.game_builder.dragon_almanacs import read_source_registry
 from skeleton.ai.game_builder.dragon_discovery_census import discovery_census
 from skeleton.ai.game_builder.dragon_discovery_reconciled import (
-    verify_reconciled_chain, SOURCE_BATCHES, EXCLUDED_ORPHANS,
+    verify_reconciled_chain, SOURCE_BATCHES, EXCLUDED_ORPHANS, EXPECTED_RAW_TOTAL,
 )
 
 
@@ -30,14 +30,14 @@ def census(registry):
 
 def test_source_census_counts_full_pinned_lineage_not_orphans(registry, census):
     verified = verify_reconciled_chain(registry)
-    assert census["raw_url_leads"] == verified["raw_url_leads"] == 19228
+    assert census["raw_url_leads"] == verified["raw_url_leads"] == EXPECTED_RAW_TOTAL
     assert census["baseline_raw_leads"] == 4405
     assert census["supplement_raw_leads"] == 14823
     assert census["canonical_distinct_urls"] == verified[
         "canonical_candidate_sources"]
     assert census["raw_to_canonical_collisions"] == (
-        19228 - census["canonical_distinct_urls"])
-    assert len(SOURCE_BATCHES) == 21
+        EXPECTED_RAW_TOTAL - census["canonical_distinct_urls"])
+    assert len(SOURCE_BATCHES) == 24
     assert all(path not in SOURCE_BATCHES for path in EXCLUDED_ORPHANS)
     assert sum(census["category_counts_canonical"].values()) == census[
         "canonical_distinct_urls"]
