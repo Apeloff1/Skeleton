@@ -102,10 +102,62 @@ class BenchmarkCase:
 
     def __post_init__(self) -> None:
         _id(self.case_id)
-        _id(self.expected_source_id)
+        if self.expected_source_id != "_abstain":
+            _id(self.expected_source_id)
         if (not isinstance(self.query, str) or not 1 <= len(self.query) <= 300
                 or not WORD.findall(self.query)):
             raise ValueError("bounded benchmark query required")
+
+
+@dataclass(frozen=True)
+class SealedHoldoutSuite:
+    """Evaluation-only canary set, signed by an independent benchmark service.
+
+    The crawler must never receive the issuer's signing key. The seal binds
+    questions, expected outcomes, owner, source-root and time before stage.
+    """
+    owner: str
+    knowledge_root: str
+    issuer: str
+    created_at: str
+    expires_at: str
+    cases: tuple[BenchmarkCase, ...]
+    seal: str
+
+    def __post_init__(self) -> None:
+        _id(self.owner)
+        _id(self.issuer)
+        _hex(self.knowledge_root)
+        _hex(self.seal)
+        if (not isinstance(self.cases, tuple) or not 5 <= len(self.cases) <= 256
+                or any(not isinstance(c, BenchmarkCase) for c in self.cases)):
+            raise ValueError("sealed suite must contain five or more typed cases")
+        if not _instant(self.created_at) < _instant(self.expires_at):
+            raise ValueError("holdout expiry must follow issuance")
+
+
+def _holdout_body(owner: str, root: str, issuer: str, created: str,
+                  expires: str, cases: tuple[BenchmarkCase, ...]) -> str:
+    return canonical_json((owner, root, issuer, created, expires,
+                           tuple(asdict(case) for case in cases)))
+
+
+def seal_holdout(
+    owner: str, root: str, issuer: str, cases: tuple[BenchmarkCase, ...],
+    *, created_at: str, expires_at: str, evaluator_key: bytes,
+) -> SealedHoldoutSuite:
+    """Call only inside the trusted independent benchmark issuer service."""
+    _id(owner)
+    _id(issuer)
+    _hex(root)
+    if not isinstance(evaluator_key, bytes) or len(evaluator_key) < 32:
+        raise ValueError("trusted dedicated holdout signing key required")
+    created, expires = _iso(created_at), _iso(expires_at)
+    if not isinstance(cases, tuple) or len(cases) < 5:
+        raise ValueError("independent five-case minimum required")
+    raw = _holdout_body(owner, root, issuer, created, expires, cases)
+    seal = hmac.new(evaluator_key, raw.encode("utf-8"), sha256).hexdigest()
+    return SealedHoldoutSuite(owner, root, issuer, created, expires, cases, seal)
 
 
 @dataclass(frozen=True)
@@ -157,24 +209,44 @@ def _route(weights: tuple[ShadowWeight, ...], query: str) -> str | None:
 
 
 def _benchmark(shadow: ShadowWeight, active: tuple[ShadowWeight, ...],
-               suite: tuple[BenchmarkCase, ...]) -> BenchmarkVerdict:
-    if (not isinstance(suite, tuple) or not 3 <= len(suite) <= 256
-            or any(not isinstance(x, BenchmarkCase) for x in suite)
-            or len({x.case_id for x in suite}) != len(suite)
-            or len({x.query.casefold().strip() for x in suite}) != len(suite)
-            or shadow.source_id not in {x.expected_source_id for x in suite}):
-        raise ValueError("independent bounded holdout benchmark suite required")
+               suite: SealedHoldoutSuite, *, at: str, key: bytes) -> BenchmarkVerdict:
+    if not isinstance(suite, SealedHoldoutSuite):
+        raise ValueError("independently sealed holdout is required")
+    payload = _holdout_body(
+        suite.owner, suite.knowledge_root, suite.issuer,
+        suite.created_at, suite.expires_at, suite.cases,
+    )
+    expected = hmac.new(key, payload.encode("utf-8"), sha256).hexdigest()
+    if (not hmac.compare_digest(expected, suite.seal)
+            or suite.owner != shadow.owner
+            or suite.knowledge_root != shadow.knowledge_root
+            or _instant(suite.created_at) > _instant(shadow.at)
+            or not _instant(suite.created_at) <= _instant(at) < _instant(suite.expires_at)
+            or not 5 <= len(suite.cases) <= 256
+            or len({x.case_id for x in suite.cases}) != len(suite.cases)
+            or len({x.query.casefold().strip() for x in suite.cases}) != len(suite.cases)):
+        raise ValueError("holdout signature, owner, revision or timing invalid")
+    cases = suite.cases
+    # Canary abstention controls prove that new weights are not matching noise.
+    positive = sum(x.expected_source_id == shadow.source_id for x in cases)
+    negative = sum(x.expected_source_id == "_abstain" for x in cases)
+    if positive < 2 or negative < 2:
+        raise ValueError("holdout requires two target and two abstention controls")
+    expected_sources = {x.expected_source_id for x in cases}
+    if any(x.source_id not in expected_sources for x in active):
+        raise ValueError("all existing live sources need regression canaries")
     base = tuple(sorted(active, key=lambda x: x.candidate_id))
     before, after, gained, lost = 0, 0, 0, 0
     for case in suite:
-        original = _route(base, case.query) == case.expected_source_id
-        proposed = _route((*base, shadow), case.query) == case.expected_source_id
+        expected_source = None if case.expected_source_id == "_abstain" else case.expected_source_id
+        original = _route(base, case.query) == expected_source
+        proposed = _route((*base, shadow), case.query) == expected_source
         before += int(original)
         after += int(proposed)
         gained += int(proposed and not original)
         lost += int(original and not proposed)
     baseline = _hash(tuple((x.candidate_id, x.source_revision) for x in base))
-    suite_digest = _hash(tuple(asdict(x) for x in suite))
+    suite_digest = _hash((payload, suite.seal))
     accepted = gained >= 1 and lost == 0 and after > before
     values = (suite_digest, baseline, shadow.candidate_id, len(suite),
               before, after, gained, lost, accepted)
@@ -185,12 +257,16 @@ class ShadowWeightAutomation:
     """Trusted-worker API only. Does not start threads, crawl or train a model."""
 
     def __init__(self, db: sqlite3.Connection, library: ReviewedKnowledgeStore,
-                 reviews: DragonHumanReviewLedger, *, signing_key: bytes):
+                 reviews: DragonHumanReviewLedger, *, signing_key: bytes,
+                 holdout_key: bytes):
         if (not isinstance(library, ReviewedKnowledgeStore)
                 or not isinstance(reviews, DragonHumanReviewLedger)
-                or not isinstance(signing_key, bytes) or len(signing_key) < 32):
-            raise ValueError("canonical knowledge, reviewer ledger and key required")
+                or not isinstance(signing_key, bytes) or len(signing_key) < 32
+                or not isinstance(holdout_key, bytes) or len(holdout_key) < 32
+                or hmac.compare_digest(signing_key, holdout_key)):
+            raise ValueError("canonical knowledge, reviewer ledger and separate keys required")
         self.db, self.library, self.reviews, self.key = db, library, reviews, signing_key
+        self.holdout_key = holdout_key
         with db:
             db.execute("""CREATE TABLE IF NOT EXISTS dragon_shadow_weights (
                 owner TEXT NOT NULL, candidate_id TEXT NOT NULL,
@@ -482,7 +558,7 @@ class ShadowWeightAutomation:
         return shadow
 
     def evaluate(
-        self, owner: str, candidate_id: str, suite: tuple[BenchmarkCase, ...], *,
+        self, owner: str, candidate_id: str, suite: SealedHoldoutSuite, *,
         at: str, authorized: bool,
     ) -> BenchmarkVerdict:
         if authorized is not True:
@@ -496,7 +572,7 @@ class ShadowWeightAutomation:
             if not self._current(shadow):
                 raise ValueError("source revision changed or was retracted")
             baseline = self._active(owner)
-            result = _benchmark(shadow, baseline, suite)
+            result = _benchmark(shadow, baseline, suite, at=at, key=self.holdout_key)
             if not result.accepted:
                 # Keep failed experiments quarantined for another independent
                 # benchmark. Never represent weak or regressive tests as ready.
@@ -515,7 +591,7 @@ class ShadowWeightAutomation:
 
     def promote(
         self, owner: str, candidate_id: str,
-        suite: tuple[BenchmarkCase, ...], *,
+        suite: SealedHoldoutSuite, *,
         memory_promotion: MemoryPromotionOutput, review_id: str,
         at: str, authorized: bool,
     ) -> ShadowWeight:
@@ -546,7 +622,7 @@ class ShadowWeightAutomation:
                     )):
                 raise PermissionError("approval/knowledge/adversarial chain mismatch")
             active = self._active(owner)
-            current_benchmark = _benchmark(shadow, active, suite)
+            current_benchmark = _benchmark(shadow, active, suite, at=at, key=self.holdout_key)
             if current_benchmark != prior:
                 raise ValueError("baseline or benchmark drift: rerun evaluation")
             facts = {
