@@ -225,6 +225,11 @@ class DragonIdleHostControl:
                 self.db.execute("""UPDATE dragon_family_idle_host_sessions SET
                     active=0,generation=generation+1,changed_at=?,
                     next_tick_at=? WHERE owner=?""",(at,at,self.owner))
+        # The owner generation is already fenced. Now terminate any persisted
+        # in-flight worker tokens; results arriving from the old session are
+        # denied even if its adapter has not been cancelled by the OS yet.
+        self.acquisition.coordinator.fence_owner_leases(
+            self.owner,authorized=True,at=at)
         return self.status(at=at,authorized=True)
 
     def _reserve_budget(self, owner: str, role: str, at: float) -> None:
