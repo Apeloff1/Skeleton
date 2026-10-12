@@ -8,11 +8,13 @@ import pytest
 
 from skeleton.ai.game_builder.dragon_almanacs import DragonAlmanacs, read_source_registry
 from skeleton.ai.game_builder.dragon_discovery_admission import (
-    DragonDiscoveryAdmission, _supplement, validate_discovery_chain,
+    DragonDiscoveryAdmission, _supplement, _evidence_headers, validate_discovery_chain,
     import_supplement_files,
 )
 from skeleton.ai.game_builder.reviewed_knowledge import ReviewedKnowledgeStore
 from skeleton.ai.game_builder.dragon_source_catalog import canonical_source_url
+from skeleton.ai.game_builder.contracts import canonical_digest
+from hashlib import sha256
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = ROOT / "skeleton/ai/game_builder/catalogs/dragon_sources_20261010"
@@ -167,3 +169,37 @@ def test_source_receipts_are_verified_during_idempotent_replay(tmp_path, baselin
         with pytest.raises(ValueError, match="corrupt"):
             ingress.import_chain("owner", baseline, chain, authorized=True)
         assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_supplement_receipts_v2").fetchone()[0] == 964
+
+
+def test_every_observed_header_gets_a_distinct_provisional_almanac(tmp_path, baseline, chain):
+    origin_row = next(row for row in chain[0][1]["candidates"]
+                      if any(o.get("headers") for o in row["discoveries"]))
+    origin = next(o for o in origin_row["discoveries"] if o.get("headers"))
+    repo = next(c["repository"] for c in chain[0][1]["catalogs"]
+                if c.get("url") == origin["catalog_url"]
+                and c["git_blob_sha"] == origin["catalog_blob"])
+    headings = _evidence_headers(origin)
+    assert headings
+    with ReviewedKnowledgeStore(tmp_path / "headings.sqlite") as store:
+        ingress = DragonDiscoveryAdmission(DragonAlmanacs(store))
+        ingress.import_chain("owner", baseline, chain, authorized=True)
+        canonical = canonical_source_url(origin_row["url"])
+        sid = "source-" + sha256(canonical.encode("utf-8")).hexdigest()
+        for depth in range(1, len(headings) + 1):
+            topic = "topic-" + canonical_digest(
+                ["Sources", "Provisional", repo, *headings[:depth]])
+            assert store.db.execute(
+                "SELECT 1 FROM dragon_almanac_members WHERE owner=? AND topic=? AND source=?",
+                ("owner", topic, sid)).fetchone()
+        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_topics WHERE owner='owner'").fetchone()[0] > 3
+
+
+def test_malicious_or_overlong_heading_is_not_a_fake_topic():
+    with pytest.raises(ValueError, match="header"):
+        _evidence_headers({"headers": ["heading\\ncontrol".replace("\\n", "\n")]})
+    with pytest.raises(ValueError, match="header"):
+        _evidence_headers({"headers": [""]})
+    heading = "long-design-heading-" * 15
+    normalized = _evidence_headers({"headers": [heading]})[0]
+    assert len(normalized) <= 160
+    assert normalized.endswith(sha256(heading.encode()).hexdigest()[:12])
