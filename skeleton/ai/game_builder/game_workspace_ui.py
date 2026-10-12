@@ -1694,6 +1694,93 @@ function renderAdvancedActions(actions){
     }
   });
   target.append(runWorld);target.append(worldPanel);
+  const streamLabel=document.createElement("label");
+  streamLabel.textContent="Chunked NPC World · source-linked actors and bounded active detail";
+  const streamSize=document.createElement("select");
+  streamSize.id="original-chunked-world-dimension";
+  streamSize.setAttribute("aria-label","Original streamed world geometry");
+  for(const [count,name] of [["3","3×3 chunks · 21×21 tiles"],
+                              ["5","5×5 chunks · 35×35 tiles"]]){
+    const item=document.createElement("option");
+    item.value=count;item.textContent=name;streamSize.append(item);
+  }
+  streamLabel.append(streamSize);target.append(streamLabel);
+  const detailedLabel=document.createElement("label");
+  detailedLabel.textContent="Actually instantiated unique original residents";
+  const residentCount=document.createElement("select");
+  residentCount.id="original-chunked-npc-count";
+  for(const n of [8,16,24,32]){
+    const option=document.createElement("option");
+    option.value=String(n);option.textContent=String(n);residentCount.append(option);
+  }
+  residentCount.value="16";detailedLabel.append(residentCount);target.append(detailedLabel);
+  const streamInput=document.createElement("textarea");
+  streamInput.id="original-chunked-world-actions";
+  streamInput.rows=5;
+  streamInput.setAttribute("aria-label","Ordered physical original world actions");
+  streamInput.value=JSON.stringify(
+    ["wait","move:west","move:east","move:south","move:east","harvest:0"],
+    null,1
+  );
+  target.append(streamInput);
+  const streamRun=document.createElement("button");
+  streamRun.type="button";
+  streamRun.textContent="Run and verify exact source-bound streaming simulation";
+  const streamOutput=document.createElement("pre");
+  streamOutput.id="original-chunked-world-proof";
+  streamOutput.setAttribute("role","status");
+  streamOutput.setAttribute("aria-live","polite");
+  streamRun.addEventListener("click",async()=>{
+    try{
+      const actions=JSON.parse(streamInput.value);
+      if(!Array.isArray(actions)||actions.length>128||
+         !actions.every(a=>typeof a==="string"&&a.length<=32))
+        throw Error("Only bounded original registered world actions are allowed");
+      const citizens=Number(residentCount.value);
+      const options={
+        chunks_per_side:Number(streamSize.value),citizens,
+        active_limit:Math.min(8,citizens),chunk_radius:1,max_turns:96
+      };
+      const result=await api("/api/chunked-npc-world",{
+        actions,options,seed:0
+      });
+      if(!result.independently_verified||result.source_files_mutated||
+         result.native_chunked_hardware_certified||
+         result.record.ai_model_weights_promoted)
+        throw Error("Streamed world source integrity failed review");
+      const check=await api("/api/chunked-npc-world-verify",{
+        record:result.record
+      });
+      if(!check.verified)throw Error("Streamed world independent replay diverged");
+      const state=result.record.state;
+      streamOutput.textContent=JSON.stringify({
+        source_evidence:result.record.digest,
+        map_tile_side:state.side,chunks:state.chunks_per_side,
+        physical_residents:result.record.physical_actor_count,
+        player_tile:state.player,world_tick:state.tick,
+        currently_loaded_chunks:state.loaded_chunks,
+        detailed_residents_this_turn:state.detailed_actor_ids,
+        detailed_actor_updates:state.scheduler.detailed_updates,
+        deferred_actor_turns:state.scheduler.deferred_actor_turns,
+        physical_actor_movements:state.scheduler.physical_moves,
+        fabricated_offscreen_events:state.scheduler.forged_offscreen_events,
+        actor_positions:state.actors.map(a=>({
+          source_id:a.id,position:a.position,
+          origin:a.origin_kind,trust:a.trust,home:a.home,work:a.work,
+          walked:a.walked,detailed_ticks:a.detailed_ticks,
+          deferred_ticks:a.deferred_ticks
+        })),
+        physical_events:state.events,original_quests:state.quests,
+        scene_source_replay_verified:true,source_files_mutated:false,
+        hardware_certified:false,model_weights_promoted:false
+      },null,2);
+      status("Original chunked NPC world replayed; unloaded residents neither teleport nor witness imaginary events.");
+    }catch(error){
+      streamOutput.textContent="";
+      status("Chunked NPC World rejected: "+error.message);
+    }
+  });
+  target.append(streamRun);target.append(streamOutput);
   return;
  }
  if(advancedSession?.editor==="economy"){
