@@ -1,7 +1,7 @@
 """Original fixed-point rigid-body physics playground with source-bound replay.
 
 The reference uses a bounded 2D/3D grid, integer impulse integration,
-swept world/fixture collision, deterministic pairwise impulse response,
+bounded world/fixture collision, deterministic pairwise impulse response,
 finite motors/anchors and genuine, reachable cargo targets. It is a game
 mechanics reference, not an industrial continuous-collision or CFD solver.
 """
@@ -26,7 +26,8 @@ DIRECTIONS = {
 ACTIONS = (
     "push:east", "push:west", "push:up", "push:down",
     "push:front", "push:back", "select:0", "select:1", "select:2",
-    "select:3", "attach:0", "attach:1", "detach",
+    "select:3", "select:4", "select:5", "select:6", "select:7",
+    "attach:0", "attach:1", "detach",
     "magnet:on", "magnet:off", "fan:on", "fan:off",
     "step", "step:4", "brake", "inspect",
 )
@@ -67,7 +68,7 @@ def default_layout(config, seed):
             {"id": "counterweight", "position": [12 * SCALE, 760, 0 if depth == 1 else SCALE],
              "velocity": [0, 0, 0], "radius": 40, "mass": 8,
              "material": "metal", "layer": 2, "mask": 3, "break_threshold": 300},
-        ],
+        ][:min(2, config["max_bodies"])],
         "fixtures": [{"position": [14 * SCALE, 900, 0 if depth == 1 else SCALE],
                       "half_size": [45, 100, 40], "layer": 3}],
         "anchors": [[3 * SCALE, 500, 0 if depth == 1 else SCALE],
@@ -375,8 +376,8 @@ def _advance(state, config, events):
                         events.append("cable_tension_constrained")
                 if state["rope"] is not None:
                     _world(body, state, config, events)
-        if state["magnet"] or state["fan"]:
-            state["battery"] = max(0, state["battery"]-1)
+        if (state["magnet"] or state["fan"]) and state["battery"] > 0:
+            state["battery"] -= 1
             state["motors_used"] += 1
         payload = state["bodies"][0]
         if payload["broken"]:
