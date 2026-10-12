@@ -76,9 +76,38 @@ const broken=[
 ];
 for(const item of broken)assert.equal(family.validateDragonFamily(item),null,
  'untrusted client must not create or modify dragon family progression');
+// Mother gleaning is an independently reviewed, read-only extension.
+const glean={
+ schema:'skeleton.ai.dragon.glean.v1',insights:1,
+ stale_observations:0,total_active_observations:2,lenses_used:1,
+ counts:{contested:0,wiki_candidate:1,needs_independent_sources:0},
+ read_only:true,promotion:'Wiki before shadow sandbox; never direct live weights',
+ updated_at:at,
+ cells:[{lens:'game_mechanics',proposition_digest:'b'.repeat(64),
+  status:'wiki_candidate',source_count:2,support_sources:2,challenge_sources:0,
+  support_groups:2,challenge_groups:0,modalities:['article','video'],
+  latest_at:at,exemplar:'Review-backed game loop inference requiring verification',
+  priority:'independent_wiki_review',evidence_fingerprint:'e'.repeat(64)}],
+};
+assert.ok(family.validateDragonFamily({...brood,glean}));
+for(const brokenGlean of [
+ {...glean,read_only:false},
+ {...glean,counts:{...glean.counts,wiki_candidate:3}},
+ {...glean,cells:[{...glean.cells[0],evidence_fingerprint:'fake'}]},
+ {...glean,cells:[{...glean.cells[0],support_groups:1}]},
+ {...glean,cells:[{...glean.cells[0],modalities:['video','unreviewed_media']}]},
+ {...glean,cells:[{...glean.cells[0],status:'contested',challenge_sources:0}]},
+]){
+ assert.equal(family.validateDragonFamily({...brood,glean:brokenGlean}),null,
+  'the UI cannot fabricate confirmed cross-source glean evidence');
+}
 const nested=load('DragonFamilyNest.tsx');
 assert.ok(nested.source.includes('idle only')&&nested.source.includes('evolution history'));
 assert.ok(nested.source.includes('validateDragonFamily'));
+assert.ok(nested.source.includes('Mother Dragon · Glean Matrix'));
+assert.ok(nested.source.includes('Disputed:'));
+assert.ok(nested.source.includes('Superseded or revoked observations:'));
+
 const familyHook=fs.readFileSync(path.join(dir,'useDragonAcademy.ts'),'utf8');
 assert.ok(familyHook.includes('validateDragonFamily(snapshot.family)'));
 assert.ok(familyHook.includes('family,subscription,practiceBusy'));
