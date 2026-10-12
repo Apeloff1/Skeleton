@@ -1,0 +1,85 @@
+name: Original Unified NPC World Authority
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_unified_npc_world.py"
+      - "skeleton/ai/game_builder/advanced_level_scenes.py"
+      - "skeleton/ai/game_builder/advanced_dialogue_runtime.py"
+      - "skeleton/ai/game_builder/advanced_npc_society_runtime.py"
+      - "skeleton/ai/game_builder/advanced_quest_director_runtime.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_unified_npc_world.py"
+      - ".github/workflows/game-builder-unified-npc-world.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: authoritative-npc-world-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  full-spatial-authority:
+    name: Unified NPC causality on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    timeout-minutes: 16
+    env:
+      PYTHONUTF8: "1"
+      PYTHONPATH: "."
+      SOURCE_HEAD: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Exact PR head with no persistent checkout credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_unified_npc_world.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Compile exact checked-out authority, API and test source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_HEAD"
+          python -m py_compile \
+            skeleton/ai/game_builder/advanced_unified_npc_world.py \
+            skeleton/ai/game_builder/system_editor_cli.py \
+            skeleton/ai/game_builder/game_workspace_server.py \
+            skeleton/ai/game_builder/game_workspace_ui.py \
+            tests/test_game_builder_unified_npc_world.py
+      - name: Physically simulate and adversarially replay authoritative actors
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_game_builder_unified_npc_world -v
+      - name: Verify deterministic original world on four source seeds
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from skeleton.ai.game_builder.advanced_unified_npc_world import (
+              run_unified_npc_world,verify_unified_npc_world,
+          )
+          original=["move:south","move:east","discover:0",
+                    "speak:0","support:0"]+["followup:0"]*5+["resolve:0"]
+          for seed in (0,1,2,7):
+              record=run_unified_npc_world(original,seed=seed)
+              assert verify_unified_npc_world(record)
+              assert record["state"]["resolved_count"]==1
+              assert not record["native_unified_engine_executed"]
+              print("UNIFIED_NPC_WORLD_VERIFIED",seed,record["digest"])
+          PY
