@@ -72,7 +72,7 @@ class AdvancedOriginalCityGameTests(unittest.TestCase):
     def test_utility_service_is_not_fabricated_and_water_is_finite(self):
         actions=["build:road:1","build:road:2","build:road:4",
                  "build:residential:5","build:commercial:6"]
-        disconnected=run_advanced_session("city_builder",actions+["tick:4"])
+        disconnected=run_advanced_session("city_builder",actions=actions+["tick:4"])
         self.assertEqual(disconnected["state"]["population"],0)
         self.assertFalse(disconnected["state"]["powered"])
         self.assertFalse(disconnected["state"]["watered"])
@@ -81,7 +81,7 @@ class AdvancedOriginalCityGameTests(unittest.TestCase):
             "aquifer":2,
         })
         with_supply=run_advanced_session(
-            "city_builder",actions+["build:road:8","build:power:3","build:waterworks:9",
+            "city_builder",actions=actions+["build:road:8","build:power:3","build:waterworks:9",
                                     "tick:4"],scene=scene)
         self.assertLessEqual(with_supply["state"]["population"],2)
         self.assertGreaterEqual(with_supply["state"]["aquifer"],0)
