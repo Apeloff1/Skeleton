@@ -160,8 +160,15 @@ def run_peer_fight(settings=None,blue_actions=(),red_actions=(),*,
                 _perform(state,rules,side,a if side=="blue" else b,events)
                 _round(state,rules,events)
             if not state["finished"] and not state["failed"] and state["round"]==current_round:
-                # Two participant commands advance exactly one simulation frame.
-                _turn(state,rules,events,rules["frames_per_turn"])
+                # A paired command is a deterministic input *step*. Actual
+                # elapsed simulation frames honor either participant's
+                # explicit bounded wait duration; short steps retain the
+                # game's authored standard frame cadence.
+                advance=max(rules["frames_per_turn"],*(
+                    int(move.split(":")[1]) for move in (a,b)
+                    if move.startswith("wait:")
+                ))
+                _turn(state,rules,events,advance)
         except (FightingActionError,FightingRollbackError) as exc:
             raise FightingRollbackError(
                 "original peer input invalid at frame "+str(frame)+": "+str(exc)
@@ -170,6 +177,7 @@ def run_peer_fight(settings=None,blue_actions=(),red_actions=(),*,
         state["events"]=events
         fragment={
             "frame":frame,"blue":a,"red":b,
+            "clock_frames":state["clock_frames"],
             "priority":first[0],"events_digest":_digest(events),
             "state_digest":_digest(state),"previous_digest":head,
         }
