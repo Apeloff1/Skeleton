@@ -55,6 +55,37 @@ class IdleCoordinatorPolicy:
             raise ValueError("backoff floor above ceiling")
 
 
+def read_idle_family_history(db: sqlite3.Connection, owner: str, *,
+                             authorized: bool, limit: int = 15) -> list[dict[str, object]]:
+    """Verify the entire owner chain, then return bounded recent events."""
+    _owner(owner)
+    if not authorized:
+        raise PermissionError("idle family journal requires authentication")
+    if type(limit) is not int or not 1<=limit<=100:
+        raise ValueError("invalid idle event page limit")
+    exists=db.execute("""SELECT 1 FROM sqlite_master WHERE type='table'
+        AND name='dragon_family_idle_attempt_events'""").fetchone()
+    if not exists:
+        return []
+    rows=db.execute("""SELECT sequence,at,role,source_id,outcome,details,
+        previous_hash,event_hash FROM dragon_family_idle_attempt_events
+        WHERE owner=? ORDER BY sequence""",(owner,)).fetchall()
+    prior="0"*64
+    last=-1.
+    result=[]
+    for ordinal,row in enumerate(rows,1):
+        sequence,at,role,sid,outcome,note,previous,digest=row
+        if (sequence!=ordinal or at<last or previous!=prior or
+                digest!=_hash([owner,sequence,at,role,sid,outcome,note,previous])):
+            raise ValueError("idle family attempt journal integrity failure")
+        last=at
+        prior=digest
+        result.append(dict(sequence=sequence,at=_utc(at),dragon=role,
+                           source_id=sid,outcome=outcome,change=note,
+                           digest=digest))
+    return result[-limit:][::-1]
+
+
 def read_idle_family_health(db: sqlite3.Connection, owner: str, *,
                             authorized: bool) -> dict[str, object]:
     """Authenticated read-only UI projection; never constructs worker authority.
@@ -70,7 +101,7 @@ def read_idle_family_health(db: sqlite3.Connection, owner: str, *,
         AND name='dragon_family_idle_leases'""").fetchone()
     if not exists:
         return dict(schema="skeleton.ai.dragon.idle_status.v1",
-                    configured=False,workers={},
+                    configured=False,workers={},history=[],
                     idle_only=True,host_state="not_connected",
                     max_tasks_per_tick=3)
     rows=db.execute("""SELECT role,COUNT(*),
@@ -84,8 +115,9 @@ def read_idle_family_health(db: sqlite3.Connection, owner: str, *,
             last_changes=changed or 0,unchanged=unchanged or 0,
             earliest_due_at=_utc(due) if due is not None else None)
             for role,n,failed,running,changed,unchanged,due in rows}
+    history=read_idle_family_history(db,owner,authorized=True,limit=15)
     return dict(schema="skeleton.ai.dragon.idle_status.v1",configured=True,
-                workers=details,idle_only=True,
+                workers=details,history=history,idle_only=True,
                 host_state="not_observed",
                 max_tasks_per_tick=3)
 
