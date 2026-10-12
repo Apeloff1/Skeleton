@@ -184,6 +184,10 @@ def normalize_layout(config,layout):
         enemies.append(dict(e))
     _integer(layout["hazard_damage"],0,config["trap_damage"],"trap damage")
     _integer(layout["reserve"],0,config["encounters_per_floor"],"encounter reserve")
+    if config["floors"]==1 and not any(e["is_boss"] for e in enemies):
+        raise RoguelikeActionError("single-floor campaigns require an actual original guardian")
+    if config["floors"]>1 and any(e["is_boss"] for e in enemies):
+        raise RoguelikeActionError("an early boss cannot masquerade as final victory")
     if len(enemies)+layout["reserve"]>config["encounters_per_floor"]+1:
         raise RoguelikeActionError("encounter reserves cannot secretly exceed typed roster")
     if layout["ambient"] not in ("crypt","glade","foundry","temple") or (
@@ -401,6 +405,7 @@ def step(state,config,action):
                 _spend(state,"mana",config["spell_cost"])
                 damage=config["spell_damage"]+state["attack"]//2
                 target["poison"]=config["spell_poison"]
+                target["stun"]=config["spell_stun"]
             damage=max(1,damage-target["armor"])
             target["hp"]=max(0,target["hp"]-damage)
             events.append("physical_tactical_attack_hit_actual_enemy")
@@ -493,6 +498,8 @@ def step(state,config,action):
         state["hp"]=min(state["max_hp"],state["hp"]+config["rest_health"])
         state["stamina"]=state["max_stamina"]
         events.append("one_real_ration_funded_dungeon_rest")
+    elif action=="inspect":
+        events.append("original_floor_enemies_and_geography_inspected")
     elif action=="scout":
         _spend(state,"stamina",config["scout_stamina"])
         state["score"]+=0
