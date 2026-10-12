@@ -106,8 +106,10 @@ def test_chapter_context_binds_citations_and_refuses_foreign_chapters():
     assert projection["truncated"] is False
     assert projection["citations"][0]["scene"] == 101
     assert "RECEIPT scene-receipt-101" in projection["context"]
+    foreign = script(ch)
+    foreign["chapter"] = 2
     with pytest.raises(ValueError, match="foreign chapter"):
-        chapter_context(ch, [script(ch, chapter=2)])
+        chapter_context(ch, [foreign])
 
 
 def test_context_budget_and_missing_prior_scenes_are_explicit():
