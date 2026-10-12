@@ -27,7 +27,13 @@ const specialistNames: Record<string, string> = {
 };
 
 function valid(snapshot: DragonNestSnapshot | null | undefined): snapshot is DragonNestSnapshot {
-  if (!snapshot || snapshot.schema !== 'skeleton.dragon.nest.v1') return false;
+  if (!snapshot || snapshot.schema !== 'skeleton.dragon.nest.v1' ||
+      !Array.isArray(snapshot.children) ||
+      typeof snapshot.history_head !== 'string' ||
+      typeof snapshot.last_changed_at !== 'string' ||
+      typeof snapshot.last_improvement !== 'string' ||
+      snapshot.last_improvement.length > 360 ||
+      !['egg', 'hatchling', 'juvenile', 'young_adult', 'adult'].includes(snapshot.stage)) return false;
   if (snapshot.promotion_authorized !== false ||
       !Number.isSafeInteger(snapshot.level) || snapshot.level < 0 || snapshot.level > 20 ||
       !Number.isSafeInteger(snapshot.sources_total) || snapshot.sources_total < 1 ||
