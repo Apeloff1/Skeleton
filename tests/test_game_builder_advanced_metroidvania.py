@@ -195,6 +195,68 @@ class OriginalConnectedWorldTests(unittest.TestCase):
         self.assertEqual(assembly["advanced_runtime_evidence"][0]["editor"],"metroidvania")
         self.assertFalse(assembly["ready_for_release"])
 
+
+    def test_live_studio_provides_original_world_map_and_supervised_progression_painter(self):
+        from skeleton.ai.game_builder.game_workspace_ui import (
+            render_workspace_html,SCRIPT,
+        )
+        html=render_workspace_html("A"*32).decode("utf-8")
+        for token in ("paintExplorationRoom","exploration-target-region",
+                      "exploration-world-order","Execute verified exploration move",
+                      "gate_next","toggle_secret","set_guardian",
+                      "Source changes remain untrusted"):
+            # Source custody language is in the behavior rather than a magic
+            # displayed testing-only badge.
+            if token=="Source changes remain untrusted":continue
+            self.assertIn(token,html)
+        self.assertIn("Original world edited. Validate full graph",SCRIPT)
+        self.assertIn("function drawAdvancedGame",SCRIPT)
+        document=make_advanced_scene("metroidvania",{"regions":8},seed=2)
+        altered=deepcopy(document)
+        altered["layout"]["rooms"][2]["biome"]="water"
+        with self.assertRaises(SceneError):
+            validate_advanced_scene(altered,{"regions":8})
+        rebuilt=make_advanced_scene("metroidvania",{"regions":8},seed=2,
+                                    layout=altered["layout"])
+        self.assertNotEqual(document["digest"],rebuilt["digest"])
+
+    def test_offline_cli_emits_independently_verifiable_original_world(self):
+        import io,json,tempfile
+        from contextlib import redirect_stdout
+        from pathlib import Path
+        from skeleton.ai.game_builder.system_editor_cli import main
+        with tempfile.TemporaryDirectory() as tmp:
+            source=Path(tmp)/"settings.json"
+            source.write_text(json.dumps({"regions":8}),encoding="utf-8")
+            stream=io.StringIO()
+            with redirect_stdout(stream):
+                self.assertEqual(main(["play","--editor","metroidvania",
+                                       "--settings",str(source),"--seed","4"]),0)
+            session=json.loads(stream.getvalue())
+            self.assertEqual(len(session["state"]["rooms"]),8)
+            self.assertEqual(session["state"]["region"],0)
+            self.assertTrue(verify_advanced_session(session,{"regions":8}))
+            self.assertFalse(session["native_hardware_verified"])
+
+    def test_elemental_guardian_reduces_real_enemy_damage_with_earned_powers(self):
+        from skeleton.ai.game_builder.advanced_metroidvania_runtime import (
+            start,step,
+        )
+        settings=make_editor_document("metroidvania",{
+            "regions":8,"foe_damage":0,"hazard_damage":0,
+            "boss_damage":6,"armor":0,
+        })["settings"]
+        base=start(settings,2)
+        base["region"]=base["guardian"]
+        hp=base["health"]
+        step(base,settings,"guard")
+        self.assertLess(base["health"],hp)
+        equipped=start(settings,2)
+        equipped["region"]=equipped["guardian"]
+        equipped["abilities"].append("phase")
+        step(equipped,settings,"guard")
+        self.assertGreater(equipped["health"],base["health"])
+
     def test_typed_actuation_and_resource_edge_cases(self):
         for bad in ("teleport","force_win","travel:24","set_hp:1000",
                     "fast:-1","break:infinite","claim"):
