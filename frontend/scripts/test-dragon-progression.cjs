@@ -101,10 +101,29 @@ for(const brokenGlean of [
  assert.equal(family.validateDragonFamily({...brood,glean:brokenGlean}),null,
   'the UI cannot fabricate confirmed cross-source glean evidence');
 }
+// Consent-bound host state is read-only. A queued tick never equals live idle.
+const host={schema:'skeleton.ai.dragon.idle.host.v1',
+ configured:true,active:true,host_idle_now:null,requires_os_idle_observer:true,
+ daily_attempts:2,daily_by_specialist:{article:1,monitor:1},
+ consent_expires_at:at,next_tick_at:at};
+assert.ok(family.validateDragonFamily({...brood,idle_host:host}));
+for(const badHost of [
+ {...host,host_idle_now:true},
+ {...host,active:true,configured:false},
+ {...host,daily_attempts:5},
+ {...host,requires_os_idle_observer:false},
+ {...host,daily_by_specialist:{article:-1}},
+ {...host,consent_expires_at:'not-a-utc-date'},
+ {...host,daily_by_specialist:{worker:2}},
+]){
+ assert.equal(family.validateDragonFamily({...brood,idle_host:badHost}),null,
+  'browser cannot forge host consent, idle status, quotas or activity');
+}
 const nested=load('DragonFamilyNest.tsx');
 assert.ok(nested.source.includes('idle only')&&nested.source.includes('evolution history'));
 assert.ok(nested.source.includes('validateDragonFamily'));
 assert.ok(nested.source.includes('Mother Dragon · Glean Matrix'));
+assert.ok(nested.source.includes('Idle research permissions'));
 assert.ok(nested.source.includes('Disputed:'));
 assert.ok(nested.source.includes('Superseded or revoked observations:'));
 
