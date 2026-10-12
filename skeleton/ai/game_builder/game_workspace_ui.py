@@ -3253,6 +3253,81 @@ function refreshNPCQuestRouteChoices(proof){
  if([...choice.options].some(opt=>opt.value===previous))choice.value=previous;
 }
 
+$("advanced-npc-route").addEventListener("click",async()=>{
+ try{
+  if(!episodicLastProof || !episodicLastScene)
+   throw Error("Replay an original episodic NPC world before investigating");
+  const value=$("advanced-npc-route-quest").value;
+  if(!value)throw Error("No active original physical-source quest requires testimony");
+  const answer=await api("/api/advanced-npc-evidence-navigation",{
+   campaign:episodicLastProof,
+   episodes:verifiedSourceEpisodes,world_scene:episodicLastScene,
+   quest_id:Number(value),objective:$("advanced-npc-route-objective").value
+  });
+  const route=answer.navigation;
+  if(!route || answer.original_game_changed ||
+      answer.automatic_quest_reward_granted || answer.native_hardware_verified ||
+      route.campaign_digest!==episodicLastProof.digest ||
+      route.world_scene_digest!==episodicLastScene.digest)
+   throw Error("Forensic navigation source custody mismatch");
+  verifiedInvestigationRoute=route;
+  $("advanced-npc-route-proof").textContent=JSON.stringify({
+   objective:route.objective,
+   original_quest_id:route.quest_id,
+   actual_witness:route.target_npc_id,
+   outcome:route.outcome,
+   real_world_actions:route.planned_and_simulated_actions,
+   original_world_steps:route.route_steps,
+   proposed_quest_state:route.next_quest_state,
+   player_after_route:route.end_world_state.player,
+   stamina_after_route:route.end_world_state.stamina,
+   actual_replay_digest:route.digest,
+   source_campaign_unchanged:true
+  },null,2);
+  status("Investigative route simulated through real obstacles, NPC sight and physical stamina; apply only to replay.");
+ }catch(error){status("Original eyewitness route blocked: "+error.message);}
+});
+$("advanced-npc-route-apply").addEventListener("click",()=>{
+ try{
+  if(!verifiedInvestigationRoute || !episodicLastProof ||
+     verifiedInvestigationRoute.campaign_digest!==episodicLastProof.digest)
+   throw Error("Run a fresh source-verified investigation route first");
+  const realMoves=verifiedInvestigationRoute.planned_and_simulated_actions;
+  if(!realMoves.length)throw Error("No earned world actions to apply");
+  if(verifiedInvestigationRoute.outcome!=="firsthand_testimony_recorded" &&
+     verifiedInvestigationRoute.outcome!=="real_site_repair_enacted" &&
+     verifiedInvestigationRoute.outcome!=="original_quest_resolved")
+   throw Error("Route has not earned an original world objective");
+  const latest=verifiedSourceEpisodes[verifiedSourceEpisodes.length-1];
+  const total=verifiedSourceEpisodes.reduce((n,x)=>n+x.world_actions.length,0);
+  if(latest.world_actions.length+realMoves.length>24 || total+realMoves.length>64)
+   throw Error("Original authored world episode/total command budgets exceeded");
+  latest.world_actions.push(...realMoves);
+  verifiedInvestigationRoute=null;
+  episodicLastProof=null;
+  episodicLastScene=null;
+  $("advanced-npc-route-proof").textContent="";
+  $("advanced-episodic-play").click();
+  status("Approved route actions added to original game episode; independent campaign replay requested.");
+ }catch(error){status("Cannot commit forensic actions: "+error.message);}
+});
+$("advanced-npc-world-canvas").addEventListener("click",event=>{
+ if(!episodicLastProof)return;
+ const canvas=$("advanced-npc-world-canvas"),box=canvas.getBoundingClientRect();
+ const x=(event.clientX-box.left)*canvas.width/box.width;
+ const y=(event.clientY-box.top)*canvas.height/box.height;
+ const col=Math.floor((x-18)/42),row=Math.floor((y-18)/42);
+ if(col<0||col>=7||row<0||row>=7)return;
+ const cell=row*7+col;
+ const site=episodicLastProof.world_state.sites.find(x=>x.cell===cell);
+ if(!site)return;
+ const q=episodicLastProof.world_state.quests.find(q=>
+   q.origin_actor==="external:physics" && q.status==="active" && q.site_id===site.id);
+ if(q){
+  $("advanced-npc-route-quest").value=String(q.id);
+  status("Selected genuine physical quest "+q.id+" at authored site "+site.id);
+ }
+});
 $("advanced-episodic-clear").addEventListener("click",()=>{
  verifiedSourceEpisodes=[];
  episodicLastProof=null;episodicLastScene=null;verifiedInvestigationRoute=null;
