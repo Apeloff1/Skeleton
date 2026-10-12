@@ -186,7 +186,9 @@ def apply_scene(state,config,layout):
     state["selected"]=0
     state["next_unit_id"]=len(state["units"])
     state["next_enemy_id"]=len(state["enemies"])
-    return state
+    state["visible"]=[]
+    state["discovered"]=[]
+    return _refresh(state,config)
 
 
 def start(config,seed):
@@ -202,7 +204,7 @@ def start(config,seed):
       "events":[],"achievements":[],"finished":False,"failed":False,
       "victory":False,"reason":""
     }
-    return _refresh(apply_scene(state,config,default_layout(config,seed)),config)
+    return apply_scene(state,config,default_layout(config,seed))
 
 
 def _alive(state,side):
