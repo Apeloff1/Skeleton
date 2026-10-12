@@ -137,6 +137,13 @@ def test_proofreading_counts_100k_executed_checks_and_authenticates_receipt():
     assert report["chapter_digest"] == ch["digest"]
     assert len(report["receipt_digest"]) == 64
     assert report["method"] == "deterministic_rule_reinspection_not_semantic_or_llm_proof"
+    assert len(report["highlight_review_queue"]) == 4
+    assert all(x["automatically_approved"] is False
+               for x in report["highlight_review_queue"])
+    assert all(x["status"] == "requires_model_or_editor_review"
+               for x in report["highlight_review_queue"])
+    assert report["highlight_model_reviews_executed"] is False
+    assert report["highlight_model_reviews_approved"] is False
     assert report == proofreading_checks(value, ch, history_complete=True, history_issues=[])
 
 
