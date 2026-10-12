@@ -38,6 +38,9 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_fast_chunk_snapshot import (
+    run_fast_chunk_branches, verify_fast_chunk_branches,
+)
 from .advanced_chunked_world_timeline import (
     make_chunked_bookmarks, verify_chunked_bookmarks,
     continue_chunked_world, verify_chunked_continuation,
@@ -200,6 +203,14 @@ def parser() -> argparse.ArgumentParser:
     ecology_verify.add_argument("--record",required=True)
     ecology_verify.add_argument("--scene",required=True)
     ecology_verify.add_argument("--settings")
+    fast_fork=commands.add_parser("fast-chunk-forks",
+        help="Verify source once and execute bounded original story suffixes")
+    fast_fork.add_argument("--checkpoint",required=True)
+    fast_fork.add_argument("--branches",required=True)
+    fast_fork.add_argument("--cursor",type=int)
+    fast_check=commands.add_parser("verify-fast-chunk-forks",
+        help="Fully replay every branch, rejecting unauthenticated fast source claims")
+    fast_check.add_argument("--record",required=True)
     checkpoint=commands.add_parser("chunked-world-checkpoint",
         help="Create source-verified original streaming-game save cursors")
     checkpoint.add_argument("--record",required=True)
@@ -469,6 +480,11 @@ def main(argv=None) -> int:
             output={"verified":verify_original_ecology_plan(
                 _load(args.record),_load(args.scene),
                 _load(args.settings) if args.settings else None)}
+        elif args.operation == "fast-chunk-forks":
+            output=run_fast_chunk_branches(
+                _load(args.checkpoint),_load(args.branches),cursor=args.cursor)
+        elif args.operation == "verify-fast-chunk-forks":
+            output={"verified":verify_fast_chunk_branches(_load(args.record))}
         elif args.operation == "chunked-world-checkpoint":
             output=make_chunked_bookmarks(_load(args.record),interval=args.interval)
         elif args.operation == "verify-chunked-world-checkpoint":
