@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from fractions import Fraction
+from .advanced_physics_contact_custody import record_fixture_contact
 from .advanced_physics_rotational_sweep import solve_oriented_sweep
 from .advanced_physics_stability import settle, is_sleeping
 from .advanced_physics_oriented import (
@@ -301,24 +302,6 @@ def _collides(a, b, axes):
                < a["radius"] + b["radius"] for axis in axes)
 
 
-def _fixture_receipt(state,body,index,kind):
-    """Authoritative original fixture identity, never a guessed collision.
-
-    The per-source-index count persists through the entire bounded physical
-    session. A 96-record rotating window preserves recent ordering while the
-    complete collision-count vector cannot lose older contact attribution.
-    """
-    state["fixture_contact_counts"][index]+=1
-    history=state["fixture_contact_events"]
-    if len(history)>=96:
-        history.pop(0)
-    history.append({
-        "fixture_index":index,"body_id":body["id"],
-        "kind":kind,"tick":state["tick"],"frame":state["frame"],
-        "position":list(body["position"]),
-    })
-
-
 def _world(body, state, config, events, previous=None):
     if config["collision_geometry"]=="oriented_box":
         oriented_world(body,state,config,events)
@@ -376,7 +359,7 @@ def _world(body, state, config, events, previous=None):
                     velocity[hit_axis] = -velocity[hit_axis]*config["wall_restitution"]//100
                     state["contacts"] += 1
                     events.append("swept_fixture_contact")
-                    _fixture_receipt(state,body,fixture_index,"swept_fixture_contact")
+                    record_fixture_contact(state,body,fixture_index,"swept_fixture_contact")
         penetrations = [
             body["radius"] + fixture["half_size"][axis] -
             abs(pos[axis]-fixture["position"][axis]) for axis in axes
@@ -390,7 +373,7 @@ def _world(body, state, config, events, previous=None):
             velocity[axis] = -velocity[axis] * config["wall_restitution"] // 100
             state["contacts"] += 1
             events.append("fixture_contact")
-            _fixture_receipt(state,body,fixture_index,"fixture_contact")
+            record_fixture_contact(state,body,fixture_index,"fixture_contact")
 
 
 def _pair_contacts(state, config, events):
