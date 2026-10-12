@@ -8,7 +8,7 @@ import pytest
 
 from skeleton.ai.webcrawler.core import CrawlDocument
 from skeleton.ai.webcrawler.dragon_consent_ledger import DragonConsentLedger
-from skeleton.ai.webcrawler.dragon_family import IdleWindow, SourceReceipt
+from skeleton.ai.webcrawler.dragon_family import IdleWindow, SourceReceipt, SourceSeed
 from skeleton.ai.webcrawler.dragon_family_custody_bridge import (
     DragonFamilyCustodyBridge, ApprovedSourceSnapshot,
 )
@@ -219,13 +219,19 @@ def test_quota_is_charged_with_atomic_lease_and_stops_second_specialist():
     token=host.acquisition.coordinator._reserve(OWNER,"article",SRC,T+720)
     assert isinstance(token,str) and token
     assert host.status(at=T+720,authorized=True)["daily_attempts"]==1
+    # Quota is independent of source-global lease fencing. Use a SECOND
+    # legitimately registered source, so a duplicate-source early return
+    # cannot falsely appear to test the host's daily quota enforcement.
+    family.enroll(OWNER,(SourceSeed("doc-2","https://example.org/further-design",
+                                   "article",TOPICS),),
+                  authorized=True,now=T+650)
     with pytest.raises(PermissionError,match="daily idle acquisition quota"):
-        host.acquisition.coordinator._reserve(OWNER,"monitor",SRC,T+721)
+        host.acquisition.coordinator._reserve(OWNER,"article","doc-2",T+721)
     row=db.execute("""SELECT started FROM dragon_family_idle_daily_usage
         WHERE owner=?""",(OWNER,)).fetchall()
     assert row==[(1,)]
     assert not db.execute("""SELECT 1 FROM dragon_family_idle_leases
-        WHERE owner=? AND role='monitor'""",(OWNER,)).fetchone()
+        WHERE owner=? AND source_id='doc-2'""",(OWNER,)).fetchone()
     db.close()
 
 
