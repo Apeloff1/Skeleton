@@ -41,6 +41,9 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_npc_conditional_mission import (
+    run_original_conditional_mission, verify_original_conditional_mission,
+)
 from .advanced_npc_mission_mirror import (
     analyze_original_npc_missions, verify_original_npc_mission_mirror,
 )
@@ -513,6 +516,23 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 values["record"],values["scene"],values.get("settings"))
             return self._json(200,{"verified":validated,
                                    "original_source_mutated":False})
+        if path=="/api/run-original-conditional-npc-mission":
+            report=run_original_conditional_mission(
+                values["record"],values["program"],
+                max_steps_per_goal=values.get("max_steps_per_goal",24))
+            return self._json(200,{
+                "record":report,
+                "verified":verify_original_conditional_mission(report),
+                "source_files_mutated":False,
+                "model_weights_promoted":False,
+                "native_hardware_certified":False,
+            })
+        if path=="/api/verify-original-conditional-npc-mission":
+            return self._json(200,{
+                "verified":verify_original_conditional_mission(values["record"]),
+                "source_files_mutated":False,
+                "model_weights_promoted":False,
+            })
         if path=="/api/analyze-original-npc-missions":
             review=analyze_original_npc_missions(
                 values["record"],values["candidates"])
