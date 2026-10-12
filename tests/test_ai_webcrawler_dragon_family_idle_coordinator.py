@@ -147,6 +147,66 @@ def test_source_revision_commit_fails_closed_without_current_lease():
     db.close()
 
 
+def test_cross_specialist_leases_cannot_race_for_same_source():
+    db,family,worker=make()
+    token=worker._reserve(OWNER,"article","article-1",NOW+720)
+    assert token
+    assert worker._reserve(OWNER,"monitor","article-1",NOW+721) is None
+    assert worker._owned(OWNER,"article","article-1",token,NOW+721)
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==0
+    db.close()
+
+
+def test_crash_recovery_reclaims_old_leases_without_replaying_knowledge():
+    db,family,worker=make()
+    key=worker._reserve(OWNER,"article","article-1",NOW+720)
+    assert key
+    assert worker.reconcile_expired_leases(OWNER,authorized=True,at=NOW+740)==0
+    assert worker.reconcile_expired_leases(OWNER,authorized=True,at=NOW+850)==1
+    assert worker.reconcile_expired_leases(OWNER,authorized=True,at=NOW+851)==0
+    assert not worker._owned(OWNER,"article","article-1",key,NOW+851)
+    assert worker._reserve(OWNER,"article","article-1",NOW+900) is None
+    events=read_idle_family_history(db,OWNER,authorized=True)
+    assert len(events)==1 and events[0]["outcome"]=="recovered"
+    assert events[0]["change"].startswith("(recovered:")
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==0
+    # Once the recovery backoff expires, genuinely new reviewed evidence
+    # may be acquired on the NEXT independently idle host tick.
+    result=worker.run_once(OWNER,authorized=True,
+         idle_state=lambda:idle(NOW+1200),
+         gatherers={"article":lambda task:receipt(task.source_id,ART,NOW+1199)},
+         task_topics=("game_engine",))
+    assert result["changed"]==1 and result["recovered"]==0
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==1
+    db.close()
+
+
+def test_idle_recovery_is_bounded_and_never_runs_while_foreground():
+    db,family,worker=make()
+    worker._reserve(OWNER,"video","video-1",NOW+720)
+    with pytest.raises(PermissionError):
+        worker.reconcile_expired_leases(OWNER,authorized=False,at=NOW+850)
+    with pytest.raises(ValueError):
+        worker.reconcile_expired_leases(OWNER,authorized=True,at=NOW+850,max_recover=0)
+    with pytest.raises(PermissionError):
+        worker.run_once(OWNER,authorized=True,idle_state=lambda:idle(foreground=True),
+                        gatherers={},task_topics=("game_engine",))
+    assert not read_idle_family_history(db,OWNER,authorized=True)
+    assert worker.reconcile_expired_leases(OWNER,authorized=True,at=NOW+850)==1
+    db.close()
+
+
+def test_commit_guard_blocks_new_knowledge_without_affecting_other_sources():
+    db,family,worker=make()
+    report=worker.run_once(OWNER,authorized=True,idle_state=idle,
+        gatherers={"article":lambda task:receipt(task.source_id,ART,NOW+719)},
+        task_topics=("game_engine",),commit_gate=lambda at:False)
+    assert report["changed"]==0 and report["paused"]
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==0
+    assert read_idle_family_history(db,OWNER,authorized=True)[0]["outcome"]=="paused"
+    db.close()
+
+
 def test_idle_attempt_journal_is_utc_timestamped_and_tamper_evident():
     db,family,worker=make()
     outcome=worker.run_once(OWNER,authorized=True,idle_state=idle,
