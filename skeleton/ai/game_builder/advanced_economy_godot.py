@@ -351,7 +351,7 @@ func _verify() -> void:
         return
     if proof.get("scene_digest") != source["scene"]["digest"] or (
         proof.get("settings_digest") != source.get("settings_digest")
-    ) or proof.get("verified_by_python_replay") is not bool or not proof["verified_by_python_replay"]:
+    ) or typeof(proof.get("verified_by_python_replay")) != TYPE_BOOL or not proof["verified_by_python_replay"]:
 
         _fail("source and proof configuration identity mismatch")
         return
