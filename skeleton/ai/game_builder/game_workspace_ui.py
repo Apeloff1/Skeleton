@@ -828,6 +828,52 @@ function drawAdvancedGame(session){
   c.fillText("Loot "+state.treasure+" · score "+state.score,tx,218);
   c.fillText("A signed source map governs every room and reward.",12,249);
  }
+ if(editor==="rts"){
+  const map=state.map;
+  const seen=new Set(state.visible),known=new Set(state.discovered);
+  c.fillStyle="#dcece4";
+  c.fillText("Original strategy · tick "+state.tick+" · "+
+    map.environment,12,35);
+  const terrain={};
+  for(let i=0;i<64;i++){
+   const x=14+(i%8)*26,y=43+Math.floor(i/8)*25;
+   c.fillStyle=map.obstacles.includes(i)?"#747b7b":
+    !known.has(i)?"#112b34":!seen.has(i)?"#294753":"#406f60";
+   c.fillRect(x,y,24,23);
+   let marker="";
+   if(seen.has(i)||!advancedSettings?.fog_of_war){
+    const deposit=map.nodes.find(n=>n.cell===i&&n.stock>0);
+    if(deposit)marker=deposit.type==="wood"?"W":deposit.type==="ore"?"O":"E";
+    const building=state.buildings.find(b=>b.cell===i&&b.hp>0);
+    if(building)marker=building.side==="blue"?"B":"X";
+    const enemy=state.enemies.find(u=>u.cell===i&&u.hp>0);
+    if(enemy)marker="R";
+   }
+   const ally=state.units.find(u=>u.cell===i&&u.hp>0);
+   if(ally)marker=ally.kind==="worker"?"w":"U";
+   if(i===map.relay&&seen.has(i)&&!ally)marker="C";
+   if(marker){
+    c.fillStyle=marker==="R"?"#ffaaa7":marker==="X"?"#f9b9a8":"#f3f5d3";
+    c.fillText(marker,x+7,y+16);
+   }
+   if(ally&&ally.id===state.selected){
+    c.strokeStyle="#fbd875";c.lineWidth=2;c.strokeRect(x+1,y+1,22,21);
+   }
+  }
+  const tx=237;c.fillStyle="#e1ebe7";
+  c.fillText("Wood "+state.wood+" · ore "+state.ore,tx,51);
+  c.fillText("Energy "+state.energy+" · supply "+state.supply_used,tx,75);
+  c.fillText("Units "+state.units.filter(u=>u.hp>0).length+
+   " · opposing "+state.enemies.filter(u=>u.hp>0&&seen.has(u.cell)).length,tx,99);
+  c.fillText("Selected unit #"+state.selected,tx,123);
+  c.fillText("Relay "+state.relay_owner+" · "+state.relay_progress,tx,147);
+  c.fillText("Relay hold "+state.relay_hold,tx,171);
+  c.fillText("Map visibility "+state.visible.length+"/64",tx,195);
+  c.fillText("Enemy HQ "+state.buildings.find(b=>b.side==="red").hp+
+   " · waves "+state.wave_index,tx,219);
+  c.fillStyle="#a3d8c2";
+  c.fillText("All movement, mining and conquest uses real map cells",12,252);
+ }
  if(state.finished||state.failed){
   c.fillStyle=state.finished?"#a2f5cb":"#ffaba6";
   c.fillText(state.finished?"Completed":"Defeat",W-100,20);
@@ -854,10 +900,69 @@ document.addEventListener("keydown",event=>{
  advanceAdvanced(mode+"_"+direction);
 });
 let originalRoguelikeLongrunRecord=null;
+let selectedRTSCell=27;
 let selectedSandboxCell=0;
 let selectedCityParcel=0;
 function renderAdvancedActions(actions){
  const target=$("advanced-actions");target.replaceChildren();
+ if(advancedSession?.editor==="rts"){
+  const troop=document.createElement("label");
+  troop.textContent="Player-owned unit";
+  const unit=document.createElement("select");unit.id="rts-owned-unit";
+  for(const u of advancedSession.state.units){
+   if(u.hp<=0)continue;
+   const option=document.createElement("option");
+   option.value=String(u.id);
+   option.textContent="#"+u.id+" "+u.kind+" HP "+u.hp+" cell "+u.cell;
+   unit.append(option);
+  }
+  unit.value=String(advancedSession.state.selected);
+  troop.append(unit);target.append(troop);
+  const choose=document.createElement("label");
+  choose.textContent="Actual battlefield target tile";
+  const targetCell=document.createElement("select");targetCell.id="rts-target-cell";
+  for(let i=0;i<64;i++){
+   const option=document.createElement("option");option.value=String(i);
+   option.textContent="Tile "+i+" · "+Math.floor(i/8)+":"+i%8;
+   targetCell.append(option);
+  }
+  targetCell.value=String(selectedRTSCell);choose.append(targetCell);
+  target.append(choose);
+  const order=document.createElement("label");
+  order.textContent="Real movement / combat / economy action";
+  const command=document.createElement("select");
+  command.id="rts-command";
+  const fill=()=>{
+   selectedRTSCell=Number(targetCell.value);
+   command.replaceChildren();
+   const local=actions.filter(a=>a.endsWith(":"+targetCell.value) &&
+                       !a.startsWith("select:"));
+   const other=actions.filter(a=>!a.match(/:[0-9]+$/) &&
+                              !a.startsWith("construct:"));
+   for(const action of [...local,...other]){
+    const opt=document.createElement("option");
+    opt.value=action;opt.textContent=action.replaceAll("_"," ");
+    command.append(opt);
+   }
+  };
+  targetCell.addEventListener("change",fill);fill();
+  order.append(command);target.append(order);
+  const issue=document.createElement("button");issue.type="button";
+  issue.textContent="Issue verified tactical order";
+  issue.disabled=Boolean(advancedSession.terminal);
+  issue.addEventListener("click",async()=>{
+   const intended=Number(unit.value);
+   if(intended!==advancedSession.state.selected)
+    await advanceAdvanced("select:"+intended);
+   await advanceAdvanced(command.value);
+  });
+  target.append(issue);
+  const hint=document.createElement("small");
+  hint.textContent="Click the battlefield to target. Worker cargo physically returns to home depots; patrols, fog and capture use real tactical positions.";
+  target.append(hint);
+  return;
+ }
+
  if(advancedSession?.editor==="roguelike"){
   const selector=document.createElement("label");
   selector.textContent="Original tactical move / equipment / floor objective";
@@ -1084,6 +1189,20 @@ function renderAdvancedActions(actions){
 }
 
 $("advanced-canvas").addEventListener("click",event=>{
+ if(advancedSession&&advancedSession.editor==="rts"){
+  const board=$("advanced-canvas"),rect=board.getBoundingClientRect();
+  const px=(event.clientX-rect.left)*board.width/rect.width;
+  const py=(event.clientY-rect.top)*board.height/rect.height;
+  const x=Math.floor((px-14)/26),y=Math.floor((py-43)/25);
+  if(x<0||x>=8||y<0||y>=8||
+     px>14+x*26+24||py>43+y*25+23)return;
+  selectedRTSCell=y*8+x;
+  const field=$("rts-target-cell");
+  if(field){field.value=String(selectedRTSCell);
+   field.dispatchEvent(new Event("change"));}
+  return;
+ }
+
  if(advancedSession&&advancedSession.editor==="sandbox"){
   const canvas=$("advanced-canvas"),rect=canvas.getBoundingClientRect();
   const px=(event.clientX-rect.left)*canvas.width/rect.width;
@@ -1159,6 +1278,13 @@ async function advanceAdvanced(action){
 // Visual paint works only on the local draft JSON. It cannot bypass the
 // server's canonical validation, exact-file review, or human commit.
 const PAINT_TOOLS={
+ rts:["obstacle_toggle","wood_node","ore_node","energy_node",
+       "remove_node","wood_plus","ore_plus","energy_plus",
+       "friendly_base","enemy_base","relay","friendly_spawn",
+       "enemy_spawn","erase_spawn","environment_next",
+       "starting_wood_up","starting_ore_up","starting_energy_up",
+       "enemy_base_hp_up"],
+
  roguelike:["wall_toggle","trap_toggle","chest_toggle",
    "spawn","exit","shop","shrine","enemy_toggle",
    "enemy_health_up","enemy_health_down","enemy_attack_up","enemy_attack_down",
@@ -1238,6 +1364,38 @@ function renderSceneAuthoring(){
   shape=sceneGridShape(source);
  }catch(_){ctx.fillText("Invalid or mismatched scene JSON: use Validate.",12,24);return;}
 
+ if(source.editor==="rts"){
+  const m=source.layout;
+  ctx.fillText("Original 8×8 original strategic resource/capture map",12,18);
+  for(let i=0;i<64;i++){
+   const x=14+(i%8)*27,y=31+Math.floor(i/8)*25;
+   ctx.fillStyle=m.obstacles.includes(i)?"#838581":"#3e735f";
+   ctx.fillRect(x,y,25,23);
+   let label="";
+   if(i===m.friendly_base)label="B";
+   else if(i===m.enemy_base)label="X";
+   else if(i===m.relay)label="C";
+   else if(m.friendly_spawns.includes(i))label="U";
+   else if(m.enemy_spawns.includes(i))label="R";
+   else{
+    const node=m.nodes.find(n=>n.cell===i);
+    if(node)label=node.type[0].toUpperCase();
+   }
+   if(label){
+    ctx.fillStyle="#faf3ce";
+    ctx.fillText(label,x+8,y+17);
+   }
+  }
+  ctx.fillStyle="#d4e8da";
+  ctx.fillText("Environment "+m.environment,251,45);
+  ctx.fillText("Wood "+m.starting_wood+" · ore "+m.starting_ore,251,69);
+  ctx.fillText("Energy "+m.starting_energy,251,92);
+  ctx.fillText("Hostile base HP "+m.enemy_base_health,251,115);
+  ctx.fillText("Nodes "+m.nodes.length+
+   " · walls "+m.obstacles.length,251,138);
+  ctx.fillText("Revalidate before playing; no instant victories",251,171);
+  return;
+ }
  if(source.editor==="roguelike"){
   const layout=source.layout;
   ctx.fillText("Original signed 6×6 procedural dungeon source (first floor)",12,18);
@@ -1429,6 +1587,54 @@ function renderSceneAuthoring(){
  }
 }
 
+function paintRTSCell(cell){
+ const doc=JSON.parse($("advanced-scene-json").value);
+ if(doc.editor!=="rts"||systemEditor().id!=="rts")
+  throw Error("Original RTS source painter requires matching editor");
+ const m=doc.layout,tool=$("advanced-paint-tool").value,settings=systemSettings();
+ if(!Number.isInteger(cell)||cell<0||cell>=64)
+  throw Error("Original battlefield target must be a real bounded tile");
+ const toggle=(rows)=>rows.includes(cell)?rows.filter(i=>i!==cell):
+  [...rows,cell].sort((a,b)=>a-b);
+ const bound=(v,step,max)=>Math.max(0,Math.min(max,v+step));
+ if(tool==="obstacle_toggle")m.obstacles=toggle(m.obstacles);
+ else if(["wood_node","ore_node","energy_node"].includes(tool)){
+  let node=m.nodes.find(n=>n.cell===cell);
+  const type=tool.split("_")[0];
+  if(node){node.type=type;}
+  else m.nodes.push({id:0,cell,type,stock:25});
+  m.nodes.forEach((n,i)=>n.id=i);
+ }else if(tool==="remove_node"){
+  m.nodes=m.nodes.filter(n=>n.cell!==cell);
+  m.nodes.forEach((n,i)=>n.id=i);
+ }else if(["wood_plus","ore_plus","energy_plus"].includes(tool)){
+  const type=tool.split("_")[0];
+  const node=m.nodes.find(n=>n.cell===cell&&n.type===type);
+  if(!node)throw Error("Original stock increase requires matching actual map node");
+  node.stock=bound(node.stock,1,10000);
+ }else if(["friendly_base","enemy_base","relay"].includes(tool))
+  m[tool]=cell;
+ else if(tool==="friendly_spawn")m.friendly_spawns=toggle(m.friendly_spawns);
+ else if(tool==="enemy_spawn")m.enemy_spawns=toggle(m.enemy_spawns);
+ else if(tool==="erase_spawn"){
+  m.friendly_spawns=m.friendly_spawns.filter(i=>i!==cell);
+  m.enemy_spawns=m.enemy_spawns.filter(i=>i!==cell);
+ }else if(tool==="environment_next"){
+  const a=["forest","desert","highland","rain"];
+  m.environment=a[(a.indexOf(m.environment)+1)%a.length];
+ }else if(tool==="starting_wood_up")m.starting_wood=bound(
+  m.starting_wood,1,settings.starting_wood);
+ else if(tool==="starting_ore_up")m.starting_ore=bound(
+  m.starting_ore,1,settings.starting_ore);
+ else if(tool==="starting_energy_up")m.starting_energy=bound(
+  m.starting_energy,1,settings.starting_energy);
+ else if(tool==="enemy_base_hp_up")m.enemy_base_health=bound(
+  m.enemy_base_health,1,settings.enemy_base_health);
+ else throw Error("Unregistered original authored strategy map operation");
+ $("advanced-scene-json").value=JSON.stringify(doc,null,2);
+ renderSceneAuthoring();
+ status("Original strategy source mutated. Validate resource custody, route connectivity and scene digest before approval.");
+}
 function paintRoguelikeCell(index){
  const doc=JSON.parse($("advanced-scene-json").value);
  if(doc.editor!=="roguelike"||systemEditor().id!=="roguelike")
@@ -1722,6 +1928,15 @@ $("advanced-scene-grid").addEventListener("click",event=>{
   if(!text)throw Error("Generate a scene document first");
   const doc=JSON.parse(text),shape=sceneGridShape(doc);
   const canvas=$("advanced-scene-grid"),rect=canvas.getBoundingClientRect();
+  if(doc.editor==="rts"){
+   const px=(event.clientX-rect.left)*canvas.width/rect.width;
+   const py=(event.clientY-rect.top)*canvas.height/rect.height;
+   const x=Math.floor((px-14)/27),y=Math.floor((py-31)/25);
+   if(x<0||x>=8||y<0||y>=8||
+      px>14+x*27+25||py>31+y*25+23)return;
+   paintRTSCell(y*8+x);
+   return;
+  }
   if(doc.editor==="roguelike"){
    const px=(event.clientX-rect.left)*canvas.width/rect.width;
    const py=(event.clientY-rect.top)*canvas.height/rect.height;
