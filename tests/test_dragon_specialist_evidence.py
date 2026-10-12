@@ -632,3 +632,31 @@ def test_research_catalog_owner_isolation_bad_cursors_and_corrupt_source(context
             if not page["has_more"]:
                 break
             cursor=page["next_after_source"]
+
+
+
+def test_three_hatchlings_new_owner_without_signed_nest_reports_real_zero_progress(context):
+    from unittest.mock import patch
+    captures,sid,url,old,new,_,_=prepare_article_revisions(context)
+    lead=add_video(context)
+    videos,_=transcript_ledger(context)
+    nest=context[2].nest
+    triad=DragonThreeHatchlingCoordinator(
+        DragonArticleHatchling(captures),videos,
+        DragonSourceDeltaLedger(captures),nest)
+    # Simulate a genuinely new account without an initialized signed nest.
+    # This must not become a failure or auto-mint a progress event.
+    with patch.object(nest,"read",return_value=None):
+        status=triad.status(
+            OWNER,article_source_id=sid,video_source_id=lead.source_id,
+            update_source_id=sid,authorized=True)
+    assert status["mother_stage"]=="not_initialized"
+    assert status["mother_level"] is None
+    assert status["lane_count"]==3
+    assert [child["growth"]["stage"] for child in status["hatchlings"]]==[
+        "locked","locked","locked"]
+    assert all(child["growth"]["level"]==0 for child in status["hatchlings"])
+    assert all(child["growth"]["accepted_evidence_count"]==0
+               for child in status["hatchlings"])
+    assert status["xp_awarded"]==0
+    assert status["model_training_authorized"] is False

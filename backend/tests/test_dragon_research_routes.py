@@ -12,6 +12,10 @@ from routes import dragon_research
 from routes.dragon_academy import _principal
 from skeleton.ai.game_builder.dragon_almanacs import DragonAlmanacs
 from skeleton.ai.game_builder.dragon_technical_source_atlas import DragonTechnicalSources
+from skeleton.ai.game_builder.dragon_technical_source_captures import DragonSourceCaptures
+from skeleton.ai.game_builder.dragon_source_delta_ledger import DragonSourceDeltaLedger
+from skeleton.ai.game_builder.dragon_video_transcript_ledger import DragonVideoTranscriptLedger
+from skeleton.ai.webcrawler.dragon_nest_source_feed import DragonNestSourceFeed
 from skeleton.ai.game_builder.reviewed_knowledge import ReviewedKnowledgeStore
 from skeleton.ai.webcrawler.dragon_nest_store import DragonNestStore
 
@@ -23,14 +27,23 @@ REVIEW_KEY=b"\x21"*32
 def storage(tmp_path):
     knowledge=tmp_path/"knowledge.sqlite"
     nest=tmp_path/"nest.sqlite"
-    with ReviewedKnowledgeStore(knowledge) as library:
-        almanacs=DragonAlmanacs(library)
-        atlas=DragonTechnicalSources(almanacs)
-        owner=_principal({
-            "email":"alice@example.test","tenant_id":"tenant-a","role":"editor"})
-        atlas.import_catalog(owner,authorized=True,recorded_at=1791800000)
+    # Migration is a trusted operator action, NOT a web GET. Create the
+    # complete existing schema before opening the read-only dashboard.
     with sqlite3.connect(nest) as db:
-        DragonNestStore(db,signing_key=NEST_KEY)
+        signed_nest=DragonNestStore(db,signing_key=NEST_KEY)
+        with ReviewedKnowledgeStore(knowledge) as library:
+            almanacs=DragonAlmanacs(library)
+            atlas=DragonTechnicalSources(almanacs)
+            owner=_principal({
+                "email":"alice@example.test","tenant_id":"tenant-a","role":"editor"})
+            atlas.import_catalog(owner,authorized=True,recorded_at=1791800000)
+            captures=DragonSourceCaptures(almanacs)
+            DragonSourceDeltaLedger(captures)
+            feed=DragonNestSourceFeed(almanacs,atlas,signed_nest)
+            DragonVideoTranscriptLedger(
+                feed,review_public_key=REVIEW_KEY,
+                issuer="independent-transcript-reviewer",
+                key_id="ed25519-review-v1")
     return knowledge,nest,owner
 
 
@@ -96,7 +109,7 @@ def test_factory_keeps_research_tenants_isolated_and_fails_closed(storage):
     assert response["page_size"]<=20 and response["has_more"]
     assert not response["training_authorized"]
     stranger=dragon_research.source_catalog(
-        request(app),limit=20,after_source=None,owner="other-tenant")
+        request(app),Response(),limit=20,after_source=None,owner="other-tenant")
     assert stranger["entries"]==[]
     with pytest.raises(HTTPException) as missing:
         dragon_research.three_hatchlings_status(
@@ -133,3 +146,85 @@ def test_environment_opt_in_missing_requirements_rejected(storage,monkeypatch):
     f=DragonResearchSessionFactory.from_env()
     with f.open() as coordinator:
         assert coordinator.source_catalog("other-tenant",authorized=True)["entries"]==[]
+
+
+
+def test_research_read_session_blocks_write_queries_on_both_databases(storage):
+    f=factory(storage)
+    knowledge,nest,owner=storage
+    with f.open() as coordinator:
+        assert coordinator.source_catalog(
+            owner,authorized=True,limit=1)["page_size"]<=1
+        for db in (coordinator.article.captures.db,coordinator.nest.db):
+            assert db.execute("PRAGMA query_only").fetchone()[0]==1
+            with pytest.raises(sqlite3.OperationalError,match="readonly"):
+                db.execute("CREATE TABLE forbidden_research_mutation(x INTEGER)")
+            # A write against an existing table must fail even if no rows
+            # match. This checks the SQLite-level read-only authority.
+            table = ("game_builder_knowledge"
+                     if db is coordinator.article.captures.db else
+                     "dragon_nest_state")
+            with pytest.raises(sqlite3.OperationalError,match="readonly"):
+                db.execute("DELETE FROM "+table+" WHERE 1=0")
+    for filename in (knowledge,nest):
+        with sqlite3.connect(filename) as db:
+            assert db.execute("SELECT name FROM sqlite_master WHERE name='forbidden_research_mutation'").fetchone() is None
+
+
+def test_read_only_web_session_never_auto_migrates_missing_schema(tmp_path):
+    knowledge=tmp_path/"legacy.sqlite"
+    nest=tmp_path/"legacy-nest.sqlite"
+    with ReviewedKnowledgeStore(knowledge):
+        pass
+    with sqlite3.connect(nest) as db:
+        DragonNestStore(db,signing_key=NEST_KEY)
+    f=DragonResearchSessionFactory(
+        knowledge_path=knowledge,nest_path=nest,
+        nest_key=NEST_KEY,transcript_review_public_key=REVIEW_KEY,
+        transcript_issuer="independent-transcript-reviewer",
+        transcript_key_id="ed25519-review-v1")
+    with pytest.raises(sqlite3.OperationalError,match="readonly"):
+        with f.open():
+            pytest.fail("incomplete research schema must never be shown")
+    with sqlite3.connect(knowledge) as db:
+        assert db.execute(
+            "SELECT name FROM sqlite_master WHERE name='dragon_almanac_sources'"
+        ).fetchone() is None
+
+
+
+def test_read_session_pins_snapshot_across_concurrent_source_registry_write(storage):
+    knowledge,_,owner=storage
+    with factory(storage).open() as reader:
+        db=reader.article.captures.db
+        old=db.execute(
+            "SELECT COUNT(*) FROM dragon_almanac_topics"
+        ).fetchone()[0]
+        # A real operator/worker may be writing while a GET is in flight.
+        # The browser must not see half an evolving source inventory.
+        with sqlite3.connect(knowledge,timeout=5) as writer:
+            writer.execute(
+                "INSERT INTO dragon_almanac_topics VALUES(?,?,?,?)",
+                ("separate-tenant","topic-concurrent",None,"[]"))
+        current=db.execute(
+            "SELECT COUNT(*) FROM dragon_almanac_topics"
+        ).fetchone()[0]
+        assert current==old
+    with factory(storage).open() as next_reader:
+        fresh=next_reader.article.captures.db.execute(
+            "SELECT COUNT(*) FROM dragon_almanac_topics"
+        ).fetchone()[0]
+        assert fresh==old+1
+
+
+def test_reviewed_knowledge_mode_ro_rejects_schema_creation(tmp_path):
+    path=tmp_path/"knowledge.sqlite"
+    with ReviewedKnowledgeStore(path):
+        pass
+    with ReviewedKnowledgeStore(path,read_only=True) as readonly:
+        assert readonly.db.execute("PRAGMA query_only").fetchone()[0]==1
+        with pytest.raises(sqlite3.OperationalError,match="readonly"):
+            readonly.db.execute("INSERT INTO game_builder_knowledge DEFAULT VALUES")
+    with pytest.raises(ValueError,match="read-only"):
+        ReviewedKnowledgeStore(tmp_path/"missing.sqlite",read_only=True)
+    assert not (tmp_path/"missing.sqlite").exists()
