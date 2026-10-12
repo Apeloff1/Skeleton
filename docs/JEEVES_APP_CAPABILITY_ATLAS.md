@@ -15,6 +15,8 @@ Scanned application families include:
 - **Training and model improvement:** `skeleton/ai/learning`, `skeleton/ai/training`, model promotion/rollback, candidate/shadow weights, heldout evaluations, source rights, contaminated data rejection, user-approved learning review and model deployment protection.
 - **Application infrastructure:** `skeleton/organism`, `hoag`, `creator`, `masterplan`, `automation`, `security`, `vault`, `shells`, `speech`, `video`, `vision`, `audio`, `providers`, `repo_machine`, `network`, `native`, `assets`, `app`, `tools`, `knowledge`, and `release`.
 
+The root-level scan also identified 48 repository-root entries and non-`skeleton/` application families: `frontend/` (37 direct entries, including React/React Native app, components, features, hooks, services and app state), `backend/` (29 direct entries, including routes, gameforge, services and data), `apps/jeeves/`, `packaging/windows/`, `java-accelerators/`, `satellites/` (Rust/gameforge/cockpit), `machine/` (201 direct machine-readable indexes), `volume_forge/`, `core/` and `tests/`. These are now cataloged by the same atlas as metadata-only families. A missing root in a consumer partial installation is reported `present:false`, not assumed working.
+
 The full module inventory is available live from `app_atlas(family=...)` or bounded `atlas.deep`. Source discovery is **read-only metadata** and never gives Jeeves a Python import/runtime/shell capability.
 
 ## Actual executable Jeeves adapters (initial safe vertical slice)
