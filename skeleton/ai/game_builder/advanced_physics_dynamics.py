@@ -48,7 +48,7 @@ def _contact_time(first, second, before_a, before_b, axes):
     return enter, normal_axis, normal_sign
 
 
-def _spin_transfer(first, second, axis, normal, impulse, axes, config):
+def transfer_collision_spin(first, second, axis, normal, impulse, axes, config):
     """Bounded off-center spin estimate; collision hulls remain AABBs."""
     if config["spin_transfer"] == 0:
         return
@@ -115,7 +115,7 @@ def resolve_moving_pairs(state, config, previous, events):
             change_b = impulse - change_a
             first["velocity"][axis] += normal * change_a
             second["velocity"][axis] -= normal * change_b
-            _spin_transfer(first, second, axis, normal, impulse, axes, config)
+            transfer_collision_spin(first, second, axis, normal, impulse, axes, config)
             for body in (first, second):
                 if impulse >= body["break_threshold"] and not body["broken"]:
                     body["broken"] = True
@@ -186,4 +186,4 @@ def solve_radial_rope(state, config, events, world_callback):
 
 
 __all__ = ["resolve_moving_pairs", "advance_rotation", "apply_torque",
-           "solve_radial_rope"]
+           "solve_radial_rope", "transfer_collision_spin"]
