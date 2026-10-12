@@ -44,6 +44,46 @@ const goodAttempt={
  supported:['movement','platforming'],deferred:[],
 };
 assert.equal(m.normalizeDragonAttempts([goodAttempt,{...goodAttempt,state:'fictional'}]).length,1);
+// The three idle hatchlings use a separately validated, read-only server wire.
+const familyModel=load('dragonFamilyProjection.ts');
+const familyModule={exports:{}};
+vm.runInNewContext(familyModel.code,{module:familyModule,exports:familyModule.exports,
+ Math,Array,Number,Object,Set,Date},{filename:'dragonFamilyProjection.js',timeout:1500});
+const family=familyModule.exports;
+const at='2026-10-12T14:15:00.000Z';
+const egg=(id,name)=>({id,name,specialty:'Verified research',stage:'egg',
+ level:0,discoveries:0,last_grew_at:null,idle_only:true});
+const brood={
+ schema:'skeleton.ai.dragon.family.v1',
+ parent:{stage:'adult',consumed:2,source_total:2,complete:true,laid_at:at},
+ inventory_sealed:true,children:[
+  egg('article','Ember'),egg('video','Flicker'),egg('monitor','Scout')],
+ history:[],pending_source_count:0,
+ knowledge_authority:'canonical human-approved crawler only',
+ update_policy:'idle-only; changed reviewed content',
+};
+assert.ok(family.validateDragonFamily(brood),'reviewed parent must have exactly three eggs');
+const broken=[
+ {...brood,children:brood.children.slice(0,2)},
+ {...brood,parent:{...brood.parent,complete:false}},
+ {...brood,parent:{...brood.parent,source_total:1}},
+ {...brood,inventory_sealed:false},
+ {...brood,children:[{...brood.children[0],level:9},...brood.children.slice(1)]},
+ {...brood,children:[{...brood.children[0],idle_only:false},...brood.children.slice(1)]},
+ {...brood,children:[{...brood.children[0],stage:'dragon'},...brood.children.slice(1)]},
+ {...brood,history:[{sequence:1,at,dragon:'article',action:'hatched',
+  source_id:'one',change:'forged',digest:'short'}]},
+];
+for(const item of broken)assert.equal(family.validateDragonFamily(item),null,
+ 'untrusted client must not create or modify dragon family progression');
+const nested=load('DragonFamilyNest.tsx');
+assert.ok(nested.source.includes('idle only')&&nested.source.includes('evolution history'));
+assert.ok(nested.source.includes('validateDragonFamily'));
+const familyHook=fs.readFileSync(path.join(dir,'useDragonAcademy.ts'),'utf8');
+assert.ok(familyHook.includes('validateDragonFamily(snapshot.family)'));
+assert.ok(familyHook.includes('family,subscription,practiceBusy'));
+assert.ok(!familyHook.includes("'/family/consume'"), 'the frontend cannot forge source consumption');
+
 for(const name of ['DragonQuestBoard.tsx','DragonCompanion.tsx','DragonCompanionPanel.tsx']){
  const result=load(name);
  if(name==='DragonQuestBoard.tsx'){
