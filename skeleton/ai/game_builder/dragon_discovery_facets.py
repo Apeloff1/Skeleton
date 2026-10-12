@@ -75,6 +75,34 @@ class DiscoveryFacetIndex:
           PRIMARY KEY(owner,origin_source,supplement_digest))""")
         self.db.execute("""CREATE INDEX IF NOT EXISTS dragon_facet_receipts
           ON dragon_almanac_supplement_receipts_v2(owner,normalized_source)""")
+        # Receipt changes would otherwise leave an apparently-current source
+        # digest beside stale indexed heading terms. Mark projections dirty at
+        # the SQL boundary, independent of which importer writes the receipt.
+        self.db.execute("""CREATE TABLE IF NOT EXISTS dragon_discovery_facet_dirty (
+          owner TEXT NOT NULL, source TEXT NOT NULL,
+          PRIMARY KEY(owner,source))""")
+        self.db.executescript("""
+          CREATE TRIGGER IF NOT EXISTS dragon_facet_receipt_insert
+          AFTER INSERT ON dragon_almanac_supplement_receipts_v2
+          BEGIN
+            INSERT OR IGNORE INTO dragon_discovery_facet_dirty
+              VALUES(NEW.owner,NEW.normalized_source);
+          END;
+          CREATE TRIGGER IF NOT EXISTS dragon_facet_receipt_delete
+          AFTER DELETE ON dragon_almanac_supplement_receipts_v2
+          BEGIN
+            INSERT OR IGNORE INTO dragon_discovery_facet_dirty
+              VALUES(OLD.owner,OLD.normalized_source);
+          END;
+          CREATE TRIGGER IF NOT EXISTS dragon_facet_receipt_update
+          AFTER UPDATE ON dragon_almanac_supplement_receipts_v2
+          BEGIN
+            INSERT OR IGNORE INTO dragon_discovery_facet_dirty
+              VALUES(OLD.owner,OLD.normalized_source);
+            INSERT OR IGNORE INTO dragon_discovery_facet_dirty
+              VALUES(NEW.owner,NEW.normalized_source);
+          END;
+        """)
 
     def _metadata_tokens(self, owner: str, source_id: str,
                          source_raw: str, source_digest: str) -> tuple[tuple[str,...],str]:
@@ -160,6 +188,9 @@ class DiscoveryFacetIndex:
                 ))
                 if (previous == (digest, receipts_digest, token_digest)
                         and actual == tokens):
+                    self.db.execute(
+                        "DELETE FROM dragon_discovery_facet_dirty WHERE owner=? AND source=?",
+                        (owner, source_id))
                     continue
                 self.db.execute(
                     "DELETE FROM dragon_discovery_facet_terms WHERE owner=? AND source=?",
@@ -179,6 +210,9 @@ class DiscoveryFacetIndex:
                        token_digest=excluded.token_digest""",
                     (owner, source_id, digest, receipts_digest, token_digest),
                 )
+                self.db.execute(
+                    "DELETE FROM dragon_discovery_facet_dirty WHERE owner=? AND source=?",
+                    (owner, source_id))
                 changed += 1
             self.db.execute("COMMIT")
         except Exception:
@@ -263,7 +297,10 @@ class DiscoveryFacetIndex:
                JOIN dragon_almanac_jobs j ON j.owner=s.owner AND j.source=s.source
                JOIN dragon_discovery_facet_records i
                  ON i.owner=s.owner AND i.source=s.source AND i.source_digest=s.digest
+               LEFT JOIN dragon_discovery_facet_dirty d
+                 ON d.owner=s.owner AND d.source=s.source
                WHERE s.owner=? AND j.stage=0 AND j.state IN ('pending','blocked')
+               AND d.source IS NULL
                AND j.input_digest=s.digest""",
             (owner,),
         ).fetchone()[0]
@@ -326,7 +363,9 @@ class DiscoveryFacetIndex:
             "JOIN dragon_almanac_sources s ON s.owner=i.owner "
             "AND s.source=i.source AND s.digest=i.source_digest "
             "JOIN dragon_almanac_jobs j ON j.owner=s.owner AND j.source=s.source "
-            "WHERE s.owner=? AND j.stage=0 "
+            "LEFT JOIN dragon_discovery_facet_dirty d "
+            "ON d.owner=s.owner AND d.source=s.source "
+            "WHERE s.owner=? AND d.source IS NULL AND j.stage=0 "
             "AND j.state IN ('pending','blocked') AND j.input_digest=s.digest "
             + condition + " GROUP BY s.source "
             "ORDER BY SUM(q.weight) DESC,s.source LIMIT ?"
