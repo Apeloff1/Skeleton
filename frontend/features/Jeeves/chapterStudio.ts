@@ -31,7 +31,7 @@ export type ChapterNote = {
   title: string; synopsis: string; notes: string;
   historical_setting: string; palette_rules: string; costume_rules: string;
   voice_rules: string; era_id: string; style_id: string; palette_id: string;
-  voice_cast: Record<string, string>; transition_reason: string | null;
+  voice_cast: Record<string, string>; face_cast: Record<string, string>; transition_reason: string | null;
 };
 export type SceneDraft = {
   scene: number; chapter: number; act: number; branch_id: string;
