@@ -27,8 +27,8 @@ COSTS={
 }
 ACTIONS=(
  tuple(f"{verb}:{i}" for verb in ("move","chop","quarry","dig_clay",
-  "gather","draw_water","fish","till","sow","reap","irrigate",
-  "tame","feed","hunt","demolish","inspect") for i in range(CELLS))
+  "gather","draw_water","fish","mine_ore","till","sow","reap","irrigate",
+  "tame","feed","hunt","ignite","extinguish","demolish","inspect") for i in range(CELLS))
  +tuple(f"build:{name}:{i}" for name in BUILDINGS for i in range(CELLS))
  +tuple(f"terraform:{name}:{i}" for name in TERRAINS for i in range(CELLS))
  +("tick","tick:4","rest","eat","drink","craft:plank","craft:brick",
@@ -325,7 +325,8 @@ def _tick(state,config):
     for t in tiles:
         if t["crop"] and t["soil"] and t["crop"]<config["crop_days"]:
             if t["moisture"] or state["weather"]=="rain":
-                t["crop"]+=1
+                t["crop"]=min(config["crop_days"],t["crop"]+
+                    (2 if t["building"]=="farm" else 1))
                 t["moisture"]=max(0,t["moisture"]-1)
         if ecology and config["resource_policy"]=="renewable":
             if t["terrain"]=="forest" and t["wood"]<config["regrowth_cap"] \
@@ -344,6 +345,58 @@ def _tick(state,config):
         if t["building"]=="generator":
             state["power"]+=config["generator_output"]
             state["emissions"]+=config["generator_emissions"]
+    # A well is only useful if physically connected to a finite source,
+    # including rainy replenishment under the explicit renewable policy.
+    for well in (t for t in tiles if t["building"]=="well"):
+        for near in _neighbors(well["id"]):
+            source=tiles[near]
+            if source["terrain"] not in ("lake","marsh") or source["water"]==0:
+                continue
+            drawn=min(source["water"],config["well_output"])
+            source["water"]-=drawn
+            state["community_water"]+=drawn
+            events.append("built_well_drew_finite_adjoining_aquifer_water")
+            break
+    # Wildfire consumes physical terrain stocks and propagates only through
+    # neighboring flammable vegetation, never through lakes or fences.
+    active=[t["id"] for t in tiles if t["fire"]>0]
+    for site in active:
+        origin=tiles[site]
+        if origin["fire"]<=1:continue
+        for near in _neighbors(site):
+            target=tiles[near]
+            if target["terrain"] not in ("grass","forest") or target["fire"] \
+              or target["building"] in ("fence","well","bridge"):
+                continue
+            if (state["ticks"]+site*11+near*7)%config["fire_spread_period"]==0:
+                target["fire"]=max(1,origin["fire"]-1)
+                events.append("original_local_wildfire_spread_to_neighbor")
+                break
+    if ecology and config["wildlife_motion"]:
+        occupied={t["id"] for t in tiles if t["animal"]}
+        transfers=[]
+        for t in tiles:
+            if t["animal"] and not t["tamed"]:
+                choices=[i for i in _neighbors(t["id"]) if i not in occupied
+                         and tiles[i]["terrain"] in ("grass","forest")
+                         and not tiles[i]["building"] and not tiles[i]["fire"]]
+                if choices and (state["ticks"]+t["id"])%config["wildlife_move_period"]==0:
+                    destination=choices[(state["ticks"]+t["id"])%len(choices)]
+                    occupied.add(destination)
+                    transfers.append((t["id"],destination))
+        for origin,destination in transfers:
+            tiles[origin]["animal"]=0
+            tiles[destination]["animal"]=1
+            events.append("original_wildlife_moved_into_safe_adjoining_habitat")
+    if ecology and config["resource_policy"]=="renewable" and (
+         state["ticks"]%config["wildlife_birth_period"]==0):
+        population=sum(t["animal"] for t in tiles)
+        if population<config["wildlife_cap"]:
+            habitat=next((t for t in tiles if t["terrain"] in ("grass","forest")
+                          and not t["animal"] and not t["building"] and not t["fire"]),None)
+            if habitat is not None:
+                habitat["animal"]=1
+                events.append("bounded_original_wildlife_population_regenerated")
     _work(state,config,events)
     # Community consumables are genuinely conserved across settlers and
     # remain separate from the player's carried inventory.
@@ -364,6 +417,7 @@ def _tick(state,config):
     state["hunger"]=min(100,state["hunger"]+config["hunger_gain"])
     state["thirst"]=min(100,state["thirst"]+config["thirst_gain"])
     if config["hazards_enabled"] and (
+        not config["creative_mode"] or config["creative_hazards"]) and (
         state["hunger"]>=config["hunger_threshold"] or
         state["thirst"]>=config["thirst_threshold"]):
         state["health"]=max(0,state["health"]-config["exposure_damage"])
@@ -393,8 +447,8 @@ def step(state,config,action):
     fields=action.split(":")
     verb=fields[0]
     if verb in ("move","chop","quarry","dig_clay","gather","draw_water",
-                "fish","till","sow","reap","irrigate","tame","feed","hunt",
-                "demolish","inspect","build","terraform"):
+                "fish","mine_ore","till","sow","reap","irrigate","tame","feed","hunt",
+                "ignite","extinguish","demolish","inspect","build","terraform"):
         kind=fields[1] if verb in ("build","terraform") else None
         index=int(fields[2] if kind is not None else fields[1])
         tile=tiles[index]
@@ -405,14 +459,18 @@ def step(state,config,action):
                 raise SandboxActionError("movement must traverse a real adjacent tile")
             if tile["terrain"]=="lake" and tile["building"]!="bridge":
                 raise SandboxActionError("lake is impassable until real bridge construction")
-            _cost_energy(state,config,config["move_energy"])
+            _cost_energy(state,config,
+                         config["move_energy"]//2 if tile["building"]=="road"
+                         else config["move_energy"])
             state["position"]=index
             events.append("original_character_moved_on_local_world")
-        elif verb in ("chop","quarry","dig_clay","gather","draw_water","fish"):
+        elif verb in ("chop","quarry","dig_clay","gather","draw_water","fish","mine_ore"):
             if verb=="chop":
                 stock,item,n="wood","wood",config["harvest_strength"]
             elif verb=="quarry":
                 stock,item,n="stone","stone",config["harvest_strength"]
+            elif verb=="mine_ore":
+                stock,item,n="ore","ore",config["harvest_strength"]
             elif verb=="dig_clay":
                 stock,item,n="clay","clay",config["harvest_strength"]
             elif verb=="gather":
@@ -426,7 +484,7 @@ def step(state,config,action):
             if config["resource_policy"]=="unlimited" and not (
                 tile[stock]>0 or
                 (verb=="chop" and tile["terrain"]=="forest") or
-                (verb=="quarry" and tile["terrain"]=="ridge") or
+                (verb in ("quarry","mine_ore") and tile["terrain"]=="ridge") or
                 (verb=="dig_clay" and tile["terrain"] in ("sand","marsh")) or
                 (verb=="gather" and tile["terrain"] in ("grass","forest")) or
                 (verb in ("draw_water","fish") and tile["terrain"] in ("lake","marsh"))):
@@ -434,6 +492,18 @@ def step(state,config,action):
             _cost_energy(state,config,config["work_energy"])
             gained=_mutate_resource(state,config,tile,stock,item,n)
             events.append("original_local_resource_extracted_"+item+"_"+str(gained))
+        elif verb=="ignite":
+            if not config["fire_enabled"] or tile["terrain"]=="lake" or tile["fire"]:
+                raise SandboxActionError("fire requires flammable original land and unlit fuel")
+            _spend(state,config,{"fuel":1},"controlled ignition")
+            tile["fire"]=config["initial_fire"]
+            events.append("original_bounded_fire_ignited")
+        elif verb=="extinguish":
+            if tile["fire"]==0:
+                raise SandboxActionError("cannot extinguish non-burning terrain")
+            _spend(state,config,{"water":config["extinguish_water"]},"real fire suppression")
+            tile["fire"]=0
+            events.append("original_terrain_fire_extinguished")
         elif verb=="till":
             if tile["terrain"] not in ("grass","marsh") or tile["building"] not in (None,"farm"):
                 raise SandboxActionError("cultivation needs viable unblocked original soil")
@@ -521,9 +591,9 @@ def step(state,config,action):
           "fuel":{"wood":2},
           "food":{"food":1,"fiber":2},
         }
-        if product in ("brick","tool") and not _structures(state,"workshop") \
-            and not _structures(state,"kiln"):
-            raise SandboxActionError("advanced manufacture requires an actually built machine")
+        if product in ("brick","tool","plank") and not _structures(state,
+            "kiln" if product=="brick" else "workshop"):
+            raise SandboxActionError("crafting requires appropriate built workshop or kiln")
         _spend(state,config,inputs[product],"crafting")
         state["inventory"][product]+=1 if product!="food" else config["cooking_yield"]
         events.append("original_material_transformer_produced_"+product)
