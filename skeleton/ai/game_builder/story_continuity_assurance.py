@@ -67,6 +67,8 @@ def validate_contract(contract, bible):
     signed(contract, CONTRACT, ("project","bible_digest","act_target",
                                "scene_target","characters","regions","items",
                                "human_design_reviewed"))
+    require(bible["story"]["planned_acts"] == ACT_TARGET,
+            "a signed 100-act story outline must precede strict production")
     require(contract["project"] == bible["project"] and
             contract["bible_digest"] == bible["digest"],
             "production assurance must lock the exact reviewed world")
@@ -282,6 +284,10 @@ def _check_attestation(bible, contract, scene, history_state, post_state,
                 colors(item["palette"], "observed item palette") ==
                 colors(asset["palette"], "approved equipment color"),
                 "historic item appearance or possession drift")
+    required_items = {key for key, item in items.items()
+                      if item["asset"] in scene_item_ids}
+    require(required_items == observed,
+            "every historical costume prop/item shown in the scene must be accounted for")
     return owned
 
 
@@ -348,7 +354,19 @@ def verify_production_history(bible, contract, scenes):
     previous_receipt = None
     root = _history_root(bible, contract)
     visited_acts = set()
+    previous_scene = None
     for stage in scenes:
+        number(stage["scene"], 1, 9999, "one scene number within an act")
+        if previous_scene is None:
+            require((stage["act"],stage["scene"]) == (1,1),
+                    "stage one must start at act 1 scene 1")
+        elif stage["act"] == previous_scene["act"]:
+            require(stage["scene"] == previous_scene["scene"] + 1,
+                    "no missing scene number inside the original act")
+        else:
+            require(stage["act"] == previous_scene["act"] + 1 and
+                    stage["scene"] == 1,
+                    "each new act must begin at scene one without skipping acts")
         receipt = stage.get("assurance")
         require(type(receipt) is dict, "stage is missing its own identity/QC receipt")
         before = character_state
@@ -366,6 +384,7 @@ def verify_production_history(bible, contract, scenes):
         character_state = after
         previous_receipt = receipt["digest"]
         visited_acts.add(stage["act"])
+        previous_scene = stage
     require(character_state == index["current_state"],
             "independent cast state projection disagrees with replay")
     result = {
