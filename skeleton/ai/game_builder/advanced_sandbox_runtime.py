@@ -140,7 +140,8 @@ def normalize_layout(config,layout):
             raise SandboxActionError("non-bridge structures cannot begin on lake water")
         if t["crop"] and not t["soil"]:
             raise SandboxActionError("authored crops require prepared soil")
-        if t["sapling"] and (t["terrain"]!="forest" or t["crop"]):
+        if t["sapling"] and (t["terrain"]!="forest" or t["crop"] or
+            t["animal"] or t["building"] or t["wood"]):
             raise SandboxActionError("authored young trees need original unoccupied forest")
         tiles.append(dict(t))
     spawn=_int(layout["spawn"],0,CELLS-1,"player spawn")
@@ -202,7 +203,8 @@ def start(config,seed):
       "community_food":10,"community_water":12,"tamed_animals":0,
       "ecology":True,"trade":True,"research":0,"power":0,
       "emissions":0,"houses":0,"achievements":[],
-      "turn":0,"witness_sequence":0,"observations":[],"quests":[],
+      "turn":0,"witness_sequence":0,"witness_head":None,
+      "observations":[],"quests":[],
       "civic_grant_reserve":0,
       "events":[],"failed":False,"finished":False,"death_reason":"",
     }
@@ -337,6 +339,9 @@ def _tick(state,config):
     tiles=_tiles(state)
     ecology=state["ecology"] and config["ecology_enabled"]
     for t in tiles:
+        if t["sapling"]>0 and t["fire"]:
+            t["sapling"]=0
+            events.append("physical_original_sapling_destroyed_by_fire")
         if t["sapling"]>0:
             if t["sapling"]>=config["sapling_days"]:
                 t["sapling"]=0
