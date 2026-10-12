@@ -116,7 +116,8 @@ def validate_discovery_chain(registry: dict, named_documents: list[tuple[str, di
             raise ValueError("supplement chain is missing, reordered or forked")
         candidates, catalogs, counts = doc.get("candidates"), doc.get("catalogs"), doc.get("counts")
         if (not isinstance(candidates, list) or len(candidates) > MAX_CANDIDATES
-                or not isinstance(catalogs, list) or not isinstance(counts, dict)):
+                or not isinstance(catalogs, list) or not 1 <= len(catalogs) <= 256
+                or not isinstance(counts, dict)):
             raise ValueError("invalid supplement structure")
         new_count = counts.get("new_candidate_urls")
         if type(new_count) is not int or new_count != len(candidates):
@@ -158,7 +159,8 @@ def validate_discovery_chain(registry: dict, named_documents: list[tuple[str, di
                     or row.get("training_authorized") is not False
                     or row.get("canonical_admission") is not False):
                 raise ValueError("discovery cannot confer use or training authority")
-            if not isinstance(row.get("discoveries"), list) or not row["discoveries"]:
+            if (not isinstance(row.get("discoveries"), list)
+                    or not 1 <= len(row["discoveries"]) <= 256):
                 raise ValueError("each source needs discovery lineage")
             repositories = set()
             for origin in row["discoveries"]:
@@ -192,6 +194,8 @@ def validate_discovery_chain(registry: dict, named_documents: list[tuple[str, di
                                   "independence": "not_assessed", "training_authorized": False,
                                   "discoveries": [], "provisional_discovery": True}
             raw_seen.add(raw_url)
+            if len(raw_seen) > 100_000:
+                raise ValueError("global raw discovery candidate budget exceeded")
             existing.add(url)
         if counts.get("provisional_total_urls") != baseline_size + len(raw_seen):
             raise ValueError("raw provisional total differs from recorded link count")
