@@ -22,6 +22,7 @@ from .system_editor_assembly import assemble_workspace_systems
 from .advanced_gameplay_runtime import run_advanced_session, verify_advanced_session
 from .advanced_level_scenes import make_advanced_scene,validate_advanced_scene
 from .advanced_puzzle_solver import solve_advanced_puzzle
+from .advanced_rhythm_longrun import (run_long_rhythm,verify_long_rhythm,continue_long_rhythm)
 from .advanced_rhythm_runtime import default_layout as original_rhythm_chart
 from .advanced_rhythm_audio import render_original_beat_wav,original_audio_receipt
 from .advanced_roguelike_longrun import (replay_long_roguelike,
@@ -103,6 +104,22 @@ def parser() -> argparse.ArgumentParser:
     marathon_more.add_argument("--record",required=True)
     marathon_more.add_argument("--actions",required=True)
     marathon_more.add_argument("--settings")
+    full_song=commands.add_parser("rhythm-longrun",
+        help="Run 256 authored beats with replay-certified chronological checkpoints")
+    full_song.add_argument("--actions",required=True)
+    full_song.add_argument("--settings")
+    full_song.add_argument("--scene")
+    full_song.add_argument("--seed",type=int,default=0)
+    full_song.add_argument("--checkpoint-interval",type=int,default=64)
+    song_verify=commands.add_parser("rhythm-longrun-verify",
+        help="Independently reconstruct original song clock, judgements and score")
+    song_verify.add_argument("--record",required=True)
+    song_verify.add_argument("--settings")
+    song_more=commands.add_parser("rhythm-longrun-continue",
+        help="Rebuild signed original chart and append bounded timing input")
+    song_more.add_argument("--record",required=True)
+    song_more.add_argument("--actions",required=True)
+    song_more.add_argument("--settings")
     rhythm_audio=commands.add_parser("rhythm-audio",
         help="Render fully original bounded local WAV from signed chart without borrowed samples")
     rhythm_audio.add_argument("--scene")
@@ -184,6 +201,20 @@ def main(argv=None) -> int:
                 _load(args.scene),
                 _load(args.settings) if args.settings else None,
                 max_states=args.max_states,max_actions=args.max_actions)
+        elif args.operation == "rhythm-longrun":
+            output=run_long_rhythm(
+                _load(args.settings) if args.settings else None,
+                _load(args.actions),seed=args.seed,
+                scene=_load(args.scene) if args.scene else None,
+                checkpoint_interval=args.checkpoint_interval)
+        elif args.operation == "rhythm-longrun-verify":
+            output={"verified":verify_long_rhythm(
+                _load(args.record),
+                _load(args.settings) if args.settings else None)}
+        elif args.operation == "rhythm-longrun-continue":
+            output=continue_long_rhythm(
+                _load(args.record),_load(args.actions),
+                _load(args.settings) if args.settings else None)
         elif args.operation == "rhythm-audio":
             if not args.trusted_local_operator:
                 raise SystemEditorError("offline WAV materialization requires explicit local operator approval")
