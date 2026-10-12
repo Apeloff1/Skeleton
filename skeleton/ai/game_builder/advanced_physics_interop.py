@@ -106,6 +106,8 @@ def rehearse_physics_encounter(source_session, source_settings=None,
         cfg=make_editor_document("physics",settings)["settings"]
         layout=physics_layout(cfg,source_session["seed"])
         layout["fixtures"]=[]
+        # Reviewed collision mask admits real solids (bit 1), not passable lanes.
+        layout["bodies"][0]["mask"]=1
         layout["goal"]=[1550,960,0]
         for witness in source_witnesses:
             layout["fixtures"].append({
@@ -124,6 +126,9 @@ def rehearse_physics_encounter(source_session, source_settings=None,
         raise
     except (ValueError,KeyError,TypeError) as exc:
         raise PhysicsInteropError("invalid original cross-family physical source or replay") from exc
+    physical_impacts=sum(
+        event in ("swept_fixture_contact","fixture_contact")
+        for frame in result["trace"] for event in frame["events"])
     record={
         "schema":SCHEMA,"source_editor":editor,
         "source_scene_digest":original["digest"],
@@ -134,7 +139,8 @@ def rehearse_physics_encounter(source_session, source_settings=None,
         "physics_scene":scene,
         "physics_session":result,
         "observed_contacts":result["state"]["contacts"],
-        "observed_impact":result["state"]["contacts"]>0,
+        "observed_fixture_impacts":physical_impacts,
+        "observed_impact":physical_impacts>0,
         "native_hardware_verified":False,
         "source_gameplay_mutated":False,
         "automatic_promotion_allowed":False,
