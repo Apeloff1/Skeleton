@@ -300,6 +300,69 @@ class DragonGleanMatrix:
                 change=note,digest=digest))
         return [{k:v for k,v in r.items() if k!="epoch"} for r in result[-limit:][::-1]]
 
+    def research_briefs(self,owner: str,*,authorized:bool,
+                        limit:int=20) -> list[dict[str,object]]:
+        """Pure, task-relevant mission briefs; no direct crawler dispatch.
+
+        A host planner may take these read-only requests through its existing
+        SSRF/robots/rights/budget gates. Every action is conditional on current
+        verified source custody and must be approved by that planner before
+        starting an idle worker.
+        """
+        self._owner(owner,authorized)
+        if type(limit) is not int or not 1<=limit<=100:
+            raise ValueError("invalid glean research brief budget")
+        valid,_=self._fresh_observations(owner)
+        cells=self._aggregate(valid)
+        briefs=[]
+        for cell in cells:
+            lens=cell["lens"]
+            proposition=cell["proposition_digest"]
+            evidence=cell["evidence_fingerprint"]
+            affected=sorted({r[2] for r in valid if
+                r[0]==lens and r[1]==proposition})
+            modalities=tuple(cell["modalities"])
+            if cell["status"]=="contested":
+                rule=("IF independent evidence challenges the same proposition "
+                      "AND corroboration is incomplete, THEN investigate both "
+                      "source revisions and seek a fresh counterexample; BUT "
+                      "never promote conflicting evidence")
+                action="revisit_conflicting_sources"
+                targets=("monitor","article","video")
+                priority=0
+            elif cell["status"]=="wiki_candidate":
+                rule=("IF two distinct source identities AND two reviewed "
+                      "publisher groups corroborate a proposition AND no "
+                      "current challenge exists, THEN request independent Wiki "
+                      "review; BUT do not bypass sandbox holdouts")
+                action="request_independent_wiki"
+                targets=()
+                priority=1
+            else:
+                rule=("IF independently supported by one source OR one publisher "
+                      "group only, THEN seek a different evidence group and "
+                      "adjacent technical context; BUT do not count repeated "
+                      "observations as corroboration")
+                action="find_independent_corroboration"
+                targets=("article","video")
+                priority=2
+            briefs.append(dict(
+                schema="skeleton.ai.dragon.glean_brief.v1",
+                lens=lens,proposition_digest=proposition,
+                evidence_fingerprint=evidence,
+                action=action,priority=priority,
+                source_ids=affected[:12],
+                source_count=len(affected),
+                required_specialists=list(targets),
+                existing_modalities=list(modalities),
+                last_evidence_at=cell["latest_at"],
+                condition=rule,
+                human_review_required=True,
+                permits_network=False,
+                permits_weight_promotion=False))
+        return sorted(briefs,key=lambda b:(
+            b["priority"],-b["source_count"],b["lens"],b["proposition_digest"]))[:limit]
+
     def queue_shadow_candidate(self,owner: str,lens:str,proposition_digest:str,*,
                                authorized:bool,at:float,
                                wiki_claim_verify:Callable[[str,str,str,tuple[str,...]],bool]) -> str:
