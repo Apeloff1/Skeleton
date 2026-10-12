@@ -155,6 +155,7 @@ def run_causal_objective_matrix(physical,genres,scene,timeline,settings=None,
             "original_source_lab_digest":laboratory["digest"],
             "baseline_campaign_digest":laboratory["baseline_campaign_digest"],
             "goals":chosen,
+            "max_candidates":max_candidates,
             "baseline_metrics":base_metrics,
             "baseline_goal_vector":base_vector,
             "candidate_results":scored,
@@ -187,8 +188,7 @@ def verify_causal_objective_matrix(proof,physical,genres,scene,timeline,
     try:
         source=run_causal_objective_matrix(
             physical,genres,scene,timeline,settings,
-            goals=proof["goals"],max_candidates=proof["candidate_count"]
-            if proof["candidate_count"] else 1)
+            goals=proof["goals"],max_candidates=proof["max_candidates"])
     except (KeyError,TypeError) as exc:
         raise ObjectiveMatrixError("matrix omitted reviewable original game goals") from exc
     if source!=proof:
