@@ -1,0 +1,474 @@
+"""Jeeves' whole-application indexed capability and operator-governed runtime.
+
+Every regular source/resource file under a reviewed repository root is discoverable.
+Discovery is NOT executable tool authority: only typed adapters become callable.
+No dynamic import, exec, eval, shell invocation, symlink traversal, secrets
+exfiltration or automatic self-modifying code runs through this interface.
+
+The inventory is intentionally tree-agnostic: it scales to previously unknown
+forge, crawler, editor, AI, shell, dragon, frontend and module families.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from hashlib import sha256
+import difflib
+import json
+import os
+from pathlib import Path
+from collections import Counter
+import re
+import stat
+
+SCHEMA = "skeleton.ai.jeeves_appwide_inventory.v1"
+ACTION_SCHEMA = "skeleton.ai.jeeves_appwide_action_receipt.v1"
+MAX_FILES = 200_000
+MAX_SOURCE = 256_000
+MAX_PATCH = 120_000
+MAX_QUERY = 180
+MAX_PAGE = 100
+MAX_DEPTH = 32
+FORBIDDEN_NAMES = frozenset({
+    ".git", ".hg", ".svn", "__pycache__", ".pytest_cache",
+    ".mypy_cache", ".ruff_cache", ".tox", ".venv", "venv",
+    "node_modules", "dist", "build", ".next", ".turbo",
+})
+PRIVATE = re.compile(
+    r"(?:^|[./_-])(?:\.env|credentials|password|private|secret|"
+    r"token|id_rsa|id_ed25519|\.pem|\.key|\.p12)(?:$|[./_-])",
+    re.I)
+INVENTORY_ROOTS = (
+    "skeleton", "backend", "frontend", "apps", "docs",
+    "tests", "scripts", "tools", "packages", "satellites",
+)
+DOMAINS = (
+    ("forge", ("forge", "craft", "blueprint", "asset_pipeline")),
+    ("crawler", ("crawler", "crawl", "recrawl", "research", "rss", "search")),
+    ("companion", ("dragon", "companion", "tamagotchi", "hatchling")),
+    ("jeeves", ("jeeves", "agent", "supervisor", "secretary")),
+    ("editor", ("editor", "studio", "canvas", "scene_builder", "director")),
+    ("game", ("game", "world", "npc", "quest", "engine", "simulation")),
+    ("learning", ("weight", "training", "distill", "almanac", "learn", "mirror")),
+    ("runtime", ("runtime", "kernel", "worker", "execution", "orchestr")),
+    ("frontend", ("frontend", "components", "views", "pages", "ui")),
+    ("security", ("security", "policy", "sandbox", "assurance", "audit")),
+    ("build", ("workflow", "release", "ci", "build", "installer", "packag")),
+    ("data", ("dataset", "fixture", "vault", "database", "data")),
+)
+SOURCE_SUFFIXES = frozenset({".py",".js",".jsx",".ts",".tsx",".mjs",".cjs",
+                             ".gd",".rs",".go",".java",".kt",".cpp",".c",
+                             ".h",".cs",".swift",".rb",".sh",".ps1"})
+TEXT_SUFFIXES = SOURCE_SUFFIXES | frozenset({
+    ".json",".jsonl",".md",".txt",".toml",".ini",".cfg",
+    ".yml",".yaml",".xml",".html",".css",".csv",".sql",
+    ".graphql",".proto",".svg",".gitattributes",".gitignore",
+})
+
+
+class JeevesAppwideError(ValueError):
+    """Unknown root, unauthorized operation, stale content or unsafe file."""
+
+
+def canonical(value):
+    return json.dumps(value,sort_keys=True,ensure_ascii=True,
+                      separators=(",",":"),allow_nan=False)
+
+
+def digest(value):
+    try:
+        return sha256(canonical(value).encode("utf-8")).hexdigest()
+    except (TypeError,ValueError,OverflowError) as exc:
+        raise JeevesAppwideError("invalid finite canonical evidence") from exc
+
+
+def _relative(path):
+    if type(path) is not str or not 1 <= len(path) <= 400 or "\\" in path:
+        raise JeevesAppwideError("relative file name required")
+    pieces=path.split("/")
+    if any(not bit or bit in (".","..") or "\x00" in bit for bit in pieces):
+        raise JeevesAppwideError("file traversal or ambiguous path blocked")
+    if pieces[0] in FORBIDDEN_NAMES:
+        raise JeevesAppwideError("private runtime files are not inventoried")
+    return path
+
+
+def _classification(path):
+    low=path.lower()
+    result=[]
+    for domain,hints in DOMAINS:
+        if any(word in low for word in hints):
+            result.append(domain)
+    return result or ["general"]
+
+
+def _kind(path):
+    suffix=Path(path).suffix.lower()
+    if suffix in SOURCE_SUFFIXES:return "source"
+    if suffix in TEXT_SUFFIXES:return "text"
+    return "resource"
+
+
+@dataclass(frozen=True)
+class Entry:
+    path: str
+    bytes: int
+    kind: str
+    domains: tuple[str,...]
+    readable: bool
+    executable_adapter_bound: bool = False
+
+    def payload(self):
+        return {"path":self.path,"bytes":self.bytes,"kind":self.kind,
+                "domains":list(self.domains),"readable":self.readable,
+                "executable_adapter_bound":self.executable_adapter_bound}
+
+
+class AppwideInventory:
+    """Deterministic bounded scan of a repository checkout, not a name heuristic.
+
+    It includes *all* regular files (even unrelated categories), and reports
+    every skipped/unreadable file separately instead of silently declaring
+    perfect coverage. File contents are read only via explicit exact path.
+    """
+    def __init__(self,repo_root):
+        root=Path(repo_root)
+        if not root.exists() or not root.is_dir() or root.is_symlink():
+            raise JeevesAppwideError("real repository directory required")
+        self.root=root.resolve(strict=True)
+        self._files={}
+        self._blocked={}
+        self._digest=None
+
+    def scan(self):
+        files={}
+        blocked={}
+        stack=[(self.root,0)]
+        while stack:
+            directory,depth=stack.pop()
+            if depth>MAX_DEPTH:
+                blocked[directory.relative_to(self.root).as_posix()]="max_depth"
+                continue
+            try:
+                rows=sorted(os.scandir(directory),key=lambda x:x.name)
+            except OSError:
+                blocked[directory.relative_to(self.root).as_posix()]="unreadable_directory"
+                continue
+            for item in rows:
+                path=Path(item.path)
+                rel=path.relative_to(self.root).as_posix()
+                if item.name in FORBIDDEN_NAMES:
+                    blocked[rel]="generated_or_private_runtime_tree"
+                    continue
+                try:
+                    attrs=item.stat(follow_symlinks=False)
+                except OSError:
+                    blocked[rel]="unreadable_metadata"
+                    continue
+                if stat.S_ISLNK(attrs.st_mode):
+                    blocked[rel]="symlink_not_followed"
+                    continue
+                if stat.S_ISDIR(attrs.st_mode):
+                    stack.append((path,depth+1))
+                    continue
+                if not stat.S_ISREG(attrs.st_mode):
+                    blocked[rel]="not_regular_file"
+                    continue
+                if len(files)>=MAX_FILES:
+                    raise JeevesAppwideError(
+                        "inventory budget exceeded: refusal is safer than hidden truncation")
+                private=bool(PRIVATE.search(rel))
+                files[rel]=Entry(rel,attrs.st_size,_kind(rel),
+                                 tuple(_classification(rel)),
+                                 not private)
+        self._files=dict(sorted(files.items()))
+        self._blocked=dict(sorted(blocked.items()))
+        self._digest=digest([[x.path,x.bytes,x.kind,x.readable]
+                             for x in self._files.values()])
+        return self.report()
+
+    def _require_scanned(self):
+        if self._digest is None:
+            raise JeevesAppwideError("explicit inventory scan required")
+
+    def report(self):
+        self._require_scanned()
+        domains=Counter(d for e in self._files.values() for d in e.domains)
+        roots=Counter(p.split("/")[0] for p in self._files)
+        return {
+            "schema":SCHEMA,"scanned_regular_files":len(self._files),
+            "classified_files":len(self._files),
+            "readable_files":sum(int(e.readable) for e in self._files.values()),
+            "restricted_files":sum(int(not e.readable) for e in self._files.values()),
+            "skipped_paths":len(self._blocked),
+            "blocked_reasons":dict(Counter(self._blocked.values())),
+            "domains":dict(sorted(domains.items())),
+            "root_counts":dict(sorted(roots.items())),
+            "snapshot_digest":self._digest,
+            "all_regular_files_discoverable":True,
+            "all_files_executable":False,
+            "all_features_working":False,
+            "source_edits_require_review":True,
+            "model_self_modification_allowed":False,
+        }
+
+    def search(self, *, query="", domain=None, offset=0, limit=40,
+               expected_snapshot=None):
+        self._require_scanned()
+        if expected_snapshot is not None and expected_snapshot!=self._digest:
+            raise JeevesAppwideError("stale inventory cursor")
+        if type(query) is not str or len(query)>MAX_QUERY:
+            raise JeevesAppwideError("bounded inventory search only")
+        if domain is not None and (type(domain) is not str or
+                                    domain not in {k for k,_ in DOMAINS}|{"general"}):
+            raise JeevesAppwideError("unknown feature domain")
+        if type(offset) is not int or offset<0 or offset>MAX_FILES:
+            raise JeevesAppwideError("invalid deterministic file-page offset")
+        if type(limit) is not int or not 1<=limit<=MAX_PAGE:
+            raise JeevesAppwideError("bounded file pagination required")
+        tokens=query.lower().split()
+        matched=[e for e in self._files.values() if
+                 (domain is None or domain in e.domains) and
+                 all(t in e.path.lower() for t in tokens)]
+        page=matched[offset:offset+limit]
+        result={
+            "schema":"skeleton.ai.jeeves_file_discovery_page.v1",
+            "snapshot_digest":self._digest,"query":query,"domain":domain,
+            "total_matches":len(matched),
+            "offset":offset,"limit":limit,
+            "next_offset":offset+len(page) if offset+len(page)<len(matched) else None,
+            "files":[e.payload() for e in page],
+            "all_entries_not_executable_by_discovery":True,
+        }
+        return {**result,"digest":digest(result)}
+
+    def _safe_file(self,path,*,max_size=MAX_SOURCE):
+        self._require_scanned()
+        path=_relative(path)
+        e=self._files.get(path)
+        if e is None or not e.readable:
+            raise JeevesAppwideError("unavailable or restricted repository file")
+        if e.kind not in ("source","text"):
+            raise JeevesAppwideError("binary/resource files need a specialized adapter")
+        if e.bytes>max_size:
+            raise JeevesAppwideError("file exceeds bounded context/page size")
+        target=self.root
+        pieces=path.split("/")
+        for bit in pieces:
+            target=target/bit
+            try:
+                status=os.lstat(target)
+            except OSError as exc:
+                raise JeevesAppwideError("repository file changed after scan") from exc
+            if stat.S_ISLNK(status.st_mode):
+                raise JeevesAppwideError("symlink/subtree swap blocked")
+        try:
+            data=target.read_bytes()
+        except OSError as exc:
+            raise JeevesAppwideError("source file unreadable") from exc
+        if len(data)>max_size or len(data)!=e.bytes:
+            raise JeevesAppwideError("source changed since inventory scan")
+        try:
+            return data.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise JeevesAppwideError("non-UTF8 source requires separate binary reader") from exc
+
+    def source(self,path):
+        content=self._safe_file(path)
+        result={
+            "schema":"skeleton.ai.jeeves_source_inspection.v1",
+            "path":path,"content":content,
+            "sha256":sha256(content.encode("utf-8")).hexdigest(),
+            "inventory_snapshot":self._digest,
+            "read_only":True,
+        }
+        return result
+
+    def propose_source_revision(self,*,path,expected_sha256,replacement,
+                                reason,operator_authorized=False):
+        """Review-only diff; does not alter repository files, run tests or merge."""
+        if operator_authorized is not True:
+            raise PermissionError("repository-wide code proposal requires operator authorization")
+        if type(replacement) is not str or len(replacement.encode())>MAX_PATCH:
+            raise JeevesAppwideError("bounded UTF-8 replacement needed")
+        if type(reason) is not str or not 12<=len(reason)<=1000:
+            raise JeevesAppwideError("reason for app improvement required")
+        old=self.source(path)
+        if expected_sha256!=old["sha256"]:
+            raise JeevesAppwideError("optimistic source SHA conflict")
+        if replacement==old["content"]:
+            raise JeevesAppwideError("no-op modification rejected")
+        diff="".join(difflib.unified_diff(
+            old["content"].splitlines(keepends=True),
+            replacement.splitlines(keepends=True),
+            fromfile="a/"+path,tofile="b/"+path))
+        if len(diff.encode())>MAX_PATCH*2:
+            raise JeevesAppwideError("oversize review diff")
+        body={
+            "schema":"skeleton.ai.jeeves_appwide_code_change_proposal.v1",
+            "path":path,"expected_sha256":expected_sha256,
+            "proposed_sha256":sha256(replacement.encode()).hexdigest(),
+            "reason":reason,"diff":diff,
+            "inventory_snapshot":self._digest,
+            "approval_required":True,"committed":False,
+            "source_mutated":False,"automatic_self_update":False,
+            "security_and_regression_review_required":True,
+        }
+        return {**body,"digest":digest(body)}
+
+
+OPERATIONS = {
+    "inventory.report":("read", "all scanned files",False),
+    "inventory.search":("read", "paged whole app",False),
+    "source.inspect":("read", "UTF-8 source",False),
+    "source.propose":("proposal", "exact-file reviewed code edit",True),
+    "editor.catalog":("read", "typed original-game editors",False),
+    "editor.preview":("compute", "isolated editor simulation",False),
+    "studio.tree":("read", "active project files",False),
+    "studio.file":("read", "active project source",False),
+    "studio.propose":("proposal", "targeted human-reviewed project edit",True),
+    "jeeves.work_order":("compute", "original production director",False),
+    "jeeves.chapter_chat":("compute", "source-backed chapter conversation",False),
+    "crawler.plan":("compute", "bounded evidence-acquisition planner",False),
+    "companion.visual":("compute", "dragon event visual reducer",False),
+    "learning.improvement_proposal":("proposal", "model improvement review",True),
+}
+
+
+class JeevesAppwideRuntime:
+    """Typed adapters for *actual* supported features; no ambient tools."""
+    def __init__(self,inventory,*,workspace=None):
+        if not isinstance(inventory,AppwideInventory):
+            raise JeevesAppwideError("verified repository inventory needed")
+        inventory._require_scanned()
+        self.inventory=inventory
+        self.workspace=workspace
+
+    def catalog(self):
+        evidence={
+            "schema":"skeleton.ai.jeeves_operational_surface.v1",
+            "inventory_digest":self.inventory._digest,
+            "files_known":len(self.inventory._files),
+            "registered_adapters":[{
+                "name":name,"effect":row[0],"scope":row[1],
+                "operator_gate":row[2],
+            } for name,row in sorted(OPERATIONS.items())],
+            "registered_action_count":len(OPERATIONS),
+            "unregistered_code_execution_denied":True,
+            "application_wide_edit_permissions_inherited":False,
+        }
+        return {**evidence,"digest":digest(evidence)}
+
+    def invoke(self,action,params=None,*,authorized=False):
+        if type(action) is not str or action not in OPERATIONS:
+            raise JeevesAppwideError("no reviewed adapter for requested action")
+        if type(params) is not dict:
+            raise JeevesAppwideError("typed action parameters required")
+        operation=OPERATIONS[action]
+        if operation[2] and authorized is not True:
+            raise PermissionError("explicit operator confirmation required")
+        inv=self.inventory
+        ws=self.workspace
+        project=params.get("project")
+        if action=="inventory.report":
+            result=inv.report()
+        elif action=="inventory.search":
+            result=inv.search(**params)
+        elif action=="source.inspect":
+            result=inv.source(params["path"])
+        elif action=="source.propose":
+            result=inv.propose_source_revision(
+                path=params["path"],expected_sha256=params["expected_sha256"],
+                replacement=params["replacement"],reason=params["reason"],
+                operator_authorized=authorized)
+        elif action=="editor.catalog":
+            from .system_editors import catalog
+            result={"editors":catalog(),"read_only":True}
+        elif action=="editor.preview":
+            from .system_editors import preview_editor
+            result=preview_editor(params["editor"],params.get("settings"))
+        elif action in ("studio.tree","studio.file","studio.propose",
+                        "jeeves.work_order","jeeves.chapter_chat"):
+            if ws is None or project != ws.active():
+                raise JeevesAppwideError("explicitly selected current project required")
+            if action=="studio.tree":
+                result=ws.tree()
+            elif action=="studio.file":
+                result=ws.read("current",project,params["path"])
+            elif action=="studio.propose":
+                result=ws.propose(project,params["path"],params["text"],
+                                  expected_sha256=params["expected_sha256"],
+                                  reason=params["reason"],authorized=authorized)
+            elif action=="jeeves.work_order":
+                from .jeeves_production_director import work_order
+                result=work_order(ws,project,params["prompt"],
+                                  cast=params.get("cast"),
+                                  region=params.get("region"),
+                                  act=params.get("act"),scene=params.get("scene"))
+            else:
+                from .jeeves_chapter_chat import chat_turn
+                result=chat_turn(ws,project,params["prompt"],
+                                 session=params.get("session"),
+                                 cast=params.get("cast"),region=params.get("region"),
+                                 act=params.get("act"),scene=params.get("scene"))
+        elif action=="crawler.plan":
+            # No network access or automatic knowledge promotion.
+            from ..webcrawler.active_research import plan_acquisition
+            result={"targets":[{
+                "start_year":t.start_year,"end_year":t.end_year,
+                "priority":t.priority,"reasons":list(t.reasons),
+            } for t in plan_acquisition(
+                regimes=params.get("regimes",()),
+                bias_rows=params.get("bias_rows",()),
+                contradiction_rows=params.get("contradiction_rows",()),
+                uncertainty_by_regime=params.get("uncertainty_by_regime"),
+                limit=params.get("limit",10))],"crawl_started":False}
+        elif action=="companion.visual":
+            from ..webcrawler.dragon_visual_state import visual_state
+            from types import SimpleNamespace
+            event=params.get("event_kind")
+            if type(event) is not str or event not in (
+                "frontier_discovered","dragon_travel","visual_probe",
+                "robots_check","fetch_started","fetch_received",
+                "policy_rejected","acquisition_accepted","burn_started",
+                "burn_chunk","burn_complete","retry_wait","crawl_complete"):
+                raise JeevesAppwideError("known dragon event only")
+            v=visual_state(SimpleNamespace(kind=event))
+            result={"pose":v.pose,"effect":v.effect,"label":v.label,
+                    "progress":v.progress,"crawler_not_started":True}
+        elif action=="learning.improvement_proposal":
+            target=inv.source(params["path"])
+            evidence=params.get("evidence")
+            if type(evidence) is not list or not 2<=len(evidence)<=32 or not all(
+                type(e) is dict and "source_digest" in e and "claim" in e and
+                type(e["source_digest"]) is str and
+                re.fullmatch(r"[a-f0-9]{64}",e["source_digest"]) and
+                type(e["claim"]) is str and 12<=len(e["claim"])<=1000
+                for e in evidence):
+                raise JeevesAppwideError("two corroborated bounded evidence claims required")
+            proposed=inv.propose_source_revision(
+                path=params["path"],expected_sha256=target["sha256"],
+                replacement=params["replacement"],reason=params["reason"],
+                operator_authorized=authorized)
+            result={
+                "source_patch":proposed,
+                "evidence":evidence,
+                "requires_mirror_adversarial_tests":True,
+                "requires_independent_benchmark_improvement":True,
+                "shadow_weights_promoted":False,
+                "normal_weights_modified":False,
+                "hyperweights_modified":False,
+                "code_automatically_deployed":False,
+            }
+        else:
+            raise JeevesAppwideError("unreachable tool routing state")
+        body={
+            "schema":ACTION_SCHEMA,"action":action,
+            "effect":operation[0],
+            "input_digest":digest(params),
+            "inventory_digest":inv._digest,
+            "result":result,
+            "read_only_or_review_only":operation[0]!="compute" or action!="editor.preview",
+            "unregistered_execution_denied":True,
+            "operator_authorized":authorized is True,
+        }
+        return {**body,"digest":digest(body)}
