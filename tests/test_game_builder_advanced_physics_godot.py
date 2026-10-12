@@ -103,7 +103,7 @@ class OriginalPhysicsGodotProofTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             render_physics_godot_package(session,rules,authorized=False)
         for invalid in [
-            {"gravity":1},{"max_bodies":2},{"dimension":"3d"},
+            {"max_bodies":2},{"dimension":"3d"},
             {"collision_geometry":"oriented_box"},{"substeps":2},
             {"initial_battery":1},
         ]:
@@ -126,6 +126,25 @@ class OriginalPhysicsGodotProofTests(unittest.TestCase):
             if alternative:
                 with self.assertRaises(AdvancedGodotExportError):
                     render_physics_godot_package(alternative,rules,authorized=True)
+
+    def test_native_gravity_has_real_airborne_acceleration_and_floor_contact(self):
+        settings=self.profile(gravity=8,tick_hz=40,air_drag=0,
+                              wall_restitution=0,floor_friction=0)
+        layout=default_layout(make_editor_document("physics",settings)["settings"],2)
+        layout["fixtures"]=[]
+        layout["bodies"][0]["position"]=[200,500,0]
+        scene=make_advanced_scene("physics",settings,seed=2,layout=layout)
+        actions=("step:4",)*6
+        result=run_advanced_session("physics",settings,actions,seed=2,scene=scene)
+        self.assertTrue(verify_advanced_session(result,settings))
+        self.assertEqual(result["state"]["bodies"][0]["position"][1],960)
+        self.assertGreater(result["state"]["contacts"],0)
+        package=render_physics_godot_package(result,settings,authorized=True)
+        proof=json.loads(package.files["godot/proof.json"])["expected"]
+        self.assertEqual(proof["y"],960)
+        self.assertEqual(proof["frame"],24)
+        self.assertEqual(proof["contacts"],result["state"]["contacts"])
+        self.assertIn("per_frame_g",GODOT_PHYSICS)
 
     def test_bounded_archive_integrity_and_no_implicit_filesystem_write(self):
         rules,scene,session=self.generate()
