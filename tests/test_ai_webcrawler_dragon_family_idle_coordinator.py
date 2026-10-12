@@ -9,7 +9,7 @@ from skeleton.ai.webcrawler.dragon_family import (
     DragonFamily, IdleWindow, SourceSeed, SourceReceipt,
 )
 from skeleton.ai.webcrawler.dragon_family_idle_coordinator import (
-    DragonIdleCoordinator, IdleCoordinatorPolicy,
+    DragonIdleCoordinator, IdleCoordinatorPolicy, read_idle_family_health,
 )
 
 OWNER="accepted-owner"
@@ -53,6 +53,17 @@ def gather(task):
     return receipt(task.source_id,tags[task.dragon],NOW+719)
 
 
+def test_read_only_ui_health_never_creates_or_authorizes_scheduler():
+    db=sqlite3.connect(":memory:")
+    early=read_idle_family_health(db,OWNER,authorized=True)
+    assert early["configured"] is False
+    assert early["host_state"]=="not_connected"
+    assert not db.execute("""SELECT 1 FROM sqlite_master WHERE
+        name='dragon_family_idle_leases'""").fetchone()
+    with pytest.raises(PermissionError):
+        read_idle_family_health(db,OWNER,authorized=False)
+    db.close()
+
 def test_three_specialists_evolve_only_on_new_approved_content():
     db,family,worker=make()
     calls=[]
@@ -73,6 +84,11 @@ def test_three_specialists_evolve_only_on_new_approved_content():
     assert [c["stage"] for c in snapshot["children"]]==["hatchling"]*3
     assert [x["action"] for x in snapshot["history"]].count("hatched")==3
     assert worker.health(OWNER,authorized=True)["max_tasks_per_tick"]==3
+    readonly=read_idle_family_health(db,OWNER,authorized=True)
+    assert readonly["configured"] is True
+    assert readonly["host_state"]=="not_observed"
+    assert readonly["workers"]["article"]["last_changes"]==1
+    assert readonly["workers"]["monitor"]["last_changes"]==1
     db.close()
 
 
