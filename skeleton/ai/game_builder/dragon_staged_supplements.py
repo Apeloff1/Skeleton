@@ -16,6 +16,7 @@ import json
 import os
 from pathlib import Path
 import re
+from uuid import uuid4
 import stat
 from urllib.parse import urlsplit
 
@@ -283,5 +284,100 @@ def build_catalog_supplements(
         "supplements": batches,
         "staged_rights_approved": False,
         "crawler_authorized": False,
+        "training_authorized": False,
+    }
+
+
+def materialize_staged_supplements(
+    registry: dict, accepted: list[tuple[str, dict]],
+    stage: dict, *, first_batch: int, batch_size: int = 600,
+    authorized: bool, root: str | Path | None = None,
+) -> dict:
+    """Write validated evidence to regular new files only, with no overwrite.
+
+    The compiler rechecks all accepted parent receipts before generating a
+    complete plan. Files are fully written and fsynced as hidden temporary
+    files, then exposed through no-clobber hard links. Any failure removes
+    only the files created by this call. No SQLite or crawler state is changed.
+    """
+    if authorized is not True:
+        raise PermissionError("explicit trusted source-evidence writer required")
+    prepared = build_catalog_supplements(
+        registry, accepted, stage, first_batch=first_batch,
+        batch_size=batch_size,
+    )
+    base = Path(root) if root is not None else Path(__file__).resolve().parents[3]
+    evidence_dir = base / "docs/ai/evidence"
+    if evidence_dir.is_symlink() or not evidence_dir.is_dir():
+        raise ValueError("regular in-repository evidence directory required")
+    specs = []
+    for name, document in prepared["supplements"]:
+        if (not name.startswith("docs/ai/evidence/dragon-source-expansion-")
+                or not re.fullmatch(
+                    r"dragon-source-expansion-20[0-9]{6}-batch-[0-9]{4}\.json",
+                    name.rsplit("/", 1)[-1])):
+            raise ValueError("noncanonical new source evidence filename")
+        destination = base / name
+        if destination.parent != evidence_dir or destination.is_symlink() or destination.exists():
+            raise FileExistsError("source evidence path already exists")
+        payload = (json.dumps(document, ensure_ascii=False, indent=2,
+                              sort_keys=True, allow_nan=False) + "\n").encode("utf-8")
+        if len(payload) > 8_000_000:
+            raise ValueError("generated catalog evidence exceeds byte budget")
+        specs.append((destination, payload))
+    created = []
+    temps = []
+    dirfd = os.open(evidence_dir, os.O_RDONLY |
+                    getattr(os, "O_DIRECTORY", 0) |
+                    getattr(os, "O_NOFOLLOW", 0))
+    try:
+        for destination, payload in specs:
+            tempname = ".dragon-staged-" + uuid4().hex + ".tmp"
+            tempfd = os.open(
+                tempname, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                getattr(os, "O_NOFOLLOW", 0), 0o600, dir_fd=dirfd)
+            temps.append(tempname)
+            with os.fdopen(tempfd, "wb") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+        for (destination, payload), tempname in zip(specs, temps):
+            # Unlike replace/rename, link() fails if another operator has
+            # created the same evidence path during the staging window.
+            os.link(tempname, destination.name, src_dir_fd=dirfd,
+                    dst_dir_fd=dirfd, follow_symlinks=False)
+            created.append((destination.name, payload))
+        os.fsync(dirfd)
+    except Exception:
+        for name, payload in reversed(created):
+            # Never remove a file another process replaced or modified.
+            try:
+                stat_now = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
+                if stat_now.st_size != len(payload):
+                    continue
+                fd = os.open(name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                             dir_fd=dirfd)
+                with os.fdopen(fd, "rb") as file:
+                    if file.read(len(payload) + 1) == payload:
+                        os.unlink(name, dir_fd=dirfd)
+            except OSError:
+                pass
+        raise
+    finally:
+        for tempname in temps:
+            try:
+                os.unlink(tempname, dir_fd=dirfd)
+            except FileNotFoundError:
+                pass
+        os.close(dirfd)
+    return {
+        "schema": "skeleton.dragon.materialized_catalog_evidence.v1",
+        "new_source_leads": prepared["new_canonical_link_leads"],
+        "raw_url_total": prepared["end_raw_leads"],
+        "evidence_files_created": [name for name, _ in created],
+        "overwrite_performed": False,
+        "database_modified": False,
+        "crawl_authorized": False,
+        "rights_approved": False,
         "training_authorized": False,
     }
