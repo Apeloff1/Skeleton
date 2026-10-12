@@ -1503,11 +1503,6 @@ function renderAdvancedActions(actions){
  if(advancedSession?.editor==="dialogue"){
   const state=advancedSession.state;
   const info=document.createElement("p");
-  info.textContent="Living original conversations · "+
-   state.active_speakers+" locally simulated speakers, "+
-   state.unmodeled_speakers+" explicitly unmodeled · mode "+state.text_delivery+
-   " · "+state.direct_statements.length+" direct statements · "+
-   state.corroboborations;
   // Source statements, rather than an assistant's guessed speech, determine
   // which choices become legal. The backend remains the authority.
   info.textContent="Speakers "+state.active_speakers+
