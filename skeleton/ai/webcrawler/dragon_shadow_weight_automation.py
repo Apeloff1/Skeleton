@@ -29,6 +29,9 @@ from .dragon_conditional_automation import (
 )
 from .dragon_human_review import DragonHumanReviewLedger
 from .dragon_memory_promotion_worker import MemoryPromotionOutput
+from .dragon_knowledge_normalization_worker import NormalizedKnowledge, normalization_records_fingerprint
+from .dragon_knowledge_manifest import canonical_knowledge_id
+from .dragon_adversarial_review_worker import AdversarialReviewOutput
 from .dragon_nest_progression import _id, _instant, _iso
 from .dragon_resource_session import HardwareSample, plan_resources
 
@@ -340,6 +343,8 @@ class ShadowWeightAutomation:
     def stage_shadow(
         self, owner: str, brief: KnowledgeBrief, source_id: str, note_id: str, *,
         normalized_knowledge_id: str, receipts: tuple[LayerReceipt, ...],
+        normalized_records: tuple[NormalizedKnowledge, ...],
+        adversarial_output: AdversarialReviewOutput,
         at: str, idle_since: str, hardware: HardwareSample,
         hardware_now: float, consented: bool, authorized: bool,
         privacy_clear: bool,
@@ -356,6 +361,24 @@ class ShadowWeightAutomation:
         verdict = validate_chain(
             receipts, authorized=True, chain=DEFAULT_CHAIN[:10],
         )
+        if (not isinstance(normalized_records, tuple)
+                or not normalized_records or len(normalized_records) > 1024
+                or any(not isinstance(r, NormalizedKnowledge) for r in normalized_records)
+                or not isinstance(adversarial_output, AdversarialReviewOutput)
+                or adversarial_output.receipt != receipts[-1]
+                or normalized_knowledge_id not in adversarial_output.surviving_knowledge_ids
+                or normalization_records_fingerprint(
+                    receipts[8].input_fingerprints, normalized_records,
+                ) != receipts[8].output_fingerprint):
+            raise ValueError("normalized evidence or adversarial survivors not bound to receipts")
+        record = next((r for r in normalized_records
+                       if r.knowledge_id == normalized_knowledge_id), None)
+        if (record is None or record.knowledge_id != canonical_knowledge_id(record)
+                or record.evidence_fingerprint != receipts[7].output_fingerprint
+                or record.verdict != "supported"
+                or record.contradiction_state == "unresolved"
+                or record.probability_semantics != "empirically_calibrated_probability"):
+            raise ValueError("unsupported, uncalibrated or unbound normalized knowledge")
         self.library.require_fresh_brief(brief, authorized=True)
         rows = self.library._rows(owner)
         source = next((x for x in rows if x["source_id"] == source_id), None)
