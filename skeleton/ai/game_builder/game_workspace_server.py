@@ -13,6 +13,7 @@ from pathlib import Path
 from urllib.parse import urlsplit, parse_qs
 import json
 import secrets
+from base64 import b64encode
 
 from .game_project_workspace import GameWorkspace, WorkspaceError
 from .game_workspace_ui import render_workspace_html
@@ -24,6 +25,8 @@ from .advanced_gameplay_runtime import (
 )
 from .advanced_level_scenes import make_advanced_scene, scene_path
 from .advanced_puzzle_solver import solve_advanced_puzzle
+from .advanced_rhythm_runtime import default_layout as rhythm_default_layout
+from .advanced_rhythm_audio import render_original_beat_wav,original_audio_receipt
 from .advanced_roguelike_longrun import (replay_long_roguelike,
     continue_long_roguelike,verify_long_roguelike)
 from .advanced_world_planner import plan_original_world
@@ -270,6 +273,30 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "requires_approved_system":True,
                 "automatically_committed":False,
             })
+        if path=="/api/rhythm-audio":
+            config=make_editor_document("rhythm",values.get("settings"))["settings"]
+            seed=values.get("seed",0)
+            if type(seed) is not int or not 0<=seed<=2**31-1:
+                raise StudioServerError("original rhythm audio seed must be a bounded integer")
+            source=values.get("scene")
+            if source is not None:
+                source=validate_advanced_scene(source,config)
+                if source["editor"]!="rhythm" or source["seed"]!=seed:
+                    raise StudioServerError("verified original source/seed mismatch")
+                chart=source["layout"]
+            else:
+                chart=rhythm_default_layout(config,seed)
+            from_ms=values.get("from_ms",0)
+            duration_ms=values.get("duration_ms",2500)
+            if type(duration_ms) is not int or not 100<=duration_ms<=5000:
+                raise StudioServerError("studio audio preview must be 100..5000ms")
+            sound=render_original_beat_wav(chart,config,from_ms=from_ms,
+                                           duration_ms=duration_ms)
+            receipt=original_audio_receipt(chart,config,from_ms=from_ms,
+                                             duration_ms=duration_ms)
+            return self._json(200,{"audio_base64":b64encode(sound).decode("ascii"),
+                "receipt":receipt,"original_asset_only":True,
+                "native_hardware_certified":False,"game_files_mutated":False})
         if path=="/api/roguelike-marathon":
             if values.get("prior") is not None:
                 result=continue_long_roguelike(
