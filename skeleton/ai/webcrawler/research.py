@@ -39,8 +39,10 @@ class ResearchQuery:
         for name in ("diversity_weight","contradiction_weight","min_relevance","min_source_score"):
             value=getattr(self,name)
             if not isinstance(value,(int,float)) or isinstance(value,bool) or not math.isfinite(value) or not 0<=value<=1: raise ValueError(f"{name} must be finite and between 0 and 1")
-        # The diversity bonus and contradiction penalty are independent;
-        # the final assurance is bounded to [0, 1].
+        # Keep the total discretionary adjustment within the normalized score
+        # budget so callers cannot suppress the actual evidence term entirely.
+        if self.diversity_weight + self.contradiction_weight > 1:
+            raise ValueError("combined diversity and contradiction weight budget exceeded")
 
 @dataclass(frozen=True)
 class EvidenceObservation:
