@@ -52,13 +52,20 @@ export default function StoryOutcomesStudio() {
   const [matrixLevel, setMatrixLevel] = useState('100');
   const [endingId, setEndingId] = useState('');
   const [pathBudget, setPathBudget] = useState('2000');
+  const [reviewVerdict, setReviewVerdict] = useState<'pass' | 'fail' | 'unknown'>('unknown');
+  const [reviewOrigin, setReviewOrigin] = useState<'creator' | 'jeeves_model_candidate'>('creator');
+  const [reviewSourceNode, setReviewSourceNode] = useState('');
+  const [reviewQuote, setReviewQuote] = useState('');
+  const [reviewRationale, setReviewRationale] = useState('');
+  const [reviewCandidateReceipt, setReviewCandidateReceipt] = useState('');
+  const [endingCoverage, setEndingCoverage] = useState<any>(null);
 
   const resetScope = (nextGame: string, nextBranch: string) => {
     setGameId(nextGame); setBranch(nextBranch);
     setRevision(0); setPlanDigest(''); setAuthorKey('');
     setDoc(null); setSimulation(null); setChoices([]); setAudit(null);
     setChapterWeave(null);
-    setMatrixItems([]); setNotice('');
+    setMatrixItems([]); setEndingCoverage(null); setNotice('');
   };
   const base = useCallback(() => {
     const id = validProjectId(gameId.trim());
@@ -209,6 +216,82 @@ export default function StoryOutcomesStudio() {
     }
     setMatrixItems(all);
     setNotice('1,000 distinct outcome rubrics with 100 scrutiny levels each verified.');
+  };
+  const currentEnding = () => {
+    confirmCurrent();
+    const target = endingId.trim() || doc?.endings[0]?.id;
+    if (!target || !doc?.endings.some(x => x.id === target)) {
+      throw new Error('Select an authored ending for this story graph.');
+    }
+    return target;
+  };
+  const recordEndingReview = async () => {
+    const target = currentEnding();
+    if (!reviewQuote.trim() || reviewRationale.trim().length < 12) {
+      throw new Error('Exact story quotation and a reasoned scrutiny finding are required.');
+    }
+    if (reviewSourceNode.trim() && (!simulation?.ending_id ||
+        simulation.ending_id !== target)) {
+      throw new Error('Replay a real player history to this ending before citing a decision scene.');
+    }
+    const response = await api.post<any>(
+      base() + '/matrix-review',
+      { branch_id: branch, plan_digest: planDigest, ending_id: target,
+        matrix_id: matrixId, level: Number(matrixLevel), verdict: reviewVerdict,
+        rationale: reviewRationale, quote: reviewQuote,
+        source_node_id: reviewSourceNode.trim() || null,
+        witness_choices: reviewSourceNode.trim() ? choices : [],
+        provenance: reviewOrigin, creator_approved: reviewOrigin === 'creator' },
+      { headers: authHeaders(), retries: 0 },
+    );
+    if (!response.ok || !response.data?.ok ||
+        response.data.plan_digest !== planDigest ||
+        response.data.ending_id !== target ||
+        !/^[a-f0-9]{64}$/.test(response.data.review_receipt)) {
+      throw new Error('Ending matrix evidence was not confirmed by its source plan.');
+    }
+    if (reviewOrigin === 'jeeves_model_candidate') {
+      setReviewCandidateReceipt(response.data.review_receipt);
+      setNotice('Jeeves candidate saved without approval; inspect its verdict and source before accepting.');
+    } else {
+      setNotice('Creator-reviewed ending evidence recorded: ' +
+        response.data.review_receipt.slice(0, 20));
+    }
+    await readEndingCoverage();
+  };
+  const approveEndingCandidate = async () => {
+    const target = currentEnding();
+    if (!/^[a-f0-9]{64}$/.test(reviewCandidateReceipt)) {
+      throw new Error('Enter a complete previously stored model review receipt.');
+    }
+    const response = await api.post<any>(
+      base() + '/matrix-review/approve-candidate',
+      { branch_id: branch, plan_digest: planDigest,
+        ending_id: target, matrix_id: matrixId,
+        level: Number(matrixLevel), review_receipt: reviewCandidateReceipt },
+      { headers: authHeaders(), retries: 0 },
+    );
+    if (!response.ok || !response.data?.ok || !response.data.creator_approved ||
+        response.data.review_receipt !== reviewCandidateReceipt) {
+      throw new Error('Human approval was not durably confirmed.');
+    }
+    setNotice('This specific model finding has been creator-approved without altering its original verdict.');
+    await readEndingCoverage();
+  };
+  const readEndingCoverage = async () => {
+    const target = currentEnding();
+    const response = await api.get<any>(
+      base() + '/matrix-coverage?branch_id=' + encodeURIComponent(branch) +
+      '&ending_id=' + encodeURIComponent(target),
+      { headers: authHeaders(), retries: 0, timeoutMs: 30000 },
+    );
+    if (!response.ok || !response.data?.ok ||
+        response.data.plan_digest !== planDigest ||
+        response.data.ending_id !== target ||
+        response.data.coverage?.required !== 100000) {
+      throw new Error('Ending review matrix inventory is not available.');
+    }
+    setEndingCoverage(response.data.coverage);
   };
   const askJeeves = async () => {
     confirmCurrent();
@@ -482,6 +565,40 @@ export default function StoryOutcomesStudio() {
         <Action label="Ask Jeeves to audit this outcome matrix"
           icon="chatbubbles-outline" disabled={busy || !planDigest}
           onPress={() => { void withOperation(askJeeves); }} />
+        <Choice label="Finding origin" value={reviewOrigin}
+          values={['creator', 'jeeves_model_candidate'] as const}
+          onChange={setReviewOrigin} />
+        <Choice label="Critical judgement" value={reviewVerdict}
+          values={['pass', 'fail', 'unknown'] as const}
+          onChange={setReviewVerdict} />
+        <Field label="Exact authored quotation (decision dialogue or ending slide)"
+          value={reviewQuote} onChange={setReviewQuote} maxLength={500} multiline />
+        <Field label="Source node ID (optional; requires a replay to this ending)"
+          value={reviewSourceNode} onChange={setReviewSourceNode} maxLength={96} />
+        <Field label="Explanation, contradictory history or literary criticism"
+          value={reviewRationale} onChange={setReviewRationale} maxLength={1400} multiline />
+        <Action label="Record one evidenced matrix review for this ending"
+          disabled={busy || !planDigest} icon="save-outline"
+          onPress={() => { void withOperation(recordEndingReview); }} />
+        <Field label="Stored Jeeves candidate evidence receipt"
+          value={reviewCandidateReceipt} onChange={setReviewCandidateReceipt} maxLength={64} />
+        <Action label="Explicitly approve this model candidate without changing its verdict"
+          disabled={busy || !planDigest} icon="checkmark-done-outline"
+          onPress={() => { void withOperation(approveEndingCandidate); }} />
+        <Action label="Recompute ending's 100,000-cell review coverage"
+          disabled={busy || !planDigest}
+          onPress={() => { void withOperation(readEndingCoverage); }} />
+        {endingCoverage && <>
+          <Text style={endingCoverage.complete ? styles.label : styles.error}>
+            {endingCoverage.passed}/100,000 approved reviews ·
+            {endingCoverage.missing} missing · {endingCoverage.failed} failed ·
+            {endingCoverage.uncertain} unreviewed · {endingCoverage.duplicate_cells} duplicates
+          </Text>
+          <Text style={styles.small}>
+            Missing, failed, duplicate and stale plan reviews prevent full scrutiny clearance.
+            This is verifiable human-reviewed coverage, not mathematical proof of artistic perfection.
+          </Text>
+        </>}
         <Text style={styles.small}>
           100,000 outcome-review requirements exist per ending, but none count
           as passed until evidence and human scrutiny support them.
