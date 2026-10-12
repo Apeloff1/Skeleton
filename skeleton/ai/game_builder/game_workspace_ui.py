@@ -1821,10 +1821,23 @@ function showAdvanced(reply){
  const nativeSourceFamilies=new Set(["puzzle","platformer","deck_battler",
   "shooter","tactics","tower_defense","racing","survival","farming",
   "factory","colony","physics"]);
- $("advanced-godot-export").disabled=!nativeSourceFamilies.has(advancedSession.editor);
- $("advanced-godot-export").title=nativeSourceFamilies.has(advancedSession.editor)?
-  "Package original Godot source; native hardware verification is a separate CI gate":
-  "This original editor has reference gameplay only; an independent native source engine is not implemented";
+ const physicsActions=new Set(["inspect","step","step:4","push:east",
+  "push:west","push:up","push:down","brake","torque:cw","torque:ccw","select:0"]);
+ const authored=advancedSession.scene?.layout;
+ const physicsNativeReady=advancedSession.editor!=="physics" || (
+   advancedSettings?.max_bodies===1 && advancedSettings?.dimension==="2d" &&
+   advancedSettings?.collision_geometry==="aabb" && advancedSettings?.substeps===1 &&
+   advancedSettings?.initial_battery===0 &&
+   authored?.bodies?.length===1 && authored?.fixtures?.length===0 &&
+   authored.water_y>authored.floor_y &&
+   advancedSession.actions.every(action=>physicsActions.has(action)));
+ const nativeReady=nativeSourceFamilies.has(advancedSession.editor)&&physicsNativeReady;
+ $("advanced-godot-export").disabled=!nativeReady;
+ $("advanced-godot-export").title=nativeReady?
+  "Package independent original Godot source; real native replay and hardware review remain separate":
+  advancedSession.editor==="physics"?
+  "Physics Godot export requires an authored one-body 2D AABB scene without fixtures, substeps=1, battery=0 and supported actions":
+  "This family has no independently running native Godot source adapter";
  $("advanced-state").textContent=JSON.stringify({
    session_digest:advancedSession.digest,
    turns:advancedSession.validated_turn_count,
