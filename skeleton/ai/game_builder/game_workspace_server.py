@@ -25,6 +25,7 @@ from .advanced_gameplay_runtime import (
 )
 from .advanced_level_scenes import make_advanced_scene, scene_path, validate_advanced_scene
 from .advanced_puzzle_solver import solve_advanced_puzzle
+from .advanced_rhythm_longrun import (run_long_rhythm,verify_long_rhythm,continue_long_rhythm)
 from .advanced_rhythm_runtime import default_layout as rhythm_default_layout
 from .advanced_rhythm_audio import render_original_beat_wav,original_audio_receipt
 from .advanced_roguelike_longrun import (replay_long_roguelike,
@@ -273,6 +274,20 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "requires_approved_system":True,
                 "automatically_committed":False,
             })
+        if path=="/api/rhythm-longrun":
+            if values.get("prior") is not None:
+                record=continue_long_rhythm(values["prior"],
+                    values.get("actions",[]),values.get("settings"))
+            else:
+                record=run_long_rhythm(
+                    values.get("settings"),values.get("actions",[]),
+                    seed=values.get("seed",0),scene=values.get("scene"),
+                    checkpoint_interval=values.get("checkpoint_interval",64))
+            return self._json(200,{"record":record,
+                "independently_verified":verify_long_rhythm(
+                    record,values.get("settings")),
+                "game_files_mutated":False,
+                "native_hardware_certified":False})
         if path=="/api/rhythm-audio":
             config=make_editor_document("rhythm",values.get("settings"))["settings"]
             seed=values.get("seed",0)
