@@ -150,6 +150,8 @@ def compile_system_assembly(project_id: str,
         "colony": ("tick",),
         "city_builder": ("tick",),
     }
+    if set(advanced_smoke) != set(ADVANCED_ENGINE_IDS):
+        raise AssemblyError("every playable editor needs an explicit assembly gameplay proof")
     advanced_evidence = [
         {"editor": name,
          "gameplay_session_digest": run_advanced_session(
@@ -189,6 +191,8 @@ def compile_system_assembly(project_id: str,
             "colony":("tick",),
             "city_builder":("tick",),
         }
+        if set(scene_smoke) != set(ADVANCED_ENGINE_IDS):
+            raise AssemblyError("every playable editor needs a source-bound scene proof")
         proof=run_advanced_session(editor,configs[editor]["settings"],
                                    scene_smoke[editor],
                                    seed=source["seed"],scene=source)
