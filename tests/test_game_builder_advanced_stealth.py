@@ -147,6 +147,10 @@ class OriginalStealthReferenceTests(unittest.TestCase):
         altered["keycards"]=[]
         with self.assertRaises(StealthActionError):
             normalize_layout({**base,"mission":"archive","hacking_charges":0},altered)
+        with self.assertRaises(StealthActionError):
+            normalize_layout({**base,"mission":"sabotage","hacking_charges":0},original)
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("stealth",{"mission":"sabotage","hacking_charges":0})
 
     def test_receipt_forgery_and_save_continue_do_not_promote_cheats(self):
         config={"guard_count":0,"camera_range":0}
