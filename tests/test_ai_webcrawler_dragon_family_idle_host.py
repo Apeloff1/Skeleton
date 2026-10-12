@@ -13,7 +13,7 @@ from skeleton.ai.webcrawler.dragon_family_custody_bridge import (
     DragonFamilyCustodyBridge, ApprovedSourceSnapshot,
 )
 from skeleton.ai.webcrawler.dragon_family_idle_host import (
-    DragonIdleHostControl, DragonIdleHostPolicy, idle_consent_scope, SCHEMA,
+    DragonIdleHostControl, DragonIdleHostPolicy, idle_consent_scope, read_idle_host_projection, SCHEMA,
 )
 from skeleton.ai.webcrawler.dragon_family_idle_integration import AcquiredArticle
 from skeleton.ai.webcrawler.dragon_game_mechanics import Mechanic
@@ -222,6 +222,29 @@ def test_restarted_host_preserves_opt_in_and_durable_budget(tmp_path):
     stopped=restored.stop(at=T+725,authorized=True)
     assert stopped["active"] is False
     db2.close()
+
+
+def test_authenticated_read_projection_never_initializes_schema_or_trusts_revocation():
+    empty=sqlite3.connect(":memory:")
+    fresh=read_idle_host_projection(empty,OWNER,at=T+700,authorized=True)
+    assert fresh["configured"] is False and fresh["active"] is False
+    assert fresh["host_idle_now"] is None
+    assert not empty.execute("""SELECT 1 FROM sqlite_master WHERE
+        name='dragon_family_idle_host_sessions'""").fetchone()
+    with pytest.raises(PermissionError):
+        read_idle_host_projection(empty,OWNER,at=T+700,authorized=False)
+    empty.close()
+    db,bridge,family,host,grant=make()
+    activate(host,grant)
+    projection=read_idle_host_projection(db,OWNER,at=T+700,authorized=True)
+    assert projection["active"] is True
+    assert projection["consent_expires_at"] is not None
+    assert projection["requires_os_idle_observer"] is True
+    host.consent.revoke(OWNER,grant.consent_id,now=T+701,authorized=True)
+    stale=read_idle_host_projection(db,OWNER,at=T+702,authorized=True)
+    assert stale["active"] is False
+    assert stale["consent_expires_at"] is None
+    db.close()
 
 
 def test_policy_fences_and_lifetime_are_bounded():
