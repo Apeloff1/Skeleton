@@ -1723,6 +1723,8 @@ function renderAdvancedActions(actions){
     null,1
   );
   target.append(streamInput);
+  let latestStreamRecord=null;
+  let latestStreamCheckpoint=null;
   const streamRun=document.createElement("button");
   streamRun.type="button";
   streamRun.textContent="Run and verify exact source-bound streaming simulation";
@@ -1753,6 +1755,8 @@ function renderAdvancedActions(actions){
       });
       if(!check.verified)throw Error("Streamed world independent replay diverged");
       const state=result.record.state;
+      latestStreamRecord=result.record;
+      latestStreamCheckpoint=null;
       streamOutput.textContent=JSON.stringify({
         source_evidence:result.record.digest,
         map_tile_side:state.side,chunks:state.chunks_per_side,
@@ -1776,11 +1780,116 @@ function renderAdvancedActions(actions){
       },null,2);
       status("Original chunked NPC world replayed; unloaded residents neither teleport nor witness imaginary events.");
     }catch(error){
+      latestStreamRecord=null;
+      latestStreamCheckpoint=null;
       streamOutput.textContent="";
       status("Chunked NPC World rejected: "+error.message);
     }
   });
   target.append(streamRun);target.append(streamOutput);
+  const timelineTitle=document.createElement("h4");
+  timelineTitle.textContent="Streaming Timeline · source-verified checkpoints and alternate worlds";
+  target.append(timelineTitle);
+  const checkpointButton=document.createElement("button");
+  checkpointButton.type="button";
+  checkpointButton.textContent="Create 8-turn source-verified timeline bookmarks";
+  const cursorSelect=document.createElement("select");
+  cursorSelect.id="original-chunked-world-bookmark-cursor";
+  cursorSelect.setAttribute("aria-label","Select an exact verified original game cursor");
+  const branchInput=document.createElement("textarea");
+  branchInput.id="original-chunked-world-fork-actions";
+  branchInput.rows=3;
+  branchInput.setAttribute("aria-label","Original real actions appended after timeline cursor");
+  branchInput.value=JSON.stringify(["wait"],null,1);
+  const branchButton=document.createElement("button");
+  branchButton.type="button";
+  branchButton.textContent="Explicitly replay selected alternate history";
+  const timelineOutput=document.createElement("pre");
+  timelineOutput.id="original-chunked-world-timeline-evidence";
+  timelineOutput.setAttribute("role","status");
+  timelineOutput.setAttribute("aria-live","polite");
+  checkpointButton.addEventListener("click",async()=>{
+    try{
+      if(!latestStreamRecord)throw Error("Run and verify the original world first");
+      const source=await api("/api/chunked-world-checkpoint",{
+        record:latestStreamRecord,interval:8
+      });
+      if(!source.verified||source.source_project_mutated||
+         source.checkpoint.model_weights_promoted)
+        throw Error("Source checkpoint proof failed independent replay");
+      const check=await api("/api/chunked-world-checkpoint-verify",{
+        record:source.checkpoint
+      });
+      if(!check.verified)throw Error("Checkpoint proof changed during review");
+      latestStreamCheckpoint=source.checkpoint;
+      cursorSelect.replaceChildren();
+      for(const row of source.checkpoint.bookmarks){
+        const option=document.createElement("option");
+        option.value=String(row.cursor);
+        option.textContent="Original turn "+row.cursor+
+          " · "+row.action_head.slice(0,12);
+        cursorSelect.append(option);
+      }
+      cursorSelect.value=String(source.checkpoint.actual_end_cursor);
+      timelineOutput.textContent=JSON.stringify({
+        original_world_digest:source.checkpoint.source_world_digest,
+        original_actors:source.checkpoint.source_actor_count,
+        source_cursors:source.checkpoint.bookmarks,
+        replay_verified:true,
+        instant_restore_claimed:false,
+        ai_weights_promoted:false
+      },null,2);
+      status("Original source world checkpoints independently verified; select a fork point.");
+    }catch(error){
+      latestStreamCheckpoint=null;
+      timelineOutput.textContent="";
+      status("Streaming Timeline checkpoint denied: "+error.message);
+    }
+  });
+  branchButton.addEventListener("click",async()=>{
+    try{
+      if(!latestStreamCheckpoint)throw Error("Create verified original source bookmarks first");
+      const actions=JSON.parse(branchInput.value);
+      if(!Array.isArray(actions)||actions.length>128||
+         !actions.every(a=>typeof a==="string"&&a.length<=32))
+        throw Error("Fork input must contain finite original registered commands");
+      const cursor=Number(cursorSelect.value);
+      const source=await api("/api/chunked-world-continue",{
+        checkpoint:latestStreamCheckpoint,actions,cursor
+      });
+      if(!source.verified||source.source_project_mutated||
+         source.branch.ai_model_weights_promoted)
+        throw Error("Historical original world fork did not replay");
+      const checked=await api("/api/chunked-world-continuation-verify",{
+        record:source.branch
+      });
+      if(!checked.verified)throw Error("Alternate original world diverged from proof");
+      const fork=source.branch;
+      timelineOutput.textContent=JSON.stringify({
+        parent_checkpoint:fork.source_checkpoint.digest,
+        fork_at_original_turn:fork.cursor,
+        original_head:fork.source_cursor_head,
+        discarded_future:fork.discarded_future_actions,
+        appended_real_actions:fork.appended_actions,
+        new_world_digest:fork.result_world_digest,
+        new_tick:fork.result.state.tick,
+        new_player_tile:fork.result.state.player,
+        new_actor_locations:fork.result.state.actors.map(a=>({
+          identity:a.id,position:a.position
+        })),
+        independently_replayed:true,
+        snapshot_was_trusted_without_replay:false,
+        ai_weights_promoted:false,project_changed:false
+      },null,2);
+      status("Original alternate history reexecuted from exact source; no state forgery or project mutation.");
+    }catch(error){
+      timelineOutput.textContent="";
+      status("Streaming Timeline fork denied: "+error.message);
+    }
+  });
+  target.append(checkpointButton);target.append(cursorSelect);
+  target.append(branchInput);target.append(branchButton);
+  target.append(timelineOutput);
   return;
  }
  if(advancedSession?.editor==="economy"){
