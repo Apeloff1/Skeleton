@@ -285,121 +285,142 @@ def _check_attestation(bible, contract, scene, history_state, post_state,
     return owned
 
 
-def _state_after(bible, scene_history):
-    return verify_story_history(bible, scene_history)["current_state"]
-
-
-def _receipt(contract,scene,observations,previous_receipt,previous_state,next_state,
-             previous_item_state,next_items,index_digest):
-    body={
+def _receipt(contract, scene, observations, previous_receipt,
+             previous_state, next_state, previous_item_state,
+             next_items, prefix_digest):
+    """Single-stage confirmation bound to all preceding verified receipts."""
+    body = {
         "schema": RECEIPT, "contract_digest": contract["digest"],
-        "sequence": scene["sequence"],"act":scene["act"],"scene":scene["scene"],
-        "scene_source_digest":_source_scene_digest(scene),
-        "previous_receipt_digest":previous_receipt,
-        "historical_index_digest_before":index_digest,
-        "character_state_before":digest(previous_state),
-        "character_state_after":digest(next_state),
-        "item_state_before":digest(previous_item_state),
-        "item_state_after":digest(next_items),
+        "sequence": scene["sequence"], "act": scene["act"],
+        "scene": scene["scene"],
+        "scene_source_digest": _source_scene_digest(scene),
+        "previous_receipt_digest": previous_receipt,
+        "historical_chain_digest_before": prefix_digest,
+        "character_state_before": digest(previous_state),
+        "character_state_after": digest(next_state),
+        "item_state_before": digest(previous_item_state),
+        "item_state_after": digest(next_items),
         "observations": observations,
-        "passed_checks":list(QC_GATES),
-        "all_source_history_reparsed":True,
-        "model_has_perfect_infinite_memory":False,
-        "voice_audio_acoustically_tested":False,
-        "visual_facial_geometry_render_tested":False,
-        "human_commit_required":True,
+        "passed_checks": list(QC_GATES),
+        "entire_source_chain_reparsed": True,
+        "actual_acoustic_voice_verified": False,
+        "actual_rendered_face_verified": False,
+        "human_source_approval_required": True,
     }
-    return {**body,"digest":digest(body)}
+    return {**body, "digest": digest(body)}
 
 
-def verify_production_history(bible,contract,scenes):
-    """Full source-chain replay and receipt/identity/wardrobe/inventory validation."""
-    validate_contract(contract,bible)
-    require(type(scenes) in (list,tuple) and len(scenes)<=SCENE_TARGET,
-            "original 9999-stage sequence is bounded")
-    stripped=[{k:v for k,v in scene.items() if k!="assurance"}
-              for scene in scenes]
-    # Independently verify the *entire* source before any receipt can pass.
-    index=verify_story_history(bible,stripped)
-    character_state={x["id"]:dict(x["state"]) for x in bible["characters"]}
-    item_state=_review_state(contract)
-    previous=None
-    previous_receipt=None
-    # Source index before each scene is hash linked; this reconstruction is
-    # intentionally exhaustive and cannot skip early scenes.
-    prior_scenes=[]
-    for entry,plain in zip(scenes,stripped):
-        receipt=entry.get("assurance")
-        require(type(receipt) is dict, "scene missing required confirmation receipt")
-        before_index=verify_story_history(bible,prior_scenes)
-        prior_scenes.append(plain)
-        stage_index=verify_story_history(bible,prior_scenes)
-        next_state=stage_index["current_state"]
-        changed_items=_check_attestation(
-            bible,contract,entry,character_state,next_state,item_state,
-            previous_receipt,receipt.get("observations"))
-        expected=_receipt(contract,entry,receipt["observations"],
-                         previous_receipt,character_state,next_state,
-                         item_state,changed_items,before_index["digest"])
-        require(receipt==expected,
-                "historical stage receipt differs from independent full-source reparse")
-        character_state=next_state
-        item_state=changed_items
-        previous_receipt=receipt["digest"]
-        previous=entry
-    result={
-        "schema":"skeleton.game_builder.production_history_confirmation.v1",
-        "bible_digest":bible["digest"],"contract_digest":contract["digest"],
-        "accepted_scenes":len(scenes),"planned_scenes":SCENE_TARGET,
-        "planned_acts":ACT_TARGET,
-        "fully_completed":len(scenes)==SCENE_TARGET and
-                          len({s["act"] for s in scenes})==ACT_TARGET,
-        "verified_source_head":index["head_digest"],
-        "verified_receipt_head":previous_receipt,
-        "current_character_state":character_state,
-        "current_item_owners":item_state,
-        "all_prior_scenes_reparsed":True,
-        "required_scene_order_proved":True,
-        "no_deviation_accepted":True,
-        "actual_voice_audio_verification_completed":False,
-        "actual_rendered_facial_matching_completed":False,
+def _advance_characters(before, scene):
+    """Replay reviewed state transitions; source history validates their cause."""
+    state = {name: dict(value) for name, value in before.items()}
+    for event in scene["events"]:
+        for change in event["changes"]:
+            who = change["character"]
+            key = change["field"]
+            require(state[who][key] == change["previous"],
+                    "historic character state differs from witnessed predecessor")
+            state[who][key] = change["value"]
+    return state
+
+
+def _history_root(bible, contract):
+    return digest({"bible": bible["digest"], "contract": contract["digest"],
+                   "stage": 0})
+
+
+def _advance_root(root, scene, receipt):
+    return digest({"previous_history": root, "source": scene["digest"],
+                   "confirmation": receipt["digest"]})
+
+
+def verify_production_history(bible, contract, scenes):
+    """O(N) full historical source replay plus O(N) receipt re-verification.
+
+    Each *new* scene also triggers a fresh full replay from stage one. That is
+    deliberate. No check trusts a cached projection or producer's assertion.
+    """
+    validate_contract(contract, bible)
+    require(type(scenes) in (list, tuple) and len(scenes) <= SCENE_TARGET,
+            "reviewable 9999-stage history required")
+    index = verify_story_history(bible, scenes)
+    character_state = {x["id"]: dict(x["state"]) for x in bible["characters"]}
+    item_state = _review_state(contract)
+    previous_receipt = None
+    root = _history_root(bible, contract)
+    visited_acts = set()
+    for stage in scenes:
+        receipt = stage.get("assurance")
+        require(type(receipt) is dict, "stage is missing its own identity/QC receipt")
+        before = character_state
+        after = _advance_characters(before, stage)
+        new_items = _check_attestation(
+            bible, contract, stage, before, after, item_state,
+            previous_receipt, receipt.get("observations"))
+        expected = _receipt(contract, stage, receipt["observations"],
+                            previous_receipt, before, after,
+                            item_state, new_items, root)
+        require(expected == receipt,
+                "full history reparse rejects forged or drifting stage receipt")
+        root = _advance_root(root, stage, receipt)
+        item_state = new_items
+        character_state = after
+        previous_receipt = receipt["digest"]
+        visited_acts.add(stage["act"])
+    require(character_state == index["current_state"],
+            "independent cast state projection disagrees with replay")
+    result = {
+        "schema": "skeleton.game_builder.production_history_confirmation.v1",
+        "bible_digest": bible["digest"], "contract_digest": contract["digest"],
+        "accepted_scenes": len(scenes), "planned_scenes": SCENE_TARGET,
+        "planned_acts": ACT_TARGET,
+        "fully_completed": len(scenes) == SCENE_TARGET and
+                           len(visited_acts) == ACT_TARGET,
+        "verified_source_head": index["head_digest"],
+        "verified_receipt_head": previous_receipt,
+        "verified_chain_head": root,
+        "current_character_state": character_state,
+        "current_item_owners": item_state,
+        "all_prior_scenes_reparsed": True,
+        "scene_order_proved": True, "deviations_approved": 0,
+        "actual_voice_audio_verification_completed": False,
+        "actual_rendered_facial_matching_completed": False,
     }
-    return {**result,"digest":digest(result)}
+    return {**result, "digest": digest(result)}
 
 
-def seal_production_scene(bible,contract,history,candidate,observations):
-    """Only one next scene, after full 1..N previous history validation."""
-    validate_contract(contract,bible)
+def seal_production_scene(bible, contract, history, candidate, observations):
+    """Certify exactly the next source scene; never manufacture scene content."""
+    validate_contract(contract, bible)
     require(type(candidate) is dict and "assurance" not in candidate,
-            "receipt signing requires clean original source scene")
-    prior=verify_production_history(bible,contract,history)
-    require(len(history)<SCENE_TARGET and candidate.get("sequence")==len(history)+1,
-            "exactly one next stage can be authored, never a batch")
-    pending={k:v for k,v in candidate.items() if k!="digest"}
-    plain=sign(pending,SCENE)
-    before=verify_story_history(bible,[{k:v for k,v in s.items() if k!="assurance"}
-                                      for s in history])
-    next_index=verify_story_history(bible,[
-        *({k:v for k,v in s.items() if k!="assurance"} for s in history),plain])
-    next_state=next_index["current_state"]
-    current_items=prior["current_item_owners"]
-    after_items=_check_attestation(
-        bible,contract,plain,prior["current_character_state"],next_state,
-        current_items,prior["verified_receipt_head"],observations)
-    receipt=_receipt(contract,plain,observations,prior["verified_receipt_head"],
-                     prior["current_character_state"],next_state,
-                     current_items,after_items,before["digest"])
-    sealed=sign({**pending,"assurance":receipt},SCENE)
-    # Complete reparse is the final acceptance gate; never trust our fast path.
-    verify_production_history(bible,contract,[*history,sealed])
+            "producer may not supply a self-certified assurance receipt")
+    prior = verify_production_history(bible, contract, history)
+    require(len(history) < SCENE_TARGET and
+            candidate.get("sequence") == len(history) + 1,
+            "one scene at a time, in exact 1..9999 order")
+    pending = {k: v for k, v in candidate.items() if k != "digest"}
+    plain = sign(pending, SCENE)
+    # The full replay checks narrative continuity, actor facts, palette,
+    # scene ordering, event causality and immutable historical world source.
+    next_index = verify_story_history(bible, [*history, plain])
+    before = prior["current_character_state"]
+    after = next_index["current_state"]
+    current_items = prior["current_item_owners"]
+    next_items = _check_attestation(
+        bible, contract, plain, before, after, current_items,
+        prior["verified_receipt_head"], observations)
+    receipt = _receipt(contract, plain, observations,
+                       prior["verified_receipt_head"], before, after,
+                       current_items, next_items, prior["verified_chain_head"])
+    sealed = sign({**pending, "assurance": receipt}, SCENE)
+    verify_production_history(bible, contract, [*history, sealed])
     return sealed
 
 
-def confirm_stage(workspace,project):
-    """Evidence receipt for all reviewed stages, including empty opening stage."""
-    from .story_workspace import load_story_workspace,load_continuity_contract
-    bible,scenes,_=load_story_workspace(workspace,project)
-    require(bible is not None,"foundation/cast/world approval required")
-    contract=load_continuity_contract(workspace,project)
-    require(contract is not None,"100-act continuity agreement not approved")
-    return verify_production_history(bible,contract,scenes)
+def confirm_stage(workspace, project):
+    """Independently verify every previously approved scene and chained receipt."""
+    from .story_workspace import load_story_workspace, load_continuity_contract
+    bible, scenes, _ = load_story_workspace(workspace, project)
+    require(bible is not None, "reviewed story, cast and world source required")
+    contract = load_continuity_contract(workspace, project)
+    require(contract is not None, "reviewed 100-act continuity contract required")
+    return verify_production_history(bible, contract, scenes)
