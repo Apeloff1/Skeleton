@@ -78,7 +78,6 @@ class TrueUnifiedSourceSaveTests(unittest.TestCase):
                 .update(fuel=9999),
             lambda x:x["genre_sessions"][0]["source_session"]["state"]
                 .update(harvested=999),
-            lambda x:x["campaign_digest"].__class__,
             lambda x:x.update(world_state_digest="0"*64),
             lambda x:x.update(head_hash="0"*64),
             lambda x:x.update(genre_event_count=99),
@@ -87,7 +86,6 @@ class TrueUnifiedSourceSaveTests(unittest.TestCase):
         for change in tamperers:
             modified=deepcopy(valid)
             change(modified)
-            if modified==valid:continue
             stripped={k:v for k,v in modified.items() if k!="digest"}
             modified["digest"]=sha256(json.dumps(
                 stripped,sort_keys=True,separators=(",",":"),
