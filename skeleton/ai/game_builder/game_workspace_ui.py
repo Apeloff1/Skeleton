@@ -1842,6 +1842,8 @@ function showAdvanced(reply){
   "This family has no independently running native Godot source adapter";
  $("advanced-physics-interop").disabled=!["platformer","racing","sandbox"].includes(
   advancedSession.editor)||!advancedSession.scene;
+ $("advanced-interop-godot").disabled=!["platformer","racing","sandbox"].includes(
+   advancedSession.editor)||!advancedSession.scene;
  $("advanced-linked-step").disabled=!["platformer","racing","sandbox"].includes(
    advancedSession.editor)||!advancedSession.scene;
  const sourceChoice=$("advanced-linked-action");
@@ -3156,6 +3158,32 @@ $("advanced-linked-step").addEventListener("click",async()=>{
   status("Played source and physical commands under separate audited authorities");
  }catch(error){status("Linked physical campaign blocked: "+error.message);}
 });
+$("advanced-interop-godot").addEventListener("click",async()=>{
+ try{
+  if(!advancedSession || !advancedSession.scene ||
+     !["platformer","racing","sandbox"].includes(advancedSession.editor))
+   throw Error("Signed source game required for native physics encounter");
+  const response=await api("/api/advanced-interoperable-physics-godot",{
+   session:advancedSession,settings:advancedSettings,
+   physics_actions:Array(8).fill("push:east")
+  });
+  if(response.native_hardware_verified || response.native_renowned_genre_completed ||
+     response.source_files_modified || response.publish_approved ||
+     response.source_scene_digest!==advancedSession.scene.digest ||
+     response.source_session_digest!==advancedSession.digest)
+   throw Error("Native original physics source custody or release status mismatch");
+  const raw=atob(response.zip_base64);
+  if(raw.length>512000)throw Error("Reviewed original-game archive exceeds size budget");
+  const bytes=Uint8Array.from(raw,c=>c.charCodeAt(0));
+  const blob=new Blob([bytes],{type:"application/zip"});
+  const url=URL.createObjectURL(blob),anchor=document.createElement("a");
+  anchor.href=url;anchor.download=response.file_name;
+  document.body.append(anchor);anchor.click();anchor.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),0);
+  status("Signed original "+advancedSession.editor+
+   " physical Godot encounter exported. It independently plays Physics only; native genre release requires a separate gate.");
+ }catch(error){status("Native original physical encounter export blocked: "+error.message);}
+});
 $("advanced-physics-interop").addEventListener("click",async()=>{
  try{
   if(!advancedSession || !["platformer","racing","sandbox"].includes(advancedSession.editor)
@@ -3274,6 +3302,7 @@ local until typed revalidation and an explicit human-approved file commit.</smal
 <button id="advanced-start" type="button">Start advanced scenario</button>
 <button id="advanced-physics-native" type="button">Prepare native physics demo</button>
 <button id="advanced-physics-interop" type="button">Rehearse authored physical encounters</button>
+<button id="advanced-interop-godot" type="button">Download original physical encounter for Godot 4</button>
 <fieldset aria-label="Opt-in linked physical campaign">
  <legend>Linked physical campaign · real health and durability</legend>
  <label>Original game action<select id="advanced-linked-action"></select></label>
