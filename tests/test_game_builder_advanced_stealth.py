@@ -231,6 +231,67 @@ class OriginalStealthReferenceTests(unittest.TestCase):
         self.assertTrue(verify_advanced_session(
             run_advanced_session("stealth",seed=3,scene=signed)))
 
+
+    def test_ai_planner_rehearses_three_real_missions_without_certifying_guard_evasion(self):
+        from skeleton.ai.game_builder.advanced_stealth_planner import plan_stealth_route
+        for mission in ("archive","sabotage","intelligence"):
+            config={"mission":mission,"guard_count":8}
+            scene=make_advanced_scene("stealth",config,seed=0)
+            proof=plan_stealth_route(scene,config,max_states=60000,max_depth=96)
+            with self.subTest(mission=mission):
+                self.assertEqual(proof["feasibility"],"rehearsal_route_found")
+                self.assertTrue(proof["route"])
+                self.assertEqual(proof["route"][-1],"extract")
+                self.assertTrue(proof["rehearsal_verified"])
+                self.assertEqual(len(proof["rehearsal_session_digest"]),64)
+                self.assertEqual(proof["scene_digest"],scene["digest"])
+                self.assertFalse(proof["actual_security_evasion_verified"])
+                self.assertFalse(proof["native_engine_verified"])
+                self.assertFalse(proof["source_mutated"])
+                self.assertEqual(proof,plan_stealth_route(
+                    scene,config,max_states=60000,max_depth=96))
+
+    def test_planner_rejects_opaque_forged_scenes_and_unbounded_search(self):
+        from skeleton.ai.game_builder.advanced_stealth_planner import (
+            plan_stealth_route,StealthPlanningError,
+        )
+        scene=make_advanced_scene("stealth",seed=0)
+        for bad in (0,True,199,150001):
+            with self.assertRaises(StealthPlanningError):
+                plan_stealth_route(scene,max_states=bad)
+        for bad in (0,True,129):
+            with self.assertRaises(StealthPlanningError):
+                plan_stealth_route(scene,max_depth=bad)
+        forged=deepcopy(scene)
+        forged["layout"]["spawn"]=[9,7]
+        with self.assertRaises(SceneError):
+            plan_stealth_route(forged)
+        with self.assertRaises(SceneError):
+            plan_stealth_route(scene,{"mission":"intelligence"})
+
+    def test_studio_and_cli_expose_actual_bounded_staged_rehearsals(self):
+        import json,io,tempfile
+        from contextlib import redirect_stdout
+        from pathlib import Path
+        from skeleton.ai.game_builder.system_editor_cli import main
+        from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html
+        scene=make_advanced_scene("stealth",seed=0)
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/"scene.json"
+            path.write_text(json.dumps(scene),encoding="utf-8")
+            output=io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(main(["plan-stealth","--scene",str(path),
+                                        "--max-states","60000"]),0)
+            proof=json.loads(output.getvalue())
+            self.assertTrue(proof["rehearsal_verified"])
+            self.assertFalse(proof["source_mutated"])
+        page=render_workspace_html("A"*32).decode("utf-8")
+        for text in ("stealth-mission-plan","stealth-plan-proof",
+                     "/api/stealth-plan","rehearsal_verified",
+                     "actual_security_evasion_verified"):
+            self.assertIn(text,page)
+
     def test_hybrid_assembly_uses_genuine_stealth_scene_and_replay(self):
         scene=make_advanced_scene("stealth",seed=0)
         assembly=compile_system_assembly("original_infiltration",
