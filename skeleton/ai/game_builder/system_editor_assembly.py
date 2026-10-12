@@ -167,6 +167,7 @@ def compile_system_assembly(project_id: str,
         "npc_society": ("inspect",),
         "ecosystem": ("inspect",),
         "economy": ("inspect",),
+        "dialogue": ("inspect",),
     }
     if set(advanced_smoke) != set(ADVANCED_ENGINE_IDS):
         raise AssemblyError("every playable editor needs an explicit assembly gameplay proof")
