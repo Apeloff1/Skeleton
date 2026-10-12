@@ -260,3 +260,32 @@ def test_state_receipts_are_reproducible_and_no_output_is_live_game_mutation():
     assert all(len(s["receipt_digest"]) == 64 for s in first["steps"])
     assert first["receipt_digest"] != compiled["source_digest"]
     assert compiled["initial_state"]["quests"] == {}
+
+
+
+def test_global_dialogue_history_ids_are_unique_across_rejoining_branches():
+    story = plan()
+    story["nodes"][1]["options"][0]["id"] = "help_aria"
+    with pytest.raises(ValueError, match="globally unique"):
+        validate_plan(story)
+
+
+def test_surprises_require_prior_planted_plot_clues_and_can_then_be_paid_off():
+    story = plan()
+    story["nodes"][1]["options"][0]["effects"].insert(
+        -1, threat("surprise", "truth"),
+    )
+    assert simulate(validate_plan(story), ["help_aria", "good_ending"])["ending_accepted"]
+    story["nodes"][0]["options"][0]["effects"] = [
+        e for e in story["nodes"][0]["options"][0]["effects"]
+        if e.get("op") != "thread"
+    ]
+    with pytest.raises(ValueError, match="previously authored open clue"):
+        simulate(validate_plan(story), ["help_aria", "good_ending"])
+
+
+def test_ending_lore_requires_bounded_unique_knowledge_ids():
+    story = plan()
+    story["endings"][0]["required_lore"] = "this string must not be read as a list"
+    with pytest.raises(ValueError, match="bounded list"):
+        validate_plan(story)
