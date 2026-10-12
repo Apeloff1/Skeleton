@@ -35,8 +35,20 @@ class Cursor:
         self.max = None
 
     def sort(self, keys):
-        self.documents.sort(key=lambda doc: tuple(doc.get(key, "") for key, _ in keys))
+        self.documents.sort(
+            key=lambda doc: tuple(doc.get(key, "") for key, _ in keys),
+            reverse=all(direction < 0 for _, direction in keys),
+        )
         return self
+
+    def __aiter__(self):
+        async def generate():
+            rows = self.documents[self.off:]
+            if self.max is not None:
+                rows = rows[:self.max]
+            for row in rows:
+                yield deepcopy(row)
+        return generate()
 
     def skip(self, offset):
         self.off = offset
@@ -202,6 +214,26 @@ async def test_full_audit_and_recall_use_provenance_across_distant_scenes(databa
     assert "A1/S500/B1" in recall["recall"]["context"]
     assert "message-later" not in recall["recall"]["context"]  # stored source is explicit
     assert "source:jeeves-message-9" in recall["recall"]["context"]
+
+
+@pytest.mark.asyncio
+async def test_recall_returns_most_recent_character_scenes_and_isolation(database):
+    for scene in range(1, 2050):
+        await route.append_story_event("game-1", row(
+            f"scene-{scene}", scene=scene, kind="establish",
+            character_ids=["hero"], witness_ids=[],
+        ), user=ACTOR)
+    report = await route.audit_story_index("game-1", branch_id="main", user=ACTOR)
+    assert report["audit"]["event_count"] == 2049
+    assert report["audit"]["complete"] is True
+    assert report["audit"]["valid"] is True
+    assert report["audit"]["bookmarks_truncated"] is True
+    result = await route.recall_story_character(
+        "game-1", "hero", branch_id="main", max_chars=400, user=ACTOR)
+    assert result["recall"]["truncated"] is True
+    assert result["recall"]["complete_source"] is False
+    assert "S2049" in result["recall"]["context"]
+    assert "S1/" not in result["recall"]["context"]
 
 
 @pytest.mark.asyncio
