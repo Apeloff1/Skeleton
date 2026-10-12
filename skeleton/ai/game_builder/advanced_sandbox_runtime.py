@@ -587,8 +587,8 @@ def step(state,config,action):
         elif verb=="terraform":
             if not config["creative_mode"] or not config["terraforming"]:
                 raise SandboxActionError("material transformation requires authorized creative terraforming")
-            if tile["building"] or tile["crop"] or tile["animal"]:
-                raise SandboxActionError("populated, built or cultivated tile cannot be silently overwritten")
+            if index==state["position"] or tile["building"] or tile["crop"] or tile["animal"]:
+                raise SandboxActionError("occupied player, built, cultivated or wildlife cell cannot be silently overwritten")
             replacement=_tile(index,kind,state["seed"]+state["region"]*31)
             tiles[index]=replacement
             events.append("authorized_original_biome_terraformed")
