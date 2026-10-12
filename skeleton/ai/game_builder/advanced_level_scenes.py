@@ -25,6 +25,14 @@ from .advanced_fighting_runtime import (default_layout as fight_layout,
 from .advanced_rhythm_runtime import (default_layout as rhythm_layout,
                                       normalize_layout as validate_rhythm_layout,
                                       RhythmActionError)
+from .advanced_rpg_runtime import (
+    default_layout as rpg_layout, normalize_layout as validate_rpg_layout,
+    RPGActionError,
+)
+from .advanced_procedural_world_runtime import (
+    default_layout as proc_layout, normalize_layout as validate_proc_layout,
+    ProceduralWorldActionError,
+)
 from .advanced_maze_runtime import (
     default_layout as maze_layout, normalize_layout as validate_maze_layout,
     MazeActionError,
@@ -200,6 +208,10 @@ def _default_layout(engine, config, seed):
         return sports_layout(config,seed)
     if engine == "maze":
         return maze_layout(config,seed)
+    if engine == "rpg":
+        return rpg_layout(config,seed)
+    if engine == "procedural_world":
+        return proc_layout(config,seed)
     raise SceneError("no advanced authored scene available for that engine")
 
 
@@ -235,6 +247,16 @@ def _normalize_layout(engine, config, layout):
         try:
             return validate_maze_layout(config,layout)
         except MazeActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="rpg":
+        try:
+            return validate_rpg_layout(config,layout)
+        except RPGActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="procedural_world":
+        try:
+            return validate_proc_layout(config,layout)
+        except ProceduralWorldActionError as exc:
             raise SceneError(str(exc)) from exc
     if engine=="fighting":
         try:
