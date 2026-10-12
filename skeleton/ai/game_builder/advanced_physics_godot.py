@@ -73,7 +73,7 @@ func _ready() -> void:
         return
     cfg = original["settings"]
     chart = original["scene"]["layout"]
-    if (int(cfg["max_bodies"]) != 1 or int(cfg["gravity"]) != 0
+    if (int(cfg["max_bodies"]) != 1
         or int(cfg["substeps"]) != 1 or str(cfg["dimension"]) != "2d"
         or str(cfg["collision_geometry"]) != "aabb"
         or int(cfg["initial_battery"]) != 0
@@ -125,6 +125,12 @@ func _frame() -> void:
     physical["angular_velocity"]=ang
     physical["max_angular_speed_seen"]=maxi(
         int(physical["max_angular_speed_seen"]),absi(ang))
+    # Reference fixed timestep gravity precedes integration and drag.
+    var per_frame_g: int=_floor_div(
+        int(cfg["gravity"])*100+_floor_div(int(cfg["tick_hz"]),2),
+        int(cfg["tick_hz"]))
+    vy=_clamp(vy+per_frame_g,
+              -int(cfg["speed_limit"]),int(cfg["speed_limit"]))
     physical["x"]=int(physical["x"])+vx
     physical["y"]=int(physical["y"])+vy
     vx=_floor_div(vx*(100-int(cfg["air_drag"])),100)
@@ -337,12 +343,12 @@ def render_physics_godot_package(session: dict, settings: dict | None = None,
     verify_advanced_session(session,rules)
     if not (
         rules["dimension"]=="2d" and rules["collision_geometry"]=="aabb"
-        and rules["max_bodies"]==1 and rules["gravity"]==0
+        and rules["max_bodies"]==1
         and rules["substeps"]==1 and rules["initial_battery"]==0
     ):
         raise AdvancedGodotExportError(
-            "native parity profile: single-body, 2D AABB, zero gravity, "
-            "zero motor battery and one authored fixed substep required")
+            "native parity profile: single-body, 2D AABB, zero motor battery "
+            "and one authored fixed substep required")
     if any(action not in NATIVE_ACTIONS for action in session["actions"]):
         raise AdvancedGodotExportError("native action unsupported by exact physics profile")
     scene = (validate_advanced_scene(session["scene"],rules)
@@ -353,16 +359,14 @@ def render_physics_godot_package(session: dict, settings: dict | None = None,
                                      seed=session["seed"],scene=scene)
     layout=scene["layout"]
     if (len(layout["bodies"])!=1 or layout["fixtures"] or
-        layout["water_y"]<=layout["floor_y"] or
-        layout["bodies"][0]["position"][1]!=
-        layout["floor_y"]*100-layout["bodies"][0]["radius"]):
+        layout["water_y"]<=layout["floor_y"]):
         raise AdvancedGodotExportError(
-            "native profile needs one floor-grounded object without fixtures/water")
+            "native profile requires one original body without fixtures/water")
     game={
         "schema":SCHEMA,"editor":"physics","quality_floor":"advanced",
         "settings":rules,"settings_digest":config["digest"],"scene":scene,
         "independent_native_parity_verified":False,
-        "native_profile":"fixedpoint_one_body_2d_laboratory",
+        "native_profile":"fixedpoint_one_body_2d_gravity_laboratory",
     }
     proof={
         "schema":PROOF_SCHEMA,"settings_digest":config["digest"],
@@ -386,8 +390,9 @@ def render_physics_godot_package(session: dict, settings: dict | None = None,
             "Arrows/WASD apply finite impulses, J/K torque, B brakes, Space advances.\n"
             "Godot 4.4.1+ headless source-proof check:\n"
             "godot --headless --path godot -- --verify-physics\n\n"
-            "Only the exact signed one-body 2D zero-gravity AABB profile is "
-            "supported. Other physics modes refuse export; Godot built-in "
+            "Only original 2D fixedpoint one-body AABB with gravity, solid world "
+            "bounds and no extra fixtures/fluid is supported. Other physics "
+            "modes refuse export; Godot built-in "
             "RigidBody contact equivalence and hardware certification are NOT claimed.\n"
         ).encode("utf-8")
     }
@@ -398,7 +403,7 @@ def render_physics_godot_package(session: dict, settings: dict | None = None,
         "advanced_floor":True,
         "source_session_digest":session["digest"],
         "authored_scene_digest":scene["digest"],
-        "native_parity_profile":"fixedpoint_one_body_2d_laboratory",
+        "native_parity_profile":"fixedpoint_one_body_2d_gravity_laboratory",
         "files":{path:sha256(raw).hexdigest() for path,raw in sorted(files.items())},
         "godot_executed":False,"native_hardware_certified":False,
         "publish_approved":False,
