@@ -166,6 +166,47 @@ def test_destination_capacity_and_seller_coin_limits_fail_before_reservation(wor
         create((society, rich), world)
 
 
+
+def test_world_society_trade_simulation_replays_exactly(world):
+    from skeleton.ai.game_builder.npc_market_logistics import (
+        simulate_market_corridor, verify_market_corridor,
+    )
+    data = dict(population=36, seller_index=0, buyer_index=1,
+                good="grain", quantity=1, steps=32, authorized=True)
+    simulation = simulate_market_corridor(world, **data)
+    assert simulation["delivered"]
+    assert simulation["position"] == len(simulation["route"]) - 1
+    assert simulation["turns"] == 32
+    assert simulation["native_hardware_verified"] is False
+    assert simulation["model_training_authorized"] is False
+    assert len(simulation["replay_digests"]) == 32
+    assert verify_market_corridor(simulation, world, **data)
+    assert simulation == simulate_market_corridor(world, **data)
+    tampered = dict(simulation)
+    tampered["delivered"] = False
+    assert not verify_market_corridor(tampered, world, **data)
+    tampered = dict(simulation)
+    tampered["replay_digests"] = simulation["replay_digests"][:-1]
+    assert not verify_market_corridor(tampered, world, **data)
+
+
+def test_simulation_scope_cannot_mutate_authority_or_infinite_time(world):
+    from skeleton.ai.game_builder.npc_market_logistics import (
+        simulate_market_corridor, verify_market_corridor,
+    )
+    options = dict(population=36, seller_index=0, buyer_index=1,
+                   good="grain", quantity=1, steps=4)
+    with pytest.raises(PermissionError):
+        simulate_market_corridor(world, **options, authorized=False)
+    with pytest.raises(EconomyError):
+        simulate_market_corridor(world, **{**options,"steps":129}, authorized=True)
+    with pytest.raises(EconomyError):
+        simulate_market_corridor(world, **{**options,"seller_index":1,
+                                          "buyer_index":1}, authorized=True)
+    with pytest.raises(PermissionError):
+        verify_market_corridor({}, world, **options, authorized=False)
+
+
 def test_world_digest_and_registered_accounts_must_match(world, market):
     society, original = market
     bogus = replace(original, world_digest="a" * 64)
