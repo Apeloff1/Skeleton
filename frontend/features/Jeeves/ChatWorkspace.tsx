@@ -13,6 +13,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import api from '../../src/utils/apiClient';
 import { WorkspaceController } from './WorkspaceController';
 import MessageContent from './MessageContent';
+import ChatStoryActions from './ChatStoryActions';
 import type { ChatHistoryResponse, ChatResponse } from './WorkspaceController';
 import { MAX_CONTEXT, MAX_TEXT, searchConversations } from './workspace';
 import type { Artifact, Attachment, Conversation, Message } from './workspace';
@@ -69,6 +70,9 @@ function MessageCard({ message, controller, busy }: { message: Message; controll
       </View>
       {!user && message.model && <Text style={s.metadata}>{message.model}{message.tier ? ` · ${message.tier}` : ''}</Text>}
       <MessageContent text={message.text} notify={controller.notify} />
+      {!user && message.status === 'complete' && !!message.text.trim() &&
+        <ChatStoryActions text={message.text} conversationId={controller.active.sessionId || controller.active.id}
+          messageId={message.id} notify={controller.notify} />}
       {message.attachmentName && <Text style={s.metadata}>Attachment · {message.attachmentName}</Text>}
       {(message.artifacts || []).map((artifact, i) => <ArtifactCard key={`${artifact.type}-${i}`} artifact={artifact} notify={controller.notify} />)}
       {!message.artifacts?.length && !!message.artifactCount && <Text style={s.metadata}>{message.artifactCount} artifact(s) from an earlier visit. File contents are not stored locally.</Text>}
