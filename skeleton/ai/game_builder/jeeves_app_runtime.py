@@ -32,6 +32,7 @@ ATLAS_SCHEMA = "skeleton.game_builder.jeeves_app_atlas.v1"
 ACTION_SCHEMA = "skeleton.game_builder.jeeves_capability_action.v1"
 REQUEST_SCHEMA = "skeleton.game_builder.jeeves_app_request.v1"
 ROOT = Path(__file__).resolve().parents[3] / "skeleton"
+REPO_ROOT = ROOT.parent
 MAX_MODULES = 30000
 MAX_VISIBLE = 120
 MAX_RESULTS = 100
@@ -90,6 +91,46 @@ SURFACES = {
     "project_files": ("ai/game_builder", "active human-reviewed workspace files"),
     "root": ("", "the installed Skeleton application source taxonomy"),
 }
+
+# GitHub root scan confirmed that the actual product also owns these parallel
+# frontend/backend, app, packaging, accelerator and machine planes.
+# They are metadata-only: not magically importable or writable Python modules.
+EXTERNAL_SURFACES = {
+    "frontend": ("frontend","React / React Native app, presentation and navigation"),
+    "frontend_features": ("frontend/features","user-visible UI feature implementations"),
+    "frontend_components": ("frontend/components","shared visual/editor components"),
+    "frontend_services": ("frontend/services","typed client app services"),
+    "frontend_state": ("frontend/state","app state and user/session interactions"),
+    "backend": ("backend","API, model services and native gameforge"),
+    "backend_routes": ("backend/routes","app-facing API route implementations"),
+    "backend_services": ("backend/services","backend service orchestration"),
+    "backend_gameforge": ("backend/gameforge","backend gameforge adapters"),
+    "jeeves_app": ("apps/jeeves","standalone Jeeves application entry point"),
+    "windows_packaging": ("packaging/windows","native Windows packaging and installer"),
+    "java_accelerators": ("java-accelerators","native Java physics, observability and vector"),
+    "satellite_gameforge": ("satellites","Rust/gameforge middleware and satellite components"),
+    "machine_index": ("machine","internal machine-readable app feature and milestone catalogs"),
+    "volume_forge": ("volume_forge","existing volume and milestone compiler"),
+    "test_suites": ("tests","engineering and regression test suites"),
+    "core_services": ("core","global supervisor and activation security"),
+}
+SURFACES.update(EXTERNAL_SURFACES)
+
+
+def _family_root(family):
+    """Fixed installed package root, never an actor-supplied filesystem path."""
+    if family not in SURFACES:
+        raise JeevesAppCapabilityError("unknown installed app capability family")
+    relative=SURFACES[family][0]
+    root=(REPO_ROOT if family in EXTERNAL_SURFACES else ROOT)
+    return root/relative
+
+
+def _family_display(family):
+    relative=SURFACES[family][0]
+    return (relative if family in EXTERNAL_SURFACES
+            else "skeleton/"+relative).rstrip("/")
+
 
 # All actions are explicitly available to Jeeves through a local, token-gated
 # dispatch route. Privileged actions *prepare* changes; none commits them.
@@ -170,12 +211,13 @@ def _entries(family, *, offset=0, limit=80, prefix=None):
         if not FILTER.fullmatch(prefix):
             raise JeevesAppCapabilityError("unsafe source module filter")
     relative=SURFACES[family][0]
-    root=_safe_dir(ROOT/relative)
+    root=_safe_dir(_family_root(family))
     entries=[]
     # os.scandir/Path.iterdir are bounded by per-directory maximum. Only
     # metadata of Python/source directories is visible, not raw code.
     for candidate in root.iterdir():
-        if candidate.is_symlink() or candidate.name.startswith("."):
+        if candidate.is_symlink() or candidate.name.startswith(".") or \
+           PROTECTED.search(candidate.name):
             continue
         if (candidate.is_dir() or candidate.suffix in (".py",".json",".md",
                 ".ts",".js",".tsx",".jsx",".css",".html",".gd",".yml",".yaml")):
@@ -183,8 +225,7 @@ def _entries(family, *, offset=0, limit=80, prefix=None):
                 entries.append({
                     "name":candidate.name,
                     "type":"family" if candidate.is_dir() else "module",
-                    "relative_path":(relative + "/" if relative else "")+
-                                    candidate.name,
+                    "relative_path":_family_display(family)+"/"+candidate.name,
                     "execution_adapter":False,
                     "access":"discoverable_only",
                 })
@@ -215,7 +256,7 @@ def _deep_entries(family, *, query=None, offset=0, limit=80, max_depth=8):
         if not FILTER.fullmatch(query):
             raise JeevesAppCapabilityError("unsafe nested feature query")
     relative=SURFACES[family][0]
-    start=_safe_dir(ROOT/relative)
+    start=_safe_dir(_family_root(family))
     stack=[(start,0)]
     entries=[]
     visited=0
@@ -239,7 +280,7 @@ def _deep_entries(family, *, query=None, offset=0, limit=80, max_depth=8):
                 typ="module"
             else:
                 continue
-            installed=candidate.relative_to(ROOT).as_posix()
+            installed=candidate.relative_to(REPO_ROOT).as_posix()
             if query is None or query.casefold() in installed.casefold():
                 entries.append({
                     "path":installed,"kind":typ,
@@ -251,7 +292,7 @@ def _deep_entries(family, *, query=None, offset=0, limit=80, max_depth=8):
     entries.sort(key=lambda x:x["path"])
     body={
         "schema":"skeleton.game_builder.jeeves_feature_deep_index.v1",
-        "family":family,"path":"skeleton/"+relative,
+        "family":family,"path":_family_display(family),
         "matching_entries":len(entries),
         "source_directories_visited":visited,
         "scanned_to_depth":max_depth,
@@ -286,9 +327,9 @@ def app_atlas(*, family=None, offset=0, limit=80, query=None):
                    or query.casefold() in SURFACES[key][1].casefold()]
         payload={
             "families":[{
-                "id":key,"path":"skeleton/"+SURFACES[key][0],
+                "id":key,"path":_family_display(key),
                 "description":SURFACES[key][1],
-                "present":(ROOT/SURFACES[key][0]).is_dir(),
+                "present":_family_root(key).is_dir(),
                 "source_executable_by_name":False,
             } for key in names],
             "family_count":len(names),"operator_adapters":_action_index(),
