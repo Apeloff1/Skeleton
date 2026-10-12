@@ -390,11 +390,11 @@ def test_reconciled_operator_projection_keeps_orphans_quarantined(baseline):
         verify_reconciled_chain, SOURCE_BATCHES, EXCLUDED_ORPHANS,
     )
     projection = verify_reconciled_chain(baseline)
-    assert len(SOURCE_BATCHES) == 15
-    assert projection["raw_url_leads"] == 12777
-    assert projection["raw_new"] == 8372
+    assert len(SOURCE_BATCHES) == 16
+    assert projection["raw_url_leads"] == 15175
+    assert projection["raw_new"] == 10770
     assert projection["canonical_new"] <= projection["raw_new"]
-    assert projection["canonical_candidate_sources"] <= 12777
+    assert projection["canonical_candidate_sources"] <= 15175
     assert projection["excluded_orphan_paths"] == list(EXCLUDED_ORPHANS)
     assert not any(path in projection["evidence_batch_paths"]
                    for path in EXCLUDED_ORPHANS)
