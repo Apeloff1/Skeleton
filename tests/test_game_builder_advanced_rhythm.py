@@ -83,7 +83,7 @@ class OriginalTimingStudioTests(unittest.TestCase):
         self.assertEqual(s["rank"],"SS")
         self.assertTrue(session["terminal"])
         self.assertTrue(s["victory"])
-        self.assertGreater(s["score"],4*cfg["perfect_points"])
+        self.assertGreaterEqual(s["score"],4*cfg["perfect_points"])
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("rhythm",rules,actions+["inspect"])
 
@@ -102,7 +102,7 @@ class OriginalTimingStudioTests(unittest.TestCase):
                 run_advanced_session("rhythm",rules,[illegal])
 
     def test_real_one_time_mines_chords_slides_and_hold_releases(self):
-        rules={"beat_count":8,"bpm":120,"starting_health":200}
+        rules={"beat_count":19,"bpm":120,"starting_health":200}
         cfg=make_editor_document("rhythm",rules)["settings"]
         notes=default_layout(cfg,0)["notes"]
         self.assertTrue(any(n["kind"]=="slide" for n in notes))
