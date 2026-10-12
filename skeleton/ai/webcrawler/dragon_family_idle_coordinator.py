@@ -251,6 +251,13 @@ class DragonIdleCoordinator:
                 (owner,role,sid)).fetchone()
             if row and (row[0] > start or row[1] > start):
                 return None
+            # Different siblings on different processes must not acquire the
+            # same source revision in overlapping leases. This fence spans
+            # ALL specialist roles and is checked under the SQLite writer lock.
+            if self.db.execute("""SELECT 1 FROM dragon_family_idle_leases
+                WHERE owner=? AND source_id=? AND lease_expires>? LIMIT 1""",
+                (owner,sid,start)).fetchone():
+                return None
             # The owner/role admission budget is debited in the SAME SQLite
             # transaction as the lease. No concurrent host can overrun quota
             # by claiming work before its usage counter becomes visible.
@@ -327,7 +334,8 @@ class DragonIdleCoordinator:
                  idle_state: Callable[[], IdleWindow],
                  gatherers: Mapping[str, Callable[[IdleTask], SourceReceipt | None]],
                  task_topics: tuple[str, ...],
-                 adjacent_topics: tuple[str, ...] = ()) -> dict[str, object]:
+                 adjacent_topics: tuple[str, ...] = (),
+                 commit_gate: Callable[[float], bool] | None = None) -> dict[str, object]:
         """Host-invoked bounded tick; fails closed if foreground becomes active.
 
         A trusted adapter must apply DNS/SSRF/robots/license policies, network
@@ -343,6 +351,8 @@ class DragonIdleCoordinator:
             raise ValueError("trusted idle observer required")
         if not isinstance(gatherers,Mapping):
             raise ValueError("host must supply policy-bound gatherers")
+        if commit_gate is not None and not callable(commit_gate):
+            raise ValueError("invalid owner-scoped source commit guard")
         state=self._window(idle_state)
         if not self.db.execute("SELECT 1 FROM dragon_family_broods WHERE owner=?",
                                (owner,)).fetchone():
@@ -387,7 +397,9 @@ class DragonIdleCoordinator:
                     changed=self.family.digest_idle(
                         owner,role,receipt,authorized=True,window=after,
                         task_topics=task_topics,adjacent_topics=adjacent_topics,
-                        lease_guard=lambda: self._owned(owner,role,sid,key,after.now))
+                        lease_guard=lambda: (
+                            self._owned(owner,role,sid,key,after.now) and
+                            (commit_gate is None or commit_gate(after.now) is True)))
                     status="changed" if changed else "unchanged"
                 self._finish(owner,role,sid,key,after.now,status)
                 stats[status] += 1
