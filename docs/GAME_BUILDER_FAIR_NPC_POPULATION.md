@@ -124,3 +124,25 @@ rule. Success means the command is rejected with no resource debit.
 
 2026-10-12 — Prevented NPC/player occupancy conflicts in spawning,
 pathfinding and movement (improved physical-world consistency).
+
+
+## Preservation of authored gameplay routes (October 12, 2026)
+
+Additional original citizens spawn outside the central, reviewed quest
+source chunk. This prevents procedural population expansion from silently
+placing a physical body on the original quest route or objective anchors.
+NPC scheduling treats the source site's interaction cell as a reserved
+player-accessible anchor: residents can approach the site but cannot occupy
+its exact interaction tile. Player/NPC collision exclusion remains strict
+and the movement engine does not teleport either body.
+
+Targeted integration tests execute the *full, original witnessed
+harvest -> firsthand testimony -> paid support -> five physical repairs ->
+earned restoration* sequence with 16, 64, and 128 citizens on both the
+21x21 and 35x35 world geometries. The source identity, actual NPC testimony,
+material costs and verified conclusion are preserved, rather than weakening
+the collision rule to make older tests green.
+
+2026-10-12 — Preserved original authoring/playability under high population
+(fixed collision-safe provenance placement and unblocked quest interaction
+anchors; adds full game regression coverage across six population/map pairs).
