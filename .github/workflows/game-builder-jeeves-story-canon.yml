@@ -10,6 +10,7 @@ on:
       - "skeleton/ai/game_builder/story_continuity_assurance.py"
       - "skeleton/ai/game_builder/story_chapter_context.py"
       - "skeleton/ai/game_builder/jeeves_chapter_chat.py"
+      - "skeleton/ai/game_builder/story_cinematic_review.py"
       - "skeleton/ai/game_builder/story_detail_history.py"
       - "skeleton/ai/game_builder/story_asset_pixels.py"
       - "tests/test_game_builder_story_asset_pixels.py"
@@ -78,7 +79,7 @@ jobs:
       - name: Compile project canon and editor glue
         shell: bash
         run: |
-          python -m py_compile skeleton/ai/game_builder/story_canon_fabric.py skeleton/ai/game_builder/story_workspace.py skeleton/ai/game_builder/story_memory.py skeleton/ai/game_builder/story_continuity_assurance.py skeleton/ai/game_builder/story_chapter_context.py skeleton/ai/game_builder/jeeves_chapter_chat.py skeleton/ai/game_builder/story_detail_history.py skeleton/ai/game_builder/story_asset_pixels.py skeleton/ai/game_builder/jeeves_production_director.py skeleton/ai/game_builder/game_project_workspace.py skeleton/ai/game_builder/game_workspace_ui.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_prompt_router.py
+          python -m py_compile skeleton/ai/game_builder/story_canon_fabric.py skeleton/ai/game_builder/story_workspace.py skeleton/ai/game_builder/story_memory.py skeleton/ai/game_builder/story_continuity_assurance.py skeleton/ai/game_builder/story_chapter_context.py skeleton/ai/game_builder/jeeves_chapter_chat.py skeleton/ai/game_builder/story_cinematic_review.py skeleton/ai/game_builder/story_detail_history.py skeleton/ai/game_builder/story_asset_pixels.py skeleton/ai/game_builder/jeeves_production_director.py skeleton/ai/game_builder/game_project_workspace.py skeleton/ai/game_builder/game_workspace_ui.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_prompt_router.py
       - name: Check 100 chapters, 1000 acts, 9999 scenes, suspense, color/voice identity and receipt forgery
         shell: bash
         run: |
