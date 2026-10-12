@@ -995,9 +995,9 @@
     sucrase "~3.35.1"
 
 "@expo/devcert@^1.2.1":
-  version "1.2.1"
-  resolved "https://registry.npmjs.org/@expo/devcert/-/devcert-1.2.1.tgz"
-  integrity sha512-qC4eaxmKMTmJC2ahwyui6ud8f3W60Ss7pMkpBq40Hu3zyiAaugPXnZ24145U7K36qO9UHdZUVxsCvIpz2RYYCA==
+  version "1.2.2"
+  resolved "https://registry.yarnpkg.com/@expo/devcert/-/devcert-1.2.2.tgz#3510c26aa2e5e85a9963295d4a1f3926d145a0bc"
+  integrity sha512-wz1YedXwdNbYqk/PRr34vixnuw1+l6uSwmPXUj649cot5iYNccb2zIOnK7Nonb1Pfd/dxAY6CvU6KM3uSdxC7A==
   dependencies:
     "@expo/sudo-prompt" "^9.3.1"
     debug "^3.1.0"
@@ -1272,9 +1272,9 @@
   integrity sha512-t9bYwG4Z0yCVzHYJoDMci1OFq2FkBkhStlfUGSkspKYTwB/84+x6sY+CXCgdhkQNQtvWaugW5KUs9YZfAXq9Sg==
 
 "@expo/sdk-runtime-versions@^1.0.0":
-  version "1.0.0"
-  resolved "https://registry.npmjs.org/@expo/sdk-runtime-versions/-/sdk-runtime-versions-1.0.0.tgz"
-  integrity sha512-Doz2bfiPndXYFPMRwPyGa1k5QaKDVpY806UJj570epIiMzWaYyCtobasyfC++qfIXVb5Ocy7r3tP9d62hAQ7IQ==
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/@expo/sdk-runtime-versions/-/sdk-runtime-versions-1.0.1.tgz#292403988e491b444f2a8c7c0921600bcc2ae3da"
+  integrity sha512-kvisefkhxu8Fm/4M8G6DEqUaigrXfrSOm2lFw7hsk/nq0zchcp6B4wSk8rlheHY8FRi5iHxKtoVMGY/3M6h04A==
 
 "@expo/spawn-async@^1.7.2", "@expo/spawn-async@^1.8.0":
   version "1.8.0"
@@ -1299,9 +1299,9 @@
   integrity sha512-nDRbLmSrJar7abvUjp3smDwH8HcbZcoOEa5jVPUv9/9CajgmWw20JNRwTuBRzWIWIkEJDkz20GoNA+tSwUqk0Q==
 
 "@expo/xcpretty@^4.3.0":
-  version "4.4.5"
-  resolved "https://registry.yarnpkg.com/@expo/xcpretty/-/xcpretty-4.4.5.tgz#82535301f1d76e10ca4fb0df23191db4066db0d2"
-  integrity sha512-J3eL4n4h5QTwfD0SIz8OIk6/+sOL/hFZAMacgCM07UNlxBQfJipEpIC2AQxvGkbYeStByJ0TVhQAJo+DeNgaSQ==
+  version "4.4.6"
+  resolved "https://registry.yarnpkg.com/@expo/xcpretty/-/xcpretty-4.4.6.tgz#0450c8cfce6ae952e93eebfc4c9b98c230074ecf"
+  integrity sha512-uRaZZ/IsX1WkFW69xxTZtMeRvI5ziD9yoian+FMqdhITkU6NGvIWd5uRMh2Gbo/6xstpQ4v0GtF1V5YatTwzDA==
   dependencies:
     "@babel/code-frame" "^7.20.0"
     chalk "^4.1.0"
