@@ -6,6 +6,11 @@ on:
       - "skeleton/ai/webcrawler/dragon_*.py"
       - "skeleton/ai/game_builder/**"
       - "backend/routes/dragon_academy.py"
+      - "backend/routes/dragon_research.py"
+      - "backend/core/dragon_research_session.py"
+      - "backend/tests/test_dragon_research_routes.py"
+      - "frontend/app/dragon-research.tsx"
+      - "frontend/app/gameforge-studio.tsx"
       - "backend/tests/test_dragon_academy_routes.py"
       - "backend/tests/test_dragon_delivery_routes.py"
       - "backend/core/dragon_*.py"
@@ -34,6 +39,11 @@ on:
       - "skeleton/ai/webcrawler/dragon_*.py"
       - "skeleton/ai/game_builder/**"
       - "backend/routes/dragon_academy.py"
+      - "backend/routes/dragon_research.py"
+      - "backend/core/dragon_research_session.py"
+      - "backend/tests/test_dragon_research_routes.py"
+      - "frontend/app/dragon-research.tsx"
+      - "frontend/app/gameforge-studio.tsx"
       - "backend/tests/test_dragon_academy_routes.py"
       - "backend/tests/test_dragon_delivery_routes.py"
       - "backend/core/dragon_*.py"
@@ -138,7 +148,7 @@ jobs:
       - name: Authenticated Dragon companion snapshots
         run: |
           python -m pip install --disable-pip-version-check "fastapi==0.142.2" "httpx==0.28.1" "bcrypt>=4,<6" "PyJWT>=2,<3" "email-validator>=2,<3"
-          PYTHONPATH=.:backend PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest backend/tests/test_dragon_academy_routes.py backend/tests/test_dragon_delivery_routes.py
+          PYTHONPATH=.:backend PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest backend/tests/test_dragon_academy_routes.py backend/tests/test_dragon_delivery_routes.py backend/tests/test_dragon_research_routes.py
       - name: Canonical Dragon resource and conversation lifecycle
         run: |
           python -m pip install --disable-pip-version-check "pymongo>=4,<5" "motor>=3,<4" "pytest-asyncio>=0.24,<2" "python-dotenv>=1,<2" "pydantic-settings>=2,<3"
@@ -169,6 +179,8 @@ jobs:
             skeleton/ai/game_builder/dragon_three_hatchling_coordinator.py \
             skeleton/ai/game_builder/dragon_evidence_disagreement.py \
             skeleton/ai/game_builder/dragon_research_mirror.py \
+            skeleton/ai/game_builder/dragon_research_source_picker.py \
+            backend/core/dragon_research_session.py \
             backend/routes/dragon_research.py \
             skeleton/ai/game_builder/dragon_source_permission_authority.py \
             skeleton/ai/game_builder/dragon_source_health.py \
