@@ -12,6 +12,14 @@ import json
 from typing import Mapping, Sequence
 
 from .system_editors import make_editor_document, SystemEditorError
+from .advanced_rpg_runtime import (
+    ACTIONS as RPG_ACTIONS, RPGActionError,
+    start as rpg_start, step as rpg_step, apply_scene as apply_rpg_scene,
+)
+from .advanced_procedural_world_runtime import (
+    ACTIONS as PROC_ACTIONS, ProceduralWorldActionError,
+    start as proc_start, step as proc_step, apply_scene as apply_proc_scene,
+)
 from .advanced_maze_runtime import (
     ACTIONS as MAZE_ACTIONS, MazeActionError,
     start as maze_start, step as maze_step, apply_scene as apply_maze_scene,
@@ -74,7 +82,7 @@ from .advanced_genre_engines import (
 )
 
 SCHEMA = "skeleton.game_builder.advanced_session.v1"
-ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze")
+ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze", "rpg", "procedural_world")
 MAX_TURNS = 128
 MAX_SEED = 2**31 - 1
 
@@ -108,6 +116,8 @@ ACTION_HELP = {
     "parkour": PARKOUR_ACTIONS,
     "sports": SPORTS_ACTIONS,
     "maze": MAZE_ACTIONS,
+    "rpg": RPG_ACTIONS,
+    "procedural_world": PROC_ACTIONS,
     **GENRE_ACTIONS,
 }
 
@@ -726,12 +736,14 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
         "parkour":parkour_start,
         "sports":sports_start,
         "maze":maze_start,
+        "rpg":rpg_start,
+        "procedural_world":proc_start,
         **GENRE_STARTS,
     }
     try:
         state=starts[editor](rules,seed)
     except (GenreActionError,FarmingActionError,FactoryActionError,
-            ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,ParkourActionError,SportsActionError,MazeActionError) as exc:
+            ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,ParkourActionError,SportsActionError,MazeActionError,RPGActionError,ProceduralWorldActionError) as exc:
         raise AdvancedRuntimeError(str(exc)) from exc
     if scene is not None:
         from .advanced_level_scenes import validate_advanced_scene
@@ -795,6 +807,10 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             apply_sports_scene(state,rules,layout)
         elif editor=="maze":
             apply_maze_scene(state,rules,layout)
+        elif editor=="rpg":
+            apply_rpg_scene(state,rules,layout)
+        elif editor=="procedural_world":
+            apply_proc_scene(state,rules,layout)
         else:
             apply_genre_scene(editor,state,layout)
     baseline=_digest({"editor":editor,"configuration":config["digest"],"seed":seed,
@@ -828,11 +844,13 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             "parkour":parkour_step,
             "sports":sports_step,
             "maze":maze_step,
+            "rpg":rpg_step,
+            "procedural_world":proc_step,
             **GENRE_STEPS,
         }
         try:
             events=steps[editor](state,rules,action)
-        except (GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,ParkourActionError,SportsActionError,MazeActionError) as exc:
+        except (GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,ParkourActionError,SportsActionError,MazeActionError,RPGActionError,ProceduralWorldActionError) as exc:
             raise AdvancedRuntimeError(str(exc)) from exc
         state["events"]=events
         receipt={"index":index,"action":action,"events":events,
