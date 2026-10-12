@@ -13,7 +13,7 @@ from copy import deepcopy
 
 from .advanced_chunked_npc_world import (
     SCHEMA as GAME_SCHEMA, MAX_STEPS, PHASES, ChunkWorldError,
-    _act, _hash as world_hash, _schedule, _visible,
+    _act, _hash as world_hash, _schedule, _visible, _lod_receipt,
     run_chunked_npc_world, verify_chunked_npc_world,
 )
 from .advanced_chunked_world_timeline import (
@@ -102,6 +102,7 @@ class VerifiedInProcessChunkSnapshot:
             if type(command) is not str or not 1 <= len(command) <= 32:
                 raise ChunkTimelineError("unregistered or malformed original suffix action")
             before = world_hash(state)
+            previous_scheduler = dict(state["scheduler"])
             detailed, _ = _visible(state, options)
             try:
                 events = _act(state, rules, options, command, detailed)
@@ -114,7 +115,9 @@ class VerifiedInProcessChunkSnapshot:
                 "step": step_number, "command": command,
                 "tick": state["tick"], "previous": previous,
                 "before": before, "causal_events": events,
-                "physical_moves": movements, "after": world_hash(state),
+                "physical_moves": movements,
+                "lod_fidelity": _lod_receipt(state, previous_scheduler),
+                "after": world_hash(state),
                 "ordered_phases": list(PHASES),
             }
             frame["digest"] = world_hash(frame)
