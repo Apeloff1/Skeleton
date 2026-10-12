@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
+from dataclasses import replace
 import sqlite3
 from urllib.parse import urlsplit
 
@@ -17,6 +18,8 @@ from skeleton.ai.game_builder.dragon_technical_source_captures import DragonSour
 from skeleton.ai.game_builder.dragon_technical_source_operations import DragonSourceOperations
 from skeleton.ai.game_builder.dragon_source_policy_renewal import DragonSourcePolicyRenewal
 from skeleton.ai.game_builder.dragon_source_refresh_planner import DragonSourceRefreshPlanner
+from skeleton.ai.game_builder.dragon_source_permission_authority import DragonSourcePermissionAuthority
+from skeleton.ai.game_builder.dragon_research_pilot import DragonResearchPilot
 from skeleton.ai.game_builder.dragon_research_supervisor import DragonResearchSupervisor
 from skeleton.ai.game_builder.dragon_technical_source_acquisition import (
     acquire_canonical_technical_article,
@@ -693,3 +696,203 @@ def test_refresh_census_strict_tenant_and_budget(lab):
         planner.scan(OWNER,now=NOW,authorized=False)
     with pytest.raises(ValueError,match="scan limit"):
         planner.scan(OWNER,now=NOW,authorized=True,limit=101)
+
+
+
+def policy_signer(lab):
+    return DragonSourcePermissionAuthority(
+        lab[5],key=b"test-only-independent-source-policy-key-32-bytes",
+        issuer="isolated-issuer",key_id="source-key-v1"
+    )
+
+
+def real_pilot_grant(lab, *, signer=None, expire=None):
+    signer=signer or policy_signer(lab)
+    grant=signer.issue(
+        OWNER,lab[7],reviewer="external-human-reviewer",
+        evidence_digest="c"*64,now=NOW,expires_at=expire or NOW+120,
+        authorized=True,trusted_issuer=True,identity_verified=True,
+        external_rights_verified=True,robots_verified=True,
+        terms_verified=True,reference_retention_verified=True,
+    )
+    return signer,grant
+
+
+def offline_pilot_fetcher(lab,*,on_robots=None):
+    host=urlsplit(lab[8]).hostname
+    fetcher=SafeHttpFetcher(
+        allowed_hosts=frozenset({host}),bind_dns_to_socket=True)
+    visited=[]
+    def fixture(url,*,user_agent,max_bytes,extra_headers=None):
+        visited.append(url)
+        if url.endswith("/robots.txt"):
+            if on_robots is not None:
+                on_robots()
+            data=b"User-agent: *\nAllow: /\n"
+        else:
+            data=(b"Gameboy hardware sprite memory and frame timing documentation. "
+                  b"An original game needs reproducible register tests.")
+        return FetchResponse(url,200,{"content-type":"text/plain"},data,float(NOW))
+    fetcher.fetch_once=fixture
+    return fetcher,visited
+
+
+def invoke_pilot(lab, pilot, grant, fetcher, *, live=True):
+    return pilot.execute(
+        grant,fetcher=fetcher,sample_provider=hardware,
+        consent_provider=consent,
+        idle_since_provider=lambda:T0,at_provider=lambda:T2,
+        clock=lambda:1000.0,sleep=lambda _:None,
+        capture_id="signed-pilot-capture-attempt-1",
+        authorized=True,trusted_worker=True,
+        live_network_approved=live,
+        reference_storage_permitted=True,
+    )
+
+
+def test_reference_grants_require_independent_external_signoff(lab):
+    signer=policy_signer(lab)
+    kw=dict(
+        reviewer="different-external-reviewer",evidence_digest="c"*64,
+        now=NOW,expires_at=NOW+30,authorized=True,trusted_issuer=True,
+        identity_verified=True,external_rights_verified=True,
+        robots_verified=True,terms_verified=True,
+        reference_retention_verified=True
+    )
+    for flag in ("trusted_issuer","identity_verified",
+                 "external_rights_verified","robots_verified",
+                 "terms_verified","reference_retention_verified"):
+        with pytest.raises(PermissionError,match="external"):
+            signer.issue(OWNER,lab[7],**{**kw,flag:False})
+    with pytest.raises(ValueError,match="one hour"):
+        signer.issue(OWNER,lab[7],**{**kw,"expires_at":NOW+3700})
+    with pytest.raises(PermissionError,match="reviewer"):
+        signer.issue(OWNER,lab[7],**{**kw,"reviewer":"isolated-issuer"})
+    assert lab[4].active_grants()==()
+
+
+def test_signed_pilot_grant_is_owner_source_receipt_scoped(lab):
+    signer,grant=real_pilot_grant(lab)
+    assert signer.verify(grant,owner=OWNER,source_id=lab[7],
+                         now=NOW,authorized=True)==grant.digest
+    assert grant.body()["model_training_authorized"] is False
+    assert grant.body()["rights_granted_by_token"] is False
+    with pytest.raises(PermissionError):
+        signer.verify(grant,owner="foreign",source_id=lab[7],
+                      now=NOW,authorized=True)
+    with pytest.raises(PermissionError,match="signature"):
+        signer.verify(replace(grant,source_url="https://evil.example/"),
+                      owner=OWNER,source_id=lab[7],now=NOW,authorized=True)
+    with pytest.raises(PermissionError,match="expiry"):
+        signer.verify(grant,owner=OWNER,source_id=lab[7],
+                      now=NOW+120,authorized=True)
+    different=DragonSourcePermissionAuthority(
+        lab[5],key=b"entirely-different-independent-signing-key-32",
+        issuer="isolated-issuer",key_id="source-key-v1")
+    with pytest.raises(PermissionError,match="signature"):
+        different.verify(grant,owner=OWNER,source_id=lab[7],
+                         now=NOW,authorized=True)
+
+
+def test_revoked_capture_permission_fails_before_any_pilot_network_request(lab):
+    schedule(lab)
+    signer,grant=real_pilot_grant(lab)
+    pilot=DragonResearchPilot(
+        DragonResearchSupervisor(lab[6],lab[3]),signer)
+    preflight=pilot.preview(grant,now=NOW,authorized=True)
+    assert preflight.source_ready and preflight.network_requests==0
+    assert not preflight.execution_authorized
+    signer.revoke(grant,now=NOW,reason="terms permission withdrawn",
+                  authorized=True,trusted_issuer=True)
+    with pytest.raises(PermissionError,match="revoked"):
+        pilot.preview(grant,now=NOW,authorized=True)
+    fetcher,visited=offline_pilot_fetcher(lab)
+    with pytest.raises(PermissionError,match="revoked"):
+        invoke_pilot(lab,pilot,grant,fetcher)
+    assert visited==[]
+    assert lab[4].active_grants()==()
+    assert lab[6].inspect(OWNER,lab[7],authorized=True)["state"]=="scheduled"
+
+
+def test_signed_capture_pilot_stages_real_extracted_evidence_under_grant(lab):
+    schedule(lab)
+    signer,grant=real_pilot_grant(lab)
+    pilot=DragonResearchPilot(
+        DragonResearchSupervisor(lab[6],lab[3]),signer)
+    fetcher,visited=offline_pilot_fetcher(lab)
+    with pytest.raises(PermissionError,match="permitted live pilot"):
+        invoke_pilot(lab,pilot,grant,fetcher,live=False)
+    assert not visited and not lab[4].active_grants()
+    capture=invoke_pilot(lab,pilot,grant,fetcher)
+    assert capture is not None and capture.captured
+    assert len(visited)==2
+    assert visited[0].endswith("/robots.txt") and visited[1]==lab[8]
+    assert capture.reason=="captured_pending_independent_review"
+    assert not capture.model_promotion_authorized
+    assert lab[4].active_grants()==()
+    assert lab[6].inspect(OWNER,lab[7],authorized=True)["state"]=="completed"
+    assert len(lab[6].review_queue(OWNER,authorized=True)["items"])==1
+    assert lab[0]._rows(OWNER)==[]
+
+
+def test_revocation_between_robots_and_article_prevents_capture(lab):
+    schedule(lab)
+    signer,grant=real_pilot_grant(lab)
+    pilot=DragonResearchPilot(
+        DragonResearchSupervisor(lab[6],lab[3]),signer)
+    fetcher,visited=offline_pilot_fetcher(
+        lab,on_robots=lambda:signer.revoke(
+            grant,now=NOW,reason="site owner withdrew reference permission",
+            authorized=True,trusted_issuer=True))
+    response=invoke_pilot(lab,pilot,grant,fetcher)
+    assert not response.captured
+    assert len(visited)==1 and visited[0].endswith("/robots.txt")
+    assert lab[4].active_grants()==()
+    assert lab[6].inspect(OWNER,lab[7],authorized=True)["state"]=="retry_wait"
+    assert lab[5].history(OWNER,lab[7],authorized=True)==()
+
+
+def test_pilot_cannot_reserve_wrong_or_unready_source(lab):
+    signer,grant=real_pilot_grant(lab)
+    pilot=DragonResearchPilot(
+        DragonResearchSupervisor(lab[6],lab[3]),signer)
+    assert not pilot.preview(grant,now=NOW,authorized=True).source_ready
+    fetcher,visited=offline_pilot_fetcher(lab)
+    assert invoke_pilot(lab,pilot,grant,fetcher) is None
+    assert visited==[] and lab[4].active_grants()==()
+
+
+
+def test_signed_permission_audit_is_custodied_and_tenant_isolated(lab):
+    signer,grant=real_pilot_grant(lab)
+    audit=signer.audit(OWNER,now=NOW,authorized=True)
+    assert audit["active_scope_count"]==1
+    assert audit["grants"][0]["grant_digest"]==grant.digest
+    assert audit["grants"][0]["state"]=="live_scope"
+    assert not audit["model_training_authorized"]
+    assert signer.audit("another-tenant",now=NOW,authorized=True)["grants"]==[]
+    with pytest.raises(PermissionError):
+        signer.audit(OWNER,now=NOW,authorized=False)
+    signer.revoke(grant,now=NOW,reason="review evidence superseded",
+                  authorized=True,trusted_issuer=True)
+    revoked=signer.audit(OWNER,now=NOW,authorized=True)
+    assert revoked["revoked_count"]==1
+    assert revoked["grants"][0]["state"]=="revoked"
+    with pytest.raises(Exception):
+        signer.revoke(grant,now=NOW,reason="duplicate revoke",
+                      authorized=True,trusted_issuer=True)
+    assert signer.audit(OWNER,now=NOW+500,authorized=True)["revoked_count"]==1
+
+
+def test_no_policy_grant_can_be_issued_after_canonical_rights_expiry(lab):
+    signer=policy_signer(lab)
+    with pytest.raises((ValueError,PermissionError),match="expired|policy"):
+        signer.issue(
+            OWNER,lab[7],reviewer="external-human-reviewer",
+            evidence_digest="c"*64,now=START+3601,
+            expires_at=START+3650,authorized=True,trusted_issuer=True,
+            identity_verified=True,external_rights_verified=True,
+            robots_verified=True,terms_verified=True,
+            reference_retention_verified=True,
+        )
+    assert signer.audit(OWNER,now=NOW,authorized=True)["grants"]==[]

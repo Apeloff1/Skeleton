@@ -61,7 +61,8 @@ class DragonResearchSupervisor:
                      authorized:bool,trusted_worker:bool,
                      consented:bool,article_consent:bool,
                      host_delay_seconds:int=5,
-                     inventory_limit:int=32) -> DurableResearchDispatch:
+                     inventory_limit:int=32,
+                     eligible_source_id:str|None=None) -> DurableResearchDispatch:
         """Atomic-when-successful handoff to the EXISTING worker resource plane.
 
         On any durable-attach failure, release the not-yet-started worker's
@@ -100,6 +101,10 @@ class DragonResearchSupervisor:
         eligible=self.operations.ready_candidates(
             owner,now=now,authorized=True,limit=inventory_limit
         )
+        if eligible_source_id is not None:
+            if not isinstance(eligible_source_id,str):
+                raise ValueError("canonical pilot source identity required")
+            eligible=tuple(x for x in eligible if x==eligible_source_id)
         if not eligible:
             return DurableResearchDispatch("no_policy_ready_source",None,None,0)
         result=self.admission.begin(
