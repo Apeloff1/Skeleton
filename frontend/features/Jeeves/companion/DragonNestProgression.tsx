@@ -35,6 +35,10 @@ const specialistSymbols: Record<string, string> = {
 const dragonForm = (stage: string): string => stage === 'egg' ? '🥚' : '🐉';
 const percentage = (value: number, total: number): number =>
   total > 0 ? Math.min(100, Math.round(value * 100 / total)) : 0;
+// React Native expects a DimensionValue percentage template, not an arbitrary
+// string. Keep values bounded by the verified nest progress contract.
+const progressWidth = (value: number, total: number): `${number}%` =>
+  `${percentage(value, total)}%`;
 
 function valid(snapshot: DragonNestSnapshot | null | undefined): snapshot is DragonNestSnapshot {
   if (!snapshot || snapshot.schema !== 'skeleton.dragon.nest.v1' ||
@@ -87,7 +91,7 @@ export default function DragonNestProgression({ snapshot }: {
         <Text style={styles.note}>Reviewed source expedition: {snapshot.sources_consumed}/{snapshot.sources_total}</Text>
         <View accessible accessibilityRole="progressbar" accessibilityValue={{min: 0, max: 100, now: collected}}
           accessibilityLabel="Parent Dragon source progression" style={styles.track}>
-          <View style={[styles.fill, {width: collected + '%'}]} />
+          <View style={[styles.fill, {width: progressWidth(snapshot.sources_consumed, snapshot.sources_total)}]} />
         </View>
       </View>
     </View>
@@ -101,7 +105,7 @@ export default function DragonNestProgression({ snapshot }: {
           <View accessible accessibilityRole="progressbar"
             accessibilityLabel={specialistNames[child.lane] + ' progression'}
             accessibilityValue={{min: 0, max: 20, now: child.level}} style={styles.track}>
-            <View style={[styles.childFill, {width: percentage(child.level, 20) + '%'}]} />
+            <View style={[styles.childFill, {width: progressWidth(child.level, 20)}]} />
           </View>
           <Text style={styles.note}>{child.knowledge_items} unique verified versions</Text>
         </View>)}</View>}
