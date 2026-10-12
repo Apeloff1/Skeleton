@@ -213,6 +213,34 @@ async function stageStorySource(path,source){
 function storyShow(data){
  $("story-evidence").textContent=JSON.stringify(data,null,2).slice(0,30000);
 }
+
+$("story-continuity-contract").addEventListener("click",async()=>{
+ try{
+  const result=await api("/api/story-continuity-template",{
+    project:storyProject()});
+  storyShow(result);
+  await stageStorySource(result.path,result.document);
+  status("Specify immutable voice references and facial geometry, all legal wardrobe variants, item owners and region styles; review before scene one.");
+ }catch(error){status("Continuity contract blocked: "+error.message);}
+});
+$("story-stage-reparse").addEventListener("click",async()=>{
+ try{
+  const result=await api("/api/story-stage-confirmation",{
+    project:storyProject()});
+  storyShow(result);
+  status("All accepted scenes reparsed and every voice/face/clothing/item/scene receipt independently verified.");
+ }catch(error){status("Scene chain rejected: "+error.message);}
+});
+$("story-detail-review").addEventListener("click",async()=>{
+ try{
+  const kind=$("story-detail-kind").value;
+  const id=$("story-detail-id").value.trim();
+  const query={project:storyProject(),character:null,item:null,region:null};
+  query[kind]=id;
+  storyShow(await api("/api/story-detail-timeline",query));
+  status("Original historical source appearances and exact prior scene receipts retrieved.");
+ }catch(error){status("Historical detail lookup rejected: "+error.message);}
+});
 $("story-foundation").addEventListener("click",async()=>{
  try{
   const response=await api("/api/story-foundation-template",
@@ -309,7 +337,9 @@ $("story-check").addEventListener("click",async()=>{
  try{
   const response=await api("/api/story-sign",{
    project:storyProject(),path:selectedFile,
-   document:JSON.parse($("editor").value)});
+   document:JSON.parse($("editor").value),
+   observations:$("story-observations").value.trim()?
+     JSON.parse($("story-observations").value):null});
   $("editor").value=JSON.stringify(response.document,null,2)+"\\n";
   storyShow(response.evidence);
   diff();
@@ -3955,8 +3985,10 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 canon index reads approved history and verifies recurring character and
 regional appearance. It does not invent model output or write hidden files.</small></p>
 <button id="story-foundation" type="button">Show blank story/world foundation</button>
+<button id="story-continuity-contract" type="button">Lock original voices, faces, wardrobe, items and regional style</button>
+<p><small>Strict mode: 100 acts / 9999 sequential scenes. Each committed scene has a signed, cross-reparsed confirmation receipt. A metadata voice hash is not an acoustic verification.</small></p>
 <label>Next act<input type="number" id="story-act" min="1" max="100" value="1"></label>
-<label>Next scene within act<input type="number" id="story-scene" min="1" max="999999" value="1"></label>
+<label>Next scene within act<input type="number" id="story-scene" min="1" max="9999" value="1"></label>
 <button id="story-next" type="button">Prepare next canon-bound scene</button>
 <label>Cast IDs, comma-separated<input id="story-cast" placeholder="alina,boren"></label>
 <label>Approved region ID<input id="story-region" placeholder="lantern_city"></label>
@@ -3975,6 +4007,13 @@ regional appearance. It does not invent model output or write hidden files.</sma
 <label>Original rendered PNG asset preview (no upload or source write)
 <input type="file" id="story-png-preview" accept="image/png"></label>
 <button id="story-png-check" type="button">Inspect real pixels against regional canon</button>
+<label>Observed voice, facial expression, wardrobe, item, and style details (JSON for the exact next scene)
+<textarea id="story-observations" rows="6" spellcheck="false"
+ placeholder='{"cast":[],"region":{},"items":[],"transfers":[]}'></textarea></label>
+<button id="story-stage-reparse" type="button">Reparse all historical scenes and verify confirmation chain</button>
+<label>Exact history lookup: character, item or region ID<input id="story-detail-id" placeholder="alina"></label>
+<label>History type<select id="story-detail-kind"><option value="character">Character: voice, face, clothes, dialogue</option><option value="item">Item identity and ownership</option><option value="region">Regional palette and style</option></select></label>
+<button id="story-detail-review" type="button">Retrieve historic looks, items and styles</button>
 <button id="story-check" type="button">Sign and validate authored source</button>
 <pre id="story-evidence" role="status" aria-live="polite"></pre>
 </fieldset>
