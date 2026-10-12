@@ -205,7 +205,7 @@ def run_fast_chunk_branches(checkpoint, branches, *, cursor=None):
         "source_checkpoint": deepcopy(checkpoint),
         "source_cursor": source.cursor,
         "original_prefix_authentications": 1,
-        "suffix_transitions_executed": sum(len(row["actions"]) for row in parsed),
+        "suffix_transitions_executed": sum(len(actions) for _name, actions in parsed),
         "prefix_transitions_reexecuted_during_branch_forks": 0,
         "full_replay_used_during_preparation": True,
         "native_speed_certified": False,
