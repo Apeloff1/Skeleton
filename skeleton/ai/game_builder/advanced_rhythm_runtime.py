@@ -195,7 +195,9 @@ def _expire(state,config,events):
     for note in state["chart"]["notes"]:
         idx=note["id"]
         if state["judgements"][idx] is not None:continue
-        at=note["at"]+state["chart"]["offset_ms"]
+        # A calibrated device reports sound-relative input late; the
+        # server-owned expiration clock must use the same effective phase.
+        at=note["at"]+state["chart"]["offset_ms"]+config["timing_calibration_ms"]
         if note["kind"]=="mine":
             if clock>at+config["hit_window_ms"]:
                 _score(state,config,note,"mine_avoided",events)
