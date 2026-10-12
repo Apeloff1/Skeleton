@@ -16,9 +16,10 @@ import re
 from urllib.parse import urlsplit
 
 from .contracts import canonical_digest, canonical_json
-from .dragon_almanacs import DragonAlmanacs
+from .dragon_almanacs import DragonAlmanacs, _auth
 from .dragon_almanac_sequence import SequentialAlmanacWorker
 from .dragon_source_catalog import canonical_source_url
+from .reviewed_knowledge import _id, _integer
 
 
 SCHEMA = "skeleton.dragon.source_discovery_supplement.v1"
@@ -243,6 +244,8 @@ class DragonDiscoveryAdmission:
             normalized_source TEXT NOT NULL, supplement_digest TEXT NOT NULL,
             body TEXT NOT NULL, digest TEXT NOT NULL,
             PRIMARY KEY (owner, origin_source, supplement_digest))""")
+        self.db.execute("""CREATE INDEX IF NOT EXISTS dragon_supplement_receipt_normalized_v2
+                           ON dragon_almanac_supplement_receipts_v2(owner, normalized_source)""")
 
     def import_chain(self, owner: str, registry: dict,
                      named_documents: list[tuple[str, dict]], *, authorized: bool) -> dict:
@@ -334,6 +337,105 @@ class DragonDiscoveryAdmission:
                 "normalized_new_against_baseline": parsed["new"],
                 "approved_sources": 0, "training_authorized": False,
                 "status": "policy_review_required_before_any_network_fetch"}
+
+
+    def topic_page(self, owner: str, *, authorized: bool, parent: str | None = None,
+                   limit: int = 100, offset: int = 0) -> dict:
+        """Browse direct child almanacs with counted, unreviewed source membership.
+
+        This is a metadata view, not an approval signal or a crawler execution
+        endpoint. Owner isolation and bounded deterministic pagination apply.
+        """
+        _auth(owner, authorized)
+        _integer(limit, "topic page limit", 1, 100)
+        _integer(offset, "topic page offset", 0, 100_000)
+        if parent is not None:
+            _id(parent, "parent topic")
+            if not self.db.execute(
+                    "SELECT 1 FROM dragon_almanac_topics WHERE owner=? AND topic=?",
+                    (owner, parent)).fetchone():
+                raise ValueError("unknown owner topic")
+        rows = self.db.execute(
+            """SELECT t.topic,t.parent,t.path,
+              (SELECT COUNT(*) FROM dragon_almanac_members m
+               WHERE m.owner=t.owner AND m.topic=t.topic)
+              FROM dragon_almanac_topics t
+              WHERE t.owner=? AND t.parent IS ?
+              ORDER BY t.path,t.topic LIMIT ? OFFSET ?""",
+            (owner, parent, limit + 1, offset),
+        ).fetchall()
+        children = []
+        for topic, ancestor, path, count in rows[:limit]:
+            if not isinstance(path, str) or len(path) > 4096:
+                raise ValueError("corrupt topic path")
+            titles = json.loads(path)
+            if (not isinstance(titles, list) or not titles or
+                    topic != "topic-" + canonical_digest(titles) or
+                    ancestor != ("topic-" + canonical_digest(titles[:-1]) if len(titles) > 1 else None)):
+                raise ValueError("invalid topic lineage")
+            children.append({"topic": topic, "parent": ancestor,
+                             "headers": titles, "source_count": count,
+                             "knowledge_authorized": False})
+        return {"owner": owner, "parent": parent, "topics": children,
+                "next_offset": offset + limit if len(rows) > limit else None,
+                "training_authorized": False, "scope": "discovery_metadata_only"}
+
+    def source_page(self, owner: str, topic: str, *, authorized: bool,
+                    limit: int = 100, offset: int = 0) -> dict:
+        """Expose canonical URL, policy progress and raw provenance counts.
+
+        A normalized URL may have several distinct raw-source receipts. Showing
+        the receipt count separately avoids confusing raw leads with acquisitions.
+        All source and job digests are checked before presenting their status.
+        """
+        _auth(owner, authorized)
+        _id(topic, "topic")
+        _integer(limit, "source page limit", 1, 100)
+        _integer(offset, "source page offset", 0, 100_000)
+        if not self.db.execute(
+                "SELECT 1 FROM dragon_almanac_topics WHERE owner=? AND topic=?",
+                (owner, topic)).fetchone():
+            raise ValueError("unknown owner topic")
+        rows = self.db.execute(
+            """SELECT m.source,s.body,s.digest,j.stage,j.state,j.input_digest,
+                 (SELECT COUNT(*) FROM dragon_almanac_supplement_receipts_v2 r
+                  WHERE r.owner=m.owner AND r.normalized_source=m.source)
+               FROM dragon_almanac_members m
+               JOIN dragon_almanac_sources s
+                 ON s.owner=m.owner AND s.source=m.source
+               LEFT JOIN dragon_almanac_jobs j
+                 ON j.owner=m.owner AND j.source=m.source
+               WHERE m.owner=? AND m.topic=? ORDER BY m.source LIMIT ? OFFSET ?""",
+            (owner, topic, limit + 1, offset),
+        ).fetchall()
+        sources = []
+        for sid, raw, digest, stage, state, input_digest, receipts in rows[:limit]:
+            if not isinstance(raw, str) or len(raw) > 32_768:
+                raise ValueError("source metadata exceeds read budget")
+            body = json.loads(raw)
+            url = body.get("url")
+            if (canonical_digest(body) != digest
+                    or sid != body.get("source_id")
+                    or sid != "source-" + sha256(canonical_source_url(url).encode("utf-8")).hexdigest()
+                    or url != canonical_source_url(url)):
+                raise ValueError("corrupt canonical discovery source")
+            if (stage is not None and (type(stage) is not int or not 0 <= stage <= 5
+                    or state not in {"pending", "leased", "blocked", "reviewed"}
+                    or (state == "reviewed") != (stage == 5)
+                    or not isinstance(input_digest, str) or not re.fullmatch(r"[0-9a-f]{64}", input_digest))):
+                raise ValueError("invalid acquisition job state")
+            sources.append({
+                "source_id": sid, "url": url, "kind": body.get("kind"),
+                "raw_provenance_receipts": receipts,
+                "stage_index": stage, "stage_state": state,
+                "rights": body.get("rights", "not_assessed"),
+                "availability": body.get("availability", "not_checked"),
+                "training_authorized": False,
+                "reviewed_knowledge_inferred": False,
+            })
+        return {"owner": owner, "topic": topic, "sources": sources,
+                "next_offset": offset + limit if len(rows) > limit else None,
+                "training_authorized": False, "scope": "discovery_metadata_only"}
 
 
 def import_supplement_files(almanacs: DragonAlmanacs, owner: str, registry: dict,
