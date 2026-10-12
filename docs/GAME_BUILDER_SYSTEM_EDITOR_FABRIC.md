@@ -874,3 +874,82 @@ reference, not an independently executed Godot city engine or commercial
 municipal simulation. Console/hardware targets, depth of city types,
 ongoing hydrology and climate adaptation, sophisticated 3D traffic,
 production art, third-party rights and retail release remain unfinished.
+
+
+## Thirteenth original advanced family — Stealth & Detection (12 October 2026)
+
+The Action-family Stealth & Detection editor has been raised from an
+authoring-only settings form to an original playable, deterministic offline
+infiltration game. This is the thirteenth of 43 editors with executable
+advanced reference gameplay: **13/43 = 30.2%**. The other 30 are currently
+authoring-only. Stealth is not independently native-certified.
+
+### Original 10×8 authored infiltration facility
+
+Walls, concealment, crawl-only vents, locked doors, physical guard patrol
+routes, active security cameras, recoverable keycards, finite intelligence
+caches, archive, security terminal, entry and extraction are source-addressed
+and protected by strict typed geometry and full-document checksums.
+Validation enforces bounds, no blocked critical objectives, mission-specific
+finite targets, terrain and extraction reachability and a game-relevant
+bounded original playfield.
+
+Patrols actually navigate the facility with deterministic shortest-path
+routes, directed 90-degree viewing cones, integer ray occlusion through
+walls and closed doors, directional noise investigations, suspicion decay,
+contact damage and escalation to actual lockdown. Walking, sprinting,
+crouching, shadow/cover, darkness, smoke and verified disguises change
+surveillance effectiveness. Independent cameras, physical sabotage and
+an increasingly dangerous alert level constrain play.
+
+For high-staff facilities, the bounded 80-cell reference map uses a
+controlled active force (maximum 20) and an actual finite guard reserve,
+deployed on alarm at authored entry coordinates. This never pretends
+250 simultaneous NPCs fit on an 80-cell map; additional configured
+personnel influence security escalation and bounded reserve waves.
+
+### Player action economy and mission choice
+
+The player may walk, sprint using recoverable stamina, crouch through
+vents, hide in actual cover, deploy finite decoys/smoke/EMP, stun close
+guards, acquire their uniforms, physically collect keycards, open secure
+doors, hack terminals, disable live cameras, collect intel, recover
+health using finite medkits and physically extract. Out-of-range,
+unsupported or fabricated commands fail closed.
+
+Three genuinely different objectives are playable: (1) archive heist
+requires a legitimate terminal hack or keycard unlock; (2) sabotage
+requires a genuinely disabled camera and terminal hack; (3) intelligence
+requires recovery of the required number of original finite caches.
+All three require reaching the mission exit, not merely clicking "win".
+Capture and alarm lockdown can end the mission unsuccessfully.
+
+**34 gameplay-affecting typed design controls** cover guard budgets,
+perception, visibility/noise, medical resources, stamina, gadgets, hearing,
+alarm/risk response, field equipment, reinforcement cadence, mission
+design and optional lockdown. No general-purpose script or free reward
+is accepted through scene or action contracts.
+
+### Graphical authoring, replay and assurance
+
+The local Studio has a live, color-coded ten-by-eight mission map and
+detailed HUD of health, stamina, guard/camera activity, alarm, equipment,
+archive, intel and score. A registered action selector and directional
+keyboard controls allow turn-based player interaction without teleporting.
+The supervised scene painter lets authors paint walls/cover/vents/doors,
+cameras, intel/keycards, patrol circuits, terminals and exit/spawn. Draft
+scene mutations remain unsigned until backend validation, exact source
+hash recalculation and explicit local review/approval.
+
+The Python engine produces deterministic independently re-created replay
+receipts, tamper-resistant saves, continuation and original scene digests.
+Hybrid game assembly now includes the real stealth smoke path and authored
+mission evidence. The dedicated cross-platform regression suite covers
+all three wins, illegal moves, forged rewards, finite inventory, physical
+security, guards, source custody and Studio rendering.
+
+**Honest boundary:** there is no independently verified Godot native
+stealth engine, release binary, audiovisual campaign, console publishing
+license or hardware certification for this thirteenth family yet. The
+City Builder is likewise reference-only. Both need independent native
+implementation, test parity and genuine export assurance.
