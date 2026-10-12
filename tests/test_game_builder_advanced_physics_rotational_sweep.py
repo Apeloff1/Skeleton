@@ -214,6 +214,17 @@ class OriginalRotatingSweepTests(unittest.TestCase):
         self.assertEqual(report["state"]["sleeping_bodies"],0)
         self.assertGreater(report["state"]["motors_used"],0)
 
+    def test_exhausted_motor_allows_real_supported_sleep_without_free_energy(self):
+        cfg={"collision_geometry":"oriented_box","gravity":0,
+             "initial_battery":1,"fan_force":0,
+             "rest_speed":20,"sleep_frames":2}
+        result=run_advanced_session("physics",cfg,
+                      ("fan:on","inspect","inspect"))
+        self.assertEqual(result["state"]["battery"],0)
+        self.assertEqual(result["state"]["bodies"][0]["sleep"],2)
+        self.assertEqual(result["state"]["sleeping_bodies"],1)
+        self.assertTrue(verify_advanced_session(result,cfg))
+
     def test_collision_metrics_are_reconstructed_not_client_owned(self):
         options={"collision_geometry":"oriented_box",
                  "speed_limit":350,"gravity":0,"air_drag":0}
