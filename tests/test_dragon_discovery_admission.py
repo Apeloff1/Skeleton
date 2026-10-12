@@ -526,3 +526,22 @@ def test_seven_catalog_batch_cannot_substitute_a_fork_or_claim_license(baseline,
     tampered[1]["candidates"][0]["discoveries"][0]["readme_blob_sha"] = "f" * 40
     with pytest.raises(ValueError, match="pinned"):
         validate_discovery_chain(baseline, [*original, *existing, tampered])
+
+
+def test_full_tenfold_source_milestone_fits_bounded_evidence_partition_budget():
+    from skeleton.ai.game_builder.dragon_discovery_admission import (
+        MAX_SUPPLEMENTS, MAX_BYTES, MAX_CANDIDATES,
+    )
+    from skeleton.ai.game_builder.dragon_discovery_reconciled import (
+        EXPECTED_RAW_TOTAL, SOURCE_BATCHES,
+    )
+    # The frozen 21-batch history must still leave sufficient finite space to
+    # reach the 44,050-raw-lead goal using at most 1,000 sources per batch.
+    import math
+    more = math.ceil((44_050 - EXPECTED_RAW_TOTAL) / 1_000)
+    assert EXPECTED_RAW_TOTAL == 19_228
+    assert len(SOURCE_BATCHES) == 21
+    assert MAX_SUPPLEMENTS >= len(SOURCE_BATCHES) + more
+    assert MAX_SUPPLEMENTS <= 128
+    assert 1_000 <= MAX_CANDIDATES <= 100_000
+    assert MAX_BYTES <= 8_000_000
