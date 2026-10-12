@@ -1523,3 +1523,154 @@ networked RTS, autonomous learning-based opponents or store-ready
 native release. Cross-platform reference CI must pass before
 reference maturity is certified; native engine and hardware
 porting remain separate unfinished work.
+
+
+## Eighteenth original advanced family — Rhythm & Timing (12 October 2026)
+
+The Creative-family Rhythm & Timing editor has been promoted from
+settings-only to an **original deterministic timing game**, with
+an authoritative game clock, timed score judgements, an authored
+chart and independent on-demand original synthesized soundtrack.
+This raises original reference gameplay coverage to **18/43
+(41.9%)**; **25/43 remain authoring-only**. Reference Python
+gameplay is not a native console-ready audiovisual engine.
+
+### Source-bound timing and game semantics
+
+Each chart is an original authored sequence of up to 256 timed
+events, with a 3–6 lane original note highway, note identities,
+timestamp, meter, accent, chord partner and held duration.
+Exact scene/source validation rejects duplicate or missing IDs,
+unrecognized kinds, invalid tempi, out-of-range lanes,
+unsupported timing shifts, mismatched hold duration,
+unknown source fields and imported sample IDs.
+
+Real player input includes physical lane taps and flicks,
+two-key chords in either authored lane order, actual pressed
+and released holds, explicitly elapsed server-controlled
+clock time, calibration, timing inspection and chart
+completion. The player cannot forge timestamps, scores
+or hit judgements by submitting them as actions.
+An unpressed hold cannot be released for reward.
+Scores depend on lateness, perfect/great/good timing
+windows, combo, multiplier, finite health, mines
+and missed notes. A qualified final rank is not granted
+until the chart genuinely finishes.
+
+The editor now provides **42 original decision-bearing fields**,
+including metrical swing, BPM, beat count, original oscillator
+selection, note volume, judgement/release accuracy,
+held/chord/mine/slide policies, latency calibration,
+accessibility assist, practice hazards, anti-mashing,
+score/health economies and conditional failure mode.
+Timing window ordering is checked. Swing actually moves
+the note timestamps; compensation affects real
+player judgement but never accepts a client clock.
+Dynamic difficulty tightens timing eligibility and
+practice mode relaxes terminal health failure without
+making missed input score as successful.
+
+### Offline math-generated soundtrack
+
+A separate synthesizer renders only mathematically
+derived sine, triangle and pulse oscillators or
+explicit silence. It never imports old game recordings,
+proprietary soundfonts or other commercial music
+and does not need an external executable or internet.
+The PCM output is deterministic 12-kHz mono signed
+16-bit WAV in bounded 20-second sections, with
+physical note onsets, envelopes, mathematically
+determined amplitudes, optional two-key chords
+and an exact SHA-256 waveform receipt.
+
+The offline rhythm-audio command requires explicit
+trusted local operator approval and a previously
+nonexistent local output path. Signed scene/seed
+mismatches and edited receipts are refused.
+The authenticated loopback Studio audio endpoint
+limits previews to five seconds; Studio plays
+2.5-second synthesized original WAV excerpts.
+Neither a preview nor its receipt automatically
+approves game assets or certifies native output.
+
+### Replay-verified full-length compositions
+
+The shared interactive reference API retains the
+128-action cap. An independent full-chart runner
+supports **4,096 real registered rhythm commands**
+through 16–128 command checkpoints. Each checkpoint
+records original source identity, chronological
+input action digest, elapsed clock, actual note
+judgements, deterministic state digest and
+previous-checkpoint chain identity.
+Every continuation independently reexecutes
+all history from the original author-reviewed
+chart and configuration before accepting input.
+Untrusted client score snapshots and replay
+substitutions are never authoritative.
+
+The local CLI provides rhythm-longrun,
+rhythm-longrun-verify and rhythm-longrun-continue.
+Studio adds full-performance command batches,
+independent source reexecution, current clock,
+judgement/score/accuracy telemetry, checkpoint
+head and explicit no-native-certification status.
+
+Studio shows the original lane highway and
+upcoming event positions, remaining beat
+progress, actual finite HP, combo, misses,
+hazards, rank, key-press controls, 1–6
+keyboard shortcuts, clock stepping,
+standalone generated sound playback, and
+an author-controlled source chart painter.
+The editor can update a real beat lane,
+kind, chord partner, accent, limited timing
+shift or original safe title, requiring
+a new valid authored source digest.
+
+Cross-platform regression coverage includes
+actual clock and hit classification,
+original chords and pressed/released holds,
+mines, harsh/friendly difficulty options,
+signed source forgery, independently
+replayed portable saves, waveform
+determinism, 256-beat long-run performance,
+checkpoint tampering and CLI/local
+Studio supervision.
+
+**Unfinished**: native console timing,
+independent device input jitter measurement,
+thousands of original polished compositions,
+native sound mixer integration and released
+copyright-checked audiovisual packages.
+The presence of generated sample WAVs
+does not make these completed.
+
+## RTS fidelity completion — seventy-two real design controls
+
+The seventeenth reference family has advanced
+from 63 to **72 typed gameplay settings**.
+Each newly included axis implements a physical
+game consequence. Medics actually heal
+wounded allies in local range by spending
+finite energy, while requiring real funded
+barracks for training. Defensive/aggressive/
+hold stances actually change autonomous
+fighting decisions. Defeating enemies now
+awards earned bounded veterancy and
+configurable damage bonuses. Siege units
+gain original structure-specific damage,
+not simply a new class name.
+All authored resource nodes are capped
+by their corresponding source resource
+budgets, eliminating invalid free material
+creation from a forged map.
+
+Adversarial tests cover real energy-funded
+medical repair, proximity constraints,
+stance-based fire, earned veterancy,
+siege damage differentiation and deposit
+stock-source conservation. A full-scale
+native thousands-of-units game, network
+model and hardware performance validation
+remain separate deliverables.
