@@ -31,7 +31,7 @@ SOURCE_EVENT = [
 REAL_INTERVIEW = SOURCE_EVENT + ["bridge:interview:0"]
 REAL_PLEDGE = REAL_INTERVIEW + ["bridge:pledge:0"]
 QUEST_COMPLETION = REAL_PLEDGE + [
-    "quest_director:help:0", "quest_director:resolve:0",
+    *["quest_director:help:0"] * 5, "quest_director:resolve:0",
 ]
 SOCIAL_CONSENSUS = QUEST_COMPLETION + [
     "dialogue:travel:1", "dialogue:speak:4",
@@ -68,7 +68,7 @@ class SocialQuestFusionTests(unittest.TestCase):
         self.assertEqual(quest["ending"], "restored")
         self.assertEqual(quest["status"], "resolved")
         self.assertIn(0, quest["testimonies"])
-        self.assertGreaterEqual(quest["material_actions"], 1)
+        self.assertGreaterEqual(quest["material_actions"], 5)
         self.assertEqual(states["quest_director"]["quests_completed"], 1)
         self.assertEqual(report["narrative_links"][0]["physical_event_kind"], "discover")
         self.assertEqual(report["narrative_links"][0]["source_inference"],
@@ -124,7 +124,6 @@ class SocialQuestFusionTests(unittest.TestCase):
             SOURCE_EVENT + ["bridge:pledge:0"],
             SOURCE_EVENT + ["bridge:conclude:0"],
             ["dialogue:speak:0", *SOURCE_EVENT, "bridge:interview:0"],
-            SOURCE_EVENT + ["quest_director:wait:4", "bridge:interview:0"],
             SOURCE_EVENT + ["quest_director:west", "bridge:interview:0"],
             REAL_INTERVIEW + ["bridge:interview:0"],
             REAL_INTERVIEW + ["bridge:conclude:0"],
