@@ -123,8 +123,8 @@ class OriginalWorldRobustnessTests(unittest.TestCase):
         variants=(
             lambda x:x["baseline_worlds"][1]["metrics"].update(
                      direct_memories=999),
-            lambda x:x.update(selected_strictly_improves_every_context=True),
-            lambda x:x.update(selected_beats_worst_baseline=True),
+            lambda x:x.update(selected_strictly_improves_every_context=not good["selected_strictly_improves_every_context"]),
+            lambda x:x.update(selected_beats_worst_baseline=not good["selected_beats_worst_baseline"]),
             lambda x:x.update(population_generalization_claimed=True),
             lambda x:x.update(automatic_ai_weights_promoted=True),
             lambda x:x["baseline_worlds"][0]["direct_source_events"][0]
