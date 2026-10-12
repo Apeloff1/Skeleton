@@ -16,6 +16,7 @@ import json
 import sqlite3
 
 from .dragon_family import DragonFamily, IdleWindow, SourceReceipt, ROLES, _epoch, _owner, _source_id, _utc, _hash
+from .dragon_family_idle_failures import IdleResearchFailure
 
 @dataclass(frozen=True)
 class IdleTask:
@@ -301,6 +302,8 @@ class DragonIdleCoordinator:
             "failed": "(deferred: adapter failed; bounded retry scheduled)",
             "paused": "(paused: user activity, consent, capacity, or lease fence)",
             "recovered": "(recovered: interrupted or crashed worker lease expired; no XP granted)",
+            "policy_blocked": "(blocked: source rights, robots, destination or capture approval denied; manual review required)",
+            "rate_limited": "(deferred: source requested bounded Retry-After; no acquisition accepted)",
         }
         if outcome not in notes:
             raise ValueError("unknown idle research outcome")
@@ -395,20 +398,32 @@ class DragonIdleCoordinator:
         return len(rows)
 
     def _finish_uncommitted(self, owner: str, role: str, sid: str,
-                            key: str, now: float, outcome: str) -> bool:
+                            key: str, now: float, outcome: str,
+                            retry_after_seconds: float | None = None) -> bool:
         """Shared terminal transition; caller must already hold write lock."""
-        if outcome not in ("changed","unchanged","failed","paused"):
+        if outcome not in ("changed","unchanged","failed","paused",
+                           "policy_blocked","rate_limited"):
             raise ValueError("invalid idle completion")
+        if outcome=="rate_limited":
+            if (type(retry_after_seconds) not in (int,float) or
+                    not isfinite(retry_after_seconds) or
+                    not 60<=retry_after_seconds<=86400):
+                raise ValueError("invalid rate limit delay")
+        elif retry_after_seconds is not None:
+            raise ValueError("unexpected rate limit delay")
         previous=self.db.execute("""SELECT failures FROM dragon_family_idle_leases
             WHERE owner=? AND role=? AND source_id=? AND lease_token=?""",
             (owner,role,sid,key)).fetchone()
         if previous is None:
             return False
-        errors=min(16,previous[0]+1) if outcome=="failed" else 0
+        errors=min(16,previous[0]+1) if outcome in (
+            "failed","rate_limited") else 0
         due=(self.policy.changed_cooldown_seconds if outcome=="changed" else
              self.policy.unchanged_cooldown_seconds if outcome=="unchanged" else
              min(self.policy.maximum_backoff_seconds,
                  self.policy.transient_backoff_seconds*(2**min(12,errors-1))) if outcome=="failed" else
+             max(86400*30,self.policy.maximum_backoff_seconds) if outcome=="policy_blocked" else
+             max(self.policy.transient_backoff_seconds,retry_after_seconds) if outcome=="rate_limited" else
              self.policy.transient_backoff_seconds)
         changed=self.db.execute("""UPDATE dragon_family_idle_leases SET next_due=?,
             failures=?,last_completed=?,last_outcome=?,lease_token='',lease_expires=0
@@ -429,10 +444,12 @@ class DragonIdleCoordinator:
             raise PermissionError("source lease disappeared during atomic admission")
 
     def _finish(self, owner: str, role: str, sid: str, key: str,
-                now: float, outcome: str) -> bool:
+                now: float, outcome: str,
+                retry_after_seconds: float | None = None) -> bool:
         self.db.execute("BEGIN IMMEDIATE")
         with self.db:
-            return self._finish_uncommitted(owner,role,sid,key,now,outcome)
+            return self._finish_uncommitted(owner,role,sid,key,now,outcome,
+                                           retry_after_seconds)
 
     def run_once(self, owner: str, *,
                  authorized: bool,
@@ -476,7 +493,8 @@ class DragonIdleCoordinator:
             owner,state.now,task_topics,adjacent_topics,
             revisit_sources=frozenset(revisit_source_ids))
         stats: dict[str,object] = dict(at=_utc(state.now),attempted=0,changed=0,
-                                       unchanged=0,failed=0,paused=False,recovered=recovered)
+                                       unchanged=0,failed=0,paused=False,recovered=recovered,
+                                       policy_blocked=0,rate_limited=0)
         roles_seen: set[str] = set()
         sources_seen: set[str] = set()
         for _,_,_,attempts,seen,sid,role,url,media,tags,digest in candidates:
@@ -523,6 +541,20 @@ class DragonIdleCoordinator:
                 if receipt is None:
                     self._finish(owner,role,sid,key,after.now,status)
                 stats[status] += 1
+            except IdleResearchFailure as failure:
+                # The trusted crawler adapter classifies HTTP 429 versus
+                # license/robots/SSRF denial. Neither can award XP. Respect
+                # bounded Retry-After and quarantine denied sources for
+                # operator review without repeating source access.
+                if failure.category=="policy_blocked":
+                    outcome="policy_blocked"
+                elif failure.category=="rate_limited":
+                    outcome="rate_limited"
+                else:
+                    outcome="failed"
+                stats[outcome] += 1
+                self._finish(owner,role,sid,key,before.now,outcome,
+                             failure.retry_after_seconds)
             except PermissionError:
                 # Losing consent/foreground/lease is terminal for this tick.
                 # Re-invoking a consent-checked observer here can itself deny,
