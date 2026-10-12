@@ -59,12 +59,14 @@ class DragonGleanMatrix:
     """
 
     def __init__(self, family: DragonFamily, *,
-                 finding_verify: Callable[[str,LensObservation], bool] | None,
+                 finding_verify: Callable[[str,LensObservation], bool] | None = None,
                  maximum_findings: int = 50000):
         if not isinstance(family,DragonFamily) or family.owner_scope is None:
             raise PermissionError("gleaning requires a trusted owner-locked Dragon Family")
-        if family.approval is None or finding_verify is None or not callable(finding_verify):
-            raise PermissionError("canonical source and independent claim reviewers required")
+        if family.approval is None:
+            raise PermissionError("canonical source reviewer required")
+        if finding_verify is not None and not callable(finding_verify):
+            raise ValueError("invalid independent claim reviewer")
         if type(maximum_findings) is not int or not 100<=maximum_findings<=1000000:
             raise ValueError("invalid glean storage budget")
         self.family=family
@@ -161,6 +163,8 @@ class DragonGleanMatrix:
         claim or duplicate anchor never contributes to family progression.
         """
         self._owner(owner,authorized)
+        if self.finding_verify is None:
+            raise PermissionError("independent proposition/anchor verifier not installed")
         self._validate(observation)
         if self._source_fresh(owner,observation.source_id,observation.content_digest) is None:
             raise PermissionError("canonical reviewed source revision missing or revoked")
