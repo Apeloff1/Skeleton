@@ -1001,7 +1001,7 @@ defeat and a persistent milestone. Campaign settings stop at victory,
 whereas the default endless world permits nonterminal revisiting and
 continued exploration after defeating the guardian.
 
-The engine exposes **39 gameplay-affecting typed editor fields**, growing
+The engine exposes **40 gameplay-affecting typed editor fields**, growing
 from the prior five: the existing number of regions, gate budgets,
 collectible abilities, fast travel and sequence-breaking options combine
 with enemy health/power/variance, authored hazard effects, survivability,
