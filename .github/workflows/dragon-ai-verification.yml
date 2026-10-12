@@ -141,6 +141,41 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check "pymongo>=4,<5" "motor>=3,<4" "pytest-asyncio>=0.24,<2" "python-dotenv>=1,<2" "pydantic-settings>=2,<3"
           PYTHONPATH=.:backend PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest -p pytest_asyncio.plugin backend/tests/test_dragon_runtime_bridge.py backend/tests/test_dragon_conversation_binding.py backend/tests/test_conversation_storage_admission.py backend/tests/test_conversation_regeneration.py backend/tests/test_conversation_governance.py
+  source-safety:
+    name: Dragon Source Safety
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with: {python-version: "3.11.16"}
+      - name: Install focused test runtime
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+      - name: Compile critical Dragon source authorities
+        run: |
+          python -m compileall -q \
+            skeleton/ai/game_builder/dragon_worker_stop_authority.py \
+            skeleton/ai/game_builder/dragon_source_permission_authority.py \
+            skeleton/ai/game_builder/dragon_source_health.py \
+            skeleton/ai/game_builder/dragon_research_pilot.py \
+            skeleton/ai/game_builder/dragon_technical_source_operations.py \
+            skeleton/ai/game_builder/dragon_technical_source_acquisition.py
+      - name: Execute signed-stop, pilot and capture regression suite
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          set -euo pipefail
+          python -m pytest -q --noconftest \
+            tests/test_dragon_technical_source_operations.py
+          python -m pytest -q --noconftest \
+            tests/test_dragon_technical_source_acquisition.py
+          python -m pytest -q --noconftest \
+            tests/test_dragon_technical_source_captures.py
+
   frontend:
     name: Dragon Frontend
     runs-on: ubuntu-latest
