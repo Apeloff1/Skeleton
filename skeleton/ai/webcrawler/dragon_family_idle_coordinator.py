@@ -175,7 +175,8 @@ class DragonIdleCoordinator:
         return state
 
     def _candidates(self, owner: str, now: float,
-                    task_topics: tuple[str, ...], adjacent_topics: tuple[str, ...]) -> list[tuple]:
+                    task_topics: tuple[str, ...], adjacent_topics: tuple[str, ...],
+                    revisit_sources: frozenset[str] = frozenset()) -> list[tuple]:
         from .dragon_family import _tokens
         focus, adjacent = set(_tokens(task_topics)), set(_tokens(adjacent_topics))
         if not focus:
@@ -238,8 +239,14 @@ class DragonIdleCoordinator:
                 # Dispatch primary article/video workers before the monitor;
                 # otherwise Scout can claim a video's lease first and starve
                 # Flicker despite three available catalog sources.
-                out.append((ROLES.index(role),0 if direct else 1,ordinal,float(seen_at),
-                            sid,role,url,media,tuple(sorted(source_topics)),revision or ""))
+                # The already-reviewed Mother's contradictory-source brief
+                # may put Scout first for that exact known source. It changes
+                # only the order of consented, catalog-eligible work, never
+                # permits a new URL, media type, fetch, or weight promotion.
+                urgent = 0 if role=="monitor" and sid in revisit_sources else 1
+                out.append((urgent,ROLES.index(role),0 if direct else 1,
+                            ordinal,float(seen_at),sid,role,url,media,
+                            tuple(sorted(source_topics)),revision or ""))
         return sorted(out)
 
     def _reserve(self, owner: str, role: str, sid: str, start: float) -> str | None:
@@ -378,7 +385,8 @@ class DragonIdleCoordinator:
                  gatherers: Mapping[str, Callable[[IdleTask], SourceReceipt | None]],
                  task_topics: tuple[str, ...],
                  adjacent_topics: tuple[str, ...] = (),
-                 commit_gate: Callable[[float], bool] | None = None) -> dict[str, object]:
+                 commit_gate: Callable[[float], bool] | None = None,
+                 revisit_source_ids: tuple[str, ...] = ()) -> dict[str, object]:
         """Host-invoked bounded tick; fails closed if foreground becomes active.
 
         A trusted adapter must apply DNS/SSRF/robots/license policies, network
@@ -396,6 +404,10 @@ class DragonIdleCoordinator:
             raise ValueError("host must supply policy-bound gatherers")
         if commit_gate is not None and not callable(commit_gate):
             raise ValueError("invalid owner-scoped source commit guard")
+        if not isinstance(revisit_source_ids,tuple) or len(revisit_source_ids)>64:
+            raise ValueError("invalid bounded review brief source list")
+        for source_id in revisit_source_ids:
+            _source_id(source_id)
         state=self._window(idle_state)
         if not self.db.execute("SELECT 1 FROM dragon_family_broods WHERE owner=?",
                                (owner,)).fetchone():
@@ -405,12 +417,14 @@ class DragonIdleCoordinator:
         # only after confirming this is an authorized idle tick.
         recovered=self.reconcile_expired_leases(
             owner,authorized=True,at=state.now,max_recover=100)
-        candidates=self._candidates(owner,state.now,task_topics,adjacent_topics)
+        candidates=self._candidates(
+            owner,state.now,task_topics,adjacent_topics,
+            revisit_sources=frozenset(revisit_source_ids))
         stats: dict[str,object] = dict(at=_utc(state.now),attempted=0,changed=0,
                                        unchanged=0,failed=0,paused=False,recovered=recovered)
         roles_seen: set[str] = set()
         sources_seen: set[str] = set()
-        for _,_,attempts,seen,sid,role,url,media,tags,digest in candidates:
+        for _,_,_,attempts,seen,sid,role,url,media,tags,digest in candidates:
             if len(roles_seen) >= self.policy.max_tasks:
                 break
             if sid in sources_seen or role in roles_seen or role not in gatherers:
