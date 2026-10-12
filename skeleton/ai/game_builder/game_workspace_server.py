@@ -36,6 +36,7 @@ from .advanced_world_planner import plan_original_world
 from .advanced_stealth_planner import plan_stealth_route
 from .advanced_parkour_planner import plan_parkour_route, verify_parkour_plan
 from .advanced_sports_coach import plan_original_sports_match, verify_original_sports_plan
+from .advanced_maze_planner import plan_original_maze, verify_original_maze_plan
 from .advanced_godot_export import (
     render_advanced_godot_package, archive_advanced_godot_package,
 )
@@ -389,6 +390,20 @@ class _StudioHandler(BaseHTTPRequestHandler):
                                    "native_hardware_certified":False})
         if path=="/api/sports-coach-verify":
             verified=verify_original_sports_plan(
+                values["record"],values["scene"],values.get("settings"))
+            return self._json(200,{"verified":verified,
+                                   "original_source_mutated":False})
+        if path=="/api/maze-plan":
+            plan=plan_original_maze(
+                values["scene"],values.get("settings"),
+                max_states=values.get("max_states",12000),
+                max_depth=values.get("max_depth",96),
+                beam_width=values.get("beam_width",96))
+            return self._json(200,{"plan":plan,
+                                   "original_source_mutated":False,
+                                   "native_hardware_certified":False})
+        if path=="/api/maze-plan-verify":
+            verified=verify_original_maze_plan(
                 values["record"],values["scene"],values.get("settings"))
             return self._json(200,{"verified":verified,
                                    "original_source_mutated":False})
