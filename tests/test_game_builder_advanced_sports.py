@@ -180,6 +180,52 @@ class OriginalSportsRulesTests(unittest.TestCase):
         self.assertEqual(gust["state"]["home_score"],0)
         self.assertTrue(verify_advanced_session(gust,config))
 
+    def test_swept_collision_uses_nearest_wall_not_json_order(self):
+        cfg=make_editor_document("sports")["settings"]
+        layout=default_layout(cfg,0)
+        layout["home_spawn"]=[8,1]
+        layout["cover"]=[[16,1],[12,1]]
+        course=make_advanced_scene("sports",layout=layout)
+        trial=run_advanced_session("sports",actions=["sprint"],scene=course)
+        self.assertEqual(trial["state"]["home"],[11,1])
+        self.assertTrue(verify_advanced_session(trial))
+        swapped=deepcopy(layout)
+        swapped["cover"].reverse()
+        swapped_course=make_advanced_scene("sports",layout=swapped)
+        swapped_trial=run_advanced_session("sports",actions=["sprint"],
+                                           scene=swapped_course)
+        self.assertEqual(swapped_trial["state"]["home"],[11,1])
+        self.assertTrue(verify_advanced_session(swapped_trial))
+
+    def test_defender_really_intercepts_swept_teammate_pass(self):
+        cfg=make_editor_document("sports")["settings"]
+        layout=default_layout(cfg,0)
+        layout["home_spawn"]=[40,1]
+        layout["away_spawn"]=[43,1]
+        layout["cover"]=[]
+        scene=make_advanced_scene("sports",layout=layout)
+        attempt=run_advanced_session("sports",actions=["pass"],scene=scene)
+        self.assertEqual(attempt["state"]["owner"],"away")
+        self.assertEqual(attempt["state"]["home"],[40,1])
+        self.assertEqual(attempt["state"]["interceptions"],1)
+        self.assertIn("defender_intercepted_swept_pass",
+                      attempt["state"]["events"])
+        self.assertTrue(verify_advanced_session(attempt))
+
+    def test_tactical_mode_goal_is_actually_earned(self):
+        settings={"rules":"turn_based","target_score":1,"action_points":2}
+        rules=make_editor_document("sports",settings)["settings"]
+        layout=default_layout(rules,0)
+        layout["home_spawn"]=[85,1]
+        scene=make_advanced_scene("sports",settings,layout=layout)
+        victory=run_advanced_session("sports",settings,
+                                     ["shoot"],scene=scene)
+        self.assertTrue(victory["state"]["finished"])
+        self.assertTrue(victory["state"]["victory"])
+        self.assertEqual(victory["state"]["home_score"],1)
+        self.assertEqual(victory["state"]["ap_remaining"],1)
+        self.assertTrue(verify_advanced_session(victory,settings))
+
     def test_fail_closed_cross_rules_and_impossible_team_rosters(self):
         for params in (
             {"rules":"racket"},
