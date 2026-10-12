@@ -5293,6 +5293,393 @@ CATALOG = json.loads(r'''[
         "minimum": null,
         "maximum": null,
         "options": []
+      },
+      {
+        "key": "npc_count",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 4,
+        "options": []
+      },
+      {
+        "key": "obstacle_count",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "site_integrity",
+        "kind": "int",
+        "default": 12,
+        "minimum": 2,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "site_stock",
+        "kind": "int",
+        "default": 12,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "starting_trust",
+        "kind": "int",
+        "default": 7,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "npc_perception",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 6,
+        "options": []
+      },
+      {
+        "key": "starting_suspicion",
+        "kind": "int",
+        "default": 0,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "starting_gold",
+        "kind": "int",
+        "default": 5,
+        "minimum": 0,
+        "maximum": 999,
+        "options": []
+      },
+      {
+        "key": "starting_supplies",
+        "kind": "int",
+        "default": 8,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "stamina",
+        "kind": "int",
+        "default": 50,
+        "minimum": 1,
+        "maximum": 300,
+        "options": []
+      },
+      {
+        "key": "starting_reputation",
+        "kind": "int",
+        "default": 0,
+        "minimum": -20,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "movement_stamina",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "action_stamina",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "help_supplies",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "help_power",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "harm_power",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "gather_units",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "repair_supplies",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "repair_power",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "trust_cap",
+        "kind": "int",
+        "default": 20,
+        "minimum": 7,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "suspicion_cap",
+        "kind": "int",
+        "default": 20,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "empathy_gain",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "harm_trust_loss",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "harm_suspicion",
+        "kind": "int",
+        "default": 4,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "reputation_cap",
+        "kind": "int",
+        "default": 20,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "reputation_gain",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "reputation_loss",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "day_ticks",
+        "kind": "int",
+        "default": 12,
+        "minimum": 4,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "night_fraction_percent",
+        "kind": "int",
+        "default": 75,
+        "minimum": 25,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "night_sight_penalty",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 6,
+        "options": []
+      },
+      {
+        "key": "witnesses_required",
+        "kind": "int",
+        "default": 1,
+        "minimum": 1,
+        "maximum": 4,
+        "options": []
+      },
+      {
+        "key": "event_budget",
+        "kind": "int",
+        "default": 64,
+        "minimum": 1,
+        "maximum": 128,
+        "options": []
+      },
+      {
+        "key": "memory_records",
+        "kind": "int",
+        "default": 8,
+        "minimum": 1,
+        "maximum": 64,
+        "options": []
+      },
+      {
+        "key": "rumor_enabled",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "rumor_interval",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "rumor_radius",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "rumor_trust_floor",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "rumor_per_tick",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "memory_decay_ticks",
+        "kind": "int",
+        "default": 48,
+        "minimum": 0,
+        "maximum": 256,
+        "options": []
+      },
+      {
+        "key": "quest_ttl",
+        "kind": "int",
+        "default": 100,
+        "minimum": 4,
+        "maximum": 512,
+        "options": []
+      },
+      {
+        "key": "evidence_min",
+        "kind": "int",
+        "default": 1,
+        "minimum": 1,
+        "maximum": 4,
+        "options": []
+      },
+      {
+        "key": "quest_goal",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "failure_reputation",
+        "kind": "int",
+        "default": 18,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "ending_policy",
+        "kind": "enum",
+        "default": "persistent",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "persistent",
+          "campaign"
+        ]
+      },
+      {
+        "key": "rest_stamina",
+        "kind": "int",
+        "default": 10,
+        "minimum": 1,
+        "maximum": 50,
+        "options": []
+      },
+      {
+        "key": "reward_gold",
+        "kind": "int",
+        "default": 5,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "exploit_gold",
+        "kind": "int",
+        "default": 8,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "rule_bonus_modulus",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 16,
+        "options": []
       }
     ],
     "preview": null
@@ -5352,7 +5739,7 @@ CATALOG = json.loads(r'''[
   }
 ]''')
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
