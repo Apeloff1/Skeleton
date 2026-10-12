@@ -38,6 +38,9 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_npc_dynamic_route_planner import (
+    plan_original_dynamic_route, verify_original_dynamic_route,
+)
 from .advanced_historical_spatial_lens import (
     analyze_original_spatial_epochs, verify_original_spatial_epochs,
 )
@@ -213,6 +216,14 @@ def parser() -> argparse.ArgumentParser:
     ecology_verify.add_argument("--record",required=True)
     ecology_verify.add_argument("--scene",required=True)
     ecology_verify.add_argument("--settings")
+    npc_route=commands.add_parser("plan-original-npc-route",
+        help="Execute real stamina-bound route search around actually moving NPCs")
+    npc_route.add_argument("--record",required=True)
+    npc_route.add_argument("--objective",required=True)
+    npc_route.add_argument("--max-steps",type=int,default=40)
+    npc_route_verify=commands.add_parser("verify-original-npc-route",
+        help="Independently replan, execute and reprove all original world route steps")
+    npc_route_verify.add_argument("--record",required=True)
     history=commands.add_parser("original-spatial-history",
         help="Reconstruct original NPC physical chunk occupancy at source-verified past ticks")
     history.add_argument("--record",required=True)
@@ -520,6 +531,11 @@ def main(argv=None) -> int:
             output={"verified":verify_original_ecology_plan(
                 _load(args.record),_load(args.scene),
                 _load(args.settings) if args.settings else None)}
+        elif args.operation == "plan-original-npc-route":
+            output=plan_original_dynamic_route(
+                _load(args.record),_load(args.objective),max_steps=args.max_steps)
+        elif args.operation == "verify-original-npc-route":
+            output={"verified":verify_original_dynamic_route(_load(args.record))}
         elif args.operation == "original-spatial-history":
             output=analyze_original_spatial_epochs(
                 _load(args.record),_load(args.turns),
