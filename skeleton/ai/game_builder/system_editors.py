@@ -6188,8 +6188,41 @@ for _entry in CATALOG:
             ],
         }[_entry["id"]]
         _entry["fields"].extend(_extension)
+# Source-grounded economic simulation controls: no monetary or stock minting.
+for _entry in CATALOG:
+    if _entry["id"] == "economy":
+        _entry["fields"].extend([
+            {"key": key, "kind": "int", "default": default,
+             "minimum": lo, "maximum": hi, "options": []}
+            for key, default, lo, hi in (
+                ("active_goods_budget", 8, 3, 8),
+                ("active_market_budget", 8, 2, 16),
+                ("starting_stock", 8, 1, 64),
+                ("warehouse_capacity", 96, 16, 256),
+                ("resource_reserve", 40, 0, 200),
+                ("household_cash", 250, 0, 2000),
+                ("market_treasury", 400, 0, 2000),
+                ("starting_cash", 220, 0, 2000),
+                ("player_energy", 80, 10, 200),
+                ("labor_cost", 6, 1, 30),
+                ("harvest_yield", 4, 1, 20),
+                ("ore_per_tool", 2, 1, 8),
+                ("cargo_capacity", 16, 1, 40),
+                ("transport_cost", 2, 0, 20),
+                ("rest_cost", 3, 1, 20),
+                ("rest_gain", 25, 1, 80),
+                ("relief_grant", 10, 1, 40),
+                ("spread", 2, 1, 10),
+                ("base_price", 9, 1, 60),
+                ("price_floor", 1, 1, 20),
+                ("price_ceiling", 80, 20, 150),
+                ("target_stock", 10, 1, 100),
+                ("demand_period", 2, 1, 20),
+            )
+        ])
+
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze", "rpg", "procedural_world", "npc_society", "ecosystem"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze", "rpg", "procedural_world", "npc_society", "ecosystem", "economy"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
@@ -6297,6 +6330,21 @@ def _normalized_settings(editor_id: str, values: Mapping[str, object] | None) ->
             raise SystemEditorError("civic checkpoint must be physically achievable")
         if normalized["memory_records"]==0 and normalized["relationship_factors"]>50:
             raise SystemEditorError("complex witness scoring requires nonzero memory records")
+    if editor_id == "economy":
+        if not normalized["finite_inventory"]:
+            raise SystemEditorError("advanced source market requires finite physical stock")
+        if normalized["goods"] < 3 or normalized["market_nodes"] < 2:
+            raise SystemEditorError("real manufacturing and routed trade need three goods and two markets")
+        if normalized["warehouse_capacity"] < normalized["starting_stock"] + 3:
+            raise SystemEditorError("authored warehouse cannot store initial or harvested goods")
+        if normalized["price_floor"] > normalized["base_price"] or normalized["base_price"] > normalized["price_ceiling"]:
+            raise SystemEditorError("market price envelope must contain base price")
+        if normalized["market_treasury"] < normalized["base_price"] + 16:
+            raise SystemEditorError("market cannot pay actual cargo bids")
+        if normalized["player_energy"] < normalized["labor_cost"]:
+            raise SystemEditorError("labor cannot fund a real production action")
+        if normalized["starting_cash"] < normalized["base_price"] + normalized["spread"] + normalized["transport_cost"]:
+            raise SystemEditorError("player cannot fund any physical market exchange")
     if editor_id == "ecosystem":
         if normalized["predators"]>normalized["species"]:
             raise SystemEditorError("predator species cannot exceed authored species count")
