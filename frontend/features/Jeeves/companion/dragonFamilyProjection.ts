@@ -45,10 +45,19 @@ export interface DragonGleanProjection {
    evidence_fingerprint:string;
  }[];
 }
+export interface DragonIdleHostProjection {
+ schema:'skeleton.ai.dragon.idle.host.v1';
+ configured:boolean;active:boolean;
+ host_idle_now:null;requires_os_idle_observer:true;
+ daily_attempts:number;
+ daily_by_specialist:Partial<Record<DragonFamilyRole,number>>;
+ consent_expires_at:string|null;next_tick_at:string|null;
+}
 export interface DragonFamilyProjection {
   schema:'skeleton.ai.dragon.family.v1';
   almanakk?:DragonAlmanakkProjection;
   idle_work?:DragonIdleFamilyProjection;
+  idle_host?:DragonIdleHostProjection;
   glean?:DragonGleanProjection;
   parent:{stage:'egg'|'hatchling'|'juvenile'|'adolescent'|'winged'|'adult';
     consumed:number;source_total:number;complete:boolean;laid_at:string|null};
@@ -107,6 +116,24 @@ export function validateDragonFamily(input:unknown):DragonFamilyProjection|null 
     typeof h.change==='string'&&h.change.length<=500&&
     typeof h.digest==='string'&&HEX.test(h.digest)&&
     (i===0||h.sequence<all[i-1].sequence)))return null;
+  if(f.idle_host!==undefined){
+    const h=f.idle_host;
+    if(!h||h.schema!=='skeleton.ai.dragon.idle.host.v1'||
+       typeof h.configured!=='boolean'||typeof h.active!=='boolean'||
+       (h.active&&!h.configured)||h.host_idle_now!==null||
+       h.requires_os_idle_observer!==true||
+       !count(h.daily_attempts)||
+       !(h.consent_expires_at===null||utc(h.consent_expires_at))||
+       !(h.next_tick_at===null||utc(h.next_tick_at))||
+       (h.active&&(h.consent_expires_at===null||h.next_tick_at===null))||
+       !h.daily_by_specialist||typeof h.daily_by_specialist!=='object'||
+       Array.isArray(h.daily_by_specialist)||
+       Object.keys(h.daily_by_specialist).some(k=>
+         !['article','video','monitor'].includes(k)))return null;
+    const values=Object.values(h.daily_by_specialist);
+    if(values.some(v=>!count(v))||
+       values.reduce<number>((sum,v)=>sum+(v??0),0)!==h.daily_attempts)return null;
+  }
   if(f.idle_work!==undefined){
     const w=f.idle_work;
     if(!w||w.schema!=='skeleton.ai.dragon.idle_status.v1'||
