@@ -220,6 +220,9 @@ class DragonAlmanakkLane:
                          stage="weight_handoff",fingerprint=signed_receipt,
                          at=approved_at,
                          description="separately authorized weight handoff; no weights changed")
+        persisted = self._row(owner,role,source_id,digest)
+        if persisted is None or persisted[0] != "weight_handoff" or persisted[3] != signed_receipt:
+            raise ValueError("handoff replay must match persisted signed receipt")
         return _hash([SCHEMA,owner,role,source_id,digest,signed_receipt])
 
     def history(self, owner: str, *, authorized: bool, limit: int = 25) -> list[dict]:
