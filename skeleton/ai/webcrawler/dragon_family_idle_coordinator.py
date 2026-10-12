@@ -386,7 +386,8 @@ class DragonIdleCoordinator:
                 else:
                     changed=self.family.digest_idle(
                         owner,role,receipt,authorized=True,window=after,
-                        task_topics=task_topics,adjacent_topics=adjacent_topics)
+                        task_topics=task_topics,adjacent_topics=adjacent_topics,
+                        lease_guard=lambda: self._owned(owner,role,sid,key,after.now))
                     status="changed" if changed else "unchanged"
                 self._finish(owner,role,sid,key,after.now,status)
                 stats[status] += 1
