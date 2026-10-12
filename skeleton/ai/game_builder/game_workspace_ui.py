@@ -1107,6 +1107,76 @@ function drawAdvancedGame(session){
   c.fillStyle="#a4ebca";
   c.fillText("Verified course mechanics: climb · parkour · swing · grapple",12,265);
  }
+ if(editor==="npc_society"){
+  const ox=16,oy=59,tile=20;
+  c.fillStyle="#e4f3e8";
+  c.fillText(state.title+" · "+state.season+" · "+advancedSettings.simulation_lod+" LOD",12,35);
+  const siteNames=Object.entries(state.sites);
+  for(let y=0;y<=8;y++)for(let x=0;x<=8;x++){
+   const sx=ox+x*tile,sy=oy+(8-y)*tile;
+   c.fillStyle=(x+y)%2?"#304f48":"#34574d";
+   c.fillRect(sx,sy,tile-1,tile-1);
+   const site=siteNames.find(([key,p])=>p[0]===x&&p[1]===y);
+   if(site){
+    const symbol={home:"H",market:"$",hall:"C",farm:"F",workshop:"W"}[site[0]];
+    c.fillStyle="#f8d78b";c.fillText(symbol,sx+5,sy+15);
+   }
+  }
+  for(const resident of state.residents){
+   const x=ox+resident.position[0]*tile+10,y=oy+(8-resident.position[1])*tile+10;
+   c.fillStyle=resident.id===state.focus?"#f6e3ad":"#88d5d3";
+   c.beginPath();c.arc(x,y,resident.id===state.focus?5:3,0,Math.PI*2);c.fill();
+  }
+  const px=ox+state.position[0]*tile+10,py=oy+(8-state.position[1])*tile+10;
+  c.fillStyle="#d8ffda";c.beginPath();c.arc(px,py,7,0,Math.PI*2);c.fill();
+  c.fillStyle="#123222";c.fillText("@",px-4,py+4);
+  const tx=W-165;c.fillStyle="#eaf4eb";
+  c.fillText("Pop "+state.population,tx,62);
+  c.fillText("Embodied "+state.embodied,tx,84);
+  c.fillText("Trust "+state.trust,tx,106);
+  c.fillText("Food "+state.food,tx,128);
+  c.fillText("Materials "+state.materials,tx,150);
+  c.fillText("Gold "+state.gold,tx,172);
+  c.fillText("Memories "+state.memories.length,tx,194);
+  c.fillText("Witnesses "+state.evidence.length,tx,216);
+  c.fillStyle="#a6ead0";
+  c.fillText(state.community_checkpoint?"Civic milestone earned · world continues":
+    "H home · $ market · C civic hall · F farm · W workshop",12,269);
+ }
+ if(editor==="ecosystem"){
+  const ox=18,oy=63,w=100,h=82;
+  c.fillStyle="#e8f5e7";
+  c.fillText(state.title+" · "+state.season+" · day "+state.tick,12,35);
+  for(const habitat of state.habitats){
+   const sx=ox+habitat.site[0]*(w+10),sy=oy+(1-habitat.site[1])*(h+8);
+   const shades=["#45684d","#3b7583","#7d8053","#677b7e"];
+   c.fillStyle=shades[habitat.id];c.fillRect(sx,sy,w,h);
+   c.fillStyle="#f3f4e2";
+   c.fillText(habitat.kind,sx+6,sy+17);
+   c.fillText("Food "+habitat.food,sx+6,sy+35);
+   c.fillText("Water "+habitat.moisture,sx+6,sy+51);
+   c.fillText("Disease "+habitat.disease,sx+6,sy+67);
+   if(habitat.site[0]===state.position[0]&&
+      habitat.site[1]===state.position[1]){
+    c.strokeStyle="#f8de97";c.lineWidth=3;c.strokeRect(sx+2,sy+2,w-4,h-4);
+    c.lineWidth=1;
+   }
+  }
+  const tx=W-171;
+  const living=state.species.reduce((v,s)=>v+s.population,0);
+  c.fillStyle="#eaf4ef";
+  c.fillText("Species "+state.species_total,tx,62);
+  c.fillText("Pop "+living,tx,84);
+  c.fillText("Births "+state.births,tx,106);
+  c.fillText("Deaths "+state.deaths,tx,128);
+  c.fillText("Surveys "+state.surveys.length+"/2",tx,150);
+  c.fillText("Migration "+state.migration_events,tx,172);
+  c.fillText("Credits "+state.credits,tx,194);
+  c.fillText("Seeds "+state.seed_bank,tx,216);
+  c.fillStyle="#abe7ce";
+  c.fillText(state.conservation_checkpoint?"Restored · nonterminal biodiversity study":
+    "Source habitats · predator-prey dynamics · finite restoration",12,269);
+ }
  if(editor==="rpg"){
   const ox=15,oy=64,tile=19;
   const w=advancedSettings.world_width,h=advancedSettings.world_height;
@@ -1361,6 +1431,44 @@ let selectedSandboxCell=0;
 let selectedCityParcel=0;
 function renderAdvancedActions(actions){
  const target=$("advanced-actions");target.replaceChildren();
+ if(advancedSession?.editor==="npc_society"||
+    advancedSession?.editor==="ecosystem"){
+  const state=advancedSession.state;
+  const ecological=advancedSession.editor==="ecosystem";
+  const box=document.createElement("label");
+  box.textContent=ecological?
+    "Original conservation and habitat interaction":
+    "Original living society, witnesses and economic choices";
+  const input=document.createElement("select");
+  input.id=ecological?"ecosystem-original-action":"npc-society-original-action";
+  for(const a of actions){
+   const option=document.createElement("option");
+   option.value=a;option.textContent=a.replaceAll("_"," ");
+   input.append(option);
+  }
+  box.append(input);target.append(box);
+  const execute=document.createElement("button");execute.type="button";
+  execute.textContent=ecological?
+   "Execute source-bound habitat intervention":
+   "Execute physically witnessed society action";
+  execute.disabled=Boolean(advancedSession.terminal);
+  execute.addEventListener("click",()=>advanceAdvanced(input.value));
+  target.append(execute);
+  const info=document.createElement("small");
+  info.textContent=ecological?
+   ("Habitat "+state.position.join(",")+" · focused species "+
+    state.focus+" · active "+state.species.length+" · "+
+    state.surveys.length+" survey receipts · "+
+    (state.conservation_checkpoint?"conservation achieved; optional retirement":
+     "living ecology remains open")):
+   ("Resident "+state.focus+" · LOD "+
+    advancedSettings.simulation_lod+" · testimony "+
+    state.evidence.join(",")+" · "+
+    (state.community_checkpoint?"civic objective earned; optional retirement":
+     "proximity and direct witness proof required"));
+  target.append(info);
+  return;
+ }
  if(advancedSession?.editor==="rpg"){
   const state=advancedSession.state;
   const box=document.createElement("label");
