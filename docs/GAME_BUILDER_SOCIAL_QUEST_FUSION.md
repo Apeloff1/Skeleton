@@ -28,7 +28,7 @@ cross-world narrative milestone without inventing any original-engine rewards.
 
 ## Source integrity and limitations
 
-- Strict authorized original scenes, typed settings and seed identity.
+- Strict content-addressed authored scenes, typed settings and seed identity; hashes detect changes but are not cryptographic user signatures.
 - Maximum 64 bounded composite commands; maximum 128 actions per game engine.
 - Reexecute all three engines from original actions. Exact source receipt and
   replay-head digests are recorded for each subsystem and every bridge.
