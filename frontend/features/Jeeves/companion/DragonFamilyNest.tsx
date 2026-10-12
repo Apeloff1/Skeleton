@@ -45,6 +45,21 @@ export default function DragonFamilyNest({family}:{family?:DragonFamilyProjectio
     'Detects verified changes in known sources'} · idle only</Text>
    <Text style={s.muted}>New information acquired: {child.discoveries} · Last growth: {safeDate(child.last_grew_at)}</Text>
    <Text style={s.privacy}>Only grows while the host confirms idle time, consent, and resource capacity. Updated or adjacent knowledge must be independently verified.</Text></View>
+  {f.idle_host&&<View style={s.details} accessibilityLabel="Consented Dragon idle research host status">
+   <Text style={s.title}>🛡️ Idle research permissions</Text>
+   <Text style={s.muted}>{f.idle_host.active?
+     'Research opt-in is active; the host must still confirm local idle time before every acquisition.':
+     f.idle_host.configured?
+     'Idle research paused or consent no longer valid. No new work may be admitted.':
+     'Research host not configured. The hatchlings will rest.'}</Text>
+   <Text style={s.role}>Daily attempted acquisitions: {f.idle_host.daily_attempts}
+     {' · '}Ember {f.idle_host.daily_by_specialist.article??0}
+     {' · '}Flicker {f.idle_host.daily_by_specialist.video??0}
+     {' · '}Scout {f.idle_host.daily_by_specialist.monitor??0}</Text>
+   {f.idle_host.active&&<Text style={s.when}>Consent expires: {safeDate(f.idle_host.consent_expires_at)}
+      {' · '}Next host tick eligible: {safeDate(f.idle_host.next_tick_at)}</Text>}
+   <Text style={s.privacy}>This is a consent and budget snapshot, not live device activity. No browser control can claim the machine is idle or fabricate verified learning.</Text>
+  </View>}
   {f.idle_work&&<View style={s.details} accessibilityLabel="Idle-only specialist work status">
    <Text style={s.title}>🌙 Dragon Nest · Idle Research</Text>
    <Text style={s.muted}>{f.idle_work.configured?
