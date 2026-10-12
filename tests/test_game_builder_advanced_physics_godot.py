@@ -216,6 +216,10 @@ class OriginalPhysicsGodotProofTests(unittest.TestCase):
         self.assertIn('_record_fixture(fixture_index,"swept_fixture_contact"',script)
         self.assertIn('counts[index]=int(counts[index])+1',script)
         self.assertIn('ledger.pop_front()',script)
+        self.assertIn('func _typed_json_proof(value: Variant)',script)
+        self.assertIn('float(int(value))==value',script)
+        self.assertIn('if is_finite(value)',script)
+        self.assertIn('var expected: Dictionary=_typed_json_proof(data["expected"])',script)
 
     def test_ignored_fixture_does_not_forge_native_source_collision_id(self):
         settings=self.profile(gravity=0,air_drag=0,
@@ -232,6 +236,20 @@ class OriginalPhysicsGodotProofTests(unittest.TestCase):
         result=json.loads(pack.files["godot/proof.json"])["expected"]
         self.assertEqual(result["fixture_contact_counts"],[0])
         self.assertEqual(result["fixture_contact_events"],[])
+
+    def test_native_numeric_type_recovery_is_strictly_lossless(self):
+        # Godot 4 JSON produces [1.0] where the original Python receipt
+        # contains [1]. Native comparisons must preserve exact integer
+        # identity without accepting fractional forged contact counts.
+        _,_,session=self.generate({},("inspect",))
+        pack=render_physics_godot_package(
+            session,self.profile(),authorized=True)
+        script=pack.files["godot/scripts/main.gd"].decode("utf-8")
+        self.assertIn('if typeof(value)==TYPE_FLOAT:',script)
+        self.assertIn('is_finite(value) and float(int(value))==value',script)
+        self.assertIn('if typeof(value)==TYPE_ARRAY:',script)
+        self.assertIn('if typeof(value)==TYPE_DICTIONARY:',script)
+        self.assertIn('return value',script)
 
     def test_native_no_fixture_source_receipts_are_exactly_empty(self):
         settings,_,session=self.generate({},("inspect",))
