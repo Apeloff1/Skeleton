@@ -634,3 +634,49 @@ test('cancelled first turn can be reconciled using its original device conversat
   await first;
   assert.equal(store.active.messages[1].text, 'Server finished');
 });
+
+
+test('retry fails closed if the canonical transcript cannot be checked', async () => {
+  let executions = 0;
+  const store = await controller(
+    async () => { executions++; throw new Error('response may have committed'); },
+    storage(),
+    async () => { throw new Error('authoritative history offline'); },
+  );
+  store.edit({ draft: 'Did you receive this?' });
+  await store.send();
+  assert.equal(store.active.messages[0].status, 'failed');
+  await store.retry(store.active.messages[0].id);
+  assert.equal(executions, 1);
+  assert.equal(store.active.messages.length, 1);
+  assert.match(store.getSnapshot().notice, /retry was not sent/i);
+});
+
+test('manual Retry cannot overtake an in-flight automatic reconciliation', async () => {
+  const history = deferred();
+  let executions = 0;
+  let sent;
+  const store = await controller(
+    async body => { executions++; sent = body; throw new Error('transport timeout'); },
+    storage(),
+    async sessionId => history.promise,
+  );
+  store.edit({ draft: 'Answer before reconnect' });
+  const send = store.send();
+  await tick();
+  const pending = store.active.messages.at(-1);
+  assert.equal(pending.status, 'failed');
+  await store.retry(pending.id);
+  assert.equal(executions, 1);
+  history.resolve({
+    ok: true, available: true, session_id: store.active.id,
+    turns: [{
+      session_id: store.active.id, client_message_id: sent.client_message_id,
+      role_user: sent.message, role_jeeves: 'Recovered while checking',
+      status: 'complete', ts: 125,
+    }],
+  });
+  await send;
+  assert.equal(executions, 1);
+  assert.equal(store.active.messages.at(-1).text, 'Recovered while checking');
+});
