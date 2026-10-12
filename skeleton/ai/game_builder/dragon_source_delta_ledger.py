@@ -303,6 +303,8 @@ class DragonSourceDeltaLedger:
             "schema":"skeleton.dragon.source_delta_review.v1",
             "owner":owner,"source_id":source_id,
             "delta_receipt":last["digest"],
+            "latest_capture_digest":last["latest_capture_digest"],
+            "observed_at":last["observed_at"],
             "change_count":len(last["candidate_changes"]),
             "candidate_changes":last["candidate_changes"],
             "independent_claim_review_required":True,
