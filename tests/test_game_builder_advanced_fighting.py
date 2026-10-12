@@ -31,13 +31,13 @@ class OriginalAdvancedArenaTests(unittest.TestCase):
                 "hazards_enabled":False,"cover_enabled":False,
                 **kwargs}
 
-    def test_nineteenth_family_has_fifty_genuine_settings_and_real_actions(self):
+    def test_nineteenth_family_has_fifty_two_genuine_settings_and_real_actions(self):
         self.assertIn("fighting",ENGINES)
         self.assertEqual(set(ACTIONS),set(ACTION_HELP["fighting"]))
         spec=next(x for x in catalog() if x["id"]=="fighting")
         self.assertEqual(spec["runtime_maturity"],"advanced_reference_runtime")
         self.assertEqual(spec["progression_floor"],"advanced")
-        self.assertEqual(len(spec["fields"]),50)
+        self.assertEqual(len(spec["fields"]),52)
         self.assertEqual(len(ACTIONS),len(set(ACTIONS)))
         self.assertGreaterEqual(len(ATTACKS),8)
 
