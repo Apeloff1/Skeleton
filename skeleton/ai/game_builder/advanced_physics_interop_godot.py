@@ -61,6 +61,31 @@ SOURCE_CHECK = '''
 '''
 
 
+# A visual original-game encounter, not an invisible fixture test.
+# Drawing uses source-authoritative physical scene coordinates only.
+SOURCE_DRAW = '''
+    for fixture in chart["fixtures"]:
+        var fx: float=sx+int(fixture["position"][0])*factor/100.0
+        var fy: float=sy+int(fixture["position"][1])*factor/100.0
+        var hw: float=int(fixture["half_size"][0])*factor/100.0
+        var hh: float=int(fixture["half_size"][1])*factor/100.0
+        var physical_color: Color=Color(0.89,0.39,0.35)
+        if (int(chart["bodies"][0]["mask"]) & int(fixture["layer"]))==0:
+            physical_color=Color(0.31,0.64,0.71,0.55)
+        draw_rect(Rect2(fx-hw,fy-hh,hw*2.0,hh*2.0),
+                  physical_color,true)
+        draw_rect(Rect2(fx-hw,fy-hh,hw*2.0,hh*2.0),
+                  Color(0.96,0.96,0.92),false,1.0)
+    if original.has("interop"):
+        var native_source_name: String=str(original["interop"]["source_editor"])
+        var overview: String=("ORIGINAL "+native_source_name.to_upper()+
+           " - REVIEWED PHYSICS ENCOUNTER - CONTACTS "+
+           str(physical["contacts"]))
+        draw_string(get_theme_default_font(),Vector2(sx,37),overview,
+                    HORIZONTAL_ALIGNMENT_LEFT,-1,17,Color(0.94,0.97,0.99))
+'''
+
+
 def render_interop_godot_package(proof, source_session, source_settings=None,
                                  *, authorized=False):
     if not authorized:
@@ -114,6 +139,10 @@ def render_interop_godot_package(proof, source_session, source_settings=None,
     if anchor not in script:
         raise AdvancedGodotExportError("unsupported native physics source provenance hook")
     script=script.replace(anchor,SOURCE_CHECK+anchor,1)
+    paint='    var b: Dictionary=chart["bodies"][0]'
+    if script.count(paint)!=1:
+        raise AdvancedGodotExportError("source-authored native geometry painter not supported")
+    script=script.replace(paint,SOURCE_DRAW+paint,1)
     if script.count(SOURCE_CHECK.strip())!=1:
         raise AdvancedGodotExportError("native source provenance validation not installed")
     files={**native.files,
@@ -145,4 +174,4 @@ def render_interop_godot_package(proof, source_session, source_settings=None,
     return NativeAdvancedGamePackage(files,manifest)
 
 
-__all__=["SCHEMA","SOURCE_CHECK","render_interop_godot_package"]
+__all__=["SCHEMA","SOURCE_CHECK","SOURCE_DRAW","render_interop_godot_package"]
