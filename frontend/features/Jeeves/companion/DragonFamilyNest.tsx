@@ -75,6 +75,8 @@ export default function DragonFamilyNest({family}:{family?:DragonFamilyProjectio
       <Text style={s.role}>{status?
        `Unchanged: ${status.unchanged} · Errors: ${status.failed}`:
        'No dispatch history'}</Text>
+      {status&&status.policy_blocked>0&&<Text style={s.when}>Rights review needed: {status.policy_blocked} blocked sources</Text>}
+      {status&&status.rate_limited>0&&<Text style={s.role}>Respecting source Retry-After: {status.rate_limited}</Text>}
       {status?.earliest_due_at&&<Text style={s.when}>Next eligible: {safeDate(status.earliest_due_at)}</Text>}
      </View>;
    })}</View>
