@@ -66,6 +66,7 @@ on:
       - "skeleton/ai/game_builder/advanced_physics_oriented.py"
       - "skeleton/ai/game_builder/advanced_physics_rotational_sweep.py"
       - "skeleton/ai/game_builder/advanced_physics_godot.py"
+      - "docs/GAME_BUILDER_NATIVE_PHYSICS_LAB.md"
       - "skeleton/ai/game_builder/advanced_physics_stability.py"
       - "skeleton/ai/game_builder/advanced_sailing_runtime.py"
       - "tests/test_game_builder_advanced_sailing.py"
