@@ -5979,8 +5979,38 @@ for _entry in CATALOG:
             {"key":"double_jump","kind":"bool","default":False,"minimum":None,"maximum":None,"options":[]},
             {"key":"difficulty","kind":"enum","default":"flow","minimum":None,"maximum":None,"options":["assisted","flow","hardcore"]},
         ])
+# Four original sports rulesets share typed controls but not scoring authority.
+for _entry in CATALOG:
+    if _entry["id"] == "sports":
+        _entry["fields"].extend([
+            {"key":"target_score","kind":"int","default":3,"minimum":1,"maximum":12,"options":[]},
+            {"key":"match_turn_limit","kind":"int","default":128,"minimum":20,"maximum":128,"options":[]},
+            {"key":"starting_stamina","kind":"int","default":100,"minimum":20,"maximum":300,"options":[]},
+            {"key":"opponent_skill","kind":"int","default":8,"minimum":1,"maximum":30,"options":[]},
+            {"key":"opponent_speed","kind":"int","default":3,"minimum":1,"maximum":10,"options":[]},
+            {"key":"defense_radius","kind":"int","default":2,"minimum":0,"maximum":6,"options":[]},
+            {"key":"interception_period","kind":"int","default":4,"minimum":2,"maximum":20,"options":[]},
+            {"key":"run_speed","kind":"int","default":6,"minimum":1,"maximum":15,"options":[]},
+            {"key":"sprint_speed","kind":"int","default":10,"minimum":2,"maximum":20,"options":[]},
+            {"key":"pass_distance","kind":"int","default":9,"minimum":1,"maximum":25,"options":[]},
+            {"key":"throw_distance","kind":"int","default":12,"minimum":1,"maximum":30,"options":[]},
+            {"key":"tackle_range","kind":"int","default":3,"minimum":1,"maximum":10,"options":[]},
+            {"key":"shot_range","kind":"int","default":18,"minimum":3,"maximum":40,"options":[]},
+            {"key":"shot_power","kind":"int","default":12,"minimum":1,"maximum":30,"options":[]},
+            {"key":"goal_lane_tolerance","kind":"int","default":1,"minimum":0,"maximum":2,"options":[]},
+            {"key":"contact_radius","kind":"int","default":2,"minimum":1,"maximum":8,"options":[]},
+            {"key":"collision_fatigue","kind":"int","default":7,"minimum":0,"maximum":30,"options":[]},
+            {"key":"recovery_per_turn","kind":"int","default":3,"minimum":0,"maximum":20,"options":[]},
+            {"key":"substitution_energy","kind":"int","default":25,"minimum":1,"maximum":100,"options":[]},
+            {"key":"fatigue_limit","kind":"int","default":70,"minimum":20,"maximum":300,"options":[]},
+            {"key":"fatigue_tax","kind":"int","default":2,"minimum":1,"maximum":20,"options":[]},
+            {"key":"strike_precision","kind":"int","default":4,"minimum":1,"maximum":20,"options":[]},
+            {"key":"rally_combo","kind":"int","default":3,"minimum":1,"maximum":12,"options":[]},
+            {"key":"racket_control","kind":"int","default":4,"minimum":0,"maximum":30,"options":[]},
+            {"key":"action_points","kind":"int","default":3,"minimum":1,"maximum":8,"options":[]},
+        ])
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
@@ -6073,6 +6103,17 @@ def _normalized_settings(editor_id: str, values: Mapping[str, object] | None) ->
         normalized["board_width"], normalized["board_height"]
     ):
         raise SystemEditorError("tactics range exceeds available board dimensions")
+    if editor_id == "sports":
+        if normalized["sprint_speed"] < normalized["run_speed"]:
+            raise SystemEditorError("sports sprint cannot be slower than normal movement")
+        if normalized["shot_range"] >= normalized["field_length"]:
+            raise SystemEditorError("original sports shots cannot span the entire field")
+        if normalized["substitutions"] > normalized["team_size"]:
+            raise SystemEditorError("substitution budget cannot exceed roster")
+        if normalized["rules"]=="racket" and normalized["team_size"]>4:
+            raise SystemEditorError("racket sports require original singles or doubles roster")
+        if normalized["rules"]=="turn_based" and normalized["action_points"]>normalized["match_turn_limit"]:
+            raise SystemEditorError("tactical action budget exceeds match")
     if editor_id == "parkour":
         if normalized["max_stride"]>normalized["course_length"]//5:
             raise SystemEditorError("parkour strides cannot leap the entire route")
