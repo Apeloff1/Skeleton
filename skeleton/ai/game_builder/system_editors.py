@@ -6053,8 +6053,8 @@ def _normalized_settings(editor_id: str, values: Mapping[str, object] | None) ->
             raise SystemEditorError("launch altitude exceeds ceiling")
         if normalized["landing_speed"] < normalized["stall_speed"]:
             raise SystemEditorError("landing speed below stall threshold")
-        if normalized["landing_altitude"] >= normalized["launch_altitude"]:
-            raise SystemEditorError("landing must occur below launch altitude")
+        if normalized["landing_altitude"] >= normalized["max_altitude"]:
+            raise SystemEditorError("landing approach outside physical ceiling")
         if normalized["landing_fuel_reserve"] > normalized["fuel_capacity"]:
             raise SystemEditorError("impossible landing fuel reserve")
 
