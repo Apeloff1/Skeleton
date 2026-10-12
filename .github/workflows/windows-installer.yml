@@ -50,6 +50,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /.github/workflows/windows-installer.yml
@@ -66,6 +67,17 @@ jobs:
             /skeleton/
             /scripts/
             /packaging/
+
+      - name: Verify exact head provenance for Windows installer
+        shell: pwsh
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          $observed = (git rev-parse HEAD).Trim()
+          if ($observed -ne $env:EXPECTED_HEAD) {
+            throw "installer checkout provenance mismatch: observed $observed, expected $env:EXPECTED_HEAD"
+          }
+          Write-Host "Exact-head installer source confirmed: $observed"
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -153,6 +165,14 @@ jobs:
           $nativeSmoke = Start-Process -FilePath $launcher -ArgumentList @("--local-ai-smoke") -Wait -PassThru
           if ($nativeSmoke.ExitCode -ne 0) {
             throw "installed Skeleton.exe native offline inference smoke exited $($nativeSmoke.ExitCode)"
+          }
+
+          # Real installed frozen executable: actual localhost socket, bearer
+          # authentication, native model execution, durable transaction, and
+          # identical-request replay. This is not a Python import-only test.
+          $httpSmoke = Start-Process -FilePath $launcher -ArgumentList @("--local-http-smoke") -Wait -PassThru
+          if ($httpSmoke.ExitCode -ne 0) {
+            throw "installed Skeleton.exe localhost AI acceptance exited $($httpSmoke.ExitCode)"
           }
 
           $uninstaller = Join-Path $installDir "unins000.exe"

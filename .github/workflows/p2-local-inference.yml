@@ -5,6 +5,21 @@ on:
     paths:
       - "skeleton/ai/runtime/inference/**"
       - "skeleton/app/local_ai.py"
+      - "skeleton/app/offline_chat_cli.py"
+      - "skeleton/app/offline_http.py"
+      - "skeleton/app/offline_knowledge.py"
+      - "skeleton/app/offline_grounding.py"
+      - "skeleton/app/offline_web.py"
+      - "skeleton/app/windows_launcher.py"
+      - "skeleton/ai/model_runtime/offline_chat.py"
+      - "tests/test_ai_offline_native_chat.py"
+      - "tests/test_ai_local_inference_cancellation.py"
+      - "tests/test_app_offline_chat_persistence.py"
+      - "tests/test_app_offline_chat_cli.py"
+      - "tests/test_app_offline_http.py"
+      - "tests/test_app_offline_knowledge.py"
+      - "tests/test_app_offline_grounding.py"
+      - "tests/test_app_offline_windows_browser.py"
       - "tests/flgb/test_desktop_offline_ai.py"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_native_neural_lm.py"
@@ -23,6 +38,21 @@ on:
     paths:
       - "skeleton/ai/runtime/inference/**"
       - "skeleton/app/local_ai.py"
+      - "skeleton/app/offline_chat_cli.py"
+      - "skeleton/app/offline_http.py"
+      - "skeleton/app/offline_knowledge.py"
+      - "skeleton/app/offline_grounding.py"
+      - "skeleton/app/offline_web.py"
+      - "skeleton/app/windows_launcher.py"
+      - "skeleton/ai/model_runtime/offline_chat.py"
+      - "tests/test_ai_offline_native_chat.py"
+      - "tests/test_ai_local_inference_cancellation.py"
+      - "tests/test_app_offline_chat_persistence.py"
+      - "tests/test_app_offline_chat_cli.py"
+      - "tests/test_app_offline_http.py"
+      - "tests/test_app_offline_knowledge.py"
+      - "tests/test_app_offline_grounding.py"
+      - "tests/test_app_offline_windows_browser.py"
       - "tests/flgb/test_desktop_offline_ai.py"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_llama_cpp_local_inference.py"
@@ -44,7 +74,7 @@ concurrency:
 jobs:
   local-inference:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     env:
       PYTHONPATH: "."
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -82,3 +112,11 @@ jobs:
           skeleton/testing/test_llama_cpp_local_inference.py
           skeleton/testing/test_local_model_deployment.py
           tests/flgb/test_desktop_offline_ai.py
+          tests/test_ai_offline_native_chat.py
+          tests/test_ai_local_inference_cancellation.py
+          tests/test_app_offline_chat_persistence.py
+          tests/test_app_offline_chat_cli.py
+          tests/test_app_offline_http.py
+          tests/test_app_offline_knowledge.py
+          tests/test_app_offline_grounding.py
+          tests/test_app_offline_windows_browser.py
