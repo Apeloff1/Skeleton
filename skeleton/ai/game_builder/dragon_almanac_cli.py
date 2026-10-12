@@ -43,7 +43,7 @@ def _portfolio_request(args, parser):
 
 def main():
     parser = argparse.ArgumentParser(description="Import, inspect and seed sequential Dragon almanacs")
-    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief", "mission-scout", "mission-index", "mission-audit", "mission-health", "mission-portfolio", "campaign-record", "campaign-inspect", "campaign-refresh", "import-supplements", "discovery-verify", "import-reconciled", "discovery-topics", "discovery-sources", "discovery-receipts"))
+    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief", "mission-scout", "mission-index", "mission-audit", "mission-health", "mission-portfolio", "campaign-record", "campaign-inspect", "campaign-refresh", "import-supplements", "discovery-verify", "discovery-census", "import-reconciled", "discovery-topics", "discovery-sources", "discovery-receipts"))
     parser.add_argument("--database", required=True)
     parser.add_argument("--owner", required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
@@ -79,7 +79,7 @@ def main():
     with ReviewedKnowledgeStore(args.database) as library:
         almanacs = DragonAlmanacs(library)
         worker = SequentialAlmanacWorker(almanacs)
-        if args.command in {"discovery-verify", "import-reconciled"}:
+        if args.command in {"discovery-verify", "discovery-census", "import-reconciled"}:
             from .dragon_discovery_reconciled import (
                 verify_reconciled_chain, import_reconciled_chain)
             registry = read_source_registry(args.registry)
@@ -87,6 +87,9 @@ def main():
                 parser.error("reconciled chain uses pinned evidence; omit --supplement")
             if args.command == "discovery-verify":
                 result = verify_reconciled_chain(registry)
+            elif args.command == "discovery-census":
+                from .dragon_discovery_census import discovery_census
+                result = discovery_census(registry, top_hosts=args.limit)
             else:
                 result = import_reconciled_chain(
                     almanacs, args.owner, registry, authorized=True)
