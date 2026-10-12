@@ -1383,6 +1383,74 @@ function renderAdvancedActions(actions){
    " · "+Object.entries(state.quests).map(([q,s])=>q+": "+s).join(" · ")+
    (state.chapter_claimed?" · optional post-story play remains open":"");
   target.append(notes);
+  const choice=document.createElement("select");
+  choice.setAttribute("aria-label","Witnessed social strategy");
+  for(const social of ["choose:trust","choose:challenge","choose:trade"]){
+   const option=document.createElement("option");
+   option.value=social;option.textContent=social.replace("choose:","");
+   choice.append(option);
+  }
+  target.append(choice);
+  const planBtn=document.createElement("button");planBtn.type="button";
+  planBtn.textContent="AI director: prove original RPG chapter";
+  planBtn.disabled=Boolean(advancedSession.terminal);
+  const proof=document.createElement("pre");
+  proof.setAttribute("role","status");proof.setAttribute("aria-live","polite");
+  planBtn.addEventListener("click",async()=>{
+   try{
+    if(advancedEditor!=="rpg"||systemEditor().id!=="rpg")
+     throw Error("Source editor changed before RPG planning");
+    const source=advancedScene||(await reviewedSceneTemplate()).scene;
+    if(source.seed!==advancedSession.seed)
+     throw Error("RPG scene seed differs from current session");
+    const result=await api("/api/rpg-story-plan",{
+      scene:source,settings:advancedSettings,
+      max_nodes:4000,max_actions:128,social_choice:choice.value
+    });
+    const planned=result.plan;
+    proof.textContent=JSON.stringify({
+      status:planned.status,choice:planned.social_choice,
+      actions:planned.actions,quests:planned.earned_quests,
+      faction_effects:planned.resulting_faction_reputation,
+      source_digest:planned.source_digest,
+      independent_replay_verified:planned.independent_replay_verified,
+      receipt:planned.digest
+    },null,2);
+    target.querySelector("#rpg-adopt-proof")?.remove();
+    if(planned.status!=="replay_verified_chapter"){
+     status("Original RPG director search inconclusive; no fabricated story completion.");
+     return;
+    }
+    const adopt=document.createElement("button");
+    adopt.type="button";adopt.id="rpg-adopt-proof";
+    adopt.textContent="Play independently verified witnessed RPG chapter";
+    adopt.addEventListener("click",async()=>{
+     try{
+      if(advancedEditor!=="rpg"||systemEditor().id!=="rpg"||
+         advancedCommands.length!==0||source.seed!==advancedSession.seed)
+       throw Error("RPG evidence requires unchanged initial source state");
+      const check=await api("/api/rpg-story-plan-verify",{
+       record:planned,scene:source,settings:advancedSettings
+      });
+      if(!check.verified)throw Error("RPG narrative proof cannot be reproduced");
+      const game=await api("/api/advanced-play",{
+       editor:"rpg",settings:advancedSettings,
+       actions:planned.actions,seed:source.seed,scene:source
+      });
+      if(game.session.digest!==planned.replay_digest||
+         !game.session.state.chapter_claimed)
+       throw Error("RPG storyline did not earn its witnessed completion");
+      advancedCommands=planned.actions.slice();
+      advancedScene=source;
+      showAdvanced(game);
+      status("Original RPG quest, choices and chapter replayed from verified source.");
+     }catch(error){status("RPG chapter adoption rejected: "+error.message);}
+    });
+    target.append(adopt);
+    status("RPG director proved an original chapter; human adoption is optional.");
+   }catch(error){proof.textContent="";status("RPG planner refused: "+error.message);}
+  });
+  target.append(planBtn);target.append(proof);
   return;
  }
  if(advancedSession?.editor==="procedural_world"){
@@ -1407,6 +1475,71 @@ function renderAdvancedActions(actions){
     " · active modifications "+Object.keys(state.edits).length+
     " · landmark evidence "+state.surveyed.length+"/2";
   target.append(status);
+  const chooseRetire=document.createElement("label");
+  const retire=document.createElement("input");retire.type="checkbox";
+  chooseRetire.append(retire," Return home and explicitly retire after expedition");
+  target.append(chooseRetire);
+  const planBtn=document.createElement("button");planBtn.type="button";
+  planBtn.textContent="AI: prove frontier landmark expedition";
+  planBtn.disabled=Boolean(advancedSession.terminal);
+  const proof=document.createElement("pre");
+  proof.setAttribute("role","status");proof.setAttribute("aria-live","polite");
+  planBtn.addEventListener("click",async()=>{
+   try{
+    if(advancedEditor!=="procedural_world"||systemEditor().id!=="procedural_world")
+     throw Error("Frontier source editor changed");
+    const source=advancedScene||(await reviewedSceneTemplate()).scene;
+    if(source.seed!==advancedSession.seed)
+     throw Error("Frontier scene seed differs from playing session");
+    const result=await api("/api/frontier-expedition-plan",{
+     scene:source,settings:advancedSettings,max_actions:100,retire:retire.checked
+    });
+    const planned=result.plan;
+    proof.textContent=JSON.stringify({
+     status:planned.status,actions:planned.actions,
+     landmarks_surveyed:planned.landmarks_surveyed,
+     chunk_loads:planned.chunk_loads,
+     open_world_continues:planned.world_still_playable,
+     deliberately_retired:planned.retired,
+     verified:planned.independent_replay_verified,
+     source_digest:planned.source_digest,receipt:planned.digest
+    },null,2);
+    target.querySelector("#frontier-adopt-proof")?.remove();
+    if(planned.status!=="replay_verified_expedition"){
+     status("Frontier search inconclusive; open-world play remains available.");
+     return;
+    }
+    const adopt=document.createElement("button");
+    adopt.type="button";adopt.id="frontier-adopt-proof";
+    adopt.textContent="Replay verified original frontier expedition";
+    adopt.addEventListener("click",async()=>{
+     try{
+      if(advancedEditor!=="procedural_world"||
+         systemEditor().id!=="procedural_world"||
+         advancedCommands.length!==0||advancedSession.seed!==source.seed)
+       throw Error("Frontier strategy requires original unmodified initial source");
+      const check=await api("/api/frontier-expedition-plan-verify",{
+       record:planned,scene:source,settings:advancedSettings
+      });
+      if(!check.verified)throw Error("Frontier expedition evidence recheck failed");
+      const game=await api("/api/advanced-play",{
+       editor:"procedural_world",settings:advancedSettings,
+       actions:planned.actions,seed:source.seed,scene:source
+      });
+      if(game.session.digest!==planned.replay_digest||
+         !game.session.state.expedition_complete||
+         game.session.state.retired!==planned.retired)
+       throw Error("Original frontier expedition could not independently replay");
+      advancedCommands=planned.actions.slice();
+      advancedScene=source;showAdvanced(game);
+      status("Original seeded world expedition independently replayed.");
+     }catch(error){status("Frontier plan adoption rejected: "+error.message);}
+    });
+    target.append(adopt);
+    status("AI proved an original nonterminal expedition; no world mutation until explicit adoption.");
+   }catch(error){proof.textContent="";status("Frontier planner refused: "+error.message);}
+  });
+  target.append(planBtn);target.append(proof);
   return;
  }
  if(advancedSession?.editor==="maze"){
