@@ -161,6 +161,7 @@ def compile_system_assembly(project_id: str,
         "sailing": ("coast",),
         "parkour": ("inspect",),
         "sports": ("inspect",),
+        "maze": ("inspect",),
     }
     if set(advanced_smoke) != set(ADVANCED_ENGINE_IDS):
         raise AssemblyError("every playable editor needs an explicit assembly gameplay proof")
@@ -214,6 +215,7 @@ def compile_system_assembly(project_id: str,
             "sailing":("coast",),
             "parkour":("inspect",),
             "sports":("inspect",),
+            "maze":("inspect",),
         }
         if set(scene_smoke) != set(ADVANCED_ENGINE_IDS):
             raise AssemblyError("every playable editor needs a source-bound scene proof")
