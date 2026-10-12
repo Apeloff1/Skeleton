@@ -45,6 +45,8 @@ test('project deep links preserve correctly named destination parameters', () =>
   assert.equal(projectHref('/physics-studio',id),'/physics-studio?pid=world_a-33');
   assert.equal(projectHref('/game-kb','../nonsense'),null);
   assert.equal(projectHref('/story-index',id),'/story-index?game=world_a-33');
+  assert.equal(projectHref('/chapter-studio',id),'/chapter-studio?game=world_a-33');
+  assert.ok(worldProjectLinks(id).some(link => link.id === 'chapter'));
   assert.ok(worldProjectLinks(id).some(link => link.id === 'story' && link.href === '/story-index?game=world_a-33'));
   assert.equal(validProjectId('a'.repeat(129)),'');
   for(const link of worldProjectLinks(id)){
