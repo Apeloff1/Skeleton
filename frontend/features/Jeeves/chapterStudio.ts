@@ -50,7 +50,7 @@ export function parseNarrativeBeats(
     throw new Error('Invalid story stage or too many emotional/thread beats.');
   }
   const anchors = new Set(plotPoints.map(p => p.id));
-  const checkedMoments: StoryMoment[] = moments.map(m => {
+  const checkedMoments: StoryMoment[] = moments.map((m: any) => {
     if (!m || !MOMENT_KINDS.includes(m.kind) || !anchors.has(m.plot_id) ||
         !Number.isInteger(m.intensity) || m.intensity < 0 || m.intensity > 100 ||
         typeof m.objective !== 'string' || m.objective.length < 12 ||
@@ -61,7 +61,7 @@ export function parseNarrativeBeats(
     return { kind: m.kind, plot_id: m.plot_id, intensity: m.intensity,
       objective: m.objective, audience_effect: m.audience_effect };
   });
-  const checkedThreads: ThreadBeat[] = threads.map(t => {
+  const checkedThreads: ThreadBeat[] = threads.map((t: any) => {
     if (!t || !THREAD_ROLES.includes(t.role) || !anchors.has(t.plot_id) ||
         typeof t.thread_id !== 'string') {
       throw new Error('Every story thread beat requires a role and highlighted source.');
