@@ -90,6 +90,8 @@ export default function ChapterStudioScreen() {
   const [threadBeatsJson, setThreadBeatsJson] = useState('[]');
   const [tapestry, setTapestry] = useState<any>(null);
   const [matrixCoverage, setMatrixCoverage] = useState<any>(null);
+  const [matrixCatalog, setMatrixCatalog] = useState<any[]>([]);
+  const [matrixCategory, setMatrixCategory] = useState('engagement');
   const [matrixId, setMatrixId] = useState('engagement.cliffhanger_fairness');
   const [matrixLevel, setMatrixLevel] = useState('100');
   const [reviewVerdict, setReviewVerdict] = useState<'pass' | 'fail' | 'unknown'>('unknown');
@@ -346,6 +348,21 @@ export default function ChapterStudioScreen() {
     setNotice(response.data.tapestry.closure_ready
       ? 'All indexed plot obligations closed; independent entertainment QA remains required.'
       : 'Unresolved setups, cliffhangers, red herrings or ending requirements remain.');
+  };
+  const loadMatrices = async () => {
+    const response = await api.get<any>(
+      base() + '/story-matrices?start=0&limit=100',
+      { headers: authHeaders(), retries: 0 },
+    );
+    if (!response.ok || !response.data?.ok ||
+        response.data.catalog?.matrix_count !== 100 ||
+        response.data.catalog?.levels_per_matrix !== 100 ||
+        !Array.isArray(response.data.catalog?.matrices) ||
+        response.data.catalog.matrices.length !== 100) {
+      throw new Error('Could not confirm all 100 narrative rubrics and their 100 levels.');
+    }
+    setMatrixCatalog(response.data.catalog.matrices);
+    setNotice('100 independent narrative rubrics loaded, with 100 scrutiny levels each.');
   };
   const readMatrixCoverage = async () => {
     if (!scene) throw new Error('Open a saved scene before reviewing matrices.');
@@ -692,6 +709,20 @@ export default function ChapterStudioScreen() {
           highlighted passage, and record your decision with a source citation.
           No model output is silently accepted.
         </Text>
+        <Action label="Load complete 100-matrix rubric catalog"
+          disabled={busy} onPress={() => { void withOperation(loadMatrices); }} />
+        {!!matrixCatalog.length && <>
+          <Choice label="Review area" value={matrixCategory}
+            values={['architecture','causality','character','dialogue','engagement',
+              'mystery','gameplay','world','proofreading','closure'] as const}
+            onChange={setMatrixCategory} />
+          <View style={styles.wrap}>
+            {matrixCatalog.filter(x => x.category === matrixCategory).map((entry: any) =>
+              <Action key={entry.id} label={entry.question}
+                selected={entry.id === matrixId} compact
+                onPress={() => setMatrixId(entry.id)} />)}
+          </View>
+        </>}
         <Field label="Matrix ID" value={matrixId} onChange={setMatrixId}
           maxLength={100} hint="e.g. mystery.red_herring_fairness, dialogue.subtext or closure.epilogue_completion" />
         <Field label="Level 1–100" value={matrixLevel} onChange={setMatrixLevel}
