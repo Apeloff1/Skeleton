@@ -281,7 +281,8 @@ class LivingOriginalQuestTests(unittest.TestCase):
     def test_quest_director_event_rule_parameter_changes_actual_resolution_payment(self):
         common=self.rules(event_rules=100,rule_bonus_modulus=7,
                           ending_policy="persistent")
-        itinerary=self.witness_start()+["choose:0:support","help:0","resolve:0"]
+        itinerary=["south","east","help:0","speak:0",
+                   "choose:0:support","help:0","resolve:0"]
         sample=run_advanced_session("quest_director",common,itinerary)
         one=run_advanced_session("quest_director",
                   {**common,"event_rules":1},itinerary)
