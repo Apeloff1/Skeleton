@@ -115,7 +115,8 @@ async def submit_matrix_review(
             matrix_id=body.matrix_id, level=body.level, verdict=body.verdict,
             rationale=body.rationale, citation_scene=scene,
             citation_plot_id=body.citation_plot_id, citation_quote=quote,
-            source_receipt=draft["digest"], reviewer=str(scope["owner_id"]).replace("@", "_").replace(".", "_"),
+            source_receipt=draft["digest"],
+            reviewer="reviewer_" + sha256(scope["owner_id"].encode("utf-8")).hexdigest()[:24],
             provenance=body.provenance,
             scene_text=draft["text"], scene_digest=draft["digest"],
         )
