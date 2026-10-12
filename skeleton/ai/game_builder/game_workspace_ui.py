@@ -3345,6 +3345,79 @@ $("advanced-unified-save-import").addEventListener("change",async()=>{
  }catch(error){status("Untrusted mixed original world save rejected: "+error.message);}
  finally{$("advanced-unified-save-import").value="";}
 });
+$("advanced-mirror-build").addEventListener("click",()=>{
+ try{
+  if(!lastInterleavedTimeline || !lastInterleavedProof)
+   throw Error("Replay a source-authenticated original world clock first");
+  const original=JSON.parse(JSON.stringify(lastInterleavedTimeline));
+  if(original.length<2 || original.some((event,index)=>event.at!==index))
+   throw Error("Automatic counterfactual draft only supports single-tick entries; author other schedules manually");
+  const alternate=JSON.parse(JSON.stringify(original));
+  let swapped=false;
+  for(let i=0;i<alternate.length-1;i++){
+   const a=alternate[i],b=alternate[i+1];
+   if((a.lane==="physical"&&b.lane==="genre") ||
+      (a.lane==="genre"&&b.lane==="physical")){
+    alternate[i]=b;alternate[i+1]=a;
+    swapped=true;break;
+   }
+  }
+  if(!swapped)throw Error("Need neighboring original physical and genre events to form a valid comparison");
+  alternate.forEach((event,index)=>{event.at=index;});
+  const candidates=[
+   {name:"original_order",timeline:original},
+   {name:"alternate_order",timeline:alternate}
+  ];
+  $("advanced-mirror-scenarios").value=JSON.stringify(candidates,null,2);
+  status("Two independent, source-identical event orders ready for reviewed adversarial replay");
+ }catch(error){status("Original counterfactual proposal blocked: "+error.message);}
+});
+$("advanced-mirror-run").addEventListener("click",async()=>{
+ try{
+  if(!episodicLastScene || !verifiedSourceEpisodes.length ||
+     !verifiedGenreEvents.length)
+   throw Error("Signed original physical plus genre sources are required");
+  const candidates=JSON.parse($("advanced-mirror-scenarios").value);
+  if(!Array.isArray(candidates) || candidates.length<2 || candidates.length>6)
+   throw Error("Compare two to six bounded authored source schedules");
+  const goal=$("advanced-mirror-objective").value;
+  const response=await api("/api/advanced-interleaved-counterfactuals",{
+   physical_episodes:verifiedSourceEpisodes,
+   genre_sessions:verifiedGenreEvents,
+   world_scene:episodicLastScene,
+   world_settings:interleavedWorldSettings,
+   scenarios:candidates,objective:goal
+  });
+  const proof=response.report;
+  if(!proof || response.original_files_changed ||
+     response.automatic_ai_promotion || response.native_full_world_certified ||
+     response.universal_game_quality_approved ||
+     proof.source_world_scene_digest!==episodicLastScene.digest ||
+     proof.objective!==goal || proof.scenario_count!==candidates.length ||
+     proof.original_project_mutated || proof.automatic_model_training_approved ||
+     proof.universal_game_quality_claimed)
+   throw Error("Counterfactual world or precise objective failed independent custody");
+  $("advanced-mirror-proof").textContent=JSON.stringify({
+   comparison_objective:proof.objective,
+   baseline:proof.baseline_scenario,
+   objective_only_ranking:proof.ranking_for_this_metric_only,
+   source_verified_scenarios:proof.scenarios.map(x=>({
+    scenario:x.scenario,
+    signed_original_world:x.verified_campaign_digest,
+    metric:x.metric,
+    factual_change_from_baseline:x.difference_from_first,
+    independently_replayed_source_counts:{
+     physics:x.physical_event_count,genre:x.genre_event_count,
+     world_commands:x.world_command_count
+    }
+   })),
+   final_evidence_digest:proof.digest,
+   universal_quality_or_ai_model_improvement_proven:false,
+   original_project_files_unchanged:true
+  },null,2);
+  status("Verified original counterfactual outcomes compared for a narrow explicit world metric");
+ }catch(error){status("Adversarial original-world mirror rejected: "+error.message);}
+});
 $("advanced-interleave-save-export").addEventListener("click",async()=>{
  try{
   if(!lastInterleavedProof || !lastInterleavedTimeline || !episodicLastScene)
@@ -4362,6 +4435,27 @@ local until typed revalidation and an explicit human-approved file commit.</smal
           accept=".json,application/json"/>
         </label>
         <pre id="advanced-interleave-save-proof" role="status" aria-live="polite"></pre>
+       <fieldset aria-label="Counterfactual original game simulation">
+        <legend>Adversarial original-world timeline mirror</legend>
+        <button id="advanced-mirror-build" type="button">
+         Prepare authentic alternate event-order comparison
+        </button>
+        <label>Explicit verified world objective
+         <select id="advanced-mirror-objective">
+          <option value="site_integrity">Total original site integrity</option>
+          <option value="direct_memories">Recorded firsthand NPC memories</option>
+          <option value="supplies">Remaining world supplies</option>
+          <option value="quests_completed">Actually completed NPC quests</option>
+         </select>
+        </label>
+        <label>Counterfactual reviewed timelines (2–6)
+         <textarea id="advanced-mirror-scenarios" rows="11"></textarea>
+        </label>
+        <button id="advanced-mirror-run" type="button">
+         Independently replay and compare actual NPC outcomes
+        </button>
+        <pre id="advanced-mirror-proof" role="status" aria-live="polite"></pre>
+       </fieldset>
        </fieldset>
       </fieldset>
       <fieldset aria-label="Portable mixed-source campaign save">
