@@ -441,6 +441,9 @@ function StudioInner() {
               <TouchableOpacity testID="gs-open-mission" style={[s.bigBtn, { backgroundColor: BLUE, flex: 0, marginTop: 10 }]} onPress={() => router.push('/mission-control')}>
                 <Text style={[s.bigBtnTxt, { color: '#fff' }]}>🛰️ MasterMap Control Center</Text>
               </TouchableOpacity>
+              <TouchableOpacity testID="gs-open-dragon-family" style={[s.bigBtn, { backgroundColor: "#287c74", flex: 0, marginTop: 10 }]} onPress={() => router.push("/dragon-research")}>
+                <Text style={[s.bigBtnTxt, { color: "#fff" }]}>🐉 Dragon Research Family — 3 Hatchlings</Text>
+              </TouchableOpacity>
               <TouchableOpacity testID="gs-open-jury" style={[s.bigBtn, { backgroundColor: '#f59e0b', flex: 0, marginTop: 10 }]} onPress={() => router.push('/jury-room')}>
                 <Text style={s.bigBtnTxt}>⚖️ Jury Room (adjudication)</Text>
               </TouchableOpacity>

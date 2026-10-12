@@ -85,5 +85,17 @@ def mount_configured_dragon_runtime(app, conversation_authority):
             install_dragon_conversation_binding(conversation_authority, binding)
         elif existing is not binding:
             raise ValueError('Dragon lifespan cannot replace conversation retention binding')
+    # Optional trusted, server-created source authority. No HTTP request may
+    # choose a database file, reviewer signer or owner. Never synthesize a
+    # research coordinator when canonical capture/nest stores are absent.
+    research = getattr(app.state, "dragon_research_coordinator", None)
+    if research is not None:
+        from routes.dragon_research import install_dragon_research_dashboard
+        existing = getattr(app.state, "dragon_research_dashboard", None)
+        if existing is None:
+            install_dragon_research_dashboard(app, research)
+        elif existing is not research:
+            raise ValueError("Dragon research authority cannot be replaced")
     return {'resource_runtime_mounted': pool is not None,
-            'conversation_binding_mounted': getattr(conversation_authority,'dragon_projection',None) is not None}
+            'conversation_binding_mounted': getattr(conversation_authority,'dragon_projection',None) is not None,
+            'research_dashboard_mounted': getattr(app.state,'dragon_research_dashboard',None) is not None}

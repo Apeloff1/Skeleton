@@ -95,6 +95,7 @@ KNOWN_ROUTES: List[RouteEntry] = [
     ("routes.game_factory_quantum_core",        "router"),
     ("routes.jeeves_game_builder",              "router"),
     ("routes.dragon_academy",                  "router"),
+    ("routes.dragon_research",                 "router"),
     ("routes.conversations",                    "router"),
     ("routes.game_deployment_pipeline",         "router"),
     ("routes.game_domains_mega_expansion",      "router"),
