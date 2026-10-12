@@ -71,6 +71,7 @@ def test_research_router_is_registered_read_only_and_role_guarded():
         "/api/dragon-research/status",
         "/api/dragon-research/sources",
         "/api/dragon-research/workboard",
+        "/api/dragon-research/task-plan",
         "/api/dragon-research/history",
         "/api/dragon-research/mother-review",
     }
@@ -123,6 +124,24 @@ def test_factory_keeps_research_tenants_isolated_and_fails_closed(storage):
     foreign=dragon_research.research_workboard(
         request(app),Response(),limit=20,after_source=None,owner="other-tenant")
     assert foreign["missions"]==[]
+    mother=dragon_research.game_task_research_plan(
+        request(app),Response(),task="gameboy physics",
+        max_sources=300,limit=6,owner=owner)
+    assert mother["schema"]=="skeleton.dragon.task_research_plan.v1"
+    assert mother["read_only"] and mother["workers_started"]==0
+    assert mother["permissions_granted"]==0 and mother["xp_awarded"]==0
+    assert not mother["training_authorized"]
+    assert mother["search_scope_exhausted"]
+    assert mother["matched_task_terms"]
+    other=dragon_research.game_task_research_plan(
+        request(app),Response(),task="gameboy",
+        max_sources=30,limit=6,owner="other-tenant")
+    assert other["suggestions"]==[]
+    with pytest.raises(HTTPException) as invalid_task:
+        dragon_research.game_task_research_plan(
+            request(app),Response(),task="../secret",
+            max_sources=30,limit=6,owner=owner)
+    assert invalid_task.value.status_code==422
     with pytest.raises(HTTPException) as missing:
         dragon_research.three_hatchlings_status(
             request(app),Response(),article="source-"+"a"*64,

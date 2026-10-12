@@ -25,6 +25,7 @@ from skeleton.ai.game_builder.dragon_article_hatchling import DragonArticleHatch
 from skeleton.ai.game_builder.dragon_three_hatchling_coordinator import DragonThreeHatchlingCoordinator
 from skeleton.ai.game_builder.dragon_research_source_picker import DragonResearchSourcePicker
 from skeleton.ai.game_builder.dragon_research_workboard import DragonResearchWorkboard
+from skeleton.ai.game_builder.dragon_task_research_planner import DragonTaskResearchPlanner
 from skeleton.ai.game_builder.dragon_family_research_history import DragonFamilyResearchHistory
 from skeleton.ai.game_builder.dragon_source_catalog import canonical_source_url
 from skeleton.ai.game_builder.reviewed_knowledge import (
@@ -840,3 +841,100 @@ def test_family_history_owner_tampering_and_invalid_source_refused(context):
         ledger.timeline(
             OWNER,article_source_id=sid,video_source_id=lead.source_id,
             update_source_id=sid,authorized=True)
+
+
+
+def test_mother_task_plan_balances_three_real_hatchlings_without_execution(context):
+    captures,sid,_,_,_,_,_=prepare_article_revisions(context)
+    lead=add_video(context)
+    videos,_=transcript_ledger(context)
+    board=DragonResearchWorkboard(
+        DragonArticleHatchling(captures),videos,
+        DragonSourceDeltaLedger(captures))
+    planner=DragonTaskResearchPlanner(board)
+    terms=("gameboy","physics")
+    first=planner.plan(OWNER,authorized=True,task_terms=terms,
+                       max_sources=300,limit=12)
+    second=planner.plan(OWNER,authorized=True,task_terms=terms,
+                        max_sources=300,limit=12)
+    assert first==second
+    assert first["schema"]=="skeleton.dragon.task_research_plan.v1"
+    assert first["search_scope_exhausted"]
+    assert first["scanned_registered_sources"]==249
+    assert set(first["represented_hatchlings"])=={"article","video","updates"}
+    assert first["distinct_source_ids"]<=first["suggestion_count"]
+    assert first["distinct_source_hosts"]<=first["suggestion_count"]
+    assert set(first["matched_task_terms"])==set(terms)
+    assert first["unmatched_task_terms"]==[]
+    assert len(first["plan_digest"])==64
+    assert all(not task["source_independence_verified"]
+               and not task["automatically_executable"]
+               and not task["knowledge_approved"]
+               and not task["training_authorized"]
+               and task["xp_awarded"]==0
+               for task in first["suggestions"])
+    article=next(t for t in first["suggestions"] if t["lane"]=="article")
+    assert article["lexical_priority_signal"]>0
+    assert first["read_only"] and first["network_requests"]==0
+    # Two-letter industry axes must be accepted, not silently filtered.
+    short=planner.plan(OWNER,authorized=True,task_terms=("ai","qa"),
+                       max_sources=60,limit=3)
+    assert short["task_terms"]==["ai","qa"]
+    assert short["source_scan_budget"]==60
+    assert first["workers_started"]==0 and first["permissions_granted"]==0
+    assert first["xp_awarded"]==0 and not first["training_authorized"]
+    assert not context[4].active_grants()
+
+
+def test_mother_task_plan_partial_scan_does_not_claim_catalog_complete(context):
+    captures,_,_,_,_,_,_=prepare_article_revisions(context)
+    videos,_=transcript_ledger(context)
+    planner=DragonTaskResearchPlanner(DragonResearchWorkboard(
+        DragonArticleHatchling(captures),videos,
+        DragonSourceDeltaLedger(captures)))
+    small=planner.plan(OWNER,authorized=True,task_terms=("gameboy",),
+                       max_sources=1,limit=2)
+    assert small["scanned_registered_sources"]==1
+    assert not small["search_scope_exhausted"]
+    assert small["source_scan_budget"]==1
+    assert len(small["suggestions"])<=2
+    assert small["host_diversity_not_independent_corroboration"]
+    assert small["lexical_priority_not_quality_or_fact_confidence"]
+
+
+def test_mother_task_plan_refuses_forged_tasks_and_cross_tenant_custody(context):
+    captures,_,_,_,_,_,_=prepare_article_revisions(context)
+    videos,_=transcript_ledger(context)
+    planner=DragonTaskResearchPlanner(DragonResearchWorkboard(
+        DragonArticleHatchling(captures),videos,
+        DragonSourceDeltaLedger(captures)))
+    assert planner.plan("other-tenant",authorized=True,
+                        task_terms=("gameboy",))["suggestions"]==[]
+    with pytest.raises(PermissionError):
+        planner.plan(OWNER,authorized=False,task_terms=("gameboy",))
+    for terms in ((),("physics","physics"),("../../../",),("Gameboy",),
+                  ("x",),("gameboy",42),["gameboy"],tuple("abcdefghij")):
+        with pytest.raises(ValueError,match="task terms"):
+            planner.plan(OWNER,authorized=True,task_terms=terms)
+    for invalid in (False,0,301):
+        with pytest.raises(ValueError,match="scan budget"):
+            planner.plan(OWNER,authorized=True,task_terms=("gameboy",),
+                         max_sources=invalid)
+    for invalid in (False,0,19):
+        with pytest.raises(ValueError,match="recommendations"):
+            planner.plan(OWNER,authorized=True,task_terms=("gameboy",),
+                         limit=invalid)
+
+
+def test_mother_task_plan_refuses_tampered_source_registry(context):
+    captures,sid,_,_,_,_,_=prepare_article_revisions(context)
+    videos,_=transcript_ledger(context)
+    planner=DragonTaskResearchPlanner(DragonResearchWorkboard(
+        DragonArticleHatchling(captures),videos,
+        DragonSourceDeltaLedger(captures)))
+    context[0].db.execute(
+        "UPDATE dragon_almanac_sources SET digest=? "
+        "WHERE owner=? AND source=?",("0"*64,OWNER,sid))
+    with pytest.raises(ValueError,match="integrity"):
+        planner.plan(OWNER,authorized=True,task_terms=("gameboy",),
+                     max_sources=300,limit=12)
