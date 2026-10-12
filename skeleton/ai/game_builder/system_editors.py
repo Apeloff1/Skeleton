@@ -3887,6 +3887,318 @@ CATALOG = json.loads(r'''[
           "emergent",
           "endless"
         ]
+      },
+      {
+        "key": "lane_count",
+        "kind": "int",
+        "default": 4,
+        "minimum": 3,
+        "maximum": 6,
+        "options": []
+      },
+      {
+        "key": "song_offset_ms",
+        "kind": "int",
+        "default": 0,
+        "minimum": 0,
+        "maximum": 5000,
+        "options": []
+      },
+      {
+        "key": "meter",
+        "kind": "int",
+        "default": 4,
+        "minimum": 2,
+        "maximum": 8,
+        "options": []
+      },
+      {
+        "key": "hold_notes",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "slides",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "chords",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "mines",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "hold_length_beats",
+        "kind": "int",
+        "default": 1,
+        "minimum": 1,
+        "maximum": 4,
+        "options": []
+      },
+      {
+        "key": "accent_interval",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 32,
+        "options": []
+      },
+      {
+        "key": "swing_limit_ms",
+        "kind": "int",
+        "default": 20,
+        "minimum": 0,
+        "maximum": 250,
+        "options": []
+      },
+      {
+        "key": "great_window_ms",
+        "kind": "int",
+        "default": 60,
+        "minimum": 5,
+        "maximum": 250,
+        "options": []
+      },
+      {
+        "key": "release_window_ms",
+        "kind": "int",
+        "default": 95,
+        "minimum": 10,
+        "maximum": 300,
+        "options": []
+      },
+      {
+        "key": "perfect_points",
+        "kind": "int",
+        "default": 100,
+        "minimum": 1,
+        "maximum": 5000,
+        "options": []
+      },
+      {
+        "key": "great_points",
+        "kind": "int",
+        "default": 70,
+        "minimum": 0,
+        "maximum": 5000,
+        "options": []
+      },
+      {
+        "key": "good_points",
+        "kind": "int",
+        "default": 35,
+        "minimum": 0,
+        "maximum": 5000,
+        "options": []
+      },
+      {
+        "key": "hold_bonus",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 8,
+        "options": []
+      },
+      {
+        "key": "max_multiplier",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 16,
+        "options": []
+      },
+      {
+        "key": "combo_interval",
+        "kind": "int",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 128,
+        "options": []
+      },
+      {
+        "key": "starting_health",
+        "kind": "int",
+        "default": 100,
+        "minimum": 1,
+        "maximum": 1000,
+        "options": []
+      },
+      {
+        "key": "miss_health",
+        "kind": "int",
+        "default": 12,
+        "minimum": 0,
+        "maximum": 1000,
+        "options": []
+      },
+      {
+        "key": "stray_interval",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 50,
+        "options": []
+      },
+      {
+        "key": "stray_health",
+        "kind": "int",
+        "default": 5,
+        "minimum": 0,
+        "maximum": 1000,
+        "options": []
+      },
+      {
+        "key": "mine_damage",
+        "kind": "int",
+        "default": 18,
+        "minimum": 0,
+        "maximum": 1000,
+        "options": []
+      },
+      {
+        "key": "hit_heal",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "clear_threshold_percent",
+        "kind": "int",
+        "default": 70,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "fail_mode",
+        "kind": "enum",
+        "default": "health",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "health",
+          "finish_only"
+        ]
+      },
+      {
+        "key": "sustain_tolerance_ms",
+        "kind": "int",
+        "default": 95,
+        "minimum": 10,
+        "maximum": 300,
+        "options": []
+      },
+      {
+        "key": "timing_calibration_ms",
+        "kind": "int",
+        "default": 0,
+        "minimum": 0,
+        "maximum": 1000,
+        "options": []
+      },
+      {
+        "key": "sound_enabled",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "instrument",
+        "kind": "enum",
+        "default": "original_sine",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "original_sine",
+          "original_triangle",
+          "original_pulse",
+          "silent"
+        ]
+      },
+      {
+        "key": "swing",
+        "kind": "int",
+        "default": 0,
+        "minimum": 0,
+        "maximum": 50,
+        "options": []
+      },
+      {
+        "key": "note_velocity",
+        "kind": "int",
+        "default": 80,
+        "minimum": 1,
+        "maximum": 127,
+        "options": []
+      },
+      {
+        "key": "auto_fail_on_stray",
+        "kind": "bool",
+        "default": false,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "practice_mode",
+        "kind": "bool",
+        "default": false,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "difficulty_curve",
+        "kind": "enum",
+        "default": "linear",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "linear",
+          "dynamic",
+          "staged"
+        ]
+      },
+      {
+        "key": "accuracy_floor",
+        "kind": "int",
+        "default": 60,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "assist_mode",
+        "kind": "enum",
+        "default": "none",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "none",
+          "visual",
+          "expanded"
+        ]
       }
     ],
     "preview": null
@@ -4516,7 +4828,7 @@ CATALOG = json.loads(r'''[
   }
 ]''')
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
