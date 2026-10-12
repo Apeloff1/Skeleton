@@ -120,7 +120,10 @@ def run_physics_handoff(origin_session:dict,
     x,height,vx,vy,angle,material,mass=_domain_projection(
         editor,origin_session,fields,layout)
     policy={**FIXED_EXERCISE,**options}
-    cfg=make_editor_document("physics",policy)
+    try:
+        cfg=make_editor_document("physics",policy)
+    except (ValueError,TypeError) as exc:
+        raise PhysicsHandoffError("invalid bounded physics exercise settings") from exc
     stage=default_layout(cfg["settings"],origin_session["seed"])
     body=stage["bodies"][0]
     body["position"]=[
