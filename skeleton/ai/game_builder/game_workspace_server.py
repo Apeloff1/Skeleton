@@ -40,6 +40,8 @@ from .advanced_godot_export import (
 from .advanced_platformer_godot import render_platformer_godot_package
 from .advanced_npc_evidence_navigation import (navigate_verified_investigation,
     verify_investigation_navigation)
+from .advanced_world_whatif_lab import (run_world_whatif_lab,
+    verify_world_whatif_lab)
 from .advanced_interleaved_save import (export_interleaved_save,
     import_interleaved_save,continue_interleaved_save)
 from .advanced_interleaved_world import (run_interleaved_world,
@@ -478,6 +480,28 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "save":saved,"restored":restored,
                 "original_files_changed":False,
                 "automatic_publishing_approved":False,
+            })
+        if path=="/api/advanced-world-whatif":
+            report=run_world_whatif_lab(
+                values["physical_episodes"],values["genre_sessions"],
+                values["world_scene"],values["scenarios"],
+                values.get("world_settings"),
+                axes=values.get("axes",None) or (
+                    "quests_completed","remaining_site_integrity",
+                    "site_stock","player_supplies","player_stamina",
+                    "player_gold","player_reputation","firsthand_memories",
+                    "trust_total","inverse_suspicion",
+                    "inverse_exploited_quests","survival"))
+            if not verify_world_whatif_lab(
+                report,values["physical_episodes"],values["genre_sessions"],
+                values["world_scene"],values["scenarios"],
+                values.get("world_settings")):
+                raise ValueError("what-if original source counterfactual replay rejected")
+            return self._json(200,{
+                "report":report,
+                "source_games_mutated":False,
+                "automatic_model_training":False,
+                "native_hardware_certified":False,
             })
         if path=="/api/advanced-interleaved-world":
             report=run_interleaved_world(
