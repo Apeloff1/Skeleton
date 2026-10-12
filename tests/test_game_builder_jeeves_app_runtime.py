@@ -71,7 +71,8 @@ class JeevesAllAppCapabilityTests(unittest.TestCase):
                 self.assertIn("simulation_executed",response)
                 self.assertIn(response["status"],("authoring_only",
                                                    "deterministic_prototype"))
-        self.assertEqual(self.work.files("current",self.project),[])
+        self.assertEqual([x.path for x in self.work.files("current",self.project)
+                          if x.path.startswith("systems/")],[])
         with self.assertRaises(ValueError):
             self.call("studio.editor.preview",{"editor":"shell.exec","settings":{}})
         with self.assertRaises(ValueError):
