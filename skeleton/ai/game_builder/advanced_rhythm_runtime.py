@@ -212,7 +212,8 @@ def _expire(state,config,events):
 def _quality(abs_delta,config):
     if abs_delta<=config["perfect_window_ms"]:return "perfect"
     if abs_delta<=config["great_window_ms"]:return "great"
-    if abs_delta<=config["hit_window_ms"]:return "good"
+    if abs_delta<=config["hit_window_ms"]+(
+        20 if config["assist_mode"]=="expanded" else 0):return "good"
     return None
 
 
