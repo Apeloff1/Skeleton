@@ -76,7 +76,9 @@ export default function ComposeScene() {
           count: item.count,
         })));
         setChatDraftNotice('Jeeves scene preset loaded. Review build, era, item counts and styling before composing.');
-        await AsyncStorage.removeItem(SCENE_CHAT_HANDOFF_KEY);
+        // Keep the bounded draft until its one-hour expiry. Loading an editor
+        // is not successful forging; a crash before Compose must be recoverable
+        // by reopening the same project-bound chat deep link.
       } catch {
         if (active) setChatDraftNotice('Could not read the chat scene draft. No forge request was made.');
       }
