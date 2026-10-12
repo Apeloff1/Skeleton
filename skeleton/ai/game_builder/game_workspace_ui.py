@@ -1037,6 +1037,7 @@ document.addEventListener("keydown",event=>{
 });
 let originalRhythmLongrunRecord=null;
 let originalRoguelikeLongrunRecord=null;
+let advancedAvailableActions=[];
 let selectedQuestSite=0;
 let selectedQuestNPC=0;
 let selectedQuestCell=8;
@@ -1594,7 +1595,7 @@ $("advanced-canvas").addEventListener("click",event=>{
   if(x<0||x>=7||y<0||y>=7||
       px>14+x*25+23||py>47+y*27+25)return;
   selectedQuestCell=y*7+x;
-  renderAdvancedActions(ACTION_HELP[advancedSession.editor]||[]);
+  renderAdvancedActions(advancedAvailableActions);
   drawAdvancedGame(advancedSession);
   return;
  }
@@ -1641,6 +1642,7 @@ $("advanced-canvas").addEventListener("click",event=>{
 });
 function showAdvanced(reply){
  advancedSession=reply.session;
+ advancedAvailableActions=reply.available_actions;
  const nativeSourceFamilies=new Set(["puzzle","platformer","deck_battler",
   "shooter","tactics","tower_defense","racing","survival","farming",
   "factory","colony"]);
@@ -2108,11 +2110,15 @@ function paintQuestDirectorCell(cell){
   m.obstacles=m.obstacles.includes(cell)?
      m.obstacles.filter(p=>p!==cell):[...m.obstacles,cell].sort((a,b)=>a-b);
  }else if(tool==="site_move"){
-  if(!site)throw Error("Select a source site first");
-  site.cell=cell;
+  const clicked=m.sites.find(s=>s.cell===cell);
+  if(clicked)selectedQuestSite=clicked.id;
+  else if(site)site.cell=cell;
+  else throw Error("Select an authored site first");
  }else if(tool==="npc_move"){
-  if(!npc)throw Error("Select a source NPC first");
-  npc.cell=cell;
+  const clicked=m.npcs.find(n=>n.cell===cell);
+  if(clicked)selectedQuestNPC=clicked.id;
+  else if(npc)npc.cell=cell;
+  else throw Error("Select an authored NPC first");
  }else if(tool==="player_spawn")m.player_spawn=cell;
  else if(tool==="site_integrity_up"){
   if(!site)throw Error("Select authored original site");
