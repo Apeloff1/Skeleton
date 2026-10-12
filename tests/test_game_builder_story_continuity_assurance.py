@@ -153,6 +153,10 @@ class MeticulousProductionContinuityTests(unittest.TestCase):
     def test_actual_historical_item_transfer_is_backlinked_to_story_event(self):
         contract=original_contract(self.bible,with_item=True)
         scene=scene_source(self.bible)
+        scene["events"][0]["kind"]="item_transfer"
+        scene["events"][0]["summary"]=(
+            "The historical_table passes from Alina to Boren under a witnessed transfer.")
+        scene=sign(scene,SCENE)
         base=next(x for x in self.bible["assets"] if x["id"]=="map_table")
         item={"id":"historical_table","owner":"boren",
               "asset_digest":digest(base),"style_id":"style_lantern_city",
@@ -169,6 +173,11 @@ class MeticulousProductionContinuityTests(unittest.TestCase):
         bad["transfers"][0]["event_ref"]="nonexistent_future_scene"
         with self.assertRaises(StoryCanonError):
             seal_production_scene(self.bible,contract,[],scene,bad)
+        generic=deepcopy(scene)
+        generic["events"][0]["kind"]="unrelated_observed_event"
+        generic=sign(generic,SCENE)
+        with self.assertRaises(StoryCanonError):
+            seal_production_scene(self.bible,contract,[],generic,good)
         bad=deepcopy(good);bad["items"]=[]
         with self.assertRaises(StoryCanonError):
             seal_production_scene(self.bible,contract,[],scene,bad)
