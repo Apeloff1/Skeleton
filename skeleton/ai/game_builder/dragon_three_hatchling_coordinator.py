@@ -72,9 +72,10 @@ class DragonThreeHatchlingCoordinator:
             raise ValueError("video and web article source identities must differ")
         article = self.article.review_packet(
             owner, article_source_id, authorized=True)
+        # A brand-new owner's egg does not yet have a signed nest snapshot.
+        # Report zero real progression without creating a new nest. A present
+        # but corrupted signature is still rejected by DragonNestStore.read.
         game = self.nest.read(owner, authorized=True) if self.nest else None
-        if self.nest and game is None:
-            raise ValueError("signed companion nest not initialized")
         children = {child.lane: child for child in game.children} if game else {}
         video = self.video.review_packet(
             owner, video_source_id, authorized=True, include_quotes=False)
@@ -125,7 +126,7 @@ class DragonThreeHatchlingCoordinator:
             "schema": "skeleton.dragon.three_hatchlings.v1",
             "owner": owner, "hatchlings": rows,
             "lane_count": 3,
-            "mother_stage": game.stage if game else "not_loaded",
+            "mother_stage": game.stage if game else "not_initialized",
             "mother_level": game.level if game else None,
             "growth_requires_idle_and_reviewed_knowledge": True,
             "review_ready_count": sum(x["review_required"] for x in rows),
