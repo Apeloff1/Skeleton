@@ -9,9 +9,9 @@
 
 This engine is an actual turnable game, integrated into the canonical editor, authenticated local studio game command endpoint, signed authored scenes, replay receipts, savegame continuation and hybrid assembly source checks.
 
-The `sailing` editor exposes **38 typed settings**: original world wind and sea state, sail efficiency, rowing, chart motion, storms, temporal weather transitions, ship displacement and cargo weight, dynamic water ingress, buoyancy limit, finite bilge pumping, physical hull and reef collisions, crew and survivor provisioning, paid dockside repairs and provisioning, finite fishing grounds, active pirate pursuit, cargo purchase/sale, route rescue, terminal expedition and nonterminal endless-world scenarios.
+The `sailing` editor exposes **38 typed settings**: original world wind and sea state, sail efficiency, rowing, chart motion, storms, temporal weather transitions, ship displacement and cargo weight, dynamic water ingress, buoyancy limit, finite bilge pumping, physical hull and reef collisions, crew and survivor provisioning, paid dockside repairs and provisioning, finite fishing grounds, active pirate pursuit, cargo transfer and sale, route rescue, terminal expedition and nonterminal endless-world scenarios.
 
-The engine has **19 registered actions** (including helm turn, sail, row, dock, unload/rescue, and bilge pump) plus source-chained, finite time advancement. Actions cannot directly mutate health, position, credits, objective flags, or source checksums. The source editor contains 43 families; this increment lifts one additional family to executable advanced reference status, increasing **20 to 21 of 43**.
+The engine has **20 registered actions** (including helm turn, sail, row, dock, unload/rescue, and bilge pump) plus source-chained, finite time advancement. Actions cannot directly mutate health, position, credits, objective flags, or source checksums. The source editor contains 43 families; this increment lifts one additional family to executable advanced reference status, increasing **20 to 21 of 43**.
 
 ### Controls and gameplay
 
