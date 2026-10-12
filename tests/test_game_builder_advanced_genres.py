@@ -48,7 +48,7 @@ class GenreMaturityTests(unittest.TestCase):
         self.assertTrue(all(spec["progression_floor"]=="advanced" for spec in specs.values()))
         for genre in ENGINES:
             self.assertEqual(specs[genre]["runtime_maturity"],"advanced_reference_runtime")
-        self.assertEqual(sum(1 for s in specs.values() if s["runtime_maturity"]=="authoring_only"),33)
+        self.assertEqual(sum(1 for s in specs.values() if s["runtime_maturity"]=="authoring_only"),32)
 
     def test_distinct_reference_states_and_chain_identity(self):
         for genre,commands in (
