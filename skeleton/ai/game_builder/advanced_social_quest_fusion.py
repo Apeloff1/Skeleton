@@ -11,7 +11,6 @@ space or a claim that an NPC is omnipresent between different games.
 """
 from __future__ import annotations
 
-from copy import deepcopy
 from hashlib import sha256
 import json
 
@@ -350,7 +349,7 @@ def run_social_quest_fusion(commands, settings=None, *, scenes=None, seed=0):
         "schema": SCHEMA, "seed": seed, "settings": rules, "scenes": worlds,
         "source_identities": source_identities,
         "commands": list(commands), "journal": journal,
-        "bindings": deepcopy(ROLE_BINDINGS),
+        "bindings": [dict(role) for role in ROLE_BINDINGS],
         "narrative_links": links, "worlds": projections,
         "triple_corroborated_interviews": sum(x["kind"] == "interview" for x in links),
         "financed_social_pledges": sum(x["kind"] == "pledge" for x in links),
