@@ -89,3 +89,35 @@ def test_incomplete_or_reordered_source_chain_cannot_be_reported(coverage, monke
     monkeypatch.setattr(module, "_chain", lambda: documents[:-1])
     with pytest.raises(ValueError):
         platform_discovery_matrix(read_source_registry(REGISTRY))
+
+
+def test_generation_coverage_deduplicates_shared_source_refs(coverage):
+    groups = coverage["generation_coverage"]
+    assert groups and [x["group"] for x in groups] == sorted(
+        x["group"] for x in groups)
+    platform_groups = {}
+    for item in coverage["platforms"]:
+        platform_groups.setdefault(item["platform_group"], []).append(item)
+    assert {x["group"] for x in groups} == set(platform_groups)
+    for group in groups:
+        peers = platform_groups[group["group"]]
+        assert group["platform_count"] == len(peers)
+        assert group["platforms_with_metadata_matches"] == sum(
+            item["canonical_candidate_urls"] > 0 for item in peers)
+        assert group["canonical_distinct_candidate_urls"] >= max(
+            item["canonical_candidate_urls"] for item in peers)
+        assert group["canonical_distinct_candidate_urls"] <= sum(
+            item["canonical_candidate_urls"] for item in peers)
+        assert group["distinct_hosts"] <= group["canonical_distinct_candidate_urls"]
+        assert group["coverage_is_unreviewed"] is True
+        assert set(group["unmatched_platforms"]) == {
+            item["platform"] for item in peers
+            if item["canonical_candidate_urls"] == 0}
+    assert coverage["generation_coverage_urls_may_overlap_between_groups"]
+    rankings = coverage["discovery_attention_queue"]
+    assert len(rankings) == len(PLATFORM_ALIASES)
+    assert set(rankings) == {row["platform"] for row in coverage["platforms"]}
+    measures = {row["platform"]: (row["canonical_candidate_urls"],
+                                  row["distinct_hosts"], row["platform"])
+                for row in coverage["platforms"]}
+    assert rankings == sorted(rankings, key=measures.__getitem__)
