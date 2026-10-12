@@ -26,6 +26,13 @@ class Reviews:
         row = self.docs.get(query.get("_id"))
         return deepcopy(row) if row else None
 
+    async def update_one(self, query, update):
+        row = self.docs.get(query.get("_id"))
+        if not row or any(row.get(k) != v for k, v in query.items() if k != "_id"):
+            return SimpleNamespace(matched_count=0)
+        row.update(update.get("$set", {}))
+        return SimpleNamespace(matched_count=1)
+
     def find(self, query):
         return Cursor([x for x in self.docs.values()
                       if all(x.get(k) == v for k, v in query.items())])
@@ -196,3 +203,48 @@ async def test_all_10000_approved_matrix_findings_produce_compact_idempotent_rec
     replay = await route.finalize_scene_matrices("game", 1, branch_id="main", user=AUTHOR)
     assert replay["replayed"] is True
     assert replay["matrix_review_receipt"] == result["matrix_review_receipt"]
+
+
+
+@pytest.mark.asyncio
+async def test_creator_can_adopt_an_immutable_model_review_without_changing_its_evidence(data):
+    notes, store = data
+    candidate = await route.submit_matrix_review("game", 1, submission(
+        provenance="jeeves_model_candidate",
+        reviewed_and_approved_by_creator=False,
+    ), user=AUTHOR)
+    assert candidate["creator_approved"] is False
+    decision = route.AdoptCandidateIn(
+        scene_digest=notes["digest"], matrix_id="engagement.surprise_earned",
+        level=100, candidate_receipt=candidate["review_receipt"],
+    )
+    accepted = await route.approve_model_candidate("game", 1, decision, user=AUTHOR)
+    assert accepted["ok"] is True
+    assert accepted["creator_approved"] is True
+    assert accepted["verdict"] == "fail"
+    assert accepted["review_receipt"] == candidate["review_receipt"]
+    assert (await route.approve_model_candidate("game", 1, decision, user=AUTHOR))["replayed"]
+    result = await route.get_matrix_coverage("game", 1, branch_id="main", user=AUTHOR)
+    assert result["coverage"]["failure_count"] == 1
+    assert result["coverage"]["fully_reviewed"] is False
+
+
+@pytest.mark.asyncio
+async def test_candidate_approval_rejects_forged_receipt_and_wrong_scene(data):
+    candidate = await route.submit_matrix_review("game", 1, submission(
+        provenance="jeeves_model_candidate", reviewed_and_approved_by_creator=False,
+    ), user=AUTHOR)
+    wrong = route.AdoptCandidateIn(
+        matrix_id="engagement.surprise_earned", level=100,
+        scene_digest="a" * 64, candidate_receipt="f" * 64,
+    )
+    with pytest.raises(HTTPException) as exc:
+        await route.approve_model_candidate("game", 1, wrong, user=AUTHOR)
+    assert exc.value.status_code == 404
+    stale = route.AdoptCandidateIn(
+        matrix_id="engagement.surprise_earned", level=100,
+        scene_digest="b" * 64, candidate_receipt=candidate["review_receipt"],
+    )
+    with pytest.raises(HTTPException) as exc:
+        await route.approve_model_candidate("game", 1, stale, user=AUTHOR)
+    assert exc.value.status_code == 409
