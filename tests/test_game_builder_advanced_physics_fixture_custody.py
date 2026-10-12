@@ -27,7 +27,7 @@ class ActualFixtureContactCustodyTests(unittest.TestCase):
                              "half_size":[10,100,40],"layer":3}]
         if second:
             layout["fixtures"].append({
-                "position":[760,900,0],"half_size":[10,100,40],"layer":3})
+                "position":[1200,900,0],"half_size":[10,100,40],"layer":3})
         layout["bodies"][0]["mask"]=mask
         scene=make_advanced_scene("physics",settings,seed=2,layout=layout)
         report=run_advanced_session("physics",settings,
