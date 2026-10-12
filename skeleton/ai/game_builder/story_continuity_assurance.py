@@ -18,9 +18,10 @@ from .story_canon_fabric import (
     verify_story_history,
 )
 
-CONTRACT = "skeleton.game_builder.production_consistency_contract.v1"
-RECEIPT = "skeleton.game_builder.scene_confirmation_receipt.v1"
-ACT_TARGET = 100
+CONTRACT = "skeleton.game_builder.production_consistency_contract.v2"
+RECEIPT = "skeleton.game_builder.scene_confirmation_receipt.v2"
+CHAPTER_TARGET = 100
+ACT_TARGET = 1000
 SCENE_TARGET = 9999
 EMOTIONS = frozenset(("neutral","joy","sadness","fear","anger",
                       "surprise","disgust","concern","determined","listening"))
@@ -30,6 +31,8 @@ QC_GATES = (
     "scene_items_and_ownership", "causal_item_transfers", "region_style",
     "region_palette", "cast_and_event_causality", "prior_scene_digest",
     "prior_confirmation_receipt", "full_historical_reparse", "reviewed_rights",
+    "chapter_highlighters", "suspense_and_pacing", "prologue_interlude_logic",
+    "chapter_ending_closure", "chapter_scoped_model_context",
 )
 
 
@@ -39,7 +42,8 @@ def contract_template(bible):
     require(bible["phase"] == "design", "approved character and world design required")
     return {
         "schema": CONTRACT, "project": bible["project"],
-        "bible_digest": bible["digest"], "act_target": ACT_TARGET,
+        "bible_digest": bible["digest"], "chapter_target": CHAPTER_TARGET,
+        "act_target": ACT_TARGET,
         "scene_target": SCENE_TARGET,
         "characters": [{
             "id": row["id"], "voice_id": "", "voice_asset_sha256": "",
@@ -64,17 +68,19 @@ def contract_template(bible):
 
 def validate_contract(contract, bible):
     validate_story_bible(bible)
-    signed(contract, CONTRACT, ("project","bible_digest","act_target",
+    signed(contract, CONTRACT, ("project","bible_digest","chapter_target","act_target",
                                "scene_target","characters","regions","items",
                                "human_design_reviewed"))
-    require(bible["story"]["planned_acts"] == ACT_TARGET,
-            "a signed 100-act story outline must precede strict production")
+    require(bible["story"].get("planned_chapters") == CHAPTER_TARGET and
+            bible["story"]["planned_acts"] == ACT_TARGET,
+            "100-chapter and 1000-act signed story outline required")
     require(contract["project"] == bible["project"] and
             contract["bible_digest"] == bible["digest"],
             "production assurance must lock the exact reviewed world")
-    require(contract["act_target"] == ACT_TARGET and
+    require(contract["chapter_target"] == CHAPTER_TARGET and
+            contract["act_target"] == ACT_TARGET and
             contract["scene_target"] == SCENE_TARGET,
-            "100 acts and exactly 9999 planned scenes are mandatory")
+            "100 chapters, 1000 acts and exactly 9999 scenes are mandatory")
     require(contract["human_design_reviewed"] is True,
             "design/voice identity attestation must be explicitly reviewed")
     approved = ids(bible["characters"], "approved cast")
@@ -309,7 +315,8 @@ def _receipt(contract, scene, observations, previous_receipt,
     """Single-stage confirmation bound to all preceding verified receipts."""
     body = {
         "schema": RECEIPT, "contract_digest": contract["digest"],
-        "sequence": scene["sequence"], "act": scene["act"],
+        "sequence": scene["sequence"], "chapter": scene["chapter"],
+        "act": scene["act"],
         "scene": scene["scene"],
         "scene_source_digest": _source_scene_digest(scene),
         "previous_receipt_digest": previous_receipt,
@@ -361,14 +368,20 @@ def verify_production_history(bible, contract, scenes):
     require(type(scenes) in (list, tuple) and len(scenes) <= SCENE_TARGET,
             "reviewable 9999-stage history required")
     index = verify_story_history(bible, scenes)
+    from .story_chapter_context import validate_chapter_history
+    chapters = validate_chapter_history(
+        scenes,require_final=len(scenes)==SCENE_TARGET)
     character_state = {x["id"]: dict(x["state"]) for x in bible["characters"]}
     item_state = _review_state(contract)
     previous_receipt = None
     root = _history_root(bible, contract)
     visited_acts = set()
+    visited_chapters = set()
     previous_scene = None
     for stage in scenes:
         number(stage["scene"], 1, 9999, "one scene number within an act")
+        require(stage.get("chapter") == (stage["act"]-1)//10+1,
+                "strict source must link chapter and global act")
         if previous_scene is None:
             require((stage["act"],stage["scene"]) == (1,1),
                     "stage one must start at act 1 scene 1")
@@ -396,6 +409,7 @@ def verify_production_history(bible, contract, scenes):
         character_state = after
         previous_receipt = receipt["digest"]
         visited_acts.add(stage["act"])
+        visited_chapters.add(stage["chapter"])
         previous_scene = stage
     require(character_state == index["current_state"],
             "independent cast state projection disagrees with replay")
@@ -403,9 +417,13 @@ def verify_production_history(bible, contract, scenes):
         "schema": "skeleton.game_builder.production_history_confirmation.v1",
         "bible_digest": bible["digest"], "contract_digest": contract["digest"],
         "accepted_scenes": len(scenes), "planned_scenes": SCENE_TARGET,
-        "planned_acts": ACT_TARGET,
+        "planned_chapters": CHAPTER_TARGET, "planned_acts": ACT_TARGET,
+        "current_chapter": chapters["current_chapter"],
+        "indexed_plot_highlighters": len(chapters["highlights"]),
+        "closed_chapters": len(chapters["closed_chapters"]),
         "fully_completed": len(scenes) == SCENE_TARGET and
-                           len(visited_acts) == ACT_TARGET,
+                           len(visited_acts) == ACT_TARGET and
+                           len(visited_chapters) == CHAPTER_TARGET,
         "verified_source_head": index["head_digest"],
         "verified_receipt_head": previous_receipt,
         "verified_chain_head": root,
@@ -433,6 +451,9 @@ def seal_production_scene(bible, contract, history, candidate, observations):
     # The full replay checks narrative continuity, actor facts, palette,
     # scene ordering, event causality and immutable historical world source.
     next_index = verify_story_history(bible, [*history, plain])
+    from .story_chapter_context import validate_chapter_history
+    validate_chapter_history([*history, plain],
+                             require_final=len(history)+1==SCENE_TARGET)
     before = prior["current_character_state"]
     after = next_index["current_state"]
     current_items = prior["current_item_owners"]
