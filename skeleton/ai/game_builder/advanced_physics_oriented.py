@@ -193,6 +193,8 @@ def oriented_pairs(state,config,events):
             if not m:
                 continue
             n=m["normal"];depth=m["depth"]
+            # A genuine collision wakes either previously resting body.
+            first["sleep"]=0;second["sleep"]=0
             total=first["mass"]+second["mass"]
             moved_first=max(1,depth*second["mass"]//total)
             moved_second=max(1,depth-moved_first)
