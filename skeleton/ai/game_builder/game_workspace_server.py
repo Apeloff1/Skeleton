@@ -272,6 +272,15 @@ class _StudioHandler(BaseHTTPRequestHandler):
             from .story_memory import asset_identity_history
             return self._json(200,asset_identity_history(
                 studio,values["project"],values["asset"]))
+        if path=="/api/story-highlight-source":
+            from .story_workspace import load_story_workspace,load_continuity_contract
+            from .story_chapter_context import highlight_source
+            bible,scenes,_=load_story_workspace(studio,values["project"])
+            contract=load_continuity_contract(studio,values["project"])
+            if bible is None or contract is None:
+                raise WorkspaceError("reviewed story history and identity contract required")
+            return self._json(200,highlight_source(
+                bible,contract,scenes,values["highlight"]))
         if path=="/api/story-chapter-context":
             from .story_workspace import load_story_workspace, load_continuity_contract
             from .story_chapter_context import chapter_context
