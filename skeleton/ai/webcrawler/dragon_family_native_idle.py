@@ -81,8 +81,13 @@ def _linux_x11_idle_seconds() -> float:
     # compositor activity. Never trust it as a full-device idle signal.
     if os.environ.get("WAYLAND_DISPLAY"):
         raise NativeIdleUnavailable("Wayland requires a trusted compositor idle provider")
-    if not os.environ.get("DISPLAY"):
+    display_name=os.environ.get("DISPLAY","")
+    if not display_name:
         raise NativeIdleUnavailable("graphical X11 display is unavailable")
+    # Remote/forwarded X11 servers are not authoritative sensors for the
+    # current user's local keyboard. Only accept a local Unix display.
+    if not (display_name.startswith(":") or display_name.startswith("unix:")):
+        raise NativeIdleUnavailable("remote X11 display cannot attest local user input")
     display=None
     try:
         libx=ctypes.CDLL("libX11.so.6")
