@@ -3345,6 +3345,69 @@ $("advanced-unified-save-import").addEventListener("change",async()=>{
  }catch(error){status("Untrusted mixed original world save rejected: "+error.message);}
  finally{$("advanced-unified-save-import").value="";}
 });
+$("advanced-objective-goals").value=JSON.stringify([
+ "credible_eyewitness_reach",
+ "earned_quest_completions",
+ "original_site_restoration",
+ "finite_material_resilience"
+],null,2);
+$("advanced-objective-run").addEventListener("click",async()=>{
+ try{
+  if(!episodicLastScene || !verifiedSourceEpisodes.length ||
+      !verifiedGenreEvents.length)
+   throw Error("Review a real original physical and multi-genre source campaign first");
+  const goalList=JSON.parse($("advanced-objective-goals").value);
+  if(!Array.isArray(goalList) || goalList.length<1 ||
+     goalList.length>4 || new Set(goalList).size!==goalList.length)
+   throw Error("Choose one to four unique source-measurable original-game objectives");
+  const timeline=JSON.parse($("advanced-interleave-editor").value);
+  const maxCandidates=Number($("advanced-whatif-trial-limit").value);
+  if(!Array.isArray(timeline) || timeline.length<2 || timeline.length>96 ||
+     !Number.isSafeInteger(maxCandidates) ||
+     maxCandidates<1 || maxCandidates>12)
+   throw Error("The signed timeline and finite original experiment budget are required");
+  const result=await api("/api/advanced-interleaved-objectives",{
+   physical_episodes:verifiedSourceEpisodes,
+   genre_sessions:verifiedGenreEvents,
+   world_scene:episodicLastScene,
+   timeline,world_settings:interleavedWorldSettings,
+   goals:goalList,max_candidates:maxCandidates
+  });
+  const matrix=result.matrix;
+  if(!matrix || result.source_project_files_mutated ||
+     result.objective_ranking_auto_applied ||
+     result.ai_model_promotion_approved ||
+     matrix.original_project_files_changed ||
+     matrix.automatic_game_event_application ||
+     matrix.automatic_ai_weight_promotion ||
+     JSON.stringify(matrix.goals)!==JSON.stringify(goalList) ||
+     matrix.max_candidates!==maxCandidates ||
+     matrix.candidate_count!==matrix.candidate_results.length)
+   throw Error("Actual game objectives were not independently measured and replayed");
+  $("advanced-objective-proof").textContent=JSON.stringify({
+   original_baseline_source:matrix.baseline_campaign_digest,
+   ordered_authored_goals:matrix.goals,
+   real_baseline_stats:matrix.baseline_metrics,
+   source_replayed_cases:matrix.verified_valid_candidates,
+   independently_better_cases:matrix.verified_strict_improvements,
+   actual_story_tradeoffs:matrix.observed_tradeoffs,
+   invalid_trials_excluded:matrix.rejected_source_timelines,
+   measured_alternatives:matrix.candidate_results.map(c=>({
+    index:c.candidate_index,
+    source_replay_valid:c.valid,
+    objective_classification:c.classification,
+    independently_measured_metrics:c.measured_metrics,
+    strict_baseline_deltas:c.goal_deltas,
+    pareto_nondominated:c.pareto_frontier
+   })),
+   suggested_only_if_strictly_better:matrix.suggested_candidate_index,
+   candidate_selection_requires_separate_manual_whatif_review:true,
+   auto_promotion:false,
+   original_source_files_untouched:true
+  },null,2);
+  status("Original NPC game objectives measured against independently re-executed worlds; ranking does not alter game state");
+ }catch(error){status("Source-measured NPC design goals rejected: "+error.message);}
+});
 $("advanced-whatif-run").addEventListener("click",async()=>{
  try{
   if(!episodicLastScene || !verifiedSourceEpisodes.length ||
@@ -4446,6 +4509,16 @@ local until typed revalidation and an explicit human-approved file commit.</smal
           Copy verified alternate order to timeline editor
         </button>
         <pre id="advanced-whatif-proof" role="status" aria-live="polite"></pre>
+        <fieldset aria-label="Measurable narrative game objectives">
+         <legend>Adversarial NPC game design objective comparison</legend>
+         <label>Ordered review goals (JSON list, maximum four)
+          <textarea id="advanced-objective-goals" rows="5"></textarea>
+         </label>
+         <button id="advanced-objective-run" type="button">
+          Compare verified playable game outcomes, not just event order
+         </button>
+         <pre id="advanced-objective-proof" role="status" aria-live="polite"></pre>
+        </fieldset>
        </fieldset>
        <fieldset aria-label="Portable original multi-engine world clock">
         <legend>Save and restore authored interleaved gameplay</legend>
