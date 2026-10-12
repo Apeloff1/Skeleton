@@ -330,6 +330,12 @@ def validate_plan(raw: Mapping[str, Any]) -> dict:
     branch_id = identifier(plan.get("branch_id", "main"), kind="story branch")
     characters = _normalize_lore(plan.get("characters", []), "character")
     places = _normalize_lore(plan.get("places", []), "place")
+    for person in characters.values():
+        if set(person["relationships"]) - set(characters):
+            raise ValueError("NPC biography refers to a non-existent relationship.")
+    for location in places.values():
+        if set(location["discovered_by"]) - set(characters):
+            raise ValueError("Place discovery references an unknown character.")
     nodes = plan.get("nodes")
     ends = plan.get("endings")
     if not isinstance(nodes, list) or not 1 <= len(nodes) <= MAX_NODES:
@@ -457,6 +463,17 @@ def validate_plan(raw: Mapping[str, Any]) -> dict:
         node_map[key] = {"id": key, "scene": scene, "act": act, "chapter": chapter,
                          "kind": kind, "speaker": speaker, "place": place,
                          "text": text, "plot_points": deepcopy(points), "options": compiled}
+    declared_threads = {
+        effect["id"] for node in node_map.values()
+        for option in node["options"] for effect in option["effects"]
+        if effect["op"] == "thread"
+    }
+    for character in characters.values():
+        if set(character["plot_threads"]) - declared_threads:
+            raise ValueError("NPC backstory has a thread never woven into any narrative choice.")
+    for place in places.values():
+        if set(place["plot_threads"]) - declared_threads:
+            raise ValueError("Place lore has a thread never woven into the story graph.")
     entry = identifier(plan.get("entry_node"), kind="entry")
     if entry not in node_map:
         raise ValueError("Unknown entry decision node.")
