@@ -90,9 +90,14 @@ def _sources(settings, scenes, seed):
 def _session(family, commands, configs, scenes, seed):
     if len(commands) > 128:
         raise SocialFusionError("social play cannot exceed an original engine turn budget")
-    result = run_advanced_session(
-        family, configs[family], commands, seed=seed, scene=scenes[family],
-    )
+    try:
+        result = run_advanced_session(
+            family, configs[family], commands, seed=seed, scene=scenes[family],
+        )
+    except AdvancedRuntimeError as exc:
+        raise SocialFusionError(
+            "original " + family + " physical action was rejected: " + str(exc)
+        ) from exc
     return result
 
 
