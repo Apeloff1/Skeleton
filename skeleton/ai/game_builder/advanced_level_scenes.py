@@ -25,6 +25,10 @@ from .advanced_fighting_runtime import (default_layout as fight_layout,
 from .advanced_rhythm_runtime import (default_layout as rhythm_layout,
                                       normalize_layout as validate_rhythm_layout,
                                       RhythmActionError)
+from .advanced_sports_runtime import (
+    default_layout as sports_layout, normalize_layout as validate_sports_layout,
+    SportsActionError,
+)
 from .advanced_parkour_runtime import (
     default_layout as parkour_layout, normalize_layout as validate_parkour_layout,
     ParkourActionError,
@@ -188,6 +192,8 @@ def _default_layout(engine, config, seed):
         return sailing_layout(config,seed)
     if engine == "parkour":
         return parkour_layout(config,seed)
+    if engine == "sports":
+        return sports_layout(config,seed)
     raise SceneError("no advanced authored scene available for that engine")
 
 
@@ -213,6 +219,11 @@ def _normalize_layout(engine, config, layout):
         try:
             return validate_parkour_layout(config,layout)
         except ParkourActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="sports":
+        try:
+            return validate_sports_layout(config,layout)
+        except SportsActionError as exc:
             raise SceneError(str(exc)) from exc
     if engine=="fighting":
         try:
