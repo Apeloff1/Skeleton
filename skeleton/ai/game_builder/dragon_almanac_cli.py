@@ -15,7 +15,7 @@ from .reviewed_knowledge import ReviewedKnowledgeStore
 
 def main():
     parser = argparse.ArgumentParser(description="Import, inspect and seed sequential Dragon almanacs")
-    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "import-supplements", "delivery-status", "delivery-search", "delivery-brief"))
+    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "import-supplements", "delivery-status", "delivery-search", "delivery-brief", "discovery-topics", "discovery-sources", "discovery-receipts"))
     parser.add_argument("--database", required=True)
     parser.add_argument("--owner", required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
@@ -23,6 +23,11 @@ def main():
     parser.add_argument("--output")
     parser.add_argument("--supplement", action="append", default=[], help="Evidence JSON; repeat in chronological chain order")
     parser.add_argument("--now", type=int)
+    parser.add_argument("--topic", help="Exact owner-scoped heading almanac identifier")
+    parser.add_argument("--parent", help="Exact parent topic; omit for root headings")
+    parser.add_argument("--source", help="Exact normalized catalog source ID for raw provenance")
+    parser.add_argument("--limit", type=int, default=100)
+    parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--query", help="Reviewed mechanic or design research question")
     parser.add_argument("--design", type=Path, help="Strict native game design JSON")
     args = parser.parse_args()
@@ -31,7 +36,28 @@ def main():
     with ReviewedKnowledgeStore(args.database) as library:
         almanacs = DragonAlmanacs(library)
         worker = SequentialAlmanacWorker(almanacs)
-        if args.command.startswith("delivery-"):
+        if args.command.startswith("discovery-"):
+            from .dragon_discovery_admission import DragonDiscoveryAdmission
+            discovery = DragonDiscoveryAdmission(almanacs)
+            library.db.execute("BEGIN")
+            try:
+                if args.command == "discovery-topics":
+                    result = discovery.topic_page(args.owner, authorized=True,
+                                                  parent=args.parent,
+                                                  limit=args.limit, offset=args.offset)
+                elif args.command == "discovery-sources":
+                    if not args.topic:
+                        parser.error("discovery-sources requires --topic")
+                    result = discovery.source_page(args.owner, args.topic, authorized=True,
+                                                   limit=args.limit, offset=args.offset)
+                else:
+                    if not args.source:
+                        parser.error("discovery-receipts requires --source")
+                    result = discovery.provenance_page(args.owner, args.source, authorized=True,
+                                                       limit=args.limit, offset=args.offset)
+            finally:
+                library.db.execute("ROLLBACK")
+        elif args.command.startswith("delivery-"):
             from .dragon_delivery import DragonDelivery
             from ..webcrawler.dragon_game_design import load_design
             if args.now is None:
