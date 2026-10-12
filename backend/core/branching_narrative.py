@@ -333,7 +333,8 @@ def validate_plan(raw: Mapping[str, Any]) -> dict:
     for entry in ends:
         item = _plain(entry, "ending")
         _exact(item, {"id", "title", "tone", "epilogue", "consequences",
-                      "character_conclusions", "place_conclusions", "required_lore"},
+                      "character_conclusions", "place_conclusions",
+                      "quest_conclusions", "faction_conclusions", "required_lore"},
                location="ending")
         key = identifier(item.get("id"), kind="ending")
         if key in end_map:
@@ -349,7 +350,17 @@ def validate_plan(raw: Mapping[str, Any]) -> dict:
                 raise ValueError("Ending references an unknown " + field + " identity.")
             conclusions[field] = {
                 k: _text(v, "conclusion", 1500) for k, v in rows.items()}
+        quest_outcomes = _plain(item.get("quest_conclusions", {}), "quest conclusions")
+        faction_outcomes = _plain(item.get("faction_conclusions", {}), "faction conclusions")
         end_map[key] = {
+            "quest_conclusions": {
+                identifier(k, kind="ending quest"): _text(v, "quest ending", 900)
+                for k, v in quest_outcomes.items()
+            },
+            "faction_conclusions": {
+                identifier(k, kind="ending faction"): _text(v, "faction ending", 900)
+                for k, v in faction_outcomes.items()
+            },
             "id": key, "title": _text(item.get("title"), "ending title", 150),
             "tone": tone, "epilogue": _text(item.get("epilogue"), "epilogue", 6000, 40),
             "consequences": _text(item.get("consequences"), "lasting consequences", 3000, 20),
@@ -537,7 +548,30 @@ def simulate(plan: Mapping[str, Any], choices: Sequence[str]) -> dict:
     ending = plan["endings"].get(terminal) if terminal else None
     missing_lore = (sorted(set(ending["required_lore"]) -
                            set(state["known_lore"])) if ending else [])
-    is_closed = bool(terminal and not incomplete and not missing_lore)
+    touched_characters = {s["character"] for s in steps if s.get("character")}
+    touched_places = {s["place"] for s in steps if s.get("place")}
+    unresolved_characters = sorted(touched_characters - set(
+        ending["character_conclusions"] if ending else {}))
+    unresolved_places = sorted(touched_places - set(
+        ending["place_conclusions"] if ending else {}))
+    unresolved_quests = sorted(
+        q for q, status in state["quests"].items()
+        if status not in ("unknown",) and
+        (status in ("available", "active") or
+         not ending or q not in ending["quest_conclusions"])
+    )
+    # Persistent tracked factions and government loyalties must be included
+    # in the ending slide when a choice altered their standings.
+    touched_factions = {
+        k.split(":", 2)[2] for k in state["meters"]
+        if k.startswith(("reputation:faction:", "reputation:gang:",
+                         "reputation:government:", "reputation:law:"))
+    }
+    unresolved_factions = sorted(touched_factions - set(
+        ending["faction_conclusions"] if ending else {}))
+    is_closed = bool(terminal and not incomplete and not missing_lore
+        and not unresolved_characters and not unresolved_places
+        and not unresolved_quests and not unresolved_factions)
     return {
         "schema_version": RECEIPT_SCHEMA, "plan_digest": plan["source_digest"],
         "state": state, "threads": threads, "steps": steps,
@@ -546,6 +580,10 @@ def simulate(plan: Mapping[str, Any], choices: Sequence[str]) -> dict:
         "ending": deepcopy(ending), "ending_id": terminal,
         "unresolved_threads": sorted(incomplete),
         "missing_ending_lore": missing_lore,
+        "unresolved_character_arcs": unresolved_characters,
+        "unresolved_place_lore": unresolved_places,
+        "unresolved_quest_conclusions": unresolved_quests,
+        "unresolved_faction_conclusions": unresolved_factions,
         "ending_accepted": is_closed,
         "story_quality_guaranteed": False,
         "receipt_digest": receipt({"plan": plan["source_digest"], "steps": steps,
@@ -585,7 +623,11 @@ def audit_outcomes(plan: Mapping[str, Any], *, max_paths: int = MAX_AUDIT_PATHS)
                 fail_examples.append({"path": picks[-20:],
                                       "error": "Ending has unresolved threads or undiscovered lore",
                                       "open_threads": history["unresolved_threads"],
-                                      "missing_lore": history["missing_ending_lore"]})
+                                      "missing_lore": history["missing_ending_lore"],
+                                      "unresolved_characters": history["unresolved_character_arcs"],
+                                      "unresolved_places": history["unresolved_place_lore"],
+                                      "unresolved_quests": history["unresolved_quest_conclusions"],
+                                      "unresolved_factions": history["unresolved_faction_conclusions"]})
             continue
         if not history["available_options"]:
             dead_ends += 1
