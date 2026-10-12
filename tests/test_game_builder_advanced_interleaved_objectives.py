@@ -81,10 +81,14 @@ class OriginalGameObjectiveMatrixTests(unittest.TestCase):
         result=run_causal_objective_matrix(
             p,g,s,clock,c,goals=("finite_material_resilience",
                                  "original_site_restoration"),max_candidates=2)
+        from skeleton.ai.game_builder.advanced_interleaved_world import (
+            run_interleaved_world)
+        actual=run_interleaved_world(p,g,s,clock,c)["world_state"]
+        measured=sum(site["stock"] for site in actual["sites"])+actual["supplies"]
         self.assertEqual(result["baseline_metrics"]["finite_material_resilience"],
-                         sum(result["baseline_metrics"][x] for x in ())
-                         + sum(result["candidate_results"][0]["measured_metrics"][x]
-                               for x in ("finite_material_resilience",)))
+                         measured)
+        self.assertEqual(result["candidate_results"][0]["measured_metrics"]
+                         ["finite_material_resilience"],measured)
         self.assertTrue(verify_causal_objective_matrix(result,p,g,s,clock,c))
 
     def test_invalid_original_games_never_receive_favorable_objective_status(self):
