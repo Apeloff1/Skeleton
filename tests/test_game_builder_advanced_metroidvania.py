@@ -213,7 +213,7 @@ class OriginalConnectedWorldTests(unittest.TestCase):
         self.assertIn("function drawAdvancedGame",SCRIPT)
         document=make_advanced_scene("metroidvania",{"regions":8},seed=2)
         altered=deepcopy(document)
-        altered["layout"]["rooms"][2]["biome"]="water"
+        altered["layout"]["rooms"][2]["biome"]="ash"
         with self.assertRaises(SceneError):
             validate_advanced_scene(altered,{"regions":8})
         rebuilt=make_advanced_scene("metroidvania",{"regions":8},seed=2,
