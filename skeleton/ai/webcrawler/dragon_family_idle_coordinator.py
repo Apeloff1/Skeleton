@@ -289,6 +289,7 @@ class DragonIdleCoordinator:
             "unchanged": "(checked: no novel verified source information)",
             "failed": "(deferred: adapter failed; bounded retry scheduled)",
             "paused": "(paused: user activity, consent, capacity, or lease fence)",
+            "recovered": "(recovered: interrupted or crashed worker lease expired; no XP granted)",
         }
         if outcome not in notes:
             raise ValueError("unknown idle research outcome")
@@ -305,6 +306,48 @@ class DragonIdleCoordinator:
         self.db.execute("""INSERT INTO dragon_family_idle_attempt_events
             VALUES(?,?,?,?,?,?,?,?,?)""",
             (owner,sequence,at,role,sid,outcome,note,prior,fingerprint))
+
+    def reconcile_expired_leases(self, owner: str, *, authorized: bool,
+                                 at: float, max_recover: int = 100) -> int:
+        """Fence abandoned host work after crash/restart, without replaying it.
+
+        Expiration is determined by a trusted host time observation; stale
+        leases never qualify as completed content and cannot regain XP.
+        Recovery is bounded, transactional, owner-scoped and hash-chained.
+        Future eligibility is delayed with the normal transient backoff.
+        """
+        self.family._assert_owner(owner)
+        if not authorized:
+            raise PermissionError("authenticated idle worker recovery required")
+        at = _epoch(at)
+        if type(max_recover) is not int or not 1 <= max_recover <= 1000:
+            raise ValueError("invalid idle recovery capacity")
+        self.db.execute("BEGIN IMMEDIATE")
+        with self.db:
+            rows = self.db.execute("""SELECT role,source_id,failures,next_due
+                FROM dragon_family_idle_leases WHERE owner=?
+                  AND last_outcome='running' AND lease_token<>''
+                  AND lease_expires<=?
+                ORDER BY lease_expires,role,source_id LIMIT ?""",
+                (owner,at,max_recover)).fetchall()
+            for role,sid,failures,due in rows:
+                errors = min(16,failures+1)
+                delay = min(self.policy.maximum_backoff_seconds,
+                            self.policy.transient_backoff_seconds *
+                            (2**min(12,errors-1)))
+                changed = self.db.execute("""UPDATE dragon_family_idle_leases
+                    SET lease_token='',lease_expires=0,
+                        next_due=?,failures=?,last_completed=?,
+                        last_outcome='recovered'
+                    WHERE owner=? AND role=? AND source_id=?
+                      AND last_outcome='running' AND lease_token<>''
+                      AND lease_expires<=?""",
+                    (max(due,at+delay),errors,at,
+                     owner,role,sid,at)).rowcount
+                if changed!=1:
+                    raise RuntimeError("expired lease recovery lost its fence")
+                self._record_attempt(owner,role,sid,at,"recovered")
+        return len(rows)
 
     def _finish(self, owner: str, role: str, sid: str, key: str,
                 now: float, outcome: str) -> None:
@@ -358,9 +401,13 @@ class DragonIdleCoordinator:
                                (owner,)).fetchone():
             return dict(at=_utc(state.now),attempted=0,changed=0,unchanged=0,
                         failed=0,paused=False,reason="parent_source_quest_incomplete")
+        # A crashed process may have left a durable 'running' row. Recover
+        # only after confirming this is an authorized idle tick.
+        recovered=self.reconcile_expired_leases(
+            owner,authorized=True,at=state.now,max_recover=100)
         candidates=self._candidates(owner,state.now,task_topics,adjacent_topics)
         stats: dict[str,object] = dict(at=_utc(state.now),attempted=0,changed=0,
-                                       unchanged=0,failed=0,paused=False)
+                                       unchanged=0,failed=0,paused=False,recovered=recovered)
         roles_seen: set[str] = set()
         sources_seen: set[str] = set()
         for _,_,attempts,seen,sid,role,url,media,tags,digest in candidates:
