@@ -15,6 +15,7 @@ from skeleton.ai.game_builder.advanced_gameplay_runtime import (
     run_advanced_session,verify_advanced_session,
 )
 from skeleton.ai.game_builder.advanced_level_scenes import make_advanced_scene
+from skeleton.ai.game_builder.system_editors import make_editor_document
 from skeleton.ai.game_builder.advanced_physics_interop import (
     rehearse_physics_encounter,verify_physics_encounter,
 )
@@ -49,9 +50,7 @@ class SourceBoundNativeEncounterTests(unittest.TestCase):
                 self.assertEqual(src["source_scene_digest"],origin["scene"]["digest"])
                 self.assertEqual(src["original_authored_scene"],origin["scene"])
                 self.assertEqual(src["original_source_settings"],
-                                 json.loads(package.files["godot/game.json"])["settings"]
-                                 if editor=="physics" else
-                                 __import__("skeleton.ai.game_builder.system_editors",fromlist=["make_editor_document"]).make_editor_document(editor)["settings"])
+                                 make_editor_document(editor)["settings"])
                 self.assertEqual(src["physics_session_digest"],
                                  physics["physics_session"]["digest"])
                 self.assertEqual(src["actual_fixture_impacts"],
