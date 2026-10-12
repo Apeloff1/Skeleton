@@ -903,8 +903,8 @@ $("advanced-scene-stage").addEventListener("click",async()=>{
 });
 $("advanced-godot-export").addEventListener("click",async()=>{
  try{
-  if(!advancedSession||!["puzzle","platformer","deck_battler","shooter","tactics","tower_defense","racing","survival","farming"].includes(advancedSession.editor))
-   throw Error("Native Godot export requires a verified advanced gameplay session in one of the nine playable native genres");
+  if(!advancedSession||!["puzzle","platformer","deck_battler","shooter","tactics","tower_defense","racing","survival","farming","factory"].includes(advancedSession.editor))
+   throw Error("Native Godot export requires a verified advanced gameplay session in one of the ten playable native genres");
   if(!advancedSettings)
    throw Error("Original authored game settings must be available");
   const response=await api("/api/advanced-godot-package",{
