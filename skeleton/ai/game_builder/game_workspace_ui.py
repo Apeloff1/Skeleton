@@ -990,6 +990,80 @@ function drawAdvancedGame(session){
   c.fillStyle="#a7dcc6";
   c.fillText("Witness (!) / forensic (F) / rumor (?) differ · original player P",12,256);
  }
+ if(editor==="flight"){
+  const ox=15,trackY=83,trackW=W-188,trackH=154;
+  const extent=Math.max(state.runway_end,1);
+  c.fillStyle="#c9e6f2";
+  c.fillText(state.title+" · "+state.weather+" · "+String(state.tick)+" steps",12,36);
+  c.fillStyle="#345568";c.fillRect(ox,trackY,trackW,trackH);
+  for(const ridge of state.ridges){
+   const x=ox+ridge.x/extent*trackW;
+   const height=Math.min(trackH-12,ridge.altitude/Math.max(1,state.altitude+90)*trackH);
+   c.fillStyle="#d6a67d";c.fillRect(x-4,trackY+trackH-height,8,height);
+  }
+  for(const b of state.beacons){
+   const x=ox+b.x/extent*trackW;
+   c.strokeStyle=state.beacons_seen.includes(b.x)?"#79e0b9":
+      state.beacons_missed.includes(b.x)?"#e9978e":"#e4d68a";
+   c.setLineDash([3,4]);c.beginPath();c.moveTo(x,trackY+5);
+   c.lineTo(x,trackY+trackH-2);c.stroke();c.setLineDash([]);
+  }
+  const runwayX=ox+state.runway_start/extent*trackW;
+  c.fillStyle="#8ca8a8";
+  c.fillRect(runwayX,trackY+trackH-7,Math.max(3,trackW-(runwayX-ox)),7);
+  const ax=ox+Math.min(extent+2,state.x)/extent*trackW;
+  const ay=trackY+trackH-14-Math.min(trackH-24,
+    state.altitude/Math.max(1,250)*trackH);
+  c.fillStyle="#a6f1d2";
+  c.beginPath();c.moveTo(ax+10,ay);c.lineTo(ax-9,ay-6);
+  c.lineTo(ax-7,ay+6);c.closePath();c.fill();
+  c.fillStyle="#eaf7ef";const tx=W-157;
+  c.fillText("Speed "+state.speed,tx,68);
+  c.fillText("Altitude "+state.altitude,tx,91);
+  c.fillText("Fuel "+state.fuel,tx,114);
+  c.fillText("Hull "+state.hull,tx,137);
+  c.fillText("Heat "+state.temperature,tx,160);
+  c.fillText("Wind "+state.wind_direction,tx,183);
+  c.fillText("NAV "+state.beacons_seen.length+"/"+state.beacons.length,tx,206);
+  c.fillText("Gear "+(state.gear?"DOWN":"UP"),tx,229);
+  c.fillStyle="#a6e9ce";
+  c.fillText("Arcade / simcade / simulation · full replay-owned physics",12,265);
+ }
+ if(editor==="sailing"){
+  const ox=17,trackY=75,trackW=W-177,trackH=157;
+  const extent=Math.max(1,state.harbor_end);
+  c.fillStyle="#d0e9ef";
+  c.fillText(state.title+" · "+state.sea+" · day tick "+String(state.tick),12,36);
+  c.fillStyle="#255368";c.fillRect(ox,trackY,trackW,trackH);
+  const shoreX=ox+state.harbor_start/extent*trackW;
+  c.fillStyle="#bdb498";c.fillRect(shoreX,trackY,trackW-(shoreX-ox),trackH);
+  for(const mark of state.buoys){
+   const x=ox+mark/extent*trackW;
+   c.fillStyle=state.buoys_seen.includes(mark)?"#8ef0c4":"#f1d187";
+   c.fillRect(x-2,trackY+13,4,trackH-26);
+  }
+  for(const shoal of state.shoals){
+   const x=ox+shoal.x/extent*trackW;
+   const y=trackY+trackH/2+shoal.lane*17;
+   c.fillStyle="#d79e75";c.fillRect(x-4,y-3,8,7);
+  }
+  const sx=ox+Math.min(extent+2,state.x)/extent*trackW;
+  const sy=trackY+trackH/2+state.lane*17;
+  c.fillStyle="#d5f4e4";c.fillRect(sx-9,sy-3,18,10);
+  if(state.sails){c.fillStyle="#f9e3ab";c.beginPath();
+   c.moveTo(sx,sy-25);c.lineTo(sx,sy-4);c.lineTo(sx+12,sy-4);c.fill();}
+  c.fillStyle="#eaf7ef";const tx=W-155;
+  c.fillText("Speed "+state.speed,tx,66);
+  c.fillText("Hull "+state.hull,tx,90);
+  c.fillText("Mast "+state.mast,tx,114);
+  c.fillText("Cargo "+state.cargo,tx,138);
+  c.fillText("Fuel "+state.fuel,tx,162);
+  c.fillText("Crew "+state.crew_morale,tx,186);
+  c.fillText("NAV "+state.buoys_seen.length+"/"+state.buoys.length,tx,210);
+  c.fillText(state.anchor?"ANCHORED":"Underway",tx,234);
+  c.fillStyle="#b6edcf";
+  c.fillText("Skiff / sloop / schooner · physical port cargo delivery",12,265);
+ }
  if(state.finished||state.failed){
   c.fillStyle=state.finished?"#a2f5cb":"#ffaba6";
   c.fillText(state.finished?"Completed":"Defeat",W-100,20);
