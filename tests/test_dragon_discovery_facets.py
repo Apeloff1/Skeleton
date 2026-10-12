@@ -226,3 +226,55 @@ def test_weighted_index_prefers_goal_over_generic_era_metadata(indexed_studio):
     with pytest.raises(ValueError, match="term weights"):
         index.matching_rows("studio", frozenset({"physics"}), authorized=True,
                             limit=3, weights={"unrelated": 12})
+
+
+def test_index_audit_detects_new_provenance_and_repairs_by_refresh(indexed_studio):
+    store, almanacs, _, rows = indexed_studio
+    index = DiscoveryFacetIndex(almanacs)
+    _populate(index)
+    initial = index.audit("studio", authorized=True, limit=100)
+    assert initial["audited"] == initial["current"] == 60
+    sid, url = rows[1]
+    candidate = {
+        "url": url, "source_id": sid,
+        "discoveries": [{"repository": "homebrew/reference",
+                         "headers": ["Platform-specific input mappings"]}],
+    }
+    receipt = {"candidate": candidate, "normalized_source_id": sid,
+               "normalized_url": url, "supplement_digest": "a" * 64,
+               "authority": "unreviewed_discovery_only"}
+    store.db.execute(
+        "INSERT INTO dragon_almanac_supplement_receipts_v2 VALUES(?,?,?,?,?,?)",
+        ("studio", sid, sid, "a" * 64, canonical_json(receipt),
+         canonical_digest(receipt)))
+    store.db.commit()
+    stale = index.audit("studio", authorized=True, limit=100)
+    assert stale["current"] == 59
+    assert stale["stale_source_ids"] == [sid]
+    _populate(index)
+    repaired = index.audit("studio", authorized=True, limit=100)
+    assert repaired["stale"] == 0
+    result = MissionSourceScout(almanacs).propose(
+        "studio", SourceMission("mappings input", limit=3),
+        authorized=True, indexed=True)
+    assert sid in {x["source_id"] for x in result["selection"]}
+
+
+def test_index_audit_refuses_forged_posting_without_rebuild(indexed_studio):
+    store, almanacs, _, _ = indexed_studio
+    index = DiscoveryFacetIndex(almanacs)
+    _populate(index)
+    sid, term = store.db.execute(
+        """SELECT source,token FROM dragon_discovery_facet_terms
+           WHERE owner='studio' ORDER BY source,token LIMIT 1"""
+    ).fetchone()
+    store.db.execute(
+        """UPDATE dragon_discovery_facet_terms SET token='forgedpoisonterm'
+           WHERE owner='studio' AND source=? AND token=?""", (sid, term))
+    store.db.commit()
+    with pytest.raises(ValueError, match="postings"):
+        index.audit("studio", authorized=True, limit=100)
+    with pytest.raises(PermissionError):
+        index.audit("studio", authorized=False)
+    with pytest.raises(ValueError):
+        index.audit("studio", authorized=True, limit=1001)
