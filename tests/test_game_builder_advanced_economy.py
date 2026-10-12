@@ -72,10 +72,6 @@ class EconomyReferenceTests(unittest.TestCase):
             "sell", "relief", "wait",
         ])["state"]
         self.assertEqual(cash_total(start), cash_total(after))
-        self.assertEqual(after["cash"] + after["transport_fees"] +
-                         after["tax_receipts"] + after["household_spend"] -
-                         (after["cash"] + after["transport_fees"] +
-                          after["tax_receipts"] + after["household_spend"]), 0)
         self.assertGreater(after["household_consumed"], 0)
         self.assertGreater(after["household_spend"], 0)
 
