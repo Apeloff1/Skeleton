@@ -5939,8 +5939,48 @@ for _entry in CATALOG:
             {"key": "voyage_turn_limit", "kind": "int", "default": 128, "minimum": 30, "maximum": 128, "options": []},
             {"key": "vessel_class", "kind": "enum", "default": "sloop", "minimum": None, "maximum": None, "options": ["skiff", "sloop", "schooner"]},
         ])
+# Original traversal mechanics are separately editable but share one guarded replay core.
+for _entry in CATALOG:
+    if _entry["id"] == "parkour":
+        _entry["fields"].extend([
+            {"key":"course_length","kind":"int","default":60,"minimum":36,"maximum":128,"options":[]},
+            {"key":"max_stride","kind":"int","default":5,"minimum":2,"maximum":8,"options":[]},
+            {"key":"stride_divisor","kind":"int","default":8,"minimum":2,"maximum":30,"options":[]},
+            {"key":"sprint_gain","kind":"int","default":4,"minimum":1,"maximum":20,"options":[]},
+            {"key":"sprint_cost","kind":"int","default":8,"minimum":1,"maximum":30,"options":[]},
+            {"key":"jump_cost","kind":"int","default":7,"minimum":1,"maximum":25,"options":[]},
+            {"key":"vault_cost","kind":"int","default":4,"minimum":1,"maximum":20,"options":[]},
+            {"key":"slide_cost","kind":"int","default":3,"minimum":1,"maximum":20,"options":[]},
+            {"key":"wall_run_cost","kind":"int","default":10,"minimum":1,"maximum":30,"options":[]},
+            {"key":"grapple_cost","kind":"int","default":12,"minimum":1,"maximum":40,"options":[]},
+            {"key":"climb_cost","kind":"int","default":7,"minimum":1,"maximum":30,"options":[]},
+            {"key":"grapple_charges","kind":"int","default":5,"minimum":0,"maximum":20,"options":[]},
+            {"key":"grip_strength","kind":"int","default":35,"minimum":10,"maximum":100,"options":[]},
+            {"key":"jump_power","kind":"int","default":4,"minimum":1,"maximum":10,"options":[]},
+            {"key":"climb_power","kind":"int","default":2,"minimum":1,"maximum":8,"options":[]},
+            {"key":"vault_clearance","kind":"int","default":3,"minimum":1,"maximum":4,"options":[]},
+            {"key":"wall_run_height","kind":"int","default":4,"minimum":1,"maximum":4,"options":[]},
+            {"key":"gravity","kind":"int","default":2,"minimum":1,"maximum":8,"options":[]},
+            {"key":"surface_friction","kind":"int","default":1,"minimum":0,"maximum":4,"options":[]},
+            {"key":"wind_period","kind":"int","default":4,"minimum":1,"maximum":20,"options":[]},
+            {"key":"wind_resistance","kind":"int","default":15,"minimum":1,"maximum":100,"options":[]},
+            {"key":"momentum_decay","kind":"int","default":2,"minimum":1,"maximum":15,"options":[]},
+            {"key":"stamina_recovery","kind":"int","default":8,"minimum":1,"maximum":40,"options":[]},
+            {"key":"stamina_regen_per_turn","kind":"int","default":2,"minimum":0,"maximum":15,"options":[]},
+            {"key":"max_health","kind":"int","default":100,"minimum":20,"maximum":200,"options":[]},
+            {"key":"collision_damage","kind":"int","default":20,"minimum":1,"maximum":80,"options":[]},
+            {"key":"hardcore_damage","kind":"int","default":15,"minimum":1,"maximum":80,"options":[]},
+            {"key":"trick_reward","kind":"int","default":10,"minimum":1,"maximum":100,"options":[]},
+            {"key":"medal_bonus","kind":"int","default":30,"minimum":1,"maximum":100,"options":[]},
+            {"key":"completion_bonus","kind":"int","default":200,"minimum":20,"maximum":1000,"options":[]},
+            {"key":"medals_required","kind":"int","default":2,"minimum":1,"maximum":4,"options":[]},
+            {"key":"time_limit","kind":"int","default":128,"minimum":32,"maximum":128,"options":[]},
+            {"key":"jump_cooldown","kind":"int","default":2,"minimum":1,"maximum":8,"options":[]},
+            {"key":"double_jump","kind":"bool","default":False,"minimum":None,"maximum":None,"options":[]},
+            {"key":"difficulty","kind":"enum","default":"flow","minimum":None,"maximum":None,"options":["assisted","flow","hardcore"]},
+        ])
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
@@ -6033,6 +6073,17 @@ def _normalized_settings(editor_id: str, values: Mapping[str, object] | None) ->
         normalized["board_width"], normalized["board_height"]
     ):
         raise SystemEditorError("tactics range exceeds available board dimensions")
+    if editor_id == "parkour":
+        if normalized["max_stride"]>normalized["course_length"]//5:
+            raise SystemEditorError("parkour strides cannot leap the entire route")
+        if normalized["sprint_cost"]>normalized["stamina"]:
+            raise SystemEditorError("starting stamina cannot fund a sprint")
+        if normalized["jump_cost"]>normalized["stamina"]:
+            raise SystemEditorError("starting stamina cannot fund a jump")
+        if normalized["grapple_charges"]>0 and normalized["grapple_reach"]==0:
+            raise SystemEditorError("grapple ammunition requires reachable surfaces")
+        if normalized["medals_required"]>normalized["course_length"]//6:
+            raise SystemEditorError("medal schedule exceeds spatial route")
     if editor_id == "sailing":
         if normalized["cargo_contract"] > normalized["cargo_capacity"]:
             raise SystemEditorError("cargo delivery cannot exceed vessel hold capacity")
