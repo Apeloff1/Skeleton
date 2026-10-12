@@ -124,7 +124,9 @@ def start(config,seed):
         "goal_x":layout["goal_x"],"target_score":layout["target_score"],
         "home_score":0,"away_score":0,
         "stamina":config["starting_stamina"],
+        "max_stamina":config["starting_stamina"],
         "away_stamina":config["starting_stamina"],
+        "ap_remaining":config["action_points"],"turns_committed":0,
         "subs_left":min(config["substitutions"],config["team_size"]-1),
         "fatigue":0,"injuries":0,"fouls":0,"passes":0,"interceptions":0,
         "shots":0,"misses":0,"goals":0,"blocks":0,
@@ -222,8 +224,12 @@ def step(state,config,action):
         raise SportsActionError("action is not a legitimate rule-specific sporting control")
     if state["finished"] or state["failed"]:
         raise SportsActionError("cannot play after original match termination")
-    if action=="substitute" and state["subs_left"]<=0:
-        raise SportsActionError("original substitutions are finite")
+    if mode=="turn_based" and state["ap_remaining"]<=0 and action!="end_turn":
+        raise SportsActionError("turn-based action points require a committed turn")
+    if action=="substitute" and (
+        state["subs_left"]<=0 or mode=="racket"
+    ):
+        raise SportsActionError("original substitutions require a finite team roster")
     if mode=="racket" and action=="serve" and state["rally"]:
         raise SportsActionError("cannot repeatedly serve into a live rally")
     if mode=="racket" and action in ATTACK and not state["rally"]:
@@ -322,9 +328,13 @@ def step(state,config,action):
                 state["fatigue"]+=config["collision_fatigue"]
                 events.append("real_contact_collision")
         if mode=="turn_based" and action=="end_turn":
+            state["turns_committed"]+=1
+            state["ap_remaining"]=config["action_points"]
             events.append("tactical_turn_committed")
         if state["home"]!=old and state["owner"]=="home":
             events.append("player_field_position_changed")
+    if mode=="turn_based" and action!="end_turn":
+        state["ap_remaining"]-=1
     state["tick"]+=1
     if action!="rest":
         state["fatigue"]+=max(1,config["team_size"]//8)
@@ -337,7 +347,8 @@ def step(state,config,action):
     # A won point resets possession before the next exchange. No AI response
     # can erase an already awarded point or fabricate a second result.
     if not any(e.startswith("earned_") and e.endswith("_point") for e in events):
-        events+=_opponent(state,config,action)
+        if mode!="turn_based" or action=="end_turn":
+            events+=_opponent(state,config,action)
     target=state["target_score"]
     if (state["home_score"]>=target or state["away_score"]>=target
         or state["tick"]>=state["match_limit"]):
