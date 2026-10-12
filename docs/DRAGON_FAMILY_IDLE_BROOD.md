@@ -266,3 +266,108 @@ role IDs remain `article`, `video`, and `monitor`.
 source-projection and tests are committed to a draft PR. Release
 qualification is pending; no production deployment or model-weight
 change should be inferred from this status.
+
+
+## Durable idle workers and real-capture integration (2026-10-12 UTC)
+
+Production-focused next milestone implementation:
+`dragon_family_idle_coordinator.py` owns a persisted, bounded owner-specific
+work lease and `dragon_family_idle_integration.py` connects all three roles
+to the **existing** custody and verified-evidence bridge. Neither module
+downloads anything, starts a daemon, invents review decisions, or alters
+AI weights; the authenticated host must supply trusted, cancelable adapters.
+
+```python
+from skeleton.ai.webcrawler.dragon_family_idle_integration import (
+    DragonIdleAcquisitionService, AcquiredArticle, AcquiredVideo
+)
+from skeleton.ai.webcrawler.dragon_family_custody_bridge import (
+    DragonFamilyCustodyBridge
+)
+
+bridge = DragonFamilyCustodyBridge(canonical_crawler_db, current_authenticated_owner)
+service = DragonIdleAcquisitionService(bridge)
+
+# Each capture callback is a separately authorized *existing crawler/media
+# adapter*, returning canonical reviewed bytes + source metadata, or None for
+# no new data. Network policy, video rights, timeouts and host budgets are the
+# adapter's responsibility; the source can never come from raw UI parameters.
+result = service.run_once(
+    authorized=True,
+    idle_state=host_authenticated_device_and_job_idle_state,
+    article_capture=host_capture_reviewed_article,
+    video_capture=host_capture_authorized_video,
+    monitor_capture=host_capture_reviewed_source_revision,
+    task_topics=("game_engine",),
+    adjacent_topics=("physics", "game_ai"),
+)
+```
+
+The host must:
+- Use a confirmed five-minute idle threshold (or stricter), opt-in research,
+  zero busy jobs and available resources, and **recheck after every fetch**.
+- Authenticate the owner at the host boundary; `DragonFamilyCustodyBridge`
+  binds family, Almanakk and idle coordinator to the same owner.
+- Return `AcquiredArticle` for articles and `AcquiredVideo` for videos;
+  Scout may use either, but not an unverified URL or arbitrary approval hash.
+- Observe host/bandwidth/robots/redirect/SSRF/license/copyright restrictions,
+  per-source timeouts shorter than the coordinator lease, and the existing
+  reviewed-source evidence chain. This module intentionally cannot enforce
+  live DNS/HTTP policies because it does **not** fetch.
+- Stop launching new ticks as soon as device activity, foreground work,
+  memory/network capacity, or consent state changes.
+
+### Scheduler behavior and measurable evidence
+
+| Condition | Coordinator action |
+|---|---|
+| Parent not yet adult | No hatchling tasks |
+| User active / consent expired | No dispatch; if activity resumes mid-capture, discard result |
+| Fresh eligible article | Ember attempts a registered article with exact source identity |
+| New licensed video material | Flicker attempts a time-coded, approved media capture |
+| Previously acquired source due for revision | Scout checks old source for changed content |
+| Same source selected by two hatchlings | Only one role may dispatch that source in a tick |
+| Same content digest revisited | No XP, no new accepted knowledge; schedule cooldown |
+| Network/custody/adapter failure | No XP; persist bounded retry information |
+| Worker lease expired or lost | Refuse admission; next trusted idle tick may reclaim source |
+| Large source inventory | Persist a rotating keyset scan cursor; no permanent first-page starvation |
+
+The source catalog keyset scan has bounded per-tick work, per-worker leases
+and fair specialist dispatch. The scheduler does not infer whether the user's
+machine is idle: the host must supply authoritative signals. No source grants,
+activity permissions, or outside-provider credentials are stored in the UI.
+
+A separate SQLite append-only idle-attempt journal stores UTC time, role,
+source ID, action, parenthesized explanation, previous SHA-256 event hash and
+current hash. The authenticated `read_idle_family_health` projection checks
+the complete journal chain and shows bounded recent entries. Examples:
+
+- `2026-10-12T15:32:01.000Z` — article — changed
+  `(improved: independently reviewed new source content acquired)`
+- `2026-10-12T15:38:09.000Z` — monitor — unchanged
+  `(checked: no novel verified source information)`
+- `2026-10-12T15:45:00.000Z` — video — paused
+  `(paused: user activity, consent, capacity, or lease fence)`
+
+**These are format examples, not actual crawl events.** A source reviewer
+may additionally record a specific improvement note, but the idle coordinator
+cannot claim a model-quality gain without an approved holdout evaluation.
+
+### Added targeted validation
+
+```bash
+pytest -q tests/test_ai_webcrawler_dragon_family_idle_coordinator.py
+pytest -q tests/test_ai_webcrawler_dragon_family_custody_bridge.py
+pytest -q tests/test_ai_webcrawler_dragon_family_almanakk.py
+cd frontend && yarn test:dragon-companion && yarn typecheck
+```
+
+New tests exercise all three specialist roles, true idle/foreground gates,
+rejected source rewrites, typed real-capture integration, repeated content,
+fair role isolation, callback interruption, retry/cooldown, rotating scans
+into later source pages, owner isolation, audit timestamps and corruption
+detection.
+
+**Release remains gated** on actual installed host adapters, real device
+state signals, independent Wiki/holdout evaluators, tenant-isolated storage,
+deployment-specific resource budgets and passing exact-head gates.
