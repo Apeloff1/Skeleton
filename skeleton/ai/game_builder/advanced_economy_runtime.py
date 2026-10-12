@@ -131,7 +131,7 @@ def start(config, seed):
         "unmodeled_good_families": other_goods,
         "unmodeled_market_nodes": other_markets,
         "cash": config["starting_cash"], "cargo": [0] * count,
-        "cargo_origin": [-1] * count, "energy": config["player_energy"],
+        "cargo_lots": [[] for _ in range(count)], "energy": config["player_energy"],
         "harvested": 0, "manufactured": 0, "transfers": 0,
         "imports_sold": 0, "market_sales": 0, "buy_count": 0,
         "household_consumed": 0, "household_spend": 0,
@@ -233,7 +233,7 @@ def step(state, config, action):
         node["treasury"] += price + tax
         state["tax_receipts"] += tax
         state["cargo"][good] += 1
-        state["cargo_origin"][good] = node["id"]
+        state["cargo_lots"][good].append(node["id"])
         state["buy_count"] += 1
         events.append("paid_finite_market_purchase")
     elif action == "sell":
@@ -248,11 +248,10 @@ def step(state, config, action):
         node["treasury"] -= price
         state["cash"] += price
         state["cargo"][good] -= 1
-        if state["cargo_origin"][good] != node["id"]:
+        original_market = state["cargo_lots"][good].pop(0)
+        if original_market != node["id"]:
             state["imports_sold"] += 1
             events.append("verified_cross_market_delivery")
-        if state["cargo"][good] == 0:
-            state["cargo_origin"][good] = -1
         state["market_sales"] += 1
         node["sales"] += 1
         events.append("market_paid_real_cargo_bid")
