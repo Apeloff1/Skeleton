@@ -73,7 +73,7 @@ def test_three_specialist_evidence_processors_keep_review_boundaries():
         DragonSourceDeltaLedger
     )
     assert TimedTranscriptCue(0,1200,"Original game evidence").end_ms==1200
-    with pytest.raises(ValueError,match="canonical"):
+    with pytest.raises(TypeError,match="canonical"):
         DragonSourceDeltaLedger(None)
     with pytest.raises(TypeError,match="canonical"):
         DragonVideoTranscriptLedger(None,review_public_key=b"\x11"*32,

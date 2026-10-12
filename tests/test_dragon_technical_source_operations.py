@@ -213,7 +213,7 @@ def test_global_ticket_attaches_to_persistent_fence_and_rechecks_chunks(lab):
     # A second controller object / process sees the exact durable state.
     other=DragonSourceOperations(lab[5])
     assert other.inspect(OWNER,ticket.source_id,authorized=True)["state"]=="leased"
-    with pytest.raises(PermissionError,match="unresolved|active"):
+    with pytest.raises(PermissionError,match="unresolved|active|no runnable durable proposal"):
         other.attach(ticket,lab[3],now=NOW+6,authorized=True,trusted_worker=True)
     stop(lab,ticket)
     released=ops.release(ticket,lab[3],now=NOW+1,capture_digest=None,
@@ -872,7 +872,8 @@ def test_revoked_capture_permission_fails_before_any_pilot_network_request(lab):
     signer.revoke(grant,now=NOW,reason="terms permission withdrawn",
                   authorized=True,trusted_issuer=True)
     with pytest.raises(PermissionError,match="revoked"):
-        pilot.preview(grant,now=NOW,authorized=True)
+        pilot.preview(grant,now=NOW,authorized=True,
+                      rights_attestation=external_rights_attestation(grant))
     fetcher,visited=offline_pilot_fetcher(lab)
     with pytest.raises(PermissionError,match="revoked"):
         invoke_pilot(lab,pilot,grant,fetcher)
@@ -926,7 +927,8 @@ def test_pilot_cannot_reserve_wrong_or_unready_source(lab):
     pilot=DragonResearchPilot(
         DragonResearchSupervisor(lab[6],lab[3]),signer,
         independent_rights_verifier())
-    assert not pilot.preview(grant,now=NOW,authorized=True).source_ready
+    assert not pilot.preview(grant,now=NOW,authorized=True,
+                             rights_attestation=external_rights_attestation(grant)).source_ready
     fetcher,visited=offline_pilot_fetcher(lab)
     assert invoke_pilot(lab,pilot,grant,fetcher) is None
     assert visited==[] and lab[4].active_grants()==()
