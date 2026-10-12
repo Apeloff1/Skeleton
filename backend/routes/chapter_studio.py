@@ -17,11 +17,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from core.chapter_continuity import (
-    MAX_CHAPTERS, MAX_SCENES, MAX_STREAM_EVENTS, PLOT_KINDS,
+    MAX_CHAPTERS, MAX_SCENES, PLOT_KINDS,
     chapter_context, chapter_for_act, digest, plot_spans,
     proofreading_checks, scene_coordinates,
 )
-from core.story_continuity import StoryAuditAccumulator
+from core.story_continuity import StoryAuditAccumulator, MAX_STREAM_EVENTS
 from routes.gameforge_auth import require_role
 from routes.playable import _db
 from routes.story_index import _scope
