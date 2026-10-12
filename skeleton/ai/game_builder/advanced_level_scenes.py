@@ -25,6 +25,10 @@ from .advanced_fighting_runtime import (default_layout as fight_layout,
 from .advanced_rhythm_runtime import (default_layout as rhythm_layout,
                                       normalize_layout as validate_rhythm_layout,
                                       RhythmActionError)
+from .advanced_physics_runtime import (
+    default_layout as physics_layout, normalize_layout as validate_physics_layout,
+    PhysicsActionError,
+)
 from .advanced_sailing_runtime import (
     default_layout as sailing_layout, normalize_layout as validate_sailing_layout,
     SailingActionError,
@@ -182,6 +186,8 @@ def _default_layout(engine, config, seed):
         return flight_layout(config,seed)
     if engine == "sailing":
         return sailing_layout(config,seed)
+    if engine == "physics":
+        return physics_layout(config,seed)
     raise SceneError("no advanced authored scene available for that engine")
 
 
@@ -197,6 +203,11 @@ def _normalize_layout(engine, config, layout):
         try:
             return validate_flight_layout(config,layout)
         except FlightActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="physics":
+        try:
+            return validate_physics_layout(config,layout)
+        except PhysicsActionError as exc:
             raise SceneError(str(exc)) from exc
     if engine=="sailing":
         try:
