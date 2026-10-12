@@ -31,6 +31,7 @@ from .advanced_roguelike_longrun import (replay_long_roguelike,
     verify_long_roguelike,continue_long_roguelike)
 from .advanced_world_planner import plan_original_world
 from .advanced_stealth_planner import plan_stealth_route
+from .advanced_parkour_planner import plan_parkour_route, verify_parkour_plan
 from .advanced_godot_export import (
     render_advanced_godot_package, write_advanced_godot_package,
 )
@@ -84,6 +85,18 @@ def parser() -> argparse.ArgumentParser:
     stealth_plan.add_argument("--settings")
     stealth_plan.add_argument("--max-states",type=int,default=30000)
     stealth_plan.add_argument("--max-depth",type=int,default=96)
+    parkour_plan=commands.add_parser("plan-parkour",
+        help="Search actual original traversal and independently prove any completed route")
+    parkour_plan.add_argument("--scene",required=True)
+    parkour_plan.add_argument("--settings")
+    parkour_plan.add_argument("--max-states",type=int,default=12000)
+    parkour_plan.add_argument("--max-depth",type=int,default=96)
+    parkour_plan.add_argument("--beam-width",type=int,default=90)
+    parkour_verify=commands.add_parser("verify-parkour-plan",
+        help="Re-search a source-verified original course and verify an exact planner receipt")
+    parkour_verify.add_argument("--record",required=True)
+    parkour_verify.add_argument("--scene",required=True)
+    parkour_verify.add_argument("--settings")
     world_plan=commands.add_parser("plan-original-world",
         help="Search and independently replay a safe original world ability path")
     world_plan.add_argument("--scene",required=True)
@@ -221,6 +234,16 @@ def main(argv=None) -> int:
                 _load(args.scene),
                 _load(args.settings) if args.settings else None,
                 max_states=args.max_states,max_depth=args.max_depth)
+        elif args.operation == "plan-parkour":
+            output=plan_parkour_route(
+                _load(args.scene),
+                _load(args.settings) if args.settings else None,
+                max_states=args.max_states,max_depth=args.max_depth,
+                beam_width=args.beam_width)
+        elif args.operation == "verify-parkour-plan":
+            output={"verified":verify_parkour_plan(
+                _load(args.record),_load(args.scene),
+                _load(args.settings) if args.settings else None)}
         elif args.operation == "plan-original-world":
             output=plan_original_world(
                 _load(args.scene),
