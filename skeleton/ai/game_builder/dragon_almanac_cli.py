@@ -15,7 +15,7 @@ from .reviewed_knowledge import ReviewedKnowledgeStore
 
 def main():
     parser = argparse.ArgumentParser(description="Import, inspect and seed sequential Dragon almanacs")
-    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief", "mission-scout"))
+    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief", "mission-scout", "import-supplements", "discovery-topics", "discovery-sources", "discovery-receipts"))
     parser.add_argument("--database", required=True)
     parser.add_argument("--owner", required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
@@ -29,6 +29,10 @@ def main():
     parser.add_argument("--topic", help="Optional owner-scoped almanac topic ID")
     parser.add_argument("--limit", type=int, default=25)
     parser.add_argument("--scan-budget", type=int, default=2000)
+    parser.add_argument("--parent", help="Optional parent heading topic ID")
+    parser.add_argument("--source", help="Exact source ID for raw discovery receipts")
+    parser.add_argument("--offset", type=int, default=0)
+    parser.add_argument("--supplement", action="append", default=[], help="Discovery evidence JSON in chain order")
     parser.add_argument("--query", help="Reviewed mechanic or design research question")
     parser.add_argument("--design", type=Path, help="Strict native game design JSON")
     args = parser.parse_args()
@@ -37,7 +41,33 @@ def main():
     with ReviewedKnowledgeStore(args.database) as library:
         almanacs = DragonAlmanacs(library)
         worker = SequentialAlmanacWorker(almanacs)
-        if args.command == "mission-scout":
+        if args.command == "import-supplements":
+            from .dragon_discovery_admission import import_supplement_files
+            if not args.supplement:
+                parser.error("import-supplements requires --supplement in lineage order")
+            registry = read_source_registry(args.registry)
+            result = import_supplement_files(
+                almanacs, args.owner, registry, args.supplement, authorized=True)
+        elif args.command in {"discovery-topics", "discovery-sources", "discovery-receipts"}:
+            from .dragon_discovery_admission import DragonDiscoveryAdmission
+            discovery = DragonDiscoveryAdmission(almanacs)
+            if args.command == "discovery-topics":
+                result = discovery.topic_page(
+                    args.owner, parent=args.parent, limit=args.limit, offset=args.offset,
+                    authorized=True)
+            elif args.command == "discovery-sources":
+                if not args.topic:
+                    parser.error("discovery-sources requires --topic")
+                result = discovery.source_page(
+                    args.owner, args.topic, limit=args.limit, offset=args.offset,
+                    authorized=True)
+            else:
+                if not args.source:
+                    parser.error("discovery-receipts requires --source")
+                result = discovery.provenance_page(
+                    args.owner, args.source, limit=args.limit, offset=args.offset,
+                    authorized=True)
+        elif args.command == "mission-scout":
             from .dragon_discovery_mission import MissionSourceScout, SourceMission
             if not args.query:
                 parser.error("mission-scout requires --query")
