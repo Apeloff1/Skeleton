@@ -203,8 +203,7 @@ class OriginalStealthReferenceTests(unittest.TestCase):
         self.assertEqual(state["guard_reserve"],142)
         for _ in range(6):
             if state["failed"]:break
-            step(state,cfg,"decoy_east" if state["stun_charges"] else "sprint_east"
-                 if state["player"][0]<7 else "wait")
+            step(state,cfg,"decoy_east" if state["stun_charges"] else "wait")
         self.assertGreater(state["reinforcements_deployed"],0)
         self.assertEqual(state["guard_reserve"]+
                          state["reinforcements_deployed"],142)
