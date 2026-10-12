@@ -111,6 +111,7 @@ export function worldProjectLinks(id: unknown): readonly ProjectLink[] {
     ['knowledge','Knowledge Base','Edit, review and approve canonical game artifacts.','/game-kb'],
     ['story','Story Continuity','Audit scene history, character witnesses and causal threads.','/story-index'],
     ['chapter','Chapter Studio','Edit all 100 chapters, 1,000 acts and 9,999 scenes with highlighted plot points and review receipts.','/chapter-studio'],
+    ['outcomes','Branching Outcomes','Author dialogue choices, karma, quests, faction standing, character and place lore, and alternate epilogues.','/story-outcomes'],
     ['studio','Galaxy Studio','Rebuild, refine and package the selected game.','/studio'],
   ] as const;
   return links.map(([key,title,description,route]) => ({ id:key,title,description,href:projectHref(route,project)! }));
