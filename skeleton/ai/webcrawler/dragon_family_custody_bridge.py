@@ -123,6 +123,15 @@ class DragonFamilyCustodyBridge:
             handoff_verify=handoff_verify,
         )
 
+    def glean_matrix(self, *, finding_verify=None):
+        """Owner-locked mother insight matrix over canonical reviewed captures.
+
+        Without an independent anchor/proposition verifier this is strictly
+        a read-only view. The product status route never holds reviewer power.
+        """
+        from .dragon_family_glean_matrix import DragonGleanMatrix
+        return DragonGleanMatrix(self.family(),finding_verify=finding_verify)
+
     def article(self, snapshot: ApprovedSourceSnapshot,
                 document: CrawlDocument) -> tuple[SourceSeed, SourceReceipt]:
         """Verify true text hash, transport provenance, and claimed review."""
