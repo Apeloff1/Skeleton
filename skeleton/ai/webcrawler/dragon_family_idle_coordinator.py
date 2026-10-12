@@ -419,6 +419,15 @@ class DragonIdleCoordinator:
         self._record_attempt(owner,role,sid,now,outcome)
         return True
 
+    def _commit_verified_completion(
+            self, owner: str, role: str, sid: str, key: str,
+            now: float, changed: bool) -> None:
+        # Called within DragonFamily.digest_idle's transaction; a missing
+        # token raises, ensuring both the new knowledge and XP roll back.
+        if not self._finish_uncommitted(
+                owner,role,sid,key,now,"changed" if changed else "unchanged"):
+            raise PermissionError("source lease disappeared during atomic admission")
+
     def _finish(self, owner: str, role: str, sid: str, key: str,
                 now: float, outcome: str) -> bool:
         self.db.execute("BEGIN IMMEDIATE")
@@ -507,12 +516,9 @@ class DragonIdleCoordinator:
                         lease_guard=lambda: (
                             self._owned(owner,role,sid,key,after.now) and
                             (commit_gate is None or commit_gate(after.now) is True)),
-                        completion_hook=lambda changed: (
-                            self._finish_uncommitted(
-                                owner,role,sid,key,after.now,
-                                "changed" if changed else "unchanged") or
-                            (_ for _ in ()).throw(RuntimeError(
-                                "idle source commit lost its worker token"))))
+                        completion_hook=lambda changed:
+                            self._commit_verified_completion(
+                                owner,role,sid,key,after.now,changed))
                     status="changed" if changed else "unchanged"
                 if receipt is None:
                     self._finish(owner,role,sid,key,after.now,status)
