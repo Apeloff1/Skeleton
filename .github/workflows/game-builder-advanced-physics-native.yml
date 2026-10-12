@@ -114,9 +114,32 @@ jobs:
           root="$RUNNER_TEMP/native-original-physics"
           for scenario in movement signed_impulses real_goal open_ended gravity_drop; do
             project="$root/$scenario/godot"
-            godot --headless --path "$project" --import
-            godot --headless --path "$project" -- --verify-physics | tee "$root/$scenario/native.log"
-            grep -q "NATIVE_ADVANCED_PHYSICS_OK" "$root/$scenario/native.log"
+            python - "$project" "$root/$scenario/native.log" <<'PY'
+          from pathlib import Path
+          import subprocess,sys
+          project,log=sys.argv[1:]
+          combined=[]
+          for label,args,seconds in (
+              ("import",["godot","--headless","--path",project,"--import"],90),
+              ("native replay",["godot","--headless","--path",project,
+                                "--","--verify-physics"],75),
+          ):
+              try:
+                  proc=subprocess.run(args,capture_output=True,text=True,
+                                      errors="replace",timeout=seconds)
+              except subprocess.TimeoutExpired as exc:
+                  print("NATIVE_PHYSICS_TIMEOUT",label,str(exc))
+                  sys.exit(1)
+              chunk=(proc.stdout or "")+"\n"+(proc.stderr or "")
+              combined.append(chunk)
+              if proc.returncode!=0:
+                  print("NATIVE_PHYSICS_ERROR",label,proc.returncode,chunk)
+                  sys.exit(1)
+          Path(log).write_text("\n".join(combined),encoding="utf-8")
+          print(combined[-1])
+          if "NATIVE_ADVANCED_PHYSICS_OK" not in combined[-1]:
+              sys.exit("Independent Godot gameplay proof marker was not printed")
+          PY
           done
       - name: Export actual standalone Linux native game
         if: runner.os == 'Linux'
