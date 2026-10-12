@@ -61,14 +61,16 @@ class ChapterIn(BaseModel):
     style_id: str = Field(pattern=SLUG)
     palette_id: str = Field(pattern=SLUG)
     voice_cast: dict[str, str] = Field(default_factory=dict, max_length=200)
+    face_cast: dict[str, str] = Field(default_factory=dict, max_length=200)
     transition_reason: str | None = Field(default=None, max_length=1200)
     source_message_id: str | None = Field(default=None, pattern=SLUG)
 
     @model_validator(mode="after")
     def characters(self):
-        for character, voice in self.voice_cast.items():
-            if not re.fullmatch(SLUG, character) or not re.fullmatch(SLUG, voice):
-                raise ValueError("Character and immutable voice reference must be a slug")
+        for registry, kind in ((self.voice_cast, "voice"), (self.face_cast, "face")):
+            for character, asset in registry.items():
+                if not re.fullmatch(SLUG, character) or not re.fullmatch(SLUG, asset):
+                    raise ValueError("Character and immutable " + kind + " reference must be a slug")
         return self
 
 
@@ -174,25 +176,32 @@ async def _scene(scope: dict, branch: str, scene: int) -> dict:
 
 async def _global_style_guard(scope: dict, branch: str, incoming: dict,
                               chapter_no: int) -> None:
+    # Identity locks are game-wide across every branch, not branch-local.
+    # Every recorded source chapter is authoritative for voice and face IDs.
     rows = await _db.game_story_chapters.find(
-        {**scope, "branch_id": branch},
-        {"era_id": 1, "style_id": 1, "palette_id": 1, "voice_cast": 1, "chapter": 1},
-    ).limit(MAX_CHAPTERS + 1).to_list(length=MAX_CHAPTERS + 1)
-    if len(rows) > MAX_CHAPTERS:
-        raise HTTPException(status_code=409, detail="Chapter index exceeds the authorized capacity")
+        {**scope},
+        {"era_id": 1, "style_id": 1, "palette_id": 1,
+         "voice_cast": 1, "face_cast": 1, "branch_id": 1, "chapter": 1},
+    ).limit(5001).to_list(length=5001)
+    if len(rows) > 5000:
+        raise HTTPException(status_code=409, detail="Identity index exceeds safe audit capacity")
     for prior in rows:
-        if prior["chapter"] == chapter_no:
+        # Revising the same chapter is checked below against its prior version.
+        if prior.get("branch_id") == branch and prior["chapter"] == chapter_no:
             continue
-        for character, voice in incoming["voice_cast"].items():
-            if character in prior.get("voice_cast", {}) and prior["voice_cast"][character] != voice:
-                raise HTTPException(status_code=409, detail=(
-                    "Character " + character + " voice identity cannot be silently replaced"
-                ))
-        if any(incoming[key] != prior[key] for key in ("era_id", "style_id", "palette_id")):
-            if not incoming.get("transition_reason"):
-                raise HTTPException(status_code=409, detail=(
-                    "Era/style/palette drift requires an explicit documented transition"
-                ))
+        for kind in ("voice_cast", "face_cast"):
+            for actor, stable_id in incoming.get(kind, {}).items():
+                previous = prior.get(kind, {}).get(actor)
+                if previous and previous != stable_id:
+                    raise HTTPException(status_code=409, detail=(
+                        "Character " + actor + " " + kind + " identity cannot be replaced"
+                    ))
+        if prior.get("branch_id") == branch and any(
+            incoming[key] != prior[key] for key in ("era_id", "style_id", "palette_id")
+        ) and not incoming.get("transition_reason"):
+            raise HTTPException(status_code=409, detail=(
+                "Era/style/palette drift requires an explicit documented transition"
+            ))
 
 
 @router.put("/{pid}/chapters/{chapter}")
@@ -211,11 +220,12 @@ async def save_chapter(
             "_id": _id(scope, body.branch_id, "chapter", chapter),
         })
         if existing_note:
-            for character, voice in existing_note.get("voice_cast", {}).items():
-                if character in incoming["voice_cast"] and incoming["voice_cast"][character] != voice:
-                    raise HTTPException(status_code=409, detail=(
-                        "Existing character voice identity cannot be silently replaced"
-                    ))
+            for kind in ("voice_cast", "face_cast"):
+                for character, identity in existing_note.get(kind, {}).items():
+                    if character in incoming[kind] and incoming[kind][character] != identity:
+                        raise HTTPException(status_code=409, detail=(
+                            "Existing character " + kind + " identity cannot be replaced"
+                        ))
             if existing_note.get("payload_digest") != digest(incoming):
                 approved = await _db.game_story_scenes.find_one({
                     **scope, "branch_id": body.branch_id, "chapter": chapter,
@@ -308,9 +318,9 @@ async def save_scene(
         if body.chapter_revision != ch["revision"] or body.chapter_digest != ch["digest"]:
             raise HTTPException(status_code=409, detail="Chapter notes have changed; refresh scene context")
         for actor in body.characters:
-            if actor not in ch["voice_cast"]:
+            if actor not in ch["voice_cast"] or actor not in ch.get("face_cast", {}):
                 raise HTTPException(status_code=409, detail=(
-                    "No stable voice identity is recorded for character " + actor
+                    "Stable voice and facial identities are required for character " + actor
                 ))
         incoming = body.model_dump(exclude={"expected_revision"})
         existing_scene = await _db.game_story_scenes.find_one({
