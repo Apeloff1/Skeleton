@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { extractConversationInterests, proposeResearchMission } from './conversationInterests';
 import { Ionicons } from '@expo/vector-icons';
 import DragonCompanion from './DragonCompanion';
+import DragonFamilyNest, {type DragonFamilyProjection} from './DragonFamilyNest';
 import DragonQuestBoard from './DragonQuestBoard';
 import type{NativeAttempt,NativeTarget,NativeCurriculum}from './dragonNativeTargets';
 import {type DragonPracticeProgress,type DragonPracticeAttempt,type DragonPracticeSubscription,validateDragonProgress} from './dragonProgression';
@@ -20,6 +21,7 @@ export interface CompanionTelemetry {
 }
 
 export interface CompanionAcademyInput {
+  family?: DragonFamilyProjection|null;
   progress?:DragonPracticeProgress|null;
   attempts?:readonly DragonPracticeAttempt[];
   nativeAttempts?:readonly NativeAttempt[];
@@ -69,6 +71,7 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry, a
   return <View style={s.panel}>
     <DragonCompanion state={state} motion={motion} reducedMotion={systemReducedMotion}
       level={verifiedProgress?.level} unlocked={verifiedProgress?.unlocked} />
+    <DragonFamilyNest family={academy?.family} />
     <View style={s.motionRow}><Text style={s.label}>Animation · 120 tiny moments</Text>{(['full','gentle','off'] as const).map(choice => <Pressable key={choice} accessibilityRole="button" accessibilityState={{selected:motion===choice}} onPress={() => setMotion(choice)} style={[s.motionButton,motion===choice && s.motionSelected]}><Text style={s.value}>{choice}</Text></Pressable>)}</View>
     <View style={s.stats}>
       <Metric icon="chatbubble-ellipses-outline" label="Interest" value={interest ? interest.split(/\s+/).slice(0, 5).join(' ') : 'Listening'} />
