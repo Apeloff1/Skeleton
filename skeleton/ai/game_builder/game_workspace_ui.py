@@ -1844,6 +1844,8 @@ function showAdvanced(reply){
   advancedSession.editor)||!advancedSession.scene;
  $("advanced-npc-observe").disabled=!["platformer","racing","sandbox"].includes(
    advancedSession.editor)||!advancedSession.scene;
+ $("advanced-npc-multi").disabled=!["platformer","racing","sandbox"].includes(
+   advancedSession.editor)||!advancedSession.scene;
  $("advanced-interop-godot").disabled=!["platformer","racing","sandbox"].includes(
    advancedSession.editor)||!advancedSession.scene;
  $("advanced-linked-step").disabled=!["platformer","racing","sandbox"].includes(
@@ -3186,6 +3188,78 @@ $("advanced-interop-godot").addEventListener("click",async()=>{
    " physical Godot encounter exported. It independently plays Physics only; native genre release requires a separate gate.");
  }catch(error){status("Native original physical encounter export blocked: "+error.message);}
 });
+$("advanced-npc-multi").addEventListener("click",async()=>{
+ try{
+  if(!advancedSession?.scene ||
+     !["platformer","racing","sandbox"].includes(advancedSession.editor))
+   throw Error("Original source game and signed scene required");
+  const physicsActions=Array(8).fill("push:east");
+  const preview=await api("/api/advanced-physics-interop",{
+   session:advancedSession,settings:advancedSettings,
+   physics_actions:physicsActions
+  });
+  if(!preview.proof || preview.proof.source_session_digest!==advancedSession.digest)
+   throw Error("Original physical source proof did not authenticate");
+  const candidates=preview.proof.witnesses;
+  const selected=candidates.slice(0,4);
+  const panel=$("advanced-npc-bindings");
+  panel.replaceChildren();
+  for(let index=0;index<selected.length;index++){
+   const item=selected[index];
+   const line=document.createElement("label");
+   line.textContent=item.source_type+" #"+item.source_id+
+    (item.layer===2?" · passable":" · solid")+" → world site ";
+   const picker=document.createElement("select");
+   picker.dataset.sourceId=String(item.source_id);
+   picker.dataset.incidentBinding="true";
+   for(let j=0;j<4;j++){
+    const option=document.createElement("option");
+    option.value=String(j);
+    option.textContent=["settlement","bridge","grove","archive"][j];
+    picker.append(option);
+   }
+   picker.value=String(index);line.append(picker);panel.append(line);
+  }
+  if(!selected.length)throw Error("Original source has no physical world fixtures");
+  // The authenticated server recomputes actual hits; UI selection is only
+  // an authored identity-to-site mapping, never an incident entitlement.
+  const bindings=[...panel.querySelectorAll('[data-incident-binding="true"]')]
+   .map(item=>({source_id:Number(item.dataset.sourceId),
+                site_id:Number(item.value)}));
+  const followups=$("advanced-npc-followups").value.trim();
+  const actions=followups?followups.split(",").map(a=>a.trim()):[];
+  if(actions.length>24 || actions.some(a=>!a))
+   throw Error("At most 24 complete authored NPC world commands are allowed");
+  const world=await api("/api/advanced-scene-template",{
+   editor:"quest_director",seed:advancedSession.seed,
+   scene_id:"multi_incident_original_world"
+  });
+  const reply=await api("/api/advanced-physics-multi-npc",{
+   session:advancedSession,settings:advancedSettings,
+   world_scene:world.scene,physics_actions:physicsActions,
+   bindings,world_actions:actions
+  });
+  const proof=reply.proof;
+  if(!proof || reply.source_project_mutated || reply.native_certified ||
+      reply.automatic_quest_rewards_granted ||
+      proof.source_session_digest!==advancedSession.digest ||
+      proof.quest_scene_digest!==world.scene.digest)
+   throw Error("Source/NPC multi-incident replay or release custody failed");
+  $("advanced-npc-multi-proof").textContent=JSON.stringify({
+   ordered_physical_incidents:proof.incidents,
+   actual_fixture_contacts:proof.source_fixture_impacts,
+   witnessed_source_events:proof.world_state.events_log,
+   eyewitnesses:proof.world_state.npcs.map(n=>({
+    id:n.id,direct:n.memories,rumors:n.heard
+   })),
+   causal_quests:proof.world_state.quests,
+   original_world_timeline:proof.world_timeline,
+   source_game_unchanged:true,
+   replay_digest:proof.digest
+  },null,2);
+  status("Actual multi-object collision investigation independently replayed with source chronology.");
+ }catch(error){status("Multi-object witness investigation rejected: "+error.message);}
+});
 $("advanced-npc-observe").addEventListener("click",async()=>{
  try{
   if(!advancedSession || !advancedSession.scene ||
@@ -3391,6 +3465,9 @@ local until typed revalidation and an explicit human-approved file commit.</smal
   Reconstruct physical incident and NPC eyewitness quests
  </button>
  <pre id="advanced-npc-evidence" role="status" aria-live="polite"></pre>
+ <button id="advanced-npc-multi" type="button">Run multi-object collision investigation</button>
+ <div id="advanced-npc-bindings" role="group" aria-label="Original collider to site bindings"></div>
+ <pre id="advanced-npc-multi-proof" role="status" aria-live="polite"></pre>
 </fieldset>
 <button id="advanced-interop-godot" type="button">Download original physical encounter for Godot 4</button>
 <fieldset aria-label="Opt-in linked physical campaign">
