@@ -25,6 +25,10 @@ from .advanced_fighting_runtime import (default_layout as fight_layout,
 from .advanced_rhythm_runtime import (default_layout as rhythm_layout,
                                       normalize_layout as validate_rhythm_layout,
                                       RhythmActionError)
+from .advanced_maze_runtime import (
+    default_layout as maze_layout, normalize_layout as validate_maze_layout,
+    MazeActionError,
+)
 from .advanced_sports_runtime import (
     default_layout as sports_layout, normalize_layout as validate_sports_layout,
     SportsActionError,
@@ -194,6 +198,8 @@ def _default_layout(engine, config, seed):
         return parkour_layout(config,seed)
     if engine == "sports":
         return sports_layout(config,seed)
+    if engine == "maze":
+        return maze_layout(config,seed)
     raise SceneError("no advanced authored scene available for that engine")
 
 
@@ -224,6 +230,11 @@ def _normalize_layout(engine, config, layout):
         try:
             return validate_sports_layout(config,layout)
         except SportsActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="maze":
+        try:
+            return validate_maze_layout(config,layout)
+        except MazeActionError as exc:
             raise SceneError(str(exc)) from exc
     if engine=="fighting":
         try:
