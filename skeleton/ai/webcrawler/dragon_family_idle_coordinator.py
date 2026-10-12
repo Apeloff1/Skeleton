@@ -262,8 +262,12 @@ class DragonIdleCoordinator:
             # same source revision in overlapping leases. This fence spans
             # ALL specialist roles and is checked under the SQLite writer lock.
             if self.db.execute("""SELECT 1 FROM dragon_family_idle_leases
-                WHERE owner=? AND source_id=? AND lease_expires>? LIMIT 1""",
-                (owner,sid,start)).fetchone():
+                WHERE owner=? AND source_id=? AND
+                  (lease_expires>? OR (next_due>? AND last_outcome IN
+                     ('changed','unchanged','paused','recovered'))) LIMIT 1""",
+                (owner,sid,start,start)).fetchone():
+                # A sibling cannot instantly recrawl the same reviewed
+                # revision just because its own role cooldown is empty.
                 return None
             # The owner/role admission budget is debited in the SAME SQLite
             # transaction as the lease. No concurrent host can overrun quota
