@@ -222,6 +222,35 @@ class OriginalAdvancedArenaTests(unittest.TestCase):
         self.assertNotEqual(rebuilt["digest"],source["digest"])
         self.assertEqual(validate_advanced_scene(rebuilt,rules),rebuilt)
 
+
+    def test_studio_renders_original_live_fight_and_signed_stage_painter(self):
+        from skeleton.ai.game_builder.game_workspace_ui import (
+            render_workspace_html,SCRIPT,
+        )
+        page=render_workspace_html("A"*32).decode("utf-8")
+        for key in (
+            "fighting-registered-action","Execute original arena frame",
+            "paintFightingCell","hazard_toggle","cover_toggle",
+            "player_spawn","enemy_spawn","theme_next","weather_next",
+            "Original 3-lane arena","Original fighting stage edited",
+            "sidestep_up","parry","actual lanes",
+        ):
+            self.assertIn(key,page)
+        self.assertIn('advancedSession.editor!=="fighting"',SCRIPT)
+        rules=self.rules()
+        old=make_advanced_scene("fighting",rules,seed=2)
+        modified=deepcopy(old)
+        modified["layout"]["weather"]="clear"
+        if old["layout"]["weather"]=="clear":
+            modified["layout"]["weather"]="fog"
+        with self.assertRaises(SceneError):
+            validate_advanced_scene(modified,rules)
+        signed=make_advanced_scene("fighting",rules,seed=2,
+                    layout=modified["layout"])
+        self.assertNotEqual(signed["digest"],old["digest"])
+        self.assertTrue(verify_advanced_session(run_advanced_session(
+            "fighting",rules,seed=2,scene=signed),rules))
+
     def test_replay_save_hybrid_assembly_and_offline_cli_use_original_engine(self):
         rules=self.rules()
         scene=make_advanced_scene("fighting",rules,seed=0)
