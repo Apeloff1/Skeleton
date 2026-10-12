@@ -128,3 +128,56 @@ python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-census \
 ```
 
 The census reads and validates the checked-in evidence without network access, writes no source-crawl permits and authorizes no Wiki/HOAG memory or model-weight promotion. Exact-head CI and the policy executor's separate legal, robots and SSRF gates are still required.
+
+## Nine more pinned catalogs and a console/era discovery matrix
+
+The accepted reconciled discovery chain now extends through raw-only batches
+`0043`–`0047`. These batches contain **4,053 newly recorded, raw-URL-distinct
+hyperlink leads** from nine Git SHA/README-blob-pinned game-development catalogs:
+`Calinou/awesome-gamedev`, `ChessMax/awesome-game-engines`,
+`terrehbyte/awesome-ue4`, `8bitworkshop/awesome-8bitgamedev`,
+`ellisonleao/magictools`, `Dvergar/awesome-haxe-gamedev`,
+`fire/awesome-godot-procedural-manual-generation`,
+`OTFCG/Awesome-Game-Analysis` and `devanshutak25/3d-resources`.
+The pinned READMEs supplied links and observed heading paths only. These are
+**not** confirmations that linked media are live, that a source is independent,
+that games or techniques can be copied, or that source material is lawful for
+training. The linked contents, binaries, artwork and video were not crawled.
+
+The canonical reconciled source-ledger target is now **19,228 raw leads out of
+44,050 (43.65%)**, comprising the 4,405-source original baseline, 10,770 earlier
+accepted raw leads, and 4,053 added leads. Raw URL counts are intentionally
+separate from normalized distinct source counts: a URL fragment, tracking query
+or mirror can create multiple raw mentions of the same destination. The
+`discovery-verify` and `discovery-census` commands calculate canonical
+distinct URLs from the entire evidence chain. Batch `0024` and batch `0030`
+remain excluded independent/orphan evidence paths, not accepted ancestors.
+
+The platform matrix adds explicit, conservatively named search categories for
+**42 consoles, handhelds, computer environments, web/mobile and XR targets**.
+It reports raw metadata mentions, distinct canonical URLs, distinct URL hosts,
+and keyword-triggered rights-review hints per platform, plus union-deduplicated
+generation-level groups. No detected name alone implies technical
+compatibility, native port support or original-asset rights. No matching
+metadata means a *research discovery gap*, not proof the platform is unsupported.
+
+```sh
+python -m skeleton.ai.game_builder.dragon_almanac_cli platform-matrix \
+  --database dragon.sqlite --owner studio --trusted-local-operator \
+  --samples-per-platform 3
+
+python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-identity-audit \
+  --database dragon.sqlite --owner studio --trusted-local-operator \
+  --limit 2
+```
+
+The separate identity audit verifies the exact Git blob SHA-1 of each source
+supplement in the two frozen 10,770-lead pre-expansion cohorts. It then requires
+all 4,053 newer source IDs to be distinct from those prior raw identities and
+validates the full reconciled chain again. Digest verification is a consistency
+test over repository bytes, **not** a trust signature, license grant, proof of
+source independence or approval to use the content. All new leads remain
+`availability=not_checked`, `rights=not_assessed`,
+`training_authorized=false` and `canonical_admission=false` until separate
+policy review. No automatic network fetch, training or AI-memory promotion has
+been initiated by this source-discovery extension.
