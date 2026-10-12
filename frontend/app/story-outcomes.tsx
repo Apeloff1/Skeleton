@@ -301,16 +301,27 @@ export default function StoryOutcomesStudio() {
     if (!Number.isInteger(level) || level < 1 || level > 100) {
       throw new Error('Select scrutiny level 1–100.');
     }
-    const response = await api.get<any>(
-      base() + '/matrix-prompt?branch_id=' + encodeURIComponent(branch) +
-      '&ending_id=' + encodeURIComponent(target) +
-      '&matrix_id=' + encodeURIComponent(matrixId) +
-      '&level=' + level,
-      { headers: authHeaders(), retries: 0 },
-    );
+    const witnessed = simulation?.ending_id === target &&
+      simulation.ending_accepted === true;
+    const response = witnessed
+      ? await api.post<any>(
+        base() + '/matrix-prompt',
+        { branch_id: branch, ending_id: target, matrix_id: matrixId,
+          level, choices },
+        { headers: authHeaders(), retries: 0 },
+      )
+      : await api.get<any>(
+        base() + '/matrix-prompt?branch_id=' + encodeURIComponent(branch) +
+        '&ending_id=' + encodeURIComponent(target) +
+        '&matrix_id=' + encodeURIComponent(matrixId) +
+        '&level=' + level,
+        { headers: authHeaders(), retries: 0 },
+      );
     if (!response.ok || !response.data?.ok ||
         response.data.plan_digest !== planDigest ||
-        response.data.instruction?.review_status !== 'unexecuted') {
+        response.data.instruction?.review_status !== 'unexecuted' ||
+        response.data.instruction.history_witnessed !== witnessed ||
+        (witnessed && response.data.playthrough_receipt !== simulation?.receipt_digest)) {
       throw new Error('Outcome review request could not be bound to the current story.');
     }
     const pending = await AsyncStorage.getItem(HANDOFF_KEY);
@@ -322,7 +333,9 @@ export default function StoryOutcomesStudio() {
       draft: response.data.instruction.prompt,
       context: compactPlayerContext(doc!, simulation),
       sourceLabels: ['Story graph ' + planDigest.slice(0, 16),
-        'Ending ' + target, 'Matrix ' + matrixId + ' / L' + level],
+        'Ending ' + target, 'Matrix ' + matrixId + ' / L' + level,
+        witnessed ? 'Actual history ' + simulation!.receipt_digest.slice(0, 16)
+          : 'UNWITNESSED: plan-level review only'],
     };
     await AsyncStorage.setItem(HANDOFF_KEY, JSON.stringify(draft));
     router.push('/jeeves-chat');
