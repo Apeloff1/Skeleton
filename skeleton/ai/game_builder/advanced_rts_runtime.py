@@ -130,6 +130,8 @@ def normalize_layout(config,layout):
         if type(n["type"]) is not str or n["type"] not in ("wood","ore","energy"):
             raise RTSActionError("unregistered original source material")
         _int(n["stock"],0,10000,"finite resource stock")
+        if n["stock"]>config[n["type"]+"_stock"]:
+            raise RTSActionError("authored material deposit cannot exceed its original typed geological budget")
     for key,max_value in (("starting_wood",10000),("starting_ore",10000),
                           ("starting_energy",10000),("enemy_base_health",500)):
         _int(layout[key],1 if key=="enemy_base_health" else 0,max_value,key)
@@ -162,7 +164,7 @@ def _unit(kind,id,side,cell,config):
     return {"id":id,"side":side,"kind":kind,"cell":cell,
       "hp":hp,"max_hp":hp,"order":"hold","target":None,
       "cargo":0,"resource":None,"stance":"defensive",
-      "kills":0,"experience":0}
+      "kills":0,"experience":0,"veterancy":0}
 
 
 def apply_scene(state,config,layout):
@@ -271,12 +273,20 @@ def _damage(state,config,attacker,cell,events):
             attacker["kind"],0)+state["tech"]["weapons"]*config["weapon_bonus"]
     armor=state["tech"]["armor"]*config["armor_bonus"] if (
         target is not None and target["side"]=="blue") else 0
+    if victim is structure and attacker["kind"]=="siege":
+        dmg+=config["siege_structure_bonus"]
+    dmg+=attacker["veterancy"]*config["veterancy_damage_bonus"]
     damage=max(1,dmg-armor)
     victim["hp"]=max(0,victim["hp"]-damage)
     events.append("real_authoritative_original_spatial_attack")
     if victim["hp"]==0:
         attacker["kills"]+=1
         attacker["experience"]+=config["kill_experience"]
+        if (attacker["experience"]>=config["veterancy_threshold"] and
+            attacker["veterancy"]<config["max_veterancy"]):
+            attacker["experience"]-=config["veterancy_threshold"]
+            attacker["veterancy"]+=1
+            events.append("actually_defeated_original_enemy_awarded_veteran_level")
         if target is not None:
             if target["side"]=="blue":state["casualties"]+=1
             events.append("finite_original_combatant_defeated")
@@ -360,6 +370,32 @@ def _tick(state,config):
                 neighbor=next((p for p in _adjacent(enemy_cell) if p not in blockers
                               and _unit_at(state,p) is None),None)
                 if neighbor is not None:_go(state,config,u,neighbor,events)
+    # Unit stances now have independently observable behavior. Hold means
+    # physical defensive abstention; defensive engages only close threats;
+    # aggressive acquires targets up to a larger exact map radius.
+    for u in _alive(state,"blue"):
+        if u["kind"]=="medic":
+            patient=next((friend for friend in _alive(state,"blue")
+              if friend is not u and friend["hp"]<friend["max_hp"]
+              and _distance(friend["cell"],u["cell"])<=config["medic_range"]),None)
+            if patient is not None and state["energy"]>=config["medic_energy_cost"]:
+                state["energy"]-=config["medic_energy_cost"]
+                patient["hp"]=min(patient["max_hp"],patient["hp"]+config["medic_heal"])
+                events.append("actual_nearby_original_combat_medic_spent_energy_healing")
+            continue
+        if u["kind"] not in ("soldier","ranger","siege") or u["order"]=="attack" or u["stance"]=="hold":
+            continue
+        radius=(config["aggressive_radius"] if u["stance"]=="aggressive"
+                else config["defensive_radius"])
+        enemy=next((e for e in _alive(state,"red")
+          if e["cell"] in state["visible"] and
+          _distance(e["cell"],u["cell"])<=radius and
+          _distance(e["cell"],u["cell"])<=(
+            config["ranger_range"] if u["kind"]=="ranger" else
+            config["siege_range"] if u["kind"]=="siege" else 1)),None)
+        if enemy is not None:
+            _damage(state,config,u,enemy["cell"],events)
+            events.append("original_owned_unit_stance_selected_real_opponent")
     if config["supply_model"]=="logistics":
         demand=max(1,state["supply_used"]//config["logistics_divisor"])
         if state["energy"]>=demand:
@@ -456,6 +492,8 @@ def step(state,config,action):
                     n["type"] for n in state["map"]["nodes"] if n["cell"]==target):
                 raise RTSActionError("real worker cannot carry mixed unbanked resources")
         if command=="attack":
+            if selected["kind"]=="medic":
+                raise RTSActionError("combat medics provide finite real healing, not enemy attacks")
             enemy=_unit_at(state,target);building=_building_at(state,target)
             if not ((enemy and enemy["side"]=="red") or
                     (building and building["side"]=="red")):
