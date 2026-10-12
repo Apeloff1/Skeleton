@@ -4,7 +4,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator, SafeAreaView, ScrollView, Text, TextInput, View,
+  ActivityIndicator, SafeAreaView, ScrollView, Text, View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -19,7 +19,7 @@ import {
   slug, validateSceneCoordinates, voiceCast,
 } from '../features/Jeeves/chapterStudio';
 import type {
-  ChapterNote, ChapterContext, PlotKind, PlotPoint, ProofReceipt, SceneDraft,
+  ChapterNote, ChapterContext, PlotKind, PlotPoint, ProofReceipt, SceneDraft, ChapterSceneHandoff,
 } from '../features/Jeeves/chapterStudio';
 import { Action, Choice, Field, Section, palette, styles } from '../features/Jeeves/workbench/ui';
 
@@ -86,7 +86,7 @@ export default function ChapterStudioScreen() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [page, setPage] = useState<'chapter' | 'scenes' | 'production'>('chapter');
-  const requestId = React.useRef(0);
+  const staged = React.useRef<ChapterSceneHandoff | null>(null);
 
   const base = useCallback(() => {
     const game = validProjectId(gameId.trim());
@@ -134,10 +134,17 @@ export default function ChapterStudioScreen() {
     setChapter(note); setContext(res.data.context);
     setChapterFormState(chapterForm(note));
     setChapterId(String(number));
-    setActId(String((number - 1) * 10 + 1));
+    const pending = staged.current;
+    setActId(String(pending?.chapter === number ? pending.act : (number - 1) * 10 + 1));
     setScene(null); setProof(null); setSceneNext(null); setScenes([]);
-    setSummary(''); setScript(''); setCharacters(''); setThreadKeys('');
-    setPlotJson('[]');
+    if (pending?.chapter === number) {
+      setSceneId(String(pending.scene)); setScript(pending.text);
+      setSourceId(pending.messageId);
+      setSummary('Reviewed from Jeeves: ' + pending.messageId);
+    } else {
+      setSummary(''); setScript(''); setCharacters(''); setThreadKeys('');
+      setPlotJson('[]');
+    }
     setNotice('Loaded chapter revision ' + note.revision + ' with receipt ' + note.digest.slice(0, 12) + '.');
   };
   const saveChapter = async () => {
@@ -249,6 +256,20 @@ export default function ChapterStudioScreen() {
         : 'No scene save receipt was confirmed. Preserve your draft.');
     }
     setScene(res.data.scene); setProof(null);
+    const pending = staged.current;
+    if (pending && pending.scene === no && pending.chapter === chapter.chapter
+        && pending.gameId === gameId.trim() && pending.branchId === branch) {
+      try {
+        const saved = await AsyncStorage.getItem(CHAPTER_SCENE_HANDOFF_KEY);
+        if (saved && parseChapterSceneHandoff(saved)?.id === pending.id) {
+          await AsyncStorage.removeItem(CHAPTER_SCENE_HANDOFF_KEY);
+          staged.current = null;
+        }
+      } catch {
+        // The scene was saved on the server; preserving the pending handoff is
+        // safer than losing it if device storage removal fails.
+      }
+    }
     setNotice('Scene revision saved: ' + res.data.receipt.slice(0, 18) +
       '. Its chapter note and voice IDs are now locked to this draft.');
     await loadScenes();
@@ -310,6 +331,7 @@ export default function ChapterStudioScreen() {
       const handoff = raw && parseChapterSceneHandoff(raw);
       if (!alive || !handoff || handoff.id !== routeScene ||
           handoff.gameId !== validProjectId(incoming)) return;
+      staged.current = handoff;
       setGameId(handoff.gameId); setBranch(handoff.branchId);
       setChapterId(String(handoff.chapter)); setActId(String(handoff.act));
       setSceneId(String(handoff.scene)); setSourceId(handoff.messageId);
