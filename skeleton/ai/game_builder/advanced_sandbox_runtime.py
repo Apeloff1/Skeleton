@@ -427,19 +427,21 @@ def _tick(state,config):
     _work(state,config,events)
     # Community consumables are genuinely conserved across settlers and
     # remain separate from the player's carried inventory.
-    mouths=len(state["settlers"])
+    current_settlers=[s for s in state["settlers"] if
+                      s["region"]==state["region"] and s["health"]>0]
+    mouths=len(current_settlers)
     if mouths:
         food=min(state["community_food"],max(1,(mouths+1)//2))
         water=min(state["community_water"],max(1,(mouths+1)//2))
         state["community_food"]-=food
         state["community_water"]-=water
         if food<max(1,(mouths+1)//2) or water<max(1,(mouths+1)//2):
-            for s in state["settlers"]:
+            for s in current_settlers:
                 s["health"]=max(0,s["health"]-config["starvation_damage"])
                 s["morale"]=max(0,s["morale"]-config["morale_decay"])
             events.append("actual_settler_food_water_shortage")
         else:
-            for s in state["settlers"]:
+            for s in current_settlers:
                 s["morale"]=min(100,s["morale"]+1)
     state["hunger"]=min(100,state["hunger"]+config["hunger_gain"])
     state["thirst"]=min(100,state["thirst"]+config["thirst_gain"])
