@@ -186,6 +186,8 @@ jobs:
             skeleton/ai/game_builder/dragon_family_research_history.py \
             skeleton/ai/webcrawler/dragon_hundred_matrix_scrutiny.py \
             skeleton/ai/webcrawler/dragon_mother_hundred_handoff.py \
+            skeleton/ai/webcrawler/dragon_cross_source_factchecking.py \
+            skeleton/ai/webcrawler/dragon_correlated_mother_handoff.py \
             skeleton/ai/webcrawler/dragon_weight_tier_sandbox.py \
             skeleton/ai/webcrawler/dragon_video_inspiration.py \
             skeleton/ai/webcrawler/dragon_rss_update_queue.py \
@@ -209,7 +211,8 @@ jobs:
             tests/test_ai_dragon_source_safety.py \
             tests/test_dragon_specialist_evidence.py \
             tests/test_dragon_evidence_mirror.py \
-            tests/test_dragon_hyperweight_pipeline.py
+            tests/test_dragon_hyperweight_pipeline.py \
+            tests/test_dragon_fact_corroboration.py
           python -m pytest -q --noconftest \
             tests/test_dragon_technical_source_acquisition.py
           python -m pytest -q --noconftest \
