@@ -1,0 +1,115 @@
+"""Adversarial and end-to-end coverage for metadata-only source discovery."""
+from __future__ import annotations
+
+from copy import deepcopy
+from pathlib import Path
+
+import pytest
+
+from skeleton.ai.game_builder.dragon_almanacs import DragonAlmanacs, read_source_registry
+from skeleton.ai.game_builder.dragon_discovery_admission import (
+    DragonDiscoveryAdmission, _supplement, validate_discovery_chain,
+    import_supplement_files,
+)
+from skeleton.ai.game_builder.reviewed_knowledge import ReviewedKnowledgeStore
+
+ROOT = Path(__file__).resolve().parents[1]
+CATALOG = ROOT / "skeleton/ai/game_builder/catalogs/dragon_sources_20261010"
+BATCHES = [
+    ROOT / "docs/ai/evidence/dragon-source-expansion-20261011-batch-0020.json",
+    ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0021.json",
+    ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0022.json",
+]
+
+
+@pytest.fixture(scope="module")
+def baseline():
+    return read_source_registry(CATALOG)
+
+
+@pytest.fixture(scope="module")
+def chain():
+    return [_supplement(path) for path in BATCHES]
+
+
+def test_real_supplement_chain_has_distinct_unapproved_counts(baseline, chain):
+    snapshot = validate_discovery_chain(baseline, chain)
+    assert snapshot["baseline"] == 4405
+    assert snapshot["new"] == 964
+    assert snapshot["total_discovered"] == 5369
+    assert all(row["rights"] == "not_assessed"
+               and row["training_authorized"] is False
+               and row["provisional_discovery"] is True
+               for row in snapshot["sources"].values())
+
+
+def test_imports_into_owner_scoped_policy_queue_idempotently(tmp_path, baseline, chain):
+    with ReviewedKnowledgeStore(tmp_path / "admission.sqlite") as store:
+        a = DragonAlmanacs(store)
+        ingress = DragonDiscoveryAdmission(a)
+        first = ingress.import_chain("alice", baseline, chain, authorized=True)
+        assert first["new_discovery_sources"] == 964
+        assert first["new_provenance_receipts"] == 964
+        assert first["new_policy_stage_jobs"] == 964
+        assert first["approved_sources"] == 0
+        assert first["training_authorized"] is False
+        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_jobs WHERE owner='alice'").fetchone()[0] == 964
+        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_supplement_receipts WHERE owner='alice'").fetchone()[0] == 964
+        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_sources WHERE owner='alice'").fetchone()[0] == 964
+        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_members WHERE owner='alice'").fetchone()[0] >= 964
+        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_jobs WHERE state!='pending'").fetchone()[0] == 0
+        second = ingress.import_chain("alice", baseline, chain, authorized=True)
+        assert second["new_discovery_sources"] == 0
+        assert second["new_provenance_receipts"] == 0
+        assert second["new_policy_stage_jobs"] == 0
+        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_sources WHERE owner='bob'").fetchone()[0] == 0
+        with pytest.raises(PermissionError):
+            ingress.import_chain("bob", baseline, chain, authorized=False)
+
+
+def test_forgery_rejected_without_partial_database_write(tmp_path, baseline, chain):
+    with ReviewedKnowledgeStore(tmp_path / "fail.sqlite") as store:
+        ingress = DragonDiscoveryAdmission(DragonAlmanacs(store))
+        for mutation in ("source_id", "training_authorized", "availability",
+                         "canonical_admission", "provenance"):
+            docs = deepcopy(chain)
+            row = docs[-1][1]["candidates"][-1]
+            if mutation == "source_id":
+                row["source_id"] = "source-forged"
+            elif mutation == "training_authorized":
+                row["training_authorized"] = True
+            elif mutation == "availability":
+                row["availability"] = "page_representation_returned"
+            elif mutation == "canonical_admission":
+                row["canonical_admission"] = True
+            else:
+                row["discoveries"][0]["readme_blob_sha"] = "f" * 40
+            with pytest.raises(ValueError):
+                ingress.import_chain("alice", baseline, docs, authorized=True)
+            assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_sources").fetchone()[0] == 0
+            assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_jobs").fetchone()[0] == 0
+            assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_supplement_receipts").fetchone()[0] == 0
+
+
+def test_rejects_nonconsecutive_or_duplicate_chain(baseline, chain):
+    with pytest.raises(ValueError):
+        validate_discovery_chain(baseline, chain[1:])
+    with pytest.raises(ValueError):
+        validate_discovery_chain(baseline, [chain[0], chain[-1]])
+    with pytest.raises(ValueError):
+        validate_discovery_chain(baseline, [chain[0], chain[0]])
+    docs = deepcopy(chain)
+    docs[1][1]["counts"]["provisional_total_urls"] += 1
+    with pytest.raises(ValueError):
+        validate_discovery_chain(baseline, docs)
+
+
+def test_real_registry_plus_supplements_remains_unapproved(tmp_path, baseline):
+    with ReviewedKnowledgeStore(tmp_path / "authority.sqlite") as store:
+        a = DragonAlmanacs(store)
+        assert a.ingest_sources("alice", baseline, authorized=True)["new_sources"] == 4405
+        result = import_supplement_files(a, "alice", baseline, BATCHES, authorized=True)
+        assert result["new_discovery_sources"] == 964
+        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_sources WHERE owner='alice'").fetchone()[0] == 5369
+        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_jobs WHERE owner='alice'").fetchone()[0] == 5369
+        assert a.library._rows("alice") == []
