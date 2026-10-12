@@ -38,6 +38,7 @@ from .advanced_godot_export import (
     render_advanced_godot_package, archive_advanced_godot_package,
 )
 from .advanced_platformer_godot import render_platformer_godot_package
+from .advanced_physics_interop_godot import render_interop_godot_package
 from .advanced_physics_linked_game import (run_linked_physics_game,
     verify_linked_physics_game)
 from .advanced_physics_interop import (rehearse_physics_encounter,
@@ -211,6 +212,28 @@ class _StudioHandler(BaseHTTPRequestHandler):
         path=urlsplit(self.path).path
         values=self._body()
         studio=self.server.workspace
+        if path=="/api/advanced-interoperable-physics-godot":
+            from base64 import b64encode
+            origin=values["session"]
+            settings=values.get("settings")
+            encounter=rehearse_physics_encounter(
+                origin,settings,values.get("physics_actions",["push:east"]*8))
+            native=render_interop_godot_package(
+                encounter,origin,settings,authorized=True)
+            zipped=archive_advanced_godot_package(native)
+            return self._json(200,{
+                "file_name":"original-"+origin["editor"]+"-godot-physics-encounter.zip",
+                "zip_base64":b64encode(zipped).decode("ascii"),
+                "zip_sha256":__import__("hashlib").sha256(zipped).hexdigest(),
+                "source_scene_digest":encounter["source_scene_digest"],
+                "source_session_digest":encounter["source_session_digest"],
+                "physics_session_digest":encounter["physics_session"]["digest"],
+                "physical_witnesses":encounter["witnesses"],
+                "native_renowned_genre_completed":False,
+                "native_hardware_verified":False,
+                "source_files_modified":False,
+                "publish_approved":False,
+            })
         if path=="/api/advanced-godot-package":
             from base64 import b64encode
             session=values["session"]
