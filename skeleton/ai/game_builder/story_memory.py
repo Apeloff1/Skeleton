@@ -113,7 +113,7 @@ def asset_identity_history(workspace, project, asset):
         "source_project": project, "region": source["region"],
         "scenes": seqs, "scene_count": len(seqs),
         "history_digest": index["digest"],
-        "appearance_consistency_verified": True,
+        "appearance_consistency_verified": len(seqs)>0,
         "no_legal_clearance_inferred": True,
     }
     return {**record, "digest": digest(record)}

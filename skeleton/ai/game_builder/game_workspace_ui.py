@@ -245,6 +245,50 @@ $("story-context").addEventListener("click",async()=>{
     "Only the latest context page is shown. Earlier history is bookmarked, not silently forgotten.");
  }catch(error){status("Jeeves history lookup blocked: "+error.message);}
 });
+
+$("story-work-order").addEventListener("click",async()=>{
+ try{
+  const plan=await api("/api/jeeves-work-order",{
+   project:storyProject(),prompt:$("story-instruction").value.trim(),
+   cast:$("story-cast").value.split(",").map(x=>x.trim()).filter(Boolean),
+   region:$("story-region").value.trim()||null,
+   act:Number($("story-act").value),scene:Number($("story-scene").value)});
+  storyShow(plan);
+  status("Jeeves work order prepared with exact source dependencies. A model draft and explicit review are still required.");
+ }catch(error){status("Jeeves production blocked: "+error.message);}
+});
+$("story-assets-queue").addEventListener("click",async()=>{
+ try{
+  const plan=await api("/api/jeeves-asset-orders",{
+   project:storyProject(),prompt:$("story-instruction").value.trim(),
+   region:$("story-region").value.trim()||null});
+  storyShow(plan);
+  status("Original asset tasks checked against regional palette, identity, and source rights.");
+ }catch(error){status("Asset planning blocked: "+error.message);}
+});
+$("story-recall").addEventListener("click",async()=>{
+ try{
+  const refs=$("story-bookmarks").value.split(",").map(s=>s.trim()).filter(Boolean);
+  storyShow(await api("/api/story-memory",{project:storyProject(),references:refs}));
+  status("Exact original bookmarked memory retrieved from approved source scenes.");
+ }catch(error){status("Story-memory lookup rejected: "+error.message);}
+});
+$("story-relationship").addEventListener("click",async()=>{
+ try{
+  const character=$("story-memory-character").value.trim();
+  const query="?project="+encodeURIComponent(storyProject())+
+    "&character="+encodeURIComponent(character)+"&limit=40";
+  storyShow(await api("/api/story-memory-page"+query));
+  status("Chronological pair interaction references retrieved; paginate when history exceeds the page.");
+ }catch(error){status("NPC memory lookup rejected: "+error.message);}
+});
+$("story-asset-replay").addEventListener("click",async()=>{
+ try{
+  storyShow(await api("/api/story-asset-history",{
+   project:storyProject(),asset:$("story-asset-id").value.trim()}));
+  status("Original asset lineage, scene usage and source palette retrieved.");
+ }catch(error){status("Asset identity lookup rejected: "+error.message);}
+});
 $("story-check").addEventListener("click",async()=>{
  try{
   const response=await api("/api/story-sign",{
@@ -3903,6 +3947,15 @@ regional appearance. It does not invent model output or write hidden files.</sma
 <label>Jeeves creative instruction<textarea id="story-instruction" rows="3"
  placeholder="Write the next scene and preserve prior character relationships, visual identities, palette, lore and original events."></textarea></label>
 <button id="story-context" type="button">Retrieve historical Jeeves context</button>
+<button id="story-work-order" type="button">Plan next Jeeves production work order</button>
+<button id="story-assets-queue" type="button">Plan AI original asset generation queue</button>
+<label>Historical bookmark IDs (comma-separated)
+<input id="story-bookmarks" placeholder="line_1, exchange_500"></label>
+<button id="story-recall" type="button">Retrieve exact historical dialogue and events</button>
+<label>Character memory lookup ID<input id="story-memory-character" placeholder="alina"></label>
+<button id="story-relationship" type="button">Review indexed character interactions</button>
+<label>Original asset ID<input id="story-asset-id" placeholder="map_table"></label>
+<button id="story-asset-replay" type="button">Review asset identity across scenes</button>
 <button id="story-check" type="button">Sign and validate authored source</button>
 <pre id="story-evidence" role="status" aria-live="polite"></pre>
 </fieldset>

@@ -194,6 +194,13 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "model_training_or_deployment_running":False,
                 "core_llm_weights_changed":False,
             })
+        if path=="/api/story-memory-page":
+            from .story_memory import character_memory_page
+            return self._json(200,character_memory_page(
+                self.server.workspace,params["project"],params["character"],
+                partner=params.get("partner") or None,
+                offset=int(params.get("offset",0)),
+                limit=int(params.get("limit",40))))
         if path=="/api/story-status":
             from .story_workspace import story_workspace_status
             return self._json(200,story_workspace_status(
@@ -223,6 +230,26 @@ class _StudioHandler(BaseHTTPRequestHandler):
         path=urlsplit(self.path).path
         values=self._body()
         studio=self.server.workspace
+        if path=="/api/jeeves-work-order":
+            from .jeeves_production_director import work_order
+            return self._json(200,work_order(
+                studio,values["project"],values["prompt"],
+                cast=values.get("cast"),region=values.get("region"),
+                act=values.get("act"),scene=values.get("scene")))
+        if path=="/api/jeeves-asset-orders":
+            from .jeeves_production_director import planned_asset_orders
+            return self._json(200,planned_asset_orders(
+                studio,values["project"],values["prompt"],
+                region=values.get("region"),kinds=values.get("kinds"),
+                max_jobs=values.get("max_jobs",128)))
+        if path=="/api/story-memory":
+            from .story_memory import retrieve_bookmarks
+            return self._json(200,retrieve_bookmarks(
+                studio,values["project"],values["references"]))
+        if path=="/api/story-asset-history":
+            from .story_memory import asset_identity_history
+            return self._json(200,asset_identity_history(
+                studio,values["project"],values["asset"]))
         if path=="/api/story-foundation-template":
             from .story_canon_fabric import story_bible_template
             return self._json(200,{"path":"game/story_bible.json",
