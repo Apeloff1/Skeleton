@@ -84,7 +84,7 @@ def test_hundred_matrix_missing_conflicted_expired_or_bad_signature_stays_closed
         "studio","a"*64,records,**{**kwargs,"now":1000})
     assert not expired["shadow_review_proposal_eligible"]
 
-def make_eval(key,candidate,*,tier="shadow_to_weight",prior=None):
+def make_eval(key,candidate,*,tier="shadow_to_weight",prior=None,matrix_report_digest="a"*64):
     trials=tuple(HoldoutTrial(
         case_id="case-"+str(i),task_family=("platform","npc","physics")[i%3],
         source_group=("publisher-1","publisher-2","publisher-3")[i%3],
@@ -95,25 +95,44 @@ def make_eval(key,candidate,*,tier="shadow_to_weight",prior=None):
         for i in range(12))
     e=SealedTierEvaluation(
         owner="studio",candidate_digest=candidate,prior_digest=prior or "0"*64,
-        matrix_report_digest="a"*64,tier=tier,
+        matrix_report_digest=matrix_report_digest,tier=tier,
         suite_digest=canonical_digest([vars(t) for t in trials]),
         trials=trials,holdout_excluded_from_training=True,
         evaluator="independent-mirror",key_id="eval-1",
         issued_at=100,expires_at=900,signature_hex="")
     return replace(e,signature_hex=sign(key,e.body()))
 
+def trusted_mother():
+    _,pub,records=matrix_bundle()
+    report=scrutinize_one_hundred(
+        "studio","a"*64,records,public_key=pub,
+        trusted_reviewer="independent-wiki",key_id="review-key-1",now=150)
+    parameters=dict(mother_findings=records,mother_public_key=pub,
+                    mother_reviewer="independent-wiki",
+                    mother_key_id="review-key-1",
+                    mother_knowledge_digest="a"*64)
+    return report,parameters
+
+
 def test_two_signed_sandboxes_and_jeeves_fast_index_with_rollback():
     eval_key,eval_pub=keypair()
     op_key,op_pub=keypair()
+    matrix, mother_args=trusted_mother()
     entries=(("f"*64,("gameboy","sprite")),("e"*64,("physics","editor")))
     digest=canonical_digest([[identity,list(words)] for identity,words in entries])
-    signed=make_eval(eval_key,digest)
+    signed=make_eval(eval_key,digest,matrix_report_digest=matrix["report_digest"])
     verdict=qualify_tier(
         signed,evaluator_public_key=eval_pub,evaluator="independent-mirror",
-        key_id="eval-1",now=150)
+        key_id="eval-1",now=150,**mother_args)
     assert verdict["promotion_review_eligible"]
     assert verdict["newly_correct"]==2 and verdict["regressions"]==0
     assert not verdict["neural_training_authorized"]
+    with pytest.raises(PermissionError,match="100 independently signed"):
+        qualify_tier(
+            signed,evaluator_public_key=eval_pub,evaluator="independent-mirror",
+            key_id="eval-1",now=150,
+            **{**mother_args,"mother_findings":mother_args["mother_findings"][:-1]})
+
     approval=SignedOverlayApproval(
         owner="studio",tier="shadow_to_weight",candidate_digest=digest,
         verdict_digest=verdict["verdict_digest"],operator="operator",
@@ -123,7 +142,7 @@ def test_two_signed_sandboxes_and_jeeves_fast_index_with_rollback():
     args=dict(entries=entries,verdict=verdict,approval=approval,evaluation=signed,
         evaluator_public_key=eval_pub,evaluator="independent-mirror",
         evaluator_key_id="eval-1",operator_public_key=op_pub,
-        operator="operator",key_id="operator-1",now=150)
+        operator="operator",key_id="operator-1",now=150,**mother_args)
     with pytest.raises(PermissionError,match="holdout"):
         router.activate(expected_generation=0,**{
             **args,"evaluation":replace(signed,holdout_excluded_from_training=False)})
@@ -138,9 +157,60 @@ def test_two_signed_sandboxes_and_jeeves_fast_index_with_rollback():
     with pytest.raises(PermissionError,match="rollback"):
         router.rollback(expected_generation=2,authorized=False)
 
+def test_weight_to_hyper_requires_new_benchmark_and_preserves_rollback():
+    eval_key,eval_pub=keypair()
+    op_key,op_pub=keypair()
+    mother,mother_args=trusted_mother()
+    router=JeevesWeightOverlay("studio")
+    previous="0"*64
+    for generation,tier,entries in (
+        (0,"shadow_to_weight",(("b"*64,("physics","npc")),)),
+        (1,"weight_to_hyper",(("c"*64,("physics","npc","gameboy")),)),
+    ):
+        digest=canonical_digest([[identity,list(words)] for identity,words in entries])
+        evidence=make_eval(eval_key,digest,tier=tier,prior=previous,
+                           matrix_report_digest=mother["report_digest"])
+        verdict=qualify_tier(
+            evidence,evaluator_public_key=eval_pub,evaluator="independent-mirror",
+            key_id="eval-1",now=150,**mother_args)
+        assert verdict["promotion_review_eligible"]
+        approved=SignedOverlayApproval(
+            "studio",tier,digest,verdict["verdict_digest"],
+            "operator","operator-1",800,"")
+        approved=replace(approved,signature_hex=sign(op_key,approved.body()))
+        kwargs=dict(entries=entries,verdict=verdict,approval=approved,
+            evaluation=evidence,evaluator_public_key=eval_pub,
+            evaluator="independent-mirror",evaluator_key_id="eval-1",
+            operator_public_key=op_pub,operator="operator",
+            key_id="operator-1",now=150,**mother_args)
+        if generation==1:
+            wrong=make_eval(eval_key,digest,tier=tier,prior="9"*64,
+                            matrix_report_digest=mother["report_digest"])
+            bad_verdict=qualify_tier(
+                wrong,evaluator_public_key=eval_pub,evaluator="independent-mirror",
+                key_id="eval-1",now=150,**mother_args)
+            bad_approval=SignedOverlayApproval(
+                "studio",tier,digest,bad_verdict["verdict_digest"],
+                "operator","operator-1",800,"")
+            bad_approval=replace(
+                bad_approval,signature_hex=sign(op_key,bad_approval.body()))
+            with pytest.raises(PermissionError,match="tier baseline"):
+                router.activate(expected_generation=1,**{
+                    **kwargs,"evaluation":wrong,"verdict":bad_verdict,
+                    "approval":bad_approval})
+        status=router.activate(expected_generation=generation,**kwargs)
+        assert status["generation"]==generation+1
+        previous=digest
+    assert router.route("gameboy")["bookmarked_retrieval_ids"]==["c"*64]
+    assert router.rollback(expected_generation=2,authorized=True)==3
+    assert router.route("physics")["bookmarked_retrieval_ids"]==["b"*64]
+    assert router.route("gameboy")["bookmarked_retrieval_ids"]==[]
+
+
 def test_sandbox_requires_real_holdout_improvement_and_no_regressions():
     key,pub=keypair()
-    sig=make_eval(key,"e"*64)
+    matrix,mother_args=trusted_mother()
+    sig=make_eval(key,"e"*64,matrix_report_digest=matrix["report_digest"])
     trials=list(sig.trials)
     trials[0]=replace(trials[0],candidate_correct=False)
     modified=replace(sig,trials=tuple(trials),
@@ -148,13 +218,13 @@ def test_sandbox_requires_real_holdout_improvement_and_no_regressions():
     signed=replace(modified,signature_hex=sign(key,modified.body()))
     report=qualify_tier(
         signed,evaluator_public_key=pub,evaluator="independent-mirror",
-        key_id="eval-1",now=150)
+        key_id="eval-1",now=150,**mother_args)
     assert not report["promotion_review_eligible"]
     assert report["regressions"]==1
     with pytest.raises(PermissionError):
         qualify_tier(replace(sig,holdout_excluded_from_training=False),
             evaluator_public_key=pub,evaluator="independent-mirror",
-            key_id="eval-1",now=150)
+            key_id="eval-1",now=150,**mother_args)
 
 def visual_packet():
     source_url="https://video.example/watch/demo"

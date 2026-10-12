@@ -12,6 +12,7 @@ from threading import RLock
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from skeleton.ai.game_builder.contracts import canonical_digest, canonical_json
+from .dragon_hundred_matrix_scrutiny import SignedMatrixFinding,scrutinize_one_hundred
 
 HEX=re.compile(r"[0-9a-f]{64}\Z")
 WORD=re.compile(r"[a-z0-9]{2,40}")
@@ -79,6 +80,9 @@ class SealedTierEvaluation:
 
 def qualify_tier(evaluation:SealedTierEvaluation,*,evaluator_public_key:bytes,
                  evaluator:str,key_id:str,now:int,
+                 mother_findings:tuple[SignedMatrixFinding,...],
+                 mother_public_key:bytes,mother_reviewer:str,mother_key_id:str,
+                 mother_knowledge_digest:str,
                  max_latency_ratio:float=1.05,max_memory_ratio:float=1.10)->dict:
     if not isinstance(evaluation,SealedTierEvaluation):
         raise TypeError("sealed independent tier-evaluation required")
@@ -91,6 +95,13 @@ def qualify_tier(evaluation:SealedTierEvaluation,*,evaluator_public_key:bytes,
         or type(max_latency_ratio) not in (float,int) or not 1<=max_latency_ratio<=1.2
         or type(max_memory_ratio) not in (float,int) or not 1<=max_memory_ratio<=1.3):
         raise PermissionError("tier evidence identity/holdout/budget invalid")
+    mother=scrutinize_one_hundred(
+        evaluation.owner,mother_knowledge_digest,mother_findings,
+        public_key=mother_public_key,trusted_reviewer=mother_reviewer,
+        key_id=mother_key_id,now=now)
+    if (mother["shadow_review_proposal_eligible"] is not True
+        or mother["report_digest"]!=evaluation.matrix_report_digest):
+        raise PermissionError("100 independently signed fact-check matrices required")
     for x in (evaluation.candidate_digest,evaluation.prior_digest,
               evaluation.matrix_report_digest,evaluation.suite_digest):
         _hash(x)
@@ -203,6 +214,9 @@ class JeevesWeightOverlay:
                  verdict:dict,approval:SignedOverlayApproval,
                  evaluation:SealedTierEvaluation,
                  evaluator_public_key:bytes,evaluator:str,evaluator_key_id:str,
+                 mother_findings:tuple[SignedMatrixFinding,...],
+                 mother_public_key:bytes,mother_reviewer:str,mother_key_id:str,
+                 mother_knowledge_digest:str,
                  operator_public_key:bytes,operator:str,key_id:str,
                  now:int,expected_generation:int)->dict:
         if (type(entries) is not tuple or len(entries)>self._entry_budget
@@ -219,8 +233,12 @@ class JeevesWeightOverlay:
             or approval.operator!=operator or approval.key_id!=key_id
             or type(now) is not int or now>=approval.expires_at):
             raise PermissionError("explicit measured and authorized overlay required")
-        checked=qualify_tier(evaluation,evaluator_public_key=evaluator_public_key,
-                             evaluator=evaluator,key_id=evaluator_key_id,now=now)
+        checked=qualify_tier(
+            evaluation,evaluator_public_key=evaluator_public_key,
+            evaluator=evaluator,key_id=evaluator_key_id,now=now,
+            mother_findings=mother_findings,mother_public_key=mother_public_key,
+            mother_reviewer=mother_reviewer,mother_key_id=mother_key_id,
+            mother_knowledge_digest=mother_knowledge_digest)
         if checked!=verdict or not checked["promotion_review_eligible"]:
             raise PermissionError("independently signed sandbox verdict required")
         verified={k:v for k,v in verdict.items() if k!="verdict_digest"}
