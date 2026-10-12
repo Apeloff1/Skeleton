@@ -178,3 +178,39 @@ def test_campaigns_isolate_owners_and_validate_cas(campaign_studio):
     with pytest.raises(ValueError, match="expected"):
         ledger.record("studio", "other-plan", _request(), authorized=True,
                       topic=topic, expected_parent="bad parent")
+
+
+def test_campaign_policy_stage_progress_invalidates_old_proposal(campaign_studio):
+    store, almanacs, topic, ids = campaign_studio
+    ledger = DiscoveryCampaigns(almanacs)
+    ledger.record("studio", "stage-fence", _request(),
+                  authorized=True, topic=topic)
+    first = ledger.inspect("studio", "stage-fence", authorized=True)
+    sid = first["plan"]["selected"][0]["source_id"]
+    store.db.execute(
+        """UPDATE dragon_almanac_jobs SET stage=1,state='pending'
+           WHERE owner='studio' AND source=?""", (sid,))
+    store.db.commit()
+    stale = ledger.inspect("studio", "stage-fence", authorized=True)
+    assert stale["source_dependencies_current"] is False
+    assert stale["stale_source_ids"] == [sid]
+    assert stale["memory_promotion_authorized"] is False
+
+
+def test_campaign_rejects_planned_url_that_differs_from_canonical_store(campaign_studio):
+    _, almanacs, topic, ids = campaign_studio
+    ledger = DiscoveryCampaigns(almanacs)
+    original = ledger.portfolio.build
+    def forged(owner, request, *, authorized, topic=None):
+        result = original(owner, request, authorized=authorized, topic=topic)
+        from copy import deepcopy
+        changed = deepcopy(result)
+        changed["selected"][0]["url"] = "https://attacker.example/not-the-source"
+        return changed
+    ledger.portfolio.build = forged
+    with pytest.raises(ValueError, match="URL differs"):
+        ledger.record("studio", "url-bound", _request(),
+                      authorized=True, topic=topic)
+    assert ledger.db.execute(
+        "SELECT COUNT(*) FROM dragon_discovery_campaigns"
+    ).fetchone()[0] == 0
