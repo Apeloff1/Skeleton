@@ -15,7 +15,7 @@ from .reviewed_knowledge import ReviewedKnowledgeStore
 
 def main():
     parser = argparse.ArgumentParser(description="Import, inspect and seed sequential Dragon almanacs")
-    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief", "mission-scout", "mission-index", "mission-audit", "import-supplements", "discovery-topics", "discovery-sources", "discovery-receipts"))
+    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief", "mission-scout", "mission-index", "mission-audit", "mission-health", "mission-portfolio", "import-supplements", "discovery-topics", "discovery-sources", "discovery-receipts"))
     parser.add_argument("--database", required=True)
     parser.add_argument("--owner", required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
@@ -29,6 +29,11 @@ def main():
     parser.add_argument("--topic", help="Optional owner-scoped almanac topic ID")
     parser.add_argument("--limit", type=int, default=25)
     parser.add_argument("--scan-budget", type=int, default=2000)
+    parser.add_argument("--axis", action="append", default=[],
+                        help="Portfolio id:question or id:question:minimum:importance")
+    parser.add_argument("--portfolio-limit", type=int, default=30)
+    parser.add_argument("--per-axis-candidates", type=int, default=15)
+    parser.add_argument("--max-per-host", type=int, default=3)
     parser.add_argument("--indexed", action="store_true",
                         help="Use materialized whole-catalog facet index")
     parser.add_argument("--after-source", help="Resumable exclusive facet indexing cursor")
@@ -70,6 +75,40 @@ def main():
                 result = discovery.provenance_page(
                     args.owner, args.source, limit=args.limit, offset=args.offset,
                     authorized=True)
+        elif args.command == "mission-health":
+            from .dragon_discovery_facets import DiscoveryFacetIndex
+            result = DiscoveryFacetIndex(almanacs).health(
+                args.owner, authorized=True)
+        elif args.command == "mission-portfolio":
+            from .dragon_discovery_portfolio import (
+                MissionPortfolio, PortfolioAxis, PortfolioRequest)
+            from .dragon_discovery_mission import SourceMission
+            if not args.query or not args.axis:
+                parser.error("mission-portfolio requires --query and at least one --axis")
+            axes = []
+            for value in args.axis:
+                parts = value.split(":")
+                if len(parts) not in (2,4):
+                    parser.error("--axis requires id:question[:minimum:importance]")
+                if len(parts) == 2:
+                    axes.append(PortfolioAxis(parts[0], parts[1]))
+                else:
+                    try:
+                        count, importance = int(parts[2]), int(parts[3])
+                    except ValueError:
+                        parser.error("axis minimum and importance must be integers")
+                    axes.append(PortfolioAxis(parts[0], parts[1], count, importance))
+            request = PortfolioRequest(
+                SourceMission(args.query, platform=args.platform,
+                              genre=args.genre, era=args.era,
+                              prefer_video=args.prefer_video,
+                              scan_budget=args.scan_budget),
+                tuple(axes), total_limit=args.portfolio_limit,
+                per_axis_candidates=args.per_axis_candidates,
+                max_per_host=args.max_per_host,
+                indexed=args.indexed)
+            result = MissionPortfolio(almanacs).build(
+                args.owner, request, authorized=True, topic=args.topic)
         elif args.command == "mission-audit":
             from .dragon_discovery_facets import DiscoveryFacetIndex
             result = DiscoveryFacetIndex(almanacs).audit(
