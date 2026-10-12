@@ -180,7 +180,7 @@ class DragonTechnicalSources:
             "training_authorized":False}
 
     def plan(self,owner,query,*,authorized,limit=20,max_per_host=2,
-             include_adjacent=True):
+             include_adjacent=True, eligible_source_ids=None):
         _auth(owner,authorized)
         _integer(limit,"research limit",1,100)
         _integer(max_per_host,"host diversity cap",1,20)
@@ -188,6 +188,14 @@ class DragonTechnicalSources:
             or not 2<=len(query)<=300 or
             any(ord(c)<32 or ord(c)==127 for c in query)):
             raise ValueError("bounded research question required")
+        if eligible_source_ids is not None:
+            if (not isinstance(eligible_source_ids,(tuple,list))
+                or not 1<=len(eligible_source_ids)<=64
+                or len(set(eligible_source_ids))!=len(eligible_source_ids)
+                or any(not isinstance(sid,str) or not _ID.fullmatch(sid)
+                       for sid in eligible_source_ids)):
+                raise ValueError("bounded canonical eligible source IDs required")
+            eligible_source_ids=set(eligible_source_ids)
         words=set(_WORD.findall(query.lower()))
         near=set()
         if include_adjacent:
@@ -195,6 +203,8 @@ class DragonTechnicalSources:
         candidates=[]
         for seed in CATALOG:
             sid="source-"+sha256(seed["url"].encode()).hexdigest()
+            if eligible_source_ids is not None and sid not in eligible_source_ids:
+                continue
             history=self._history(owner,sid)
             if not history: continue
             if history[-1]["seed"]!=seed:

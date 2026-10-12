@@ -15,6 +15,7 @@ from skeleton.ai.game_builder.dragon_technical_source_atlas import (
 )
 from skeleton.ai.game_builder.dragon_technical_source_captures import DragonSourceCaptures
 from skeleton.ai.game_builder.dragon_technical_source_operations import DragonSourceOperations
+from skeleton.ai.game_builder.dragon_research_supervisor import DragonResearchSupervisor
 from skeleton.ai.game_builder.dragon_technical_source_acquisition import (
     acquire_canonical_technical_article,
 )
@@ -340,3 +341,116 @@ def test_worker_permission_failure_stops_and_backoffs_durable_lease(lab):
     assert lab[4].active_grants()==()
     assert lab[6].inspect(OWNER,ticket.source_id,authorized=True)["state"]=="retry_wait"
     assert lab[6].review_queue(OWNER,authorized=True)["items"]==[]
+
+
+
+def test_supervisor_refuses_undurable_or_unauthorized_acquisition(lab):
+    coordinator=DragonResearchSupervisor(lab[6],lab[3])
+    assert coordinator.ready(OWNER,now=NOW,authorized=True)["count"]==0
+    result=coordinator.reserve_next(
+        OWNER,sample=hardware(),at=T2,idle_since=T0,now_seconds=1000,
+        authorized=True,trusted_worker=True,consented=True,article_consent=True)
+    assert not result.ticket and result.status=="no_policy_ready_source"
+    assert lab[4].active_grants()==()
+    with pytest.raises(PermissionError):
+        coordinator.reserve_next(
+            OWNER,sample=hardware(),at=T2,idle_since=T0,now_seconds=1000,
+            authorized=True,trusted_worker=False,consented=True,article_consent=True)
+
+
+def test_supervisor_routes_only_durable_ready_source_and_grants_real_slot(lab):
+    schedule(lab)
+    coordinator=DragonResearchSupervisor(lab[6],lab[3])
+    ready=coordinator.ready(OWNER,now=NOW,authorized=True)
+    assert ready["count"]==1 and ready["ready_sources"]==[lab[7]]
+    assert ready["execution_authorized"] is False
+    accepted=coordinator.reserve_next(
+        OWNER,sample=hardware(),at=T2,idle_since=T0,now_seconds=1000,
+        authorized=True,trusted_worker=True,consented=True,article_consent=True)
+    assert accepted.status=="durably_fenced_resource_granted"
+    assert accepted.ticket and accepted.lease
+    assert accepted.ticket.source_id==lab[7]
+    assert accepted.lease.ticket_digest and not accepted.lease.acquisition_authorized
+    assert len(lab[4].active_grants())==1
+    assert coordinator.ready(OWNER,now=NOW+1,authorized=True)["count"]==0
+    assert lab[6].inspect(OWNER,lab[7],authorized=True)["state"]=="leased"
+    stop(lab,accepted.ticket)
+    lab[6].release(accepted.ticket,lab[3],now=NOW+1,capture_digest=None,
+                   authorized=True,trusted_worker=True)
+    assert lab[4].active_grants()==()
+
+
+def test_supervisor_foreground_consent_and_hardware_gate_do_not_scan_queue(lab):
+    schedule(lab)
+    coordinator=DragonResearchSupervisor(lab[6],lab[3])
+    for overrides in (
+        {"consented":False},
+        {"article_consent":False},
+        {"idle_since":T2},
+        {"sample":HardwareSample(512*1024**2,8,.99,.75,True,False,1000.)},
+    ):
+        kwargs=dict(owner=OWNER,sample=hardware(),at=T2,idle_since=T0,
+            now_seconds=1000,authorized=True,trusted_worker=True,
+            consented=True,article_consent=True)
+        kwargs.update(overrides)
+        denied=coordinator.reserve_next(**kwargs)
+        assert denied.ticket is None and denied.lease is None
+        assert lab[4].active_grants()==()
+    assert lab[6].inspect(OWNER,lab[7],authorized=True)["state"]=="scheduled"
+
+
+def test_supervisor_rejects_backoff_or_expired_policy(lab):
+    schedule(lab)
+    coordinator=DragonResearchSupervisor(lab[6],lab[3])
+    # Explicit ready time controls the queue, even when an atlas recommendation exists.
+    lab[0].db.execute("UPDATE dragon_source_ops_heads_v1 SET ready_at=? "
+        "WHERE owner=? AND source=?",(NOW-1,OWNER,lab[7]))
+    with pytest.raises(ValueError,match="head mismatch"):
+        coordinator.ready(OWNER,now=NOW,authorized=True)
+    # Corruption is a hard stop, never a fallback to scanning raw URLs.
+
+
+def test_supervisor_releases_unused_global_grant_on_durable_attach_race(lab):
+    schedule(lab)
+    coordinator=DragonResearchSupervisor(lab[6],lab[3])
+    old=lab[6].attach
+    def lost_race(*args,**kwargs):
+        raise PermissionError("host delay changed in another process")
+    lab[6].attach=lost_race
+    try:
+        denied=coordinator.reserve_next(
+            OWNER,sample=hardware(),at=T2,idle_since=T0,now_seconds=1000,
+            authorized=True,trusted_worker=True,consented=True,
+            article_consent=True)
+    finally:
+        lab[6].attach=old
+    assert denied.status=="durable_lease_raced_or_policy_changed"
+    assert denied.ticket is None and denied.lease is None
+    assert lab[4].active_grants()==()
+    assert not lab[3].active
+    assert lab[6].inspect(OWNER,lab[7],authorized=True)["state"]=="scheduled"
+
+
+def test_supervisor_does_not_dispatch_into_crashed_leases(lab):
+    schedule(lab)
+    coordinator=DragonResearchSupervisor(lab[6],lab[3])
+    reservation=coordinator.reserve_next(
+        OWNER,sample=hardware(),at=T2,idle_since=T0,now_seconds=1000,
+        authorized=True,trusted_worker=True,consented=True,
+        article_consent=True)
+    assert reservation.ticket
+    quarantined=lab[6].quarantine_expired(OWNER,now=NOW+61,
+        authorized=True,trusted_supervisor=True)
+    assert len(quarantined["quarantined"])==1
+    assert coordinator.ready(OWNER,now=NOW+62,authorized=True)["ready_sources"]==[]
+    # Worker and global grant are still tracked until explicit stop.
+    assert lab[4].active_grants()
+    stop(lab,reservation.ticket)
+    lab[6].confirm_recovered(OWNER,lab[7],now=NOW+62,
+        external_stop_receipt="a"*64,authorized=True,
+        trusted_supervisor=True,worker_stopped=True,
+        resources_reconciled=True)
+    lab[6].schedule(OWNER,lab[7],now=NOW+63,ready_at=NOW+65,
+                    authorized=True,trusted_worker=True)
+    assert coordinator.ready(OWNER,now=NOW+64,authorized=True)["ready_sources"]==[]
+    assert coordinator.ready(OWNER,now=NOW+65,authorized=True)["ready_sources"]==[lab[7]]

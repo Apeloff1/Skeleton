@@ -464,3 +464,62 @@ class DragonSourceOperations:
             })
         return {"owner":owner,"items":items,"network_requests":0,
                 "model_training_authorized":False}
+
+
+    def ready_candidates(self, owner: str, *, now: int, authorized: bool,
+                         limit: int=32) -> tuple[str, ...]:
+        """Read-only, fenced admission inventory, not an execution grant.
+
+        Waited retries become eligible only once their backoff AND per-host
+        cooldown have elapsed. Stale active leases require supervisor
+        quarantine; they are NEVER automatically released here.
+        """
+        _auth(owner,authorized)
+        _integer(now,"source scheduling clock",0,4_102_444_800)
+        _integer(limit,"source inventory limit",1,64)
+        entries=self.db.execute(
+            """SELECT source FROM dragon_source_ops_heads_v1
+               WHERE owner=? AND state IN ('scheduled','retry_wait')
+               AND ready_at<=? ORDER BY ready_at,source LIMIT ?""",
+            (owner,now,_MAX_OWNER_QUEUE+1)
+        ).fetchall()
+        if len(entries)>_MAX_OWNER_QUEUE:
+            raise ValueError("too many queued sources; operator intervention required")
+        # Never admit one more worker for an owner with a crashed, still
+        # unaccounted, or live worker. No process manager proves otherwise.
+        if self.db.execute(
+            """SELECT 1 FROM dragon_source_ops_heads_v1
+               WHERE owner=? AND state IN ('leased','quarantined') LIMIT 1""",
+            (owner,)
+        ).fetchone():
+            return ()
+        candidates=[]
+        for (sid,) in entries:
+            event=self._history(owner,sid)[-1]
+            host=event["host"]
+            if event["ready_at"]>now:
+                continue
+            cooldown=self.db.execute(
+                "SELECT next_at FROM dragon_source_host_cooldown_v1 WHERE host=?",
+                (host,)
+            ).fetchone()
+            if cooldown and cooldown[0]>now:
+                continue
+            if self.db.execute(
+                """SELECT 1 FROM dragon_source_ops_heads_v1
+                   WHERE host=? AND state IN ('leased','quarantined') LIMIT 1""",
+                (host,)
+            ).fetchone():
+                continue
+            registered,_=self.captures._source(owner,sid)
+            self.captures._policy(owner,sid,registered["url"],observed_at=now)
+            row=self.db.execute(
+                """SELECT stage,state FROM dragon_almanac_jobs
+                   WHERE owner=? AND source=?""",(owner,sid)
+            ).fetchone()
+            if row!=(1,"pending"):
+                continue
+            candidates.append(sid)
+            if len(candidates)>=limit:
+                break
+        return tuple(candidates)

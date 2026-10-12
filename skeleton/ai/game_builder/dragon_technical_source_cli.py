@@ -18,11 +18,12 @@ def main():
     parser.add_argument("command",choices=("census","import","plan","history",
                                                   "capture-history","capture-review",
                                                   "capture-census","glean-preview","glean-handoff",
-                                                  "operations-inspect","operations-review"))
+                                                  "operations-inspect","operations-review","operations-ready"))
     parser.add_argument("--database",required=True)
     parser.add_argument("--owner",required=True)
     parser.add_argument("--trusted-local-operator",action="store_true")
     parser.add_argument("--recorded-at",type=int)
+    parser.add_argument("--now",type=int)
     parser.add_argument("--query")
     parser.add_argument("--source-id")
     parser.add_argument("--capture-digest")
@@ -57,9 +58,19 @@ def main():
             report=atlas.history(args.owner,args.source_id,authorized=True)
         else:
             captures=DragonSourceCaptures(atlas.a)
-            if args.command in ("operations-inspect","operations-review"):
+            if args.command in ("operations-inspect","operations-review",
+                                "operations-ready"):
                 operations=DragonSourceOperations(captures)
-                if args.command=="operations-inspect":
+                if args.command=="operations-ready":
+                    if args.now is None: parser.error("--now UTC epoch required")
+                    sources=operations.ready_candidates(
+                        args.owner,now=args.now,authorized=True,
+                        limit=args.limit)
+                    report={"schema":"skeleton.dragon.ready_sources.v1",
+                            "owner":args.owner,"ready_sources":list(sources),
+                            "read_only":True,"network_requests":0,
+                            "training_authorized":False}
+                elif args.command=="operations-inspect":
                     if not args.source_id:
                         parser.error("--source-id required for operations inspection")
                     report=operations.inspect(args.owner,args.source_id,authorized=True)

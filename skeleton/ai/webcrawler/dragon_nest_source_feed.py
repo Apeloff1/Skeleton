@@ -133,7 +133,8 @@ class DragonNestSourceFeed:
                 update_hints: tuple[ResearchLead, ...] = (),
                 policy: IdleResearchPolicy = IdleResearchPolicy(),
                 article_limit: int = 64,
-                max_per_host: int = 2) -> SourceFedNestPlan:
+                max_per_host: int = 2,
+                eligible_source_ids=None) -> SourceFedNestPlan:
         _auth(owner, authorized)
         if not isinstance(video_hints, tuple) or not isinstance(update_hints, tuple):
             raise ValueError("typed research hint batches required")
@@ -187,6 +188,7 @@ class DragonNestSourceFeed:
                 proposal=self.atlas.plan(
                     owner,query,authorized=True,limit=max(article_limit,min(len(CATALOG),100)),
                     max_per_host=max_per_host,
+                    eligible_source_ids=eligible_source_ids,
                 )
                 for hit in proposal["selected"]:
                     if hit["policy_state"] == "blocked":
@@ -220,6 +222,9 @@ class DragonNestSourceFeed:
                         break
         if video_consent:
             for hint in sorted(video_hints,key=lambda x:(x.source_id,x.url)):
+                if eligible_source_ids is not None and hint.source_id not in eligible_source_ids:
+                    rejected+=1
+                    continue
                 if not self._registered(owner,hint):
                     rejected+=1
                     continue

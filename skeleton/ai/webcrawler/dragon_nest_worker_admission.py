@@ -75,6 +75,7 @@ class DragonNestWorkerAdmission:
         self.lock=RLock()
         self.active: dict[str,tuple[HatchlingWorkerTicket,tuple[ResearchLead,...],
                                     tuple[ResearchLead,...]]] = {}
+        self._eligible: dict[str,tuple[str,...]|None] = {}
 
     def _owner(self,owner,*,authorized,trusted_worker):
         if authorized is not True or trusted_worker is not True:
@@ -96,7 +97,8 @@ class DragonNestWorkerAdmission:
               update_hints:tuple[ResearchLead,...]=(),
               policy:IdleResearchPolicy=IdleResearchPolicy(),
               memory_bytes:int=8*1024**2,io_tokens:int=2,
-              max_active:int=6) -> HatchlingWorkerPreview:
+              max_active:int=6,
+              eligible_source_ids=None) -> HatchlingWorkerPreview:
         self._owner(owner,authorized=authorized,trusted_worker=trusted_worker)
         if type(memory_bytes) is not int or not 8*1024**2<=memory_bytes<=64*1024**2:
             raise ValueError("bounded hatchling worker memory required")
@@ -113,13 +115,16 @@ class DragonNestWorkerAdmission:
                 article_consent=article_consent,video_consent=video_consent,
                 updates_consent=updates_consent,video_hints=video_hints,
                 update_hints=update_hints,policy=policy,
+                eligible_source_ids=eligible_source_ids,
             )
             if not proposal.plan.assignments:
                 return HatchlingWorkerPreview(
                     None,False,proposal.plan.reason,len(self.active))
             used={(t.lane,t.source_id) for t,_,_ in self.active.values()}
             selection=next((a for a in proposal.plan.assignments
-                            if (a.lane,a.source_id) not in used),None)
+                            if (a.lane,a.source_id) not in used
+                            and (eligible_source_ids is None
+                                 or a.source_id in eligible_source_ids)),None)
             if selection is None:
                 return HatchlingWorkerPreview(None,False,"already_leased",len(self.active))
             # A local admission alone is advisory: execution requires the
@@ -149,6 +154,8 @@ class DragonNestWorkerAdmission:
                 self.session.stopped(task_id)
                 raise
             self.active[task_id]=(ticket,video_hints,update_hints)
+            self._eligible[task_id]=(tuple(eligible_source_ids)
+                                     if eligible_source_ids is not None else None)
             return HatchlingWorkerPreview(ticket,True,"resource_granted",
                                            len(self.active))
 
@@ -186,6 +193,7 @@ class DragonNestWorkerAdmission:
                 article_consent=article_consent,video_consent=video_consent,
                 updates_consent=updates_consent,video_hints=videos,
                 update_hints=updates,policy=policy,
+                eligible_source_ids=self._eligible.get(ticket.task_id),
             ).plan
             return any(
                 self._assignment_identity(ticket.owner,a)==ticket.assignment_digest
@@ -206,3 +214,4 @@ class DragonNestWorkerAdmission:
                 raise ValueError("unknown, forged or already stopped worker ticket")
             self.session.stopped(ticket.task_id)
             del self.active[ticket.task_id]
+            self._eligible.pop(ticket.task_id,None)
