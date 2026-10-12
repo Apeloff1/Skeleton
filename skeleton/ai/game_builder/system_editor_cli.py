@@ -21,6 +21,7 @@ from .system_editor_assembly import assemble_workspace_systems
 from .advanced_gameplay_runtime import run_advanced_session, verify_advanced_session
 from .advanced_level_scenes import make_advanced_scene
 from .advanced_puzzle_solver import solve_advanced_puzzle
+from .advanced_world_planner import plan_original_world
 from .advanced_stealth_planner import plan_stealth_route
 from .advanced_godot_export import (
     render_advanced_godot_package, write_advanced_godot_package,
@@ -75,6 +76,12 @@ def parser() -> argparse.ArgumentParser:
     stealth_plan.add_argument("--settings")
     stealth_plan.add_argument("--max-states",type=int,default=30000)
     stealth_plan.add_argument("--max-depth",type=int,default=96)
+    world_plan=commands.add_parser("plan-original-world",
+        help="Search and independently replay a safe original world ability path")
+    world_plan.add_argument("--scene",required=True)
+    world_plan.add_argument("--settings")
+    world_plan.add_argument("--max-states",type=int,default=50000)
+    world_plan.add_argument("--max-actions",type=int,default=128)
     native=commands.add_parser("godot-export",help="Real offline native Godot 4 puzzle source, proof and export presets")
     native.add_argument("--session",required=True)
     native.add_argument("--settings")
@@ -142,6 +149,11 @@ def main(argv=None) -> int:
                 _load(args.scene),
                 _load(args.settings) if args.settings else None,
                 max_states=args.max_states,max_depth=args.max_depth)
+        elif args.operation == "plan-original-world":
+            output=plan_original_world(
+                _load(args.scene),
+                _load(args.settings) if args.settings else None,
+                max_states=args.max_states,max_actions=args.max_actions)
         elif args.operation == "godot-export":
             receipt=_load(args.session)
             settings=_load(args.settings) if args.settings else None
