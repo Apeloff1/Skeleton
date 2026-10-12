@@ -24,6 +24,7 @@ from skeleton.ai.game_builder.advanced_godot_export import (
     write_advanced_godot_package,
 )
 from skeleton.ai.game_builder.system_editors import make_editor_document
+from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html
 
 
 def supported_scene(settings, seed=0, *, win=False):
@@ -183,6 +184,17 @@ class OriginalPhysicsGodotProofTests(unittest.TestCase):
         with self.assertRaises(Exception):
             render_physics_godot_package(
                 session,{**rules,"gravity":1},authorized=True)
+
+    def test_studio_has_actual_signed_native_profile_preparation(self):
+        html=render_workspace_html("B"*32).decode("utf-8")
+        self.assertIn('id="advanced-physics-native"',html)
+        self.assertIn("native_physics_demo",html)
+        self.assertIn("layout.fixtures=[]",html)
+        self.assertIn("Authenticated authored native profile was not replayed",html)
+        self.assertIn('advancedSettings?.max_bodies===1',html)
+        self.assertIn('advancedSettings?.initial_battery===0',html)
+        self.assertIn('advancedSession.scene_digest!==approved.scene.digest',html)
+        self.assertIn("device validation is separate",html)
 
     def test_independent_script_has_actual_transition_and_exact_proof_comparison(self):
         self.assertIn("func _frame() -> void:",GODOT_PHYSICS)
