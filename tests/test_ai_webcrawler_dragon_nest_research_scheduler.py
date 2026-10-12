@@ -155,6 +155,9 @@ def test_no_video_article_mislabel():
     "http://docs.example.org/x",
     "https://user:pass@docs.example.org/x",
     "https://localhost/private",
+    "https://127.0.0.1/private",
+    "https://169.254.169.254/metadata",
+    "https://docs.example.org/x?utm_source=hidden",
     "https://docs.example.org/x#anchor",
 ])
 def test_leads_reject_unsafe_identity_syntax(url):
