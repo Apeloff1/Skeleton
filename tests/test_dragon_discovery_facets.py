@@ -124,10 +124,23 @@ def test_source_digest_drift_requires_refresh_before_index_match(indexed_studio)
         authorized=True, indexed=True)
     assert target not in {x["source_id"] for x in missing["selection"]}
     _populate(index)
+    # Re-indexing metadata alone must NOT repair the fenced policy-input
+    # contract. An authenticated independent stage must reconcile that digest.
+    assert index.health("studio", authorized=True)["stale_job_inputs"] == 1
+    blocked = MissionSourceScout(almanacs).propose(
+        "studio", SourceMission("collision physics", limit=5),
+        authorized=True, indexed=True)
+    assert target not in {x["source_id"] for x in blocked["selection"]}
+    store.db.execute(
+        "UPDATE dragon_almanac_jobs SET input_digest=? "
+        "WHERE owner='studio' AND source=? AND stage=0",
+        (canonical_digest(record), target))
+    store.db.commit()
     restored = MissionSourceScout(almanacs).propose(
         "studio", SourceMission("collision physics", limit=5),
         authorized=True, indexed=True)
     assert target in {x["source_id"] for x in restored["selection"]}
+    assert index.health("studio", authorized=True)["coverage_complete"]
 
 
 def test_corrupt_source_rolls_back_entire_refresh_page(indexed_studio):
@@ -193,3 +206,23 @@ def test_receipt_header_tokens_are_indexed_without_knowledge_approval(indexed_st
     assert sid in {x["source_id"] for x in result["selection"]}
     assert all(x["training_authorized"] is False for x in result["selection"])
     assert all(x["network_authorized"] is False for x in result["selection"])
+
+
+def test_weighted_index_prefers_goal_over_generic_era_metadata(indexed_studio):
+    _, almanacs, _, rows = indexed_studio
+    index = DiscoveryFacetIndex(almanacs)
+    _populate(index)
+    # Query weights are explicit and the fetch is advisory; a broad era token
+    # cannot evict the only exact high-value objective from a tiny scan budget.
+    result = MissionSourceScout(almanacs).propose(
+        "studio", SourceMission("platforming physics", genre="graphics",
+                                 limit=1, scan_budget=1),
+        authorized=True, indexed=True)
+    assert len(result["selection"]) == 1
+    assert "platforming-physics" in result["selection"][0]["url"]
+    with pytest.raises(ValueError, match="term weights"):
+        index.matching_rows("studio", frozenset({"physics"}), authorized=True,
+                            limit=3, weights={"physics": True})
+    with pytest.raises(ValueError, match="term weights"):
+        index.matching_rows("studio", frozenset({"physics"}), authorized=True,
+                            limit=3, weights={"unrelated": 12})
