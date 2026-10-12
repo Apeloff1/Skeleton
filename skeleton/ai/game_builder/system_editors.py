@@ -216,6 +216,281 @@ CATALOG = json.loads(r'''[
         "minimum": null,
         "maximum": null,
         "options": []
+      },
+      {
+        "key": "foe_health",
+        "kind": "int",
+        "default": 7,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "foe_variation",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "foe_damage",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "enemy_variance",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "hazard_damage",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "starting_health",
+        "kind": "int",
+        "default": 38,
+        "minimum": 5,
+        "maximum": 150,
+        "options": []
+      },
+      {
+        "key": "starting_stamina",
+        "kind": "int",
+        "default": 12,
+        "minimum": 3,
+        "maximum": 60,
+        "options": []
+      },
+      {
+        "key": "attack_power",
+        "kind": "int",
+        "default": 6,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "armor",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "tonics",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "camp_supplies",
+        "kind": "int",
+        "default": 4,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "opening_shards",
+        "kind": "int",
+        "default": 6,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "boss_health",
+        "kind": "int",
+        "default": 30,
+        "minimum": 1,
+        "maximum": 300,
+        "options": []
+      },
+      {
+        "key": "boss_damage",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "boss_reward",
+        "kind": "int",
+        "default": 25,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "foe_reward",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "heavy_stamina",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 15,
+        "options": []
+      },
+      {
+        "key": "heavy_multiplier",
+        "kind": "int",
+        "default": 4,
+        "minimum": 2,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "stamina_regen",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "evade_cost",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "focus_cost",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "focus_power",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "cache_variation",
+        "kind": "int",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "cache_tonics",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 6,
+        "options": []
+      },
+      {
+        "key": "heal_power",
+        "kind": "int",
+        "default": 12,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "camp_heal",
+        "kind": "int",
+        "default": 18,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "craft_cost",
+        "kind": "int",
+        "default": 10,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "craft_gain",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "max_attack",
+        "kind": "int",
+        "default": 25,
+        "minimum": 5,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "fast_travel_cost",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "break_stamina",
+        "kind": "int",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "secret_interval",
+        "kind": "int",
+        "default": 3,
+        "minimum": 2,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "secret_reward",
+        "kind": "int",
+        "default": 7,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "ending_policy",
+        "kind": "enum",
+        "default": "endless",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "endless",
+          "campaign"
+        ]
       }
     ],
     "preview": null
@@ -2633,7 +2908,7 @@ CATALOG = json.loads(r'''[
   }
 ]''')
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
