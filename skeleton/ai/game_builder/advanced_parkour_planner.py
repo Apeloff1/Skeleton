@@ -156,6 +156,14 @@ def plan_parkour_route(scene,settings=None,*,max_states=DEFAULT_MAX_STATES,
         if budget_reached:
             break
 
+    # The last expanded layer can itself contain a completed course. Evaluate
+    # it before reporting that a finite beam/budget could not prove a win.
+    for physical,path in frontier:
+        if physical["x"]==physical["exit_x"] and (
+            len(physical["medals_collected"])==len(physical["medals"])
+        ):
+            return finished(path+("finish",))
+
     # Report the actual best observed physical attempt without counterfeit
     # victory or a logically unsound claim of unsolvability.
     report={
