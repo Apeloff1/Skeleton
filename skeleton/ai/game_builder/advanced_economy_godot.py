@@ -336,6 +336,27 @@ func _step(action: String) -> bool:
     return true
 
 
+func _parity_value(value: Variant) -> Variant:
+    # Godot JSON numbers are floats even where Python source has an integer.
+    # Normalize ONLY finite integral JSON numbers to integers recursively.
+    # This does not round fractional forgery, convert strings, or equate bools.
+    if typeof(value) == TYPE_FLOAT:
+        if not is_finite(value) or floor(value) != value or absf(value) > 9007199254740991.0:
+            return "invalid_nonintegral_or_unsafe_number"
+        return int(value)
+    if typeof(value) == TYPE_ARRAY:
+        var normalized: Array = []
+        for entry in value:
+            normalized.append(_parity_value(entry))
+        return normalized
+    if typeof(value) == TYPE_DICTIONARY:
+        var normalized: Dictionary = {}
+        for name in value:
+            normalized[name] = _parity_value(value[name])
+        return normalized
+    return value
+
+
 func _verify() -> void:
     var text: String = FileAccess.get_file_as_string("res://proof.json")
     if text.is_empty() or text.length() > 200000:
@@ -373,7 +394,7 @@ func _verify() -> void:
         if not state.has(key):
             _fail("proof requests an unknown source market variable")
             return
-        if state[key] != expected[key]:
+        if _parity_value(state[key]) != _parity_value(expected[key]):
             _fail("independent economic divergence: " + str(key) +
                 " actual=" + JSON.stringify(state[key]) +
                 " expected=" + JSON.stringify(expected[key]))
