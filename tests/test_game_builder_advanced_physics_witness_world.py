@@ -6,6 +6,7 @@ import unittest
 
 from skeleton.ai.game_builder.advanced_gameplay_runtime import run_advanced_session
 from skeleton.ai.game_builder.advanced_level_scenes import make_advanced_scene
+from skeleton.ai.game_builder.system_editors import make_editor_document
 from skeleton.ai.game_builder.advanced_physics_witness_world import (
     MAX_FOLLOWUPS,PhysicalWitnessError,
     run_physical_witness_world,verify_physical_witness_world,
@@ -102,7 +103,7 @@ class SignedPhysicsWitnessWorldTests(unittest.TestCase):
         result=run_physical_witness_world(
             source,scene,quest_settings=settings,binding=self.binding(source))
         self.assertEqual(result["world_state"]["reputation"],
-                         settings.get("starting_reputation",0))
+                         make_editor_document("quest_director",settings)["settings"]["starting_reputation"])
         self.assertEqual(result["world_state"]["events_log"][0]["actor"],
                          "external:physics")
 
