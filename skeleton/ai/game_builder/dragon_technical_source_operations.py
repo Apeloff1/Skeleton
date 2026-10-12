@@ -19,6 +19,9 @@ from skeleton.ai.webcrawler.dragon_nest_worker_admission import (
 from .contracts import canonical_digest, canonical_json
 from .dragon_almanacs import _auth
 from .dragon_technical_source_captures import DragonSourceCaptures
+from .dragon_worker_stop_authority import (
+    DragonWorkerStopAuthority, SignedWorkerStop,
+)
 from .reviewed_knowledge import _integer
 
 _HASH = re.compile(r"[0-9a-f]{64}\Z")
@@ -439,31 +442,50 @@ class DragonSourceOperations:
                 "network_requests":0}
 
     def confirm_recovered(self,owner:str,source_id:str,*,now:int,
-                          external_stop_receipt:str,authorized:bool,
-                          trusted_supervisor:bool,worker_stopped:bool,
+                          signed_stop:SignedWorkerStop,
+                          stop_authority:DragonWorkerStopAuthority,
+                          authorized:bool,trusted_supervisor:bool,
+                          worker_stopped:bool,
                           resources_reconciled:bool) -> dict:
-        """Requires independent supervisor proof of real process/grant cleanup."""
+        """Only a signed independent, exact-quarantine stop proof can release.
+
+        A caller's booleans or an unsigned 64-byte string cannot clear the
+        quarantine. The issuer must *actually* attest to OS process death and
+        reconciliation of the global resource grant before signing.
+        """
         _auth(owner,authorized)
         _integer(now,"stop verified time",0,4_102_444_800)
         if (trusted_supervisor is not True or worker_stopped is not True
             or resources_reconciled is not True):
             raise PermissionError("independent process-stop and grant reconciliation required")
-        if (not isinstance(external_stop_receipt,str)
-            or not _HASH.fullmatch(external_stop_receipt)):
-            raise ValueError("bounded external supervisor receipt required")
+        if not isinstance(stop_authority,DragonWorkerStopAuthority):
+            raise PermissionError("separately keyed external stop authority required")
         self.db.execute("BEGIN IMMEDIATE")
         try:
             old=self._history(owner,source_id)
             if not old or old[-1]["state"]!="quarantined":
                 raise ValueError("source has no quarantined lease")
-            event=self._append(owner,source_id,old[-1]["host"],
+            locked=old[-1]
+            proof_digest=stop_authority.verify(
+                signed_stop,owner=owner,source_id=source_id,
+                host=locked["host"],ticket_digest=locked["ticket_digest"],
+                quarantine_digest=locked["digest"],now=now,authorized=True)
+            event=self._append(owner,source_id,locked["host"],
                                "acknowledged_stop",now=now,
-                               details={"supervisor_stop_receipt":external_stop_receipt})
+                               details={
+                                   "supervisor_stop_receipt":proof_digest,
+                                   "quarantine_digest":locked["digest"],
+                                   "process_stop_digest":signed_stop.process_stop_digest,
+                                   "resource_reconciliation_digest":
+                                       signed_stop.resource_reconciliation_digest,
+                                   "supervisor":signed_stop.supervisor,
+                               })
             self.db.execute("COMMIT")
         except Exception:
             self.db.execute("ROLLBACK")
             raise
         return {"status":"ready_for_new_policy_review","digest":event["digest"],
+                "signed_stop_receipt":proof_digest,
                 "resource_release_verified_externally":True,
                 "training_authorized":False}
 
