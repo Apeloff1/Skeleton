@@ -63,6 +63,8 @@ export class WorkspaceController {
   private saving = false;
   private loading: Promise<void> | null = null;
   private attachments = new Map<string, Attachment>();
+  /** Fence duplicate manual retries while authoritative history is being checked. */
+  private retrying = new Set<string>();
 
   constructor(
     private storage: WorkspaceStorage,
@@ -203,8 +205,10 @@ export class WorkspaceController {
     const current = this.snapshot.workspace.conversations.find(
       item => item.id === conversationId,
     );
-    if (!current?.sessionId) return false;
-    const sessionId = current.sessionId;
+    // The first turn uses the device conversation ID before the server returns a session ID.
+    // Its reply may have committed even if the HTTP response was lost.
+    if (!current || (!current.sessionId && !current.messages.length)) return false;
+    const sessionId = current.sessionId || current.id;
     try {
       const result = await this.historyTransport(sessionId);
       if (
@@ -220,7 +224,7 @@ export class WorkspaceController {
       );
       if (
         !latest
-        || latest.sessionId !== sessionId
+        || (latest.sessionId || latest.id) !== sessionId
         || this.running?.conversationId === conversationId
       ) {
         return false;
@@ -350,6 +354,11 @@ export class WorkspaceController {
   async send(attachment?: Attachment): Promise<void> {
     if (!this.snapshot.ready || this.running) return;
     const conversation = this.active;
+    const tail = conversation.messages[conversation.messages.length - 1];
+    if (tail?.role === 'user' && tail.status !== 'complete') {
+      this.notify('Resolve the interrupted turn with Retry or Check server before sending another message. Your draft is preserved.');
+      return;
+    }
     const content = conversation.draft.trim() || (attachment ? `Analyze this ${attachment.modality}` : '');
     if (!content) return;
     if (conversation.messages.length > MAX_MESSAGES - 2) {
@@ -377,7 +386,7 @@ export class WorkspaceController {
   }
 
   async retry(messageId: string): Promise<void> {
-    if (!this.snapshot.ready || this.running) return;
+    if (!this.snapshot.ready || this.running || this.retrying.has(messageId)) return;
     const conversation = this.active;
     const index = conversation.messages.findIndex(m => m.id === messageId && m.role === 'user');
     const message = conversation.messages[index];
@@ -388,27 +397,44 @@ export class WorkspaceController {
       this.notify('The earlier message is in your draft. Send it as a new turn.');
       return;
     }
-    const attachment = this.attachments.get(messageId);
-    if (message.attachmentName && !attachment) {
-      this.edit({ draft: message.text });
-      this.notify('Attachments are not saved on this device. Reattach the file and send your restored draft.');
-      return;
+    this.retrying.add(messageId);
+    try {
+      // An HTTP abort or timeout is not proof the backend failed to commit.
+      // Read the canonical transcript BEFORE re-submitting the identical client ID.
+      if (this.historyTransport) {
+        await this.refreshCanonical(conversation.id);
+      }
+      const current = this.snapshot.workspace.conversations.find(c => c.id === conversation.id);
+      if (!current || this.active.id !== conversation.id || this.running) return;
+      const last = current.messages[current.messages.length - 1];
+      // A successful reconciliation is terminal. Do not generate a duplicate.
+      if (!last || last.id !== messageId || last.status === 'complete'
+          || !['failed', 'cancelled'].includes(last.status)) return;
+      const attachment = this.attachments.get(messageId);
+      if (last.attachmentName && !attachment) {
+        this.edit({ draft: last.text });
+        this.notify('Attachments are not saved on this device. Reattach the file and send your restored draft.');
+        return;
+      }
+      const body = buildChatBody(
+        { ...current, messages: current.messages.slice(0, -1) },
+        last.text,
+        attachment,
+        Date.now(),
+        last.id,
+      );
+      this.setMessage(conversation.id, messageId, { status: 'pending', error: undefined });
+      await this.execute(conversation.id, messageId, body);
+    } finally {
+      this.retrying.delete(messageId);
     }
-    const body = buildChatBody(
-      { ...conversation, messages: conversation.messages.slice(0, index) },
-      message.text,
-      attachment,
-      Date.now(),
-      message.id,
-    );
-    this.setMessage(conversation.id, messageId, { status: 'pending', error: undefined });
-    await this.execute(conversation.id, messageId, body);
   }
 
   private async execute(conversationId: string, messageId: string, body: ChatBody): Promise<void> {
     const running: Running = { controller: new AbortController(), conversationId, messageId };
     this.running = running;
     this.emit({ busyId: conversationId, notice: null });
+    let deliveryUncertain = false;
     try {
       const response = await this.transport(body, running.controller.signal);
       if (this.running !== running) return;
@@ -446,6 +472,7 @@ export class WorkspaceController {
       if (response.persisted === false) this.notify('The server could not save this exchange. Your device-local transcript is still available.');
     } catch (error) {
       if (this.running !== running) return;
+      deliveryUncertain = true;
       this.setMessage(conversationId, messageId, {
         status: 'failed', error: error instanceof Error ? error.message.slice(0, 400) : 'Jeeves could not respond. Try again.',
       });
@@ -453,6 +480,13 @@ export class WorkspaceController {
       if (this.running === running) {
         this.running = null;
         this.emit({ busyId: null });
+        if (deliveryUncertain && this.historyTransport) {
+          const checked = await this.refreshCanonical(conversationId);
+          const latest = this.snapshot.workspace.conversations.find(c => c.id === conversationId);
+          if (checked && latest?.messages.some(m => m.id === messageId && m.status === 'complete')) {
+            this.notify('The reply was saved on the server and has been recovered.');
+          }
+        }
       }
     }
   }
