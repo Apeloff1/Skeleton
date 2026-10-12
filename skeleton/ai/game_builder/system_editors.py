@@ -2548,6 +2548,46 @@ CATALOG = json.loads(r'''[
         "minimum": 1,
         "maximum": 6,
         "options": []
+      },
+      {
+        "key": "line_of_sight",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "rain_range_penalty",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 4,
+        "options": []
+      },
+      {
+        "key": "enemy_siege_range",
+        "kind": "int",
+        "default": 1,
+        "minimum": 1,
+        "maximum": 4,
+        "options": []
+      },
+      {
+        "key": "enemy_siege_damage",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 40,
+        "options": []
+      },
+      {
+        "key": "desert_logistics_penalty",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
       }
     ],
     "preview": null
