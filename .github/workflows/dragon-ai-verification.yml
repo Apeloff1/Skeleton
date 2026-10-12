@@ -1,7 +1,9 @@
 name: Dragon AI Verification
 on:
   push:
-    branches: [main]
+    # Exact-head execution for Dragon feature work, rather than relying on
+    # a PR check that currently exposes only CodeQL Actions analysis.
+    branches: [main, "feat/dragon-*"]
     paths:
       - "skeleton/ai/webcrawler/dragon_*.py"
       - "skeleton/ai/game_builder/**"
@@ -180,6 +182,8 @@ jobs:
             skeleton/ai/game_builder/dragon_evidence_disagreement.py \
             skeleton/ai/game_builder/dragon_research_mirror.py \
             skeleton/ai/game_builder/dragon_research_source_picker.py \
+            skeleton/ai/game_builder/dragon_research_workboard.py \
+            skeleton/ai/game_builder/dragon_family_research_history.py \
             backend/core/dragon_research_session.py \
             backend/routes/dragon_research.py \
             skeleton/ai/game_builder/dragon_source_permission_authority.py \

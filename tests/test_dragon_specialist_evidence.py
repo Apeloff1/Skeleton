@@ -24,6 +24,8 @@ from skeleton.ai.game_builder.dragon_mother_evidence_synergy import DragonMother
 from skeleton.ai.game_builder.dragon_article_hatchling import DragonArticleHatchling
 from skeleton.ai.game_builder.dragon_three_hatchling_coordinator import DragonThreeHatchlingCoordinator
 from skeleton.ai.game_builder.dragon_research_source_picker import DragonResearchSourcePicker
+from skeleton.ai.game_builder.dragon_research_workboard import DragonResearchWorkboard
+from skeleton.ai.game_builder.dragon_family_research_history import DragonFamilyResearchHistory
 from skeleton.ai.game_builder.dragon_source_catalog import canonical_source_url
 from skeleton.ai.game_builder.reviewed_knowledge import (
     ReviewedKnowledgeStore,ReviewedDocument,ReviewedNote,
@@ -682,5 +684,147 @@ def test_existing_signed_nest_with_tampered_head_is_not_mistaken_for_new_egg(con
         ("f"*64,OWNER))
     with pytest.raises(ValueError,match="signature|history|head|invalid"):
         triad.status(
+            OWNER,article_source_id=sid,video_source_id=lead.source_id,
+            update_source_id=sid,authorized=True)
+
+
+
+def test_three_hatchling_research_workboard_reports_actual_pending_actions(context):
+    captures,sid,url,old,new,_,_=prepare_article_revisions(context)
+    lead=add_video(context)
+    videos,_=transcript_ledger(context)
+    board=DragonResearchWorkboard(
+        DragonArticleHatchling(captures),videos,
+        DragonSourceDeltaLedger(captures))
+    tasks=[]
+    cursor=None
+    for _ in range(30):
+        page=board.page(OWNER,authorized=True,limit=20,after_source=cursor)
+        assert page["schema"]=="skeleton.dragon.research_workboard.v1"
+        assert page["read_only"] and page["workers_started"]==0
+        assert not page["training_authorized"]
+        assert page["permissions_granted"]==0 and page["xp_awarded"]==0
+        tasks+=page["missions"]
+        if not page["has_more"]:
+            break
+        cursor=page["next_after_source"]
+    by_lane={lane:[x for x in tasks if x["lane"]==lane]
+             for lane in ("article","video","updates")}
+    assert len(by_lane["article"])==1
+    assert len(by_lane["video"])==1
+    assert len(by_lane["updates"])==1
+    assert by_lane["article"][0]["action"]=="article_candidate"
+    assert by_lane["article"][0]["requires_independent_wiki_review"]
+    assert by_lane["video"][0]["action"]=="video_needs_transcript"
+    assert by_lane["video"][0]["requires_operator_authorization"]
+    assert by_lane["updates"][0]["action"]=="update_needs_idle_analysis"
+    assert by_lane["updates"][0]["requires_idle"]
+    assert all(not task["automatically_executable"] for task in tasks)
+    assert all(not task["model_training_authorized"] for task in tasks)
+    assert not context[4].active_grants()
+
+
+def test_workboard_no_rights_or_training_and_tenant_guard(context):
+    captures,sid,_,_,_,_,_=prepare_article_revisions(context)
+    videos,_=transcript_ledger(context)
+    board=DragonResearchWorkboard(
+        DragonArticleHatchling(captures),videos,
+        DragonSourceDeltaLedger(captures))
+    assert board.page("different-tenant",authorized=True)["missions"]==[]
+    with pytest.raises(PermissionError):
+        board.page(OWNER,authorized=False)
+    with pytest.raises(ValueError,match="cursor"):
+        board.page(OWNER,authorized=True,after_source="../../other")
+    with pytest.raises(ValueError):
+        board.page(OWNER,authorized=True,limit=999)
+    with pytest.raises(TypeError,match="canonical"):
+        DragonResearchWorkboard(None,videos,DragonSourceDeltaLedger(captures))
+
+
+def test_workboard_duplicate_reobservation_does_not_claim_change(context):
+    captures,sid,url,old,new,_,_=prepare_article_revisions(context)
+    videos,_=transcript_ledger(context)
+    board=DragonResearchWorkboard(
+        DragonArticleHatchling(captures),videos,
+        DragonSourceDeltaLedger(captures))
+    add_capture(captures,sid,url,new,epoch(T0)+4,"same-source-recheck")
+    missions=board.page(OWNER,authorized=True)["missions"]
+    changes=[m for m in missions if m["lane"]=="updates"]
+    assert len(changes)==1
+    assert changes[0]["action"]=="update_unchanged"
+    assert changes[0]["requires_idle"] is False
+    assert changes[0]["xp_awarded"]==0
+    assert changes[0]["model_training_authorized"] is False
+
+
+
+def test_three_hatchling_history_preserves_timestamped_article_and_video_custody(context):
+    captures,sid,url,old,new,_,_=prepare_article_revisions(context)
+    lead=add_video(context)
+    videos,key=transcript_ledger(context)
+    cues=transcript_cues()
+    ticket=video_worker(context,lead)
+    result=stage_video(
+        context,videos,ticket,cues,transcript_receipt(key,lead,cues))
+    deltas=DragonSourceDeltaLedger(captures)
+    history=DragonFamilyResearchHistory(
+        DragonArticleHatchling(captures),videos,deltas)
+    packet=history.timeline(
+        OWNER,article_source_id=sid,
+        video_source_id=lead.source_id,update_source_id=sid,
+        authorized=True,limit=10)
+    assert packet["schema"]=="skeleton.dragon.three_hatchling_history.v1"
+    assert packet["event_counts"]=={"article":2,"video":1,"updates":0}
+    assert packet["total_events"]==3
+    assert packet["entries"][0]["lane"]=="video"
+    assert packet["entries"][0]["event_digest"]==result["capture_digest"]
+    assert all(event["change_note"].startswith("(") for event in packet["entries"])
+    assert all("exact_quote" not in event and "text" not in event
+               for event in packet["entries"])
+    assert all(event["observation_at"]>0 for event in packet["entries"])
+    assert packet["network_requests"]==0 and packet["workers_started"]==0
+    assert packet["xp_awarded"]==0 and not packet["knowledge_approved"]
+    assert not packet["training_authorized"]
+    one=history.timeline(
+        OWNER,article_source_id=sid,
+        video_source_id=lead.source_id,update_source_id=sid,
+        authorized=True,limit=1)
+    assert one["truncated"] and len(one["entries"])==1
+    assert one["total_events"]==3
+    assert context[4].active_grants()==()
+
+
+def test_family_history_owner_tampering_and_invalid_source_refused(context):
+    captures,sid,url,old,new,_,_=prepare_article_revisions(context)
+    lead=add_video(context)
+    videos,key=transcript_ledger(context)
+    ledger=DragonFamilyResearchHistory(
+        DragonArticleHatchling(captures),videos,
+        DragonSourceDeltaLedger(captures))
+    with pytest.raises(PermissionError):
+        ledger.timeline(
+            OWNER,article_source_id=sid,video_source_id=lead.source_id,
+            update_source_id=sid,authorized=False)
+    with pytest.raises(ValueError,match="unregistered"):
+        ledger.timeline(
+            "foreign-owner",article_source_id=sid,
+            video_source_id=lead.source_id,update_source_id=sid,
+            authorized=True)
+    with pytest.raises(ValueError,match="differ"):
+        ledger.timeline(
+            OWNER,article_source_id=sid,
+            video_source_id=sid,update_source_id=sid,
+            authorized=True)
+    with pytest.raises(ValueError):
+        ledger.timeline(
+            OWNER,article_source_id=sid,
+            video_source_id=lead.source_id,update_source_id=sid,
+            authorized=True,limit=0)
+    context[0].db.execute(
+        "UPDATE dragon_technical_captures_v1 SET digest=? "
+        "WHERE owner=? AND source=? AND sequence=2",
+        ("0"*64,OWNER,sid))
+    with pytest.raises(ValueError,match="integrity"):
+        ledger.timeline(
             OWNER,article_source_id=sid,video_source_id=lead.source_id,
             update_source_id=sid,authorized=True)

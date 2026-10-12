@@ -70,6 +70,8 @@ def test_research_router_is_registered_read_only_and_role_guarded():
     assert set(methods)=={
         "/api/dragon-research/status",
         "/api/dragon-research/sources",
+        "/api/dragon-research/workboard",
+        "/api/dragon-research/history",
         "/api/dragon-research/mother-review",
     }
     assert all(verbs=={"GET"} for verbs in methods.values())
@@ -111,6 +113,16 @@ def test_factory_keeps_research_tenants_isolated_and_fails_closed(storage):
     stranger=dragon_research.source_catalog(
         request(app),Response(),limit=20,after_source=None,owner="other-tenant")
     assert stranger["entries"]==[]
+    board=dragon_research.research_workboard(
+        request(app),Response(),limit=20,after_source=None,owner=owner)
+    assert board["schema"]=="skeleton.dragon.research_workboard.v1"
+    assert board["read_only"] and board["workers_started"]==0
+    assert board["permissions_granted"]==0 and board["xp_awarded"]==0
+    assert board["mission_count"]>=0
+    assert all(not m["automatically_executable"] for m in board["missions"])
+    foreign=dragon_research.research_workboard(
+        request(app),Response(),limit=20,after_source=None,owner="other-tenant")
+    assert foreign["missions"]==[]
     with pytest.raises(HTTPException) as missing:
         dragon_research.three_hatchlings_status(
             request(app),Response(),article="source-"+"a"*64,
@@ -118,6 +130,13 @@ def test_factory_keeps_research_tenants_isolated_and_fails_closed(storage):
             owner=owner)
     assert missing.value.status_code==409
     assert all(not row["is_rights_approval"] for row in response["entries"])
+    with pytest.raises(HTTPException) as inaccessible_history:
+        dragon_research.family_research_history(
+            request(app),Response(),article="source-"+"a"*64,
+            video="source-"+"b"*64,updates="source-"+"a"*64,
+            limit=10,owner=owner)
+    assert inaccessible_history.value.status_code==409
+    assert all("exact_quote" not in item for item in board["missions"])
 
 
 def test_configured_factory_must_not_autocreate_missing_sqlite_files(tmp_path):
