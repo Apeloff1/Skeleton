@@ -24,6 +24,7 @@ export type StorySimulation = {
   schema_version: string; plan_digest: string;
   position: string | null; ending_id: string | null;
   ending: StoryEnding | null; ending_accepted: boolean;
+  ending_variants_selected?: string[];
   available_options: StoryChoice[];
   state: {
     quests: Record<string, string>; meters: Record<string, number>;
@@ -185,6 +186,7 @@ export function compactPlayerContext(
     'Karma/reputation/relationships/law: ' + JSON.stringify(outcome?.state.meters || {}),
     'Open threads: ' + (outcome?.unresolved_threads.join(',') || 'unknown'),
     'Current ending: ' + (outcome?.ending_id || 'undecided'),
+    'Selected outcome variations: ' + (outcome?.ending_variants_selected || []).join(', '),
     'Do not invent proof of unseen alternative branches or resolve a missing source by fiat.',
   ].join('\n');
   return body.slice(0, 4000);
