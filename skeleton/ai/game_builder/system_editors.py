@@ -3648,6 +3648,30 @@ CATALOG = json.loads(r'''[
         "minimum": 0,
         "maximum": 32,
         "options": []
+      },
+      {
+        "key": "combo_window_frames",
+        "kind": "int",
+        "default": 48,
+        "minimum": 1,
+        "maximum": 480,
+        "options": []
+      },
+      {
+        "key": "dash_stamina_cost",
+        "kind": "int",
+        "default": 4,
+        "minimum": 0,
+        "maximum": 40,
+        "options": []
+      },
+      {
+        "key": "feint_range",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 6,
+        "options": []
       }
     ],
     "preview": null
