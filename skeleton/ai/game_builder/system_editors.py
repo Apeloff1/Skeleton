@@ -5752,6 +5752,70 @@ CATALOG = json.loads(r'''[
         "minimum": 0,
         "maximum": 20,
         "options": []
+      },
+      {
+        "key": "npc_mobility",
+        "kind": "bool",
+        "default": false,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "npc_patrol_interval",
+        "kind": "int",
+        "default": 16,
+        "minimum": 1,
+        "maximum": 128,
+        "options": []
+      },
+      {
+        "key": "npc_walk_budget",
+        "kind": "int",
+        "default": 32,
+        "minimum": 0,
+        "maximum": 256,
+        "options": []
+      },
+      {
+        "key": "npc_move_energy_cost",
+        "kind": "int",
+        "default": 1,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "npc_lead_radius",
+        "kind": "int",
+        "default": 6,
+        "minimum": 1,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "npc_investigation_memory",
+        "kind": "int",
+        "default": 8,
+        "minimum": 1,
+        "maximum": 64,
+        "options": []
+      },
+      {
+        "key": "npc_avoids_player",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "npc_pursues_evidence",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
       }
     ],
     "preview": null
