@@ -1281,6 +1281,14 @@ CATALOG = json.loads(r'''[
         "minimum": 1,
         "maximum": 1000,
         "options": []
+      },
+      {
+        "key": "spell_stun",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 8,
+        "options": []
       }
     ],
     "preview": null
