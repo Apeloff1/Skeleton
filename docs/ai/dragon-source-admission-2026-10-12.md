@@ -67,3 +67,16 @@ An observed catalog hierarchy is now preserved as its own indexed almanac lineag
 Metadata for an original raw URL, including every quoted heading path and repository/README identity, is retained in the owner-scoped `dragon_almanac_supplement_receipts_v2` table. Acquisition jobs use the independently canonicalized URL and its derived source ID. This prevents five known fragment/hostname collisions from creating duplicate policy jobs, while retaining all 964 raw discovery receipts. The canonical unique count is computed against the full baseline at import time; the previously recorded total **5,369 is a raw discovery count**, not a validated canonical count.
 
 Operators should first run the single-source import in a staged tenant and inspect `new_discovery_sources`, `new_provenance_receipts`, `new_policy_stage_jobs`, `raw_provisional_urls` and `canonical_discovered_urls`. Only the policy stage can authorize subsequent fetching; all derivative knowledge remains unreviewed until the independent review, rights and Wiki/HOAG gates have run. No source topic membership is itself evidence of factual accuracy.
+
+## Bounded metadata inspection
+
+A trusted local operator can inspect the owner-scoped source hierarchy without fetching any source or promoting extracted text:
+
+```sh
+python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-topics --database dragon.sqlite --owner studio --trusted-local-operator
+python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-topics --database dragon.sqlite --owner studio --parent topic-<exact-topic-digest> --limit 25 --offset 0 --trusted-local-operator
+python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-sources --database dragon.sqlite --owner studio --topic topic-<exact-topic-digest> --limit 25 --trusted-local-operator
+python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-receipts --database dragon.sqlite --owner studio --source source-<exact-source-digest> --limit 25 --trusted-local-operator
+```
+
+`discovery-topics` returns the direct children of an observed heading path, with inherited source counts. `discovery-sources` returns one canonical acquisition identity per URL, its existing policy-stage job state and the total count of unreviewed raw provenance receipts. `discovery-receipts` returns the exact original link, catalog evidence path, observed heading paths, pinned identifiers and receipt digest. Each view validates stored source or evidence digests before presentation and carries explicit `training_authorized: false` and `scope: discovery_metadata_only` fields. Pagination is bounded to 100 rows and all queries require an explicit owner. The CLI is a local operator interface, **not** an HTTP endpoint and **not** a new runtime permission.
