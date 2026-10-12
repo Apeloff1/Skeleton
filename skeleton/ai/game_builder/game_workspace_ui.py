@@ -3312,7 +3312,8 @@ $("advanced-unified-save-import").addEventListener("change",async()=>{
   // Physical-world investigator routines need the authenticated PHYSICAL
   // prefix, not a forged or mis-typed unified genre-world state.
   const physical=await api("/api/advanced-physics-episodic-npc",{
-   episodes:verified.physical_episodes,world_scene:verified.world_scene
+   episodes:verified.physical_episodes,world_scene:verified.world_scene,
+   world_settings:verified.world_settings
   });
   if(!physical.proof ||
      physical.proof.digest!==verified.replayed_campaign.physical_campaign_digest)
