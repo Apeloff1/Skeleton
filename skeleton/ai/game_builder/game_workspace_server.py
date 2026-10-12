@@ -40,6 +40,9 @@ from .advanced_godot_export import (
 from .advanced_platformer_godot import render_platformer_godot_package
 from .advanced_npc_evidence_navigation import (navigate_verified_investigation,
     verify_investigation_navigation)
+from .advanced_world_whatif_lab import (
+    run_world_whatif,verify_world_whatif,
+)
 from .advanced_interleaved_save import (export_interleaved_save,
     import_interleaved_save,continue_interleaved_save)
 from .advanced_interleaved_world import (run_interleaved_world,
@@ -449,6 +452,27 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "original_game_changed":False,
                 "automatic_quest_reward_granted":False,
                 "native_hardware_verified":False,
+            })
+        if path=="/api/advanced-world-whatif-lab":
+            report=run_world_whatif(
+                values["physical_episodes"],values["genre_sessions"],
+                values["world_scene"],values["timeline"],
+                values.get("world_settings"),
+                objective=values.get("objective","eyewitness_coverage"),
+                max_depth=values.get("max_depth",2),
+                max_attempts=values.get("max_attempts",12),
+                max_accepted=values.get("max_accepted",6))
+            if not verify_world_whatif(
+                    report,values["physical_episodes"],
+                    values["genre_sessions"],values["world_scene"],
+                    values["timeline"],values.get("world_settings")):
+                raise ValueError("source-backed adversarial world replay rejected")
+            return self._json(200,{
+                "report":report,
+                "original_game_files_mutated":False,
+                "automatic_scenario_committed":False,
+                "native_hardware_certified":False,
+                "model_weight_promotion_approved":False,
             })
         if path=="/api/advanced-interleaved-save-export":
             saved=export_interleaved_save(
