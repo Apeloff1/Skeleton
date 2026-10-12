@@ -106,6 +106,7 @@ jobs:
             tests/test_dragon_almanacs.py \
             tests/test_dragon_discovery_mission.py \
             tests/test_dragon_discovery_facets.py \
+            tests/test_dragon_discovery_portfolio.py \
             tests/test_dragon_discovery_admission.py \
             tests/test_dragon_catalog_expansion.py \
             tests/test_dragon_delivery.py \
