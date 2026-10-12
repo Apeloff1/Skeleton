@@ -82,7 +82,7 @@ def test_stale_taste_rejected():
     spec = forge.propose(profile, constraints(), authorized=True)
     with pytest.raises(ValueError, match="stale"):
         forge.evaluate(
-            spec, replace(profile, fingerprint="f" * 64), authorized=True,
+            spec, replace(profile, fingerprint="different"), authorized=True,
         )
 
 

@@ -13,64 +13,15 @@ from .dragon_industry_domains import INDUSTRY_DOMAINS, ALMANAC_SECTIONS
 from .reviewed_knowledge import ReviewedKnowledgeStore
 
 
-def _portfolio_request(args, parser):
-    """One typed parser for preview and persistent research campaign creation."""
-    from .dragon_discovery_portfolio import PortfolioAxis, PortfolioRequest
-    from .dragon_discovery_mission import SourceMission
-    if not args.query or not args.axis:
-        parser.error("portfolio planning requires --query and at least one --axis")
-    axes = []
-    for value in args.axis:
-        parts = value.split(":")
-        if len(parts) not in (2, 4):
-            parser.error("--axis requires id:question[:minimum:importance]")
-        if len(parts) == 2:
-            axes.append(PortfolioAxis(parts[0], parts[1]))
-        else:
-            try:
-                count, importance = int(parts[2]), int(parts[3])
-            except ValueError:
-                parser.error("axis minimum and importance must be integers")
-            axes.append(PortfolioAxis(parts[0], parts[1], count, importance))
-    return PortfolioRequest(
-        SourceMission(args.query, platform=args.platform, genre=args.genre,
-                      era=args.era, prefer_video=args.prefer_video,
-                      scan_budget=args.scan_budget),
-        tuple(axes), total_limit=args.portfolio_limit,
-        per_axis_candidates=args.per_axis_candidates,
-        max_per_host=args.max_per_host, indexed=args.indexed)
-
-
 def main():
     parser = argparse.ArgumentParser(description="Import, inspect and seed sequential Dragon almanacs")
-    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief", "mission-scout", "mission-index", "mission-audit", "mission-health", "mission-portfolio", "campaign-record", "campaign-inspect", "campaign-refresh", "import-supplements", "discovery-topics", "discovery-sources", "discovery-receipts"))
+    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief"))
     parser.add_argument("--database", required=True)
     parser.add_argument("--owner", required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
     parser.add_argument("--registry", default=str(Path(__file__).parent / "catalogs/dragon_sources_20261010"))
     parser.add_argument("--output")
     parser.add_argument("--now", type=int)
-    parser.add_argument("--platform", default="", help="Target console, computer or mobile platform")
-    parser.add_argument("--genre", default="", help="Target game style or editor family")
-    parser.add_argument("--era", default="", help="Historical era or generation")
-    parser.add_argument("--prefer-video", action="store_true")
-    parser.add_argument("--topic", help="Optional owner-scoped almanac topic ID")
-    parser.add_argument("--limit", type=int, default=25)
-    parser.add_argument("--scan-budget", type=int, default=2000)
-    parser.add_argument("--axis", action="append", default=[],
-                        help="Portfolio id:question or id:question:minimum:importance")
-    parser.add_argument("--portfolio-limit", type=int, default=30)
-    parser.add_argument("--per-axis-candidates", type=int, default=15)
-    parser.add_argument("--max-per-host", type=int, default=3)
-    parser.add_argument("--campaign", help="Exact research campaign ID")
-    parser.add_argument("--expected-parent", help="Current campaign revision digest for CAS")
-    parser.add_argument("--indexed", action="store_true",
-                        help="Use materialized whole-catalog facet index")
-    parser.add_argument("--after-source", help="Resumable exclusive facet indexing cursor")
-    parser.add_argument("--parent", help="Optional parent heading topic ID")
-    parser.add_argument("--source", help="Exact source ID for raw discovery receipts")
-    parser.add_argument("--offset", type=int, default=0)
-    parser.add_argument("--supplement", action="append", default=[], help="Discovery evidence JSON in chain order")
     parser.add_argument("--query", help="Reviewed mechanic or design research question")
     parser.add_argument("--design", type=Path, help="Strict native game design JSON")
     args = parser.parse_args()
@@ -79,79 +30,7 @@ def main():
     with ReviewedKnowledgeStore(args.database) as library:
         almanacs = DragonAlmanacs(library)
         worker = SequentialAlmanacWorker(almanacs)
-        if args.command == "import-supplements":
-            from .dragon_discovery_admission import import_supplement_files
-            if not args.supplement:
-                parser.error("import-supplements requires --supplement in lineage order")
-            registry = read_source_registry(args.registry)
-            result = import_supplement_files(
-                almanacs, args.owner, registry, args.supplement, authorized=True)
-        elif args.command in {"discovery-topics", "discovery-sources", "discovery-receipts"}:
-            from .dragon_discovery_admission import DragonDiscoveryAdmission
-            discovery = DragonDiscoveryAdmission(almanacs)
-            if args.command == "discovery-topics":
-                result = discovery.topic_page(
-                    args.owner, parent=args.parent, limit=args.limit, offset=args.offset,
-                    authorized=True)
-            elif args.command == "discovery-sources":
-                if not args.topic:
-                    parser.error("discovery-sources requires --topic")
-                result = discovery.source_page(
-                    args.owner, args.topic, limit=args.limit, offset=args.offset,
-                    authorized=True)
-            else:
-                if not args.source:
-                    parser.error("discovery-receipts requires --source")
-                result = discovery.provenance_page(
-                    args.owner, args.source, limit=args.limit, offset=args.offset,
-                    authorized=True)
-        elif args.command == "mission-health":
-            from .dragon_discovery_facets import DiscoveryFacetIndex
-            result = DiscoveryFacetIndex(almanacs).health(
-                args.owner, authorized=True)
-        elif args.command == "mission-portfolio":
-            from .dragon_discovery_portfolio import MissionPortfolio
-            result = MissionPortfolio(almanacs).build(
-                args.owner, _portfolio_request(args, parser),
-                authorized=True, topic=args.topic)
-        elif args.command in {"campaign-record", "campaign-inspect", "campaign-refresh"}:
-            from .dragon_research_campaigns import DiscoveryCampaigns
-            if not args.campaign:
-                parser.error("campaign command requires --campaign")
-            ledger = DiscoveryCampaigns(almanacs)
-            if args.command == "campaign-record":
-                result = ledger.record(
-                    args.owner, args.campaign, _portfolio_request(args, parser),
-                    authorized=True, topic=args.topic,
-                    expected_parent=args.expected_parent)
-            elif args.command == "campaign-refresh":
-                result = ledger.refresh(
-                    args.owner, args.campaign, authorized=True,
-                    expected_parent=args.expected_parent)
-            else:
-                result = ledger.inspect(
-                    args.owner, args.campaign, authorized=True)
-        elif args.command == "mission-audit":
-            from .dragon_discovery_facets import DiscoveryFacetIndex
-            result = DiscoveryFacetIndex(almanacs).audit(
-                args.owner, authorized=True, limit=args.limit,
-                after_source=args.after_source)
-        elif args.command == "mission-index":
-            from .dragon_discovery_facets import DiscoveryFacetIndex
-            result = DiscoveryFacetIndex(almanacs).refresh(
-                args.owner, authorized=True, limit=args.limit,
-                after_source=args.after_source)
-        elif args.command == "mission-scout":
-            from .dragon_discovery_mission import MissionSourceScout, SourceMission
-            if not args.query:
-                parser.error("mission-scout requires --query")
-            result = MissionSourceScout(almanacs).propose(
-                args.owner,
-                SourceMission(args.query, platform=args.platform, genre=args.genre,
-                              era=args.era, prefer_video=args.prefer_video,
-                              limit=args.limit, scan_budget=args.scan_budget),
-                authorized=True, topic=args.topic, indexed=args.indexed)
-        elif args.command.startswith("delivery-"):
+        if args.command.startswith("delivery-"):
             from .dragon_delivery import DragonDelivery
             from ..webcrawler.dragon_game_design import load_design
             if args.now is None:

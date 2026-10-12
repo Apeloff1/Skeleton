@@ -322,48 +322,7 @@ class RobotsCache:
     def install(self, origin: str, robots_text: str, *, fetched_at: float = 0.0, etag: str | None = None, last_modified: str | None = None) -> None:
         parser = RobotFileParser()
         parser.set_url(origin.rstrip("/") + "/robots.txt")
-        # RobotFileParser uses first-matching rule, which differs from the
-        # longest-match precedence specified by modern robots policies.
-        # Reorder only directives within each agent group, retaining group
-        # boundaries and their user-agent selection semantics.
-        lines = robots_text.splitlines()
-        sorted_lines: list[str] = []
-        group: list[str] = []
-        def flush() -> None:
-            if not group:
-                return
-            agents = []
-            rules = []
-            seen_rule = False
-            for line in group:
-                key = line.split(":", 1)[0].strip().casefold() if ":" in line else ""
-                if key == "user-agent" and not seen_rule:
-                    agents.append(line)
-                else:
-                    if key not in {"user-agent", ""}:
-                        seen_rule = True
-                    rules.append(line)
-            rules.sort(key=lambda line: (
-                -(len(line.split(":", 1)[1].strip()) if ":" in line and
-                  line.split(":", 1)[0].strip().casefold() in {"allow", "disallow"} else 0),
-                0 if line.split(":", 1)[0].strip().casefold() == "allow" else 1,
-            ))
-            sorted_lines.extend(agents + rules)
-        for line in lines:
-            if not line.strip():
-                flush()
-                group = []
-                sorted_lines.append("")
-                continue
-            key = line.split(":", 1)[0].strip().casefold() if ":" in line else ""
-            if key == "user-agent" and any(
-                x.split(":", 1)[0].strip().casefold() in {"allow", "disallow"} for x in group if ":" in x
-            ):
-                flush()
-                group = []
-            group.append(line)
-        flush()
-        parser.parse(sorted_lines)
+        parser.parse(robots_text.splitlines())
         self._parsers[origin] = parser
         self._meta[origin] = {"fetched_at": fetched_at, "etag": etag, "last_modified": last_modified}
 
