@@ -6070,6 +6070,12 @@ for _entry in CATALOG:
                 {"key":"max_gear","kind":"int","default":4,"minimum":1,"maximum":12,"options":[]},
                 {"key":"chapter_bonus","kind":"int","default":200,"minimum":10,"maximum":1000,"options":[]},
                 {"key":"turn_limit","kind":"int","default":128,"minimum":32,"maximum":128,"options":[]},
+                {"key":"guardian_strike_bonus","kind":"int","default":3,"minimum":0,"maximum":12,"options":[]},
+                {"key":"guardian_guard_bonus","kind":"int","default":3,"minimum":0,"maximum":15,"options":[]},
+                {"key":"scholar_spell_bonus","kind":"int","default":5,"minimum":0,"maximum":20,"options":[]},
+                {"key":"scout_evasion","kind":"int","default":1,"minimum":0,"maximum":10,"options":[]},
+                {"key":"mender_heal_bonus","kind":"int","default":6,"minimum":0,"maximum":30,"options":[]},
+                {"key":"ore_capacity","kind":"int","default":8,"minimum":1,"maximum":30,"options":[]},
             ],
             "procedural_world":[
                 {"key":"world_radius_chunks","kind":"int","default":3,"minimum":1,"maximum":16,"options":[]},
