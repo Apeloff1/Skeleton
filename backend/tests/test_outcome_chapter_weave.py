@@ -3,7 +3,7 @@ import pytest
 from copy import deepcopy
 from core.branching_narrative import validate_plan
 from core.outcome_chapter_weave import audit_chapter_weave
-from test_branching_narrative import plan
+from backend.tests.test_branching_narrative import plan
 
 
 def canon(compiled):
