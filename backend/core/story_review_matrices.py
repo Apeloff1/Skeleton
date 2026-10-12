@@ -200,3 +200,58 @@ def coverage(cells: Sequence[Mapping[str, Any]], *, scene_digest: str,
         and passed == REQUIRED_CELLS and not failures and not unknown and not pending,
         "guaranteed_artistic_perfection": False,
     }
+
+
+
+HIGHLIGHT_REVIEW_MAP = {
+    "cliffhanger": ("engagement.cliffhanger_fairness", "closure.cliffhangers_paid_off"),
+    "surprise": ("engagement.surprise_earned", "causality.foreshadow_fairness"),
+    "red_herring": ("mystery.red_herring_fairness", "closure.red_herrings_disclosed"),
+    "misdirection_reveal": ("mystery.false_lead_resolution", "mystery.reveal_explanation"),
+    "epilogue": ("architecture.epilogue_aftercare", "closure.epilogue_completion"),
+    "prologue": ("architecture.prologue_setup", "architecture.premise_coherence"),
+    "dialogue": ("dialogue.subtext", "proofreading.speaker_attribution"),
+    "emotional_turn": ("character.emotional_truth", "engagement.emotional_variety"),
+    "tension_release": ("engagement.tension_release", "character.emotional_truth"),
+    "comic_relief": ("dialogue.humour_timing", "engagement.emotional_variety"),
+    "romance": ("character.relationship_evolution", "dialogue.subtext"),
+    "betrayal": ("character.loyalty_change", "causality.motivation_precedes_action"),
+    "foreshadow": ("causality.foreshadow_fairness", "mystery.clue_provenance"),
+    "payoff": ("causality.setup_before_payoff", "closure.thread_ledger"),
+    "promise": ("closure.promises_kept_or_explained", "causality.choice_consequence"),
+    "visual_identity": ("world.costume_palette", "world.voice_face_identity"),
+    "voice_identity": ("world.voice_face_identity", "dialogue.voice_distinctiveness"),
+}
+assert all(value in MATRIX_IDS for pair in HIGHLIGHT_REVIEW_MAP.values() for value in pair)
+
+
+def highlight_review_queue(
+    plot_spans: Sequence[Mapping[str, Any]],
+    *, scene: int, scene_digest: str,
+) -> list[dict[str, Any]]:
+    """Turn every exact-highlighted passage into explicit model-audit prompts.
+
+    This is a backlog of *unexecuted* scrutiny requests. The review engine
+    must submit cited verdicts and creator approval before coverage can pass.
+    """
+    if not DIGEST.fullmatch(scene_digest):
+        raise ValueError("Cannot queue highlights without a real scene receipt.")
+    queued = []
+    for span in plot_spans:
+        chosen = HIGHLIGHT_REVIEW_MAP.get(
+            span.get("kind"),
+            ("architecture.resolution_logic", "proofreading.tone_coherence"),
+        )
+        for matrix_id in chosen:
+            queued.append({
+                "scene": scene,
+                "scene_digest": scene_digest,
+                "plot_point_id": span["id"],
+                "anchor": span["anchor"],
+                "start": span["start"], "end": span["end"],
+                "matrix_id": matrix_id,
+                "suggested_level": 100,
+                "status": "requires_model_or_editor_review",
+                "automatically_approved": False,
+            })
+    return queued
