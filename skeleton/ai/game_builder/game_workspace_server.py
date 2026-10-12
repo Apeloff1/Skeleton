@@ -41,6 +41,9 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_npc_dynamic_route_planner import (
+    plan_original_dynamic_route, verify_original_dynamic_route,
+)
 from .advanced_historical_spatial_lens import (
     analyze_original_spatial_epochs, verify_original_spatial_epochs,
 )
@@ -504,6 +507,23 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 values["record"],values["scene"],values.get("settings"))
             return self._json(200,{"verified":validated,
                                    "original_source_mutated":False})
+        if path=="/api/plan-original-npc-route":
+            route=plan_original_dynamic_route(
+                values["record"],values["objective"],
+                max_steps=values.get("max_steps",40))
+            return self._json(200,{
+                "record":route,
+                "verified":verify_original_dynamic_route(route),
+                "source_files_mutated":False,
+                "model_weights_promoted":False,
+                "native_hardware_certified":False,
+            })
+        if path=="/api/verify-original-npc-route":
+            return self._json(200,{
+                "verified":verify_original_dynamic_route(values["record"]),
+                "source_files_mutated":False,
+                "model_weights_promoted":False,
+            })
         if path=="/api/original-spatial-history":
             history=analyze_original_spatial_epochs(
                 values["record"],values["turns"],query=values.get("query"))
