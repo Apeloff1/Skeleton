@@ -19,6 +19,7 @@ from .advanced_chunked_npc_world import (
 from .advanced_chunked_world_timeline import (
     BRANCH_SCHEMA, ChunkTimelineError, _hash as timeline_hash,
     verify_chunked_bookmarks, verify_chunked_continuation,
+    continue_chunked_world,
 )
 
 SCHEMA = "skeleton.game_builder.trusted_fast_chunk_forks.v1"
@@ -198,7 +199,6 @@ def run_fast_chunk_branches(checkpoint, branches, *, cursor=None):
                 "quests_resolved": world["completed"],
                 "ending": world["finished"], "supplies": world["inventory"]["supplies"],
             },
-            "complete_branch": branch,
         })
     body = {
         "schema": SCHEMA,
@@ -235,10 +235,15 @@ def verify_fast_chunk_branches(record):
     if record != expected:
         raise ChunkTimelineError("source branch, final state, clock or ledger was forged")
     for row in record["results"]:
-        if not verify_chunked_continuation(row["complete_branch"]):
+        historical = continue_chunked_world(
+            record["source_checkpoint"],row["appended_actions"],
+            cursor=record["source_cursor"],
+        )
+        if (not verify_chunked_continuation(historical)
+            or not verify_chunked_npc_world(historical["result"])
+            or historical["result_world_digest"] != row["result_digest"]
+            or historical["result"]["head_digest"] != row["result_head"]):
             raise ChunkTimelineError("original branch full replay did not converge")
-        if not verify_chunked_npc_world(row["complete_branch"]["result"]):
-            raise ChunkTimelineError("original source game state did not converge")
     return True
 
 
