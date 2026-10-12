@@ -3268,6 +3268,370 @@ CATALOG = json.loads(r'''[
         "minimum": null,
         "maximum": null,
         "options": []
+      },
+      {
+        "key": "arena_width",
+        "kind": "int",
+        "default": 12,
+        "minimum": 8,
+        "maximum": 16,
+        "options": []
+      },
+      {
+        "key": "rounds_to_win",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 5,
+        "options": []
+      },
+      {
+        "key": "player_health",
+        "kind": "int",
+        "default": 100,
+        "minimum": 10,
+        "maximum": 300,
+        "options": []
+      },
+      {
+        "key": "enemy_health",
+        "kind": "int",
+        "default": 100,
+        "minimum": 10,
+        "maximum": 300,
+        "options": []
+      },
+      {
+        "key": "starting_stamina",
+        "kind": "int",
+        "default": 100,
+        "minimum": 10,
+        "maximum": 300,
+        "options": []
+      },
+      {
+        "key": "stamina_regen",
+        "kind": "int",
+        "default": 5,
+        "minimum": 0,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "starting_meter",
+        "kind": "int",
+        "default": 10,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "meter_cap",
+        "kind": "int",
+        "default": 100,
+        "minimum": 10,
+        "maximum": 200,
+        "options": []
+      },
+      {
+        "key": "meter_gain_per_hit",
+        "kind": "int",
+        "default": 6,
+        "minimum": 0,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "move_stamina",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "attack_stamina",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "jump_stamina",
+        "kind": "int",
+        "default": 5,
+        "minimum": 0,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "jump_duration_frames",
+        "kind": "int",
+        "default": 24,
+        "minimum": 1,
+        "maximum": 120,
+        "options": []
+      },
+      {
+        "key": "parry_stamina",
+        "kind": "int",
+        "default": 4,
+        "minimum": 0,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "parry_stun_frames",
+        "kind": "int",
+        "default": 12,
+        "minimum": 0,
+        "maximum": 120,
+        "options": []
+      },
+      {
+        "key": "parry_meter_gain",
+        "kind": "int",
+        "default": 8,
+        "minimum": 0,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "guard_damage",
+        "kind": "int",
+        "default": 8,
+        "minimum": 0,
+        "maximum": 40,
+        "options": []
+      },
+      {
+        "key": "guard_chip",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "guard_break_stun",
+        "kind": "int",
+        "default": 24,
+        "minimum": 1,
+        "maximum": 120,
+        "options": []
+      },
+      {
+        "key": "guard_regen",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "knockback",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 3,
+        "options": []
+      },
+      {
+        "key": "ring_outs",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "hazards_enabled",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "hazard_count",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 6,
+        "options": []
+      },
+      {
+        "key": "hazard_damage",
+        "kind": "int",
+        "default": 4,
+        "minimum": 0,
+        "maximum": 40,
+        "options": []
+      },
+      {
+        "key": "hazard_period_frames",
+        "kind": "int",
+        "default": 60,
+        "minimum": 12,
+        "maximum": 720,
+        "options": []
+      },
+      {
+        "key": "cover_enabled",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "cover_count",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 6,
+        "options": []
+      },
+      {
+        "key": "cover_health",
+        "kind": "int",
+        "default": 15,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "attack_bonus",
+        "kind": "int",
+        "default": 0,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "combo_limit",
+        "kind": "int",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "combo_damage_bonus",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "combo_damage_cap",
+        "kind": "int",
+        "default": 5,
+        "minimum": 0,
+        "maximum": 60,
+        "options": []
+      },
+      {
+        "key": "frames_per_turn",
+        "kind": "int",
+        "default": 12,
+        "minimum": 1,
+        "maximum": 60,
+        "options": []
+      },
+      {
+        "key": "recovery_frames",
+        "kind": "int",
+        "default": 6,
+        "minimum": 0,
+        "maximum": 120,
+        "options": []
+      },
+      {
+        "key": "ai_style",
+        "kind": "enum",
+        "default": "adaptive",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "aggressive",
+          "defensive",
+          "adaptive"
+        ]
+      },
+      {
+        "key": "ai_adaptation_threshold",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "ai_defense_frequency",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 4,
+        "options": []
+      },
+      {
+        "key": "charge_meter",
+        "kind": "int",
+        "default": 7,
+        "minimum": 0,
+        "maximum": 40,
+        "options": []
+      },
+      {
+        "key": "recover_stamina",
+        "kind": "int",
+        "default": 8,
+        "minimum": 0,
+        "maximum": 50,
+        "options": []
+      },
+      {
+        "key": "feint_stamina",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "projectile_meter_cost",
+        "kind": "int",
+        "default": 12,
+        "minimum": 0,
+        "maximum": 90,
+        "options": []
+      },
+      {
+        "key": "special_meter_cost",
+        "kind": "int",
+        "default": 30,
+        "minimum": 0,
+        "maximum": 150,
+        "options": []
+      },
+      {
+        "key": "fog_projectile_penalty",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 4,
+        "options": []
+      },
+      {
+        "key": "accessibility_auto_guard",
+        "kind": "bool",
+        "default": false,
+        "minimum": null,
+        "maximum": null,
+        "options": []
       }
     ],
     "preview": null
@@ -4948,7 +5312,7 @@ CATALOG = json.loads(r'''[
   }
 ]''')
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
