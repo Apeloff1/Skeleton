@@ -1556,6 +1556,94 @@ function renderAdvancedActions(actions){
    }catch(error){proof.textContent="";status("Economic director refused: "+error.message);}
   });
   target.append(planBtn);target.append(proof);
+  const mirrorBtn=document.createElement("button");
+  mirrorBtn.type="button";
+  mirrorBtn.textContent="Strategy mirror: compare real economic trade-offs";
+  mirrorBtn.disabled=Boolean(advancedSession.terminal);
+  const mirrorView=document.createElement("pre");
+  mirrorView.id="original-economy-mirror-evidence";
+  mirrorView.setAttribute("role","status");
+  mirrorView.setAttribute("aria-live","polite");
+  mirrorBtn.addEventListener("click",async()=>{
+   try{
+    if(advancedEditor!=="economy"||systemEditor().id!=="economy")
+     throw Error("Economy editor selection changed");
+    const source=advancedScene||(await reviewedSceneTemplate()).scene;
+    if(source.seed!==advancedSession.seed)
+     throw Error("Cannot compare stale authored market world");
+    const result=await api("/api/economy-mirror",{
+     scene:source,settings:advancedSettings,horizon:12,max_scenarios:24
+    });
+    const report=result.report;
+    const proofCheck=await api("/api/economy-mirror-verify",{
+     record:report,scene:source,settings:advancedSettings
+    });
+    if(!proofCheck.verified||report.weights_promoted||
+       !report.comparison_is_simulated_game_only)
+     throw Error("Market comparison failed strict source review");
+    mirrorView.textContent=JSON.stringify({
+     source:report.source_digest,
+     scenarios_attempted:report.scenarios_attempted,
+     scenarios_verified:report.scenarios_verified,
+     infeasible:report.scenarios_infeasible,
+     pareto_frontier:report.pareto_frontier,
+     relative_policy_leader:report.top_relative_policy,
+     evidence:report.evaluated.map(x=>({
+      strategy:x.strategy,relative_score:x.relative_policy_score,
+      households_served:x.metrics.households_served,
+      imports:x.metrics.imported_deliveries,
+      production:x.metrics.manufactured_units,
+      player_cash:x.metrics.player_cash,
+      public_treasury:x.metrics.public_treasury,
+      cargo_supply:x.metrics.market_inventory,
+      verified_session:x.gameplay_session_digest
+     })),
+     source_bound_replay:true,model_weights_promoted:false,
+     hardware_certified:false,mirror_receipt:report.digest
+    },null,2);
+    target.querySelector("#original-economy-mirror-apply")?.remove();
+    target.querySelector("#original-economy-mirror-choice")?.remove();
+    const chooser=document.createElement("select");
+    chooser.id="original-economy-mirror-choice";
+    chooser.setAttribute("aria-label","Select independently simulated market policy");
+    for(const option of report.evaluated){
+     const item=document.createElement("option");
+     item.value=option.strategy;
+     item.textContent=option.strategy+" · relative score "+option.relative_policy_score;
+     chooser.append(item);
+    }
+    target.append(chooser);
+    const apply=document.createElement("button");
+    apply.id="original-economy-mirror-apply";apply.type="button";
+    apply.textContent="Explicitly replay selected market policy from original state";
+    apply.addEventListener("click",async()=>{
+     try{
+      if(advancedEditor!=="economy"||systemEditor().id!=="economy"||
+         advancedCommands.length!==0||advancedSession.seed!==source.seed)
+       throw Error("Counterfactual adoption requires unchanged initial market world");
+      const choice=report.evaluated.find(x=>x.strategy===chooser.value);
+      if(!choice)throw Error("Unknown evidence-backed market policy");
+      const checked=await api("/api/economy-mirror-verify",{
+       record:report,scene:source,settings:advancedSettings
+      });
+      if(!checked.verified)throw Error("Economic policy verification failed");
+      const played=await api("/api/advanced-play",{
+       editor:"economy",settings:advancedSettings,
+       scene:source,seed:source.seed,actions:choice.actions
+      });
+      if(played.session.digest!==choice.gameplay_session_digest)
+       throw Error("Applied real policy diverged from market evidence");
+      advancedCommands=choice.actions.slice();
+      advancedScene=source;
+      showAdvanced(played);
+      status("Selected original market policy replayed after explicit adoption.");
+     }catch(error){status("Market policy adoption rejected: "+error.message);}
+    });
+    target.append(apply);
+    status("Compared actual original economic decisions; no weights promoted.");
+   }catch(error){mirrorView.textContent="";status("Economic mirror refused: "+error.message);}
+  });
+  target.append(mirrorBtn);target.append(mirrorView);
   return;
  }
  if(advancedSession?.editor==="npc_society"||
