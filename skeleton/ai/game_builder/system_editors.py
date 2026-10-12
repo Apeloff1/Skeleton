@@ -3632,6 +3632,22 @@ CATALOG = json.loads(r'''[
         "minimum": null,
         "maximum": null,
         "options": []
+      },
+      {
+        "key": "rollback_window_frames",
+        "kind": "int",
+        "default": 8,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "max_rollback_corrections",
+        "kind": "int",
+        "default": 8,
+        "minimum": 0,
+        "maximum": 32,
+        "options": []
       }
     ],
     "preview": null
