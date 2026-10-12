@@ -292,7 +292,11 @@ class DragonIdleHostControl:
             video_capture=video_capture,
             monitor_capture=monitor_capture,
             task_topics=tuple(json.loads(initial[2])),
-            adjacent_topics=tuple(json.loads(initial[3])))
+            adjacent_topics=tuple(json.loads(initial[3])),
+            # Called *under* the same write transaction that inserts a new
+            # reading. Consent revocation on another connection cannot race
+            # past this final durable check.
+            commit_gate=lambda at: bool(self._require(at,generation)))
 
     def status(self, *, at: float, authorized: bool) -> dict[str,object]:
         if not authorized:
