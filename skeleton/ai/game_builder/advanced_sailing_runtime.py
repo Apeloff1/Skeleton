@@ -16,7 +16,7 @@ class SailingActionError(SystemEditorError):
 
 
 ACTIONS = (
-    "port", "starboard", "sail", "row", "anchor", "unanchor",
+    "port", "starboard", "sail", "row", "anchor", "unanchor", "pump",
     "reef_sails", "full_sails", "lower_sails", "dock", "undock",
     "load", "deliver", "rescue", "fish", "resupply", "repair", "wait",
 )
@@ -111,6 +111,8 @@ def start(cfg, seed):
         "hull": cfg["hull_integrity"], "max_hull": cfg["hull_integrity"],
         "crew": cfg["crew_size"], "supplies": cfg["starting_supplies"],
         "coins": cfg["starting_coins"], "cargo": 0, "delivered": 0,
+        "flooding": 0, "displacement": 0, "buoyancy_margin": 0,
+        "pumps_used": 0,
         "rescued": 0, "passengers_ashore": 0, "rescued_identity": False,
         "warehouse": 3, "destination_stock": 0,
         "repair_stock": cfg["repairs_available"],
@@ -253,6 +255,13 @@ def step(state, cfg, action):
             raise SailingActionError("helm cannot turn moored vessel")
         state["heading"] = (state["heading"] + (-1 if action == "port" else 1)) % 4
         events.append("helm_heading_changed")
+    elif action == "pump":
+        if docked or state["flooding"] == 0 or state["supplies"] < 1:
+            raise SailingActionError("active bilge pump requires flooding, provisions and crew")
+        state["supplies"] -= 1
+        state["flooding"] = max(0, state["flooding"] - cfg["pump_capacity"])
+        state["pumps_used"] += 1
+        events.append("crew_pumped_real_floodwater")
     elif action == "anchor":
         if docked or state["anchored"]:
             raise SailingActionError("anchor requires unanchored vessel at sea")
@@ -342,6 +351,20 @@ def step(state, cfg, action):
             state["supplies"] = 0
             _damage(state, cfg["starvation_damage"], "crew_starvation", events)
     _pirate_turn(state, cfg, events)
+    # Discrete marine displacement: flooding has mass, damage causes ingress.
+    # Source configuration bounds all terms and every tick recomputes this
+    # from authoritative stocks, rather than accepting client buoyancy flags.
+    if not state["docked"] and state["hull"] < state["max_hull"]:
+        ingress = (state["max_hull"] - state["hull"]) // cfg["leak_threshold"]
+        state["flooding"] = min(300, state["flooding"] + ingress)
+        if ingress:
+            events.append("damaged_hull_ingress")
+    state["displacement"] = (cfg["ship_mass"] + state["crew"] // 2
+                             + state["cargo"] * 8 + state["rescued"] * 6
+                             + state["flooding"])
+    state["buoyancy_margin"] = cfg["buoyancy_capacity"] - state["displacement"]
+    if state["buoyancy_margin"] < 0 and not state["failed"]:
+        _damage(state, cfg["overload_damage"], "insufficient_buoyancy", events)
     mission = cfg["mission_type"]
     # The original warehouse starts finite; deliveries must not create stock.
     cargo_done = state["warehouse"] == 0 and state["cargo"] == 0 and state["delivered"] > 0
