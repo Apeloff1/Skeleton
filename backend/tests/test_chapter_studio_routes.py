@@ -126,6 +126,7 @@ def chapter(**changes):
         voice_rules="Never replace Aria's original voice model",
         era_id="iron", style_id="illuminated", palette_id="copper",
         voice_cast={"aria": "voice_original"},
+        face_cast={"aria": "face_scar_right"},
         transition_reason=None, source_message_id="jeeves-1",
     )
     source.update(changes)
@@ -183,6 +184,19 @@ async def test_voice_id_locked_both_within_a_chapter_and_across_100_chapters(db)
     allowed = await route.save_chapter("game-x", 2,
         chapter(voice_cast={"aria": "voice_original"}), user=AUTHOR)
     assert allowed["ok"] and first["chapter"]["voice_cast"]["aria"] == "voice_original"
+
+
+@pytest.mark.asyncio
+async def test_facial_identity_and_voice_can_never_change_on_a_forked_branch(db):
+    await route.save_chapter("game-x", 1, chapter(), user=AUTHOR)
+    with pytest.raises(HTTPException, match="voice_cast identity"):
+        await route.save_chapter("game-x", 1,
+            chapter(branch_id="alternate", voice_cast={"aria": "replacement"}),
+            user=AUTHOR)
+    with pytest.raises(HTTPException, match="face_cast identity"):
+        await route.save_chapter("game-x", 2,
+            chapter(branch_id="alternate", face_cast={"aria": "no_scar"}),
+            user=AUTHOR)
 
 
 @pytest.mark.asyncio
@@ -283,9 +297,9 @@ async def test_project_and_user_scopes_prevent_cross_editor_read_or_mutation(db)
 async def test_story_index_and_chapter_timeline_branch_isolation(db):
     first = await route.save_chapter("game-x", 1, chapter(), user=AUTHOR)
     branch = await route.save_chapter("game-x", 1,
-        chapter(branch_id="alternate", voice_cast={"aria": "alternate_voice"}),
+        chapter(branch_id="alternate", voice_cast={"aria": "voice_original"}),
         user=AUTHOR)
-    assert branch["receipt"] != first["receipt"]
+    assert branch["chapter"]["branch_id"] != first["chapter"]["branch_id"]
     assert (await route.list_chapters(
         "game-x", branch_id="main", user=AUTHOR))["count"] == 1
     assert (await route.list_chapters(
