@@ -38,6 +38,9 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_unified_npc_world import (
+    run_unified_npc_world, verify_unified_npc_world,
+)
 from .advanced_social_quest_fusion import (
     run_social_quest_fusion, verify_social_quest_fusion,
 )
@@ -190,6 +193,15 @@ def parser() -> argparse.ArgumentParser:
     ecology_verify.add_argument("--record",required=True)
     ecology_verify.add_argument("--scene",required=True)
     ecology_verify.add_argument("--settings")
+    unified=commands.add_parser("unified-npc-world",
+        help="Run one physically authoritative original NPC dialogue/quest world")
+    unified.add_argument("--actions",required=True)
+    unified.add_argument("--settings",help="Original per-family typed rules")
+    unified.add_argument("--scenes",help="Reviewed source scenes")
+    unified.add_argument("--seed",type=int,default=0)
+    unified_verify=commands.add_parser("verify-unified-npc-world",
+        help="Replay exact source, time, physical NPC positions and causal world events")
+    unified_verify.add_argument("--record",required=True)
     social=commands.add_parser("social-quest-fusion",
         help="Run real multi-engine Dialogue/NPC/Quest commands with bounded physical evidence")
     social.add_argument("--commands",required=True)
@@ -425,6 +437,14 @@ def main(argv=None) -> int:
             output={"verified":verify_original_ecology_plan(
                 _load(args.record),_load(args.scene),
                 _load(args.settings) if args.settings else None)}
+        elif args.operation == "unified-npc-world":
+            output=run_unified_npc_world(
+                _load(args.actions),
+                _load(args.settings) if args.settings else None,
+                scenes=_load(args.scenes) if args.scenes else None,
+                seed=args.seed)
+        elif args.operation == "verify-unified-npc-world":
+            output={"verified":verify_unified_npc_world(_load(args.record))}
         elif args.operation == "social-quest-fusion":
             output=run_social_quest_fusion(
                 _load(args.commands),
