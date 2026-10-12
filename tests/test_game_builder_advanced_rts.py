@@ -63,7 +63,7 @@ class OriginalLiveStrategyTests(unittest.TestCase):
 
     def test_worker_cargo_is_conserved_and_bank_requires_actual_nearby_depot(self):
         rules=self.rules()
-        commands=["harvest:9","tick","tick","deposit"]
+        commands=["harvest:9","tick","tick"]
         report=run_advanced_session("rts",rules,commands)
         self.assertTrue(verify_advanced_session(report,rules))
         state=report["state"]
@@ -73,6 +73,8 @@ class OriginalLiveStrategyTests(unittest.TestCase):
         self.assertEqual(state["units"][0]["cargo"],0)
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("rts",rules,["deposit"])
+        carried=run_advanced_session("rts",rules,["harvest:9","deposit"])
+        self.assertEqual(carried["state"]["units"][0]["cargo"],0)
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("rts",rules,["harvest:63"])
         with self.assertRaises(AdvancedRuntimeError):
@@ -101,7 +103,7 @@ class OriginalLiveStrategyTests(unittest.TestCase):
         state=start(cfg,0)
         fighter=state["units"][1];fighter["cell"]=62
         state["selected"]=1
-        for _ in range(4):
+        for _ in range(6):
             step(state,cfg,"attack:63")
             if state["finished"]:break
         self.assertEqual(state["buildings"][1]["hp"],0)
@@ -121,6 +123,7 @@ class OriginalLiveStrategyTests(unittest.TestCase):
         with self.assertRaises(RTSActionError):
             step(state,cfg,"construct:wall:1")
         step(state,cfg,"construct:barracks:2")
+        step(state,cfg,"move:9")
         before=state["wood"]
         step(state,cfg,"train:soldier")
         self.assertEqual(len(state["units"]),3)
