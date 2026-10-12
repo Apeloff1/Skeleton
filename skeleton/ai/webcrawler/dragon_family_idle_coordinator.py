@@ -231,7 +231,10 @@ class DragonIdleCoordinator:
                 # Direct relevance > adjacent, then least tried, then least
                 # recently examined, then stable ID. Separate candidate
                 # generation from trusted network execution.
-                out.append((0 if direct else 1,ordinal,float(seen_at),
+                # Dispatch primary article/video workers before the monitor;
+                # otherwise Scout can claim a video's lease first and starve
+                # Flicker despite three available catalog sources.
+                out.append((ROLES.index(role),0 if direct else 1,ordinal,float(seen_at),
                             sid,role,url,media,tuple(sorted(source_topics)),revision or ""))
         return sorted(out)
 
@@ -341,7 +344,7 @@ class DragonIdleCoordinator:
                                        unchanged=0,failed=0,paused=False)
         roles_seen: set[str] = set()
         sources_seen: set[str] = set()
-        for _,attempts,seen,sid,role,url,media,tags,digest in candidates:
+        for _,_,attempts,seen,sid,role,url,media,tags,digest in candidates:
             if len(roles_seen) >= self.policy.max_tasks:
                 break
             if sid in sources_seen or role in roles_seen or role not in gatherers:
