@@ -755,6 +755,44 @@ function drawAdvancedGame(session){
   c.fillText(state.boss_defeated?"Guardian defeated; world persists":
    "Route locks demand earned abilities",12,236);
  }
+ if(editor==="sandbox"){
+  const tiles=state.regions[String(state.region)]||[];
+  const terrainInk={grass:"#3c6e57",forest:"#2b8657",
+   ridge:"#8a816c",sand:"#c6ad77",marsh:"#367884",lake:"#337cc6"};
+  const glyph={house:"H",road:"r",bridge:"=",farm:"F",well:"W",
+   workshop:"T",kiln:"K",fence:"f",beacon:"B",generator:"G",storehouse:"S"};
+  c.fillStyle="#e6f0df";
+  c.fillText("Original streamed sandbox · region "+state.region+
+    " / "+state.visited_regions.length+" visited",12,31);
+  for(const t of tiles){
+   const x=12+(t.id%8)*27,y=37+Math.floor(t.id/8)*24;
+   c.fillStyle=terrainInk[t.terrain]||"#516b6e";
+   c.fillRect(x,y,25,22);
+   c.fillStyle="#f7f5dc";
+   if(t.building)c.fillText(glyph[t.building]||"?",x+6,y+16);
+   else if(t.animal)c.fillText(t.tamed?"a":"w",x+7,y+15);
+   else if(t.crop)c.fillText(String(t.crop),x+8,y+16);
+   if(t.fire){
+    c.fillStyle="#fc9c4c";c.fillRect(x+19,y+1,4,5);
+   }
+  }
+  const px=12+(state.position%8)*27;
+  const py=37+Math.floor(state.position/8)*24;
+  c.strokeStyle="#ffffcc";c.lineWidth=3;c.strokeRect(px,py,25,22);
+  const cols=247;
+  c.fillStyle="#e1ebe7";
+  c.fillText("Day "+state.day+" · weather "+state.weather,cols,43);
+  c.fillText("HP "+state.health+" · energy "+state.energy,cols,65);
+  c.fillText("Food "+state.inventory.food+" · water "+state.inventory.water,cols,87);
+  c.fillText("Wood "+state.inventory.wood+" · stone "+state.inventory.stone,cols,109);
+  c.fillText("Ore "+state.inventory.ore+" · tools "+state.inventory.tool,cols,131);
+  c.fillText("Credits "+state.credits+" · power "+state.power,cols,153);
+  c.fillText("Settlers "+state.settlers.length+" · housing "+state.houses,cols,175);
+  c.fillText("Seasons "+state.season+" · achievement "+
+   state.achievements.length,cols,197);
+  c.fillStyle="#a6dcc0";
+  c.fillText("Draw / play only in source-validated original cells.",12,247);
+ }
  if(state.finished||state.failed){
   c.fillStyle=state.finished?"#a2f5cb":"#ffaba6";
   c.fillText(state.finished?"Completed":"Defeat",W-100,20);
@@ -772,9 +810,54 @@ document.addEventListener("keydown",event=>{
  const mode=event.shiftKey?"sprint":event.ctrlKey?"crouch":"move";
  advanceAdvanced(mode+"_"+direction);
 });
+let selectedSandboxCell=0;
 let selectedCityParcel=0;
 function renderAdvancedActions(actions){
  const target=$("advanced-actions");target.replaceChildren();
+ if(advancedSession?.editor==="sandbox"){
+  const terrain=advancedSession.state.regions[String(advancedSession.state.region)]||[];
+  const choose=document.createElement("label");
+  choose.textContent="Original 8×8 world cell";
+  const cell=document.createElement("select");cell.id="sandbox-target-cell";
+  cell.setAttribute("aria-label","Select local original sandbox cell");
+  for(const t of terrain){
+   const option=document.createElement("option");
+   option.value=String(t.id);
+   option.textContent=String(t.id)+" · "+t.terrain+
+    (t.building?" · "+t.building:"");
+   cell.append(option);
+  }
+  cell.value=String(selectedSandboxCell);
+  choose.append(cell);target.append(choose);
+  const order=document.createElement("label");
+  order.textContent="Terraform / harvest / structure / world operation";
+  const actionSelect=document.createElement("select");
+  actionSelect.id="sandbox-registered-action";
+  actionSelect.setAttribute("aria-label","Choose physically validated sandbox order");
+  const generic=actions.filter(x=>!/:([0-9]+)$/.test(x));
+  const fill=()=>{
+   selectedSandboxCell=Number(cell.value);
+   actionSelect.replaceChildren();
+   const local=actions.filter(x=>x.endsWith(":"+cell.value));
+   for(const command of [...local,...generic]){
+    const option=document.createElement("option");
+    option.value=command;option.textContent=command.replaceAll("_"," ");
+    actionSelect.append(option);
+   }
+  };
+  cell.addEventListener("change",fill);fill();order.append(actionSelect);
+  target.append(order);
+  const submit=document.createElement("button");submit.type="button";
+  submit.textContent="Execute verified world operation";
+  submit.disabled=Boolean(advancedSession.terminal);
+  submit.addEventListener("click",()=>advanceAdvanced(actionSelect.value));
+  target.append(submit);
+  const note=document.createElement("small");
+  note.textContent="Yellow frame is player; nearby terrain only. Crossing regions preserves all built and harvested terrain. Creative controls cannot bypass source review.";
+  target.append(note);
+  return;
+ }
+
  if(advancedSession?.editor==="metroidvania"){
   const choose=document.createElement("label");
   choose.textContent="Connected region / traversal target";
@@ -890,6 +973,20 @@ function renderAdvancedActions(actions){
 }
 
 $("advanced-canvas").addEventListener("click",event=>{
+ if(advancedSession&&advancedSession.editor==="sandbox"){
+  const canvas=$("advanced-canvas"),rect=canvas.getBoundingClientRect();
+  const px=(event.clientX-rect.left)*canvas.width/rect.width;
+  const py=(event.clientY-rect.top)*canvas.height/rect.height;
+  const col=Math.floor((px-12)/27),row=Math.floor((py-37)/24);
+  if(col<0||col>7||row<0||row>7||
+     px>12+col*27+25||py>37+row*24+22)return;
+  selectedSandboxCell=row*8+col;
+  const picker=$("sandbox-target-cell");
+  if(picker){picker.value=String(selectedSandboxCell);
+   picker.dispatchEvent(new Event("change"));}
+  return;
+ }
+
  if(!advancedSession||advancedSession.editor!=="city_builder")return;
  const canvas=$("advanced-canvas"),rect=canvas.getBoundingClientRect();
  const px=(event.clientX-rect.left)*canvas.width/rect.width;
@@ -951,6 +1048,15 @@ async function advanceAdvanced(action){
 // Visual paint works only on the local draft JSON. It cannot bypass the
 // server's canonical validation, exact-file review, or human commit.
 const PAINT_TOOLS={
+ sandbox:["terrain_next","wood_plus","wood_minus","stone_plus","stone_minus",
+          "clay_plus","clay_minus","ore_plus","ore_minus","water_plus",
+          "water_minus","fish_plus","fish_minus","forage_plus",
+          "forage_minus","soil_toggle","crop_up","crop_down",
+          "moisture_plus","animal_toggle","tamed_toggle",
+          "fire_up","fire_down","pollution_down",
+          "structure_next","spawn","settler_toggle","weather_next",
+          "credits_plus","credits_minus"],
+
  shooter:["cover","medkit","player_spawn","extraction",
           "enemy_spawn_0","enemy_spawn_1","enemy_spawn_2","erase"],
  tactics:["obstacles","squad_0","squad_1","enemy_0","enemy_1",
@@ -1015,6 +1121,33 @@ function renderSceneAuthoring(){
   shape=sceneGridShape(source);
  }catch(_){ctx.fillText("Invalid or mismatched scene JSON: use Validate.",12,24);return;}
 
+ if(source.editor==="sandbox"){
+  const world=source.layout,tiles=world.tiles||[];
+  const ink={grass:"#397c58",forest:"#27824f",ridge:"#868477",
+   sand:"#bbad7c",marsh:"#48859b",lake:"#387ac7"};
+  ctx.fillText("Original sandbox 8×8 · physical stocks, homes, wildlife and soil",12,18);
+  for(const t of tiles){
+   const x=12+(t.id%8)*27,y=32+Math.floor(t.id/8)*24;
+   ctx.fillStyle=ink[t.terrain]||"#506977";ctx.fillRect(x,y,25,22);
+   ctx.fillStyle="#f1f3db";
+   let symbol=t.id===world.spawn?"P":t.building?
+    t.building.slice(0,1).toUpperCase():t.animal?"w":t.crop?"c":"";
+   ctx.fillText(symbol,x+7,y+15);
+   if(t.fire){ctx.fillStyle="#f8a058";ctx.fillRect(x+20,y+1,4,5);}
+   if(world.settler_spawns.includes(t.id)){
+    ctx.strokeStyle="#a4e6ec";ctx.strokeRect(x+1,y+1,22,20);
+   }
+  }
+  ctx.fillStyle="#d1e5e3";
+  ctx.fillText("Region "+world.region_name,245,52);
+  ctx.fillText("Initial funds "+world.starting_credits,245,75);
+  ctx.fillText("Wildlife "+world.wildlife_population+
+   " · settlers "+world.settler_spawns.length,245,98);
+  ctx.fillText("Weather "+world.starting_weather,245,120);
+  ctx.fillText("Select palette tool; click cells; revalidate digest",245,149);
+  ctx.fillText("Other streamed regions generate from stable seed",245,174);
+  return;
+ }
  if(source.editor==="metroidvania"){
   const world=source.layout,rooms=world.rooms||[];
   const coords=i=>[12+(i%6)*56,32+Math.floor(i/6)*47];
@@ -1154,6 +1287,61 @@ function renderSceneAuthoring(){
  }
 }
 
+function paintSandboxCell(index){
+ const doc=JSON.parse($("advanced-scene-json").value);
+ if(doc.editor!=="sandbox"||systemEditor().id!=="sandbox")
+  throw Error("Sandbox palette requires an original matching scene document");
+ const layout=doc.layout,tile=layout.tiles[index],tool=$("advanced-paint-tool").value;
+ if(!tile||!Number.isInteger(index)||index<0||index>=64)
+  throw Error("Original geographic index outside authored 8×8 bounds");
+ const limit=(key,delta,max=1000)=>tile[key]=Math.max(0,Math.min(max,tile[key]+delta));
+ if(tool==="terrain_next"){
+  const terrain=["grass","forest","ridge","sand","marsh","lake"];
+  tile.terrain=terrain[(terrain.indexOf(tile.terrain)+1)%terrain.length];
+  for(const k of ["wood","stone","clay","ore","water","fish","forage"])
+   tile[k]=0;
+  if(tile.terrain==="forest"){tile.wood=6;tile.forage=2;}
+  else if(tile.terrain==="ridge"){tile.stone=6;tile.ore=3;}
+  else if(["marsh","lake"].includes(tile.terrain)){
+   tile.water=9;tile.fish=5;tile.clay=tile.terrain==="marsh"?3:0;
+  }else if(tile.terrain==="sand")tile.clay=3;
+  else if(tile.terrain==="grass")tile.forage=3;
+ }else if(/^(wood|stone|clay|ore|water|fish|forage)_(plus|minus)$/.test(tool)){
+  const [key,mode]=tool.split("_");
+  limit(key,mode==="plus"?1:-1);
+ }else if(tool==="soil_toggle")tile.soil=tile.soil?0:1;
+ else if(tool==="crop_up"||tool==="crop_down"){
+  limit("crop",tool==="crop_up"?1:-1,8);
+ }else if(tool==="moisture_plus")limit("moisture",1,10);
+ else if(tool==="animal_toggle"){
+  tile.animal=tile.animal?0:1;if(!tile.animal)tile.tamed=false;
+ }else if(tool==="tamed_toggle")tile.tamed=!tile.tamed;
+ else if(tool==="fire_up"||tool==="fire_down"){
+  limit("fire",tool==="fire_up"?1:-1,8);
+ }else if(tool==="pollution_down")limit("pollution",-1);
+ else if(tool==="structure_next"){
+  const buildings=[null,"house","road","bridge","farm","well",
+   "workshop","kiln","fence","beacon","generator","storehouse"];
+  const next=buildings[(buildings.indexOf(tile.building)+1)%buildings.length];
+  tile.building=next;tile.level=next?1:0;
+ }else if(tool==="spawn")layout.spawn=index;
+ else if(tool==="settler_toggle"){
+  layout.settler_spawns=layout.settler_spawns.includes(index)?
+   layout.settler_spawns.filter(p=>p!==index):
+   [...layout.settler_spawns,index].sort((a,b)=>a-b);
+ }else if(tool==="weather_next"){
+  const modes=["clear","rain","drought","storm"];
+  layout.starting_weather=modes[(modes.indexOf(layout.starting_weather)+1)%4];
+ }else if(tool==="credits_plus"||tool==="credits_minus"){
+  layout.starting_credits=Math.max(0,Math.min(
+   systemSettings().build_budget,layout.starting_credits+
+   (tool==="credits_plus"?10:-10)));
+ }else throw Error("Unregistered original sandbox terrain authoring tool");
+ layout.wildlife_population=layout.tiles.reduce((n,t)=>n+t.animal,0);
+ $("advanced-scene-json").value=JSON.stringify(doc,null,2);
+ renderSceneAuthoring();
+ status("Sandbox source changed. Validate geography, stock identity and full original world digest before playable approval.");
+}
 function paintExplorationRoom(index){
  const source=JSON.parse($("advanced-scene-json").value);
  if(source.editor!=="metroidvania"||systemEditor().id!=="metroidvania")
@@ -1329,6 +1517,15 @@ $("advanced-scene-grid").addEventListener("click",event=>{
   if(!text)throw Error("Generate a scene document first");
   const doc=JSON.parse(text),shape=sceneGridShape(doc);
   const canvas=$("advanced-scene-grid"),rect=canvas.getBoundingClientRect();
+  if(doc.editor==="sandbox"){
+   const px=(event.clientX-rect.left)*canvas.width/rect.width;
+   const py=(event.clientY-rect.top)*canvas.height/rect.height;
+   const col=Math.floor((px-12)/27),row=Math.floor((py-32)/24);
+   if(col<0||col>=8||row<0||row>=8||
+      px>12+col*27+25||py>32+row*24+22)return;
+   paintSandboxCell(row*8+col);
+   return;
+  }
   if(doc.editor==="metroidvania"){
    const px=(event.clientX-rect.left)*canvas.width/rect.width;
    const py=(event.clientY-rect.top)*canvas.height/rect.height;
