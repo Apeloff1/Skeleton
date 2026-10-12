@@ -27,7 +27,9 @@ from .dragon_source_catalog import canonical_source_url
 
 STAGE_SCHEMA = "skeleton.dragon.raw_catalog_link_observations.v1"
 STAGE_STATUS = "staged_raw_catalog_links_not_admitted"
-_REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
+# GitHub owner/repository identifiers are names, never relative paths.
+# Leading dot, dash or traversal-like segments can masquerade as local paths.
+_REPO = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*\Z")
 _SHA = re.compile(r"[0-9a-f]{40}\Z")
 _BANNED_EXT = re.compile(
     r"\.(?:rom|iso|nds|3ds|cia|gba|gbc|gb|bin|bios|exe|msi|apk|ipa|"

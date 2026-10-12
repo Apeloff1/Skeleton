@@ -139,6 +139,12 @@ def test_rejects_forged_git_metadata_and_source_observation(accepted, stage):
         ("readme_blob_sha", "x"*40),
         ("commit_sha", "injected"),
         ("repository", "../secret"),
+        ("repository", "./local"),
+        ("repository", "-danger/repo"),
+        ("repository", "owner/.."),
+        ("repository", "owner/."),
+        ("repository", "owner/-repo"),
+        ("repository", "/absolute"),
         ("readme_path", "../README.md"),
     ):
         invalid = deepcopy(stage)
@@ -154,6 +160,20 @@ def test_rejects_forged_git_metadata_and_source_observation(accepted, stage):
     invalid["catalogs"][0]["observed"][0]["url"] = "http://127.0.0.1/private"
     with pytest.raises(ValueError):
         build_catalog_supplements(registry, earlier, invalid, first_batch=2)
+
+
+def test_valid_git_repo_names_are_not_accidentally_blocked(accepted, stage):
+    registry, earlier = accepted
+    for repository in ("studio-2026/game.builder", "owner_name/engine_v2",
+                       "dev.team/homebrew-library"):
+        item=deepcopy(stage)
+        item["catalogs"][0]["repository"]=repository
+        result=build_catalog_supplements(
+            registry, earlier, item, first_batch=2)
+        assert result["new_canonical_link_leads"]==3
+        assert result["supplements"][0][1]["catalogs"][0]["repository"]==repository
+        assert result["crawler_authorized"] is False
+        assert result["training_authorized"] is False
 
 
 def test_compilation_guards_existing_parent_and_finite_size(accepted, stage):
