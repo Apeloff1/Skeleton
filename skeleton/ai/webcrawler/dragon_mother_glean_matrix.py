@@ -417,7 +417,8 @@ def glean_mother_insights(
                 identity, acq.lane, acq.source_id, acq.note_id,
                 (first, second), question, citations,
             ))
-    note = (f"(mother glean improved: {len(probes)} verified lens searches, "
+    note = (f"(mother glean improved: {len(cached)} unique reviewed searches "
+            f"across {len(probes)} lens probes, "
             f"{len(unique_hypotheses)} testable subtext hypotheses, "
             f"{len(synergies)} cross-lens synergies, "
             f"{len(set(gaps))} unresolved research gaps; no automatic weight promotion)")
