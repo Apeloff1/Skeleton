@@ -23,6 +23,7 @@ from core.chapter_continuity import (
 )
 from core.story_continuity import StoryAuditAccumulator, MAX_STREAM_EVENTS
 from core.story_production_manifest import production_manifest
+from core.story_tapestry import STORY_MOMENTS, SCENE_KINDS, THREAD_BEATS, weave_tapestry
 from routes.gameforge_auth import require_role
 from routes.playable import _db
 from routes.story_index import _scope
@@ -75,6 +76,34 @@ class ChapterIn(BaseModel):
         return self
 
 
+class StoryMomentIn(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    kind: str = Field(min_length=1, max_length=48)
+    plot_id: str = Field(pattern=SLUG)
+    intensity: int = Field(ge=0, le=100)
+    objective: str = Field(min_length=12, max_length=600)
+    audience_effect: str = Field(min_length=12, max_length=600)
+
+    @model_validator(mode="after")
+    def known(self):
+        if self.kind not in STORY_MOMENTS:
+            raise ValueError("Unrecognized emotional storytelling moment")
+        return self
+
+
+class StoryThreadBeatIn(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    thread_id: str = Field(pattern=SLUG)
+    role: str = Field(min_length=1, max_length=48)
+    plot_id: str = Field(pattern=SLUG)
+
+    @model_validator(mode="after")
+    def known(self):
+        if self.role not in THREAD_BEATS:
+            raise ValueError("Unrecognized narrative thread beat")
+        return self
+
+
 class SceneIn(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     expected_revision: int = Field(default=0, ge=0)
@@ -82,6 +111,9 @@ class SceneIn(BaseModel):
     chapter: int = Field(ge=1, le=MAX_CHAPTERS)
     act: int = Field(ge=1, le=1000)
     summary: str = Field(min_length=1, max_length=600)
+    scene_kind: str = Field(default="story", max_length=32)
+    story_moments: list[StoryMomentIn] = Field(default_factory=list, max_length=40)
+    thread_beats: list[StoryThreadBeatIn] = Field(default_factory=list, max_length=100)
     text: str = Field(min_length=1, max_length=16000)
     characters: list[str] = Field(default_factory=list, min_length=1, max_length=30)
     thread_keys: list[str] = Field(default_factory=list, max_length=100)
@@ -100,6 +132,23 @@ class SceneIn(BaseModel):
             len(set(self.thread_keys)) != len(self.thread_keys)
         ):
             raise ValueError("Duplicated scene references")
+        ids = {p.id for p in self.plot_points}
+        if self.scene_kind not in SCENE_KINDS:
+            raise ValueError("Unrecognized story stage")
+        for moment in self.story_moments:
+            if moment.plot_id not in ids:
+                raise ValueError("Every emotional beat requires a highlighted plot point")
+        for beat in self.thread_beats:
+            if beat.plot_id not in ids:
+                raise ValueError("Every plot obligation requires a highlighted source")
+        if self.scene_kind == "epilogue" and not any(
+            moment.kind == "epilogue" for moment in self.story_moments
+        ):
+            raise ValueError("Epilogue requires its own highlighted emotional conclusion")
+        if self.scene_kind == "finale" and not any(
+            moment.kind == "climax" for moment in self.story_moments
+        ):
+            raise ValueError("The finale must mark a climax in the script")
         plot_spans(self.text, [p.model_dump() for p in self.plot_points])
         return self
 
@@ -550,3 +599,32 @@ async def get_production_manifest(
     except (PyMongoError, OSError):
         logger.exception("production inventory unavailable")
         raise HTTPException(status_code=503, detail="Narrative production inventory unavailable")
+
+
+
+@router.get("/{pid}/chapters/tapestry")
+async def get_story_tapestry(
+    pid: str,
+    branch_id: str = Query("main", pattern=SLUG),
+    user=Depends(require_role("viewer")),
+):
+    """Audit all mystery/emotional threads and ending obligations.
+
+    Partial story drafts are reported, never marked closure-ready.
+    """
+    scope = _scope(pid, user)
+    try:
+        docs = await _db.game_story_scenes.find(
+            {**scope, "branch_id": branch_id},
+            {"text": 0},
+        ).sort("scene", 1).limit(MAX_SCENES + 1).to_list(length=MAX_SCENES + 1)
+        complete = len(docs) <= MAX_SCENES
+        review = weave_tapestry(docs[:MAX_SCENES], complete_source=complete)
+        # A manuscript without its 9,999 planned global scenes is incomplete.
+        if len(docs) != MAX_SCENES:
+            review["closure_ready"] = False
+            review["manuscript_incomplete"] = True
+        return {"ok": True, "game_id": pid, "branch_id": branch_id,
+                "tapestry": review}
+    except (PyMongoError, OSError):
+        raise HTTPException(status_code=503, detail="Story tapestry unavailable")
