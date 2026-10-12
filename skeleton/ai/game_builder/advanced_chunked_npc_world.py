@@ -122,10 +122,11 @@ def _step(source, target, obstacles, occupied, side):
     return source
 
 
-def _placement(seed, count, side, blocked, reserved):
+def _placement(seed, count, side, blocked, reserved, authored_center):
     """Stable original authored expansion, not externally acquired game IP."""
     locations = [pos for pos in range(side * side)
                  if pos not in blocked and pos not in reserved
+                 and _chunk(pos, side) != (authored_center, authored_center)
                  and pos % CHUNK_EDGE not in (0, CHUNK_EDGE - 1)
                  and (pos // side) % CHUNK_EDGE not in (0, CHUNK_EDGE - 1)]
     locations.sort(key=lambda cell: sha256(
@@ -183,8 +184,10 @@ def _init_world(rules, sources, options, seed):
                          rules["dialogue"]["speaker_patience"]),
             "heard": [], "memories": [], "bond": 0, "supported": 0,
         })
-    positions = _placement(seed, options["citizens"]-len(actors),
-                           side, blocked, used | {origin})
+    positions = _placement(
+        seed, options["citizens"]-len(actors),
+        side, blocked, used | {origin}, middle,
+    )
     sites = []
     for i, original in enumerate(source["sites"]):
         sites.append({
