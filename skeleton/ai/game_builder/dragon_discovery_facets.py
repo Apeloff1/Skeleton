@@ -198,8 +198,7 @@ class DiscoveryFacetIndex:
         total = self.db.execute(
             """SELECT COUNT(*) FROM dragon_almanac_sources s
                JOIN dragon_almanac_jobs j ON j.owner=s.owner AND j.source=s.source
-               WHERE s.owner=? AND j.stage=0 AND j.state IN ('pending','blocked')
-               AND j.input_digest=s.digest""",
+               WHERE s.owner=? AND j.stage=0 AND j.state IN ('pending','blocked')""",
             (owner,),
         ).fetchone()[0]
         covered = self.db.execute(
@@ -207,7 +206,8 @@ class DiscoveryFacetIndex:
                JOIN dragon_almanac_jobs j ON j.owner=s.owner AND j.source=s.source
                JOIN dragon_discovery_facet_records i
                  ON i.owner=s.owner AND i.source=s.source AND i.source_digest=s.digest
-               WHERE s.owner=? AND j.stage=0 AND j.state IN ('pending','blocked')""",
+               WHERE s.owner=? AND j.stage=0 AND j.state IN ('pending','blocked')
+               AND j.input_digest=s.digest""",
             (owner,),
         ).fetchone()[0]
         stale_job_inputs = self.db.execute(
