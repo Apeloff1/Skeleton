@@ -129,6 +129,16 @@ def rehearse_physics_encounter(source_session, source_settings=None,
     physical_impacts=sum(
         event in ("swept_fixture_contact","fixture_contact")
         for frame in result["trace"] for event in frame["events"])
+    source_counts=result["state"]["fixture_contact_counts"]
+    if len(source_counts)!=len(source_witnesses) or sum(source_counts)!=physical_impacts:
+        raise PhysicsInteropError(
+            "original collision receipts disagree with physically authored event trace")
+    source_hits=[
+        {"fixture_index":index,"source_id":source_witnesses[index]["source_id"],
+         "source_type":source_witnesses[index]["source_type"],
+         "impacts":count}
+        for index,count in enumerate(source_counts) if count>0
+    ]
     record={
         "schema":SCHEMA,"source_editor":editor,
         "source_scene_digest":original["digest"],
@@ -140,6 +150,7 @@ def rehearse_physics_encounter(source_session, source_settings=None,
         "physics_session":result,
         "observed_contacts":result["state"]["contacts"],
         "observed_fixture_impacts":physical_impacts,
+        "source_fixture_impacts":source_hits,
         "observed_impact":physical_impacts>0,
         "native_hardware_verified":False,
         "source_gameplay_mutated":False,
