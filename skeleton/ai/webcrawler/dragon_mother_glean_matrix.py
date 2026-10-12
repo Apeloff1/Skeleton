@@ -155,6 +155,8 @@ class LensProbe:
 class MeaningHypothesis:
     hypothesis_id: str
     lane: str
+    source_id: str
+    note_id: str
     lens: str
     mechanic: str
     question: str
@@ -168,6 +170,33 @@ class MeaningHypothesis:
 
 
 @dataclass(frozen=True)
+class SynergyHypothesis:
+    """A bounded cross-lens extrapolation; never a discovered source fact."""
+    hypothesis_id: str
+    lane: str
+    source_id: str
+    note_id: str
+    lenses: tuple[str, str]
+    question: str
+    evidence_ids: tuple[str, ...]
+    status: str = "shadow_hypothesis"
+    empirically_validated: bool = False
+    model_promotion_authorized: bool = False
+
+
+# Pairwise interactions make the mother more than twelve disconnected filters.
+SYNERGIES = (
+    ("causal", "failure", "Where might the causal mechanism break at the failure boundary?"),
+    ("tradeoff", "platform", "Can this optimization retain benefits on another platform?"),
+    ("player_experience", "accessibility", "Whose agency or understanding changes with accessibility constraints?"),
+    ("emergence", "transfer", "Could two original mechanics combine into a new cross-genre system?"),
+    ("time_change", "testing", "Would the latest revision still beat the old experimental baseline?"),
+    ("rights", "transfer", "Is this cross-domain technique reusable without copying protected expression?"),
+    ("adversarial", "failure", "Can an adversarial input exploit the known failure boundary?"),
+)
+
+
+@dataclass(frozen=True)
 class MotherGleanReport:
     schema: str
     owner: str
@@ -177,6 +206,7 @@ class MotherGleanReport:
     acquisitions: tuple[HatchlingReceipt, ...]
     probes: tuple[LensProbe, ...]
     hypotheses: tuple[MeaningHypothesis, ...]
+    synergies: tuple[SynergyHypothesis, ...]
     research_gaps: tuple[str, ...]
     conflict_ids: tuple[str, ...]
     improvement: str
@@ -337,7 +367,8 @@ def glean_mother_insights(
                 anchor.mechanic, lens.key, citations,
             ))
             hypotheses.append(MeaningHypothesis(
-                hypothesis_id, acq.lane, lens.key, anchor.mechanic,
+                hypothesis_id, acq.lane, acq.source_id, acq.note_id,
+                lens.key, anchor.mechanic,
                 lens.question,
                 "Potential cross-source implication for " + anchor.mechanic
                 + " (" + lens.key.replace("_", " ") + "); verify with a controlled experiment.",
@@ -348,20 +379,46 @@ def glean_mother_insights(
     if library.snapshot_root(nest.owner, authorized=True) != root:
         raise ValueError("reviewed knowledge changed during mother glean")
     unique_hypotheses = tuple(dict.fromkeys(hypotheses))
+    synergies = []
+    for acq, _ in witnesses:
+        by_lens = {
+            h.lens: h for h in unique_hypotheses
+            if h.lane == acq.lane and h.source_id == acq.source_id
+            and h.note_id == acq.note_id
+        }
+        for first, second, question in SYNERGIES:
+            if first not in by_lens or second not in by_lens:
+                continue
+            citations = tuple(sorted(
+                set(by_lens[first].evidence_ids) | set(by_lens[second].evidence_ids)
+            ))
+            if len(citations) < 3:
+                continue
+            identity = canonical_digest((
+                nest.owner, root, acq.source_id, acq.source_text_digest,
+                acq.note_id, first, second, citations,
+            ))
+            synergies.append(SynergyHypothesis(
+                identity, acq.lane, acq.source_id, acq.note_id,
+                (first, second), question, citations,
+            ))
     note = (f"(mother glean improved: {len(probes)} verified lens searches, "
             f"{len(unique_hypotheses)} testable subtext hypotheses, "
+            f"{len(synergies)} cross-lens synergies, "
             f"{len(set(gaps))} unresolved research gaps; no automatic weight promotion)")
     fields = (
         "skeleton.dragon.mother_glean.v1", nest.owner, _iso(at), root, nest.head,
         tuple(asdict(x) for x in acquisitions),
         tuple(asdict(x) for x in probes),
         tuple(asdict(x) for x in unique_hypotheses),
+        tuple(asdict(x) for x in synergies),
         tuple(sorted(set(gaps))), tuple(sorted(conflict_ids)), note,
     )
     return MotherGleanReport(
         fields[0], fields[1], fields[2], fields[3], fields[4], acquisitions,
-        tuple(probes), unique_hypotheses, tuple(sorted(set(gaps))),
-        tuple(sorted(conflict_ids)), note, canonical_digest(fields),
+        tuple(probes), unique_hypotheses, tuple(synergies),
+        tuple(sorted(set(gaps))), tuple(sorted(conflict_ids)),
+        note, canonical_digest(fields),
     )
 
 
@@ -376,6 +433,7 @@ def verify_mother_report(report: MotherGleanReport) -> bool:
             tuple(asdict(x) for x in report.acquisitions),
             tuple(asdict(x) for x in report.probes),
             tuple(asdict(x) for x in report.hypotheses),
+            tuple(asdict(x) for x in report.synergies),
             report.research_gaps, report.conflict_ids, report.improvement,
         )
         return (report.schema == "skeleton.dragon.mother_glean.v1"
