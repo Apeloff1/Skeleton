@@ -164,6 +164,7 @@ def validate_discovery_chain(registry: dict, named_documents: list[tuple[str, di
             for origin in row["discoveries"]:
                 if not isinstance(origin, dict):
                     raise ValueError("invalid discovery origin")
+                _evidence_headers(origin)
                 if "repository" in origin:
                     key = (origin.get("repository"), origin.get("commit_sha"), origin.get("readme_blob_sha"))
                     if key not in known_sources or canonical_source_url(origin.get("exact_url", "")) != url:
@@ -198,6 +199,28 @@ def validate_discovery_chain(registry: dict, named_documents: list[tuple[str, di
     return {"baseline": baseline_size, "new": len(collected),
             "raw_new": len(raw_seen), "raw_total_discovered": baseline_size + len(raw_seen),
             "total_discovered": len(existing), "sources": collected}
+
+
+def _evidence_headers(origin: dict) -> tuple[str, ...]:
+    """Represent observed heading lineage, never an inferred topic.
+
+    Historical source lists may include long markdown links as headings. A
+    stable suffix prevents collisions from truncation without storing arbitrary
+    unbounded markdown in topic paths. Empty lineage means repository-only.
+    """
+    raw = origin.get("headers", ())
+    if not isinstance(raw, (list, tuple)) or len(raw) > 12:
+        raise ValueError("invalid discovery header lineage")
+    result = []
+    for title in raw:
+        if (not isinstance(title, str) or not title.strip() or len(title) > 2048
+                or any(ord(c) < 32 or ord(c) == 127 for c in title)):
+            raise ValueError("invalid catalog header")
+        normalized = " ".join(title.split())
+        if len(normalized) > 150:
+            normalized = normalized[:136] + "-" + sha256(normalized.encode("utf-8")).hexdigest()[:12]
+        result.append(normalized)
+    return tuple(result)
 
 
 class DragonDiscoveryAdmission:
@@ -283,7 +306,8 @@ class DragonDiscoveryAdmission:
                                         if c.get("url") == origin["catalog_url"]
                                         and c["git_blob_sha"] == origin["catalog_blob"])
                         topic = self.almanacs.ensure_topic(
-                            owner, ("Sources", "Provisional", repo), authorized=True)
+                            owner, ("Sources", "Provisional", repo,
+                                    *_evidence_headers(origin)), authorized=True)
                         while topic:
                             self.db.execute(
                                 "INSERT OR IGNORE INTO dragon_almanac_members VALUES(?,?,?)",
