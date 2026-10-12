@@ -122,8 +122,17 @@ class OriginalRoguelikeRunTests(unittest.TestCase):
         step(s,cfg,"open_chest")
         self.assertIn(chest,s["chests_opened"])
         self.assertEqual(s["relics"],relics+cfg["chest_relics"])
+        # A different unopened chest can legitimately be within one tile:
+        # opening it is real gameplay, not a duplicate payout exploit.
+        nearby=[p for p in s["map"]["chests"] if p not in s["chests_opened"]
+                and abs(p%6-chest%6)+abs(p//6-chest//6)<=1]
+        if nearby:
+            step(s,cfg,"open_chest")
+            self.assertIn(nearby[0],s["chests_opened"])
+            self.assertEqual(len(s["chests_opened"]),2)
         with self.assertRaises(RoguelikeActionError):
             step(s,cfg,"open_chest")
+        self.assertEqual(len(set(s["chests_opened"])),len(s["chests_opened"]))
         a=run_advanced_session("roguelike",self.easy(item_pool=5))
         b=run_advanced_session("roguelike",self.easy(item_pool=2000))
         self.assertNotEqual(a["configuration_digest"],b["configuration_digest"])
