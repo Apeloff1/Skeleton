@@ -13,9 +13,20 @@ export interface DragonAlmanakkProjection {
  policy:string;
 }
 
+export interface DragonIdleFamilyProjection {
+ schema:'skeleton.ai.dragon.idle_status.v1';
+ configured:boolean;idle_only:true;
+ host_state:'not_connected'|'not_observed';
+ max_tasks_per_tick:number;
+ workers:Partial<Record<DragonFamilyRole,{
+   known_sources:number;failed:number;incomplete_leases:number;
+   last_changes:number;unchanged:number;earliest_due_at:string|null;
+ }>>;
+}
 export interface DragonFamilyProjection {
   schema:'skeleton.ai.dragon.family.v1';
   almanakk?:DragonAlmanakkProjection;
+  idle_work?:DragonIdleFamilyProjection;
   parent:{stage:'egg'|'hatchling'|'juvenile'|'adolescent'|'winged'|'adult';
     consumed:number;source_total:number;complete:boolean;laid_at:string|null};
   inventory_sealed:boolean;
@@ -73,6 +84,22 @@ export function validateDragonFamily(input:unknown):DragonFamilyProjection|null 
     typeof h.change==='string'&&h.change.length<=500&&
     typeof h.digest==='string'&&HEX.test(h.digest)&&
     (i===0||h.sequence<all[i-1].sequence)))return null;
+  if(f.idle_work!==undefined){
+    const w=f.idle_work;
+    if(!w||w.schema!=='skeleton.ai.dragon.idle_status.v1'||
+      typeof w.configured!=='boolean'||w.idle_only!==true||
+      !['not_connected','not_observed'].includes(w.host_state)||
+      !count(w.max_tasks_per_tick)||w.max_tasks_per_tick<1||w.max_tasks_per_tick>3||
+      !w.workers||typeof w.workers!=='object'||Array.isArray(w.workers)||
+      Object.keys(w.workers).some(k=>!['article','video','monitor'].includes(k)))return null;
+    for(const role of ['article','video','monitor'] as const){
+      const item=w.workers[role];
+      if(item!==undefined&&(!item||!count(item.known_sources)||
+         !count(item.failed)||!count(item.incomplete_leases)||
+         !count(item.last_changes)||!count(item.unchanged)||
+         !(item.earliest_due_at===null||utc(item.earliest_due_at))))return null;
+    }
+  }
   if(f.almanakk!==undefined){
     const a=f.almanakk;
     if(!a||a.schema!=='skeleton.ai.dragon.almanakk.v1'||
