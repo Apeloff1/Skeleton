@@ -252,7 +252,7 @@ class OriginalColonyNativeSourceTests(unittest.TestCase):
             "colony", seed=3,layout=edited["layout"])
         self.assertEqual(validate_advanced_scene(reviewed),reviewed)
         self.assertNotEqual(scene["digest"],reviewed["digest"])
-        reference=run_advanced_session("colony",scene=reviewed)
+        reference=run_advanced_session("colony",seed=3,scene=reviewed)
         self.assertTrue(verify_advanced_session(reference))
 
 
