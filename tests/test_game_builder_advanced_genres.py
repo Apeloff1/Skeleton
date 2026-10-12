@@ -39,7 +39,7 @@ from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html
 class GenreMaturityTests(unittest.TestCase):
     def test_ten_genuine_advanced_replay_engines(self):
         self.assertEqual(set(ENGINES),set(ADVANCED_ENGINE_IDS))
-        self.assertEqual(len(ENGINES),10)
+        self.assertEqual(len(ENGINES),11)
         for genre in ("shooter","deck_battler","puzzle"):
             self.assertIn(genre,ACTION_HELP)
             self.assertGreaterEqual(len(ACTION_HELP[genre]),7)
