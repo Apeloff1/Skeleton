@@ -402,7 +402,11 @@ export class WorkspaceController {
       // An HTTP abort or timeout is not proof the backend failed to commit.
       // Read the canonical transcript BEFORE re-submitting the identical client ID.
       if (this.historyTransport) {
-        await this.refreshCanonical(conversation.id);
+        const checked = await this.refreshCanonical(conversation.id);
+        if (!checked) {
+          this.notify('Canonical history is unavailable. Retry was not sent; check the connection and try again.');
+          return;
+        }
       }
       const current = this.snapshot.workspace.conversations.find(c => c.id === conversation.id);
       if (!current || this.active.id !== conversation.id || this.running) return;
@@ -481,10 +485,17 @@ export class WorkspaceController {
         this.running = null;
         this.emit({ busyId: null });
         if (deliveryUncertain && this.historyTransport) {
-          const checked = await this.refreshCanonical(conversationId);
-          const latest = this.snapshot.workspace.conversations.find(c => c.id === conversationId);
-          if (checked && latest?.messages.some(m => m.id === messageId && m.status === 'complete')) {
-            this.notify('The reply was saved on the server and has been recovered.');
+          // Reconciliation itself is part of the logical retry fence.
+          // Another tap must not start generation while the first check is in flight.
+          this.retrying.add(messageId);
+          try {
+            const checked = await this.refreshCanonical(conversationId);
+            const latest = this.snapshot.workspace.conversations.find(c => c.id === conversationId);
+            if (checked && latest?.messages.some(m => m.id === messageId && m.status === 'complete')) {
+              this.notify('The reply was saved on the server and has been recovered.');
+            }
+          } finally {
+            this.retrying.delete(messageId);
           }
         }
       }
