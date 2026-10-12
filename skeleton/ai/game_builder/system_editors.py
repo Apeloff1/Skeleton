@@ -6008,6 +6008,9 @@ for _entry in CATALOG:
             {"key":"rally_combo","kind":"int","default":3,"minimum":1,"maximum":12,"options":[]},
             {"key":"racket_control","kind":"int","default":4,"minimum":0,"maximum":30,"options":[]},
             {"key":"action_points","kind":"int","default":3,"minimum":1,"maximum":8,"options":[]},
+            {"key":"rain_stride_penalty","kind":"int","default":2,"minimum":0,"maximum":8,"options":[]},
+            {"key":"wind_shot_penalty","kind":"int","default":4,"minimum":0,"maximum":20,"options":[]},
+            {"key":"press_tackle_bonus","kind":"int","default":2,"minimum":0,"maximum":6,"options":[]},
         ])
 MINIMUM_PROGRESSION = "advanced"
 ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports"})
@@ -6106,6 +6109,10 @@ def _normalized_settings(editor_id: str, values: Mapping[str, object] | None) ->
     if editor_id == "sports":
         if normalized["sprint_speed"] < normalized["run_speed"]:
             raise SystemEditorError("sports sprint cannot be slower than normal movement")
+        if normalized["pass_distance"] >= normalized["field_length"]:
+            raise SystemEditorError("a sports pass cannot exceed original stadium width")
+        if normalized["rain_stride_penalty"] >= normalized["run_speed"]:
+            raise SystemEditorError("rain cannot eliminate all active athletic movement")
         if normalized["shot_range"] >= normalized["field_length"]:
             raise SystemEditorError("original sports shots cannot span the entire field")
         if normalized["substitutions"] > normalized["team_size"]:
