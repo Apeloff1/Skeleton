@@ -231,6 +231,45 @@ class OriginalLiveStrategyTests(unittest.TestCase):
             with self.assertRaises(AdvancedRuntimeError):
                 verify_advanced_session(forged,rules)
 
+
+    def test_studio_original_terrain_painter_and_live_unit_composer_are_verified(self):
+        from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html,SCRIPT
+        page=render_workspace_html("A"*32).decode("utf-8")
+        for token in ("paintRTSCell","rts-owned-unit","rts-target-cell",
+             "rts-command","Issue verified tactical order",
+             "obstacle_toggle","wood_node","enemy_base_hp_up",
+             "friendly_spawn","enemy_spawn","selectedRTSCell",
+             "Original 8×8 original strategic resource/capture map"):
+            self.assertIn(token,page)
+        self.assertIn("Original strategy source mutated. Validate",SCRIPT)
+        rules=self.rules()
+        source=make_advanced_scene("rts",rules,seed=3)
+        changed=deepcopy(source)
+        changed["layout"]["environment"]="desert" if (
+            changed["layout"]["environment"]!="desert") else "rain"
+        with self.assertRaises(SceneError):
+            validate_advanced_scene(changed,rules)
+        refreshed=make_advanced_scene("rts",rules,seed=3,
+                            layout=changed["layout"])
+        self.assertNotEqual(refreshed["digest"],source["digest"])
+        self.assertTrue(verify_advanced_session(
+            run_advanced_session("rts",rules,seed=3,scene=refreshed),rules))
+
+    def test_real_physical_terrain_prevents_direct_unit_teleports(self):
+        rules=self.rules()
+        match=run_advanced_session("rts",rules,["select:1","move:27"])
+        unit=next(x for x in match["state"]["units"] if x["id"]==1)
+        self.assertNotEqual(unit["cell"],27)
+        self.assertEqual(match["state"]["turn"],2)
+        self.assertLessEqual(abs(unit["cell"]%8)+abs(unit["cell"]//8-1),2)
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("rts",rules,["select:1","move:63"])
+        # Remote movement may be ordered across valid geography; it is
+        # never executed as one-step teleportation.
+        travel=run_advanced_session("rts",rules,["select:1","move:62"])
+        self.assertNotEqual(travel["state"]["units"][1]["cell"],62)
+        self.assertTrue(verify_advanced_session(travel,rules))
+
     def test_original_hybrid_source_and_offline_cli_produce_true_gameplay(self):
         cfg=self.rules()
         scene=make_advanced_scene("rts",cfg,seed=0)
