@@ -12,7 +12,7 @@ from collections import deque
 from hashlib import sha256
 
 from .advanced_unified_npc_world import (
-    _sources, _hash, _sight, UnifiedWorldError, SIDE as SOURCE_SIDE,
+    _sources, _hash, UnifiedWorldError, SIDE as SOURCE_SIDE,
 )
 
 SCHEMA = "skeleton.game_builder.original_chunked_npc_world.v1"
@@ -77,6 +77,24 @@ def _neighbors(cell, side):
         nx, ny = x+dx, y+dy
         if 0 <= nx < side and 0 <= ny < side:
             yield _cell(nx, ny, side)
+
+
+def _sight(source, target, blockers, side):
+    """Correct world-scale raster line of sight, not the old 7x7 kernel."""
+    x0,y0=_xy(source,side);x1,y1=_xy(target,side)
+    dx=abs(x1-x0);dy=abs(y1-y0)
+    sx=1 if x0<x1 else -1;sy=1 if y0<y1 else -1
+    error=dx-dy
+    while x0!=x1 or y0!=y1:
+        twice=2*error
+        if twice>-dy:
+            error-=dy;x0+=sx
+        if twice<dx:
+            error+=dx;y0+=sy
+        loc=_cell(x0,y0,side)
+        if loc in blockers and loc!=target:
+            return False
+    return True
 
 
 def _step(source, target, obstacles, occupied, side):
@@ -352,7 +370,7 @@ def _act(state, rules, opts, command, active):
                     a["index"] for a in active
                     if _dist(a["position"],site["cell"],side)<=min(
                         3,q["npc_perception"],q["witness_radius"])
-                    and _sight(a["position"],site["cell"],blockers)
+                    and _sight(a["position"],site["cell"],blockers,side)
                 ]
                 eid = len(state["events"])
                 fact = {
