@@ -33,6 +33,8 @@ QC_GATES = (
     "prior_confirmation_receipt", "full_historical_reparse", "reviewed_rights",
     "chapter_highlighters", "suspense_and_pacing", "prologue_interlude_logic",
     "chapter_ending_closure", "chapter_scoped_model_context",
+    "cinematic_shot_order", "screen_direction_axis",
+    "voice_and_face_per_shot", "visual_grade_and_lighting",
 )
 
 
@@ -193,7 +195,8 @@ def _check_attestation(bible, contract, scene, history_state, post_state,
     identities = ids(contract["characters"], "locked cast")
     regions = ids(contract["regions"], "locked regions")
     items = ids(contract["items"], "locked items")
-    attributes = shape(source, ("cast","region","items","transfers"),
+    attributes = shape(source, ("cast","region","items","transfers",
+                                "cinematic_shots"),
                        "scene-level observed evidence")
     seen = set()
     cast = attributes["cast"]
@@ -306,6 +309,8 @@ def _check_attestation(bible, contract, scene, history_state, post_state,
                       if item["asset"] in scene_item_ids}
     require(required_items == observed,
             "every historical costume prop/item shown in the scene must be accounted for")
+    from .story_cinematic_review import verify_cinematic_shots
+    verify_cinematic_shots(bible,contract,scene,attributes["cinematic_shots"])
     return owned
 
 
