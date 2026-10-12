@@ -33,10 +33,13 @@ def _beat_ms(beat,bpm):
 
 def default_layout(config,seed):
     _int(seed,0,2**31-1,"seed")
+    if not 5<=config["perfect_window_ms"]<=config["great_window_ms"]<=config["hit_window_ms"]:
+        raise RhythmActionError("temporal difficulty requires perfect <= great <= hit windows")
     count=config["beat_count"]
     notes=[]
     for i in range(count):
-        at=_beat_ms(i,config["bpm"])
+        at=_beat_ms(i,config["bpm"])+(min(config["swing"],
+              config["swing_limit_ms"]) if i%2 else 0)
         lane=(i*3+seed+i//4)%config["lane_count"]
         kind=("tap" if i==0 else
               "hold" if config["hold_notes"] and i%7==4 else
@@ -62,6 +65,10 @@ def default_layout(config,seed):
 
 
 def normalize_layout(config,layout):
+    if not 5<=config["perfect_window_ms"]<=config["great_window_ms"]<=config["hit_window_ms"]:
+        raise RhythmActionError("typed rhythm hit windows must be ordered perfect <= great <= hit")
+    if config["release_window_ms"]<config["perfect_window_ms"]:
+        raise RhythmActionError("held release window must allow the actual perfect interval")
     if type(layout) is not dict or set(layout)!={
         "title","bpm","lanes","beats","offset_ms","meter","style","notes"}:
         raise RhythmActionError("original rhythm chart requires exact safe fields")
@@ -178,7 +185,7 @@ def _score(state,config,note,grade,events):
         state["health"]=min(state["max_health"],
                             state["health"]+config["hit_heal"])
         events.append("original_player_hit_timed_"+grade+"_note")
-    if state["health"]==0 and config["fail_mode"]=="health":
+    if state["health"]==0 and config["fail_mode"]=="health" and not config["practice_mode"]:
         state["failed"]=True
         state["reason"]="original_challenge_health_exhausted"
 
@@ -197,7 +204,8 @@ def _expire(state,config,events):
                 del state["pressed"][str(idx)]
                 state["held"]=[x for x in state["held"] if x!=idx]
                 _score(state,config,note,"miss",events)
-        elif clock>at+config["hit_window_ms"]:
+        elif clock>at+config["hit_window_ms"]+(
+             20 if config["assist_mode"]=="expanded" else 0):
             _score(state,config,note,"miss",events)
 
 
@@ -231,7 +239,8 @@ def _finish(state,config,events):
     state["rank"]="SS" if pct>=9900 else "S" if pct>=9500 else (
        "A" if pct>=8500 else "B" if pct>=7000 else "C")
     state["finished"]=True
-    state["victory"]=pct>=config["clear_threshold_percent"]*100
+    state["victory"]=pct>=max(config["clear_threshold_percent"],
+                             config["accuracy_floor"])*100
     state["reason"]="original_rhythm_chart_cleared" if state["victory"] else (
          "original_rhythm_chart_completed_below_clear_target")
     events.append("original_authoritative_rhythm_chart_finalized")
@@ -269,6 +278,9 @@ def step(state,config,action):
             partner is not None and partner>=state["chart"]["lanes"]):
             raise RhythmActionError("physical key is outside authored lane count")
         candidate=None
+        # User-authored timing calibration compensates a delayed physical
+        # key press, without accepting client supplied hit timestamps.
+        judged_clock=clock-config["timing_calibration_ms"]
         for note in state["chart"]["notes"]:
             if state["judgements"][note["id"]] is not None:continue
             if note["lane"]!=lane:continue
@@ -280,13 +292,24 @@ def step(state,config,action):
             if not match:continue
             at=note["at"]+state["chart"]["offset_ms"]
             target=at+note["duration"] if kind=="release" else at
-            if abs(clock-target)<=max(config["hit_window_ms"],config["release_window_ms"]):
+            window=(config["release_window_ms"] if kind=="release" else
+                    config["hit_window_ms"])
+            if config["assist_mode"]=="expanded":window+=20
+            if config["difficulty_curve"]=="staged":
+                window=max(config["perfect_window_ms"],window-
+                           (20*note["id"]//max(1,state["chart"]["beats"])))
+            elif config["difficulty_curve"]=="dynamic" and state["combo"]>=config["combo_interval"]:
+                window=max(config["perfect_window_ms"],window-10)
+            if abs(judged_clock-target)<=window:
                 candidate=note;break
         if candidate is None:
             state["stray"]+=1
             state["combo"]=0
             if state["stray"]%config["stray_interval"]==0:
                 state["health"]=max(0,state["health"]-config["stray_health"])
+                if config["auto_fail_on_stray"] and not config["practice_mode"]:
+                    state["failed"]=True
+                    state["reason"]="original_excessive_mashing_fail"
             events.append("unmatched_real_time_original_input")
         else:
             at=candidate["at"]+state["chart"]["offset_ms"]
@@ -299,7 +322,7 @@ def step(state,config,action):
             elif kind=="press":
                 if str(candidate["id"]) in state["pressed"]:
                     raise RhythmActionError("cannot start same physical note hold twice")
-                grade=_quality(abs(clock-at),config)
+                grade=_quality(abs(judged_clock-at),config)
                 if grade is None:
                     state["stray"]+=1
                     events.append("unmatched_real_time_original_input")
@@ -312,8 +335,9 @@ def step(state,config,action):
                 if grade is None:
                     raise RhythmActionError("hold release requires a previously authenticated key press")
                 end=at+candidate["duration"]
-                release_quality=_quality(abs(clock-end),config)
-                if abs(clock-end)>config["release_window_ms"] or release_quality is None:
+                release_quality=_quality(abs(judged_clock-end),config)
+                if abs(judged_clock-end)>min(config["release_window_ms"],
+                                         config["sustain_tolerance_ms"]) or release_quality is None:
                     raise RhythmActionError("real held note needs an accurately timed release")
                 del state["pressed"][str(candidate["id"])]
                 state["held"].remove(candidate["id"])
@@ -321,11 +345,11 @@ def step(state,config,action):
                 quality=grades[max(grades.index(grade),grades.index(release_quality))]
                 _score(state,config,candidate,quality,events)
             else:
-                grade=_quality(abs(clock-at),config)
+                grade=_quality(abs(judged_clock-at),config)
                 if grade is None:
                     raise RhythmActionError("rhythmic hit outside playable timing window")
                 _score(state,config,candidate,grade,events)
-        if state["health"]==0 and config["fail_mode"]=="health":
+        if state["health"]==0 and config["fail_mode"]=="health" and not config["practice_mode"]:
             state["failed"]=True
             state["reason"]="original_rhythm_input_health_exhausted"
     state["turn"]+=1
