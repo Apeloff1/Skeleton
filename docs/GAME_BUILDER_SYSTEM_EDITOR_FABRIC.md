@@ -1419,3 +1419,107 @@ finite: a total 8,192 commands, never a claim of continuous
 background work, an indefinitely persistent server process or
 hardware-level native execution. Faster checkpoint promotion
 requires a separate independent trust and performance review.
+
+
+## Seventeenth advanced reference family — Real-Time Strategy (12 October 2026)
+
+The Strategy-family Real-Time Strategy editor now implements an original
+**spatial RTS reference game**, rather than merely holding an economy,
+fog and command-latency form. It raises playable reference coverage to
+**17/43 = 39.5%** of the original catalog, with **26/43 still
+authoring-only**. This is deterministic Python gameplay and a playable
+Studio client, not an independently native-certified hardware RTS.
+
+### Original authored operational battlefield
+
+A canonical 8×8 bounded demonstration battlefield includes signed
+obstacle cells, original friendly/enemy command bases with real HP,
+friendly and hostile spawns, a capturable relay, initial finite
+wood/ore/energy treasuries, typed stock-limited physical deposits and
+an original environmental setting. The authenticated scene validator
+checks every tile is in range, rejects mismatched dimensions,
+duplicated/overlapping structures/units/sources, resource spoofing,
+illegal free budgets and disconnected original objectives. Dynamic
+pathfinding uses deterministic shortest routes with real blocked cells,
+unoccupied destination tests and incremental per-tick movement.
+Orders are not a teleport, and fog-concealed enemies cannot be attacked.
+
+The reference field keeps a maximum of sixteen simultaneously
+selectable original friendly units, not a deceptive 300/5,000-unit
+claim on 64 map tiles. The broader editor preserves its preexisting
+max-units profile values for future native/large-map expansion, but
+live local reference play explicitly caps active units at sixteen.
+A high configured resource-node budget similarly cannot mint more
+sources than physically fit; source count is bounded by signed
+geography and a 64-cell world.
+
+### Actionable tactical economics, battle and victory
+
+Five differentiated units (worker, soldier, ranger, medic, siege)
+have bounded HP, spatial location, different attack behavior,
+equipment, experience and actual finite supply usage. Authentic
+worker gather/return cycles **deplete physical wood/ore/energy
+deposits, hold limited material cargo and deposit it only at a real
+friendly command/outpost**. Unfunded training or absent barracks
+cannot mint a new army. Five genuinely priced structures include
+an outpost for logistics/supply, real barracks, attacking defense
+turrets, periodic power generators and barriers. Tech upgrades
+consume wood, ore and energy to change actual attacking capability,
+armor protection, economy and vision.
+
+Three authored supply policies are distinct: no army supply
+restriction, population capacity, or logistics with explicit
+per-tick energy expense and supply-line attrition on shortage.
+The engine models independently configured hostile faction pursuit,
+melee contact, damage, bounded reinforcement waves and finite base HP.
+Fog of war has a true visibility/discovery mask, actual army/
+building vision, finite energy-funded temporary scanning and
+rejected concealed enemy targeting.
+
+**Two distinct playable victories** exist: a player must physically
+deploy and hold the relay for the required capture/hold time, with
+enemy contest preventing a free victory, or physically wear down
+the original hostile command building to zero HP. The player's
+force may also fail from actual attrition/loss. Typed action
+contracts support selection, spatial move orders, finite worker
+harvest orders, attacks, scanning, structures, research,
+production, repair, cargo deposit, squad posture and real
+simulated time advancement.
+
+The editor expands from five to **62 typed rule fields** in
+this implementation, including finite budget and army population,
+individual unit roles/HP/damage/range, hostile AI/aggro, physical
+transport capacity, deposit stock, tick-time productivity,
+world topology, technology cost and effectiveness, fog/vision,
+supply modes, energy upkeep, opposing waves, fortress construction,
+relay-victory timings and potential defensive buildouts.
+
+### Graphical Studio, independent source/replay and assurance
+
+The playable Studio renders original 64-cell terrain, discovered
+versus current fog, original sources, allied and hostile units,
+bases, relay, town economy, researched/owned force and battle
+objectives. A cell-targeted tactical action composer uses the
+registered commands; changing the selected friendly unit is itself
+a physical authorized command. Clicking the map chooses a target,
+not a magical unit or resource. A separate original map painter
+supports terrain block toggles, physical deposit identity/stock,
+base/relay moves, troop spawns, environment and initial treasuries,
+and keeps each draft **unsigned until strict revalidation and
+exact-file approval**.
+
+Replay receipts cryptographically bind input actions and original
+authored source to every state transition. The dedicated Windows
+and Ubuntu regression suite checks actual spatial relay victory,
+enemy command combat victory, no teleporting, finite labor/material
+delivery, supply policies, hostile pursuit, visibility,
+construction/research charges, signed-map anti-spoofing, portable
+save/continuation, original scene painting and hybrid game assembly.
+
+**Scope boundary:** this is an advanced original reference on
+a deliberately bounded tactical grid, not a production 60-Hz
+multi-thousand-unit engine, GPU fog-of-war implementation,
+networked RTS, autonomous learning-based opponents or store-ready
+native release. Cross-platform reference CI must pass before
+reference maturity is certified; native engine and hardware
+porting remain separate unfinished work.
