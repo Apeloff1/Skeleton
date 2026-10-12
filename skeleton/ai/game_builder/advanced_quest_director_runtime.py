@@ -151,7 +151,9 @@ def apply_scene(state,config,layout):
     state["sites"]=[dict(site) for site in source["sites"]]
     state["npcs"]=[
         {**npc,"memories":[],"heard":[],"suspicion":config["starting_suspicion"],
-         "witnessed":0,"rumors_spread":0}
+         "witnessed":0,"rumors_spread":0,"cargo":0,
+         "personal_supplies":config["npc_supplies"],
+         "energy":config["npc_energy"]}
         for npc in source["npcs"]
     ]
     return state
@@ -166,6 +168,7 @@ def start(config,seed):
         "reputation":config["starting_reputation"],"discovered":[],
         "events_log":[],"quests":[],"quest_archive":[],
         "next_event":0,"next_quest":0,
+        "npc_events_generated":0,"next_npc_actor":0,
         "quests_completed":0,"quests_exploited":0,
         "rumor_edges":[],"milestones":[],
         "finished":False,"failed":False,"victory":False,"reason":"",
@@ -209,18 +212,19 @@ def _remember(npc,event,config,*,direct):
     return True
 
 
-def _emit(state,config,kind,site,events):
+def _emit(state,config,kind,site,events,*,actor="player"):
     if len(state["events_log"])>=config["event_budget"]:
         raise QuestDirectorError("authored finite event memory ledger is full")
     witnesses=[]
     for npc in state["npcs"]:
-        if (_distance(npc["cell"],site["cell"])<=_day_vision(state,config,npc)
+        if (actor!="npc:"+str(npc["id"]) and
+            _distance(npc["cell"],site["cell"])<=_day_vision(state,config,npc)
             and _line_open(npc["cell"],site["cell"],set(state["world"]["obstacles"]))):
             witnesses.append(npc["id"])
     entry={
         "id":state["next_event"],"tick":state["tick"],"kind":kind,
         "site_id":site["id"],"cell":site["cell"],
-        "actor":"player","direct_witnesses":witnesses,
+        "actor":actor,"direct_witnesses":witnesses,
         "rumored_to":[],"original_source":"physical_player_world_action",
     }
     state["events_log"].append(entry);state["next_event"]+=1
@@ -234,9 +238,10 @@ def _emit(state,config,kind,site,events):
             if kind=="harm":
                 n["suspicion"]=min(config["suspicion_cap"],
                                      n["suspicion"]+config["harm_suspicion"])
-    state["reputation"]=max(-config["reputation_cap"],min(config["reputation_cap"],
-         state["reputation"]+(config["reputation_gain"] if kind in ("help","repair")
-         else -config["reputation_loss"] if kind=="harm" else 0)))
+    if actor=="player":
+        state["reputation"]=max(-config["reputation_cap"],min(config["reputation_cap"],
+            state["reputation"]+(config["reputation_gain"] if kind in ("help","repair")
+            else -config["reputation_loss"] if kind=="harm" else 0)))
     events.append("original_physical_"+kind+"_event_authored_at_real_site")
     if witnesses:
         events.append("real_local_npcs_directly_witnessed_event")
@@ -248,7 +253,7 @@ def _emit(state,config,kind,site,events):
             continue
         wanted=("harm" if quest["choice"]=="exploit" else
                 "repair" if quest["trigger"]=="harm" else "help")
-        if kind==wanted:
+        if kind==wanted and actor=="player":
             quest["material_actions"]+=1
             events.append("existing_original_quest_advanced_by_real_followup")
     if (len(state["quests"])<min(config["active_quests"],12)
@@ -262,7 +267,7 @@ def _emit(state,config,kind,site,events):
                  site["id"]*997+EVENTS.index(kind)*131)%config["event_rules"]
         quest={
             "id":state["next_quest"],"origin_event":entry["id"],
-            "rule_id":rule_id,
+            "rule_id":rule_id,"origin_actor":actor,
             "site_id":site["id"],"trigger":kind,"status":"active",
             "witnesses":witnesses[:],"testimonies":[],
             "heard_from":[],"choice":None,"material_actions":0,
@@ -308,13 +313,70 @@ def _rumors(state,config,events):
                     events.append("real_original_npc_to_npc_rumor_transfer")
 
 
+def _autonomous_npc_action(state,config,events):
+    """Actually enact bounded finite NPC behavior from role and nearby sites.
+
+    Never grants the player quest progress or free reputation; NPC-caused
+    events may start authentic witnessed quests *only when another NPC saw*.
+    """
+    if not config["npc_autonomy"] or not state["npcs"] or (
+        state["npc_events_generated"]>=config["npc_action_budget"]):
+        return
+    chosen=state["next_npc_actor"]%len(state["npcs"])
+    state["next_npc_actor"]+=1
+    npc=state["npcs"][chosen]
+    if npc["energy"]<config["npc_action_energy_cost"]:
+        events.append("original_NPC_idle_due_to_finite_personal_energy")
+        return
+    site=next((site for site in state["sites"] if
+               _distance(npc["cell"],site["cell"])<=1),None)
+    if site is None:
+        events.append("original_NPC_cannot_act_outside_physical_home_range")
+        return
+    kind=None
+    if npc["role"]=="caretaker":
+        if npc["personal_supplies"]>=1 and site["integrity"]<config["site_integrity"]:
+            npc["personal_supplies"]-=1
+            site["integrity"]=min(config["site_integrity"],site["integrity"]+1)
+            kind="help"
+        elif site["stock"]>0:
+            site["stock"]-=1;npc["cargo"]+=1
+            kind="discover"
+    elif npc["role"]=="scout" and site["stock"]>0:
+        site["stock"]-=1;npc["cargo"]+=1;kind="discover"
+    elif npc["role"]=="merchant":
+        if config["npc_self_interest"] and site["integrity"]>0:
+            site["integrity"]=max(0,site["integrity"]-1)
+            kind="harm"
+        elif site["stock"]>0:
+            site["stock"]-=1;npc["cargo"]+=1;kind="discover"
+    elif npc["role"]=="scribe":
+        if npc["personal_supplies"]>=1 and site["integrity"]<config["site_integrity"]:
+            npc["personal_supplies"]-=1
+            site["integrity"]=min(config["site_integrity"],site["integrity"]+1)
+            kind="repair"
+        elif site["stock"]>0:
+            site["stock"]-=1;npc["cargo"]+=1;kind="discover"
+    if kind is None:
+        events.append("original_NPC_had_no_remaining_legitimate_material_action")
+        return
+    npc["energy"]-=config["npc_action_energy_cost"]
+    state["npc_events_generated"]+=1
+    _emit(state,config,kind,site,events,actor="npc:"+str(npc["id"]))
+    events.append("NPC_authored_role_drove_finite_physical_world_event")
+
+
 def _tick(state,config,events,steps=1):
     for _ in range(steps):
         state["tick"]+=1
         if state["tick"]%config["day_ticks"]==0:
+            for npc in state["npcs"]:
+                npc["energy"]=config["npc_energy"]
             state["day"]+=1
             events.append("actual_original_day_cycle_advanced")
         _rumors(state,config,events)
+        if state["tick"]%config["npc_act_interval"]==0:
+            _autonomous_npc_action(state,config,events)
         if config["memory_decay_ticks"]>0:
             for npc in state["npcs"]:
                 if state["tick"]%config["memory_decay_ticks"]==0:
