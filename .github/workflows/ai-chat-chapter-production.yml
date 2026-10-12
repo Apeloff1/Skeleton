@@ -8,6 +8,15 @@ on:
       - "backend/core/chapter_continuity.py"
       - "backend/core/story_production_manifest.py"
       - "backend/core/story_tapestry.py"
+      - "backend/core/branching_narrative.py"
+      - "backend/core/outcome_weaving_matrices.py"
+      - "backend/routes/story_outcomes.py"
+      - "backend/tests/test_branching_narrative.py"
+      - "backend/tests/test_outcome_weaving_matrices.py"
+      - "backend/tests/test_story_outcomes_routes.py"
+      - "frontend/app/story-outcomes.tsx"
+      - "frontend/features/Jeeves/outcomeStudio.ts"
+      - "frontend/scripts/jeeves-workbench/outcome-studio.test.cjs"
       - "backend/core/story_review_matrices.py"
       - "backend/routes/story_review.py"
       - "backend/tests/test_story_tapestry.py"
@@ -67,6 +76,9 @@ jobs:
           backend/core/chapter_continuity.py
           backend/core/story_production_manifest.py
           backend/core/story_tapestry.py
+          backend/core/branching_narrative.py
+          backend/core/outcome_weaving_matrices.py
+          backend/routes/story_outcomes.py
           backend/core/story_review_matrices.py
           backend/routes/story_review.py
           backend/routes/chapter_studio.py
@@ -74,6 +86,9 @@ jobs:
           backend/tests/test_chapter_continuity.py
           backend/tests/test_story_production_manifest.py
           backend/tests/test_story_tapestry.py
+          backend/tests/test_branching_narrative.py
+          backend/tests/test_outcome_weaving_matrices.py
+          backend/tests/test_story_outcomes_routes.py
           backend/tests/test_story_review_matrices.py
           backend/tests/test_story_review_routes.py
           backend/tests/test_chapter_studio_routes.py
@@ -83,6 +98,9 @@ jobs:
           backend/tests/test_chapter_continuity.py
           backend/tests/test_story_production_manifest.py
           backend/tests/test_story_tapestry.py
+          backend/tests/test_branching_narrative.py
+          backend/tests/test_outcome_weaving_matrices.py
+          backend/tests/test_story_outcomes_routes.py
           backend/tests/test_story_review_matrices.py
           backend/tests/test_story_review_routes.py
           backend/tests/test_chapter_studio_routes.py
