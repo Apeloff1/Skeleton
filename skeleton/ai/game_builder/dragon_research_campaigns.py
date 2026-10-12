@@ -73,9 +73,12 @@ class DiscoveryCampaigns:
             for sid, ref in body["source_dependencies"].items():
                 if (not isinstance(sid, str) or
                         not isinstance(ref, dict) or
-                        set(ref) != {"source_digest", "provenance_digest"} or
-                        any(not isinstance(v, str) or not HASH.fullmatch(v)
-                            for v in ref.values())):
+                        set(ref) != {"source_digest", "provenance_digest",
+                                     "job_input_digest", "policy_state"} or
+                        any(not isinstance(ref[k], str) or not HASH.fullmatch(ref[k])
+                            for k in ("source_digest", "provenance_digest",
+                                      "job_input_digest")) or
+                        ref["policy_state"] not in {"pending", "blocked"}):
                     raise ValueError("campaign source dependencies are corrupt")
             history.append({"body": body, "digest": digest})
             parent = digest
@@ -96,10 +99,23 @@ class DiscoveryCampaigns:
             ).fetchone()
             if row is None:
                 raise ValueError("selected campaign source disappeared")
+            source = json.loads(row[0])
+            if source.get("url") != item.get("url"):
+                raise ValueError("campaign proposal URL differs from canonical source")
             _, receipts = self.facets._metadata_tokens(owner, sid, row[0], row[1])
+            job = self.db.execute(
+                """SELECT stage,state,input_digest FROM dragon_almanac_jobs
+                   WHERE owner=? AND source=?""", (owner, sid)).fetchone()
+            if (job is None or job[0] != 0 or
+                    job[1] != item.get("policy_state") or
+                    job[1] not in {"pending", "blocked"} or
+                    job[2] != row[1]):
+                raise ValueError("campaign source policy-stage input has changed")
             result[sid] = {
                 "source_digest": row[1],
                 "provenance_digest": receipts,
+                "job_input_digest": job[2],
+                "policy_state": job[1],
             }
         if len(result) != len(selected):
             raise ValueError("duplicate campaign source selection")
@@ -199,8 +215,14 @@ class DiscoveryCampaigns:
                 stale.append(sid)
                 continue
             _, receipts = self.facets._metadata_tokens(owner, sid, row[0], row[1])
+            job = self.db.execute(
+                """SELECT stage,state,input_digest FROM dragon_almanac_jobs
+                   WHERE owner=? AND source=?""", (owner, sid)).fetchone()
             if (row[1] != captured["source_digest"] or
-                    receipts != captured["provenance_digest"]):
+                    receipts != captured["provenance_digest"] or
+                    job is None or job[0] != 0 or
+                    job[1] != captured["policy_state"] or
+                    job[2] != captured["job_input_digest"]):
                 stale.append(sid)
         earlier = history[-2]["body"]["plan"] if len(history) > 1 else None
         current = latest["plan"]
