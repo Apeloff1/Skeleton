@@ -22,6 +22,7 @@ from core.chapter_continuity import (
     proofreading_checks, scene_coordinates,
 )
 from core.story_continuity import StoryAuditAccumulator, MAX_STREAM_EVENTS
+from core.story_production_manifest import production_manifest
 from routes.gameforge_auth import require_role
 from routes.playable import _db
 from routes.story_index import _scope
@@ -511,3 +512,41 @@ async def approve_scene(
         raise
     except (PyMongoError, OSError):
         raise HTTPException(status_code=503, detail="Story production approval unavailable")
+
+
+
+@router.get("/{pid}/chapters/production-manifest")
+async def get_production_manifest(
+    pid: str,
+    branch_id: str = Query("main", pattern=SLUG),
+    user=Depends(require_role("viewer")),
+):
+    """Independently recompute structural production coverage from saved receipts.
+
+    No cached completion flag, scene count or LLM output can override missing
+    chapters, acts, scene identities or stale proof hashes.
+    """
+    scope = _scope(pid, user)
+    try:
+        chapters = await _db.game_story_chapters.find({
+            **scope, "branch_id": branch_id,
+        }).limit(MAX_CHAPTERS + 1).to_list(length=MAX_CHAPTERS + 1)
+        scenes = await _db.game_story_scenes.find({
+            **scope, "branch_id": branch_id,
+        }, {"text": 0}).sort("scene", 1).limit(MAX_SCENES + 1).to_list(
+            length=MAX_SCENES + 1,
+        )
+        complete = len(chapters) <= MAX_CHAPTERS and len(scenes) <= MAX_SCENES
+        if not complete:
+            # For a malformed repository do not claim a complete inventory.
+            raise HTTPException(
+                status_code=409, detail="Narrative index exceeds the planned 100/1000/9999 capacity",
+            )
+        manifest = production_manifest(chapters, scenes, complete_source=True)
+        return {"ok": True, "game_id": pid, "branch_id": branch_id,
+                "manifest": manifest}
+    except HTTPException:
+        raise
+    except (PyMongoError, OSError):
+        logger.exception("production inventory unavailable")
+        raise HTTPException(status_code=503, detail="Narrative production inventory unavailable")
