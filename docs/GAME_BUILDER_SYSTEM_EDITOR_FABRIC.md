@@ -1035,3 +1035,40 @@ impossible geometry and genuine authored-source custody.
 24 regions, with no production streaming/open-world scale and no
 independently authored/native-executed Godot metroidvania engine. It is an
 original game-reference implementation, not a publication certificate.
+
+
+### AI-assisted interconnected-world progression planner
+
+A further original AI-facing capability is now implemented in
+advanced_world_planner.py. It is an explicitly bounded offline
+shortest-action search across real authored bidirectional passages.
+State includes current region, persistent visited-room bitset, and
+collected traversal-ability bitset. Portal access is denied until the
+corresponding movement relic is actually reachable; every previously
+unvisited room carries the action costs of clearing its finite enemies
+and claiming its earned original power. The planner finds a feasible
+guardian route without relying on the optional sequence-break mechanic
+to conceal impossible map design.
+
+The resulting itinerary consists only of commands the real gameplay
+engine accepts: travel to an actual connected region, damage actual
+enemies, claim earned abilities and defeat the original guardian.
+The itinerary is independently re-executed in an explicitly
+damage-disabled *diagnostic mode*, including authored enemy and boss
+HP and unchanged geometry. The source and configuration identities
+are preserved as hashes. The route cannot write or auto-approve
+original user files; live challenge survivability, native execution,
+platform-specific behavior and publication all remain unverified.
+
+The planner exposes bounded node and action limits, explicit
+no-solution/unproven statuses, deterministic hashes and supervised
+local operations through the Studio (AI: rehearse world ability
+progression) and offline CLI (plan-original-world). Adversarial
+regressions cover full eight- and 24-region route planning, source
+digest falsification, impossible budgets, game transcript replay,
+and source mutation invariants.
+
+Original reference-only City, Stealth and Interconnected World editor
+sessions deliberately disable their Godot export UI until a real
+separately implemented native engine is ready. The native source
+support of previously implemented families remains intact.
