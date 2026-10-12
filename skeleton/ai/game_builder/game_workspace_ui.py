@@ -1177,6 +1177,42 @@ function drawAdvancedGame(session){
   c.fillText(state.conservation_checkpoint?"Restored · nonterminal biodiversity study":
     "Source habitats · predator-prey dynamics · finite restoration",12,269);
  }
+ if(editor==="economy"){
+  const left=14,top=57,cellW=90,cellH=42;
+  c.fillStyle="#eff6df";
+  c.fillText(state.title+" · turn "+state.tick+" · finite original goods",12,35);
+  for(const market of state.markets){
+   const x=left+(market.id%4)*96,y=top+Math.floor(market.id/4)*49;
+   const located=market.id===state.position;
+   c.fillStyle=located?"#355d53":"#31495d";
+   c.fillRect(x,y,cellW,cellH);
+   c.fillStyle="#f1d8a4";
+   c.fillText(market.id+" "+market.kind,x+5,y+15);
+   const onHand=market.inventory[state.focus]||0;
+   const price=market.prices[state.focus]||0;
+   c.fillStyle="#c8e9e2";
+   c.fillText("Stock "+onHand+" · "+price+" cr",x+5,y+33);
+   if(located){
+    c.strokeStyle="#ffe29c";c.lineWidth=3;
+    c.strokeRect(x+1,y+1,cellW-2,cellH-2);c.lineWidth=1;
+   }
+  }
+  const rx=W-183;
+  const allStock=state.markets.reduce((n,m)=>n+
+   m.inventory.reduce((a,b)=>a+b,0),0);
+  c.fillStyle="#eef6e7";
+  c.fillText("Cash "+state.cash,rx,63);
+  c.fillText("Cargo "+state.cargo.reduce((a,b)=>a+b,0),rx,84);
+  c.fillText("Food & goods "+allStock,rx,105);
+  c.fillText("Factory "+state.manufactured,rx,126);
+  c.fillText("Harvest "+state.harvested,rx,147);
+  c.fillText("Imports "+state.imports_sold,rx,168);
+  c.fillText("Audits "+state.audited.length,rx,189);
+  c.fillText("Households "+state.household_consumed,rx,210);
+  c.fillStyle="#cceab9";
+  c.fillText(state.checkpoint?"Real trade milestone earned · market stays alive":
+   "Physical cargo · market prices · finite deposits",12,269);
+ }
  if(editor==="rpg"){
   const ox=15,oy=64,tile=19;
   const w=advancedSettings.world_width,h=advancedSettings.world_height;
