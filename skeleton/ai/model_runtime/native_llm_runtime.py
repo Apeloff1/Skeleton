@@ -269,6 +269,7 @@ class NativeLLMRuntime:
             raise RuntimeContractError("mutated model context below runtime limit")
         if self.estimate_kv_bytes(self.limits.max_context) > self.limits.max_kv_bytes:
             raise RuntimeContractError("mutated model exceeds KV memory budget")
+        digest = snapshot_digest(snapshot)
         self._model_snapshot = snapshot
         self._model_digest = digest
         self._model_bytes = size
@@ -323,6 +324,11 @@ class NativeLLMRuntime:
             raise RuntimeContractError("TokenSequence required")
         if not isinstance(use_cache, bool):
             raise RuntimeContractError("use_cache must be boolean")
+        self.assert_model_unchanged()
+        try:
+            self.tokenizer.assert_unchanged()
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("tokenizer drift during inference") from exc
         if not hmac.compare_digest(sequence.tokenizer_digest, self.tokenizer.digest):
             raise RuntimeContractError("token sequence tokenizer identity mismatch")
         if not sequence.token_ids:
@@ -335,7 +341,7 @@ class NativeLLMRuntime:
         try:
             self.tokenizer.assert_unchanged()
         except TokenizerContractError as exc:
-            raise RuntimeContractError("native tokenizer drift during inference") from exc
+            raise RuntimeContractError("tokenizer drift during inference") from exc
         if use_cache and self.estimate_kv_bytes(len(sequence.token_ids)) > self.limits.max_kv_bytes:
             raise RuntimeContractError("inference exceeds KV memory budget")
         window = sequence.token_ids[-self.limits.max_context:]
@@ -357,60 +363,14 @@ class NativeLLMRuntime:
         """Tokenize text and execute one next-token inference graph pass."""
         return self.infer_sequence(self.encode(text), use_cache=use_cache)
 
-    def infer_sequence(
-        self,
-        sequence: TokenSequence,
-        *,
-        use_cache: bool = True,
-    ) -> InferenceResult:
-        """Run embeddings → position/RoPE → transformer blocks → LM head.
-
-        This exposes the executable inference graph independently of decoding so
-        loaders, portability checks, and samplers can validate identical model
-        state against a canonical pre-tokenized input.
-        """
-        if not isinstance(sequence, TokenSequence):
-            raise RuntimeContractError("TokenSequence required")
-        if not isinstance(use_cache, bool):
-            raise RuntimeContractError("use_cache must be boolean")
-        self.assert_model_unchanged()
+    def _finalize_feed(self, feed: StreamingTextFeed) -> TokenSequence:
+        """Admit a bounded text feed without leaking tokenizer-specific errors."""
+        if not isinstance(feed, StreamingTextFeed):
+            raise RuntimeContractError("StreamingTextFeed required")
         try:
-            self.tokenizer.assert_unchanged()
+            return feed.finalize(self.tokenizer)
         except TokenizerContractError as exc:
-            raise RuntimeContractError("tokenizer mutated after admission") from exc
-        if not hmac.compare_digest(sequence.tokenizer_digest, self.tokenizer.digest):
-            raise RuntimeContractError("token sequence tokenizer identity mismatch")
-        if not sequence.token_ids:
-            raise RuntimeContractError("token sequence must not be empty")
-        if len(sequence.token_ids) > self.limits.max_context:
-            raise RuntimeContractError("prompt exceeds context budget")
-        if any(token_id >= self.tokenizer.vocab_size for token_id in sequence.token_ids):
-            raise RuntimeContractError("token sequence contains id outside vocabulary")
-        self.assert_model_unchanged()
-        try:
-            self.tokenizer.assert_unchanged()
-        except TokenizerContractError as exc:
-            raise RuntimeContractError("tokenizer mutated after admission") from exc
-        if use_cache and self.estimate_kv_bytes(len(sequence.token_ids)) > self.limits.max_kv_bytes:
-            raise RuntimeContractError("inference exceeds KV memory budget")
-        window = sequence.token_ids[-self.limits.max_context:]
-        cache = KVCache(self.model.n_layers, self.limits.max_context) if use_cache else None
-        logits = tuple(float(value) for value in self.model._logits_window(window, cache))
-        if len(logits) != self.tokenizer.vocab_size:
-            raise RuntimeContractError("inference graph emitted invalid logits shape")
-        if any(value != value or value in (float("inf"), float("-inf")) for value in logits):
-            raise RuntimeContractError("inference graph emitted non-finite logits")
-        return InferenceResult(
-            prompt_sequence=sequence,
-            logits=logits,
-            cache_tokens=len(cache.tokens) if cache is not None else 0,
-            model_digest=self.model_digest,
-            architecture_digest=self.architecture.digest,
-        )
-
-    def infer_text(self, text: str, *, use_cache: bool = True) -> InferenceResult:
-        """Tokenize text and execute one next-token inference graph pass."""
-        return self.infer_sequence(self.encode(text), use_cache=use_cache)
+            raise RuntimeContractError("feed tokenization failed admission") from exc
 
     def infer_feed(
         self,
@@ -419,9 +379,7 @@ class NativeLLMRuntime:
         use_cache: bool = True,
     ) -> InferenceResult:
         """Execute next-token inference directly from a bounded text feed."""
-        if not isinstance(feed, StreamingTextFeed):
-            raise RuntimeContractError("StreamingTextFeed required")
-        return self.infer_sequence(feed.finalize(self.tokenizer), use_cache=use_cache)
+        return self.infer_sequence(self._finalize_feed(feed), use_cache=use_cache)
 
     def _config_digest(self, config: GenerationConfig) -> str:
         return digest_json(config.to_dict())
@@ -500,7 +458,15 @@ class NativeLLMRuntime:
     ) -> Iterator[RuntimeEvent]:
         if not isinstance(config, GenerationConfig):
             raise RuntimeContractError("GenerationConfig required")
-        return (yield from self._stream_sequence_impl(self.encode(prompt), config))
+        try:
+            sequence = self.encode(prompt)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("prompt tokenization failed admission") from exc
+        except RuntimeContractError as exc:
+            if isinstance(exc.__cause__, TokenizerContractError):
+                raise RuntimeContractError("prompt tokenization failed admission") from exc.__cause__
+            raise
+        return (yield from self._stream_sequence_impl(sequence, config))
 
     def stream_sequence(
         self,
@@ -652,6 +618,10 @@ class NativeLLMRuntime:
             device_digest=self.device.digest,
             seed=config.seed,
         )
+        # Construct and validate the durable checkpoint before announcing
+        # completion. An invalidated model or tokenizer must never emit a
+        # terminal success event whose final replay receipt is unavailable.
+        checkpoint = self.checkpoint()
         event = RuntimeEvent(
             sequence,
             "completed",
@@ -661,7 +631,6 @@ class NativeLLMRuntime:
         events.append(event)
         yield event
 
-        checkpoint = self.checkpoint()
         return GenerationResult(
             prompt_sequence=prompt_sequence,
             generated_ids=generated_ids,
@@ -697,9 +666,7 @@ class NativeLLMRuntime:
         The feed is finalized once; token IDs are forwarded without a lossy
         text round-trip, and generation uses the canonical decoder.
         """
-        if not isinstance(feed, StreamingTextFeed):
-            raise RuntimeContractError("StreamingTextFeed required")
-        return self.stream_sequence(feed.finalize(self.tokenizer), config)
+        return self.stream_sequence(self._finalize_feed(feed), config)
 
     def generate_feed(
         self,
@@ -707,9 +674,7 @@ class NativeLLMRuntime:
         config: GenerationConfig | None = None,
     ) -> GenerationResult:
         """Finalize a StreamingTextFeed and execute it end-to-end."""
-        if not isinstance(feed, StreamingTextFeed):
-            raise RuntimeContractError("StreamingTextFeed required")
-        return self.generate_sequence(feed.finalize(self.tokenizer), config)
+        return self.generate_sequence(self._finalize_feed(feed), config)
 
     def generate(
         self,
@@ -738,18 +703,23 @@ class NativeLLMRuntime:
             raise RuntimeContractError("duplicate batch request id")
 
         aggregate = 0
+        admitted: list[tuple[BatchGenerationRequest, TokenSequence]] = []
         for request in requests:
             sequence, _ = self._admit(request.prompt, request.config)
             aggregate += len(sequence.token_ids) + request.config.max_new_tokens
             if aggregate > self.limits.max_batch_tokens:
                 raise RuntimeContractError("batch token budget exceeded")
+            admitted.append((request, sequence))
 
+        # Each admitted sequence is immutable and bound to the tokenizer
+        # digest. Re-encoding a prompt here would create a second admission
+        # boundary and allow a different token trajectory after preflight.
         return tuple(
             BatchGenerationResult(
                 request.request_id,
-                self.generate(request.prompt, request.config),
+                self.generate_sequence(sequence, request.config),
             )
-            for request in requests
+            for request, sequence in admitted
         )
 
     def replay(
@@ -787,7 +757,7 @@ class NativeLLMRuntime:
         try:
             self.tokenizer.assert_unchanged()
         except TokenizerContractError as exc:
-            raise RuntimeContractError("tokenizer mutated before checkpoint") from exc
+            raise RuntimeContractError("tokenizer changed before checkpoint") from exc
         return make_checkpoint(
             model=self.model,
             model_digest=self.model_digest,
