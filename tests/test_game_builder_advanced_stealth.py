@@ -24,12 +24,12 @@ from skeleton.ai.game_builder.system_editors import make_editor_document, catalo
 
 
 class OriginalStealthReferenceTests(unittest.TestCase):
-    def test_thirty_three_advanced_controls_and_playable_action_registry(self):
+    def test_thirty_four_advanced_controls_and_playable_action_registry(self):
         self.assertIn("stealth",ENGINES)
         self.assertEqual(set(ACTIONS),set(ACTION_HELP["stealth"]))
         self.assertGreater(len(ACTIONS),20)
         specs={s["id"]:s for s in catalog()}
-        self.assertEqual(len(specs["stealth"]["fields"]),33)
+        self.assertEqual(len(specs["stealth"]["fields"]),34)
         self.assertEqual(specs["stealth"]["runtime_maturity"],"advanced_reference_runtime")
         self.assertEqual(specs["stealth"]["progression_floor"],"advanced")
 
@@ -166,6 +166,71 @@ class OriginalStealthReferenceTests(unittest.TestCase):
                 verify_advanced_session(altered,config)
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("stealth",config,["wait"]*129)
+
+
+    def test_reachable_sabotage_and_intelligence_have_distinct_real_objectives(self):
+        security={"guard_count":0,"camera_range":0,"mission":"sabotage"}
+        # Reach a live surveillance device, then its actual security console.
+        sab=(["move_east"]*8+["move_south"]*2+["disable_camera"]
+             +["move_south"]*2+["move_west","hack_terminal"]
+             +["move_south"]*3+["move_east"]*2+["extract"])
+        sabotaged=run_advanced_session("stealth",security,sab)
+        self.assertTrue(sabotaged["state"]["finished"])
+        self.assertTrue(sabotaged["state"]["terminal_hacked"])
+        self.assertEqual(sabotaged["state"]["cameras_disabled"],1)
+        self.assertTrue(verify_advanced_session(sabotaged,security))
+        intelligence={"guard_count":0,"camera_range":0,"mission":"intelligence"}
+        dossier=(["move_east"]*5+["collect_intel"]+["move_east"]*2
+                +["move_south"]*7+["collect_intel"]+["move_east"]*2
+                +["extract"])
+        intel=run_advanced_session("stealth",intelligence,dossier)
+        self.assertTrue(intel["state"]["finished"])
+        self.assertEqual(intel["state"]["intel_collected"],2)
+        self.assertTrue(verify_advanced_session(intel,intelligence))
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("stealth",security,["extract"])
+
+    def test_actual_reserve_agents_deploy_under_alarm_without_250_actors_on_80_cells(self):
+        cfg=make_editor_document("stealth",{
+            "guard_count":150,"suspicion_threshold":1,
+            "alarm_gain":50,"alarm_cooldown":0,
+            "noise_gain":20,"fail_on_alarm":False,
+            "alarm_damage":0,"contact_damage":0,
+            "reinforcement_interval":1,
+        })["settings"]
+        state=start(cfg,0)
+        self.assertEqual(len(state["guards"]),8)
+        self.assertEqual(state["guard_reserve"],142)
+        for _ in range(6):
+            if state["failed"]:break
+            step(state,cfg,"decoy_east" if state["stun_charges"] else "sprint_east"
+                 if state["player"][0]<7 else "wait")
+        self.assertGreater(state["reinforcements_deployed"],0)
+        self.assertEqual(state["guard_reserve"]+
+                         state["reinforcements_deployed"],142)
+        self.assertLessEqual(len(state["guards"]),20)
+
+    def test_local_studio_has_visual_infiltration_map_and_supervised_patrol_source(self):
+        from skeleton.ai.game_builder.game_workspace_ui import (
+            SCRIPT,render_workspace_html,
+        )
+        source=render_workspace_html("A"*32).decode("utf-8")
+        for piece in ("paintStealthCell","patrol_route",
+                      "guard_routes","Stealth geography changed",
+                      "stealth-player-command",
+                      "Execute verified stealth action",
+                      "ArrowUp","crouch","sprint","Original infiltration 10×8"):
+            self.assertIn(piece,source)
+        self.assertIn("paintStealthCell",SCRIPT)
+        initial=make_advanced_scene("stealth",seed=3)
+        draft=deepcopy(initial)
+        draft["layout"]["lighting"]="night"
+        with self.assertRaises(SceneError):
+            validate_advanced_scene(draft)
+        signed=make_advanced_scene("stealth",seed=3,layout=draft["layout"])
+        self.assertNotEqual(signed["digest"],initial["digest"])
+        self.assertTrue(verify_advanced_session(
+            run_advanced_session("stealth",seed=3,scene=signed)))
 
     def test_hybrid_assembly_uses_genuine_stealth_scene_and_replay(self):
         scene=make_advanced_scene("stealth",seed=0)
