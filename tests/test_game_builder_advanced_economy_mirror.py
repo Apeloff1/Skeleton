@@ -2,8 +2,19 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from contextlib import redirect_stdout, redirect_stderr
+from pathlib import Path
+from io import StringIO
+import http.client
+import json
+import tempfile
+import threading
 import unittest
 
+from skeleton.ai.game_builder.system_editor_cli import main as editor_cli
+from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
+from skeleton.ai.game_builder.game_workspace_server import create_workspace_server
+from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html
 from skeleton.ai.game_builder.advanced_economy_mirror import (
     METRICS, PARETO_GOALS, EconomyMirrorError,
     analyze_original_economy, verify_original_economy_mirror,
@@ -144,6 +155,85 @@ class OriginalEconomyMirrorTests(unittest.TestCase):
             with self.subTest(options=options):
                 with self.assertRaises(EconomyMirrorError):
                     analyze_original_economy(scene, **options)
+
+
+class EconomicMirrorAppSurfaceTests(unittest.TestCase):
+    def test_cli_research_and_independent_recompute(self):
+        scene = make_advanced_scene("economy", seed=7)
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source = root / "scene.json"
+            record = root / "mirror.json"
+            source.write_text(json.dumps(scene), encoding="utf-8")
+            with redirect_stdout(StringIO()) as output:
+                self.assertEqual(editor_cli([
+                    "economy-mirror", "--scene", str(source), "--horizon", "4",
+                    "--max-scenarios", "8"
+                ]), 0)
+            report = json.loads(output.getvalue())
+            self.assertEqual(report["schema"],
+                "skeleton.game_builder.original_economy_mirror.v1")
+            record.write_text(json.dumps(report), encoding="utf-8")
+            with redirect_stdout(StringIO()) as verified:
+                self.assertEqual(editor_cli([
+                    "verify-economy-mirror", "--record", str(record),
+                    "--scene", str(source)
+                ]), 0)
+            self.assertEqual(json.loads(verified.getvalue()), {"verified": True})
+            modified = deepcopy(report)
+            modified["evaluated"][0]["metrics"]["player_cash"] += 100
+            record.write_text(json.dumps(modified), encoding="utf-8")
+            with redirect_stderr(StringIO()):
+                self.assertEqual(editor_cli([
+                    "verify-economy-mirror", "--record", str(record),
+                    "--scene", str(source)
+                ]), 2)
+
+    def test_authenticated_studio_stays_read_only_and_rejects_forgery(self):
+        with tempfile.TemporaryDirectory() as folder:
+            studio = GameWorkspace.create(Path(folder) / "studio", authorized=True)
+            studio.create_project("trade_lab", "hybrid", authorized=True)
+            server = create_workspace_server(studio, port=0)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            def post(path, values, authorized=True):
+                connection = http.client.HTTPConnection(
+                    "127.0.0.1", server.server_port, timeout=8)
+                headers = {"Content-Type": "application/json"}
+                if authorized:
+                    headers["X-Game-Studio-Token"] = server.secret
+                connection.request("POST", path, json.dumps(values), headers)
+                response = connection.getresponse()
+                body = json.loads(response.read())
+                status = response.status
+                connection.close()
+                return status, body
+            try:
+                scene = make_advanced_scene("economy", seed=1)
+                values = {"scene": scene, "horizon": 4, "max_scenarios": 8}
+                self.assertEqual(post("/api/economy-mirror", values, False)[0], 403)
+                code, payload = post("/api/economy-mirror", values)
+                self.assertEqual(code, 200)
+                self.assertFalse(payload["source_project_mutated"])
+                self.assertFalse(payload["model_weights_promoted"])
+                report = payload["report"]
+                self.assertTrue(report["scenarios_verified"])
+                code, result = post("/api/economy-mirror-verify", {
+                    "scene": scene, "record": report
+                })
+                self.assertEqual(code, 200)
+                self.assertTrue(result["verified"])
+                forged = deepcopy(report)
+                forged["top_relative_policy"] = "guaranteed_income"
+                self.assertEqual(post("/api/economy-mirror-verify", {
+                    "scene": scene, "record": forged
+                })[0], 400)
+                html = render_workspace_html("x" * 32).decode()
+                self.assertIn("Strategy mirror: compare real economic trade-offs", html)
+                self.assertIn("/api/economy-mirror-verify", html)
+            finally:
+                server.shutdown()
+                server.server_close()
 
 
 if __name__ == "__main__":
