@@ -11,6 +11,7 @@ import {
   readSceneChatHandoff, sceneHandoffItems,
 } from '../features/Jeeves/sceneHandoff';
 import { validProjectId, projectHref } from '../src/product/worldWorkspace';
+import { acceptSceneForgeResponse } from '../src/product/sceneForgeAcceptance';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../utils/apiController';
 import { lazyDefault, LazyMount } from '../src/utils/lazyMount';
@@ -166,7 +167,7 @@ export default function ComposeScene() {
       Alert.alert('Select a real build', 'Choose a project and add at least one scene item before composing.');
       return;
     }
-    setBusy(true); setResult(null);
+    setBusy(true); setResult(null); setDiorama([]);
     try {
       const r = await apiFetch(`${API}/api/galaxy-studio/forge/compose`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -182,7 +183,21 @@ export default function ComposeScene() {
         }),
         timeoutMs: 60000,
       });
-      setResult(await r.json());
+      const response = await r.json().catch(() => null);
+      const accepted = acceptSceneForgeResponse(
+        r.ok, response, buildId.trim(),
+        picks.map(item => ({ category: item.category, count: item.count })),
+      );
+      if (!accepted.accepted) {
+        setChatDraftNotice('Scene mount was not confirmed. Inspect the game assets before retrying.');
+        Alert.alert('Scene outcome unconfirmed',
+          'The forge did not provide a complete successful mount receipt. Check the build asset list before retrying to avoid duplicates.');
+        return;
+      }
+      setResult(response);
+      if (accepted.clamped) {
+        setChatDraftNotice('Scene Forge reached its asset budget. Only the confirmed mounted subset is shown.');
+      }
       // Build a 3D diorama from the freshly-forged assets laid on a ground plane.
       try {
         const lr = await apiFetch(`${API}/api/galaxy-studio/forge/list?build_id=${encodeURIComponent(buildId.trim())}&limit=25`, { timeoutMs: 20000 });
@@ -215,7 +230,11 @@ export default function ComposeScene() {
         });
         setDiorama(merged);
       } catch { /* diorama is best-effort */ }
-    } catch { Alert.alert('Compose failed', 'Please try again.'); } finally { setBusy(false); }
+    } catch {
+      setChatDraftNotice('Forge outcome unknown after connection failure; inspect the build before trying again.');
+      Alert.alert('Scene outcome unconfirmed',
+        'Check the game asset list before retrying. The server may have mounted assets even if the response was lost.');
+    } finally { setBusy(false); }
   }, [picks, buildId, era, skinStyle, makeVariants, axes, treatment]);
 
   return (
