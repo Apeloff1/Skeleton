@@ -169,7 +169,9 @@ def test_history_forbids_backdated_changes_and_naive_time():
     with pytest.raises(ValueError):
         new_nest("owner", ("a",), focus_tags=("game-code",), at="2026-10-12T12:00:00")
     with pytest.raises(ValueError):
-        grow(adult(), at="2026-10-11T13:00:00Z")
+        feed_parent(nest(), "source-0", content_sha256=H1,
+                    at="2026-10-11T13:00:00Z", authorized=True,
+                    reviewed=True, lawful=True)
 
 
 def test_stage_levels_bounded_under_continuous_novel_evidence():
