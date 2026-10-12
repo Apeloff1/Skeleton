@@ -165,6 +165,7 @@ def chapter_context(
 def proofreading_checks(
     scene: Mapping[str, Any], chapter: Mapping[str, Any],
     *, history_complete: bool, history_issues: Sequence[Mapping[str, Any]],
+    predecessor: Mapping[str, Any] | None = None,
     inspection_budget: int = PROOFREAD_INSPECTIONS,
 ) -> dict[str, Any]:
     """Execute and receipt 100k deterministic checks across 12 review axes.
@@ -190,6 +191,13 @@ def proofreading_checks(
         errors.append("previous_continuity_issues")
     if not scene.get("summary", "").strip():
         errors.append("scene_summary_missing")
+    if scene["scene"] > 1:
+        if not predecessor:
+            errors.append("previous_scene_missing")
+        elif (predecessor.get("scene") != scene["scene"] - 1
+              or predecessor.get("status") != "approved_for_production"
+              or predecessor.get("act", 0) > scene["act"]):
+            errors.append("previous_scene_unapproved_or_out_of_sequence")
     if not scene.get("characters"):
         warnings.append("no_characters")
     if not highlights:
@@ -243,6 +251,11 @@ def proofreading_checks(
         "chapter": scene["chapter"], "act": scene["act"], "scene": scene["scene"],
         "scene_digest": scene["digest"], "chapter_digest": chapter["digest"],
         "chapter_revision": chapter["revision"], "plot_spans": highlights,
+        "predecessor_scene_digest": predecessor.get("digest") if predecessor else None,
+        "predecessor_scene_approved": (scene["scene"] == 1 or (
+            predecessor is not None and
+            predecessor.get("status") == "approved_for_production"
+        )),
         "inspections_executed": sum(counts), "inspection_budget": inspection_budget,
         "axes": [
             {"name": REVIEW_AXES[i], "executed": counts[i], "failed": fail_counts[i]}
