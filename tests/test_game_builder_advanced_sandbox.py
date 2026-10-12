@@ -375,7 +375,7 @@ class OriginalEndlessSandboxTests(unittest.TestCase):
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("sandbox",actions=["build:house:1","terraform:lake:1"])
         with self.assertRaises(AdvancedRuntimeError):
-            run_advanced_session("sandbox",actions=["move:1","till:1","sow:1","terraform:lake:1"])
+            run_advanced_session("sandbox",actions=["move:1","move:9","till:9","sow:9","move:1","terraform:lake:9"])
 
     def test_reference_cli_is_offline_non_native_and_no_malicious_action(self):
         from skeleton.ai.game_builder.system_editor_cli import main
