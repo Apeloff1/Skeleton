@@ -539,6 +539,12 @@ def step(state,config,action):
                 raise QuestDirectorError("material help requires real supplies or damaged original site")
             if len(state["events_log"])>=config["event_budget"]:
                 raise QuestDirectorError("no capacity for audited original relief event")
+            # Original-world actions are mutable; preflight both finite
+            # resources together so a failed stamina gate cannot consume
+            # supplies before the rejection reaches the caller.
+            if (state["supplies"]<config["help_supplies"] or
+                state["stamina"]<config["action_stamina"]):
+                raise QuestDirectorError("material relief requires actual finite supplies and stamina")
             _spend(state,"supplies",config["help_supplies"])
             _spend(state,"stamina",config["action_stamina"])
             site["integrity"]=min(config["site_integrity"],
