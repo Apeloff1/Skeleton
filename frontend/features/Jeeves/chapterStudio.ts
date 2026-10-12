@@ -109,6 +109,13 @@ export type ProofReceipt = {
   plot_spans: Highlight[];
   inspections_executed: number; inspection_budget: number;
   axes: { name: string; executed: number; failed: number }[];
+  highlight_review_queue?: {
+    scene: number; scene_digest: string; plot_point_id: string;
+    anchor: string; matrix_id: string; suggested_level: number;
+    status: string; automatically_approved: boolean;
+  }[];
+  highlight_model_reviews_executed?: boolean;
+  highlight_model_reviews_approved?: boolean;
   blocking_issues: string[]; warnings: string[];
   history_complete: boolean; history_issue_count: number;
   method: string; status: string; receipt_digest: string;
