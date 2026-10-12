@@ -152,6 +152,57 @@ engines. It never equates successful reference simulation with a certified
 Godot export or native executable. Integration of the actual other 40
 game engines and producer-grade scene/node editors remains outstanding.
 
+## Tenth genuine original gameplay family: Factory & Automation
+
+The `factory` editor is no longer just fields for machine counts and belt
+speed. `advanced_factory_runtime.py` adds an independently replayable,
+source-bound manufacturing game. The authored original factory has one to
+four operative machine stations of bounded smelter, assembler, packer and
+optional generator types, unique sequential machine IDs, finite ore/coal
+deposits, a configurable shipment objective and priced market.
+
+Players construct, upgrade, toggle, liquidate and repair real machines;
+mine finite ore and purchase from finite coal reserves; spend coal on local
+generation, allocate actual energy to machines, set speed vs efficiency,
+scrub paid pollution, and ship batches of *actually manufactured* goods.
+Ore is consumed to forge plates, plates become components, and components
+become packaged product through bounded belt speed and machine levels.
+Energy scarcity stalls individual machines, monthly-style operational time
+increments and machine wear create maintenance obligations, and pollution
+shutdown or bankrupting supply chains can terminate a run. Only two or
+more authentic manufacturing contracts meeting the authored target permit
+success: no fabricated shipments or unlimited-money outcomes.
+
+The separate `advanced_factory_godot.py` is a **real native Godot game**
+that independently implements the same throughput/power/wear/economy
+mechanics, draws a live machine-floor status view and accepts construction,
+production, mine, shipment, pollution, upgrade, repair, switch and sale
+orders. Gamepad controls cover daily production and assembly actions.
+Its `--verify-factory` mode begins from original source state and
+independently replays the reviewed command history, comparing every full
+factory state field including nested sorted machine stats and immutable
+station roles. ZIP distribution and source export are not falsely reported
+as native runtime/hardware certification.
+
+Game Studio, offline operator-authorized `godot-export` CLI, deterministic
+`original-godot-factory/` source ZIP, strict canonical scene authoring,
+and native-proof/tamper rejection tests now cover this tenth real genre.
+Dedicated `game-builder-advanced-factory-native.yml` executes eight authored
+factory histories (resource mining, powered three-stage lines, contract win,
+maintenance, smart power, finite coal, repairs, efficiency and pollution)
+on Linux and Windows **and runs their exported desktop game binaries**.
+The broader advanced regression gate keeps all ten reference engines and
+source custody tested on both operating systems.
+
+**Evidence requirements:** count `factory` as an independently verified
+native game only after its exact-head Godot history and desktop binary checks
+both succeed. The previous nine native engines are proven, with 10/43
+(23.3%) now having real reference gameplay but 33/43 editor families still
+authoring-only. These reference games are bounded examples, not comprehensive
+production-quality coverage of every subgenre or console/PC hardware.
+PR #3642 remains draft until readiness gates and broader app priorities
+are separately assessed.
+
 ## Ninth actual original gameplay family: Godot 4 Farming & Ecology
 
 This is a **new game**, not a ninth adapter for an existing reference
