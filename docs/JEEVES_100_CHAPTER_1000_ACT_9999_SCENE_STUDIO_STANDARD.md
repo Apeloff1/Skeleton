@@ -18,7 +18,7 @@ This is a **structural dramatic-quality gate**. Subjective suspense, actual prof
 
 A plot marker has a globally unique ID, authored category/color, importance 1–5, review note, and a direct pointer to an actual scene event, dialogue line, interaction or beat. Categories include foreshadowing, revelation, conflict, motivation, relationship, prop, suspense, payoff. Markers have canonical editor colors, not guesses from the generative model.
 
-When Jeeves opens a chapter, the chapter-scoped context includes (1) all verified current-chapter scene text if the context remains within a **1.5 MB** byte budget; (2) the current chapter's precise source/receipt references and plot highlighter ledger; (3) unresolved highlighters from earlier chapters; (4) a bounded list of previous chapter-ending receipts; and (5) canonical character/world state. Oversize chapter texts remain accessible by source ID and are marked explicitly as not fully embedded. No false claim of infinite context, silent omission or globally perfect model memory is permitted.
+When Jeeves opens a chapter, the chapter-scoped context includes (1) all verified current-chapter scene text if the context remains within a **1.5 MB** byte budget; (2) the current chapter's precise source/receipt references and plot highlighter ledger; (3) up to 200 prioritized unresolved highlighters from earlier chapters (the full historical highlighter index remains source-queryable); (4) a bounded list of previous chapter-ending receipts; and (5) canonical character/world state. Oversize chapter texts remain accessible by source ID and are marked explicitly as not fully embedded. No false claim of infinite context, silent omission or globally perfect model memory is permitted.
 
 A dedicated highlight lookup returns the exact original event/beat/line, source digest, stage receipt, chapter/act/scene location, open/closed status and provenance. Model-generated recollections must be grounded in these records.
 
@@ -47,3 +47,11 @@ Not proven or implemented as part of this milestone: live Jeeves model authoring
 5. Playtest and scene-signoff gates: thematic cohesion, pacing, NPC behavior, player agency, non-linear ending alternatives, original-work scrutiny, accessibility/localization, hardware targets and release-grade validations.
 
 **Continuity objective:** no *known source-level* inconsistency may pass certification. Claims of literally guaranteed 100% story, audio or visual quality would exceed what deterministic validation can prove.
+
+## Source-authored cinematic shot-board preflight
+
+A mandatory `cinematic_shots` observation must specify each authored shot's timeline offset, duration, camera grammar, cut type, screen-direction axis, focus character, original voice/face IDs, covered dialogue line IDs, region lighting, exact color grade, original style ID, sound and directorial notes. The validator rejects gaps or overlaps in authored shot time, unmotivated axis crossings, missing or repeated spoken lines, unknown characters, voice or face replacements, wrong period lighting or recolored regions. It is a storyboard/source verification gate, **not** a generated film/render pass; perceptual cinematography and music/speech output still require downstream media analysis and expert playtesting.
+
+## Source-bound Jeeves chat turn receipts
+
+The `/api/jeeves-chapter-chat` endpoint accepts an original production request and an optional signed finite transcript (up to 64 turns). It attaches the next deterministic work order and the verified chapter context, and rejects altered transcript digests, skipped dialogue turns, a different selected project or a stale underlying story index. The Studio provides dedicated chat send/reset controls, with no unreviewed files written. This is **conversation orchestration**, not yet inference of original prose by a connected LLM.
