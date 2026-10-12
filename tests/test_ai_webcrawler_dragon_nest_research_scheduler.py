@@ -144,7 +144,7 @@ def test_known_source_version_cannot_be_requeued_solely_from_digest_hint():
     {"lane": "video", "domain": "docs"},
     {"lane": "article", "domain": "video"},
 ])
-def test_no_video_article_mislabel():
+def test_no_video_article_mislabel(kwargs):
     domain = "www.youtube.com" if kwargs["domain"] == "video" else "docs.example.org"
     with pytest.raises(ValueError, match="specialist"):
         ResearchLead("x", "https://" + domain + "/x", ("game-code",),
