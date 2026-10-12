@@ -1,0 +1,90 @@
+name: Original Fair NPC Population Fidelity
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_chunked_npc_world.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_fair_npc_population.py"
+      - ".github/workflows/game-builder-fair-npc-population.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: original-fair-npc-population-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  actual-large-npc-population:
+    name: 128 embodied NPCs and bounded fidelity (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    timeout-minutes: 22
+    env:
+      PYTHONUTF8: "1"
+      PYTHONPATH: "."
+      SOURCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Exact-head checkout without persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_fair_npc_population.py
+      - name: Configure Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Exact source identity and original-game source compilation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_HEAD_SHA"
+          python -m py_compile \
+            skeleton/ai/game_builder/advanced_chunked_npc_world.py \
+            skeleton/ai/game_builder/advanced_fast_chunk_snapshot.py \
+            skeleton/ai/game_builder/advanced_npc_provenance_index.py \
+            skeleton/ai/game_builder/game_workspace_ui.py \
+            tests/test_game_builder_fair_npc_population.py
+      - name: Simulate physically embodied fair NPCs and reject forged deferred states
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_game_builder_fair_npc_population -v
+      - name: Cross-seed actor ledger and physical movement verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from skeleton.ai.game_builder.advanced_chunked_npc_world import (
+              run_chunked_npc_world, verify_chunked_npc_world,
+          )
+          for chunks in (3,5):
+              for seed in (0,1,5,9):
+                  actions=["wait"]*6
+                  options={
+                      "chunks_per_side":chunks,
+                      "citizens":128,
+                      "active_limit":8,
+                      "lod_policy":"fair",
+                      "chunk_radius":1,
+                  }
+                  record=run_chunked_npc_world(actions,options=options,seed=seed)
+                  assert verify_chunked_npc_world(record)
+                  actors=record["state"]["actors"]
+                  assert len(actors)==len({a["position"] for a in actors})==128
+                  ledger=record["state"]["scheduler"]
+                  assert ledger["detailed_updates"]<=8*len(actions)
+                  assert ledger["detailed_updates"]+ledger["deferred_actor_turns"]==128*len(actions)
+                  assert ledger["forged_offscreen_events"]==0
+                  print("FULL_SOURCE_FAIR_NPC_OK",chunks,seed,record["digest"])
+          PY
