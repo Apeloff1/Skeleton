@@ -497,3 +497,120 @@ def test_orchestration_rejects_unscheduled_or_duplicate_reviewed_sources(setup):
             automation, library, plan, (item,), **{**options, "now": T2},
         )
     assert automation.active_weights(OWNER, authorized=True) == ()
+
+
+def test_forged_memory_promotion_fingerprint_cannot_activate_shadow(setup):
+    from skeleton.ai.webcrawler.dragon_memory_promotion_worker import (
+        MemoryPromotionOutput,
+    )
+    from skeleton.ai.webcrawler.dragon_analysis_chains import LayerReceipt, AnalysisLayer
+    from skeleton.ai.webcrawler.dragon_memory_promotion_worker import PromotedKnowledge
+    from skeleton.ai.game_builder.contracts import canonical_digest
+    automation, *_ = setup
+    weight, record, _, adversarial = offer(setup)
+    automation.evaluate(OWNER, weight.candidate_id, suite(setup),
+                        at=T2, authorized=True)
+    output, review_id = reviewed_promotion(setup, record, adversarial)
+    genuine = output.promoted[0]
+    fake = replace(genuine, promotion_fingerprint="f" * 64)
+    forged_output = replace(
+        output,
+        promoted=(fake,),
+        receipt=replace(
+            output.receipt,
+            output_fingerprint=canonical_digest([vars(fake)]),
+        ),
+    )
+    with pytest.raises(PermissionError, match="approval/knowledge"):
+        automation.promote(
+            OWNER, weight.candidate_id, suite(setup),
+            memory_promotion=forged_output, review_id=review_id,
+            at=T3, authorized=True,
+        )
+    assert automation.active_weights(OWNER, authorized=True) == ()
+    assert automation.history(
+        OWNER, weight.candidate_id, authorized=True,
+    )[-1].after == "tested"
+
+
+def test_invalid_holdout_signature_or_baseline_controls_cannot_grant_approval(setup):
+    automation, *_ = setup
+    weight, _, _, _ = offer(setup)
+    original = suite(setup)
+    forged = replace(original, seal="f" * 64)
+    with pytest.raises(ValueError, match="signature"):
+        automation.evaluate(
+            OWNER, weight.candidate_id, forged, at=T2, authorized=True,
+        )
+    contaminated = replace(
+        original,
+        cases=original.cases[:-1] + (
+            BenchmarkCase("abstain-b", "movement", "_abstain"),
+        ),
+    )
+    with pytest.raises(ValueError, match="signature"):
+        automation.evaluate(
+            OWNER, weight.candidate_id, contaminated, at=T2, authorized=True,
+        )
+    assert automation.history(
+        OWNER, weight.candidate_id, authorized=True,
+    )[-1].after == "shadow"
+
+
+def test_holdout_expiry_denies_promotion_even_after_initial_usefulness(setup):
+    automation, *_ = setup
+    weight, record, _, adversarial = offer(setup)
+    signed = suite(setup)
+    accepted = automation.evaluate(
+        OWNER, weight.candidate_id, signed, at=T2, authorized=True,
+    )
+    assert accepted.accepted
+    promotion, review_id = reviewed_promotion(setup, record, adversarial)
+    with pytest.raises(ValueError, match="timing"):
+        automation.promote(
+            OWNER, weight.candidate_id, signed,
+            memory_promotion=promotion, review_id=review_id,
+            at="2026-10-13T00:00:00Z", authorized=True,
+        )
+    assert automation.active_weights(OWNER, authorized=True) == ()
+
+
+def test_negative_canaries_detect_noise_poisoning_in_shadow_retrieval(setup):
+    automation, library, _, _ = setup
+    weight, _, _, _ = offer(setup)
+    cases = (
+        BenchmarkCase("a", "responsive jumping", "alpha"),
+        BenchmarkCase("b", "smooth climbing", "alpha"),
+        BenchmarkCase("c", "jump timing", "alpha"),
+        BenchmarkCase("d", "movement", "_abstain"),
+        BenchmarkCase("e", "distant galaxy astronomy", "_abstain"),
+    )
+    poisoned = seal_holdout(
+        OWNER, library.snapshot_root(OWNER, authorized=True),
+        "independent-evaluator", cases,
+        created_at=T0, expires_at="2026-10-13T00:00:00Z",
+        evaluator_key=b"trusted-benchmark-evaluator-service-key-32b",
+    )
+    result = automation.evaluate(
+        OWNER, weight.candidate_id, poisoned, at=T2, authorized=True,
+    )
+    assert not result.accepted
+    assert result.regressed == 1
+    assert result.improved >= 1
+    assert automation.active_weights(OWNER, authorized=True) == ()
+
+
+def test_unreviewed_ontology_mismatch_cannot_advance_stage(setup):
+    automation, library, _, _ = setup
+    record, receipts, adversarial = scrutiny("alpha")
+    forged = replace(record, ontology_version="incompatible.ontology")
+    with pytest.raises(ValueError, match="normalized evidence|calibrated|bound"):
+        automation.stage_shadow(
+            OWNER, brief(library), "alpha", "note-alpha",
+            normalized_knowledge_id=record.knowledge_id,
+            normalized_records=(forged,),
+            receipts=receipts, adversarial_output=adversarial,
+            at=T1, idle_since=T0, hardware=sample(), hardware_now=1000,
+            consented=True, authorized=True, privacy_clear=True,
+        )
+    assert automation.active_weights(OWNER, authorized=True) == ()
