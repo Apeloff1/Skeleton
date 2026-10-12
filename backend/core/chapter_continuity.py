@@ -25,7 +25,10 @@ CHAPTER_SCHEMA = "jeeves.chapter.context.v1"
 PLOT_KINDS = (
     "setup", "payoff", "foreshadow", "reveal", "decision", "consequence",
     "promise", "resolution", "dialogue", "motif", "historical_detail",
-    "visual_identity", "voice_identity",
+    "visual_identity", "voice_identity", "prologue", "epilogue",
+    "cliffhanger", "surprise", "emotional_turn", "red_herring",
+    "misdirection_reveal", "dramatic_irony", "comic_relief",
+    "choice", "romance", "betrayal", "tension_release",
 )
 REVIEW_AXES = (
     "chapter_assignment",
