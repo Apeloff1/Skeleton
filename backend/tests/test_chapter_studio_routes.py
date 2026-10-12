@@ -174,11 +174,11 @@ async def test_chapter_receipt_revision_replay_and_changed_content_conflict(db):
 @pytest.mark.asyncio
 async def test_voice_id_locked_both_within_a_chapter_and_across_100_chapters(db):
     first = await route.save_chapter("game-x", 1, chapter(), user=AUTHOR)
-    with pytest.raises(HTTPException, match="voice identity"):
+    with pytest.raises(HTTPException, match="voice_cast identity"):
         await route.save_chapter("game-x", 1,
             chapter(expected_revision=1, voice_cast={"aria": "replacement"}),
             user=AUTHOR)
-    with pytest.raises(HTTPException, match="voice identity"):
+    with pytest.raises(HTTPException, match="voice_cast identity"):
         await route.save_chapter("game-x", 2,
             chapter(voice_cast={"aria": "replacement"}), user=AUTHOR)
     allowed = await route.save_chapter("game-x", 2,
