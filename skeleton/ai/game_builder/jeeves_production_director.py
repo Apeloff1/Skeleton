@@ -37,7 +37,7 @@ WORK_UNITS = {
         "Review provenance and mark individual assets approved only after rights review",
     ),
     "continuity_lock": (
-        "Approve exactly 100 acts and 9999 individually confirmed scenes",
+        "Approve 100 chapters, 1000 acts and 9999 individually confirmed scenes",
         "Lock source voice ID and voice master hash for every character",
         "Lock permanent facial geometry and dialogue-to-expression rules",
         "Approve clothing variants, cloth textures, items and historical owners",
@@ -96,7 +96,12 @@ def work_order(workspace, project, user_message, *, cast=None, region=None,
     else:
         stage = "scene"
         if act is None:
-            act = scenes[-1]["act"] if scenes else 1
+            if scenes and (scenes[-1]["scene"] >= 10 or
+                    scenes[-1].get("storytelling",{}).get("chapter_outcome")
+                        in ("resolution","cliffhanger")):
+                act = scenes[-1]["act"] + 1
+            else:
+                act = scenes[-1]["act"] if scenes else 1
         if scene is None:
             scene = ((scenes[-1]["scene"] + 1)
                      if scenes and act == scenes[-1]["act"] else 1)
@@ -112,16 +117,24 @@ def work_order(workspace, project, user_message, *, cast=None, region=None,
                                 scene == scenes[-1]["scene"]+1) or
                                (act == scenes[-1]["act"]+1 and scene == 1)):
                 raise StoryCanonError("Jeeves must author one exact next scene at a time")
-        blank = story_scene_template(bible, sequence=len(scenes)+1,
-                                     act=act, scene=scene)
-        blank["prior_digest"] = index["head_digest"]
-        target = scene_path(blank)
+        if load_continuity_contract(workspace,project) is not None:
+            from .story_workspace import next_story_scene_template
+            prepared = next_story_scene_template(
+                workspace,project,act,scene)
+            blank=prepared["document"]
+            target=prepared["path"]
+        else:
+            blank = story_scene_template(bible, sequence=len(scenes)+1,
+                                         act=act, scene=scene)
+            blank["prior_digest"] = index["head_digest"]
+            target = scene_path(blank)
         requires = [bible["digest"]] + ([index["head_digest"]]
                                         if index["head_digest"] else [])
         context = {"history_head_digest": index["head_digest"],
                    "history_index_digest": index["digest"],
                    "accepted_scenes": len(scenes),
                    "required_act": act, "required_scene": scene,
+                   "required_chapter":blank.get("chapter"),
                    "strict_identity_contract_digest":
                        (load_continuity_contract(workspace,project) or {}).get("digest"),
                    "legacy_source_history_unlocked":
@@ -146,12 +159,16 @@ def work_order(workspace, project, user_message, *, cast=None, region=None,
         "generation_discipline": (
             "originality", "scene_specificity", "referential_continuity",
             "no_unlicensed_character_or_art_copying",
-            "full_story_history_validation", "no_model_memory_fabrication"
+            "full_story_history_validation", "no_model_memory_fabrication",
+            "chapter_context_handoff", "plot_point_highlighter",
+            "prologue_prelude_interlude_editing",
+            "chapter_suspense_and_resolution", "cinematic_staging"
         ),
         "independent_review_required": [
             "wiki_story_facts", "mirror_continuity_adversarial",
             "assets_palette_and_identity", "source_and_rights",
             "human_commit_approval",
+            "chapter_plot_highlighters", "scene_tension_closure",
         ],
         "model_inference_performed": False,
         "provider_connected_by_this_call": False,
