@@ -66,6 +66,7 @@ def validate_discovery_chain(registry: dict, named_documents: list[tuple[str, di
                                  if k != "catalog_digest"}) != registry["catalog_digest"]):
         raise ValueError("canonical baseline invalid")
     existing = set(baseline)
+    raw_seen = set()
     seen_paths = []
     collected: dict[str, dict] = {}
     for name, doc in named_documents:
@@ -92,7 +93,7 @@ def validate_discovery_chain(registry: dict, named_documents: list[tuple[str, di
             previous = baseline_size + counts["previous_new_candidate_urls"]
         if previous is None:
             previous = doc.get("baseline_urls")
-        if type(previous) is not int or previous != len(existing):
+        if type(previous) is not int or previous != baseline_size + len(raw_seen):
             raise ValueError("nonconsecutive discovery totals")
         known_sources = set()
         for catalog in catalogs:
@@ -109,12 +110,15 @@ def validate_discovery_chain(registry: dict, named_documents: list[tuple[str, di
         for row in candidates:
             if not isinstance(row, dict):
                 raise ValueError("invalid candidate")
-            url = canonical_source_url(row["url"])
-            if url != row["url"] or url in existing:
-                raise ValueError("duplicate, noncanonical or baseline URL")
+            raw_url = row["url"]
+            url = canonical_source_url(raw_url)
+            if raw_url in raw_seen:
+                raise ValueError("duplicate raw discovery link")
+            # Historical supplements hashed raw links, including URL fragments and
+            # bare hostnames. Preserve those IDs as evidence, never as queue IDs.
+            if row.get("source_id") != "source-" + sha256(raw_url.encode("utf-8")).hexdigest():
+                raise ValueError("raw discovery ID does not bind recorded URL")
             sid = "source-" + sha256(url.encode("utf-8")).hexdigest()
-            if row.get("source_id") != sid:
-                raise ValueError("source ID does not bind URL")
             if (row.get("availability") != "not_checked"
                     or row.get("rights") != "not_assessed"
                     or row.get("independence") != "not_assessed"
@@ -144,20 +148,22 @@ def validate_discovery_chain(registry: dict, named_documents: list[tuple[str, di
                                           if c.get("url") == key[0] and c.get("git_blob_sha") == key[1]))
             if len(repositories) > 32:
                 raise ValueError("too many claimed discoveries per URL")
-            collected[url] = {"source_id": sid, "url": url,
-                              "host": urlsplit(url).hostname,
-                              "kind": "video_candidate" if urlsplit(url).hostname in
-                                  {"www.youtube.com", "youtube.com", "youtu.be", "vimeo.com", "www.vimeo.com"}
-                                  else "web_candidate",
-                              "availability": "not_checked", "rights": "not_assessed",
-                              "independence": "not_assessed", "training_authorized": False,
-                              "discoveries": [],
-                              "provisional_discovery": True}
+            if url not in existing:
+                collected[url] = {"source_id": sid, "url": url,
+                                  "host": urlsplit(url).hostname,
+                                  "kind": "video_candidate" if urlsplit(url).hostname in
+                                      {"www.youtube.com", "youtube.com", "youtu.be", "vimeo.com", "www.vimeo.com"}
+                                      else "web_candidate",
+                                  "availability": "not_checked", "rights": "not_assessed",
+                                  "independence": "not_assessed", "training_authorized": False,
+                                  "discoveries": [], "provisional_discovery": True}
+            raw_seen.add(raw_url)
             existing.add(url)
-        if counts.get("provisional_total_urls") != len(existing):
-            raise ValueError("provisional total inconsistent with distinct URLs")
+        if counts.get("provisional_total_urls") != baseline_size + len(raw_seen):
+            raise ValueError("raw provisional total differs from recorded link count")
         seen_paths.append(name)
     return {"baseline": baseline_size, "new": len(collected),
+            "raw_new": len(raw_seen), "raw_total_discovered": baseline_size + len(raw_seen),
             "total_discovered": len(existing), "sources": collected}
 
 
