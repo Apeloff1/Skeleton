@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { workbenchStore } from './store';
 import {
-  ChatTaskPlan, commitChatTasks, extractChatTaskTitles,
+  commitChatTasks, extractChatTaskTitles,
   prepareChatTasks, undoChatTasks,
 } from './chatTaskActions';
+import type { ChatTaskPlan } from './chatTaskActions';
 import { Action, Editor, palette, styles } from './ui';
 
 /** Workbench tasks are only applied on explicit user confirmation. */
@@ -23,6 +24,8 @@ export default function ChatTaskActions({
   const [error, setError] = useState('');
   const [working, setWorking] = useState(false);
   const [appliedRevision, setAppliedRevision] = useState<number | null>(null);
+  const [included, setIncluded] = useState<number[]>([]);
+  const [titles, setTitles] = useState<Record<number, string>>({});
 
   if (!extractChatTaskTitles(text).length) return null;
 
@@ -36,6 +39,8 @@ export default function ChatTaskActions({
         messageId,
       );
       setPlan(next);
+      setIncluded(next.steps.map(step => step.ordinal));
+      setTitles({});
       setError('');
     } catch (failure) {
       setPlan(null);
@@ -66,10 +71,17 @@ export default function ChatTaskActions({
   };
 
   const apply = async () => {
-    if (!plan || working) return;
+    if (!plan || !included.length || working) return;
+    const reviewed = {
+      ...plan,
+      steps: plan.steps.filter(step => included.includes(step.ordinal)).map(step => ({
+        ...step,
+        title: titles[step.ordinal] ?? step.title,
+      })),
+    };
     setWorking(true);
     try {
-      const outcome = await commitChatTasks(workbenchStore, plan);
+      const outcome = await commitChatTasks(workbenchStore, reviewed);
       if (outcome.status === 'saved') {
         setAppliedRevision(outcome.revision);
         setPlan(null);
@@ -115,7 +127,7 @@ export default function ChatTaskActions({
         footer={
           <View style={{ gap: 8 }}>
             <Action icon="checkmark-circle-outline" label="Add reviewed tasks to Workbench"
-              onPress={() => { void apply(); }} disabled={!plan || working} />
+              onPress={() => { void apply(); }} disabled={!plan || !included.length || working} />
             <Action icon="close-outline" label="Cancel without changes"
               onPress={() => setOpen(false)} disabled={working} />
           </View>
@@ -134,7 +146,7 @@ export default function ChatTaskActions({
           ))}
         </View>
         {plan && <Text style={[styles.label, { marginTop: 12 }]}>
-          {plan.steps.length} task(s) to create in {plan.projectTitle}
+          {included.length} selected of {plan.steps.length} task(s) in {plan.projectTitle}
         </Text>}
         {plan?.steps.map(step => (
           <View key={step.ordinal} style={{
@@ -143,11 +155,28 @@ export default function ChatTaskActions({
             borderWidth: 1,
             borderRadius: 9,
             padding: 12,
+            gap: 6,
           }}>
-            <Text style={styles.text}>{step.ordinal}. {step.title}</Text>
-            <Text style={styles.small}>Inbox · normal priority · 0 estimated minutes</Text>
+            <TouchableOpacity accessibilityRole="checkbox"
+              accessibilityLabel={`Include task ${step.ordinal}: ${step.title}`}
+              accessibilityState={{ checked: included.includes(step.ordinal) }}
+              onPress={() => setIncluded(previous => previous.includes(step.ordinal)
+                ? previous.filter(value => value !== step.ordinal)
+                : [...previous, step.ordinal])}
+              disabled={working} style={styles.row}>
+              <Text style={styles.text}>
+                {included.includes(step.ordinal) ? '☑' : '☐'} Include task {step.ordinal}
+              </Text>
+            </TouchableOpacity>
+            <TextInput style={styles.input} editable={!working && included.includes(step.ordinal)}
+              accessibilityLabel={`Edit task ${step.ordinal}`}
+              value={titles[step.ordinal] ?? step.title}
+              onChangeText={value => setTitles(current => ({ ...current, [step.ordinal]: value }))}
+              maxLength={160} />
+            <Text style={styles.small}>Inbox · normal priority · original chat source retained</Text>
           </View>
         ))}
+        {plan && included.length === 0 && <Text style={styles.muted}>Select at least one task to apply.</Text>}
         {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
         <Action icon="open-outline" label="Open Workbench"
           onPress={() => { setOpen(false); router.push('/jeeves-workbench'); }} />
