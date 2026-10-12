@@ -25,6 +25,10 @@ from .advanced_fighting_runtime import (default_layout as fight_layout,
 from .advanced_rhythm_runtime import (default_layout as rhythm_layout,
                                       normalize_layout as validate_rhythm_layout,
                                       RhythmActionError)
+from .advanced_flight_runtime import (
+    default_layout as flight_layout, normalize_layout as validate_flight_layout,
+    FlightActionError,
+)
 from .advanced_rts_runtime import (default_layout as rts_layout,
                                    normalize_layout as validate_rts_layout,
                                    RTSActionError)
@@ -170,6 +174,8 @@ def _default_layout(engine, config, seed):
         return fight_layout(config,seed)
     if engine == "quest_director":
         return quest_layout(config,seed)
+    if engine == "flight":
+        return flight_layout(config,seed)
     raise SceneError("no advanced authored scene available for that engine")
 
 
@@ -180,6 +186,11 @@ def _normalize_layout(engine, config, layout):
         try:
             return validate_quest_layout(config,layout)
         except QuestDirectorError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="flight":
+        try:
+            return validate_flight_layout(config,layout)
+        except FlightActionError as exc:
             raise SceneError(str(exc)) from exc
     if engine=="fighting":
         try:
