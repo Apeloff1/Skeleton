@@ -28,12 +28,12 @@ from skeleton.ai.game_builder.advanced_gameplay_save import (
 
 
 class OriginalEndlessSandboxTests(unittest.TestCase):
-    def test_fifteenth_real_editor_65_controls_and_4096_seeded_chunks(self):
+    def test_fifteenth_real_editor_76_controls_and_4096_seeded_chunks(self):
         self.assertIn("sandbox", ENGINES)
         self.assertEqual(set(ACTION_HELP["sandbox"]),set(ACTIONS))
         self.assertGreater(len(ACTIONS),1000)
         spec=next(s for s in catalog() if s["id"]=="sandbox")
-        self.assertEqual(len(spec["fields"]),65)
+        self.assertEqual(len(spec["fields"]),76)
         self.assertEqual(spec["runtime_maturity"],"advanced_reference_runtime")
         self.assertEqual(spec["progression_floor"],"advanced")
         self.assertEqual(len(generated_chunk(3,4095)),CELLS)
@@ -376,6 +376,140 @@ class OriginalEndlessSandboxTests(unittest.TestCase):
             run_advanced_session("sandbox",actions=["build:house:1","terraform:lake:1"])
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("sandbox",actions=["move:1","move:9","till:9","sow:9","move:1","terraform:lake:9"])
+
+
+    def test_witnesses_generate_and_complete_actual_reforestation_once(self):
+        cfg=make_editor_document("sandbox",{
+            "creative_mode":False,"work_energy":0,"move_energy":0,
+            "witness_radius":2,
+        })["settings"]
+        state=start(cfg,0)
+        source_stock=state["regions"]["0"][1]["wood"]
+        step(state,cfg,"chop:1")
+        self.assertTrue(state["observations"])
+        self.assertEqual(state["observations"][0]["cause"],"chop")
+        self.assertEqual(state["observations"][0]["site"],1)
+        self.assertEqual(state["observations"][0]["witnesses"][0]["id"],0)
+        self.assertEqual(state["quests"][0]["type"],"forest_restoration")
+        self.assertEqual(state["quests"][0]["status"],"open")
+        self.assertEqual(len(state["observations"][0]["digest"]),64)
+        while state["regions"]["0"][1]["wood"]:
+            step(state,cfg,"chop:1")
+        self.assertEqual(state["regions"]["0"][1]["wood"],0)
+        before=state["credits"]
+        fund=state["civic_grant_reserve"]
+        step(state,cfg,"plant_tree:1")
+        self.assertEqual(state["regions"]["0"][1]["sapling"],1)
+        self.assertEqual(state["quests"][0]["status"],"completed")
+        self.assertEqual(state["credits"],before+cfg["quest_reward"])
+        self.assertEqual(state["civic_grant_reserve"],fund-cfg["quest_reward"])
+        self.assertEqual(state["quests"][0]["paid_from_fund"],cfg["quest_reward"])
+        self.assertEqual(state["inventory"]["seed"],6)
+        self.assertEqual(state["inventory"]["water"],11)
+        for _ in range(cfg["sapling_days"]):
+            step(state,cfg,"tick")
+        self.assertEqual(state["regions"]["0"][1]["sapling"],0)
+        self.assertGreaterEqual(state["regions"]["0"][1]["wood"],
+                                cfg["sapling_wood_yield"])
+        step(state,cfg,"chop:1")
+        self.assertEqual(len(state["quests"]),1)
+        self.assertEqual(state["civic_grant_reserve"],fund-cfg["quest_reward"])
+        self.assertEqual(source_stock>0,True)
+
+    def test_unwitnessed_events_never_invent_character_quests(self):
+        cfg=make_editor_document("sandbox",{"settler_count":0})["settings"]
+        state=start(cfg,0)
+        step(state,cfg,"chop:1")
+        step(state,cfg,"ignite:1")
+        self.assertEqual(state["observations"],[])
+        self.assertEqual(state["quests"],[])
+        self.assertEqual(state["civic_grant_reserve"],cfg["civic_grant_reserve"])
+
+    def test_auditory_witness_to_arson_can_open_actual_fire_control_story(self):
+        cfg=make_editor_document("sandbox",{
+            "witness_radius":0,"sound_radius":5,
+            "creative_mode":False,"work_energy":0,
+        })["settings"]
+        state=start(cfg,0)
+        step(state,cfg,"ignite:1")
+        q=state["quests"][0]
+        self.assertEqual(q["type"],"fire_safety")
+        self.assertEqual(state["observations"][0]["witnesses"][0]["perception"],
+                         "heard")
+        self.assertEqual(q["status"],"open")
+        water=state["inventory"]["water"]
+        step(state,cfg,"extinguish:1")
+        self.assertEqual(state["inventory"]["water"],water-cfg["extinguish_water"])
+        self.assertEqual(q["status"],"completed")
+        self.assertEqual(state["regions"]["0"][1]["fire"],0)
+        self.assertEqual(q["paid_from_fund"],cfg["quest_reward"])
+        self.assertEqual(len(state["quests"]),1)
+        with self.assertRaises(SandboxActionError):
+            step(state,cfg,"extinguish:1")
+
+    def test_survival_shortage_triggers_self_reported_relief_quests(self):
+        cfg=make_editor_document("sandbox",{
+           "observation_limit":3,"quest_limit":3,"relief_food":4,
+           "relief_water":4,"donation_amount":3,
+        })["settings"]
+        state=start(cfg,0)
+        for _ in range(3):
+            step(state,cfg,"tick:4")
+        types=[q["type"] for q in state["quests"]]
+        self.assertIn("community_relief",types)
+        q=next(q for q in state["quests"] if q["type"]=="community_relief")
+        self.assertEqual(q["status"],"open")
+        self.assertLessEqual(len(state["observations"]),3)
+        for _ in range(2):step(state,cfg,"donate:food")
+        for _ in range(2):step(state,cfg,"donate:water")
+        self.assertEqual(q["status"],"completed")
+        self.assertEqual(q["paid_from_fund"],cfg["quest_reward"])
+        self.assertGreaterEqual(state["community_food"],cfg["relief_food"])
+        self.assertGreaterEqual(state["community_water"],cfg["relief_water"])
+
+    def test_finite_civic_budget_caps_rewards_without_duplicating_quests(self):
+        cfg=make_editor_document("sandbox",{
+            "quest_reward":90,"civic_grant_reserve":7,
+        })["settings"]
+        state=start(cfg,0)
+        step(state,cfg,"ignite:1")
+        step(state,cfg,"extinguish:1")
+        self.assertEqual(state["civic_grant_reserve"],0)
+        self.assertEqual(state["quests"][0]["paid_from_fund"],7)
+        self.assertEqual(state["credits"],407)
+        step(state,cfg,"ignite:1")
+        step(state,cfg,"extinguish:1")
+        self.assertEqual(len(state["quests"]),1)
+        self.assertEqual(state["credits"],407)
+        self.assertEqual(state["civic_grant_reserve"],0)
+
+    def test_witnessed_public_demolition_requires_actual_rebuilding(self):
+        cfg=make_editor_document("sandbox")["settings"]
+        state=start(cfg,0)
+        step(state,cfg,"build:house:1")
+        step(state,cfg,"demolish:1")
+        quest=state["quests"][0]
+        self.assertEqual(quest["type"],"civic_reconstruction")
+        self.assertEqual(quest["status"],"open")
+        step(state,cfg,"build:house:1")
+        self.assertEqual(quest["status"],"completed")
+        self.assertEqual(state["regions"]["0"][1]["building"],"house")
+
+    def test_witness_evidence_stays_replayable_across_return_to_original_chunk(self):
+        cfg={"observation_limit":2,"quest_limit":2}
+        session=run_advanced_session("sandbox",cfg,
+            ["chop:1","region:next","region:previous","chop:1"])
+        self.assertTrue(verify_advanced_session(session,cfg))
+        self.assertEqual(len(session["state"]["quests"]),1)
+        self.assertEqual(len(session["state"]["observations"]),2)
+        q=session["state"]["quests"][0]
+        self.assertEqual(q["region"],0)
+        self.assertEqual(q["witness_id"],0)
+        self.assertTrue(q["observation_digest"])
+        forged=deepcopy(session)
+        forged["state"]["quests"][0]["paid_from_fund"]=100
+        with self.assertRaises(AdvancedRuntimeError):
+            verify_advanced_session(forged,cfg)
 
     def test_reference_cli_is_offline_non_native_and_no_malicious_action(self):
         from skeleton.ai.game_builder.system_editor_cli import main
