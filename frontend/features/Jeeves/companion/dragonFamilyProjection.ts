@@ -26,10 +26,30 @@ export interface DragonIdleFamilyProjection {
    last_changes:number;unchanged:number;earliest_due_at:string|null;
  }>>;
 }
+export interface DragonGleanProjection {
+ schema:'skeleton.ai.dragon.glean.v1';
+ insights:number;stale_observations:number;
+ total_active_observations:number;lenses_used:number;
+ counts:{contested:number;wiki_candidate:number;needs_independent_sources:number};
+ read_only:true;
+ promotion:string;
+ updated_at:string|null;
+ cells:readonly {
+   lens:string;proposition_digest:string;
+   status:'contested'|'wiki_candidate'|'needs_independent_sources';
+   source_count:number;support_sources:number;challenge_sources:number;
+   support_groups:number;challenge_groups:number;
+   modalities:readonly ('article'|'video')[];
+   latest_at:string;exemplar:string;
+   priority:'investigate_disagreement'|'independent_wiki_review'|'seek_separate_source';
+   evidence_fingerprint:string;
+ }[];
+}
 export interface DragonFamilyProjection {
   schema:'skeleton.ai.dragon.family.v1';
   almanakk?:DragonAlmanakkProjection;
   idle_work?:DragonIdleFamilyProjection;
+  glean?:DragonGleanProjection;
   parent:{stage:'egg'|'hatchling'|'juvenile'|'adolescent'|'winged'|'adult';
     consumed:number;source_total:number;complete:boolean;laid_at:string|null};
   inventory_sealed:boolean;
@@ -109,6 +129,31 @@ export function validateDragonFamily(input:unknown):DragonFamilyProjection|null 
          !count(item.last_changes)||!count(item.unchanged)||
          !(item.earliest_due_at===null||utc(item.earliest_due_at))))return null;
     }
+  }
+  if(f.glean!==undefined){
+    const g=f.glean;
+    if(!g||g.schema!=='skeleton.ai.dragon.glean.v1'||g.read_only!==true||
+      !count(g.insights)||!count(g.stale_observations)||
+      !count(g.total_active_observations)||!count(g.lenses_used)||
+      typeof g.promotion!=='string'||g.promotion.length>180||
+      !(g.updated_at===null||utc(g.updated_at))||
+      !g.counts||!count(g.counts.contested)||!count(g.counts.wiki_candidate)||
+      !count(g.counts.needs_independent_sources)||
+      g.counts.contested+g.counts.wiki_candidate+g.counts.needs_independent_sources!==g.insights||
+      !Array.isArray(g.cells)||g.cells.length>12||
+      !g.cells.every((v)=>v&&typeof v.lens==='string'&&v.lens.length<=40&&
+       HEX.test(v.proposition_digest)&&HEX.test(v.evidence_fingerprint)&&
+       ['contested','wiki_candidate','needs_independent_sources'].includes(v.status)&&
+       count(v.source_count)&&v.source_count>0&&count(v.support_sources)&&
+       count(v.challenge_sources)&&count(v.support_groups)&&count(v.challenge_groups)&&
+       v.support_sources<=v.source_count&&v.challenge_sources<=v.source_count&&
+       v.support_groups<=v.support_sources&&v.challenge_groups<=v.challenge_sources&&
+       Array.isArray(v.modalities)&&v.modalities.length>0&&v.modalities.length<=2&&
+       v.modalities.every((media:unknown)=>media==='article'||media==='video')&&
+       utc(v.latest_at)&&typeof v.exemplar==='string'&&v.exemplar.length<=240&&
+       ['investigate_disagreement','independent_wiki_review','seek_separate_source'].includes(v.priority)&&
+       (v.status!=='contested'||v.challenge_sources>0)&&
+       (v.status!=='wiki_candidate'||v.support_sources>=2&&v.support_groups>=2)))return null;
   }
   if(f.almanakk!==undefined){
     const a=f.almanakk;
