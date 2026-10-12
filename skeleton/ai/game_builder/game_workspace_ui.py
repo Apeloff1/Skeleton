@@ -246,6 +246,59 @@ $("jeeves-app-use-editor").addEventListener("click",async()=>{
  }catch(error){status("Jeeves editor staging rejected: "+error.message);}
 });
 let storyChatSession=null;
+
+let jeevesAppSnapshot=null;
+$("jeeves-app-scan").addEventListener("click",async()=>{
+ try{
+  const result=await api("/api/jeeves-appwide-status");
+  const catalog=await api("/api/jeeves-appwide-catalog");
+  jeevesAppSnapshot=result.snapshot_digest;
+  setOptions("jeeves-app-action",catalog.registered_adapters.map(x=>x.name));
+  $("jeeves-app-report").textContent=JSON.stringify({
+   scanned_regular_files:result.scanned_regular_files,
+   readable_files:result.readable_files,
+   restricted_files:result.restricted_files,
+   skipped_paths:result.skipped_paths,
+   subsystem_counts:result.domains,
+   governed_runtime_adapters:catalog.registered_action_count,
+   every_file_executable:false,
+   independently_verified_release_status:false,
+   inventory_digest:result.snapshot_digest,
+  },null,2);
+  status("Whole-application source inventory scanned; only registered, governed adapters can run.");
+ }catch(error){status("Whole-app inventory failed: "+error.message);}
+});
+$("jeeves-app-search").addEventListener("click",async()=>{
+ try{
+  const result=await api("/api/jeeves-appwide-invoke",{
+   action:"inventory.search",
+   params:{query:$("jeeves-app-query").value.trim(),
+           domain:$("jeeves-app-domain").value||null,
+           limit:50,offset:0,
+           expected_snapshot:jeevesAppSnapshot},
+  });
+  $("jeeves-app-report").textContent=JSON.stringify(result.result,null,2).slice(0,48000);
+  status(result.result.total_matches+" discoverable files; source visibility does not grant arbitrary execution.");
+ }catch(error){status("Jeeves inventory lookup blocked: "+error.message);}
+});
+$("jeeves-app-invoke").addEventListener("click",async()=>{
+ try{
+  const action=$("jeeves-app-action").value;
+  if(!action)throw Error("Scan application first to discover bound action adapters");
+  const params=JSON.parse($("jeeves-app-params").value);
+  if(!params||typeof params!=="object"||Array.isArray(params))
+   throw Error("Provide a typed JSON object for capability parameters");
+  const authorized=$("jeeves-app-approval").checked===true;
+  if((action==="source.propose"||action==="studio.propose"||
+      action==="learning.improvement_proposal")&&!authorized)
+   throw Error("Source changes require deliberate approval before preview");
+  const receipt=await api("/api/jeeves-appwide-invoke",{
+   action,params,operator_authorized:authorized});
+  $("jeeves-app-report").textContent=JSON.stringify(receipt,null,2).slice(0,65000);
+  status("Jeeves "+action+" completed with a typed receipt. No arbitrary code execution or unreviewed app mutation.");
+ }catch(error){status("Jeeves capability invocation blocked: "+error.message);}
+});
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -4133,6 +4186,34 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <label>Natural-language original game design prompt
 <textarea id="user-prompt" rows="4" placeholder="Create a branching escort storyline with eyewitness reactions, alternative endings, NPC memories and cinematic staging..."></textarea></label>
 <button id="plan">Plan affected modules and targets</button>
+<fieldset><legend>Jeeves — complete application capabilities</legend>
+<p><small>Index every discoverable file in the checked-out app, including forges, game builders, crawlers, dragon companion, AI, runtimes, UI editors and internal trees. Read access does not confer program execution or automatic source edits.</small></p>
+<button id="jeeves-app-scan" type="button">Scan all app files and report coverage</button>
+<label>Filter by filename/module<input id="jeeves-app-query" placeholder="forge, dragon, runtime, editor, jeeves..."></label>
+<label>Subsystem<select id="jeeves-app-domain">
+<option value="">All app files</option>
+<option value="forge">Forges</option>
+<option value="crawler">Crawlers and source gathering</option>
+<option value="companion">Dragon companions</option>
+<option value="jeeves">Jeeves and agents</option>
+<option value="editor">Game Studio and UI editors</option>
+<option value="game">Game engines and directors</option>
+<option value="learning">Weights and improvement systems</option>
+<option value="runtime">Internal execution systems</option>
+<option value="frontend">Frontends</option>
+<option value="security">Security and policy</option>
+<option value="build">CI, packaging and builds</option>
+<option value="data">Almanacs and internal data</option>
+<option value="general">Other tracked components</option>
+</select></label>
+<button id="jeeves-app-search" type="button">Search indexed source and resources</button>
+<label>Governed runtime action<select id="jeeves-app-action"></select></label>
+<label>Typed action arguments JSON<textarea id="jeeves-app-params" rows="3" spellcheck="false">{}</textarea></label>
+<label>Explicit approval for a source-change proposal (never automatic commit)
+<input id="jeeves-app-approval" type="checkbox"></label>
+<button id="jeeves-app-invoke" type="button">Invoke reviewed capability</button>
+<pre id="jeeves-app-report" role="status" aria-live="polite"></pre>
+</fieldset>
 <fieldset><legend>Jeeves · Whole-App Capability Cockpit</legend>
 <p><small>Live inventory of installed app families, forges, game editors, Dragon/crawler workers, model and training planes. Source discovery is not execution authority. Only audited local adapters can act; edits create proposals needing explicit human commit. No arbitrary shell, network, AI weight promotion or provider secrets.</small></p>
 <button id="jeeves-app-refresh" type="button">Scan installed app capabilities</button>
