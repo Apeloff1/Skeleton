@@ -304,6 +304,79 @@ class OriginalEndlessSandboxTests(unittest.TestCase):
         self.assertEqual(assembly["advanced_runtime_evidence"][0]["editor"],"sandbox")
         self.assertFalse(assembly["ready_for_release"])
 
+
+    def test_studio_has_playable_persistent_map_and_supervised_terrain_tools(self):
+        from skeleton.ai.game_builder.game_workspace_ui import (
+            render_workspace_html,SCRIPT,
+        )
+        document=render_workspace_html("A"*32).decode("utf-8")
+        for item in ("sandbox-target-cell","sandbox-registered-action",
+                     "selectedSandboxCell","paintSandboxCell",
+                     "Execute verified world operation","terrain_next",
+                     "animal_toggle","tamed_toggle","structure_next",
+                     "credits_plus","settler_toggle","sandbox"):
+            self.assertIn(item,document)
+        self.assertIn("Sandbox source changed. Validate geography",SCRIPT)
+        self.assertIn("state.regions[String(state.region)]",SCRIPT)
+        original=make_advanced_scene("sandbox",seed=7)
+        modified=deepcopy(original)
+        modified["layout"]["tiles"][1]["wood"]+=2
+        with self.assertRaises(SceneError):
+            validate_advanced_scene(modified)
+        rebuilt=make_advanced_scene("sandbox",seed=7,layout=modified["layout"])
+        self.assertNotEqual(original["digest"],rebuilt["digest"])
+        self.assertTrue(verify_advanced_session(
+            run_advanced_session("sandbox",seed=7,scene=rebuilt)))
+
+    def test_wells_and_kilns_have_real_utilities_and_power_budget(self):
+        self.assertRaises(AdvancedRuntimeError,run_advanced_session,
+                          "sandbox",None,["craft:brick"])
+        self.assertRaises(AdvancedRuntimeError,run_advanced_session,
+                          "sandbox",None,["craft:tool"])
+        well=run_advanced_session("sandbox",actions=["build:well:1","tick"])
+        s=well["state"]
+        self.assertEqual(s["regions"]["0"][1]["building"],"well")
+        self.assertGreater(s["community_water"],12-1)
+        initial=default_layout(make_editor_document("sandbox")["settings"],0)
+        self.assertLess(s["regions"]["0"][9]["water"],initial["tiles"][9]["water"])
+        workshop=run_advanced_session("sandbox",
+             {"creative_mode":False},["build:workshop:0","craft:tool"])
+        self.assertEqual(workshop["state"]["inventory"]["tool"],3)
+        self.assertEqual(workshop["state"]["inventory"]["ore"],0)
+
+    def test_real_local_wildlife_and_regrowth_depend_on_policy(self):
+        renewable={"resource_policy":"renewable","regrowth_period":1,
+                   "regrowth_cap":50,"wildlife_birth_period":1,
+                   "wildlife_move_period":1,"wildlife_cap":64}
+        grown=run_advanced_session("sandbox",renewable,["chop:1","tick"])
+        cfg=make_editor_document("sandbox",renewable)["settings"]
+        start_source=default_layout(cfg,0)
+        tile=grown["state"]["regions"]["0"][1]
+        initial=start_source["tiles"][1]["wood"]
+        chopped=min(cfg["harvest_strength"],initial)
+        self.assertEqual(tile["wood"],initial-chopped+1)
+        self.assertGreaterEqual(sum(t["animal"] for t in grown["state"]["regions"]["0"]),
+                                start_source["wildlife_population"])
+        finite=run_advanced_session("sandbox",
+                 {"resource_policy":"finite","regrowth_period":1},
+                 ["chop:1","tick"])
+        self.assertEqual(finite["state"]["regions"]["0"][1]["wood"],
+                         initial-chopped)
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("sandbox",{"wildlife_move_period":0})
+
+    def test_terrain_rewrites_reject_built_tiles_and_noncreative_cheating(self):
+        moved=run_advanced_session("sandbox",actions=["terraform:lake:0"])
+        self.assertEqual(moved["state"]["regions"]["0"][0]["terrain"],"lake")
+        self.assertEqual(moved["state"]["regions"]["0"][0]["water"]>0,True)
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("sandbox",{"creative_mode":False},
+                                 ["terraform:lake:0"])
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("sandbox",actions=["build:house:0","terraform:lake:0"])
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("sandbox",actions=["till:0","sow:0","terraform:lake:0"])
+
     def test_reference_cli_is_offline_non_native_and_no_malicious_action(self):
         from skeleton.ai.game_builder.system_editor_cli import main
         out=io.StringIO()
