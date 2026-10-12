@@ -192,6 +192,63 @@ class DiscoveryFacetIndex:
             "training_authorized": False,
         }
 
+    def audit(self, owner: str, *, authorized: bool, limit: int = 200,
+              after_source: str | None = None) -> dict:
+        """Check index postings against canonical source and raw receipt lineage.
+
+        Stale snapshots are disclosed, but malformed or forged postings are
+        rejected. This is a bounded verification read, not a source refresh or
+        a model-quality benchmark.
+        """
+        _auth(owner, authorized)
+        _integer(limit, "audit page size", 1, 1000)
+        if after_source is not None:
+            _id(after_source, "audit cursor")
+        rows = self.db.execute(
+            """SELECT source,source_digest,receipts_digest,token_digest
+               FROM dragon_discovery_facet_records
+               WHERE owner=? AND source>? ORDER BY source LIMIT ?""",
+            (owner, after_source or "", limit + 1),
+        ).fetchall()
+        stale_sources = []
+        verified = 0
+        for sid, claimed_source, claimed_receipts, claimed_tokens in rows[:limit]:
+            stored = self.db.execute(
+                "SELECT body,digest FROM dragon_almanac_sources WHERE owner=? AND source=?",
+                (owner, sid),
+            ).fetchone()
+            if stored is None:
+                stale_sources.append(sid)
+                continue
+            tokens, current_receipts = self._metadata_tokens(
+                owner, sid, stored[0], stored[1])
+            actual = tuple(t[0] for t in self.db.execute(
+                """SELECT token FROM dragon_discovery_facet_terms
+                   WHERE owner=? AND source=? ORDER BY token""",
+                (owner, sid),
+            ))
+            if actual != tokens and (
+                    claimed_source == stored[1] and
+                    claimed_receipts == current_receipts):
+                raise ValueError("facet postings are inconsistent with current evidence")
+            if (claimed_source != stored[1] or
+                    claimed_receipts != current_receipts or
+                    claimed_tokens != canonical_digest(tokens) or actual != tokens):
+                stale_sources.append(sid)
+            else:
+                verified += 1
+        return {
+            "owner": owner,
+            "audited": min(len(rows), limit),
+            "current": verified,
+            "stale": len(stale_sources),
+            "stale_source_ids": stale_sources,
+            "next_source": rows[limit - 1][0] if len(rows) > limit else None,
+            "independent_content_verified": False,
+            "index_is_advisory": True,
+            "training_authorized": False,
+        }
+
     def health(self, owner: str, *, authorized: bool) -> dict:
         """Counts materialization gaps and source-digest drift, not knowledge truth."""
         _auth(owner, authorized)
