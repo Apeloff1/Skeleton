@@ -142,6 +142,20 @@ class OriginalMarathonDungeonTests(unittest.TestCase):
         self.assertTrue(verify_long_roguelike(empty,cfg))
         self.assertEqual(empty["head_digest"],empty["genesis_digest"])
 
+
+    def test_local_studio_exposes_longrun_replay_without_native_or_file_write_promotion(self):
+        from skeleton.ai.game_builder.game_workspace_ui import (
+            render_workspace_html,SCRIPT,
+        )
+        page=render_workspace_html("A"*32).decode("utf-8")
+        for token in ("roguelike-longrun-actions","roguelike-longrun-submit",
+                      "roguelike-longrun-proof","/api/roguelike-marathon",
+                      "originalRoguelikeLongrunRecord",
+                      "independently_verified","native_executable_certified"):
+            self.assertIn(token,page)
+        self.assertIn("originalRoguelikeLongrunRecord=null",SCRIPT)
+        self.assertIn("Long-run dungeon replayed from original source",SCRIPT)
+
     def test_cli_longrun_supports_trusted_replay_and_separate_save_continuation(self):
         from skeleton.ai.game_builder.system_editor_cli import main
         cfg=self.settings(2);actions=self.route(2)
