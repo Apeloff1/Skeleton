@@ -5680,6 +5680,14 @@ CATALOG = json.loads(r'''[
         "minimum": 1,
         "maximum": 16,
         "options": []
+      },
+      {
+        "key": "testimony_trust_floor",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
       }
     ],
     "preview": null
