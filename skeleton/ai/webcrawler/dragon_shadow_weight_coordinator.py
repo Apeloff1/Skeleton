@@ -155,8 +155,15 @@ def run_shadow_automation(
                 "approved_usefulness_verified", shadow.candidate_id,
             ))
         except (ValueError, PermissionError, LookupError) as exc:
-            # Failure of one candidate must not turn a later candidate into an
-            # implicit approval. Expose a fixed reason, not untrusted text.
+            # A damaged signed registry is not an ordinary weak candidate:
+            # abort the entire pass rather than masking corrupted persistence.
+            if any(marker in str(exc).lower() for marker in (
+                "integrity", "signature", "tamper", "shadow audit",
+                "shadow event history", "signed stage",
+            )):
+                raise
+            # Ordinary per-candidate rejection is isolated and never becomes
+            # a success receipt. Expose only a fixed reason, not raw source text.
             items.append(ShadowAutomationItem(
                 candidate.source_id, candidate.note_id, "deferred",
                 type(exc).__name__.lower(),
