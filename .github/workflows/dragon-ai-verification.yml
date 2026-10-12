@@ -105,6 +105,8 @@ jobs:
             tests/test_game_niche_research.py \
             tests/test_dragon_almanacs.py \
             tests/test_dragon_discovery_mission.py \
+            tests/test_dragon_discovery_admission.py \
+            tests/test_dragon_catalog_expansion.py \
             tests/test_dragon_delivery.py \
             tests/test_dragon_wisdom_pyramid.py \
             tests/test_dragon_wisdom_refresh_bridge.py \
