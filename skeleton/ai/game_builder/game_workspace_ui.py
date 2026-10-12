@@ -1107,6 +1107,52 @@ function drawAdvancedGame(session){
   c.fillStyle="#a4ebca";
   c.fillText("Verified course mechanics: climb · parkour · swing · grapple",12,265);
  }
+ if(editor==="sports"){
+  const ox=14,oy=66,fw=W-181,fh=165;
+  const scale=fw/Math.max(1,state.width);
+  c.fillStyle="#d9f2eb";
+  c.fillText(state.title+" · "+state.mode+" · "+state.weather,12,35);
+  c.fillStyle=state.mode==="racket"?"#31506b":"#255548";
+  c.fillRect(ox,oy,fw,fh);
+  c.strokeStyle="#e0ece3";c.lineWidth=1;
+  c.strokeRect(ox+7,oy+7,fw-14,fh-14);
+  c.beginPath();c.moveTo(ox+fw/2,oy+7);c.lineTo(ox+fw/2,oy+fh-7);c.stroke();
+  for(let i=1;i<3;i++){
+   const yy=oy+fh*i/3;
+   c.strokeStyle="#638c84";c.beginPath();
+   c.moveTo(ox+7,yy);c.lineTo(ox+fw-7,yy);c.stroke();
+  }
+  for(const cell of state.cover){
+   c.fillStyle="#a4a4a0";
+   c.fillRect(ox+cell[0]*scale-4,oy+(cell[1]+0.5)*fh/3-6,8,12);
+  }
+  const player=(p,color,letter)=>{
+   const x=ox+Math.max(0,Math.min(state.width,p[0]))*scale;
+   const y=oy+(p[1]+0.5)*fh/3;
+   c.fillStyle=color;c.beginPath();c.arc(x,y,7,0,Math.PI*2);c.fill();
+   c.fillStyle="#10242a";c.fillText(letter,x-4,y+4);
+  };
+  player(state.home,"#9cf2c7","H");
+  if(state.mode!=="racket")player(state.teammate,"#d7f2a7","T");
+  player(state.away,"#ffc1a4","A");
+  c.fillStyle="#ffffff";const bx=ox+state.ball[0]*scale;
+  const by=oy+(state.ball[1]+0.5)*fh/3;
+  c.beginPath();c.arc(bx,by,3,0,Math.PI*2);c.fill();
+  c.fillStyle="#8feccb";c.fillRect(ox+state.goal_x*scale-2,oy+fh/3,3,fh/3);
+  const tx=W-160;c.fillStyle="#f0eee8";
+  c.fillText("HOME "+state.home_score,tx,62);
+  c.fillText("AWAY "+state.away_score,tx,85);
+  c.fillText("Target "+state.target_score,tx,108);
+  c.fillText("Energy "+state.stamina,tx,131);
+  c.fillText("Ball "+state.owner,tx,154);
+  c.fillText(state.mode==="racket"?"Rally "+state.rally_strokes:
+      "Passes "+state.passes,tx,177);
+  c.fillText(state.mode==="turn_based"?"AP "+state.ap_remaining:
+      "Tempo "+state.tempo,tx,200);
+  c.fillText("Tick "+state.tick+"/"+state.match_limit,tx,223);
+  c.fillStyle="#a7e6cc";
+  c.fillText("Original rule-specific scoring · source-replayed state",12,264);
+ }
  if(state.finished||state.failed){
   c.fillStyle=state.finished?"#a2f5cb":"#ffaba6";
   c.fillText(state.finished?"Completed":"Defeat",W-100,20);
