@@ -55,7 +55,7 @@ def discovery_census(registry: dict, *, top_hosts: int = 25) -> dict:
         raise ValueError("invalid top host count")
     chain = _chain()
     checked = validate_discovery_chain(registry, chain)
-    if checked["raw_total_discovered"] != 15_175 or len(chain) != len(SOURCE_BATCHES):
+    if checked["raw_total_discovered"] != 19_228 or len(chain) != len(SOURCE_BATCHES):
         raise ValueError("census evidence must match full frozen sequence")
 
     raw_by_host = Counter()
