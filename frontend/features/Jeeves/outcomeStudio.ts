@@ -55,7 +55,7 @@ export type PlanCatalog = {
   schema_version: string; branch_id: string; title: string; entry_node: string;
   nodes: {
     id: string; scene: number; act: number; chapter: number;
-    kind: 'dialogue' | 'quest' | 'exploration' | 'combat' | 'world_event';
+    kind: string; // Author draft: the canonical backend validates its allowed enum.
     text: string; speaker: string | null; place: string | null;
     plot_points: { id: string; anchor: string }[];
     options: unknown[];
