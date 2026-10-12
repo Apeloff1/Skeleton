@@ -4,7 +4,7 @@ from __future__ import annotations
 import unittest
 
 from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html
-from skeleton.ai.game_builder.game_workspace_server import GameWorkspaceHandler
+from skeleton.ai.game_builder.game_workspace_server import _StudioHandler
 
 
 class PhysicalNPCLocalStudioTests(unittest.TestCase):
@@ -43,7 +43,7 @@ class PhysicalNPCLocalStudioTests(unittest.TestCase):
         # The API is same-origin and authenticated by the enclosing workspace
         # handler, not by a client-authorized result or an arbitrary source URL.
         import inspect
-        source=inspect.getsource(GameWorkspaceHandler)
+        source=inspect.getsource(_StudioHandler)
         self.assertIn('"/api/advanced-physics-npc-witness"',source)
         self.assertIn('verify_physical_witness_world(',source)
         self.assertIn('"automatic_quest_reward_granted_to_original_game":False',source)
