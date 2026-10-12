@@ -144,6 +144,30 @@ def platform_discovery_matrix(registry: dict, *, samples_per_platform: int = 3,
         seen_unique.add(normalized)
     if len(seen_unique) != validated["total_discovered"]:
         raise ValueError("canonical platform denominator differs from validated chain")
+    # Count each distinct URL once within each generation family. Summing
+    # individual consoles would double-count shared references and exaggerate
+    # discovery coverage for cross-platform libraries.
+    era_sources = defaultdict(set)
+    era_hosts = defaultdict(set)
+    era_members = defaultdict(list)
+    for key, era, _ in PLATFORM_ALIASES:
+        era_sources[era].update(canonical_sets[key])
+        era_hosts[era].update(host_sets[key])
+        era_members[era].append(key)
+    generation_coverage = [
+        {
+            "group": era,
+            "platform_count": len(era_members[era]),
+            "platforms_with_metadata_matches": sum(bool(canonical_sets[k])
+                                                  for k in era_members[era]),
+            "canonical_distinct_candidate_urls": len(era_sources[era]),
+            "distinct_hosts": len(era_hosts[era]),
+            "unmatched_platforms": sorted(
+                k for k in era_members[era] if not canonical_sets[k]),
+            "coverage_is_unreviewed": True,
+        }
+        for era in sorted(era_members)
+    ]
     rows = []
     for key, era, aliases in PLATFORM_ALIASES:
         sources = canonical_sets[key]
@@ -170,6 +194,18 @@ def platform_discovery_matrix(registry: dict, *, samples_per_platform: int = 3,
         "multi_platform_raw_link_mentions": multi_platform_raw,
         "unclassified_raw_link_mentions": unclassified_raw,
         "platforms": rows,
+        "generation_coverage": generation_coverage,
+        "discovery_attention_queue": [
+            item["platform"] for item in sorted(
+                rows,
+                key=lambda item: (
+                    item["canonical_candidate_urls"],
+                    item["distinct_hosts"],
+                    item["platform"],
+                ),
+            )
+        ],
+        "generation_coverage_urls_may_overlap_between_groups": True,
         "source_content_or_hardware_verified": False,
         "metadata_keyword_overlap_is_not_independent_evidence": True,
         "lack_of_metadata_match_is_not_proof_of_no_support": True,
