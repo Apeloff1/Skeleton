@@ -14,6 +14,7 @@ import api from '../../src/utils/apiClient';
 import { WorkspaceController } from './WorkspaceController';
 import MessageContent from './MessageContent';
 import ChatTaskActions from './workbench/ChatTaskActions';
+import ChatSceneActions from './ChatSceneActions';
 import type { ChatHistoryResponse, ChatResponse } from './WorkspaceController';
 import { MAX_CONTEXT, MAX_TEXT, searchConversations } from './workspace';
 import type { Artifact, Attachment, Conversation, Message } from './workspace';
@@ -71,6 +72,9 @@ function MessageCard({ message, controller, busy }: { message: Message; controll
       {!user && message.model && <Text style={s.metadata}>{message.model}{message.tier ? ` · ${message.tier}` : ''}</Text>}
       <MessageContent text={message.text} notify={controller.notify} />
       {!user && message.status === 'complete' && <ChatTaskActions
+        text={message.text} conversationId={controller.active.id}
+        messageId={message.id} notify={controller.notify} />}
+      {!user && message.status === 'complete' && <ChatSceneActions
         text={message.text} conversationId={controller.active.id}
         messageId={message.id} notify={controller.notify} />}
       {message.attachmentName && <Text style={s.metadata}>Attachment · {message.attachmentName}</Text>}
