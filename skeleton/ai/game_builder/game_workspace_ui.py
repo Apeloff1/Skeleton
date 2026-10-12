@@ -1953,6 +1953,105 @@ function renderAdvancedActions(actions){
     }
   });
   target.append(fastRun);target.append(fastOutput);
+  const provenanceTitle=document.createElement("h4");
+  provenanceTitle.textContent="NPC History Index · exact action heads and eyewitness chronology";
+  target.append(provenanceTitle);
+  const indexKind=document.createElement("select");
+  indexKind.id="original-npc-provenance-kind";
+  for(const [kind,name] of [
+    ["all","All source-indexed game facts"],
+    ["action","Actual player commands"],
+    ["gameplay_event","Actual rule-generated source events"],
+    ["physical_move","NPC original single-tile movement"],
+    ["physical_event","Directly observed source-world event"]
+  ]){
+    const option=document.createElement("option");
+    option.value=kind;option.textContent=name;indexKind.append(option);
+  }
+  indexKind.setAttribute("aria-label","Filter indexed original NPC source events");
+  target.append(indexKind);
+  const indexActor=document.createElement("input");
+  indexActor.id="original-npc-history-actor";
+  indexActor.placeholder="Optional exact actor: original_chunk_npc:000";
+  indexActor.setAttribute("aria-label","Optional exact NPC physical source identity");
+  target.append(indexActor);
+  const indexRun=document.createElement("button");
+  indexRun.type="button";
+  indexRun.textContent="Rebuild and verify real multi-world history index";
+  const indexNext=document.createElement("button");
+  indexNext.type="button";
+  indexNext.textContent="Next verified source page";
+  indexNext.disabled=true;
+  const indexOutput=document.createElement("pre");
+  indexOutput.id="original-npc-index-proof";
+  indexOutput.setAttribute("role","status");
+  indexOutput.setAttribute("aria-live","polite");
+  let nextPage=null;
+  let liveQuery=null;
+  async function originalHistoryPage(offset){
+    if(!latestStreamCheckpoint)
+      throw Error("First create verified original world timeline bookmarks");
+    const variants=JSON.parse(fastInput.value);
+    if(!Array.isArray(variants)||!variants.length||variants.length>12)
+      throw Error("Choose one to twelve bounded authentic game histories");
+    const query=liveQuery||{
+      kind:indexKind.value,limit:24,
+      ...(indexActor.value.trim()?{actor_id:indexActor.value.trim()}:{})
+    };
+    const result=await api("/api/indexed-npc-histories",{
+      checkpoint:latestStreamCheckpoint,variants,
+      cursor:Number(cursorSelect.value),query:{...query,offset}
+    });
+    if(!result.verified||result.source_files_mutated||
+       result.record.model_weights_promoted)
+      throw Error("Indexed original gameplay evidence did not reexecute");
+    const checked=await api("/api/indexed-npc-histories-verify",{
+      record:result.record
+    });
+    if(!checked.verified)
+      throw Error("Original historical physical-event trace did not match source");
+    nextPage=result.record.next_offset;
+    indexNext.disabled=nextPage===null;
+    indexOutput.textContent=JSON.stringify({
+      checkpoint_turn:result.record.source_cursor,
+      authoritative_player_world:result.record.source_cursor_head,
+      comparison_to_original_bookmark:result.record.comparisons.map(x=>({
+        name:x.branch,source_head:x.source_head,
+        real_quest_outcomes:x.real_earned_quests,
+        source_metrics:x.metrics,
+        measured_actual_differences:x.delta_from_original_cursor
+      })),
+      original_records_matching_query:result.record.matching_record_count,
+      next_page:result.record.next_offset,
+      real_source_records:result.record.records,
+      real_world_source_hashes_replayed:true,
+      project_mutated:false,core_weights_promoted:false
+    },null,2);
+    status("Original NPC source history index independently rebuilt and verified.");
+  }
+  indexRun.addEventListener("click",async()=>{
+    try{
+      liveQuery={
+        kind:indexKind.value,limit:24,
+        ...(indexActor.value.trim()?{actor_id:indexActor.value.trim()}:{})
+      };
+      nextPage=null;
+      await originalHistoryPage(0);
+    }catch(error){
+      indexOutput.textContent="";indexNext.disabled=true;
+      status("NPC History Index rejected: "+error.message);
+    }
+  });
+  indexNext.addEventListener("click",async()=>{
+    try{
+      if(nextPage===null)throw Error("No further source-linked historical page");
+      await originalHistoryPage(nextPage);
+    }catch(error){
+      indexOutput.textContent="";indexNext.disabled=true;
+      status("NPC History Index page rejected: "+error.message);
+    }
+  });
+  target.append(indexRun);target.append(indexNext);target.append(indexOutput);
   return;
  }
  if(advancedSession?.editor==="economy"){
