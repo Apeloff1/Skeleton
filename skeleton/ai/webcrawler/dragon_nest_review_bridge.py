@@ -79,7 +79,17 @@ class DragonNestReviewBridge:
         elif lane == "article":
             if host in VIDEO_HOSTS:
                 raise ValueError("article hatchling cannot claim a video as an article")
-        elif lane != "updates":
+        elif lane == "updates":
+            # Fresh observation is not proof a source actually changed. Require
+            # a newer *reviewed* canonical revision with changed source bytes.
+            # Publication still needs separate independently attested dating.
+            revisions = self.library.history(owner, source_id, authorized=True)
+            if (len(revisions) < 2
+                    or revisions[-1].revision != hit.revision
+                    or revisions[-1].source_text_digest != hit.source_text_digest
+                    or revisions[-2].source_text_digest == hit.source_text_digest):
+                raise ValueError("updates require a changed reviewed source revision")
+        else:
             raise ValueError("unknown hatchling specialist")
         previous = self.nest.read(owner, authorized=True)
         if previous is None or len(previous.children) != 3:
