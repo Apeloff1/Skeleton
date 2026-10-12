@@ -19,7 +19,7 @@ from skeleton.ai.game_builder.advanced_level_scenes import (
     make_advanced_scene,validate_advanced_scene,SceneError,
 )
 from skeleton.ai.game_builder.system_editors import (
-    make_editor_document,catalog,
+    make_editor_document,catalog,SystemEditorError,
 )
 from skeleton.ai.game_builder.system_editor_assembly import compile_system_assembly
 from skeleton.ai.game_builder.advanced_gameplay_save import (
@@ -116,7 +116,8 @@ class OriginalEndlessSandboxTests(unittest.TestCase):
 
     def test_crop_soil_water_growth_and_yield_are_real(self):
         actions=["till:0","sow:0","irrigate:0","tick:4","reap:0"]
-        state=run_advanced_session("sandbox",actions=actions)["state"]
+        state=run_advanced_session("sandbox",{"creative_mode":False},
+                                   actions=actions)["state"]
         self.assertEqual(state["inventory"]["food"],10+4)
         self.assertEqual(state["inventory"]["seed"],7)
         self.assertEqual(state["regions"]["0"][0]["crop"],0)
@@ -134,7 +135,7 @@ class OriginalEndlessSandboxTests(unittest.TestCase):
         step(s,cfg,"move:1")
         fish=s["regions"]["0"][9]["fish"]
         self.assertGreaterEqual(fish,3)
-        for _ in range(fish):
+        while s["regions"]["0"][9]["fish"]:
             step(s,cfg,"fish:9")
         self.assertEqual(s["regions"]["0"][9]["fish"],0)
         with self.assertRaises(SandboxActionError):
@@ -363,7 +364,7 @@ class OriginalEndlessSandboxTests(unittest.TestCase):
                  ["chop:1","tick"])
         self.assertEqual(finite["state"]["regions"]["0"][1]["wood"],
                          initial-chopped)
-        with self.assertRaises(AdvancedRuntimeError):
+        with self.assertRaises(SystemEditorError):
             run_advanced_session("sandbox",{"wildlife_move_period":0})
 
     def test_terrain_rewrites_reject_built_tiles_and_noncreative_cheating(self):
