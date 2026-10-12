@@ -346,20 +346,17 @@ def materialize_staged_supplements(
             # created the same evidence path during the staging window.
             os.link(tempname, destination.name, src_dir_fd=dirfd,
                     dst_dir_fd=dirfd, follow_symlinks=False)
-            created.append((destination.name, payload))
+            created.append((destination.name, tempname))
         os.fsync(dirfd)
     except Exception:
-        for name, payload in reversed(created):
-            # Never remove a file another process replaced or modified.
+        for name, tempname in reversed(created):
+            # Remove only the destination inode actually hard-linked here.
+            # Never delete a concurrent writer's replacement or a symlink.
             try:
-                stat_now = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
-                if stat_now.st_size != len(payload):
-                    continue
-                fd = os.open(name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
-                             dir_fd=dirfd)
-                with os.fdopen(fd, "rb") as file:
-                    if file.read(len(payload) + 1) == payload:
-                        os.unlink(name, dir_fd=dirfd)
+                ours = os.stat(tempname, dir_fd=dirfd, follow_symlinks=False)
+                live = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
+                if (ours.st_dev, ours.st_ino) == (live.st_dev, live.st_ino):
+                    os.unlink(name, dir_fd=dirfd)
             except OSError:
                 pass
         raise
