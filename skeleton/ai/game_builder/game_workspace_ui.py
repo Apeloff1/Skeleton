@@ -990,6 +990,75 @@ function drawAdvancedGame(session){
   c.fillStyle="#a7dcc6";
   c.fillText("Witness (!) / forensic (F) / rumor (?) differ · original player P",12,256);
  }
+ if(editor==="physics"){
+  const sx=17,sy=44,scale=Math.min(19,282/Math.max(1,state.width-1)),
+       renderHeight=Math.max(2,(state.floor_y)*scale);
+  c.fillStyle="#dbeae5";
+  c.fillText("Original fixed-point bodies · "+(state.depth>1?"3D slices":"2D")+" · frame "+state.frame,12,36);
+  c.fillStyle="#1c4250";c.fillRect(sx,sy,scale*(state.width-1),renderHeight);
+  c.strokeStyle="#3c6670";c.lineWidth=1;
+  for(let x=0;x<state.width;x++){
+   c.beginPath();c.moveTo(sx+x*scale,sy);
+   c.lineTo(sx+x*scale,sy+renderHeight);c.stroke();
+  }
+  for(let y=0;y<=state.floor_y;y++){
+   c.beginPath();c.moveTo(sx,sy+y*scale);
+   c.lineTo(sx+scale*(state.width-1),sy+y*scale);c.stroke();
+  }
+  c.fillStyle="#bba078";
+  c.fillRect(sx,sy+renderHeight,scale*(state.width-1),4);
+  if(state.water_y<=state.floor_y){
+   c.fillStyle="#2d7c9b55";
+   c.fillRect(sx,sy+state.water_y*scale,scale*(state.width-1),
+              Math.max(0,(state.floor_y-state.water_y)*scale));
+  }
+  for(const fixture of state.fixtures){
+   c.fillStyle="#6a777c";
+   const p=fixture.position,h=fixture.half_size;
+   c.fillRect(sx+(p[0]-h[0])/100*scale,sy+(p[1]-h[1])/100*scale,
+              h[0]/50*scale,h[1]/50*scale);
+  }
+  for(const [i,anchor] of state.anchors.entries()){
+   c.fillStyle="#ecce8d";c.fillRect(sx+anchor[0]/100*scale-3,
+              sy+anchor[1]/100*scale-3,6,6);
+  }
+  const goalX=sx+state.goal[0]/100*scale,goalY=sy+state.goal[1]/100*scale;
+  c.strokeStyle="#80d6a1";c.lineWidth=2;c.strokeRect(goalX-7,goalY-7,14,14);
+  if(state.rope){
+   const selected=state.bodies.find(b=>b.id===state.rope.body);
+   if(selected){const end=state.anchors[state.rope.anchor];
+    c.strokeStyle="#ecd6a2";c.beginPath();
+    c.moveTo(sx+end[0]/100*scale,sy+end[1]/100*scale);
+    c.lineTo(sx+selected.position[0]/100*scale,
+             sy+selected.position[1]/100*scale);c.stroke();}
+  }
+  for(const [index,body] of state.bodies.entries()){
+   const bx=sx+body.position[0]/100*scale,
+         by=sy+body.position[1]/100*scale;
+   c.fillStyle=body.broken?"#925969":
+      index===state.selected?"#fff1c5":
+      body.material==="metal"?"#b9c7d8":
+      body.material==="glass"?"#93d6d4":"#a5c68a";
+   c.beginPath();c.arc(bx,by,Math.max(3,body.radius/100*scale),
+                        0,Math.PI*2);c.fill();
+   if(state.depth>1){
+    c.fillStyle="#f1e1ac";c.font="9px monospace";
+    c.fillText(String(body.position[2]/100),bx-5,by-8);}
+  }
+  const tx=Math.min(345,sx+scale*(state.width-1)+12);
+  c.font="11px monospace";c.fillStyle="#d6e5e9";
+  [
+   "Contact: "+state.contacts,
+   "Battery: "+state.battery,
+   "Impulses: "+state.impulses_left,
+   "Motors: "+state.motors_used,
+   "Ropes: "+state.rope_breaks,
+   "Fractures: "+state.fractures,
+   "Selected: "+state.selected,
+   "Goal dwell: "+state.goal_frames,
+   "Max speed: "+state.max_velocity_seen
+  ].forEach((line,i)=>c.fillText(line,tx,54+i*20));
+ }
  if(editor==="flight"){
   const ox=15,trackY=83,trackW=W-188,trackH=154;
   const extent=Math.max(state.runway_end,1);
