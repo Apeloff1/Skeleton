@@ -13,6 +13,7 @@ from .dragon_technical_source_operations import DragonSourceOperations
 from .dragon_source_policy_renewal import DragonSourcePolicyRenewal
 from .dragon_source_refresh_planner import DragonSourceRefreshPlanner
 from .dragon_source_health import DragonSourceHealth
+from .dragon_pilot_budget import DragonPilotBudget
 from .reviewed_knowledge import ReviewedKnowledgeStore
 
 
@@ -23,7 +24,7 @@ def main():
                                                   "capture-census","glean-preview","glean-handoff",
                                                   "operations-inspect","operations-review","operations-ready",
                                                   "policy-renewal-pending","refresh-inspect",
-                                                  "refresh-census","operations-health"))
+                                                  "refresh-census","operations-health","pilot-budget"))
     parser.add_argument("--database",required=True)
     parser.add_argument("--owner",required=True)
     parser.add_argument("--trusted-local-operator",action="store_true")
@@ -66,9 +67,14 @@ def main():
             captures=DragonSourceCaptures(atlas.a)
             if args.command in ("operations-inspect","operations-review",
                                 "operations-ready","policy-renewal-pending",
-                                "refresh-inspect","refresh-census","operations-health"):
+                                "refresh-inspect","refresh-census","operations-health",
+                                "pilot-budget"):
                 operations=DragonSourceOperations(captures)
-                if args.command=="operations-health":
+                if args.command=="pilot-budget":
+                    if args.now is None: parser.error("--now UTC epoch required")
+                    report=DragonPilotBudget(captures).census(
+                        args.owner,now=args.now,authorized=True)
+                elif args.command=="operations-health":
                     if args.now is None: parser.error("--now UTC epoch required")
                     report=DragonSourceHealth(operations).snapshot(
                         args.owner,now=args.now,authorized=True,

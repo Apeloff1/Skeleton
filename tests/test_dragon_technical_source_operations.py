@@ -18,6 +18,12 @@ from skeleton.ai.game_builder.dragon_technical_source_captures import DragonSour
 from skeleton.ai.game_builder.dragon_technical_source_operations import DragonSourceOperations
 from skeleton.ai.game_builder.dragon_worker_stop_authority import DragonWorkerStopAuthority
 from skeleton.ai.game_builder.dragon_source_health import DragonSourceHealth
+from skeleton.ai.game_builder.dragon_pilot_budget import DragonPilotBudget
+from skeleton.ai.game_builder.dragon_external_rights import (
+    DragonExternalRightsVerifier, IndependentRightsAttestation,
+)
+from skeleton.ai.game_builder.contracts import canonical_json
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from skeleton.ai.game_builder.dragon_source_policy_renewal import DragonSourcePolicyRenewal
 from skeleton.ai.game_builder.dragon_source_refresh_planner import DragonSourceRefreshPlanner
 from skeleton.ai.game_builder.dragon_source_permission_authority import DragonSourcePermissionAuthority
@@ -725,6 +731,30 @@ def test_refresh_census_strict_tenant_and_budget(lab):
 
 
 
+
+
+def external_rights_attestation(grant):
+    """A TEST-ONLY independent signing fixture; no private key in app."""
+    issuer=Ed25519PrivateKey.from_private_bytes(b"\x11"*32)
+    att=IndependentRightsAttestation(
+        owner=grant.owner,source_id=grant.source_id,
+        source_url=grant.source_url,
+        grant_digest=grant.digest,policy_receipt=grant.policy_receipt,
+        evidence_digest=grant.evidence_digest,reviewer=grant.reviewer,
+        issuer="independent-rights-review",key_id="fixture-review-key",
+        issued_at=grant.issued_at,expires_at=min(grant.expires_at,grant.issued_at+60),
+        retention_permitted=True,signature_hex="")
+    from dataclasses import replace
+    return replace(att,signature_hex=issuer.sign(
+        canonical_json(att.body()).encode("utf-8")).hex())
+
+
+def independent_rights_verifier():
+    issuer=Ed25519PrivateKey.from_private_bytes(b"\x11"*32)
+    return DragonExternalRightsVerifier(
+        public_key_bytes=issuer.public_key().public_bytes_raw(),
+        issuer="independent-rights-review",key_id="fixture-review-key")
+
 def policy_signer(lab):
     return DragonSourcePermissionAuthority(
         lab[5],key=b"test-only-independent-source-policy-key-32-bytes",
@@ -781,6 +811,7 @@ def invoke_pilot(lab, pilot, grant, fetcher, *, live=True):
         authorized=True,trusted_worker=True,
         live_network_approved=live,
         reference_storage_permitted=True,
+        rights_attestation=external_rights_attestation(grant),
     )
 
 
@@ -832,8 +863,10 @@ def test_revoked_capture_permission_fails_before_any_pilot_network_request(lab):
     schedule(lab)
     signer,grant=real_pilot_grant(lab)
     pilot=DragonResearchPilot(
-        DragonResearchSupervisor(lab[6],lab[3]),signer)
-    preflight=pilot.preview(grant,now=NOW,authorized=True)
+        DragonResearchSupervisor(lab[6],lab[3]),signer,
+        independent_rights_verifier())
+    preflight=pilot.preview(grant,now=NOW,authorized=True,
+                            rights_attestation=external_rights_attestation(grant))
     assert preflight.source_ready and preflight.network_requests==0
     assert not preflight.execution_authorized
     signer.revoke(grant,now=NOW,reason="terms permission withdrawn",
@@ -852,7 +885,8 @@ def test_signed_capture_pilot_stages_real_extracted_evidence_under_grant(lab):
     schedule(lab)
     signer,grant=real_pilot_grant(lab)
     pilot=DragonResearchPilot(
-        DragonResearchSupervisor(lab[6],lab[3]),signer)
+        DragonResearchSupervisor(lab[6],lab[3]),signer,
+        independent_rights_verifier())
     fetcher,visited=offline_pilot_fetcher(lab)
     with pytest.raises(PermissionError,match="permitted live pilot"):
         invoke_pilot(lab,pilot,grant,fetcher,live=False)
@@ -873,7 +907,8 @@ def test_revocation_between_robots_and_article_prevents_capture(lab):
     schedule(lab)
     signer,grant=real_pilot_grant(lab)
     pilot=DragonResearchPilot(
-        DragonResearchSupervisor(lab[6],lab[3]),signer)
+        DragonResearchSupervisor(lab[6],lab[3]),signer,
+        independent_rights_verifier())
     fetcher,visited=offline_pilot_fetcher(
         lab,on_robots=lambda:signer.revoke(
             grant,now=NOW,reason="site owner withdrew reference permission",
@@ -889,7 +924,8 @@ def test_revocation_between_robots_and_article_prevents_capture(lab):
 def test_pilot_cannot_reserve_wrong_or_unready_source(lab):
     signer,grant=real_pilot_grant(lab)
     pilot=DragonResearchPilot(
-        DragonResearchSupervisor(lab[6],lab[3]),signer)
+        DragonResearchSupervisor(lab[6],lab[3]),signer,
+        independent_rights_verifier())
     assert not pilot.preview(grant,now=NOW,authorized=True).source_ready
     fetcher,visited=offline_pilot_fetcher(lab)
     assert invoke_pilot(lab,pilot,grant,fetcher) is None
@@ -964,7 +1000,8 @@ def test_kill_switch_blocks_future_requests_and_preserves_worker_stop(lab):
     schedule(lab)
     signer,grant=real_pilot_grant(lab)
     pilot=DragonResearchPilot(
-        DragonResearchSupervisor(lab[6],lab[3]),signer)
+        DragonResearchSupervisor(lab[6],lab[3]),signer,
+        independent_rights_verifier())
     state=signer.control_state(OWNER,authorized=True)
     def disable_on_robots():
         signer.set_pilot_enabled(
@@ -1137,3 +1174,132 @@ def test_health_detects_corrupt_source_journal_and_invalid_cursor(lab):
         "WHERE owner=? AND source=?",(OWNER,lab[7]))
     with pytest.raises(ValueError,match="integrity"):
         health.snapshot(OWNER,now=NOW,authorized=True)
+
+
+
+def test_pilot_attempt_ledger_counts_failed_attempts_cross_instance(lab):
+    budget=DragonPilotBudget(lab[5],owner_daily_limit=3,host_daily_limit=2)
+    other=DragonPilotBudget(lab[5],owner_daily_limit=3,host_daily_limit=2)
+    grant="b"*64
+    first=budget.reserve(
+        OWNER,lab[7],grant_digest=grant,
+        attempt_id="attempt-1",now=NOW,authorized=True)
+    assert first["consumed"] and not first["network_authorized_by_budget"]
+    with pytest.raises(PermissionError,match="already consumed"):
+        other.reserve(OWNER,lab[7],grant_digest=grant,
+            attempt_id="attempt-1",now=NOW,authorized=True)
+    second=other.reserve(OWNER,lab[7],grant_digest=grant,
+        attempt_id="attempt-2",now=NOW+1,authorized=True)
+    assert second["consumed"]
+    with pytest.raises(PermissionError,match="host daily"):
+        budget.reserve(OWNER,lab[7],grant_digest=grant,
+            attempt_id="attempt-3",now=NOW+2,authorized=True)
+    counts=other.census(OWNER,now=NOW+2,authorized=True)
+    assert counts["attempted"]==2 and counts["owner_remaining"]==1
+    assert counts["host_daily_limit"]==2
+    assert counts["no_network_requests"]
+    assert other.census("other-tenant",now=NOW,authorized=True)["attempted"]==0
+    assert budget.census(OWNER,now=NOW+86400,authorized=True)["attempted"]==0
+
+
+def test_pilot_budget_owner_cap_and_tampering_fail_closed(lab):
+    budget=DragonPilotBudget(lab[5],owner_daily_limit=1,host_daily_limit=1)
+    budget.reserve(OWNER,lab[7],grant_digest="c"*64,
+                   attempt_id="bounded-1",now=NOW,authorized=True)
+    with pytest.raises(PermissionError,match="owner daily"):
+        budget.reserve(OWNER,lab[7],grant_digest="c"*64,
+                       attempt_id="bounded-2",now=NOW,authorized=True)
+    with pytest.raises(PermissionError):
+        budget.census(OWNER,now=NOW,authorized=False)
+    lab[0].db.execute(
+        "UPDATE dragon_pilot_attempts_v1 SET digest=? "
+        "WHERE owner=? AND attempt_id=?",("0"*64,OWNER,"bounded-1"))
+    with pytest.raises(ValueError,match="integrity"):
+        budget.census(OWNER,now=NOW,authorized=True)
+    with pytest.raises(ValueError,match="integrity"):
+        budget.reserve(OWNER,lab[7],grant_digest="c"*64,
+                       attempt_id="bounded-3",now=NOW,authorized=True)
+
+
+def test_pilot_budget_default_off_and_source_selection_no_slot_consumption(lab):
+    signer,grant=real_pilot_grant(lab)
+    pilot=DragonResearchPilot(
+        DragonResearchSupervisor(lab[6],lab[3]),signer,
+        independent_rights_verifier())
+    fetcher,network=offline_pilot_fetcher(lab)
+    assert invoke_pilot(lab,pilot,grant,fetcher) is None
+    assert pilot.budget.census(OWNER,now=NOW,authorized=True)["attempted"]==0
+    schedule(lab)
+    result=invoke_pilot(lab,pilot,grant,fetcher)
+    assert result is not None and result.captured
+    assert pilot.budget.census(OWNER,now=NOW,authorized=True)["attempted"]==1
+    assert len(network)==2 and lab[4].active_grants()==()
+
+
+
+def test_external_ed25519_rights_signature_binds_policy_and_grant(lab):
+    signer,grant=real_pilot_grant(lab)
+    verifier=independent_rights_verifier()
+    signed=external_rights_attestation(grant)
+    assert verifier.verify(signed,grant,now=NOW,authorized=True)==signed.digest
+    from dataclasses import replace
+    with pytest.raises(PermissionError,match="scope"):
+        verifier.verify(replace(signed,evidence_digest="f"*64),
+                        grant,now=NOW,authorized=True)
+    with pytest.raises(PermissionError,match="signature"):
+        verifier.verify(replace(signed,signature_hex="0"*128),
+                        grant,now=NOW,authorized=True)
+    another=Ed25519PrivateKey.from_private_bytes(b"\x22"*32)
+    wrong=DragonExternalRightsVerifier(
+        public_key_bytes=another.public_key().public_bytes_raw(),
+        issuer="independent-rights-review",key_id="fixture-review-key")
+    with pytest.raises(PermissionError,match="signature"):
+        wrong.verify(signed,grant,now=NOW,authorized=True)
+    with pytest.raises(PermissionError,match="expiry"):
+        verifier.verify(signed,grant,now=NOW+60,authorized=True)
+
+
+def test_pilot_denies_missing_external_signed_rights_before_any_http(lab):
+    schedule(lab)
+    signer,grant=real_pilot_grant(lab)
+    pilot=DragonResearchPilot(
+        DragonResearchSupervisor(lab[6],lab[3]),signer,
+        independent_rights_verifier())
+    fetcher,visited=offline_pilot_fetcher(lab)
+    invalid=external_rights_attestation(grant)
+    from dataclasses import replace
+    with pytest.raises(PermissionError,match="signature"):
+        pilot.execute(
+            grant,fetcher=fetcher,sample_provider=hardware,
+            consent_provider=consent,
+            idle_since_provider=lambda:T0,at_provider=lambda:T2,
+            clock=lambda:1000.0,sleep=lambda _:None,
+            capture_id="independent-rights-denied",
+            authorized=True,trusted_worker=True,
+            live_network_approved=True,reference_storage_permitted=True,
+            rights_attestation=replace(invalid,signature_hex="0"*128))
+    assert visited==[] and lab[4].active_grants()==()
+    assert pilot.budget.census(OWNER,now=NOW,authorized=True)["attempted"]==0
+
+
+
+def test_foreground_preemption_does_not_consume_attempt_budget(lab):
+    schedule(lab)
+    signer,grant=real_pilot_grant(lab)
+    pilot=DragonResearchPilot(
+        DragonResearchSupervisor(lab[6],lab[3]),signer,
+        independent_rights_verifier())
+    fetcher,visited=offline_pilot_fetcher(lab)
+    result=pilot.execute(
+        grant,fetcher=fetcher,sample_provider=hardware,
+        consent_provider=consent,
+        idle_since_provider=lambda:T2,at_provider=lambda:T2,
+        clock=lambda:1000.0,sleep=lambda _:None,
+        capture_id="foreground-should-not-consume",
+        authorized=True,trusted_worker=True,
+        live_network_approved=True,reference_storage_permitted=True,
+        rights_attestation=external_rights_attestation(grant))
+    assert result is None
+    assert pilot.budget.census(OWNER,now=NOW,authorized=True)["attempted"]==0
+    assert visited==[] and lab[4].active_grants()==()
+    assert lab[6].inspect(OWNER,lab[7],authorized=True)["state"]=="scheduled"
