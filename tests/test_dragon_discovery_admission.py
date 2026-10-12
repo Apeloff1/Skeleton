@@ -12,6 +12,7 @@ from skeleton.ai.game_builder.dragon_discovery_admission import (
     import_supplement_files,
 )
 from skeleton.ai.game_builder.reviewed_knowledge import ReviewedKnowledgeStore
+from skeleton.ai.game_builder.dragon_source_catalog import canonical_source_url
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = ROOT / "skeleton/ai/game_builder/catalogs/dragon_sources_20261010"
@@ -35,8 +36,14 @@ def chain():
 def test_real_supplement_chain_has_distinct_unapproved_counts(baseline, chain):
     snapshot = validate_discovery_chain(baseline, chain)
     assert snapshot["baseline"] == 4405
-    assert snapshot["new"] == 964
-    assert snapshot["total_discovered"] == 5369
+    raw_urls = [row["url"] for _, doc in chain for row in doc["candidates"]]
+    all_canonical = {canonical_source_url(url) for url in raw_urls}
+    baseline_urls = {row["url"] for row in baseline["sources"]}
+    assert len(raw_urls) == snapshot["raw_new"] == 964
+    assert snapshot["raw_total_discovered"] == 5369
+    assert len(all_canonical) < 964  # historical fragment collisions are real
+    assert snapshot["new"] == len(all_canonical - baseline_urls)
+    assert snapshot["total_discovered"] == 4405 + snapshot["new"]
     assert all(row["rights"] == "not_assessed"
                and row["training_authorized"] is False
                and row["provisional_discovery"] is True
@@ -48,15 +55,19 @@ def test_imports_into_owner_scoped_policy_queue_idempotently(tmp_path, baseline,
         a = DragonAlmanacs(store)
         ingress = DragonDiscoveryAdmission(a)
         first = ingress.import_chain("alice", baseline, chain, authorized=True)
-        assert first["new_discovery_sources"] == 964
+        distinct_destinations = len({
+            canonical_source_url(row["url"])
+            for _, doc in chain for row in doc["candidates"]
+        })
+        assert first["new_discovery_sources"] == distinct_destinations
         assert first["new_provenance_receipts"] == 964
-        assert first["new_policy_stage_jobs"] == 964
+        assert first["new_policy_stage_jobs"] == distinct_destinations
         assert first["approved_sources"] == 0
         assert first["training_authorized"] is False
-        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_jobs WHERE owner='alice'").fetchone()[0] == 964
-        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_supplement_receipts WHERE owner='alice'").fetchone()[0] == 964
+        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_jobs WHERE owner='alice'").fetchone()[0] == distinct_destinations
+        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_supplement_receipts_v2 WHERE owner='alice'").fetchone()[0] == 964
         assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_sources WHERE owner='alice'").fetchone()[0] == 964
-        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_members WHERE owner='alice'").fetchone()[0] >= 964
+        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_members WHERE owner='alice'").fetchone()[0] >= distinct_destinations
         assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_jobs WHERE state!='pending'").fetchone()[0] == 0
         second = ingress.import_chain("alice", baseline, chain, authorized=True)
         assert second["new_discovery_sources"] == 0
@@ -88,7 +99,7 @@ def test_forgery_rejected_without_partial_database_write(tmp_path, baseline, cha
                 ingress.import_chain("alice", baseline, docs, authorized=True)
             assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_sources").fetchone()[0] == 0
             assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_jobs").fetchone()[0] == 0
-            assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_supplement_receipts").fetchone()[0] == 0
+            assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_supplement_receipts_v2").fetchone()[0] == 0
 
 
 def test_rejects_nonconsecutive_or_duplicate_chain(baseline, chain):
@@ -109,7 +120,11 @@ def test_real_registry_plus_supplements_remains_unapproved(tmp_path, baseline):
         a = DragonAlmanacs(store)
         assert a.ingest_sources("alice", baseline, authorized=True)["new_sources"] == 4405
         result = import_supplement_files(a, "alice", baseline, BATCHES, authorized=True)
-        assert result["new_discovery_sources"] == 964
-        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_sources WHERE owner='alice'").fetchone()[0] == 5369
-        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_jobs WHERE owner='alice'").fetchone()[0] == 5369
+        assert result["raw_provisional_urls"] == 5369
+        canonical_count = validate_discovery_chain(
+            baseline, [_supplement(path) for path in BATCHES])["total_discovered"]
+        assert result["canonical_discovered_urls"] == canonical_count
+        assert result["new_discovery_sources"] == canonical_count - 4405
+        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_sources WHERE owner='alice'").fetchone()[0] == canonical_count
+        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_jobs WHERE owner='alice'").fetchone()[0] == canonical_count
         assert a.library._rows("alice") == []
