@@ -5688,6 +5688,62 @@ CATALOG = json.loads(r'''[
         "minimum": 0,
         "maximum": 20,
         "options": []
+      },
+      {
+        "key": "npc_autonomy",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "npc_self_interest",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "npc_supplies",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "npc_energy",
+        "kind": "int",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "npc_action_energy_cost",
+        "kind": "int",
+        "default": 1,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "npc_act_interval",
+        "kind": "int",
+        "default": 10,
+        "minimum": 1,
+        "maximum": 64,
+        "options": []
+      },
+      {
+        "key": "npc_action_budget",
+        "kind": "int",
+        "default": 8,
+        "minimum": 0,
+        "maximum": 64,
+        "options": []
       }
     ],
     "preview": null
