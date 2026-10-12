@@ -720,6 +720,41 @@ function drawAdvancedGame(session){
   c.fillText("Score "+state.score+" · extracted "+state.extracted,253,203);
   c.fillText("No player-issued teleport or hidden native execution.",15,247);
  }
+ if(editor==="metroidvania"){
+  const rooms=state.rooms,region=state.region;
+  const n=rooms.length,ox=14,oy=37;
+  const xy=i=>[ox+(i%6)*48,oy+Math.floor(i/6)*43];
+  c.strokeStyle="#637f90";c.lineWidth=2;
+  for(const p of state.passages){
+   const [x,y]=xy(p.a),[xx,yy]=xy(p.b);
+   c.strokeStyle=p.gate&&!state.abilities.includes(p.gate)?"#cb8978":"#73b1a2";
+   c.beginPath();c.moveTo(x+19,y+14);c.lineTo(xx+19,yy+14);c.stroke();
+  }
+  for(const r of rooms){
+   const [x,y]=xy(r.id);
+   c.fillStyle=r.id===region?"#e0c67c":r.visited?"#4ea989":"#29495c";
+   c.fillRect(x,y,38,29);
+   c.fillStyle=r.id===region?"#112935":"#edf7f3";
+   c.fillText(String(r.id),x+5,y+14);
+   if(r.ability&&!r.claimed){
+    c.fillStyle="#a8d8f5";c.fillText("*",x+22,y+14);
+   }
+   if(r.foe>0){c.fillStyle="#f29c93";c.fillRect(x+4,y+21,25,3);}
+  }
+  const room=rooms[region];
+  c.fillStyle="#e1ebe7";
+  c.fillText("World "+rooms.length+" rooms · in "+room.biome+
+    " / "+region,313,43);
+  c.fillText("HP "+state.health+" · stamina "+state.stamina,313,69);
+  c.fillText("Enemy "+room.foe+" · boss "+state.guardian_hp,313,95);
+  c.fillText("Abilities "+state.abilities.join(",").slice(0,17),313,120);
+  c.fillText("Shards "+state.shards+" · tonics "+state.tonics,313,145);
+  c.fillText("Explored "+state.visited.length+"/"+rooms.length,313,170);
+  c.fillText("Secrets "+state.secrets_found+
+    " · breaks "+state.sequence_breaks,313,195);
+  c.fillText(state.boss_defeated?"Guardian defeated; world persists":
+   "Route locks demand earned abilities",12,236);
+ }
  if(state.finished||state.failed){
   c.fillStyle=state.finished?"#a2f5cb":"#ffaba6";
   c.fillText(state.finished?"Completed":"Defeat",W-100,20);
@@ -740,6 +775,47 @@ document.addEventListener("keydown",event=>{
 let selectedCityParcel=0;
 function renderAdvancedActions(actions){
  const target=$("advanced-actions");target.replaceChildren();
+ if(advancedSession?.editor==="metroidvania"){
+  const choose=document.createElement("label");
+  choose.textContent="Connected region / traversal target";
+  const region=document.createElement("select");
+  region.id="exploration-target-region";
+  for(const r of advancedSession.state.rooms){
+   const option=document.createElement("option");
+   option.value=String(r.id);
+   option.textContent="Region "+r.id+" · "+r.biome+
+    (r.visited?" · visited":" · unexplored");
+   region.append(option);
+  }
+  choose.append(region);target.append(choose);
+  const group=document.createElement("label");
+  group.textContent="Travel / combat / crafting / realm action";
+  const command=document.createElement("select");
+  command.id="exploration-world-order";
+  const local=["travel","break","fast"];
+  const fill=()=>{
+   const id=region.value;
+   command.replaceChildren();
+   const selected=[...local.map(kind=>kind+":"+id).filter(x=>actions.includes(x)),
+                   ...actions.filter(x=>!x.includes(":"))];
+   for(const action of selected){
+    const opt=document.createElement("option");
+    opt.value=action;opt.textContent=action.replaceAll("_"," ");
+    command.append(opt);
+   }
+  };
+  region.addEventListener("change",fill);
+  fill();group.append(command);target.append(group);
+  const go=document.createElement("button");go.type="button";
+  go.textContent="Execute verified exploration move";
+  go.disabled=Boolean(advancedSession.terminal);
+  go.addEventListener("click",()=>advanceAdvanced(command.value));
+  target.append(go);
+  const hint=document.createElement("small");
+  hint.textContent="Orange links need powers; claim a cleared shrine, revisit rooms or spend stamina on a legal break.";
+  target.append(hint);
+  return;
+ }
  if(advancedSession?.editor==="stealth"){
   const group=document.createElement("label");
   group.textContent="Infiltration move / cover / gadget";
@@ -878,6 +954,10 @@ const PAINT_TOOLS={
          "food_plus","food_minus","water_plus","water_minus",
          "biome_next","make_start","threat_up","threat_down",
          "caravan_plus","caravan_minus"],
+ metroidvania:["biome_next","foe_plus","foe_minus",
+              "hazard_up","hazard_down","cache_plus","cache_minus",
+              "ability_next","toggle_anchor","toggle_secret",
+              "set_entry","set_guardian","gate_next","toggle_break"],
  stealth:["walls","shadows","vents","doors","cameras","keycards",
           "intel","patrol_route","spawn","extraction","objective",
           "terminal","erase","lighting_next","alarm_up","alarm_down"],
@@ -928,6 +1008,33 @@ function renderSceneAuthoring(){
   shape=sceneGridShape(source);
  }catch(_){ctx.fillText("Invalid or mismatched scene JSON: use Validate.",12,24);return;}
 
+ if(source.editor==="metroidvania"){
+  const world=source.layout,rooms=world.rooms||[];
+  const coords=i=>[12+(i%6)*56,32+Math.floor(i/6)*47];
+  ctx.fillText("Original connected progression · 6×4 room layout (max 24)",12,18);
+  for(const edge of world.passages){
+   const [x,y]=coords(edge.a),[xx,yy]=coords(edge.b);
+   ctx.strokeStyle=edge.gate?"#d28b72":"#80b9a8";
+   ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x+24,y+19);
+   ctx.lineTo(xx+24,yy+19);ctx.stroke();
+  }
+  for(const r of rooms){
+   const [x,y]=coords(r.id);
+   ctx.fillStyle=r.id===world.entry?"#2c8069":
+    r.id===world.guardian?"#96474e":"#284e63";
+   ctx.fillRect(x,y,49,42);
+   ctx.fillStyle="#eef5df";ctx.fillText(String(r.id)+
+    (r.ability?"*":"")+(r.anchor?" A":""),x+4,y+16);
+   ctx.fillStyle="#c5e3e1";
+   ctx.fillText(r.biome.slice(0,5),x+4,y+30);
+  }
+  ctx.fillStyle="#ccdfdf";
+  ctx.fillText("Green = entry · red = boss · * = relic · A = fast shrine",355,57);
+  ctx.fillText("Red links require a real collected traversal relic",355,84);
+  ctx.fillText("Paint rooms; amend portal gate requirements only after review",355,111);
+  ctx.fillText("No imported maps, scripts or unverifiable assets",355,137);
+  return;
+ }
  if(source.editor==="stealth"){
   const layout=source.layout;
   const step=23,ox=12,oy=31;
@@ -1040,6 +1147,49 @@ function renderSceneAuthoring(){
  }
 }
 
+function paintExplorationRoom(index){
+ const source=JSON.parse($("advanced-scene-json").value);
+ if(source.editor!=="metroidvania"||systemEditor().id!=="metroidvania")
+  throw Error("Review an original authored world scene first");
+ const world=source.layout,rooms=world.rooms||[],room=rooms[index];
+ if(!room)throw Error("Requested original world room is not in authored graph");
+ const tool=$("advanced-paint-tool").value;
+ const bound=(value,step,low,high)=>Math.max(low,Math.min(high,value+step));
+ if(tool==="biome_next"){
+  const biomes=["moss","ruins","canopy","cavern","water","spire","ash"];
+  room.biome=biomes[(biomes.indexOf(room.biome)+1)%biomes.length];
+ }else if(tool==="foe_plus"||tool==="foe_minus")
+  room.foe=bound(room.foe,tool==="foe_plus"?1:-1,0,1000);
+ else if(tool==="hazard_up"||tool==="hazard_down")
+  room.hazard=bound(room.hazard,tool==="hazard_up"?1:-1,0,20);
+ else if(tool==="cache_plus"||tool==="cache_minus")
+  room.cache=bound(room.cache,tool==="cache_plus"?1:-1,0,100);
+ else if(tool==="ability_next"){
+  const powers=[null,"dash","grapple","phase","swim","resonance"];
+  const next=powers[(powers.indexOf(room.ability)+1)%powers.length];
+  if(next)for(const r of rooms)if(r.id!==room.id&&r.ability===next)r.ability=null;
+  room.ability=next;
+ }else if(tool==="toggle_anchor")
+  room.anchor=!room.anchor;
+ else if(tool==="toggle_secret")
+  room.secret=!room.secret;
+ else if(tool==="set_entry")
+  world.entry=index;
+ else if(tool==="set_guardian")
+  world.guardian=index;
+ else if(tool==="gate_next"||tool==="toggle_break"){
+  const passage=world.passages.find(e=>e.a===index-1&&e.b===index);
+  if(!passage)throw Error("Choose a room with a sequential authored passage");
+  if(tool==="toggle_break")passage.breakable=!passage.breakable;
+  else{
+   const powers=[null,...new Set(rooms.map(r=>r.ability).filter(Boolean))];
+   passage.gate=powers[(powers.indexOf(passage.gate)+1)%powers.length];
+  }
+ }else throw Error("Unsupported original interconnected-world authoring tool");
+ $("advanced-scene-json").value=JSON.stringify(source,null,2);
+ renderSceneAuthoring();
+ status("Original world edited. Validate full graph reachability, ability cycles, budget and digest before playing.");
+}
 function paintStealthCell([x,y]){
  const doc=JSON.parse($("advanced-scene-json").value);
  if(doc.editor!=="stealth"||doc.editor!==systemEditor().id)
@@ -1172,6 +1322,17 @@ $("advanced-scene-grid").addEventListener("click",event=>{
   if(!text)throw Error("Generate a scene document first");
   const doc=JSON.parse(text),shape=sceneGridShape(doc);
   const canvas=$("advanced-scene-grid"),rect=canvas.getBoundingClientRect();
+  if(doc.editor==="metroidvania"){
+   const px=(event.clientX-rect.left)*canvas.width/rect.width;
+   const py=(event.clientY-rect.top)*canvas.height/rect.height;
+   const col=Math.floor((px-12)/56),row=Math.floor((py-32)/47);
+   if(col<0||col>=6||row<0||row>=4||
+      px>12+col*56+49||py>32+row*47+42)return;
+   const index=row*6+col;
+   if(index>=doc.layout.rooms.length)return;
+   paintExplorationRoom(index);
+   return;
+  }
   if(doc.editor==="stealth"){
    const px=(event.clientX-rect.left)*canvas.width/rect.width;
    const py=(event.clientY-rect.top)*canvas.height/rect.height;
