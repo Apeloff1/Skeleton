@@ -31,9 +31,9 @@ def adult():
 
 def knowledge(digest=H1, *, source="library/a", tags=("game-code",),
               published="2026-10-11T00:00:00Z", reviewed=True, lawful=True,
-              observed=T1, confidence=0.95):
+              observed=T1, confidence=0.95, kind="article"):
     return AcquiredKnowledge(source, digest, observed, tags, reviewed, lawful,
-                             confidence, published)
+                             confidence, published, kind)
 
 
 def grow(dragon, lane="article", item=None, **kw):
@@ -118,20 +118,27 @@ def test_article_video_updates_are_isolated_and_adjacent_knowledge_counts():
     assert dragon.children[0].level == 1
     assert dragon.children[1].level == 0
     assert "adjacent-relevant" in dragon.changes[-1].improvement
-    dragon = grow(dragon, "video", knowledge(source="video/v", digest=H2))
-    dragon = grow(dragon, "updates", knowledge(source="upstream/r", digest=H2))
+    dragon = grow(dragon, "video", knowledge(source="video/v", digest=H2, kind="video"))
+    dragon = grow(dragon, "updates", knowledge(source="upstream/r", digest=H2, kind="updates"))
     assert [child.level for child in dragon.children] == [1, 1, 1]
     assert all(child.stage == "hatchling" for child in dragon.children)
     assert verify_change_history(dragon)
 
 
+def test_specialists_refuse_cross_lane_evidence():
+    with pytest.raises(ValueError, match="media kind"):
+        grow(adult(), "video", knowledge(kind="article"))
+    with pytest.raises(ValueError, match="media kind"):
+        grow(adult(), "updates", knowledge(kind="video"))
+
+
 def test_updates_require_dated_recent_revisions():
     with pytest.raises(ValueError):
-        grow(adult(), "updates", knowledge(published=None))
+        grow(adult(), "updates", knowledge(published=None, kind="updates"))
     with pytest.raises(ValueError):
-        grow(adult(), "updates", knowledge(published="2020-01-01T00:00:00Z"))
+        grow(adult(), "updates", knowledge(published="2020-01-01T00:00:00Z", kind="updates"))
     with pytest.raises(ValueError):
-        grow(adult(), "updates", knowledge(published="2026-10-12T15:00:00Z"))
+        grow(adult(), "updates", knowledge(published="2026-10-12T15:00:00Z", kind="updates"))
 
 
 def test_duplicate_evidence_retry_does_not_increase_level_or_history():
