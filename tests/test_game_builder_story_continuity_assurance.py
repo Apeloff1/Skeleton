@@ -77,11 +77,27 @@ def observations(contract,bible,scene, *, extra_items=None, transfers=None):
                          if rule["intent"]==d["intent"])
             } for d in scene["dialogue"] if d["speaker"]==who],
         })
+    dialogue=scene["dialogue"]
+    voice_who=dialogue[0]["speaker"] if dialogue else scene["cast"][0]
+    actor=actor_profiles[voice_who]
+    original_region=next(x for x in bible["regions"] if x["id"]==scene["region"])
+    shots=[{
+        "id":"shot_main","start_ms":0,"duration_ms":6000,
+        "camera":"over_shoulder","cut":"straight","axis":"axis_a",
+        "focus_character":voice_who,
+        "voice_id":actor["voice_id"],"face_id":actor["face_id"],
+        "dialogue_ids":[line["id"] for line in dialogue],
+        "style_id":profile["style_id"],"palette":profile["palette"],
+        "lighting":original_region["lighting"],
+        "sound":"Original lantern wind on approved audio cues.",
+        "director_note":"Hold source-matched face and eye line on authored speech.",
+    }]
     return {"cast":cast,"region":{
                 "id":scene["region"],"style_id":profile["style_id"],
                 "era":profile["era"],"palette":profile["palette"],
                 "architecture":profile["architecture"]},
-            "items":extra_items or [],"transfers":transfers or []}
+            "items":extra_items or [],"transfers":transfers or [],
+            "cinematic_shots":shots}
 
 
 
@@ -198,6 +214,52 @@ class MeticulousProductionContinuityTests(unittest.TestCase):
             else:mutated["region"]["architecture"]="changed city architecture"
             with self.subTest(attack=attack),self.assertRaises(StoryCanonError):
                 seal_production_scene(self.bible,self.contract,[],scene,mutated)
+
+    def test_movie_quality_preflight_rejects_shot_eye_line_and_sound_inconsistency(self):
+        source=chapter_scene(self.bible,1)
+        correct=observations(self.contract,self.bible,source)
+        for defect in ("swapped_voice","swapped_face","wrong_palette",
+                       "missing_dialogue","wrong_speaker","wrong_lighting",
+                       "empty_director_notes","invalid_shot_time","invalid_cut",
+                       "unreviewed_actor"):
+            malformed=deepcopy(correct)
+            frame=malformed["cinematic_shots"][0]
+            if defect=="swapped_voice":frame["voice_id"]="not_the_original_voice"
+            elif defect=="swapped_face":frame["face_id"]="not_the_original_face"
+            elif defect=="wrong_palette":frame["palette"]=["#FFFFFF"]
+            elif defect=="missing_dialogue":frame["dialogue_ids"]=[]
+            elif defect=="wrong_speaker":frame["focus_character"]="boren"
+            elif defect=="wrong_lighting":frame["lighting"]="unapproved noon"
+            elif defect=="empty_director_notes":frame["director_note"]=""
+            elif defect=="invalid_shot_time":frame["start_ms"]=1000
+            elif defect=="invalid_cut":frame["cut"]="teleport_spectator"
+            else:frame["focus_character"]="somebody_new"
+            with self.subTest(defect=defect),self.assertRaises(StoryCanonError):
+                seal_production_scene(self.bible,self.contract,[],source,malformed)
+        proof=seal_production_scene(self.bible,self.contract,[],source,correct)
+        self.assertEqual(
+            proof["assurance"]["observations"]["cinematic_shots"][0]["voice_id"],
+            "voice_original_alina")
+
+    def test_crossed_cinematic_axis_requires_establishing_reorientation(self):
+        from skeleton.ai.game_builder.story_cinematic_review import verify_cinematic_shots
+        source=chapter_scene(self.bible,1)
+        base=observations(self.contract,self.bible,source)["cinematic_shots"][0]
+        establish=deepcopy(base)
+        establish.update(id="establish",camera="establishing",
+                         dialogue_ids=[],duration_ms=1000)
+        conversation=deepcopy(base)
+        conversation.update(id="spoken",start_ms=1000)
+        crossed=deepcopy(conversation)
+        crossed["axis"]="axis_b"
+        with self.assertRaises(StoryCanonError):
+            verify_cinematic_shots(self.bible,self.contract,source,
+                                   [establish,conversation,crossed])
+        conversation["axis"]="axis_b"
+        proof=verify_cinematic_shots(self.bible,self.contract,source,
+                                     [establish,conversation])
+        self.assertEqual(proof["spoken_lines_verified"],1)
+        self.assertFalse(proof["movie_quality_render_certified"])
 
     def test_actual_historical_item_transfer_is_backlinked_to_story_event(self):
         contract=original_contract(self.bible,with_item=True)
