@@ -366,16 +366,16 @@ class OriginalEndlessSandboxTests(unittest.TestCase):
             run_advanced_session("sandbox",{"wildlife_move_period":0})
 
     def test_terrain_rewrites_reject_built_tiles_and_noncreative_cheating(self):
-        moved=run_advanced_session("sandbox",actions=["terraform:lake:0"])
-        self.assertEqual(moved["state"]["regions"]["0"][0]["terrain"],"lake")
-        self.assertEqual(moved["state"]["regions"]["0"][0]["water"]>0,True)
+        moved=run_advanced_session("sandbox",actions=["terraform:lake:1"])
+        self.assertEqual(moved["state"]["regions"]["0"][1]["terrain"],"lake")
+        self.assertEqual(moved["state"]["regions"]["0"][1]["water"]>0,True)
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("sandbox",{"creative_mode":False},
-                                 ["terraform:lake:0"])
+                                 ["terraform:lake:1"])
         with self.assertRaises(AdvancedRuntimeError):
-            run_advanced_session("sandbox",actions=["build:house:0","terraform:lake:0"])
+            run_advanced_session("sandbox",actions=["build:house:1","terraform:lake:1"])
         with self.assertRaises(AdvancedRuntimeError):
-            run_advanced_session("sandbox",actions=["till:0","sow:0","terraform:lake:0"])
+            run_advanced_session("sandbox",actions=["move:1","till:1","sow:1","terraform:lake:1"])
 
     def test_reference_cli_is_offline_non_native_and_no_malicious_action(self):
         from skeleton.ai.game_builder.system_editor_cli import main
