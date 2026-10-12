@@ -244,10 +244,10 @@ class OriginalColonyNativeSourceTests(unittest.TestCase):
              [settings[name] for name in family],authorized=True,scenes=scenes)
         self.assertEqual({x["editor"] for x in result["advanced_runtime_evidence"]},
                          set(family))
-        self.assertEqual({x["editor"] for x in result["scene_evidence"]},
+        self.assertEqual({x["editor"] for x in result["authored_scene_evidence"]},
                          set(family))
         self.assertTrue(all(len(x["gameplay_session_digest"])==64
-                            for x in result["scene_evidence"]))
+                            for x in result["authored_scene_evidence"]))
 
     def test_visual_colony_district_editor_is_supervised_and_source_bound(self):
         from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html, SCRIPT
