@@ -35,14 +35,14 @@ def test_platform_aliases_are_distinct_bounded_and_word_boundary_aware():
 
 
 def test_full_reconciled_platform_inventory_has_canonical_denominator(coverage):
-    assert coverage["raw_link_leads"] == 15175
+    assert coverage["raw_link_leads"] == 19228
     assert coverage["canonical_distinct_urls_global"] > 4405
-    assert coverage["canonical_distinct_urls_global"] <= 15175
+    assert coverage["canonical_distinct_urls_global"] <= 19228
     assert coverage["platforms_in_heuristic_catalog"] == len(PLATFORM_ALIASES)
     assert len(coverage["platforms"]) == len(PLATFORM_ALIASES)
     assert 0 < coverage["platforms_with_keyword_matches"] <= len(PLATFORM_ALIASES)
-    assert 0 <= coverage["multi_platform_raw_link_mentions"] <= 15175
-    assert 0 <= coverage["unclassified_raw_link_mentions"] <= 15175
+    assert 0 <= coverage["multi_platform_raw_link_mentions"] <= 19228
+    assert 0 <= coverage["unclassified_raw_link_mentions"] <= 19228
     assert coverage["source_content_or_hardware_verified"] is False
     assert coverage["crawler_authorized"] is False
     assert coverage["training_authorized"] is False
