@@ -125,6 +125,40 @@ def test_cross_media_contradiction_triggers_research_instead_of_promotion():
     db.close()
 
 
+def test_logic_matrix_routes_disagreement_to_scrutiny_without_fetching():
+    db,_,matrix=setup()
+    record_corroborated(matrix)
+    wiki=matrix.research_briefs(OWNER,authorized=True)
+    assert wiki[0]["action"]=="request_independent_wiki"
+    assert wiki[0]["required_specialists"]==[]
+    assert wiki[0]["human_review_required"]
+    assert not wiki[0]["permits_network"]
+    assert "BUT" in wiki[0]["condition"]
+    matrix.record(OWNER,finding("gamma",anchor=ANCHORS[2],
+        group="video-lab",stance="challenges"),authorized=True)
+    disputed=matrix.research_briefs(OWNER,authorized=True)
+    assert disputed[0]["action"]=="revisit_conflicting_sources"
+    assert disputed[0]["priority"]==0
+    assert "monitor" in disputed[0]["required_specialists"]
+    assert disputed[0]["source_count"]==3
+    assert "BUT" in disputed[0]["condition"]
+    assert not disputed[0]["permits_weight_promotion"]
+    with pytest.raises(PermissionError):
+        matrix.research_briefs(OWNER,authorized=False)
+    db.close()
+
+
+def test_sparse_glimpse_routes_to_separate_sources_not_model_promotion():
+    db,_,matrix=setup()
+    matrix.record(OWNER,finding(),authorized=True)
+    item=matrix.research_briefs(OWNER,authorized=True)[0]
+    assert item["action"]=="find_independent_corroboration"
+    assert set(item["required_specialists"])=={"article","video"}
+    assert item["source_ids"]==["alpha"]
+    assert not item["permits_network"] and not item["permits_weight_promotion"]
+    db.close()
+
+
 def test_revoked_source_review_disappears_from_live_inferences():
     db,family,matrix=setup()
     record_corroborated(matrix)
