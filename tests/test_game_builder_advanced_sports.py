@@ -226,6 +226,22 @@ class OriginalSportsRulesTests(unittest.TestCase):
         self.assertEqual(victory["state"]["ap_remaining"],1)
         self.assertTrue(verify_advanced_session(victory,settings))
 
+    def test_authored_match_clock_records_draw_and_full_period_lifecycle(self):
+        settings={"match_minutes":80,"match_turn_limit":20,"opponent_speed":1}
+        timeline=run_advanced_session("sports",settings,["inspect"]*20)
+        self.assertTrue(timeline["state"]["finished"])
+        self.assertFalse(timeline["state"]["victory"])
+        self.assertTrue(timeline["state"]["draw"])
+        self.assertEqual(timeline["state"]["winner"],"draw")
+        self.assertEqual(timeline["state"]["elapsed_minutes"],80)
+        self.assertEqual(timeline["state"]["period"],4)
+        self.assertEqual(timeline["state"]["tick"],20)
+        self.assertTrue(verify_advanced_session(timeline,settings))
+        first=run_advanced_session("sports",settings,["inspect"]*5)
+        self.assertEqual(first["state"]["elapsed_minutes"],20)
+        self.assertEqual(first["state"]["period"],2)
+        self.assertFalse(first["state"]["finished"])
+
     def test_fail_closed_cross_rules_and_impossible_team_rosters(self):
         for params in (
             {"rules":"racket"},
