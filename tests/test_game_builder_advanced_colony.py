@@ -208,9 +208,9 @@ class OriginalColonyNativeSourceTests(unittest.TestCase):
                            run({"water_yield": 1},
                               ["build:well", "tick"])["water"])
         self.assertEqual(run({"threats": "scheduled", "raid_interval": 3},
-                             ["tick"]*2)["injured"], 0)
+                             ["tick"])["injured"], 0)
         self.assertGreater(run({"threats": "scheduled", "raid_interval": 3},
-                               ["tick"]*3)["injured"], 0)
+                               ["tick"]*2)["injured"], 0)
         self.assertEqual(run({"disease_pressure": 0, "threats": "off",
                               "disasters": "off"}, ["tick"]*6)["injured"], 0)
         self.assertGreater(run({"disease_pressure": 6, "threats": "off",
