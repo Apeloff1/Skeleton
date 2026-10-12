@@ -9,8 +9,10 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from hashlib import sha256
-import json
 import re
+from urllib.parse import urlsplit
+
+from .dragon_nest_review_bridge import VIDEO_HOSTS
 
 from skeleton.ai.game_builder.contracts import canonical_digest
 from skeleton.ai.game_builder.reviewed_knowledge import (
@@ -243,6 +245,16 @@ def _find_acquisition(library: ReviewedKnowledgeStore, owner: str,
     if (note["stance"] != "supports" or note["confidence_ppm"] < 800000
             or _instant(source["observed_at"]) > _instant(acquisition.observed_at)):
         raise ValueError("hatchling evidence lacks current high-confidence review")
+    host = (urlsplit(source["source_url"]).hostname or "").lower()
+    if ((acquisition.lane == "video" and host not in VIDEO_HOSTS)
+            or (acquisition.lane == "article" and host in VIDEO_HOSTS)):
+        raise ValueError("hatchling evidence media does not match specialist")
+    if acquisition.lane == "updates":
+        revisions = library.history(owner, acquisition.source_id, authorized=True)
+        if (len(revisions) < 2
+                or revisions[-1].source_text_digest != acquisition.source_text_digest
+                or revisions[-2].source_text_digest == acquisition.source_text_digest):
+            raise ValueError("update subtext requires a changed reviewed source revision")
     # Search yields canonical KnowledgeHit values and checks the current owner
     # rights policy. No raw crawler text is accepted as new facts.
     candidates = library.search(
@@ -312,8 +324,9 @@ def glean_mother_insights(
             for source, digest, observed in evidence
         ):
             raise ValueError("mother acquisition does not appear in the hatchling's lineage")
-        if _instant(acq.observed_at) > now:
-            raise ValueError("future hatchling observation")
+        if (_instant(acq.observed_at) > now
+                or (now - _instant(acq.observed_at)).total_seconds() > 90 * 86400):
+            raise ValueError("future or stale hatchling observation")
         witnesses.append((acq, _find_acquisition(library, nest.owner, acq)))
     probes: list[LensProbe] = []
     hypotheses: list[MeaningHypothesis] = []
