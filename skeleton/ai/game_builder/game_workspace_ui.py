@@ -1794,6 +1794,15 @@ function renderAdvancedActions(actions){
         eligible_but_deferred_actor_turns:state.scheduler.eligible_deferred_actor_turns,
         longest_active_detail_deferral:state.scheduler.max_deferral_streak,
         fabricated_offscreen_events:state.scheduler.forged_offscreen_events,
+        per_turn_lod_proof:result.record.trace.map(x=>({
+          tick:x.tick,
+          selected_original_ids:x.lod_fidelity.selected_actor_ids,
+          actually_detailed:x.lod_fidelity.actually_detailed,
+          deferred:x.lod_fidelity.deferred,
+          nearby_but_deferred:x.lod_fidelity.eligible_but_deferred,
+          loaded_chunks:x.lod_fidelity.currently_loaded_chunks,
+          source_head:x.digest
+        })),
         actor_positions:state.actors.map(a=>({
           source_id:a.id,position:a.position,
           origin:a.origin_kind,trust:a.trust,home:a.home,work:a.work,
