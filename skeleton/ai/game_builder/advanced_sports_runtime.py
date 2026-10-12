@@ -136,6 +136,8 @@ def start(config,seed):
         "tempo":"balanced","rally":False,"rally_strokes":0,
         "opponent_readiness":config["opponent_skill"],
         "serve_home":True,"match_limit":config["match_turn_limit"],
+        "match_minutes":config["match_minutes"],"elapsed_minutes":0,
+        "period":1,"winner":None,"draw":False,
         "finished":False,"failed":False,"victory":False,
         "score_reason":None,"events":[],
     }
@@ -385,6 +387,15 @@ def step(state,config,action):
     if mode=="turn_based" and action!="end_turn":
         state["ap_remaining"]-=1
     state["tick"]+=1
+    # The existing designer-set match length is now authoritative. Integer
+    # scaled game time is deterministic across Windows/Linux and save replay.
+    state["elapsed_minutes"]=min(
+        state["match_minutes"],
+        state["tick"]*state["match_minutes"]//state["match_limit"]
+    )
+    state["period"]=min(
+        4,1+state["elapsed_minutes"]*4//max(1,state["match_minutes"])
+    )
     if action!="rest":
         state["fatigue"]+=max(1,config["team_size"]//8)
         if state["tempo"]=="press" and action in ("sprint","dash","tackle"):
@@ -405,6 +416,11 @@ def step(state,config,action):
         or state["tick"]>=state["match_limit"]):
         state["finished"]=True
         state["victory"]=state["home_score"]>state["away_score"]
+        state["draw"]=state["home_score"]==state["away_score"]
+        state["winner"]=(
+            "home" if state["victory"] else
+            "away" if state["away_score"]>state["home_score"] else "draw"
+        )
         events.append("match_ended_by_play_or_clock")
     state["events"]=events
     return events
