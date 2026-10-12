@@ -102,7 +102,7 @@ class OriginalTimingStudioTests(unittest.TestCase):
                 run_advanced_session("rhythm",rules,[illegal])
 
     def test_real_one_time_mines_chords_slides_and_hold_releases(self):
-        rules={"beat_count":19,"bpm":120,"starting_health":200}
+        rules={"beat_count":30,"bpm":120,"starting_health":200}
         cfg=make_editor_document("rhythm",rules)["settings"]
         notes=default_layout(cfg,0)["notes"]
         self.assertTrue(any(n["kind"]=="slide" for n in notes))
@@ -153,7 +153,7 @@ class OriginalTimingStudioTests(unittest.TestCase):
         self.assertGreater(s["miss"],0)
 
     def test_trap_mine_avoided_only_after_actual_timing_window_expired(self):
-        rules={"beat_count":8,"bpm":120,"starting_health":200}
+        rules={"beat_count":30,"bpm":120,"starting_health":1000,"fail_mode":"finish_only"}
         cfg=make_editor_document("rhythm",rules)["settings"]
         mine=next(n for n in default_layout(cfg,0)["notes"] if n["kind"]=="mine")
         state=start(cfg,0)
