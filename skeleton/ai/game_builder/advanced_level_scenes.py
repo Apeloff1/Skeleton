@@ -17,6 +17,9 @@ from .advanced_gameplay_runtime import (
 )
 from .system_editors import make_editor_document, SystemEditorError
 from .advanced_genre_engines import STARTS as GENRE_STARTS, CARDS, puzzle_default_layout
+from .advanced_roguelike_runtime import (default_layout as rogue_layout,
+                                         normalize_layout as validate_rogue_layout,
+                                         RoguelikeActionError)
 from .advanced_sandbox_runtime import (default_layout as sandbox_layout,
                                        normalize_layout as validate_sandbox_layout,
                                        SandboxActionError)
@@ -146,12 +149,19 @@ def _default_layout(engine, config, seed):
         return explore_layout(config,seed)
     if engine == "sandbox":
         return sandbox_layout(config,seed)
+    if engine == "roguelike":
+        return rogue_layout(config,seed)
     raise SceneError("no advanced authored scene available for that engine")
 
 
 def _normalize_layout(engine, config, layout):
     if type(layout) is not dict:
         raise SceneError("authored layout must be a JSON object")
+    if engine=="roguelike":
+        try:
+            return validate_rogue_layout(config,layout)
+        except RoguelikeActionError as exc:
+            raise SceneError(str(exc)) from exc
     if engine=="sandbox":
         try:
             return validate_sandbox_layout(config,layout)
