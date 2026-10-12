@@ -494,6 +494,21 @@ export default function ChapterStudioScreen() {
           onChange={setThreadKeys} maxLength={3500} />
         <Field label="Source Jeeves message / creator evidence ID" value={sourceId}
           onChange={setSourceId} maxLength={96} />
+        <Choice label="Narrative stage" value={sceneKind} values={SCENE_KINDS}
+          onChange={value => { setSceneKind(value); setProof(null); }} />
+        <Text style={styles.muted}>
+          Prologue establishes the world; emotional cliffhangers need later payoffs.
+          Surprises need planted clues. Red herrings require explicit disclosure.
+          The climax/finale must precede the epilogue.
+        </Text>
+        <Field label="Emotion, surprise, entertainment and dialogue moments (JSON)"
+          value={storyMomentsJson} onChange={value => { setStoryMomentsJson(value); setProof(null); }}
+          maxLength={12000} multiline
+          hint='[{"kind":"cliffhanger","plot_id":"door_01","intensity":85,"objective":"Make the player fear for the hero","audience_effect":"Sustain anticipation until the payoff"}]' />
+        <Field label="Global plot tapestry: setups, red herrings, surprises and payoffs (JSON)"
+          value={threadBeatsJson} onChange={value => { setThreadBeatsJson(value); setProof(null); }}
+          maxLength={16000} multiline
+          hint='[{"thread_id":"lost_key","role":"setup","plot_id":"key_hint"}] — later scenes use payoff, resolution or false_lead_disclosed with the same thread_id.' />
         <Field label="Scene script — dialogue, actions, camera and interaction"
           value={script} onChange={value => { setScript(value); setProof(null); }}
           maxLength={16000} multiline />
