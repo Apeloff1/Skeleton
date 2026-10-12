@@ -2,8 +2,20 @@
 const HEX = /^[0-9a-f]{64}$/;
 export type DragonFamilyRole = 'article'|'video'|'monitor';
 export type DragonFamilyStage = 'unborn'|'egg'|'hatchling'|'juvenile'|'dragon';
+export interface DragonAlmanakkProjection {
+ schema:'skeleton.ai.dragon.almanakk.v1';
+ architecture:string;
+ counts:{collected:number;wiki_verified:number;shadow_validated:number;weight_handoff:number};
+ items:readonly {source_id:string;dragon:string;stage:'collected'|'wiki_verified'|'shadow_validated'|'weight_handoff';
+    last_acquired_at:string;topics:readonly string[];measured_gain:number|null}[];
+ history:readonly {sequence:number;dragon:string;source_id:string;stage:string;
+    at:string;change:string;event_hash:string}[];
+ policy:string;
+}
+
 export interface DragonFamilyProjection {
   schema:'skeleton.ai.dragon.family.v1';
+  almanakk?:DragonAlmanakkProjection;
   parent:{stage:'egg'|'hatchling'|'juvenile'|'adolescent'|'winged'|'adult';
     consumed:number;source_total:number;complete:boolean;laid_at:string|null};
   inventory_sealed:boolean;
@@ -61,5 +73,29 @@ export function validateDragonFamily(input:unknown):DragonFamilyProjection|null 
     typeof h.change==='string'&&h.change.length<=500&&
     typeof h.digest==='string'&&HEX.test(h.digest)&&
     (i===0||h.sequence<all[i-1].sequence)))return null;
+  if(f.almanakk!==undefined){
+    const a=f.almanakk;
+    if(!a||a.schema!=='skeleton.ai.dragon.almanakk.v1'||
+      typeof a.architecture!=='string'||a.architecture.length>240||
+      typeof a.policy!=='string'||a.policy.length>240||
+      !a.counts||!['collected','wiki_verified','shadow_validated','weight_handoff']
+       .every(k=>count(a.counts[k as keyof typeof a.counts]))||
+      !Array.isArray(a.items)||a.items.length>20||
+      !a.items.every(e=>e&&typeof e.source_id==='string'&&e.source_id.length<=128&&
+       typeof e.dragon==='string'&&e.dragon.length<=25&&
+       ['collected','wiki_verified','shadow_validated','weight_handoff'].includes(e.stage)&&
+       utc(e.last_acquired_at)&&Array.isArray(e.topics)&&e.topics.length<=24&&
+       e.topics.every(t=>typeof t==='string'&&t.length<=64)&&
+       (e.measured_gain===null||(typeof e.measured_gain==='number'&&
+       Number.isFinite(e.measured_gain)&&e.measured_gain>=0&&e.measured_gain<=1)))||
+      !Array.isArray(a.history)||a.history.length>25||
+      !a.history.every((e,i)=>e&&count(e.sequence)&&e.sequence>0&&
+       typeof e.dragon==='string'&&e.dragon.length<=25&&
+       typeof e.source_id==='string'&&e.source_id.length<=128&&
+       typeof e.stage==='string'&&e.stage.length<=32&&
+       utc(e.at)&&typeof e.change==='string'&&e.change.length<=250&&
+       typeof e.event_hash==='string'&&HEX.test(e.event_hash)&&
+       (i===0||e.sequence<a.history[i-1].sequence)))return null;
+  }
   return f as DragonFamilyProjection;
 }
