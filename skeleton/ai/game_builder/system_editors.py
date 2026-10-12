@@ -713,6 +713,574 @@ CATALOG = json.loads(r'''[
           "unlocks",
           "upgrades"
         ]
+      },
+      {
+        "key": "starting_health",
+        "kind": "int",
+        "default": 34,
+        "minimum": 5,
+        "maximum": 200,
+        "options": []
+      },
+      {
+        "key": "starting_stamina",
+        "kind": "int",
+        "default": 9,
+        "minimum": 2,
+        "maximum": 60,
+        "options": []
+      },
+      {
+        "key": "starting_mana",
+        "kind": "int",
+        "default": 7,
+        "minimum": 0,
+        "maximum": 60,
+        "options": []
+      },
+      {
+        "key": "attack_power",
+        "kind": "int",
+        "default": 7,
+        "minimum": 1,
+        "maximum": 60,
+        "options": []
+      },
+      {
+        "key": "armor",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 25,
+        "options": []
+      },
+      {
+        "key": "opening_gold",
+        "kind": "int",
+        "default": 12,
+        "minimum": 0,
+        "maximum": 200,
+        "options": []
+      },
+      {
+        "key": "arrows",
+        "kind": "int",
+        "default": 6,
+        "minimum": 0,
+        "maximum": 50,
+        "options": []
+      },
+      {
+        "key": "potions",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "rations",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "lockpicks",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "potion_healing",
+        "kind": "int",
+        "default": 14,
+        "minimum": 1,
+        "maximum": 80,
+        "options": []
+      },
+      {
+        "key": "wall_density",
+        "kind": "int",
+        "default": 4,
+        "minimum": 2,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "trap_count",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 4,
+        "options": []
+      },
+      {
+        "key": "chest_count",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 4,
+        "options": []
+      },
+      {
+        "key": "trap_damage",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "foe_health",
+        "kind": "int",
+        "default": 10,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "foe_health_growth",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "health_variance",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "foe_attack",
+        "kind": "int",
+        "default": 4,
+        "minimum": 0,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "boss_health",
+        "kind": "int",
+        "default": 32,
+        "minimum": 1,
+        "maximum": 250,
+        "options": []
+      },
+      {
+        "key": "boss_health_growth",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "boss_attack",
+        "kind": "int",
+        "default": 8,
+        "minimum": 1,
+        "maximum": 60,
+        "options": []
+      },
+      {
+        "key": "boss_armor",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "floor_damage_cap",
+        "kind": "int",
+        "default": 8,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "damage_scaling",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "poison_enabled",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "poison_damage",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "poison_duration",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "guard_block",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "revive_relic_cost",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "revival_gold_penalty",
+        "kind": "int",
+        "default": 15,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "enemy_patrol",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "aggro_distance",
+        "kind": "int",
+        "default": 6,
+        "minimum": 0,
+        "maximum": 16,
+        "options": []
+      },
+      {
+        "key": "archer_range",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 5,
+        "options": []
+      },
+      {
+        "key": "dash_cost",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "spell_range",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 5,
+        "options": []
+      },
+      {
+        "key": "spell_cost",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "spell_damage",
+        "kind": "int",
+        "default": 9,
+        "minimum": 1,
+        "maximum": 60,
+        "options": []
+      },
+      {
+        "key": "spell_poison",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "arrow_range",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 5,
+        "options": []
+      },
+      {
+        "key": "arrow_damage",
+        "kind": "int",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 50,
+        "options": []
+      },
+      {
+        "key": "mana_regen",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "food_stamina",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "food_heal",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "chest_gold",
+        "kind": "int",
+        "default": 10,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "chest_relics",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "chest_potions",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 5,
+        "options": []
+      },
+      {
+        "key": "kill_gold",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 40,
+        "options": []
+      },
+      {
+        "key": "boss_gold",
+        "kind": "int",
+        "default": 30,
+        "minimum": 0,
+        "maximum": 200,
+        "options": []
+      },
+      {
+        "key": "kill_xp",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 40,
+        "options": []
+      },
+      {
+        "key": "boss_xp",
+        "kind": "int",
+        "default": 40,
+        "minimum": 0,
+        "maximum": 200,
+        "options": []
+      },
+      {
+        "key": "xp_threshold",
+        "kind": "int",
+        "default": 18,
+        "minimum": 1,
+        "maximum": 200,
+        "options": []
+      },
+      {
+        "key": "level_health_gain",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "level_attack_gain",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "shrine_vitality",
+        "kind": "int",
+        "default": 7,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "shrine_attack",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "shrine_armor",
+        "kind": "int",
+        "default": 1,
+        "minimum": 1,
+        "maximum": 8,
+        "options": []
+      },
+      {
+        "key": "shrine_stamina",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "shrine_gold",
+        "kind": "int",
+        "default": 12,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "potion_price",
+        "kind": "int",
+        "default": 9,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "arrow_price",
+        "kind": "int",
+        "default": 6,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "arrow_bundle",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "weapon_upgrade_price",
+        "kind": "int",
+        "default": 18,
+        "minimum": 1,
+        "maximum": 200,
+        "options": []
+      },
+      {
+        "key": "armor_upgrade_price",
+        "kind": "int",
+        "default": 16,
+        "minimum": 1,
+        "maximum": 200,
+        "options": []
+      },
+      {
+        "key": "weapon_gain",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "armor_gain",
+        "kind": "int",
+        "default": 1,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "rest_health",
+        "kind": "int",
+        "default": 5,
+        "minimum": 0,
+        "maximum": 50,
+        "options": []
+      },
+      {
+        "key": "disarm_stamina",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "search_recovery",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "scout_stamina",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "win_score",
+        "kind": "int",
+        "default": 200,
+        "minimum": 1,
+        "maximum": 1000,
+        "options": []
       }
     ],
     "preview": null
@@ -3484,7 +4052,7 @@ CATALOG = json.loads(r'''[
   }
 ]''')
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
