@@ -58,6 +58,61 @@ class JeevesAllAppCapabilityTests(unittest.TestCase):
         with self.assertRaises(JeevesAppCapabilityError):
             app_atlas(family="studio",limit=999999)
 
+    def test_nested_installed_filetree_is_indexed_without_executing_modules(self):
+        result=self.call("atlas.deep",{
+            "family":"studio","query":None,
+            "offset":0,"limit":80,"max_depth":3})["result"]
+        self.assertGreaterEqual(result["matching_entries"],100)
+        self.assertTrue(all(not x["local_execution_adapter_granted"]
+                            for x in result["entries"]))
+        subset=self.call("atlas.deep",{
+            "family":"studio","query":"story_canon",
+            "offset":0,"limit":20,"max_depth":3})["result"]
+        self.assertTrue(any("story_canon_fabric.py" in x["path"]
+                            for x in subset["entries"]))
+        with self.assertRaises(JeevesAppCapabilityError):
+            self.call("atlas.deep",{
+                "family":"studio","query":"../secrets",
+                "offset":0,"limit":80,"max_depth":3})
+        with self.assertRaises(JeevesAppCapabilityError):
+            self.call("atlas.deep",{
+                "family":"studio","query":None,
+                "offset":0,"limit":80,"max_depth":100})
+
+    def test_real_original_game_builds_are_replay_proved_and_source_only(self):
+        intent={"title":"Original Lantern Investigation",
+                "subtitle":"A new game built from reviewed original intent",
+                "seed":42,"width":9,"height":9,"levels":1,
+                "collectibles_per_level":1,"hazards_per_level":0,
+                "theme":"forest","starting_health":3}
+        self.assertIn("game.compile.original",ACTIONS)
+        with self.assertRaises(PermissionError):
+            self.call("game.compile.original",{"intent":intent})
+        browser=self.call("game.compile.original",{"intent":intent},authorized=True)
+        self.assertTrue(browser["result"]["gameplay_proof_executed"])
+        self.assertEqual(browser["result"]["compiled_source_receipt"]["levels"],1)
+        self.assertTrue(browser["result"]["compiled_source_receipt"]
+                        ["validated_gameplay_proof"])
+        self.assertFalse(browser["result"]["source_exported_to_disk"])
+        self.assertFalse(browser["result"]["consumer_release_certified"])
+        native=self.call("game.compile.native",{"intent":intent},authorized=True)
+        self.assertEqual(native["result"]["browser_html_sha256"],
+                         browser["result"]["browser_html_sha256"])
+        self.assertRegex(native["result"]["native_source_manifest_digest"],
+                         r"^[a-f0-9]{64}$")
+        self.assertFalse(native["result"]["native_godot_executable_executed"])
+        with self.assertRaises(ValueError):
+            self.call("game.compile.original",{"intent":{**intent,"width":8}},
+                      authorized=True)
+        with self.assertRaises(ValueError):
+            self.call("game.compile.original",{"intent":{**intent,"levels":8}},
+                      authorized=True)
+        with self.assertRaises(JeevesAppCapabilityError):
+            self.call("game.compile.native",{"intent":{**intent,
+                "project_id":"different_project"}},authorized=True)
+        self.assertFalse(any(x.path.startswith("systems/") for x in
+                             self.work.files("current",self.project)))
+
     def test_all_actual_editors_have_typed_context_and_can_be_previewed(self):
         all_systems=catalog()
         self.assertGreaterEqual(len(all_systems),40)
