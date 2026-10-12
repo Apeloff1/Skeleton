@@ -154,3 +154,24 @@ def test_low_budget_portfolio_always_keeps_rights_and_promotion_closed(game_stud
     assert plan["memory_promotion_authorized"] is False
     assert plan["training_authorized"] is False
     assert plan["portfolio_authority"] == "unreviewed_discovery_metadata_only"
+
+
+def test_generic_project_labels_cannot_fabricate_axis_specific_coverage(game_studio):
+    _,a,_ = game_studio
+    DiscoveryFacetIndex(a).refresh("studio", authorized=True, limit=100)
+    plan = MissionPortfolio(a).build(
+        "studio", _request(), authorized=True)
+    for candidate in plan["selected"]:
+        for axis in candidate["axis_scores"]:
+            if axis == "physics":
+                assert "physics" in candidate["url"]
+            elif axis == "quests":
+                assert "quest" in candidate["url"]
+            elif axis == "rights":
+                assert "rights" in candidate["url"]
+    with pytest.raises(ValueError, match="distinctive"):
+        MissionPortfolio(a).build(
+            "studio", PortfolioRequest(
+                SourceMission("original game", limit=10, scan_budget=100),
+                (PortfolioAxis("copy", "original game", minimum=2),)),
+            authorized=True)
