@@ -158,6 +158,8 @@ class OriginalNPCConditionalTests(unittest.TestCase):
             [self.rule({"fact":"world_tick","op":"gt","value":1})],
             [self.rule({"fact":"world_tick","op":"gte","value":True})],
             [self.rule({"fact":"world_tick","op":"gte","value":5000})],
+            [self.rule({"fact":["world_tick"],"op":"gte","value":1})],
+            [self.rule({"fact":"world_tick","op":["eq"],"value":1})],
             [self.rule(rid="same"),self.rule(rid="same")],
             [self.rule(rid="A Space")],
             [self.rule(qid=True)],
