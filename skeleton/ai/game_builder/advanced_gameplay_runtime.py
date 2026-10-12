@@ -12,6 +12,10 @@ import json
 from typing import Mapping, Sequence
 
 from .system_editors import make_editor_document, SystemEditorError
+from .advanced_physics_runtime import (
+    ACTIONS as PHYSICS_ACTIONS, PhysicsActionError,
+    start as physics_start, step as physics_step, apply_scene as apply_physics_scene,
+)
 from .advanced_sailing_runtime import (
     ACTIONS as SAIL_ACTIONS, SailingActionError,
     start as sail_start, step as sail_step, apply_scene as apply_sail_scene,
@@ -62,7 +66,7 @@ from .advanced_genre_engines import (
 )
 
 SCHEMA = "skeleton.game_builder.advanced_session.v1"
-ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing")
+ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "physics")
 MAX_TURNS = 128
 MAX_SEED = 2**31 - 1
 
@@ -93,6 +97,7 @@ ACTION_HELP = {
     "quest_director": QUEST_ACTIONS,
     "flight": FLIGHT_ACTIONS,
     "sailing": SAIL_ACTIONS,
+    "physics": PHYSICS_ACTIONS,
     **GENRE_ACTIONS,
 }
 
@@ -708,12 +713,13 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
         "quest_director":quest_start,
         "flight":flight_start,
         "sailing":sail_start,
+        "physics":physics_start,
         **GENRE_STARTS,
     }
     try:
         state=starts[editor](rules,seed)
     except (GenreActionError,FarmingActionError,FactoryActionError,
-            ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError) as exc:
+            ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,PhysicsActionError) as exc:
         raise AdvancedRuntimeError(str(exc)) from exc
     if scene is not None:
         from .advanced_level_scenes import validate_advanced_scene
@@ -771,6 +777,8 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             apply_flight_scene(state,rules,layout)
         elif editor=="sailing":
             apply_sail_scene(state,rules,layout)
+        elif editor=="physics":
+            apply_physics_scene(state,rules,layout)
         else:
             apply_genre_scene(editor,state,layout)
     baseline=_digest({"editor":editor,"configuration":config["digest"],"seed":seed,
@@ -801,11 +809,12 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             "quest_director":quest_step,
             "flight":flight_step,
             "sailing":sail_step,
+            "physics":physics_step,
             **GENRE_STEPS,
         }
         try:
             events=steps[editor](state,rules,action)
-        except (GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError) as exc:
+        except (GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,PhysicsActionError) as exc:
             raise AdvancedRuntimeError(str(exc)) from exc
         state["events"]=events
         receipt={"index":index,"action":action,"events":events,
