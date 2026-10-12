@@ -205,7 +205,7 @@ class NativeSurvivalStudioTests(unittest.TestCase):
 
     def test_studio_accepts_eight_native_games(self):
         html=render_workspace_html("T"*32).decode()
-        self.assertIn('"tower_defense","racing","survival","farming"].includes(advancedSession.editor)',html)
+        self.assertIn('"tower_defense","racing","survival","farming","factory"].includes(advancedSession.editor)',html)
         self.assertIn("Download playable Godot 4 game project",html)
 
 
