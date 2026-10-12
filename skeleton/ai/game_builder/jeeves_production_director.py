@@ -92,7 +92,7 @@ def work_order(workspace, project, user_message, *, cast=None, region=None,
         requires = [bible["digest"]]
         context = {"approved_design_bible": bible["digest"],
                    "immutable_voice_and_face_identity_required": True,
-                   "planned_acts": 100, "planned_scenes": 9999}
+                   "planned_chapters": 100, "planned_acts": 1000, "planned_scenes": 9999}
     else:
         stage = "scene"
         if act is None:
