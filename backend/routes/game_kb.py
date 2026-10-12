@@ -875,3 +875,7 @@ router.include_router(_story_review_router)
 # Authenticated, deterministic multi-ending RPG/adventure story planning and simulation.
 from routes.story_outcomes import router as _story_outcomes_router
 router.include_router(_story_outcomes_router)
+
+# Evidence-backed author signoff for per-ending 1000×100 narrative review lattice.
+from routes.outcome_reviews import router as _outcome_reviews_router
+router.include_router(_outcome_reviews_router)
