@@ -8,6 +8,7 @@ mechanics reference, not an industrial continuous-collision or CFD solver.
 from __future__ import annotations
 
 from copy import deepcopy
+from fractions import Fraction
 
 from .system_editors import SystemEditorError
 
@@ -230,7 +231,7 @@ def _collides(a, b, axes):
                < a["radius"] + b["radius"] for axis in axes)
 
 
-def _world(body, state, config, events):
+def _world(body, state, config, events, previous=None):
     radius = body["radius"]
     pos = body["position"]
     velocity = body["velocity"]
@@ -249,6 +250,40 @@ def _world(body, state, config, events):
         if not (body["mask"] & fixture["layer"]):
             continue
         axes = range(3) if state["depth"] > 1 else range(2)
+        # Swept point versus Minkowski-expanded AABB: rational t prevents
+        # thin-fixture tunneling at the largest permitted impulse speed.
+        if previous is not None:
+            lo = [fixture["position"][a]-fixture["half_size"][a]-radius for a in axes]
+            hi = [fixture["position"][a]+fixture["half_size"][a]+radius for a in axes]
+            was_inside = all(lo[a] < previous[a] < hi[a] for a in axes)
+            if not was_inside:
+                entry, leave, hit_axis, normal = Fraction(0), Fraction(1), None, 0
+                possible = True
+                for axis in axes:
+                    speed = pos[axis]-previous[axis]
+                    if speed == 0:
+                        if not lo[axis] <= previous[axis] <= hi[axis]:
+                            possible = False
+                            break
+                        continue
+                    near = Fraction(lo[axis]-previous[axis], speed)
+                    far = Fraction(hi[axis]-previous[axis], speed)
+                    if near > far:
+                        near, far = far, near
+                    if near >= entry:
+                        entry, hit_axis, normal = near, axis, -_sign(speed)
+                    leave = min(leave, far)
+                    if entry > leave:
+                        possible = False
+                        break
+                if possible and hit_axis is not None and 0 <= entry <= leave <= 1:
+                    for axis in axes:
+                        pos[axis] = previous[axis] + int(
+                            Fraction(pos[axis]-previous[axis])*entry)
+                    pos[hit_axis] += normal
+                    velocity[hit_axis] = -velocity[hit_axis]*config["wall_restitution"]//100
+                    state["contacts"] += 1
+                    events.append("swept_fixture_contact")
         penetrations = [
             body["radius"] + fixture["half_size"][axis] -
             abs(pos[axis]-fixture["position"][axis]) for axis in axes
@@ -336,6 +371,7 @@ def _advance(state, config, events):
                         vel[axis] = _clamp(vel[axis] + _sign(anchor[axis]-pos[axis])
                                           * config["magnet_force"]//body["mass"],
                                           -config["speed_limit"], config["speed_limit"])
+            previous = pos[:]
             for axis in (range(3) if state["depth"] > 1 else range(2)):
                 pos[axis] += vel[axis]
             # Physics controls do not create energy while resting on boundaries.
@@ -346,7 +382,7 @@ def _advance(state, config, events):
                 if state["depth"] > 1:
                     vel[2] = vel[2] * (100-config["floor_friction"])//100
             state["max_velocity_seen"] = max(state["max_velocity_seen"], max(abs(v) for v in vel))
-            _world(body, state, config, events)
+            _world(body, state, config, events, previous)
         for _solver in range(config["solver_iterations"]):
             before = state["contacts"]
             _pair_contacts(state, config, events)
