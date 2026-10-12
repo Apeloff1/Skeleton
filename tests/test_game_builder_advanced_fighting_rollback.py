@@ -169,6 +169,69 @@ class OriginalPeerRollbackTests(unittest.TestCase):
         with self.assertRaises(FightingRollbackError):
             verify_peer_reconciliation(forged,cfg)
 
+
+    def test_offline_cli_runs_original_two_peer_inputs_and_verifies_late_correction(self):
+        from skeleton.ai.game_builder.system_editor_cli import main
+        settings=self.rules(rollback_window_frames=4)
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            def source(filename,value):
+                path=root/filename
+                path.write_text(json.dumps(value),encoding="utf-8")
+                return str(path)
+            rules=source("settings.json",settings)
+            blue=source("blue.json",["inspect"]*4)
+            guessed=source("guess.json",["inspect"]*4)
+            remote=source("remote.json",["inspect"]*3+["approach"])
+            output=StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(main([
+                    "fighting-peer-replay","--settings",rules,
+                    "--blue-actions",blue,"--red-actions",remote]),0)
+            match=json.loads(output.getvalue())
+            self.assertTrue(verify_peer_fight(match,settings))
+            record=source("pair.json",match)
+            verify=StringIO()
+            with redirect_stdout(verify):
+                self.assertEqual(main([
+                    "fighting-peer-verify","--record",record,
+                    "--settings",rules]),0)
+            self.assertTrue(json.loads(verify.getvalue())["verified"])
+            prediction=StringIO()
+            with redirect_stdout(prediction):
+                self.assertEqual(main([
+                    "fighting-rollback","--settings",rules,
+                    "--blue-actions",blue,"--predicted-red",guessed,
+                    "--authoritative-red",remote]),0)
+            receipt=json.loads(prediction.getvalue())
+            self.assertEqual(receipt["reconciled_indices"],[3])
+            self.assertTrue(verify_peer_reconciliation(receipt,settings))
+            recon=source("correction.json",receipt)
+            output=StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(main([
+                    "fighting-rollback-verify","--record",recon,
+                    "--settings",rules]),0)
+            self.assertTrue(json.loads(output.getvalue())["verified"])
+
+    def test_supervised_studio_exposes_bounded_two_player_correction_not_real_network(self):
+        from skeleton.ai.game_builder.game_workspace_ui import (
+            render_workspace_html,SCRIPT,
+        )
+        html=render_workspace_html("A"*32).decode("utf-8")
+        for marker in (
+            "fighting-blue-actions","fighting-predicted-actions",
+            "fighting-real-actions","fighting-rollback-reconcile",
+            "fighting-rollback-proof","/api/fighting-rollback",
+            "Reexecute authenticated fighting rollback",
+            "authoritative_digest","remote_client_state_trusted",
+        ):
+            if marker!="remote_client_state_trusted":
+                self.assertIn(marker,html)
+        self.assertIn("Prediction rejected as authority",SCRIPT)
+        self.assertIn("native_hardware_certified",SCRIPT)
+        self.assertIn("network_transport_certified",SCRIPT)
+
     def test_non_native_original_multiplayer_source_is_export_agnostic(self):
         cfg=self.rules()
         pair=run_peer_fight(cfg,["charge","inspect"],["inspect","charge"])
