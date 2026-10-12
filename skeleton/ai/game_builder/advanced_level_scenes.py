@@ -17,6 +17,8 @@ from .advanced_gameplay_runtime import (
 )
 from .system_editors import make_editor_document, SystemEditorError
 from .advanced_genre_engines import STARTS as GENRE_STARTS, CARDS, puzzle_default_layout
+from .advanced_quest_director_runtime import (default_layout as quest_layout,
+    normalize_layout as validate_quest_layout,QuestDirectorError)
 from .advanced_fighting_runtime import (default_layout as fight_layout,
                                          normalize_layout as validate_fight_layout,
                                          FightingActionError)
@@ -166,12 +168,19 @@ def _default_layout(engine, config, seed):
         return rhythm_layout(config,seed)
     if engine == "fighting":
         return fight_layout(config,seed)
+    if engine == "quest_director":
+        return quest_layout(config,seed)
     raise SceneError("no advanced authored scene available for that engine")
 
 
 def _normalize_layout(engine, config, layout):
     if type(layout) is not dict:
         raise SceneError("authored layout must be a JSON object")
+    if engine=="quest_director":
+        try:
+            return validate_quest_layout(config,layout)
+        except QuestDirectorError as exc:
+            raise SceneError(str(exc)) from exc
     if engine=="fighting":
         try:
             return validate_fight_layout(config,layout)
