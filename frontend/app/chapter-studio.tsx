@@ -658,6 +658,74 @@ export default function ChapterStudioScreen() {
           </Text>
         </>}
       </Section>}
+      {page === 'production' && <Section title="Story tapestry: emotional engagement and plot closure"
+        subtitle="Cliffhangers must pay off, false leads be disclosed, and the finale lead to an epilogue.">
+        <Action label="Audit emotional arcs, red herrings and unresolved plot threads"
+          disabled={busy} icon="git-branch-outline"
+          onPress={() => { void withOperation(auditTapestry); }} />
+        {tapestry && <>
+          <Text style={tapestry.closure_ready ? styles.label : styles.error}>
+            {tapestry.closure_ready ? 'All indexed obligations closed' : 'Narrative closure incomplete'}
+            · {tapestry.threads_closed}/{tapestry.threads_recorded} threads closed
+            · {tapestry.issue_count} issues
+          </Text>
+          <Text style={styles.muted}>
+            Story moments: {Object.entries(tapestry.moment_counts || {}).map(
+              ([type, number]) => type + ' ' + number).join(' · ') || 'not indexed'}
+          </Text>
+          {(tapestry.open_threads || []).slice(0, 30).map((item: any) =>
+            <Text key={item.thread_id} style={styles.error}>
+              Open {item.kind}: {item.thread_id} (scene {item.introduced_scene})
+            </Text>)}
+          {(tapestry.issues || []).slice(0, 40).map((item: any, i: number) =>
+            <Text key={item.code + i} style={styles.error}>
+              {item.code}, scene {item.scene}: {item.detail}
+            </Text>)}
+          <Text style={styles.small}>Evidence receipt: {tapestry.receipt_digest}</Text>
+        </>}
+      </Section>}
+      {page === 'production' && <Section title="100 storytelling matrices × 100 scrutiny levels"
+        subtitle="10,000 differentiated review cells per scene — evidence and creator acceptance required">
+        <Text style={styles.muted}>
+          A matrix and its level define an explicit editorial question, source
+          scope and adversarial lens. Ask Jeeves for a critique, inspect the
+          highlighted passage, and record your decision with a source citation.
+          No model output is silently accepted.
+        </Text>
+        <Field label="Matrix ID" value={matrixId} onChange={setMatrixId}
+          maxLength={100} hint="e.g. mystery.red_herring_fairness, dialogue.subtext or closure.epilogue_completion" />
+        <Field label="Level 1–100" value={matrixLevel} onChange={setMatrixLevel}
+          numeric maxLength={3} />
+        <Action label="Ask Jeeves to review the highlighted scene at this level"
+          disabled={!scene || busy} icon="chatbubbles-outline"
+          onPress={() => { void withOperation(discussMatrixWithJeeves); }} />
+        <Choice label="Creator assessment" value={reviewVerdict}
+          values={['pass', 'fail', 'unknown'] as const}
+          onChange={setReviewVerdict} />
+        <Field label="Exact script passage supporting your conclusion"
+          value={reviewQuote} onChange={setReviewQuote} maxLength={500} multiline />
+        <Field label="Relevant highlighted plot-point ID (optional)"
+          value={reviewPlotId} onChange={setReviewPlotId} maxLength={96} />
+        <Field label="Reasoning, counterexample or correction needed"
+          value={reviewRationale} onChange={setReviewRationale} maxLength={1200} multiline />
+        <Action label="Approve and record one matrix review"
+          disabled={!scene || busy} icon="checkmark-circle-outline"
+          onPress={() => { void withOperation(saveMatrixFinding); }} />
+        <Action label="Check 10,000-cell scrutiny coverage"
+          disabled={!scene || busy}
+          onPress={() => { void withOperation(readMatrixCoverage); }} />
+        {matrixCoverage && <>
+          <Text style={matrixCoverage.fully_reviewed ? styles.label : styles.error}>
+            {matrixCoverage.cells_passed}/10,000 reviewed and accepted
+            · {matrixCoverage.cells_missing} missing · {matrixCoverage.cells_unknown} unknown
+            · {matrixCoverage.failure_count} failed
+          </Text>
+          <Text style={styles.small}>
+            100% reviewer coverage is not a mathematical guarantee of literary perfection.
+            Resolve failures and examine all source evidence before production.
+          </Text>
+        </>}
+      </Section>}
       {page === 'production' && <Section title="100,000-inspection scene proofreading"
         subtitle="Deterministic rules are repeated and counted. They do not certify 100% semantic or artistic perfection.">
         <Text style={styles.muted}>
