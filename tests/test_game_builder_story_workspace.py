@@ -125,7 +125,7 @@ class JeevesWorkspaceTests(unittest.TestCase):
         with self.assertRaises(StoryCanonError):
             validate_story_workspace_source(self.studio,"worldforge",
                                              "game/story_bible.json",
-                                             sign({...bible,"title":"Changed history"},BIBLE))
+                                             sign({**bible,"title":"Changed history"},BIBLE))
         with self.assertRaises(WorkspaceError):
             self.studio.propose("worldforge","story/scenes/../../../escape.json",
                  json.dumps(first),expected_sha256=EMPTY,
