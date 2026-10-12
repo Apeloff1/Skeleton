@@ -16,6 +16,8 @@ from skeleton.ai.game_builder.dragon_technical_source_atlas import (
 )
 from skeleton.ai.game_builder.dragon_technical_source_captures import DragonSourceCaptures
 from skeleton.ai.game_builder.dragon_technical_source_operations import DragonSourceOperations
+from skeleton.ai.game_builder.dragon_worker_stop_authority import DragonWorkerStopAuthority
+from skeleton.ai.game_builder.dragon_source_health import DragonSourceHealth
 from skeleton.ai.game_builder.dragon_source_policy_renewal import DragonSourcePolicyRenewal
 from skeleton.ai.game_builder.dragon_source_refresh_planner import DragonSourceRefreshPlanner
 from skeleton.ai.game_builder.dragon_source_permission_authority import DragonSourcePermissionAuthority
@@ -148,6 +150,28 @@ def saved_doc(lab,at=NOW+1):
     return text,doc
 
 
+
+
+def signed_stop_evidence(lab, source_id, *, now=NOW+62):
+    """Only TEST fixtures claim externally observed process/grant cleanup."""
+    last=lab[6]._history(OWNER,source_id)[-1]
+    assert last["state"]=="quarantined"
+    issuer=DragonWorkerStopAuthority(
+        key=b"independent-stop-issuer-test-key-32-bytes!",
+        issuer="external-process-supervisor")
+    grant=issuer.issue(
+        owner=OWNER,source_id=source_id,host=last["host"],
+        ticket_digest=last["ticket_digest"],
+        quarantine_digest=last["digest"],
+        process_stop_digest="c"*64,
+        resource_reconciliation_digest="d"*64,
+        supervisor="external-verified-os-process",
+        now=now-1,expires_at=now+300,
+        trusted_external_supervisor=True,process_stopped=True,
+        global_resources_reconciled=True)
+    return issuer,grant
+
+
 def test_schedule_requires_canonical_policy_and_idempotently_persists(lab):
     db,a,atlas,adm,g,caps,ops,sid,url=lab
     first=schedule(lab)
@@ -254,14 +278,15 @@ def test_crash_expiry_quarantines_without_faking_global_stop(lab):
     assert not ops.authorize_chunk(ticket,lab[3],sample=hardware(1061),
         at=moment(NOW+61),idle_since=T0,now_seconds=1061,
         authorized=True,trusted_worker=True,**consent())
+    stop(lab,ticket)
+    issuer,receipt=signed_stop_evidence(lab,ticket.source_id)
     with pytest.raises(PermissionError,match="process-stop"):
         ops.confirm_recovered(OWNER,ticket.source_id,now=NOW+62,
-            external_stop_receipt="f"*64,authorized=True,
+            signed_stop=receipt,stop_authority=issuer,authorized=True,
             trusted_supervisor=True,worker_stopped=False,
             resources_reconciled=True)
-    stop(lab,ticket)
     proof=ops.confirm_recovered(OWNER,ticket.source_id,now=NOW+62,
-        external_stop_receipt="f"*64,authorized=True,
+        signed_stop=receipt,stop_authority=issuer,authorized=True,
         trusted_supervisor=True,worker_stopped=True,
         resources_reconciled=True)
     assert proof["status"]=="ready_for_new_policy_review"
@@ -451,8 +476,9 @@ def test_supervisor_does_not_dispatch_into_crashed_leases(lab):
     # Worker and global grant are still tracked until explicit stop.
     assert lab[4].active_grants()
     stop(lab,reservation.ticket)
+    issuer,receipt=signed_stop_evidence(lab,lab[7])
     lab[6].confirm_recovered(OWNER,lab[7],now=NOW+62,
-        external_stop_receipt="a"*64,authorized=True,
+        signed_stop=receipt,stop_authority=issuer,authorized=True,
         trusted_supervisor=True,worker_stopped=True,
         resources_reconciled=True)
     lab[6].schedule(OWNER,lab[7],now=NOW+63,ready_at=NOW+65,
@@ -986,3 +1012,128 @@ def test_pilot_switch_events_are_append_only_and_tampering_fails_closed(lab):
         "WHERE owner=? AND sequence=0",(OWNER,))
     with pytest.raises(ValueError,match="lineage"):
         signer.control_state(OWNER,authorized=True)
+
+
+
+def test_signed_stop_proof_refuses_wrong_owner_quarantine_and_key(lab):
+    schedule(lab)
+    ticket=begin(lab)
+    attach(lab,ticket)
+    lab[6].quarantine_expired(OWNER,now=NOW+61,
+                               authorized=True,trusted_supervisor=True)
+    stop(lab,ticket)
+    issuer,receipt=signed_stop_evidence(lab,ticket.source_id)
+    other=DragonWorkerStopAuthority(
+        key=b"another-issuer-key-with-proper-minimum-length",
+        issuer="external-process-supervisor")
+    with pytest.raises(PermissionError,match="signature"):
+        lab[6].confirm_recovered(
+            OWNER,ticket.source_id,now=NOW+62,
+            signed_stop=receipt,stop_authority=other,
+            authorized=True,trusted_supervisor=True,
+            worker_stopped=True,resources_reconciled=True)
+    from dataclasses import replace
+    with pytest.raises(PermissionError,match="misbound"):
+        lab[6].confirm_recovered(
+            OWNER,ticket.source_id,now=NOW+62,
+            signed_stop=replace(receipt,quarantine_digest="0"*64),
+            stop_authority=issuer,authorized=True,trusted_supervisor=True,
+            worker_stopped=True,resources_reconciled=True)
+    assert lab[6].inspect(OWNER,ticket.source_id,authorized=True)["state"]=="quarantined"
+    with pytest.raises(PermissionError,match="external process"):
+        issuer.issue(
+            owner=OWNER,source_id=ticket.source_id,host=receipt.host,
+            ticket_digest=receipt.ticket_digest,
+            quarantine_digest=receipt.quarantine_digest,
+            process_stop_digest="c"*64,
+            resource_reconciliation_digest="d"*64,
+            supervisor="external-verified-os-process",
+            now=NOW+62,expires_at=NOW+70,
+            trusted_external_supervisor=True,process_stopped=False,
+            global_resources_reconciled=True)
+    with pytest.raises(PermissionError,match="stale"):
+        lab[6].confirm_recovered(
+            OWNER,ticket.source_id,now=NOW+400,
+            signed_stop=receipt,stop_authority=issuer,
+            authorized=True,trusted_supervisor=True,
+            worker_stopped=True,resources_reconciled=True)
+    assert lab[6].inspect(OWNER,ticket.source_id,authorized=True)["state"]=="quarantined"
+
+
+def test_signed_stop_receipt_cannot_replay_after_recovery(lab):
+    schedule(lab)
+    ticket=begin(lab)
+    attach(lab,ticket)
+    lab[6].quarantine_expired(OWNER,now=NOW+61,
+                               authorized=True,trusted_supervisor=True)
+    stop(lab,ticket)
+    issuer,receipt=signed_stop_evidence(lab,ticket.source_id)
+    first=lab[6].confirm_recovered(
+        OWNER,ticket.source_id,now=NOW+62,
+        signed_stop=receipt,stop_authority=issuer,
+        authorized=True,trusted_supervisor=True,
+        worker_stopped=True,resources_reconciled=True)
+    assert first["signed_stop_receipt"]==receipt.digest
+    with pytest.raises(ValueError,match="quarantined"):
+        lab[6].confirm_recovered(
+            OWNER,ticket.source_id,now=NOW+63,
+            signed_stop=receipt,stop_authority=issuer,
+            authorized=True,trusted_supervisor=True,
+            worker_stopped=True,resources_reconciled=True)
+
+
+
+def test_health_page_reports_true_queue_state_without_resource_work(lab):
+    schedule(lab)
+    status=DragonSourceHealth(lab[6]).snapshot(
+        OWNER,now=NOW,authorized=True,limit=1)
+    assert status["fleet_totals_complete"]
+    assert status["state_counts_this_page"]=={"scheduled":1}
+    assert len(status["entries"])==1
+    assert status["entries"][0]["source_id"]==lab[7]
+    assert status["entries"][0]["warnings"]==[]
+    assert not status["alerts_this_page"]
+    assert status["network_requests"]==0
+    assert status["workers_started"]==0 and status["resources_released"]==0
+    assert lab[4].active_grants()==()
+    with pytest.raises(PermissionError):
+        DragonSourceHealth(lab[6]).snapshot(
+            OWNER,now=NOW,authorized=False)
+    assert DragonSourceHealth(lab[6]).snapshot(
+        "different-owner",now=NOW,authorized=True)["entries"]==[]
+
+
+def test_health_recognizes_expired_lease_and_quarantine_without_auto_releasing(lab):
+    schedule(lab)
+    ticket=begin(lab)
+    attach(lab,ticket)
+    health=DragonSourceHealth(lab[6])
+    before=health.snapshot(OWNER,now=NOW+61,authorized=True)
+    assert before["alerts_this_page"][0]["warnings"]==[
+        "expired_lease_needs_quarantine"]
+    assert lab[4].active_grants()
+    lab[6].quarantine_expired(
+        OWNER,now=NOW+61,authorized=True,trusted_supervisor=True)
+    after=health.snapshot(OWNER,now=NOW+62,authorized=True)
+    assert after["state_counts_this_page"]=={"quarantined":1}
+    assert after["alerts_this_page"][0]["needs_supervisor"]
+    assert "external_stop_and_grant_reconciliation_required" in (
+        after["entries"][0]["warnings"])
+    assert after["resources_released"]==0
+    assert lab[4].active_grants()
+    stop(lab,ticket)
+
+
+def test_health_detects_corrupt_source_journal_and_invalid_cursor(lab):
+    schedule(lab)
+    health=DragonSourceHealth(lab[6])
+    with pytest.raises(ValueError,match="continuation"):
+        health.snapshot(OWNER,now=NOW,authorized=True,
+                        after_source="../../another-owner")
+    with pytest.raises(Exception):
+        health.snapshot(OWNER,now=NOW,authorized=True,limit=101)
+    lab[0].db.execute(
+        "UPDATE dragon_source_ops_events_v1 SET body='{}' "
+        "WHERE owner=? AND source=?",(OWNER,lab[7]))
+    with pytest.raises(ValueError,match="integrity"):
+        health.snapshot(OWNER,now=NOW,authorized=True)

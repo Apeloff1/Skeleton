@@ -12,6 +12,7 @@ from .dragon_technical_source_analysis import DragonTechnicalGlean
 from .dragon_technical_source_operations import DragonSourceOperations
 from .dragon_source_policy_renewal import DragonSourcePolicyRenewal
 from .dragon_source_refresh_planner import DragonSourceRefreshPlanner
+from .dragon_source_health import DragonSourceHealth
 from .reviewed_knowledge import ReviewedKnowledgeStore
 
 
@@ -22,12 +23,13 @@ def main():
                                                   "capture-census","glean-preview","glean-handoff",
                                                   "operations-inspect","operations-review","operations-ready",
                                                   "policy-renewal-pending","refresh-inspect",
-                                                  "refresh-census"))
+                                                  "refresh-census","operations-health"))
     parser.add_argument("--database",required=True)
     parser.add_argument("--owner",required=True)
     parser.add_argument("--trusted-local-operator",action="store_true")
     parser.add_argument("--recorded-at",type=int)
     parser.add_argument("--now",type=int)
+    parser.add_argument("--after-source")
     parser.add_argument("--query")
     parser.add_argument("--source-id")
     parser.add_argument("--capture-digest")
@@ -64,9 +66,14 @@ def main():
             captures=DragonSourceCaptures(atlas.a)
             if args.command in ("operations-inspect","operations-review",
                                 "operations-ready","policy-renewal-pending",
-                                "refresh-inspect","refresh-census"):
+                                "refresh-inspect","refresh-census","operations-health"):
                 operations=DragonSourceOperations(captures)
-                if args.command=="refresh-census":
+                if args.command=="operations-health":
+                    if args.now is None: parser.error("--now UTC epoch required")
+                    report=DragonSourceHealth(operations).snapshot(
+                        args.owner,now=args.now,authorized=True,
+                        limit=args.limit,after_source=args.after_source)
+                elif args.command=="refresh-census":
                     if args.now is None: parser.error("--now required")
                     report=DragonSourceRefreshPlanner(operations).scan(
                         args.owner,now=args.now,authorized=True,
