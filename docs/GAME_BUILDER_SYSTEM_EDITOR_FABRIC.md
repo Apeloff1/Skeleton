@@ -723,3 +723,80 @@ their production runtime adapters actually exist.
 The existing exact-head **AI Game Builder 500 Levels** gate now includes
 `tests.test_game_builder_system_editors`. The proposed code is not considered
 shippable simply because its configuration hashes or previews validate.
+
+
+## Eleventh original game — Colony Simulator (12 October 2026)
+
+This adds a real reference game and a separately authored Godot 4 game, not
+another settings-only editor. Catalog coverage increases from **10 to 11 of 43
+families with executable advanced gameplay (25.6%)**. **32 families remain
+authoring-only**. Native Colony is implemented but is an *unverified candidate*
+until exact-head Linux and Windows native/desktop-binary workflows succeed.
+The previously verified ten natives retain their separate evidence.
+
+### Advanced authored agency
+
+Colony provides **15 bounded real game controls**: founding settlers, labor
+capacity, needs decay, relationship bonuses, adaptive/scheduled/off threats,
+starting supplies, credits, worker productivity, water yield, raid frequency,
+disease pressure, frugal/balanced/abundant food demand, disabled/rare/frequent
+disasters, endless or victory lifecycle, and controlled migration. These
+controls affect simulation, not merely the source label.
+
+Canonical, settings-bound scene source has 2–6 distinct ordered original
+districts, typed biomes, finite food, water, timber and stone reserves, starting
+district, raid strength and finite caravan stores. Every identity and budget is
+validated, and scene/source digests are included in replay evidence. No
+external maps, scripts or licensed game assets are imported into executable
+content.
+
+Players can assign/release six professions, construct six building types,
+harvest finite resources, send food-costing expeditions, trade with finite
+caravans, recruit settlers within housing constraints, manage rations,
+feasts, defenses, medical care and advance simulation in one/four-day steps.
+Assigned labor changes genuine district stock and original inventory; daily
+consumption, raids, storms and disease drive morale, health, injuries,
+resource loss and potential depopulation. Medical care costs supplies.
+Fortifications require real wood/stone and raid survival requires adequate
+guards/watchposts. Replay transcripts reject forged supplies, population,
+dates, achievements, altered action chains and changed authored geography.
+
+The self-sufficient milestone requires a functional farm/well and sustainable
+stores; the tougher thriving-outpost milestone requires morale, clinic,
+watchpost and defended raids. Default gameplay remains open-ended *after*
+milestones. An optional campaign-ending policy can terminate on success.
+Unsolvable resource situations are valid game outcomes and do not confer
+fabricated victory.
+
+### Independent native game, Studio and qualification
+
+The Python gameplay source lives in advanced_colony_runtime.py. The
+separately implemented Godot game in advanced_colony_godot.py executes its
+own worker/economy/crisis rules, renders district vitality and supports
+keyboard/gamepad orders. Its --verify-colony mode replays all reviewed
+commands and compares every gameplay state field, including nested district
+stocks, workers, structures, injuries, events and end conditions. It does
+not replay Python-rendered frames.
+
+The offline original Godot ZIP contains game.json, proof.json, original
+project source, release SHA-256 manifest and Linux/Windows export presets.
+The trusted-operator CLI and token-gated local Game Studio can export a
+source-bound project. Studio canvas renders finite district stocks, worker
+assignments, needs and milestones. No implicit project writes or publication
+permissions are granted.
+
+Dedicated game-builder-advanced-colony-native.yml exercises eight distinct
+original colony scenarios on Ubuntu 24.04 and Windows 2022, checking real
+Godot replay and the exported desktop executable. The broader advanced
+gameplay regression workflow validates exact-head Python gameplay,
+source/scene custody and adversarial receipts on both operating systems.
+The workflow *definition* is not evidence of successful execution.
+Native hardware/console certification, vendor SDK authorization, independent
+production playtesting, full app completion and rights clearance remain
+outside these proof claims.
+
+Operator examples (create your own JSON actions and reviewed receipt):
+
+    python -m skeleton.ai.game_builder.system_editor_cli scene-template --editor colony --seed 5
+    python -m skeleton.ai.game_builder.system_editor_cli play --editor colony --seed 5 --actions authored-colony-commands.json
+    python -m skeleton.ai.game_builder.system_editor_cli godot-export --session reviewed-colony-session.json --output /tmp/new-colony --trusted-local-operator
