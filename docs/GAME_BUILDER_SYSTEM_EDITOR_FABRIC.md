@@ -953,3 +953,85 @@ stealth engine, release binary, audiovisual campaign, console publishing
 license or hardware certification for this thirteenth family yet. The
 City Builder is likewise reference-only. Both need independent native
 implementation, test parity and genuine export assurance.
+
+
+## Fourteenth original advanced family — Interconnected Exploration (12 October 2026)
+
+The World-family Interconnected Exploration editor (metroidvania) now
+implements a real **persistent, original interconnected adventure**. This
+is reference runtime coverage for **14/43 = 32.6%** of the existing family
+catalog; **29/43 remain authoring-only**. Reference coverage is not
+independent Godot, console or release verification.
+
+### Persistent authored worlds, progression and side routes
+
+The default setting authors 24 original world regions (bounded runtime
+range 2..24), with independently changeable biome, finite enemy health,
+environmental hazards, supply caches, optional secrets, collectible traversal
+power, fast-travel shrine, original guardian chamber and undirected passage
+graph. A strict authored source validator rejects unknown fields, noninteger
+quantities, duplicate rooms/portals/ability rewards, closed progression
+cycles, duplicated or fabricated powers, disconnected guardian routes and
+unreachable regions. Gated routes cannot demand abilities that cannot be
+earned earlier; a static progression fixed-point must reach every chamber.
+
+Movement powers include original dash, grapple, phase, swim and resonance
+archetypes. An ability must be acquired from an actually visited, cleared
+room. World locks use those earned powers. For a user-configured world,
+sequence breaks are optional and strictly limited to authored breakable
+locked routes. Each unorthodox crossing consumes real stamina and changes
+persistent progression evidence. Visiting and revisiting rooms preserves
+clearance, enemy injuries, cache depletion, activated fast-travel shrines,
+acquired powers, secret discoveries and equipment gains. Travel across
+nonadjacent regions is only permitted between visited, activated shrines
+with a real stamina charge.
+
+### Combat, economy, defeat and indefinite play
+
+The player starts with finite health, stamina, healing tonics, camp
+provisions and crafting shards. Ordinary and heavy strikes actually reduce
+authored enemies, with counterattacks, armor, dodge, stamina, guard and
+focused strikes. Room hazards respond to authored biomes and certain
+acquired powers. Defeated foes grant finite material rewards, never
+repeatable on revisits. Original hidden caches/secrets can be recovered
+exactly once; forging consumes materials and increases effective attacks;
+camping consumes provisions and restores bounded resources in safe shrines.
+There is an actual high-health guardian with attacks, defensive factors,
+defeat and a persistent milestone. Campaign settings stop at victory,
+whereas the default endless world permits nonterminal revisiting and
+continued exploration after defeating the guardian.
+
+The engine exposes **39 gameplay-affecting typed editor fields**, growing
+from the prior five: the existing number of regions, gate budgets,
+collectible abilities, fast travel and sequence-breaking options combine
+with enemy health/power/variance, authored hazard effects, survivability,
+stamina economy, finite healing/loot, attack and guard strength, concentrated
+strikes, heavy attacks, upgrades, rare secrets, boss stats, map density,
+camping, traversal cost and endgame policy.
+
+### Studio, source review and replay guarantees
+
+The local operator Studio renders a live 24-room network with sealed
+or open routes, visited/revisited chambers, available power relics,
+current enemy and boss damage, finite supplies, collectible progress and
+achievement state. Instead of flooding the UI with dozens of independent
+buttons, a region-targeted action composer selects travel, legal sequence
+breaking, activated fast travel, combat, heal, explore, shrine, crafting and
+resource actions. The separate supervised original world authoring map
+allows painting each region's biome, foe HP, hazards, cache, powers,
+shrine/secret flags, entry/finale and annotated passage requirements.
+Source changes remain untrusted until strict backend validation and
+explicit approved file review; no grid click authorizes unearned gameplay.
+
+The engine supports independently recomputed action-transcript receipts,
+portable verified save/continuation, forged-state detection, typed
+content-addressed authored scenes and cross-editor hybrid assembly
+evidence. Its dedicated adversarial tests cover complete original
+campaign and postgame, gate progression, deliberate sequence breaks,
+full-room topology, finite loot, boss combat, replay forgery, auto-save,
+impossible geometry and genuine authored-source custody.
+
+**Delivery boundary:** World runtime currently caps a configured map at
+24 regions, with no production streaming/open-world scale and no
+independently authored/native-executed Godot metroidvania engine. It is an
+original game-reference implementation, not a publication certificate.
