@@ -922,6 +922,15 @@ function drawAdvancedGame(session){
 }
 
 document.addEventListener("keydown",event=>{
+ if(!advancedSession||advancedSession.editor!=="rhythm"||advancedSession.terminal)return;
+ if(event.target&&(["INPUT","TEXTAREA","SELECT"].includes(event.target.tagName)||
+    event.target.isContentEditable))return;
+ if(!/^[1-6]$/.test(event.key))return;
+ const lane=Number(event.key)-1;
+ if(lane>=advancedSession.state.chart.lanes)return;
+ event.preventDefault();advanceAdvanced("tap:"+lane);
+});
+document.addEventListener("keydown",event=>{
  if(!advancedSession||advancedSession.editor!=="roguelike"||advancedSession.terminal)return;
  if(event.target&&(["INPUT","TEXTAREA","SELECT"].includes(event.target.tagName)||
     event.target.isContentEditable))return;
@@ -1005,6 +1014,29 @@ function renderAdvancedActions(actions){
   finish.disabled=Boolean(advancedSession.terminal);
   finish.addEventListener("click",()=>advanceAdvanced("finish"));
   target.append(finish);
+  const audioLabel=document.createElement("label");
+  audioLabel.textContent="Original oscillator soundtrack preview";
+  const audio=document.createElement("audio");
+  audio.id="rhythm-original-wav-preview";
+  audio.controls=true;audio.preload="none";
+  audioLabel.append(audio);target.append(audioLabel);
+  const hear=document.createElement("button");hear.type="button";
+  hear.textContent="Synthesize reviewed original song audio";
+  hear.addEventListener("click",async()=>{
+   try{
+    const clip=await api("/api/rhythm-audio",{
+      settings:advancedSettings,seed:advancedSession.seed,scene:advancedScene,
+      from_ms:Math.floor(s.clock_ms/2500)*2500,duration_ms:2500
+    });
+    audio.src="data:audio/wav;base64,"+clip.audio_base64;
+    audio.load();
+    status("Original oscillator audio SHA-256 "+clip.receipt.sha256.slice(0,16)+
+      " · independent native playback remains unverified.");
+   }catch(error){
+    status("Original rhythm audio source rejected: "+error.message);
+   }
+  });
+  target.append(hear);
   return;
  }
 
