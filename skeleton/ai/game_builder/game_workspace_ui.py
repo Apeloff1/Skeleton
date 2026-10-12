@@ -951,6 +951,52 @@ function drawAdvancedGame(session){
   c.fillStyle="#a9dccc";
   c.fillText("Original sprites are drawn primitives; collision and judging are backend-owned.",12,258);
  }
+ if(editor==="sailing"){
+  // Original nautical sprites are derived only from replay-verified state.
+  const ox=12,oy=48,cell=Math.max(6,Math.floor(Math.min(
+   296/state.width,174/state.height)));
+  const xy=(p)=>[ox+p[0]*cell,oy+p[1]*cell];
+  const symbols=[
+   [state.islands,"#586e65"],[state.reefs,"#a58b56"],
+   [state.shoals,"#4c9898"]
+  ];
+  c.fillStyle="#d5e8ed";
+  c.fillText("Original maritime world · "+state.weather+
+   " · wind "+["E","S","W","N"][state.wind_heading],12,36);
+  for(let y=0;y<state.height;y++)for(let x=0;x<state.width;x++){
+   c.fillStyle=(x+y)%2?"#224a5f":"#29536a";
+   c.fillRect(ox+x*cell,oy+y*cell,cell-1,cell-1);
+  }
+  for(const [cells,color] of symbols)for(const p of cells){
+   const [x,y]=xy(p);c.fillStyle=color;
+   c.fillRect(x+1,y+1,Math.max(2,cell-3),Math.max(2,cell-3));
+  }
+  const marker=(p,color,glyph)=>{
+   const [x,y]=xy(p);c.fillStyle=color;
+   c.fillRect(x+1,y+1,Math.max(3,cell-2),Math.max(3,cell-2));
+   if(cell>=11){c.fillStyle="#102d38";c.font="bold 10px monospace";
+    c.fillText(glyph,x+2,y+cell-3);}
+  };
+  marker(state.home,"#a8d8b2","H");
+  marker(state.destination,"#e9bd81","D");
+  if(!state.rescued_identity)marker(state.castaway,"#edce76","!");
+  marker(state.pirate,"#dd8b8b","P");
+  marker(state.position,"#ffffff",["›","⌄","‹","⌃"][state.heading]);
+  const hudX=ox+state.width*cell+13;
+  c.font="11px monospace";c.fillStyle="#cde9df";
+  [
+   "Hull "+state.hull+"/"+state.max_hull,
+   "Bilge "+state.flooding,
+   "Buoyancy "+state.buoyancy_margin,
+   "Cargo "+state.cargo,
+   "Delivered "+state.delivered,
+   "Rescued "+state.passengers_ashore,
+   "Supplies "+state.supplies,
+   "Coins "+state.coins,
+   "Heading "+["E","S","W","N"][state.heading],
+   state.docked?"DOCKED":state.anchored?"ANCHORED":"AT SEA"
+  ].forEach((t,i)=>c.fillText(t,Math.min(hudX,338),53+i*17));
+ }
  if(editor==="quest_director"){
   const ox=14,oy=47,cell=25;
   c.fillStyle="#dbece5";
