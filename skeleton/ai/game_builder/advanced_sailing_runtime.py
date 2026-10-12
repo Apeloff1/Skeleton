@@ -125,6 +125,8 @@ def start(cfg, seed):
         "events": [], "finished": False, "failed": False,
     }
     apply_scene(state, cfg, default_layout(cfg, seed))
+    state["displacement"] = cfg["ship_mass"] + state["crew"] // 2
+    state["buoyancy_margin"] = cfg["buoyancy_capacity"] - state["displacement"]
     return state
 
 
