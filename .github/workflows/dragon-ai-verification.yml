@@ -115,6 +115,7 @@ jobs:
             tests/test_dragon_discovery_identity_audit.py \
             tests/test_dragon_technical_source_atlas.py \
             tests/test_dragon_nest_source_feed.py \
+            tests/test_dragon_nest_worker_admission.py \
             tests/test_dragon_catalog_expansion.py \
             tests/test_dragon_delivery.py \
             tests/test_dragon_wisdom_pyramid.py \
