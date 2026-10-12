@@ -149,7 +149,10 @@ def test_forged_or_missing_hatchling_receipts_refused(scenario):
     with pytest.raises(ValueError):
         run(knowledge, replace(nest, head="e" * 64), acquisitions)
     with pytest.raises(ValueError, match="future"):
-        run(knowledge, nest, acquisitions, at=T0)
+        run(
+            knowledge, nest, acquisitions, at=T0,
+            idle_since="2026-10-12T11:00:00Z",
+        )
 
 
 def test_freshness_video_and_source_revision_bound_to_canonical_review(scenario):
