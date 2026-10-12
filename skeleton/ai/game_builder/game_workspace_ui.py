@@ -949,6 +949,7 @@ document.addEventListener("keydown",event=>{
  const mode=event.shiftKey?"sprint":event.ctrlKey?"crouch":"move";
  advanceAdvanced(mode+"_"+direction);
 });
+let originalRhythmLongrunRecord=null;
 let originalRoguelikeLongrunRecord=null;
 let selectedRhythmNote=0;
 let selectedRTSCell=27;
@@ -1037,6 +1038,55 @@ function renderAdvancedActions(actions){
    }
   });
   target.append(hear);
+  const marathonLabel=document.createElement("label");
+  marathonLabel.textContent="Original long song action batch (JSON list of legal rhythmic inputs)";
+  const marathonText=document.createElement("textarea");
+  marathonText.id="rhythm-longrun-actions";
+  marathonText.setAttribute("aria-label","Original authored song actions for full replay");
+  marathonText.rows=3;
+  marathonText.placeholder='["tap:0","wait:500","tap:3"]';
+  marathonLabel.append(marathonText);target.append(marathonLabel);
+  const button=document.createElement("button");
+  button.type="button";button.id="rhythm-longrun-submit";
+  button.textContent="Verify / resume long rhythm performance";
+  const evidence=document.createElement("pre");
+  evidence.id="rhythm-longrun-proof";
+  evidence.setAttribute("role","status");
+  evidence.setAttribute("aria-live","polite");
+  button.addEventListener("click",async()=>{
+   try{
+    const actions=JSON.parse(marathonText.value);
+    if(!Array.isArray(actions))throw Error("A JSON list of registered gameplay inputs is required");
+    if(advancedEditor!==systemEditor().id)
+      throw Error("Authored rhythm editor changed; restart the source session");
+    const result=await api("/api/rhythm-longrun",{
+      settings:advancedSettings,actions,
+      prior:originalRhythmLongrunRecord,
+      seed:advancedSession.seed,scene:advancedScene,
+      checkpoint_interval:64
+    });
+    originalRhythmLongrunRecord=result.record;
+    evidence.textContent=JSON.stringify({
+      turns:result.record.turn_count,
+      checkpoints:result.record.checkpoint_count,
+      clock_ms:result.record.state.clock_ms,
+      beat_count:result.record.state.chart.beats,
+      score:result.record.state.score,
+      accuracy:result.record.accuracy,
+      victory:result.record.victory,
+      terminal:result.record.finished||result.record.failed,
+      head_digest:result.record.head_digest,
+      independently_verified:result.independently_verified,
+      native_hardware_certified:result.native_hardware_certified,
+      game_files_mutated:result.game_files_mutated
+    },null,2);
+    marathonText.value="[]";
+    status("Full original rhythm history independently reexecuted from source. No untrusted checkpoint, auto-approval or native certification.");
+   }catch(error){
+    status("Original rhythm marathon rejected: "+error.message);
+   }
+  });
+  target.append(button);target.append(evidence);
   return;
  }
 
@@ -1394,7 +1444,9 @@ async function startAdvanced(){
   const reply=await api("/api/advanced-play",{
    editor:advancedEditor,settings:advancedSettings,actions:[],seed,
    scene:advancedScene});
-  advancedCommands=[];originalRoguelikeLongrunRecord=null;showAdvanced(reply);
+  advancedCommands=[];
+  originalRhythmLongrunRecord=null;originalRoguelikeLongrunRecord=null;
+  showAdvanced(reply);
   status("Started deterministic advanced "+advancedEditor+" session. Commands are replay-audited.");
  }catch(error){status("Advanced session blocked: "+error.message);}
 }
