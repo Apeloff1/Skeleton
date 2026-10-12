@@ -145,11 +145,20 @@ class ChunkedNPCTest(unittest.TestCase):
                 with self.assertRaises(ChunkWorldError):
                     run_chunked_npc_world(actions)
 
+    def test_expanded_thirty_three_citizens_is_now_valid_original_gameplay(self):
+        # The previous 32-citizen cap no longer holds; 33 is a supported,
+        # physically embodied source population, whereas 129 is not.
+        report=run_chunked_npc_world(["wait"],options={
+            "citizens":33,"active_limit":8,
+        })
+        self.assertEqual(report["physical_actor_count"],33)
+        self.assertTrue(verify_chunked_npc_world(report))
+
     def test_wrong_types_and_budgets_rejected_before_source(self):
         cases=(
             {"options":{"chunks_per_side":4}},
             {"options":{"chunks_per_side":True}},
-            {"options":{"citizens":33}},
+            {"options":{"citizens":129}},
             {"options":{"citizens":8,"active_limit":9}},
             {"options":{"active_limit":0}},
             {"options":{"chunk_radius":2}},
