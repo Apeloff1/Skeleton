@@ -55,6 +55,41 @@ class IdleCoordinatorPolicy:
             raise ValueError("backoff floor above ceiling")
 
 
+def read_idle_family_health(db: sqlite3.Connection, owner: str, *,
+                            authorized: bool) -> dict[str, object]:
+    """Authenticated read-only UI projection; never constructs worker authority.
+
+    A queued lease's existence is not proof that a background task is currently
+    running or even that a host scheduler is installed. The UI must distinguish
+    last-known dispatch from the device's current idle status.
+    """
+    _owner(owner)
+    if not authorized:
+        raise PermissionError("idle family health requires authentication")
+    exists=db.execute("""SELECT 1 FROM sqlite_master WHERE type='table'
+        AND name='dragon_family_idle_leases'""").fetchone()
+    if not exists:
+        return dict(schema="skeleton.ai.dragon.idle_status.v1",
+                    configured=False,workers={},
+                    idle_only=True,host_state="not_connected",
+                    max_tasks_per_tick=3)
+    rows=db.execute("""SELECT role,COUNT(*),
+        SUM(last_outcome='failed'),SUM(last_outcome='running'),
+        SUM(last_outcome='changed'),SUM(last_outcome='unchanged'),
+        MIN(CASE WHEN next_due>0 THEN next_due ELSE NULL END)
+        FROM dragon_family_idle_leases
+        WHERE owner=? GROUP BY role ORDER BY role""", (owner,)).fetchall()
+    details={role:dict(known_sources=n,failed=failed or 0,
+            incomplete_leases=running or 0,
+            last_changes=changed or 0,unchanged=unchanged or 0,
+            earliest_due_at=_utc(due) if due is not None else None)
+            for role,n,failed,running,changed,unchanged,due in rows}
+    return dict(schema="skeleton.ai.dragon.idle_status.v1",configured=True,
+                workers=details,idle_only=True,
+                host_state="not_observed",
+                max_tasks_per_tick=3)
+
+
 class DragonIdleCoordinator:
     """Policy-bound, owner-fenced SQLite dispatch with finite durable leases.
 
