@@ -254,3 +254,99 @@ def conserved_totals(logistics: TradeLogistics) -> dict:
             total_coins += shipment.escrow_coins
             totals[shipment.good] += shipment.amount
     return {"coins": total_coins, "goods": totals}
+
+
+def simulate_market_corridor(
+    world: DirectorWorld, *, population: int,
+    seller_index: int, buyer_index: int,
+    good: str, quantity: int, steps: int,
+    authorized: bool, active_budget: int = 24,
+    ambient_budget: int = 48,
+) -> dict:
+    """Deterministic gameplay integration: AI citizens plus independent trade.
+
+    A real society_tick advances citizen needs/locations and a separate
+    authoritative logistics step advances the shipment one authored scene.
+    Outputs contain replay-verifiable digests and finite conservation checks.
+    This is a game simulation, not a real-world logistics service.
+    """
+    if authorized is not True:
+        raise PermissionError("operator authority required to run market world")
+    if (type(population) is not int or not 3 <= population <= 512
+            or type(seller_index) is not int or not 0 <= seller_index < population
+            or type(buyer_index) is not int or not 0 <= buyer_index < population
+            or seller_index == buyer_index
+            or type(steps) is not int or not 1 <= steps <= 128):
+        raise EconomyError("market simulation requires bounded citizens and clock")
+    from .npc_society_runtime import make_society, society_tick
+    from .npc_social_economy import new_economy
+    society = make_society(world, population, authorized=True)
+    seller = society.profiles[seller_index].key
+    buyer = society.profiles[buyer_index].key
+    initial = new_logistics(
+        new_economy(society, authorized=True), society, world, authorized=True,
+    )
+    before = conserved_totals(initial)
+    current = schedule_trade(
+        initial, society, world, seller=seller, buyer=buyer,
+        good=good, quantity=quantity, authorized=True,
+    )
+    root = current.shipments[0].shipment_id
+    digests = []
+    player_scene = society.minds[seller_index].scene
+    for _ in range(steps):
+        society = society_tick(
+            society, world, player_scene=player_scene,
+            active_budget=active_budget, ambient_budget=ambient_budget,
+            authorized=True,
+        )
+        current = advance_trade_routes(
+            current, society, world, authorized=True,
+        )
+        if conserved_totals(current) != before:
+            raise EconomyError("gameplay violated finite trade conservation")
+        digests.append(current.digest)
+    shipment = current.shipments[0]
+    result = {
+        "schema": "skeleton.game_builder.npc_market_corridor.v1",
+        "world_digest": world.digest,
+        "society_digest": society.digest,
+        "route": list(shipment.route),
+        "position": shipment.position,
+        "delivered": shipment.state == "delivered",
+        "shipment_id": root,
+        "turns": steps,
+        "seller": seller,
+        "buyer": buyer,
+        "good": good,
+        "quantity": quantity,
+        "replay_digests": digests,
+        "conserved_assets": before,
+        "events": [event.payload() for event in current.events],
+        "final_economy": current.economy.payload(),
+        "native_hardware_verified": False,
+        "model_training_authorized": False,
+    }
+    return {**result, "replay_digest": canonical_digest(result)}
+
+
+def verify_market_corridor(report: dict, world: DirectorWorld, *,
+                          population: int, seller_index: int, buyer_index: int,
+                          good: str, quantity: int, steps: int,
+                          authorized: bool, active_budget: int = 24,
+                          ambient_budget: int = 48) -> bool:
+    """Reject forged outcome receipts by replaying the original-world engine."""
+    if authorized is not True:
+        raise PermissionError("review requires operator authority")
+    if not isinstance(report, dict):
+        return False
+    try:
+        expected = simulate_market_corridor(
+            world, population=population, seller_index=seller_index,
+            buyer_index=buyer_index, good=good, quantity=quantity, steps=steps,
+            active_budget=active_budget, ambient_budget=ambient_budget,
+            authorized=True,
+        )
+        return report == expected
+    except (ValueError, TypeError, KeyError, OverflowError):
+        return False
