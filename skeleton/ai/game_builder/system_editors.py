@@ -6012,8 +6012,31 @@ for _entry in CATALOG:
             {"key":"wind_shot_penalty","kind":"int","default":4,"minimum":0,"maximum":20,"options":[]},
             {"key":"press_tackle_bonus","kind":"int","default":2,"minimum":0,"maximum":6,"options":[]},
         ])
+# Spatial topology changes the actual labyrinth transition rules.
+for _entry in CATALOG:
+    if _entry["id"] == "maze":
+        _entry["fields"].extend([
+            {"key":"key_count","kind":"int","default":2,"minimum":1,"maximum":4,"options":[]},
+            {"key":"wall_budget","kind":"int","default":16,"minimum":0,"maximum":64,"options":[]},
+            {"key":"health","kind":"int","default":100,"minimum":10,"maximum":200,"options":[]},
+            {"key":"stamina","kind":"int","default":80,"minimum":5,"maximum":250,"options":[]},
+            {"key":"torches","kind":"int","default":2,"minimum":0,"maximum":16,"options":[]},
+            {"key":"torch_duration","kind":"int","default":12,"minimum":1,"maximum":40,"options":[]},
+            {"key":"move_cost","kind":"int","default":1,"minimum":1,"maximum":10,"options":[]},
+            {"key":"diagonal_cost","kind":"int","default":1,"minimum":0,"maximum":8,"options":[]},
+            {"key":"stair_cost","kind":"int","default":2,"minimum":1,"maximum":10,"options":[]},
+            {"key":"portal_cost","kind":"int","default":3,"minimum":1,"maximum":20,"options":[]},
+            {"key":"phase_period","kind":"int","default":3,"minimum":1,"maximum":16,"options":[]},
+            {"key":"hazard_damage","kind":"int","default":12,"minimum":1,"maximum":80,"options":[]},
+            {"key":"crush_damage","kind":"int","default":15,"minimum":1,"maximum":80,"options":[]},
+            {"key":"rest_recovery","kind":"int","default":9,"minimum":1,"maximum":40,"options":[]},
+            {"key":"exploration_budget","kind":"int","default":128,"minimum":8,"maximum":128,"options":[]},
+            {"key":"completion_bonus","kind":"int","default":200,"minimum":10,"maximum":1000,"options":[]},
+            {"key":"key_reward","kind":"int","default":30,"minimum":1,"maximum":100,"options":[]},
+            {"key":"turn_limit","kind":"int","default":128,"minimum":24,"maximum":128,"options":[]},
+        ])
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
@@ -6106,6 +6129,19 @@ def _normalized_settings(editor_id: str, values: Mapping[str, object] | None) ->
         normalized["board_width"], normalized["board_height"]
     ):
         raise SystemEditorError("tactics range exceeds available board dimensions")
+    if editor_id == "maze":
+        cells=(normalized["width"]-2)*(normalized["height"]-2)*normalized["levels"]
+        minimum_reserved=6 if normalized["topology"]=="non_euclidean" else 4
+        if normalized["key_count"]+normalized["hazards"]+minimum_reserved>cells:
+            raise SystemEditorError("maze objective and finite hazards exceed actual cells")
+        if normalized["topology"]=="non_euclidean" and normalized["height"]<6:
+            raise SystemEditorError("non-Euclidean portals require separate spatial cells")
+        if normalized["stair_cost"]>normalized["stamina"]:
+            raise SystemEditorError("maze staircase beyond original stamina budget")
+        if normalized["portal_cost"]>normalized["stamina"]:
+            raise SystemEditorError("authored portal cannot be paid for")
+        if normalized["move_cost"]>normalized["stamina"]:
+            raise SystemEditorError("original walker cannot perform a legal move")
     if editor_id == "sports":
         if normalized["sprint_speed"] < normalized["run_speed"]:
             raise SystemEditorError("sports sprint cannot be slower than normal movement")
