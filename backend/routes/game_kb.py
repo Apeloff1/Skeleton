@@ -861,3 +861,9 @@ async def edit_kb(pid: str, artifact: str, body: KBEdit):
 # the Mongo document ceiling. All writes remain user-reviewed and role-gated.
 from routes.story_index import router as _story_index_router
 router.include_router(_story_index_router)
+
+
+# Chapter context, scene proofreading and editorial production use the same
+# canonical game KB root. Their story ledgers stay project-scoped and versioned.
+from routes.chapter_studio import router as _chapter_studio_router
+router.include_router(_chapter_studio_router)
