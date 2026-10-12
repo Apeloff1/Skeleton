@@ -34,6 +34,15 @@ class SavePlan(BaseModel):
     plan: dict
 
 
+class WitnessedMatrixPromptIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    branch_id: str = Field(default="main", pattern=ID)
+    matrix_id: str = Field(min_length=5, max_length=140)
+    level: int = Field(ge=1, le=100)
+    ending_id: str = Field(pattern=ID)
+    choices: list[str] = Field(min_length=1, max_length=2000)
+
+
 class SimulateIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     branch_id: str = Field(default="main", pattern=ID)
@@ -227,3 +236,35 @@ async def get_chapter_weave_audit(
     except (PyMongoError, OSError):
         logger.exception("Canonical story weave audit unavailable")
         raise HTTPException(status_code=503, detail="Story-chapter alignment unavailable")
+
+
+
+@router.post("/{pid}/outcomes/matrix-prompt")
+async def get_witnessed_matrix_instruction(
+    pid: str, body: WitnessedMatrixPromptIn,
+    user=Depends(require_role("viewer")),
+):
+    """Require a true, closed playthrough before calling a prompt witnessed."""
+    scope = _scope(pid, user)
+    try:
+        record = await _find(scope, body.branch_id)
+        if body.ending_id not in record["compiled"]["endings"]:
+            raise HTTPException(status_code=404, detail="Ending is not part of the plan")
+        play = simulate(record["compiled"], body.choices)
+        if play["ending_id"] != body.ending_id or not play["ending_accepted"]:
+            raise HTTPException(status_code=409, detail=(
+                "Player choices do not reach a causally closed version of this ending"
+            ))
+        row = instruction(body.matrix_id, body.level,
+                          ending_id=body.ending_id,
+                          player_history_digest=play["receipt_digest"])
+        return {"ok": True, "game_id": pid, "branch_id": body.branch_id,
+                "plan_digest": record["source_digest"],
+                "playthrough_receipt": play["receipt_digest"],
+                "instruction": row}
+    except HTTPException:
+        raise
+    except (KeyError, ValueError, TypeError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except (PyMongoError, OSError):
+        raise HTTPException(status_code=503, detail="Witnessed matrix audit unavailable")
