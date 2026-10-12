@@ -29,6 +29,7 @@ PROOF_FIELDS = (
     "angular_velocity", "impulses_left", "battery", "contacts",
     "max_velocity_seen", "max_angular_speed_seen", "goal_frames",
     "finished", "failed", "milestones",
+    "fixture_contact_counts", "fixture_contact_events",
 )
 
 GODOT_PHYSICS = r'''
@@ -114,7 +115,10 @@ func _reset() -> void:
         "contacts":0,"max_velocity_seen":0,
         "max_angular_speed_seen":0,"goal_frames":0,
         "finished":false,"failed":false,"milestones":[],
+        "fixture_contact_counts":[],"fixture_contact_events":[],
     }
+    for _fixture in chart["fixtures"]:
+        physical["fixture_contact_counts"].append(0)
     actions=[]
     notice="Push the authored payload to the green destination"
     queue_redraw()
@@ -177,13 +181,33 @@ func _frame() -> void:
         physical["goal_frames"]=0
 
 
+func _record_fixture(index: int,kind: String,position: Array) -> void:
+    # Native independently identifies the original collider at resolution
+    # time. It never infers fixture provenance from the final position.
+    var counts: Array=physical["fixture_contact_counts"]
+    counts[index]=int(counts[index])+1
+    var ledger: Array=physical["fixture_contact_events"]
+    if ledger.size()>=96:
+        ledger.pop_front()
+    ledger.append({
+        "fixture_index":index,
+        "body_id":str(chart["bodies"][0]["id"]),
+        "kind":kind,
+        "tick":int(physical["tick"]),
+        "frame":int(physical["frame"]),
+        "position":[int(position[0]),int(position[1]),
+                    int(chart["bodies"][0]["position"][2])],
+    })
+
+
 func _fixtures(previous_x: int, previous_y: int) -> void:
     # Native mirrors the original source AABB fixture collision sequence.
     # The authored integer world is small enough for exact float-rational
     # comparisons; hit coordinates truncate toward zero as in Python.
     var radius: int=int(chart["bodies"][0]["radius"])
     var mask: int=int(chart["bodies"][0]["mask"])
-    for fixture in chart["fixtures"]:
+    for fixture_index in range(chart["fixtures"].size()):
+        var fixture: Dictionary=chart["fixtures"][fixture_index]
         if (mask & int(fixture["layer"])) == 0:
             continue
         var fpos: Array=fixture["position"]
@@ -234,6 +258,7 @@ func _fixtures(previous_x: int, previous_y: int) -> void:
                 velocity[hit_axis]=_floor_div(
                     -velocity[hit_axis]*int(cfg["wall_restitution"]),100)
                 physical["contacts"]=int(physical["contacts"])+1
+                _record_fixture(fixture_index,"swept_fixture_contact",position)
         var penetration: Array=[
             radius+int(half[0])-absi(position[0]-int(fpos[0])),
             radius+int(half[1])-absi(position[1]-int(fpos[1]))
@@ -247,6 +272,7 @@ func _fixtures(previous_x: int, previous_y: int) -> void:
             velocity[axis]=_floor_div(
                 -velocity[axis]*int(cfg["wall_restitution"]),100)
             physical["contacts"]=int(physical["contacts"])+1
+            _record_fixture(fixture_index,"fixture_contact",position)
         physical["x"]=position[0]
         physical["y"]=position[1]
         physical["vx"]=velocity[0]
@@ -415,6 +441,8 @@ def _projection(state: dict) -> dict:
         "max_angular_speed_seen":state["max_angular_speed_seen"],
         "goal_frames":state["goal_frames"],"finished":state["finished"],
         "failed":state["failed"],"milestones":state["milestones"],
+        "fixture_contact_counts":state["fixture_contact_counts"],
+        "fixture_contact_events":state["fixture_contact_events"],
     }
 
 
