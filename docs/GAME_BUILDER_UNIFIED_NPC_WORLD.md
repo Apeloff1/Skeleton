@@ -36,7 +36,16 @@ never becomes false eyewitness evidence. Paid social support consumes influence
 and supplies in this very same state, increases genuine resident trust/bond and
 locks an actual source quest branch. A site must receive every configured
 material follow-up action before completion. Earned quest rewards and
-optional retirement are source-grounded. An additional optional civic
+optional retirement are source-grounded.
+
+The player can choose a second, materially different **exploit** route:
+an actually interviewed eyewitness can be challenged at a finite influence
+cost, reducing the same actor's trust, bond and social standing. The original
+quest commits that branch permanently. Five paid acts of physical site
+exploitation must consume real source stock before a distinct exploited
+outcome becomes available. Restoration and exploitation cannot silently share
+follow-up actions or rewrite each other's already committed choices.
+An exploited site cannot claim a restorative council. An additional optional civic
 council cannot be claimed without two distinct real firsthand speakers.
 
 ### Single-authority event ordering
@@ -98,6 +107,10 @@ outcome and optional retirement (real game consequences, not synthetic scores).
 
 2026-10-12 — Added exact replay and comprehensive tamper, source, spatial,
 time and resource regressions (reviewable historical state integrity).
+
+2026-10-12 — Added actual original narrative divergence
+(challenged eyewitnesses, physical site exploitation and a separate earned
+ending with reputation loss; branch-specific resources cannot be fabricated).
 
 2026-10-12 — Added Studio and CLI interaction plus Ubuntu/Windows native
 operating-system Python checks (actual input/replay on two OS environments,
