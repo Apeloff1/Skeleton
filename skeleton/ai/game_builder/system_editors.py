@@ -6035,8 +6035,73 @@ for _entry in CATALOG:
             {"key":"key_reward","kind":"int","default":30,"minimum":1,"maximum":100,"options":[]},
             {"key":"turn_limit","kind":"int","default":128,"minimum":24,"maximum":128,"options":[]},
         ])
+# Real standalone RPG and procedural world runtime configuration.
+for _entry in CATALOG:
+    if _entry["id"] in ("rpg","procedural_world"):
+        _extended={
+            "rpg":[
+                {"key":"world_width","kind":"int","default":9,"minimum":8,"maximum":24,"options":[]},
+                {"key":"world_height","kind":"int","default":9,"minimum":8,"maximum":24,"options":[]},
+                {"key":"max_obstacles","kind":"int","default":16,"minimum":0,"maximum":64,"options":[]},
+                {"key":"enemy_health","kind":"int","default":22,"minimum":1,"maximum":250,"options":[]},
+                {"key":"enemy_damage","kind":"int","default":4,"minimum":0,"maximum":30,"options":[]},
+                {"key":"hero_health","kind":"int","default":60,"minimum":10,"maximum":200,"options":[]},
+                {"key":"hero_mana","kind":"int","default":25,"minimum":0,"maximum":100,"options":[]},
+                {"key":"starting_herbs","kind":"int","default":3,"minimum":0,"maximum":20,"options":[]},
+                {"key":"starting_potions","kind":"int","default":2,"minimum":0,"maximum":20,"options":[]},
+                {"key":"camp_supplies","kind":"int","default":4,"minimum":0,"maximum":20,"options":[]},
+                {"key":"starting_gold","kind":"int","default":20,"minimum":0,"maximum":200,"options":[]},
+                {"key":"diplomacy_cost","kind":"int","default":3,"minimum":0,"maximum":30,"options":[]},
+                {"key":"quest_gold_reward","kind":"int","default":12,"minimum":1,"maximum":100,"options":[]},
+                {"key":"quest_xp","kind":"int","default":30,"minimum":1,"maximum":100,"options":[]},
+                {"key":"combat_xp","kind":"int","default":40,"minimum":1,"maximum":100,"options":[]},
+                {"key":"xp_per_level","kind":"int","default":20,"minimum":2,"maximum":100,"options":[]},
+                {"key":"level_heal","kind":"int","default":8,"minimum":0,"maximum":50,"options":[]},
+                {"key":"level_mana","kind":"int","default":4,"minimum":0,"maximum":30,"options":[]},
+                {"key":"attack_damage","kind":"int","default":8,"minimum":1,"maximum":40,"options":[]},
+                {"key":"spell_cost","kind":"int","default":4,"minimum":1,"maximum":30,"options":[]},
+                {"key":"spell_damage","kind":"int","default":12,"minimum":1,"maximum":40,"options":[]},
+                {"key":"guard_block","kind":"int","default":3,"minimum":0,"maximum":25,"options":[]},
+                {"key":"potion_healing","kind":"int","default":18,"minimum":1,"maximum":100,"options":[]},
+                {"key":"camp_healing","kind":"int","default":20,"minimum":1,"maximum":100,"options":[]},
+                {"key":"camp_mana","kind":"int","default":12,"minimum":0,"maximum":100,"options":[]},
+                {"key":"herb_capacity","kind":"int","default":20,"minimum":2,"maximum":100,"options":[]},
+                {"key":"gear_cost","kind":"int","default":8,"minimum":1,"maximum":50,"options":[]},
+                {"key":"max_gear","kind":"int","default":4,"minimum":1,"maximum":12,"options":[]},
+                {"key":"chapter_bonus","kind":"int","default":200,"minimum":10,"maximum":1000,"options":[]},
+                {"key":"turn_limit","kind":"int","default":128,"minimum":32,"maximum":128,"options":[]},
+            ],
+            "procedural_world":[
+                {"key":"world_radius_chunks","kind":"int","default":3,"minimum":1,"maximum":16,"options":[]},
+                {"key":"resource_density","kind":"int","default":3,"minimum":1,"maximum":12,"options":[]},
+                {"key":"starting_wood","kind":"int","default":8,"minimum":0,"maximum":100,"options":[]},
+                {"key":"starting_stone","kind":"int","default":8,"minimum":0,"maximum":100,"options":[]},
+                {"key":"starting_food","kind":"int","default":30,"minimum":0,"maximum":100,"options":[]},
+                {"key":"starting_water","kind":"int","default":15,"minimum":0,"maximum":100,"options":[]},
+                {"key":"starting_seeds","kind":"int","default":4,"minimum":0,"maximum":50,"options":[]},
+                {"key":"health","kind":"int","default":80,"minimum":10,"maximum":200,"options":[]},
+                {"key":"energy","kind":"int","default":120,"minimum":10,"maximum":250,"options":[]},
+                {"key":"exploration_budget","kind":"int","default":128,"minimum":8,"maximum":128,"options":[]},
+                {"key":"max_edited_tiles","kind":"int","default":64,"minimum":1,"maximum":128,"options":[]},
+                {"key":"shelter_wood","kind":"int","default":3,"minimum":1,"maximum":20,"options":[]},
+                {"key":"shelter_stone","kind":"int","default":2,"minimum":1,"maximum":20,"options":[]},
+                {"key":"rest_energy","kind":"int","default":18,"minimum":1,"maximum":50,"options":[]},
+                {"key":"shelter_healing","kind":"int","default":9,"minimum":0,"maximum":40,"options":[]},
+                {"key":"hydration_gain","kind":"int","default":8,"minimum":1,"maximum":30,"options":[]},
+                {"key":"tool_stone","kind":"int","default":2,"minimum":1,"maximum":20,"options":[]},
+                {"key":"tool_ore","kind":"int","default":1,"minimum":0,"maximum":10,"options":[]},
+                {"key":"survey_reward","kind":"int","default":40,"minimum":1,"maximum":100,"options":[]},
+                {"key":"expedition_bonus","kind":"int","default":200,"minimum":10,"maximum":1000,"options":[]},
+                {"key":"sprint_thirst","kind":"int","default":2,"minimum":0,"maximum":10,"options":[]},
+                {"key":"thirst_period","kind":"int","default":5,"minimum":1,"maximum":20,"options":[]},
+                {"key":"thirst_limit","kind":"int","default":30,"minimum":5,"maximum":100,"options":[]},
+                {"key":"dehydration_damage","kind":"int","default":4,"minimum":1,"maximum":30,"options":[]},
+                {"key":"turn_limit","kind":"int","default":128,"minimum":32,"maximum":128,"options":[]},
+            ],
+        }[_entry["id"]]
+        _entry["fields"].extend(_extended)
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze", "rpg", "procedural_world"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
@@ -6129,6 +6194,28 @@ def _normalized_settings(editor_id: str, values: Mapping[str, object] | None) ->
         normalized["board_width"], normalized["board_height"]
     ):
         raise SystemEditorError("tactics range exceeds available board dimensions")
+    if editor_id == "rpg":
+        if normalized["max_obstacles"] >= normalized["world_width"]*normalized["world_height"]//3:
+            raise SystemEditorError("original RPG obstacles cannot seal most of the world")
+        if normalized["starting_herbs"] > normalized["herb_capacity"]:
+            raise SystemEditorError("initial herbs exceed real storage")
+        if normalized["spell_cost"] > normalized["hero_mana"]:
+            raise SystemEditorError("no original party spell is financeable")
+        if normalized["camp_healing"] > normalized["hero_health"]:
+            raise SystemEditorError("camp recovery exceeds actual hero capacity")
+        if normalized["level_heal"] > normalized["hero_health"]:
+            raise SystemEditorError("RPG level recovery exceeds hero capacity")
+        if normalized["quest_depth"] > normalized["turn_limit"]*2:
+            raise SystemEditorError("authoring quest depth exceeds bounded replay complexity")
+    if editor_id == "procedural_world":
+        if normalized["shelter_wood"]>normalized["starting_wood"]+normalized["resource_density"]*10:
+            raise SystemEditorError("original shelter cannot be constructed from local resources")
+        if normalized["shelter_stone"]>normalized["starting_stone"]+normalized["resource_density"]*10:
+            raise SystemEditorError("original shelter stone budget is unreachable")
+        if normalized["tool_stone"]>normalized["starting_stone"]+normalized["resource_density"]*10:
+            raise SystemEditorError("tool stone cannot be sourced from local biome")
+        if normalized["world_radius_chunks"]*normalized["chunk_size"]<12:
+            raise SystemEditorError("original world cannot fit source exploration landmarks")
     if editor_id == "maze":
         cells=(normalized["width"]-2)*(normalized["height"]-2)*normalized["levels"]
         minimum_reserved=3+normalized["levels"]+(2 if normalized["topology"]=="non_euclidean" else 0)
