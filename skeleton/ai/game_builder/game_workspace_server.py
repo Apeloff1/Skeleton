@@ -41,6 +41,9 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_fast_chunk_snapshot import (
+    run_fast_chunk_branches, verify_fast_chunk_branches,
+)
 from .advanced_chunked_world_timeline import (
     make_chunked_bookmarks, verify_chunked_bookmarks,
     continue_chunked_world, verify_chunked_continuation,
@@ -491,6 +494,23 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 values["record"],values["scene"],values.get("settings"))
             return self._json(200,{"verified":validated,
                                    "original_source_mutated":False})
+        if path=="/api/fast-chunk-forks":
+            batch=run_fast_chunk_branches(
+                values["checkpoint"],values["branches"],
+                cursor=values.get("cursor"))
+            return self._json(200,{
+                "record":batch,
+                "verified":verify_fast_chunk_branches(batch),
+                "source_files_mutated":False,
+                "speed_certified":False,
+                "ai_model_weights_promoted":False,
+            })
+        if path=="/api/fast-chunk-forks-verify":
+            return self._json(200,{
+                "verified":verify_fast_chunk_branches(values["record"]),
+                "source_files_mutated":False,
+                "ai_model_weights_promoted":False,
+            })
         if path=="/api/chunked-world-checkpoint":
             record=make_chunked_bookmarks(
                 values["record"],interval=values.get("interval",8))
