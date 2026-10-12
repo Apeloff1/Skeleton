@@ -282,6 +282,22 @@ $("story-relationship").addEventListener("click",async()=>{
   status("Chronological pair interaction references retrieved; paginate when history exceeds the page.");
  }catch(error){status("NPC memory lookup rejected: "+error.message);}
 });
+
+$("story-png-check").addEventListener("click",async()=>{
+ try{
+  const file=$("story-png-preview").files[0];
+  if(!file||file.size>200000)throw Error("Choose a PNG preview under 200 KB");
+  const binary=new Uint8Array(await file.arrayBuffer());
+  let text="";
+  for(const byte of binary)text+=String.fromCharCode(byte);
+  const reply=await api("/api/story-pixel-proof",{
+    project:storyProject(),asset:$("story-asset-id").value.trim(),
+    png_base64:btoa(text),max_channel_delta:0
+  });
+  storyShow(reply.pixel_proof);
+  status("Actual PNG pixels checked against the original approved color palette.");
+ }catch(error){status("Rendered asset rejected: "+error.message);}
+});
 $("story-asset-replay").addEventListener("click",async()=>{
  try{
   storyShow(await api("/api/story-asset-history",{
@@ -3956,6 +3972,9 @@ regional appearance. It does not invent model output or write hidden files.</sma
 <button id="story-relationship" type="button">Review indexed character interactions</button>
 <label>Original asset ID<input id="story-asset-id" placeholder="map_table"></label>
 <button id="story-asset-replay" type="button">Review asset identity across scenes</button>
+<label>Original rendered PNG asset preview (no upload or source write)
+<input type="file" id="story-png-preview" accept="image/png"></label>
+<button id="story-png-check" type="button">Inspect real pixels against regional canon</button>
 <button id="story-check" type="button">Sign and validate authored source</button>
 <pre id="story-evidence" role="status" aria-live="polite"></pre>
 </fieldset>

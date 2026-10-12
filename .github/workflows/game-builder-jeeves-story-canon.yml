@@ -7,6 +7,8 @@ on:
       - "skeleton/ai/game_builder/story_canon_fabric.py"
       - "skeleton/ai/game_builder/story_workspace.py"
       - "skeleton/ai/game_builder/story_memory.py"
+      - "skeleton/ai/game_builder/story_asset_pixels.py"
+      - "tests/test_game_builder_story_asset_pixels.py"
       - "skeleton/ai/game_builder/jeeves_production_director.py"
       - "skeleton/ai/game_builder/game_project_workspace.py"
       - "skeleton/ai/game_builder/game_workspace_server.py"
@@ -51,6 +53,7 @@ jobs:
             tests/test_game_builder_story_canon_fabric.py
             tests/test_game_builder_story_workspace.py
             tests/test_game_builder_jeeves_production.py
+            tests/test_game_builder_story_asset_pixels.py
             tests/test_game_builder_system_editors.py
       - name: Setup Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
@@ -63,8 +66,8 @@ jobs:
       - name: Compile project canon and editor glue
         shell: bash
         run: |
-          python -m py_compile skeleton/ai/game_builder/story_canon_fabric.py skeleton/ai/game_builder/story_workspace.py skeleton/ai/game_builder/story_memory.py skeleton/ai/game_builder/jeeves_production_director.py skeleton/ai/game_builder/game_project_workspace.py skeleton/ai/game_builder/game_workspace_ui.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_prompt_router.py
+          python -m py_compile skeleton/ai/game_builder/story_canon_fabric.py skeleton/ai/game_builder/story_workspace.py skeleton/ai/game_builder/story_memory.py skeleton/ai/game_builder/story_asset_pixels.py skeleton/ai/game_builder/jeeves_production_director.py skeleton/ai/game_builder/game_project_workspace.py skeleton/ai/game_builder/game_workspace_ui.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_prompt_router.py
       - name: Check 500-scene persistence, asset identity, rights and adversarial forgery
         shell: bash
         run: |
-          python -m unittest tests.test_game_builder_story_canon_fabric tests.test_game_builder_story_workspace tests.test_game_builder_jeeves_production -v
+          python -m unittest tests.test_game_builder_story_canon_fabric tests.test_game_builder_story_workspace tests.test_game_builder_jeeves_production tests.test_game_builder_story_asset_pixels -v

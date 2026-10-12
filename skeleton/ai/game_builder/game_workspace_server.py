@@ -246,6 +246,28 @@ class _StudioHandler(BaseHTTPRequestHandler):
             from .story_memory import retrieve_bookmarks
             return self._json(200,retrieve_bookmarks(
                 studio,values["project"],values["references"]))
+        if path=="/api/story-pixel-proof":
+            from .story_asset_pixels import inspect_png_against_canon
+            from .story_workspace import load_story_workspace
+            from base64 import b64decode
+            import binascii
+            bible,_,_=load_story_workspace(studio,values["project"])
+            if bible is None:
+                raise WorkspaceError("approved original world design required")
+            data=values["png_base64"]
+            if type(data) is not str or len(data)>280000:
+                raise WorkspaceError("bounded original image preview only")
+            try:
+                raw=b64decode(data,validate=True)
+            except (ValueError,binascii.Error) as exc:
+                raise WorkspaceError("malformed original asset PNG transport") from exc
+            proof=inspect_png_against_canon(
+                bible,values["asset"],raw,
+                max_channel_delta=values.get("max_channel_delta",0))
+            return self._json(200,{"pixel_proof":proof,
+                                   "preview_size_limited":True,
+                                   "game_source_mutated":False,
+                                   "model_art_generated":False})
         if path=="/api/story-asset-history":
             from .story_memory import asset_identity_history
             return self._json(200,asset_identity_history(
