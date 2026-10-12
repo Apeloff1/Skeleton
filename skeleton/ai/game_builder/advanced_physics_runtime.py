@@ -260,6 +260,7 @@ def start(config, seed):
         "magnet": False, "fan": False,
         "battery": config["initial_battery"], "impulses_left": config["impulse_budget"],
         "motors_used": 0, "contacts": 0, "fractures": 0, "water_contacts": 0,
+        "fixture_contact_counts": [], "fixture_contact_events": [],
         "rope_breaks": 0, "max_velocity_seen": 0, "goal_frames": 0,
         "oriented_contacts": 0, "contact_manifolds": [],
         "geometry_mode": config["collision_geometry"],
@@ -279,6 +280,8 @@ def apply_scene(state, config, layout):
     scene = normalize_layout(config, layout)
     for key in LAYOUT_KEYS:
         state[key] = deepcopy(scene[key])
+    state["fixture_contact_counts"]=[0]*len(scene["fixtures"])
+    state["fixture_contact_events"]=[]
     state["bodies"] = [{
         **original, "sleep": 0, "broken": False,
         "orientation": original["initial_orientation"], "angular_velocity": 0
@@ -296,6 +299,24 @@ def _clamp(value, minimum, maximum):
 def _collides(a, b, axes):
     return all(abs(a["position"][axis] - b["position"][axis])
                < a["radius"] + b["radius"] for axis in axes)
+
+
+def _fixture_receipt(state,body,index,kind):
+    """Authoritative original fixture identity, never a guessed collision.
+
+    The per-source-index count persists through the entire bounded physical
+    session. A 96-record rotating window preserves recent ordering while the
+    complete collision-count vector cannot lose older contact attribution.
+    """
+    state["fixture_contact_counts"][index]+=1
+    history=state["fixture_contact_events"]
+    if len(history)>=96:
+        history.pop(0)
+    history.append({
+        "fixture_index":index,"body_id":body["id"],
+        "kind":kind,"tick":state["tick"],"frame":state["frame"],
+        "position":list(body["position"]),
+    })
 
 
 def _world(body, state, config, events, previous=None):
@@ -317,7 +338,7 @@ def _world(body, state, config, events, previous=None):
             velocity[axis] = -velocity[axis] * config["wall_restitution"] // 100
             state["contacts"] += 1
             events.append("bounded_world_collision")
-    for fixture in state["fixtures"]:
+    for fixture_index,fixture in enumerate(state["fixtures"]):
         if not (body["mask"] & fixture["layer"]):
             continue
         axes = range(3) if state["depth"] > 1 else range(2)
@@ -355,6 +376,7 @@ def _world(body, state, config, events, previous=None):
                     velocity[hit_axis] = -velocity[hit_axis]*config["wall_restitution"]//100
                     state["contacts"] += 1
                     events.append("swept_fixture_contact")
+                    _fixture_receipt(state,body,fixture_index,"swept_fixture_contact")
         penetrations = [
             body["radius"] + fixture["half_size"][axis] -
             abs(pos[axis]-fixture["position"][axis]) for axis in axes
@@ -368,6 +390,7 @@ def _world(body, state, config, events, previous=None):
             velocity[axis] = -velocity[axis] * config["wall_restitution"] // 100
             state["contacts"] += 1
             events.append("fixture_contact")
+            _fixture_receipt(state,body,fixture_index,"fixture_contact")
 
 
 def _pair_contacts(state, config, events):
