@@ -54,15 +54,30 @@ canonical ingestion engine or introduce a new state domain or runtime service.
 | L12 controls | Caller owns invocation, clock, scheduling, checkpoint durability, authorization and crawl budget. |
 | L13 exit | Local correctness increment; no production SLO or enterprise-superiority claim. |
 
-Index persistence and crawler storage are still separate commits. If indexing
-fails after a fetch, retain and replay captured documents through
-`ingest_captured_documents`; this change does not add a distributed transaction
-or an automatic reconciliation worker. The caller must use an owner-scoped
-index and approved transport. No live source acquisition, source approval,
-model training or weight promotion is claimed by the synthetic tests.
+Index persistence and crawler storage are still separate commits. Within the
+knowledge index, the second work pass makes each captured batch atomic across
+source revisions, passages, tags, engine symbols, parameters, relations and FTS.
+Oversized inputs fail after at most `max_docs + 1` reads before mutation.
+Savepoints compose with an existing caller transaction: ingestion neither
+commits nor rolls back unrelated pending caller writes. An outermost successful
+batch commits normally and survives a database reopen.
+
+If indexing fails after a fetch, `resume_acquisition` raises
+`GameKnowledgeIndexingError` carrying the complete acquisition report as
+`error.batch`. After correcting the storage failure, replay
+`error.batch.documents` through the authorized `ingest_captured_documents`
+method. The retry does not fetch the pages again. Successful replay is
+idempotent for existing document identities. The exception message is generic;
+its chained storage exception is for protected diagnostics, not public output.
+
+This does not add a distributed transaction or automatic crash-reconciliation
+worker. After process loss, recovery still requires the existing durable crawl
+store; an in-memory exception is not a durable receipt. The caller must use an
+owner-scoped index and approved transport. No live source acquisition, source
+approval, model training or weight promotion is claimed by the synthetic tests.
 
 Validation command:
 
 ```sh
-python -m pytest -q tests/test_game_acquisition_batches.py tests/test_ai_webcrawler_game_knowledge_build.py tests/test_ai_webcrawler_redirects.py tests/test_ai_webcrawler_robots_budget.py tests/test_ai_webcrawler_stress.py
+python -m pytest -q tests/test_game_knowledge_atomic_ingestion.py tests/test_game_acquisition_batches.py tests/test_ai_webcrawler_game_knowledge_build.py tests/test_ai_webcrawler_redirects.py tests/test_ai_webcrawler_robots_budget.py tests/test_ai_webcrawler_stress.py
 ```

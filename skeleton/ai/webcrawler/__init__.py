@@ -153,6 +153,7 @@ _SPINE_EXPORTS = {
     "acquire_game_documents": ".game_knowledge_acquisition",
     "acquire_game_batch": ".game_knowledge_acquisition",
     "GameAcquisitionBatch": ".game_knowledge_acquisition",
+    "GameKnowledgeIndexingError": ".game_builder_knowledge_runtime",
     "extract_game_sections": ".game_knowledge_acquisition",
     "extract_game_mechanics": ".game_knowledge_acquisition",
     "extract_engine_symbols": ".game_knowledge_acquisition",

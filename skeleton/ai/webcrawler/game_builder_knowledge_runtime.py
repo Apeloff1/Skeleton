@@ -19,6 +19,7 @@ from .game_knowledge_acquisition import (
     prioritize_game_sources, queue_game_sources,
     official_game_documentation,
     _validate_acquisition_budget,
+    _validated_document,
 )
 from .game_knowledge_index import GameKnowledgeIndex, KnowledgeGap
 from .game_knowledge_design import (
@@ -45,6 +46,14 @@ class GameKnowledgeBuild:
     human_review_required: bool
 
 
+class GameKnowledgeIndexingError(RuntimeError):
+    """Fetched evidence remains available for an authorized indexing retry."""
+
+    def __init__(self, batch: GameAcquisitionBatch):
+        super().__init__("acquired game documents could not be indexed; batch retained for retry")
+        self.batch = batch
+
+
 class KnowledgeDrivenGameBuilder:
     """Working game acquisition + knowledge + construction entry point."""
 
@@ -57,18 +66,14 @@ class KnowledgeDrivenGameBuilder:
     ) -> int:
         if not authorized:
             raise PermissionError("game knowledge ingestion requires authorization")
-        if not 1<=max_docs<=1000:
-            raise ValueError("invalid game document budget")
-        count=0
-        for doc in docs:
-            if count>=max_docs:
-                raise ValueError("game document ingestion budget exceeded")
-            source_id=sha256(doc.canonical_url.encode("utf-8")).hexdigest()
-            self.knowledge.ingest_document(
-                source_id,doc,engine=engine,authorized=True,
-            )
-            count+=1
-        return count
+        def identified_documents():
+            for doc in docs:
+                _validated_document(doc)
+                yield sha256(doc.canonical_url.encode("utf-8")).hexdigest(), doc
+        return self.knowledge.ingest_documents(
+            identified_documents(), engine=engine, authorized=True,
+            max_documents=max_docs,
+        )
 
     def discover_and_acquire(
         self, crawler: CrawlEngine, transport: Callable, *,
@@ -134,8 +139,11 @@ class KnowledgeDrivenGameBuilder:
             raise ValueError("invalid game document budget")
         batch=acquire_game_batch(crawler,now=now,max_steps=max_steps,
                                  max_documents=max_documents)
-        self.ingest_captured_documents(batch.documents,engine=engine,
-                                       authorized=True,max_docs=max_documents)
+        try:
+            self.ingest_captured_documents(batch.documents,engine=engine,
+                                           authorized=True,max_docs=max_documents)
+        except Exception as exc:
+            raise GameKnowledgeIndexingError(batch) from exc
         return batch
 
     def build_game(
