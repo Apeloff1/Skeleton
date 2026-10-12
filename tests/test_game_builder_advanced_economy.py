@@ -8,6 +8,10 @@ from skeleton.ai.game_builder.system_editors import (
 from skeleton.ai.game_builder.advanced_level_scenes import (
     make_advanced_scene, validate_advanced_scene, SceneError,
 )
+from skeleton.ai.game_builder.advanced_gameplay_save import (
+    SavegameError, export_advanced_savegame, import_advanced_savegame,
+    continue_advanced_savegame,
+)
 from skeleton.ai.game_builder.system_editor_assembly import compile_system_assembly
 from skeleton.ai.game_builder.advanced_gameplay_runtime import (
     ENGINES, AdvancedRuntimeError, run_advanced_session,
@@ -75,6 +79,21 @@ class EconomyReferenceTests(unittest.TestCase):
         self.assertEqual(report["authored_scene_evidence"][0]["editor"],"economy")
         self.assertEqual(report["advanced_runtime_evidence"][0]["editor"],"economy")
         self.assertFalse(report["ready_for_release"])
+
+    def test_economy_portable_save_reconstructs_money_and_continues(self):
+        initial=run_advanced_session("economy", actions=ROUTE[:-1])
+        save=export_advanced_savegame(initial)
+        loaded=import_advanced_savegame(save)
+        self.assertEqual(loaded["session"]["state"]["cash"],
+                         initial["state"]["cash"])
+        restored=continue_advanced_savegame(save, ["checkpoint"])
+        final=import_advanced_savegame(restored)
+        self.assertTrue(final["session"]["state"]["checkpoint"])
+        self.assertTrue(verify_advanced_session(final["session"]))
+        forged=copy.deepcopy(save)
+        forged["actions"].append("buy")
+        with self.assertRaises(SavegameError):
+            import_advanced_savegame(forged)
 
     def test_cash_custody_has_no_external_minting(self):
         start = run_advanced_session("economy")["state"]
