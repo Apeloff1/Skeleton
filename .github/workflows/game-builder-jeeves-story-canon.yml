@@ -67,6 +67,11 @@ jobs:
             skeleton/ai/webcrawler/__init__.py
             skeleton/ai/webcrawler/
             skeleton/kernel/
+            frontend/features/
+            backend/gameforge/
+            apps/jeeves/
+            packaging/windows/
+            java-accelerators/
             tests/__init__.py
             tests/test_game_builder_story_canon_fabric.py
             tests/test_game_builder_story_workspace.py
