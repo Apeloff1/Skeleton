@@ -867,3 +867,7 @@ router.include_router(_story_index_router)
 # canonical game KB root. Their story ledgers stay project-scoped and versioned.
 from routes.chapter_studio import router as _chapter_studio_router
 router.include_router(_chapter_studio_router)
+
+# Model critiques are candidates; only reviewed evidence is eligible for scene quality coverage.
+from routes.story_review import router as _story_review_router
+router.include_router(_story_review_router)
