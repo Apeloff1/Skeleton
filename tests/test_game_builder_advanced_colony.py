@@ -233,5 +233,28 @@ class OriginalColonyNativeSourceTests(unittest.TestCase):
         self.assertIn(b"playable", native.files["godot/scripts/main.gd"])
 
 
+    def test_visual_colony_district_editor_is_supervised_and_source_bound(self):
+        from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html, SCRIPT
+        page=render_workspace_html("A"*32).decode("utf-8")
+        self.assertIn("paintColonyDistrict", page)
+        self.assertIn("colony:[\"wood_plus\"", page)
+        self.assertIn("authoring", page.lower())
+        self.assertIn("source.editor===\"colony\"", SCRIPT)
+        self.assertIn("Create / validate authored scene", SCRIPT)
+        self.assertIn("advanced-scene-grid", page)
+        self.assertIn("advanced-godot-export", page)
+        scene=make_advanced_scene("colony", seed=3)
+        edited=deepcopy(scene)
+        edited["layout"]["districts"][0]["wood"]+=5
+        with self.assertRaises(SceneError):
+            validate_advanced_scene(edited)
+        reviewed=make_advanced_scene(
+            "colony", seed=3,layout=edited["layout"])
+        self.assertEqual(validate_advanced_scene(reviewed),reviewed)
+        self.assertNotEqual(scene["digest"],reviewed["digest"])
+        reference=run_advanced_session("colony",scene=reviewed)
+        self.assertTrue(verify_advanced_session(reference))
+
+
 if __name__ == "__main__":
     unittest.main()
