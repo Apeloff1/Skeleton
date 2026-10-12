@@ -32,6 +32,7 @@ from .advanced_roguelike_longrun import (replay_long_roguelike,
 from .advanced_world_planner import plan_original_world
 from .advanced_stealth_planner import plan_stealth_route
 from .advanced_parkour_planner import plan_parkour_route, verify_parkour_plan
+from .advanced_sports_coach import plan_original_sports_match, verify_original_sports_plan
 from .advanced_godot_export import (
     render_advanced_godot_package, write_advanced_godot_package,
 )
@@ -97,6 +98,18 @@ def parser() -> argparse.ArgumentParser:
     parkour_verify.add_argument("--record",required=True)
     parkour_verify.add_argument("--scene",required=True)
     parkour_verify.add_argument("--settings")
+    sports_plan=commands.add_parser("plan-sports",
+        help="Search source-bound original matches and independently prove a real win")
+    sports_plan.add_argument("--scene",required=True)
+    sports_plan.add_argument("--settings")
+    sports_plan.add_argument("--max-states",type=int,default=16000)
+    sports_plan.add_argument("--max-depth",type=int,default=64)
+    sports_plan.add_argument("--beam-width",type=int,default=48)
+    sports_verify=commands.add_parser("verify-sports-plan",
+        help="Re-search and independently verify exact sporting strategy evidence")
+    sports_verify.add_argument("--record",required=True)
+    sports_verify.add_argument("--scene",required=True)
+    sports_verify.add_argument("--settings")
     world_plan=commands.add_parser("plan-original-world",
         help="Search and independently replay a safe original world ability path")
     world_plan.add_argument("--scene",required=True)
@@ -242,6 +255,16 @@ def main(argv=None) -> int:
                 beam_width=args.beam_width)
         elif args.operation == "verify-parkour-plan":
             output={"verified":verify_parkour_plan(
+                _load(args.record),_load(args.scene),
+                _load(args.settings) if args.settings else None)}
+        elif args.operation == "plan-sports":
+            output=plan_original_sports_match(
+                _load(args.scene),
+                _load(args.settings) if args.settings else None,
+                max_states=args.max_states,max_depth=args.max_depth,
+                beam_width=args.beam_width)
+        elif args.operation == "verify-sports-plan":
+            output={"verified":verify_original_sports_plan(
                 _load(args.record),_load(args.scene),
                 _load(args.settings) if args.settings else None)}
         elif args.operation == "plan-original-world":
