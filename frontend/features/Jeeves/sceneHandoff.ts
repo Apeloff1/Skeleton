@@ -32,9 +32,28 @@ export const SCENE_RECIPES = [
     { category: 'table', count: 3 }, { category: 'bread', count: 4 },
     { category: 'cake', count: 2 }, { category: 'barrel', count: 4 },
   ] },
-  { key: 'lab', icon: '🤖', name: 'Research Lab', items: [
-    { category: 'robot', count: 3 }, { category: 'computer', count: 4 },
-    { category: 'table', count: 3 },
+  { key: 'lab', icon: '🤖', name: 'Robotics Lab', items: [
+    { category: 'robot', count: 4 }, { category: 'machine', count: 3 },
+    { category: 'crate', count: 5 }, { category: 'turret', count: 2 },
+  ] },
+  { key: 'garden', icon: '🌸', name: 'Botanical Garden', items: [
+    { category: 'tree', count: 6 }, { category: 'rose_bush', count: 5 },
+    { category: 'sunflower', count: 5 }, { category: 'mushroom', count: 4 },
+    { category: 'fountain', count: 1 },
+  ] },
+  { key: 'shrine', icon: '⛩️', name: 'Sacred Shrine', items: [
+    { category: 'shrine', count: 2 }, { category: 'altar', count: 1 },
+    { category: 'obelisk', count: 2 }, { category: 'torch', count: 4 },
+    { category: 'banner', count: 4 },
+  ] },
+  { key: 'dungeon', icon: '🗝️', name: 'Dungeon Crawl', items: [
+    { category: 'chest', count: 4 }, { category: 'spike_trap', count: 4 },
+    { category: 'bat', count: 4 }, { category: 'torch', count: 5 },
+    { category: 'door', count: 3 },
+  ] },
+  { key: 'treasury', icon: '💎', name: 'Royal Treasury', items: [
+    { category: 'gold_coin', count: 6 }, { category: 'diamond', count: 4 },
+    { category: 'chest', count: 4 }, { category: 'medallion', count: 4 },
   ] },
 ] as const;
 
@@ -59,7 +78,11 @@ const HINTS: Record<SceneRecipeKey, RegExp> = {
   squad: /\b(?:party of heroes|hero squad|adventuring party)\b/i,
   armory: /\b(?:armou?ry|weapons room|weapon shop)\b/i,
   feast: /\b(?:tavern|feast|banquet)\b/i,
-  lab: /\b(?:research lab|laboratory|robotic workshop)\b/i,
+  lab: /\b(?:research lab|laboratory|robotic workshop|robotics lab)\b/i,
+  garden: /\b(?:botanical garden|flower garden)\b/i,
+  shrine: /\b(?:sacred shrine|temple shrine)\b/i,
+  dungeon: /\b(?:dungeon|catacombs)\b/i,
+  treasury: /\b(?:royal treasury|treasure vault)\b/i,
 };
 
 function id(value: unknown): value is string {
