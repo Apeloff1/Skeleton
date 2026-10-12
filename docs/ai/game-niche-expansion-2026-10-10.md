@@ -712,4 +712,3 @@ Tests verify query budgets and deferred work, source-role distinctions, canonica
 - Proposed measurement: cross-screen attention cost and stylus-free alternatives.
 - Failure probe: mandatory information is split beyond comfortable attention.
 - Original-design prompt: pair an original field notebook with a navigable miniature world.
-
