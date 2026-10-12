@@ -35,6 +35,7 @@ from .advanced_defense_godot import render_defense_godot_package
 from .advanced_racing_godot import render_racing_godot_package
 from .advanced_survival_godot import render_survival_godot_package
 from .advanced_farming_godot import render_farming_godot_package
+from .advanced_factory_godot import render_factory_godot_package
 from .advanced_gameplay_save import (
     export_advanced_savegame, import_advanced_savegame, continue_advanced_savegame,
 )
@@ -213,6 +214,8 @@ class _StudioHandler(BaseHTTPRequestHandler):
                       if type(session) is dict and session.get("editor")=="survival"
                       else render_farming_godot_package
                       if type(session) is dict and session.get("editor")=="farming"
+                      else render_factory_godot_package
+                      if type(session) is dict and session.get("editor")=="factory"
                       else render_advanced_godot_package)
             package=renderer(session,values.get("settings"),authorized=True)
             compressed=archive_advanced_godot_package(package)
