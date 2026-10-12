@@ -904,6 +904,13 @@ $("advanced-canvas").addEventListener("click",event=>{
 });
 function showAdvanced(reply){
  advancedSession=reply.session;
+ const nativeSourceFamilies=new Set(["puzzle","platformer","deck_battler",
+  "shooter","tactics","tower_defense","racing","survival","farming",
+  "factory","colony"]);
+ $("advanced-godot-export").disabled=!nativeSourceFamilies.has(advancedSession.editor);
+ $("advanced-godot-export").title=nativeSourceFamilies.has(advancedSession.editor)?
+  "Package original Godot source; native hardware verification is a separate CI gate":
+  "This original editor has reference gameplay only; an independent native source engine is not implemented";
  $("advanced-state").textContent=JSON.stringify({
    session_digest:advancedSession.digest,
    turns:advancedSession.validated_turn_count,
