@@ -45,6 +45,7 @@ class Cursor:
 @pytest.fixture
 def data(monkeypatch):
     notes = {
+        "_id": "document-1", "revision": 1,
         "digest": "a" * 64, "chapter": 1, "scene": 1,
         "branch_id": "main", "text": "Aria gasped as the castle fell.",
         "source_message_id": "message-1",
@@ -52,7 +53,15 @@ def data(monkeypatch):
                          "anchor": "the castle fell"}],
     }
     reviews = Reviews()
-    monkeypatch.setattr(route, "_db", SimpleNamespace(game_story_reviews=reviews))
+    class Scenes:
+        async def update_one(self, query, change):
+            if query.get("digest") != notes["digest"] or query.get("revision") != notes["revision"]:
+                return SimpleNamespace(matched_count=0)
+            notes.update(change["$set"])
+            return SimpleNamespace(matched_count=1)
+    monkeypatch.setattr(route, "_db", SimpleNamespace(
+        game_story_reviews=reviews, game_story_scenes=Scenes(),
+    ))
     async def get(scope, branch, scene):
         assert scope["game_id"] == "game"
         if branch != "main" or scene != 1:
@@ -153,3 +162,37 @@ async def test_registry_and_model_review_prompt_are_retrieved_without_claiming_q
     assert prompt["scene_receipt"] == "a" * 64
     assert "earlier" not in prompt["prompt"].lower() or isinstance(prompt["prompt"], str)
     assert "red_herring_fairness" in prompt["prompt"]
+
+
+
+@pytest.mark.asyncio
+async def test_matrix_finalization_refuses_missing_or_unapproved_reviews(data):
+    with pytest.raises(HTTPException) as error:
+        await route.finalize_scene_matrices("game", 1, branch_id="main", user=AUTHOR)
+    assert error.value.status_code == 409
+    assert error.value.detail["coverage"]["cells_missing"] == 10000
+    assert "matrix_review" not in data[0]
+
+
+@pytest.mark.asyncio
+async def test_all_10000_approved_matrix_findings_produce_compact_idempotent_receipt(data):
+    from core.story_review_matrices import MATRICES
+    notes, reviews = data
+    for rubric in MATRICES:
+        for level in range(1, 101):
+            identity = rubric["id"] + ":" + str(level)
+            reviews.docs[identity] = {
+                "matrix_id": rubric["id"], "level": level,
+                "review_digest": "b" * 64, "verdict": "pass",
+                "creator_approved": True, "scene_digest": notes["digest"],
+                "game_id": "game", "tenant_id": "team",
+                "owner_id": "writer@example.com", "branch_id": "main", "scene": 1,
+            }
+    result = await route.finalize_scene_matrices("game", 1, branch_id="main", user=AUTHOR)
+    assert result["ok"] and result["replayed"] is False
+    assert result["coverage"]["cells_passed"] == 10000
+    assert notes["matrix_review"]["cells_approved"] == 10000
+    assert notes["matrix_review"]["scene_digest"] == "a" * 64
+    replay = await route.finalize_scene_matrices("game", 1, branch_id="main", user=AUTHOR)
+    assert replay["replayed"] is True
+    assert replay["matrix_review_receipt"] == result["matrix_review_receipt"]
