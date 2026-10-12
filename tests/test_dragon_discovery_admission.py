@@ -383,3 +383,35 @@ def test_orphan_batches_do_not_silently_satisfy_reconciled_chain(baseline, chain
     poisoned[2][1]["counts"]["raw_provisional_urls"] += 1
     with pytest.raises(ValueError):
         validate_discovery_chain(baseline, [*historical, *poisoned])
+
+
+def test_reconciled_operator_projection_keeps_orphans_quarantined(baseline):
+    from skeleton.ai.game_builder.dragon_discovery_reconciled import (
+        verify_reconciled_chain, SOURCE_BATCHES, EXCLUDED_ORPHANS,
+    )
+    projection = verify_reconciled_chain(baseline)
+    assert len(SOURCE_BATCHES) == 11
+    assert projection["raw_url_leads"] == 10551
+    assert projection["raw_new"] == 6146
+    assert projection["canonical_new"] <= projection["raw_new"]
+    assert projection["canonical_candidate_sources"] <= 10551
+    assert projection["excluded_orphan_paths"] == list(EXCLUDED_ORPHANS)
+    assert not any(path in projection["evidence_batch_paths"]
+                   for path in EXCLUDED_ORPHANS)
+    assert projection["crawler_authorized"] is False
+    assert projection["rights_approved"] is False
+    assert projection["training_authorized"] is False
+    assert projection["memory_promotion_authorized"] is False
+
+
+def test_reconciled_import_requires_exact_authorized_owner(tmp_path, baseline):
+    from skeleton.ai.game_builder.dragon_discovery_reconciled import (
+        import_reconciled_chain,
+    )
+    with ReviewedKnowledgeStore(tmp_path / "reconciled-denied.sqlite") as store:
+        almanacs = DragonAlmanacs(store)
+        with pytest.raises(PermissionError):
+            import_reconciled_chain(
+                almanacs, "studio", baseline, authorized=False)
+        assert store.db.execute(
+            "SELECT COUNT(*) FROM dragon_almanac_sources").fetchone()[0] == 0
