@@ -150,6 +150,7 @@ def compile_system_assembly(project_id: str,
         "colony": ("tick",),
         "city_builder": ("tick",),
         "stealth": ("wait",),
+        "metroidvania": ("inspect",),
     }
     if set(advanced_smoke) != set(ADVANCED_ENGINE_IDS):
         raise AssemblyError("every playable editor needs an explicit assembly gameplay proof")
@@ -192,6 +193,7 @@ def compile_system_assembly(project_id: str,
             "colony":("tick",),
             "city_builder":("tick",),
             "stealth":("wait",),
+            "metroidvania":("inspect",),
         }
         if set(scene_smoke) != set(ADVANCED_ENGINE_IDS):
             raise AssemblyError("every playable editor needs a source-bound scene proof")
