@@ -12,6 +12,9 @@ import json
 from typing import Mapping, Sequence
 
 from .system_editors import make_editor_document, SystemEditorError
+from .advanced_factory_runtime import (ACTIONS as FACTORY_ACTIONS, FactoryActionError,
+                                        start as factory_start, step as factory_step,
+                                        apply_scene as apply_factory_scene)
 from .advanced_farming_runtime import (ACTIONS as FARM_ACTIONS, FarmingActionError,
                                         start as farming_start, step as farming_step,
                                         apply_scene as apply_farm_scene)
@@ -21,7 +24,7 @@ from .advanced_genre_engines import (
 )
 
 SCHEMA = "skeleton.game_builder.advanced_session.v1"
-ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming")
+ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory")
 MAX_TURNS = 128
 MAX_SEED = 2**31 - 1
 
@@ -39,6 +42,7 @@ ACTION_HELP = {
                  "cook", "craft_tool", "light_fire", "build_shelter",
                  "trade", "travel", "rest"),
     "farming": FARM_ACTIONS,
+    "factory": FACTORY_ACTIONS,
     **GENRE_ACTIONS,
 }
 
@@ -641,6 +645,7 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
         "racing":_racing_start,
         "survival":_survival_start,
         "farming":farming_start,
+        "factory":factory_start,
         **GENRE_STARTS,
     }
     state=starts[editor](rules,seed)
@@ -674,6 +679,8 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             state["weather"]=layout["weather"]
         elif editor=="farming":
             apply_farm_scene(state,rules,layout)
+        elif editor=="factory":
+            apply_factory_scene(state,rules,layout)
         else:
             apply_genre_scene(editor,state,layout)
     baseline=_digest({"editor":editor,"configuration":config["digest"],"seed":seed,
@@ -691,11 +698,12 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             "tower_defense":_defense_step,"racing":_racing_step,
             "survival":_survival_step,
             "farming":farming_step,
+            "factory":factory_step,
             **GENRE_STEPS,
         }
         try:
             events=steps[editor](state,rules,action)
-        except (GenreActionError,FarmingActionError) as exc:
+        except (GenreActionError,FarmingActionError,FactoryActionError) as exc:
             raise AdvancedRuntimeError(str(exc)) from exc
         state["events"]=events
         receipt={"index":index,"action":action,"events":events,
