@@ -404,6 +404,14 @@ func _verify() -> void:
         var wanted: Variant = expected[field]
         if field == "districts":
             wanted = _districts(wanted)
+        elif field == "workers" or field == "buildings":
+            if typeof(wanted) != TYPE_DICTIONARY:
+                _fail("colony civic source requires structured worker/building counts")
+                return
+            var normalized: Dictionary = {}
+            for key in wanted:
+                normalized[str(key)] = int(wanted[key])
+            wanted = normalized
         if state[field] != wanted:
             _fail("colony independent rules mismatch at " + field +
                 " native=" + str(state[field]) + " reference=" + str(wanted))
