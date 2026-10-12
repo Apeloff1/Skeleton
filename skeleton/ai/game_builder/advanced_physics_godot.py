@@ -178,10 +178,12 @@ func _step(action: String) -> bool:
                 physical["vx"]=_clamp(int(physical["vx"])+delta,
                     -int(cfg["speed_limit"]),int(cfg["speed_limit"]))
             "push:west":
-                physical["vx"]=_clamp(int(physical["vx"])-delta,
+                physical["vx"]=_clamp(int(physical["vx"])+
+                    _floor_div(-int(cfg["impulse_strength"]),mass),
                     -int(cfg["speed_limit"]),int(cfg["speed_limit"]))
             "push:up":
-                physical["vy"]=_clamp(int(physical["vy"])-delta,
+                physical["vy"]=_clamp(int(physical["vy"])+
+                    _floor_div(-int(cfg["impulse_strength"]),mass),
                     -int(cfg["speed_limit"]),int(cfg["speed_limit"]))
             "push:down":
                 physical["vy"]=_clamp(int(physical["vy"])+delta,
