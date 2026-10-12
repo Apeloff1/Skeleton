@@ -13,6 +13,23 @@ from .story_canon_fabric import (
 )
 
 
+def load_continuity_contract(workspace, project):
+    """Load a reviewed immutable 100-act/9999-scene identity contract, if any."""
+    from .game_project_workspace import _json
+    from .story_continuity_assurance import validate_contract
+    if project != workspace.active():
+        raise StoryCanonError("cannot inspect another project's canon")
+    files = workspace.files("current", project)
+    if "game/continuity_contract.json" not in {f.path for f in files}:
+        return None
+    base = _json(workspace.read("current", project,
+                    "game/story_bible.json")["content"])
+    contract = _json(workspace.read("current", project,
+                    "game/continuity_contract.json")["content"])
+    validate_contract(contract, base)
+    return contract
+
+
 def load_story_workspace(workspace, project):
     """Read all committed story sources without executing generated content."""
     if project != workspace.active():
@@ -46,16 +63,37 @@ def load_story_workspace(workspace, project):
             raise StoryCanonError("scene source file identity does not match contents")
         scenes.append(content)
     index = verify_story_history(bible, scenes)
+    # Strict source history cannot be bypassed by choosing a different
+    # studio entry point or reading the source directly.
+    contract = load_continuity_contract(workspace, project)
+    if contract is not None:
+        from .story_continuity_assurance import verify_production_history
+        verify_production_history(bible, contract, scenes)
     return bible, scenes, index
 
 
 def validate_story_workspace_source(workspace, project, path, source):
     """Required at BOTH proposed-source and human commit boundaries."""
+    if path == "game/continuity_contract.json":
+        from .story_continuity_assurance import validate_contract
+        bible, scenes, _ = load_story_workspace(workspace, project)
+        if bible is None or bible["phase"] != "design":
+            raise StoryCanonError("no voice/face lock before reviewed world design")
+        if scenes:
+            raise StoryCanonError("cannot replace the visual/voice contract after scene one")
+        current = load_continuity_contract(workspace, project)
+        if current is not None and current != source:
+            raise StoryCanonError("signed production contract is immutable once approved")
+        validate_contract(source, bible)
+        return {"kind":"immutable_100_act_production_contract",
+                "source_digest":source["digest"],"human_commit_required":True}
     if path == "game/story_bible.json":
         validate_story_bible(source)
         if source["project"] != project:
             raise StoryCanonError("cannot retarget another game's story canon")
         current, scenes, _ = load_story_workspace(workspace, project)
+        if load_continuity_contract(workspace, project) is not None and current != source:
+            raise StoryCanonError("approved cast voices, faces and region style are locked")
         if current is None and source["phase"] != "foundation":
             raise StoryCanonError("first reviewed story source must be the foundation")
         if current is not None:
@@ -79,6 +117,10 @@ def validate_story_workspace_source(workspace, project, path, source):
     if any(s["act"] == source["act"] and s["scene"] == source["scene"]
            for s in scenes):
         raise StoryCanonError("approved story is append-only; no silent scene overwrite")
+    contract = load_continuity_contract(workspace, project)
+    if contract is not None:
+        from .story_continuity_assurance import verify_production_history
+        verify_production_history(bible, contract, [*scenes, source])
     return {"kind": "story_scene",
             **verify_story_scene(bible, scenes, source),
             "human_commit_required": True}
@@ -117,4 +159,10 @@ def story_workspace_status(workspace, project):
             "human_approved_sources_only": True,
             "automated_game_assets_generated": False,
             "live_Jeeves_model_connected": False,
-            "model_weights_modified": False}
+            "model_weights_modified": False,
+            "required_production_scenes": 9999,
+            "maximum_story_acts": 100,
+            "scene_by_scene_confirmation_enabled":
+                load_continuity_contract(workspace, project) is not None,
+            "actual_audio_voice_consistency_verified": False,
+            "actual_rendered_face_consistency_verified": False}
