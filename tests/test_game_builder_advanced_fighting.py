@@ -223,6 +223,40 @@ class OriginalAdvancedArenaTests(unittest.TestCase):
         self.assertEqual(validate_advanced_scene(rebuilt,rules),rebuilt)
 
 
+
+    def test_true_zero_object_budgets_and_bounded_starting_meter(self):
+        settings=self.rules(hazards_enabled=True,hazard_count=0,
+                            cover_enabled=True,cover_count=0)
+        cfg=make_editor_document("fighting",settings)["settings"]
+        source=default_layout(cfg,0)
+        self.assertEqual(source["hazards"],[])
+        self.assertEqual(source["cover"],[])
+        self.assertEqual(normalize_layout(cfg,source),source)
+        report=run_advanced_session("fighting",settings)
+        self.assertTrue(verify_advanced_session(report,settings))
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("fighting",self.rules(
+                meter_cap=20,starting_meter=100))
+
+    def test_knockback_must_not_tunnel_through_real_cover_or_enemy(self):
+        rules=self.rules(cover_enabled=True,cover_count=1,
+                         knockback=2,ring_outs=True)
+        cfg=make_editor_document("fighting",rules)["settings"]
+        state=start(cfg,0)
+        player=state["player"];enemy=state["opponent"]
+        player["x"]=4;player["lane"]=2
+        enemy["x"]=5;enemy["lane"]=2
+        self.assertEqual(state["arena"]["cover"][0]["x"],6)
+        before=enemy["hp"]
+        step(state,cfg,"kick")
+        self.assertEqual(enemy["x"],5)
+        self.assertLess(enemy["hp"],before)
+        self.assertIn("physical_original_stage_cover_blocked_knockback",
+                      state["events"])
+        self.assertEqual(state["ringouts"],0)
+        self.assertTrue(verify_advanced_session(
+            run_advanced_session("fighting",rules),rules))
+
     def test_studio_renders_original_live_fight_and_signed_stage_painter(self):
         from skeleton.ai.game_builder.game_workspace_ui import (
             render_workspace_html,SCRIPT,
