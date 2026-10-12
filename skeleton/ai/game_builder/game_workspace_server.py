@@ -38,6 +38,8 @@ from .advanced_godot_export import (
     render_advanced_godot_package, archive_advanced_godot_package,
 )
 from .advanced_platformer_godot import render_platformer_godot_package
+from .advanced_physics_linked_game import (run_linked_physics_game,
+    verify_linked_physics_game)
 from .advanced_physics_interop import (rehearse_physics_encounter,
     verify_physics_encounter)
 from .advanced_physics_godot import render_physics_godot_package
@@ -376,6 +378,17 @@ class _StudioHandler(BaseHTTPRequestHandler):
             return self._json(200, {"session":result,
                                     "available_actions":list(ACTION_HELP[result["editor"]]),
                                     "server_mutated_game_files":False})
+        if path=="/api/advanced-physics-linked":
+            game=run_linked_physics_game(
+                values["editor"],values["scene"],
+                values.get("settings"),values.get("turns",[]))
+            if not verify_linked_physics_game(game,values["scene"],
+                                              values.get("settings")):
+                raise ValueError("source-linked physical campaign proof rejected")
+            return self._json(200,{
+                "game":game,"source_file_mutated":False,
+                "native_hardware_verified":False,"promotion_approved":False,
+            })
         if path=="/api/advanced-physics-interop":
             proof=rehearse_physics_encounter(
                 values["session"],values.get("settings"),
