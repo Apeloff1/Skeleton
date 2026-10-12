@@ -14,7 +14,8 @@ import re
 from .contracts import canonical_digest, canonical_json
 from .dragon_almanacs import DragonAlmanacs, _auth
 from .dragon_discovery_facets import DiscoveryFacetIndex
-from .dragon_discovery_portfolio import MissionPortfolio, PortfolioRequest
+from .dragon_discovery_portfolio import MissionPortfolio, PortfolioRequest, PortfolioAxis
+from .dragon_discovery_mission import SourceMission
 from .reviewed_knowledge import _id
 
 
@@ -197,6 +198,70 @@ class DiscoveryCampaigns:
             "discovery_gaps": proposal["uncovered_axes"],
             "training_authorized": False,
         }
+
+    @staticmethod
+    def _restore_request(body: dict) -> tuple[PortfolioRequest, str | None]:
+        """Strictly decode a committed campaign's original typed mission.
+
+        Do not accept inferred or added parameter fields when resuming. All
+        admitted options must have existed at the time the campaign was made.
+        """
+        if not isinstance(body, dict) or set(body) != {
+                "mission", "axes", "total_limit", "per_axis_candidates",
+                "max_per_host", "indexed", "topic"}:
+            raise ValueError("campaign request schema mismatch")
+        allowed_mission = {
+            "goal", "platform", "genre", "era", "prefer_video", "limit",
+            "scan_budget"}
+        mission = body["mission"]
+        axes = body["axes"]
+        if not isinstance(mission, dict) or set(mission) != allowed_mission:
+            raise ValueError("campaign mission schema mismatch")
+        if not isinstance(axes, list) or not all(
+                isinstance(x, dict) and set(x) ==
+                {"axis_id", "question", "minimum", "importance"} for x in axes):
+            raise ValueError("campaign axis schema mismatch")
+        topic = body["topic"]
+        if topic is not None:
+            _id(topic, "campaign topic")
+        try:
+            restored = PortfolioRequest(
+                SourceMission(**mission),
+                tuple(PortfolioAxis(**x) for x in axes),
+                total_limit=body["total_limit"],
+                per_axis_candidates=body["per_axis_candidates"],
+                max_per_host=body["max_per_host"],
+                indexed=body["indexed"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("committed campaign parameters invalid") from exc
+        if DiscoveryCampaigns._request_body(restored, topic) != body:
+            raise ValueError("campaign typed request is not canonical")
+        return restored, topic
+
+    def refresh(self, owner: str, campaign: str, *,
+                authorized: bool, expected_parent: str | None = None) -> dict:
+        """Recompute the saved plan, preserving its original policy boundaries.
+
+        Reuses the same typed source mission and axes. No crawl, source use or
+        training occurs. CAS serializes competing refreshes/revisions.
+        """
+        _auth(owner, authorized)
+        _id(campaign, "campaign")
+        history = self._history(owner, campaign)
+        if not history:
+            raise ValueError("unknown owner campaign")
+        digest = history[-1]["digest"]
+        if expected_parent is not None and expected_parent != digest:
+            raise ValueError("campaign refresh expected parent differs")
+        request, topic = self._restore_request(history[-1]["body"]["request"])
+        result = self.record(
+            owner, campaign, request, authorized=True, topic=topic,
+            expected_parent=digest)
+        result["reused_saved_request"] = True
+        result["crawl_authorized"] = False
+        result["source_rights_approved"] = False
+        return result
 
     def inspect(self, owner: str, campaign: str, *, authorized: bool) -> dict:
         _auth(owner, authorized)
