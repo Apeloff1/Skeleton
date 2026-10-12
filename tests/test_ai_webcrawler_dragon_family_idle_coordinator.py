@@ -157,6 +157,34 @@ def test_cross_specialist_leases_cannot_race_for_same_source():
     db.close()
 
 
+def test_reviewed_dispute_brief_gives_scout_first_known_source_only():
+    db,family,worker=make()
+    seen=[]
+    def capture(task):
+        seen.append((task.dragon,task.source_id))
+        return gather(task)
+    result=worker.run_once(
+        OWNER,authorized=True,idle_state=idle,
+        gatherers={role:capture for role in ("article","video","monitor")},
+        task_topics=("game_engine",),adjacent_topics=("physics",),
+        revisit_source_ids=("article-1",))
+    assert result["changed"]==3
+    assert seen[0]==("monitor","article-1")
+    assert len({sid for _,sid in seen})==3
+    assert set(role for role,_ in seen)=={"monitor","article","video"}
+    # A source outside the authenticated catalog can never be dispatched
+    # just because a reviewer included it in a priority hint.
+    assert worker.run_once(
+        OWNER,authorized=True,idle_state=lambda:idle(NOW+800),
+        gatherers={"monitor":capture},task_topics=("game_engine",),
+        revisit_source_ids=("unknown-outside-catalog",))["attempted"]==0
+    with pytest.raises(ValueError):
+        worker.run_once(OWNER,authorized=True,idle_state=idle,
+            gatherers={},task_topics=("game_engine",),
+            revisit_source_ids=("broken space id",))
+    db.close()
+
+
 def test_crash_recovery_reclaims_old_leases_without_replaying_knowledge():
     db,family,worker=make()
     key=worker._reserve(OWNER,"article","article-1",NOW+720)
