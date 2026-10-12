@@ -124,6 +124,8 @@ class StoryAuditAccumulator:
             self.issue("participants_missing", item, "Active event lacks identified characters.")
         if set(witnesses) - set(participants):
             self.issue("witness_missing", item, "Witness must be listed among event participants.")
+        for actor in participants:
+            self.known.setdefault(actor, set())
         if len(participants) > 1:
             self.interaction_groups.add("|".join(sorted(participants)))
         for actor in participants:
