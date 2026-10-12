@@ -194,14 +194,24 @@ def _spend(state,key,amount):
 def _day_vision(state,config,npc):
     phase=(state["tick"]+state["world"]["day_phase"])%config["day_ticks"]
     night=phase>=config["day_ticks"]*config["night_fraction_percent"]//100
-    return max(0,min(config["witness_radius"],npc["perception"])-
+    climate=state["world"]["climate"]
+    climate_bonus=(1 if climate=="highland" else
+                   -1 if climate=="rainforest" else 0)
+    return max(0,min(config["witness_radius"],
+                     npc["perception"]+climate_bonus)-
                (config["night_sight_penalty"] if night else 0))
 
 
 def _remember(npc,event,config,*,direct):
     target="memories" if direct else "heard"
+    if not direct and any(m["event_id"]==event["id"]
+                          for m in npc["memories"]):
+        return False
     if any(m["event_id"]==event["id"] for m in npc[target]):
         return False
+    if direct:
+        npc["heard"]=[m for m in npc["heard"]
+                      if m["event_id"]!=event["id"]]
     while len(npc[target])>=config["memory_records"]:
         npc[target].pop(0)
     npc[target].append({
@@ -459,8 +469,9 @@ def step(state,config,action):
         npc=state["npcs"][index]
         if not _adjacent(state,npc["cell"]):
             raise QuestDirectorError("cannot remotely interview an NPC that is not present")
-        if npc["trust"]<config["testimony_trust_floor"]:
-            raise QuestDirectorError("actual NPC trust too low to testify")
+        if (npc["trust"]<config["testimony_trust_floor"] or
+            npc["suspicion"]>npc["trust"]+config["testimony_suspicion_tolerance"]):
+            raise QuestDirectorError("NPC credibility cannot support first-hand testimony")
         found=False
         for quest in state["quests"]:
             if quest["status"]!="active" or npc["id"] in quest["testimonies"]:
