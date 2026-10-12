@@ -223,10 +223,11 @@ class DragonIdleCoordinator:
         stats: dict[str,object] = dict(at=_utc(state.now),attempted=0,changed=0,
                                        unchanged=0,failed=0,paused=False)
         roles_seen: set[str] = set()
+        sources_seen: set[str] = set()
         for _,attempts,seen,sid,role,url,media,tags,digest in candidates:
             if len(roles_seen) >= self.policy.max_tasks:
                 break
-            if role in roles_seen or role not in gatherers:
+            if sid in sources_seen or role in roles_seen or role not in gatherers:
                 continue
             adapter = gatherers[role]
             if not callable(adapter):
@@ -240,6 +241,7 @@ class DragonIdleCoordinator:
             if key is None:
                 continue
             roles_seen.add(role)
+            sources_seen.add(sid)
             stats["attempted"] += 1
             task=IdleTask(role,sid,url,media,tags,digest,attempts+1)
             try:
