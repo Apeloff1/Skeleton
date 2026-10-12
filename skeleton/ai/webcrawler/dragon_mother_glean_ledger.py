@@ -126,7 +126,6 @@ class MotherGleanLedger:
         )
         key = canonical_digest((
             report.owner, report.knowledge_root,
-            report.nest_history_head,
             tuple(asdict(a) for a in report.acquisitions),
         ))
         if not verify_mother_report(report):
