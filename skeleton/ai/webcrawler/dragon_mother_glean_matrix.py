@@ -305,11 +305,13 @@ def glean_mother_insights(
         raise PermissionError("mother may glean only when the app is idle")
     if nest.stage != "adult" or tuple(child.lane for child in nest.children) != LANES:
         raise ValueError("mother's three hatchlings must be unlocked")
-    if (not isinstance(acquisitions, tuple) or not 1 <= len(acquisitions) <= MAX_ACQUISITIONS
-            or any(not isinstance(x, HatchlingReceipt) for x in acquisitions)
-            or len({(x.lane, x.source_id, x.source_text_digest, x.note_id)
-                    for x in acquisitions}) != len(acquisitions)):
-        raise ValueError("bounded unique hatchling acquisitions required")
+    if (not isinstance(acquisitions, tuple)
+            or not 1 <= len(acquisitions) <= MAX_ACQUISITIONS
+            or any(not isinstance(x, HatchlingReceipt) for x in acquisitions)):
+        raise ValueError("bounded typed hatchling acquisitions required")
+    if len({(x.lane, x.source_id, x.source_text_digest, x.note_id)
+            for x in acquisitions}) != len(acquisitions):
+        raise ValueError("duplicate hatchling acquisition identity")
     if (not isinstance(lenses, tuple) or not 1 <= len(lenses) <= MAX_LENSES
             or any(not isinstance(x, MeaningLens) for x in lenses)
             or len({x.key for x in lenses}) != len(lenses)):
