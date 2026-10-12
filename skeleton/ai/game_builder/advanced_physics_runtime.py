@@ -335,8 +335,10 @@ def _pair_contacts(state, config, events):
             second["position"][axis] += direction * push_b
             relative = first["velocity"][axis] - second["velocity"][axis]
             if relative * direction > 0:
-                impulse = relative * (100 + min(MATERIAL_RESTITUTION[first["material"]],
-                                               MATERIAL_RESTITUTION[second["material"]])) // 100
+                impulse = relative * (100 + min(
+                    config["wall_restitution"], config["material_restitution"],
+                    MATERIAL_RESTITUTION[first["material"]],
+                    MATERIAL_RESTITUTION[second["material"]])) // 100
                 delta_a = impulse * second["mass"] // total
                 delta_b = impulse - delta_a
                 first["velocity"][axis] -= direction * delta_a
