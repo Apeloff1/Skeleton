@@ -1,0 +1,28 @@
+# Verified single-clock interleaving of original game engine achievements
+**Authored:** 2026-10-12, Europe/Oslo. **Parent:** replayed unified physical/genre save #3698, original Game Builder/NPC/Physics chains.
+
+## Executable world engine
+A new deterministic NPC-world timeline combines authenticated original platformer/racing/sandbox **physical impacts**, verified real **farming harvest, maritime cargo delivery and aircraft landing** achievements, and canonical player NPC-world actions in **one advancing source-authored 49-cell world clock**. The main difference from the older unified campaign is structural: game creators may now schedule, for example, a farm harvest, then interview a witness, then let an original physical collision harm another location, then deliver ship cargo. The NPCs' positions, time/day, suspicion, eyewitness memories, rumor links, quests and material world inventory evolve throughout the interleaved sequence instead of being initialized for the entire physical lane first.
+
+## Source admission before event execution
+Every original physics episode is independently authenticated by the canonical original source/Physics interop and exact fixture-index incident bridge. Every genre session and original action index is independently authenticated by the separately verified source genre runtime and genre-to-NPC world bridge. The source engines can never supply NPC health, memory, reward, gold or an arbitrary effect. All source receipt identities are unique; physical-source transcript continuity is append-only per original game scene/settings and a repeated collision receipt cannot be admitted twice. Game sources are constrained to six physical episodes and four genre sessions, with eight total genre achievements maximum.
+
+Every true source incident MUST be present exactly once in the final authored schedule: omitted source events, duplicate event indices, reordered events within one source, a physical episode overtaking an unfinished predecessor, unidentified source episodes and impossible action indices fail closed. Canonical original physics actor = `external:physics`; genuine other games use `external:genre`. NPC actions still execute through the original quest director's physical 7×7 movement, finite resources, credible eyewitness and material-action validation, not by writing desired consequences.
+
+## One causally real world clock
+The scheduler requires each event's authored `at` tick to equal the current signed NPC-world tick. A player cannot fabricate a gap, retroactively insert a source incident or put two external events at the same clock tick. To let time pass, authors schedule actual `world` actions such as `wait`; these invoke the canonical NPC engine, preserving night/day perception, rumor delivery, quest TTL, memory decay and other state-changing time behavior. The bounded ledger accepts at most 96 world-clock entries and 64 NPC-world commands. Each step records original source digest/action index/collision source, actual eyewitnesses, quest origins, world time, site damage/stock and bounded memory counts; a canonical SHA-256 hash chain links exact before/after evidence.
+
+### Source time semantics
+Source-internal physics tick/frame and genre action/trace indices are preserved as **source-local evidence**, while schedule `at` ticks are explicit user-authored world admission times. This is genuine deterministic **event-level interleaving**, NOT a globally synchronized multi-engine 60 FPS simulation. Global frame-rate parity across source engines would require a separate shared simulation clock and native scheduler implementation.
+
+## Studio
+The game Studio now has a source-verified scheduler editor with **Derive authentic physics + genre event order**, a bounded user-editable JSON schedule and **Replay authored cross-engine event timeline**. Source derivation asks the authenticated server to prove each physical and genre event before displaying any candidate. The reviewable schedule is replayed independently on the server; its real original NPC world is rendered on the existing map, with per-step witnessed events, quests, source indices and final world digest. For this mode, original physics episodes must not have hidden preplayed world actions; those actions must be explicit timeline entries.
+
+## Adversarial tests and release
+Ten engine tests exercise truly different causal orderings, ship stock before a collision, actual aircraft discovery, missing/duplicated events, fabricated or retrodated clock values, original scene and reward corruption, hidden world actions, unknown source indices and genuine NPC time advances. Three Studio tests cover actual event source derivation, editable clock, same-origin replay and strict world-identity guards. Both Windows and Ubuntu advanced reference CI and original Godot physical parity gates must pass before readiness. No source game save overwrite, automatic model-weight promotion, native full-world certification or commercial console release.
+
+### Dated improvements
+- 2026-10-12 (improved: individual physics and original genre events became real NPC causes).
+- 2026-10-12 (improved: physical and genre causes began sharing one persistent NPC world).
+- 2026-10-12 (improved: all genuine causes and NPC actions now interleave on one deterministic, audited logical world clock).
+- 2026-10-12 (improved: source admission is complete and fail-closed rather than permitting partial-source cherry-picking).
