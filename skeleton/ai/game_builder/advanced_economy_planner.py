@@ -55,16 +55,17 @@ def plan_original_trade(scene, settings=None, *, max_actions=100, retire=False):
         act("manufacture")
         act("focus:2")
         for i in range(state["trade_goal"]):
-            # Trade all deliveries through an actual cargo and paid local bid.
-            # The source model may run out of warehouse stock or cash; in that
-            # case the plan is inconclusive, never a minted perfect route.
+            # Return to source before every subsequent purchased delivery.
+            # This preserves the real location and unit-origin constraints.
+            # A route budget, stock shortage or insufficient market cash must
+            # produce an honest inconclusive plan, never a claimed win.
+            if i:
+                act("travel:0")
             act("buy")
             act("travel:1")
             if i == 0:
                 act("audit")
             act("sell")
-            if i + 1 < state["trade_goal"]:
-                act("travel:0")
         act("checkpoint")
         if retire:
             act("retire")
