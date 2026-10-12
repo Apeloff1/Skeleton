@@ -1848,6 +1848,10 @@ function showAdvanced(reply){
    advancedSession.editor)||!advancedSession.scene;
  $("advanced-episodic-add").disabled=!["platformer","racing","sandbox"].includes(
    advancedSession.editor)||!advancedSession.scene;
+ $("advanced-genre-event-inspect").disabled=!["farming","sailing","flight"].includes(
+   advancedSession.editor)||!advancedSession.scene;
+ $("advanced-genre-event-play").disabled=!["farming","sailing","flight"].includes(
+   advancedSession.editor)||!advancedSession.scene;
  $("advanced-interop-godot").disabled=!["platformer","racing","sandbox"].includes(
    advancedSession.editor)||!advancedSession.scene;
  $("advanced-linked-step").disabled=!["platformer","racing","sandbox"].includes(
@@ -3239,6 +3243,71 @@ async function runNPCConditionalRules(mode){
     "No independently earned original world commands were applied");
  }
 }
+$("advanced-genre-event-inspect").addEventListener("click",()=>{
+ try{
+  if(!advancedSession?.scene ||
+     !["farming","sailing","flight"].includes(advancedSession.editor))
+   throw Error("A signed farming, sailing or flight source scene is needed");
+  const approved={
+   farming:"mature_crop_harvested",
+   sailing:"original_cargo_delivered",
+   flight:"runway_landing_confirmed"
+  }[advancedSession.editor];
+  const optionList=$("advanced-genre-event-index");
+  optionList.replaceChildren();
+  for(let index=0;index<advancedSession.trace.length;index++){
+   const item=advancedSession.trace[index];
+   if(!item.events.includes(approved))continue;
+   const choice=document.createElement("option");
+   choice.value=String(index);
+   choice.textContent="Source action "+index+" · "+item.action+" · "+approved;
+   optionList.append(choice);
+  }
+  if(!optionList.options.length)
+   throw Error("The original source engine has not earned that gameplay event");
+  status("Candidate original genre events listed; server will independently replay their source");
+ }catch(error){status("Original genre source inspection rejected: "+error.message);}
+});
+$("advanced-genre-event-play").addEventListener("click",async()=>{
+ try{
+  if(!advancedSession?.scene ||
+     !["farming","sailing","flight"].includes(advancedSession.editor))
+   throw Error("Original genre action source not available");
+  const index=Number($("advanced-genre-event-index").value);
+  if(!Number.isSafeInteger(index) || index<0 ||
+      index>=advancedSession.trace.length)
+   throw Error("Inspect one actually earned original source event first");
+  const world=await api("/api/advanced-scene-template",{
+   editor:"quest_director",seed:0,scene_id:"cross_genre_source_world"
+  });
+  const reply=await api("/api/advanced-cross-genre-npc-world",{
+   session:advancedSession,world_scene:world.scene,
+   source_settings:advancedSettings,
+   bindings:[{trace_index:index,
+              site_id:Number($("advanced-genre-event-site").value)}],
+   world_actions:[]
+  });
+  const proof=reply.report;
+  if(!proof || reply.original_project_files_modified ||
+     reply.native_hardware_certified || reply.automatic_rewards_or_promotion ||
+     proof.source_session_digest!==advancedSession.digest ||
+     proof.world_scene_digest!==world.scene.digest ||
+     proof.source_game_files_changed || proof.automatic_rewards_approved)
+   throw Error("Source/eyewitness custody denied cross-genre world event");
+  $("advanced-genre-event-proof").textContent=JSON.stringify({
+    real_source_engine:proof.source_editor,
+    original_action_events:proof.earned_events,
+    direct_witness_memories:proof.world_state.npcs.map(n=>({
+      id:n.id,cell:n.cell,direct:n.memories,rumors:n.heard
+    })),
+    actual_source_quests:proof.world_state.quests,
+    finite_npc_site_stock:proof.world_state.sites,
+    original_game_not_mutated:true,
+    replay_digest:proof.digest
+  },null,2);
+  status("Earned original genre achievement independently replayed into NPC world with actual eyewitnesses");
+ }catch(error){status("Cross-genre original gameplay event rejected: "+error.message);}
+});
 $("advanced-npc-rule-preview").addEventListener("click",async()=>{
  try{await runNPCConditionalRules("preview");}
  catch(error){status("NPC rule preview rejected: "+error.message);}
@@ -3862,6 +3931,27 @@ local until typed revalidation and an explicit human-approved file commit.</smal
       Commit verified source actions into current campaign
     </button>
     <pre id="advanced-npc-rule-proof" role="status" aria-live="polite"></pre>
+    <fieldset aria-label="Original cross-genre NPC world">
+      <legend>Original farming, sailing and flight event witnesses</legend>
+      <button id="advanced-genre-event-inspect" type="button">
+        Inspect earned original source events
+      </button>
+      <label>Real original gameplay event
+        <select id="advanced-genre-event-index"></select>
+      </label>
+      <label>NPC world site
+        <select id="advanced-genre-event-site">
+          <option value="0">Settlement</option>
+          <option value="1">Bridge</option>
+          <option value="2">Grove</option>
+          <option value="3">Archive</option>
+        </select>
+      </label>
+      <button id="advanced-genre-event-play" type="button">
+        Replay original achievement into NPC world
+      </button>
+      <pre id="advanced-genre-event-proof" role="status" aria-live="polite"></pre>
+    </fieldset>
   </fieldset>
   </fieldset>
   <fieldset aria-label="Forensic NPC route navigator">
