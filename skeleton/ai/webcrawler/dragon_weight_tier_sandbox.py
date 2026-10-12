@@ -13,6 +13,10 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from skeleton.ai.game_builder.contracts import canonical_digest, canonical_json
 from .dragon_hundred_matrix_scrutiny import SignedMatrixFinding,scrutinize_one_hundred
+from .dragon_cross_source_factchecking import (
+    ClaimSubject,SourceWitness,SignedClaimAdjudication,
+    verify_cross_source_claims,
+)
 
 HEX=re.compile(r"[0-9a-f]{64}\Z")
 WORD=re.compile(r"[a-z0-9]{2,40}")
@@ -83,6 +87,12 @@ def qualify_tier(evaluation:SealedTierEvaluation,*,evaluator_public_key:bytes,
                  mother_findings:tuple[SignedMatrixFinding,...],
                  mother_public_key:bytes,mother_reviewer:str,mother_key_id:str,
                  mother_knowledge_digest:str,
+                 fact_claims:tuple[ClaimSubject,...],
+                 fact_witnesses:tuple[SourceWitness,...],
+                 fact_adjudications:tuple[SignedClaimAdjudication,...],
+                 fact_reviewers:dict[str,tuple[str,str,bytes]],
+                 fact_adjudicator_public_key:bytes,
+                 fact_adjudicator:str,fact_adjudicator_key_id:str,
                  max_latency_ratio:float=1.05,max_memory_ratio:float=1.10)->dict:
     if not isinstance(evaluation,SealedTierEvaluation):
         raise TypeError("sealed independent tier-evaluation required")
@@ -102,6 +112,16 @@ def qualify_tier(evaluation:SealedTierEvaluation,*,evaluator_public_key:bytes,
     if (mother["shadow_review_proposal_eligible"] is not True
         or mother["report_digest"]!=evaluation.matrix_report_digest):
         raise PermissionError("100 independently signed fact-check matrices required")
+    fact_report=verify_cross_source_claims(
+        evaluation.owner,mother_knowledge_digest,
+        fact_claims,fact_witnesses,fact_adjudications,
+        trusted_publisher_reviewers=fact_reviewers,
+        adjudicator_public_key=fact_adjudicator_public_key,
+        adjudicator=fact_adjudicator,
+        adjudicator_key_id=fact_adjudicator_key_id,
+        now=now)
+    if not fact_report["all_claims_review_eligible"]:
+        raise PermissionError("disputed or incomplete article fact review blocks weight promotion")
     for x in (evaluation.candidate_digest,evaluation.prior_digest,
               evaluation.matrix_report_digest,evaluation.suite_digest):
         _hash(x)
@@ -150,6 +170,8 @@ def qualify_tier(evaluation:SealedTierEvaluation,*,evaluator_public_key:bytes,
         "candidate_digest":evaluation.candidate_digest,
         "prior_digest":evaluation.prior_digest,
         "matrix_report_digest":evaluation.matrix_report_digest,
+        "cross_source_fact_report_digest":fact_report["report_digest"],
+        "corroborated_claim_count":fact_report["corroborated_claim_count"],
         "suite_digest":evaluation.suite_digest,
         "trial_count":len(trials),"task_families":len(families),
         "source_groups":len(groups),"baseline_correct":base,
@@ -217,6 +239,12 @@ class JeevesWeightOverlay:
                  mother_findings:tuple[SignedMatrixFinding,...],
                  mother_public_key:bytes,mother_reviewer:str,mother_key_id:str,
                  mother_knowledge_digest:str,
+                 fact_claims:tuple[ClaimSubject,...],
+                 fact_witnesses:tuple[SourceWitness,...],
+                 fact_adjudications:tuple[SignedClaimAdjudication,...],
+                 fact_reviewers:dict[str,tuple[str,str,bytes]],
+                 fact_adjudicator_public_key:bytes,
+                 fact_adjudicator:str,fact_adjudicator_key_id:str,
                  operator_public_key:bytes,operator:str,key_id:str,
                  now:int,expected_generation:int)->dict:
         if (type(entries) is not tuple or len(entries)>self._entry_budget
@@ -238,7 +266,12 @@ class JeevesWeightOverlay:
             evaluator=evaluator,key_id=evaluator_key_id,now=now,
             mother_findings=mother_findings,mother_public_key=mother_public_key,
             mother_reviewer=mother_reviewer,mother_key_id=mother_key_id,
-            mother_knowledge_digest=mother_knowledge_digest)
+            mother_knowledge_digest=mother_knowledge_digest,
+            fact_claims=fact_claims,fact_witnesses=fact_witnesses,
+            fact_adjudications=fact_adjudications,fact_reviewers=fact_reviewers,
+            fact_adjudicator_public_key=fact_adjudicator_public_key,
+            fact_adjudicator=fact_adjudicator,
+            fact_adjudicator_key_id=fact_adjudicator_key_id)
         if checked!=verdict or not checked["promotion_review_eligible"]:
             raise PermissionError("independently signed sandbox verdict required")
         verified={k:v for k,v in verdict.items() if k!="verdict_digest"}

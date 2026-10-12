@@ -11,6 +11,9 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from skeleton.ai.game_builder.contracts import canonical_digest,canonical_json
 from skeleton.ai.webcrawler.dragon_hundred_matrix_scrutiny import (
     MATRIX_IDS,SignedMatrixFinding,scrutinize_one_hundred)
+from skeleton.ai.webcrawler.dragon_cross_source_factchecking import (
+    ClaimSubject,SourceWitness,SignedClaimAdjudication,witness_set_digest,
+)
 from skeleton.ai.webcrawler.dragon_weight_tier_sandbox import (
     HoldoutTrial,SealedTierEvaluation,SignedOverlayApproval,
     JeevesWeightOverlay,qualify_tier)
@@ -113,10 +116,40 @@ def trusted_mother():
     report=scrutinize_one_hundred(
         "studio","a"*64,records,public_key=pub,
         trusted_reviewer="independent-wiki",key_id="review-key-1",now=150)
+    # Each factual witness has a different signing key and source revision.
+    # A separate, third adjudicator signs the complete witness-set digest.
+    a,apub=keypair()
+    b,bpub=keypair()
+    judge,jpub=keypair()
+    claim=ClaimSubject("f"*64,"b"*64,"game-physics")
+    witnesses=[]
+    trusted={}
+    for n,(key,public,group,name) in enumerate((
+        (a,apub,"publisher-one","fact-auditor-one"),
+        (b,bpub,"publisher-two","fact-auditor-two"),
+    ),start=1):
+        trusted[group]=(name,"fact-key-"+str(n),public)
+        w=SourceWitness(
+            "studio","a"*64,claim.claim_digest,claim.context_digest,
+            "source-"+str(n)*64,str(n+2)*64,group,"supports",
+            name,"fact-key-"+str(n),100,900,"")
+        witnesses.append(replace(w,signature_hex=sign(key,w.body())))
+    claims=(claim,)
+    witnesses=tuple(witnesses)
+    review=SignedClaimAdjudication(
+        "studio","a"*64,claim.claim_digest,claim.context_digest,
+        witness_set_digest(witnesses),"accept",
+        "independent-fact-judge","judge-key",100,900,"")
+    review=replace(review,signature_hex=sign(judge,review.body()))
     parameters=dict(mother_findings=records,mother_public_key=pub,
                     mother_reviewer="independent-wiki",
                     mother_key_id="review-key-1",
-                    mother_knowledge_digest="a"*64)
+                    mother_knowledge_digest="a"*64,
+                    fact_claims=claims,fact_witnesses=witnesses,
+                    fact_adjudications=(review,),fact_reviewers=trusted,
+                    fact_adjudicator_public_key=jpub,
+                    fact_adjudicator="independent-fact-judge",
+                    fact_adjudicator_key_id="judge-key")
     return report,parameters
 
 
@@ -133,6 +166,21 @@ def test_two_signed_sandboxes_and_jeeves_fast_index_with_rollback():
     assert verdict["promotion_review_eligible"]
     assert verdict["newly_correct"]==2 and verdict["regressions"]==0
     assert not verdict["neural_training_authorized"]
+    assert verdict["corroborated_claim_count"]==1
+    assert len(verdict["cross_source_fact_report_digest"])==64
+    with pytest.raises(PermissionError,match="disputed or incomplete"):
+        qualify_tier(
+            signed,evaluator_public_key=eval_pub,evaluator="independent-mirror",
+            key_id="eval-1",now=150,
+            **{**mother_args,"fact_adjudications":()})
+    with pytest.raises(PermissionError,match="signed factual"):
+        qualify_tier(
+            signed,evaluator_public_key=eval_pub,evaluator="independent-mirror",
+            key_id="eval-1",now=150,
+            **{**mother_args,"fact_witnesses":(
+                replace(mother_args["fact_witnesses"][0],
+                        source_revision_digest="9"*64),
+                mother_args["fact_witnesses"][1])})
     with pytest.raises(PermissionError,match="100 independently signed"):
         qualify_tier(
             signed,evaluator_public_key=eval_pub,evaluator="independent-mirror",
