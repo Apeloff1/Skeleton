@@ -491,6 +491,14 @@ CATALOG = json.loads(r'''[
           "endless",
           "campaign"
         ]
+      },
+      {
+        "key": "guard_block",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 15,
+        "options": []
       }
     ],
     "preview": null
