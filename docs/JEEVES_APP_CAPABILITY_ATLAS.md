@@ -44,3 +44,13 @@ Important boundaries: the `studio_execution_plane.execute_local_tool_plan` **alr
 6. **End-to-end release:** cinematic generated media QA, adversarial game playtest, rights clearance, platform portability and full installer/release gates.
 
 **Completion reporting must distinguish:** located modules; registered adapters; executable local implementation; tested adapter; user-reviewed source mutation; and final released functionality. A source module named `dragon_video_worker` is not evidence that video crawling actually ran.
+
+## Second milestone in this workpass: real game execution and all-project-editor source editing
+
+The `game.compile.original` action invokes the **actual canonical original-world compiler** with a bounded, project-bound `GameBuildIntent`. The result contains a compiled browser-game digest, an executable winning-replay proof, original world identity and a content-addressed receipt. `game.compile.native` additionally renders browser+Godot 4 **source** in memory (it does not launch or sign the engine or installer). `game.mirror.review` explicitly requests the existing 64-attempt adversarial game mirror and reports its proof digest; none writes to disk or publishes a product. These actions require operator authorization, no more than three 25×25 original levels, and finite CPU budgets.
+
+The `studio.source.propose` action can stage a targeted source edit in **any current-project-owned** supported editor/director/forge/story/NPC/world/engine/cinematic/asset/almanac/notes directory. The caller must supply an exact current SHA-256 for optimistic concurrency and a concrete review reason. A source proposal is stored for later human review; the separate original Studio approval boundary still owns commit authority, schema validation, stale-base rejection and append-only story constraints. This does **not** authorize writing or replacing `skeleton/` application Python modules, model checkpoints or private engine internals.
+
+The `atlas.deep` operation recursively discovers installed submodules within a named bounded family, including nested crawlers, learning components and Jeeves internals, without executing their imports or reading source files. All discovered entries are explicitly marked **non-executable** until an audited handler is installed.
+
+**Coverage distinction:** This represents a meaningful working slice of Jeeves app operation and universal-editor staging, not complete operational integration of hundreds of app-specific services. Missing runtime adapters are documented, not silently treated as completed milestones.
