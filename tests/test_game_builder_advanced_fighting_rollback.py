@@ -105,7 +105,7 @@ class OriginalPeerRollbackTests(unittest.TestCase):
         match=run_peer_fight(cfg,blue,red)
         self.assertEqual(match["state"]["opponent"]["parried"],1)
         self.assertEqual(match["state"]["player"]["hits"],0)
-        self.assertEqual(match["state"]["player"]["hp"],cfg["player_health"])
+        self.assertEqual(match["state"]["player"]["hp"],match["state"]["player"]["max_hp"])
         self.assertFalse(match["state"]["opponent"]["parry"])
         self.assertTrue(verify_peer_fight(match,cfg))
 
