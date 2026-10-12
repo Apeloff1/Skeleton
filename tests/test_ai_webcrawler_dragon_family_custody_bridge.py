@@ -125,8 +125,8 @@ def test_idle_custody_service_uses_real_reviewed_article_and_monitor_captures():
     grant(db,sid="web-1",digest=original.content_hash)
     src,first=bridge.article(snap("web-1"),original)
     family=bridge.family()
-    family.enroll(OWNER,(src,),authorized=True,now=NOW+11)
-    family.seal_inventory(OWNER,authorized=True,now=NOW+12)
+    family.enroll(OWNER,(src,),authorized=True,now=NOW+2)
+    family.seal_inventory(OWNER,authorized=True,now=NOW+3)
     family.consume(OWNER,first,authorized=True)
     updated=document("Improved source with newly reviewed mechanics.",
                      fetched_at=NOW+710)
@@ -163,8 +163,8 @@ def test_idle_custody_service_rejects_wrong_source_capture_without_growth():
     grant(db,sid="web-1",digest=original.content_hash)
     src,first=bridge.article(snap("web-1"),original)
     family=bridge.family()
-    family.enroll(OWNER,(src,),authorized=True,now=NOW+11)
-    family.seal_inventory(OWNER,authorized=True,now=NOW+12)
+    family.enroll(OWNER,(src,),authorized=True,now=NOW+2)
+    family.seal_inventory(OWNER,authorized=True,now=NOW+3)
     family.consume(OWNER,first,authorized=True)
     controller=DragonIdleAcquisitionService(bridge)
     result=controller.run_once(authorized=True,
