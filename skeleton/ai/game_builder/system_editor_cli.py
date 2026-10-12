@@ -64,6 +64,7 @@ from .advanced_farming_godot import render_farming_godot_package
 from .advanced_factory_godot import render_factory_godot_package
 from .advanced_colony_godot import render_colony_godot_package
 from .advanced_economy_godot import render_economy_godot_package
+from .advanced_dialogue_godot import render_dialogue_godot_package
 from .advanced_gameplay_save import (
     export_advanced_savegame, import_advanced_savegame, continue_advanced_savegame,
 )
@@ -515,6 +516,7 @@ def main(argv=None) -> int:
                       else render_factory_godot_package if receipt.get("editor")=="factory"
                       else render_colony_godot_package if receipt.get("editor")=="colony"
                       else render_economy_godot_package if receipt.get("editor")=="economy"
+                      else render_dialogue_godot_package if receipt.get("editor")=="dialogue"
                       else render_advanced_godot_package)
             artifact=renderer(receipt,settings,authorized=args.trusted_local_operator)
             destination=write_advanced_godot_package(
