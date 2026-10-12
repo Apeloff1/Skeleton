@@ -40,7 +40,7 @@ def script(chapter=None, **overrides):
         ],
         "chapter_revision": ch["revision"], "chapter_digest": ch["digest"],
         "source_message_id": "conversation-answer-1",
-        "digest": "scene-original",
+        "digest": "b" * 64,
     }
     result.update(overrides)
     return result
