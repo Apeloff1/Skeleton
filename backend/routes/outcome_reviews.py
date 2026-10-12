@@ -106,6 +106,7 @@ def _review_payload(body: EndingReviewIn, plan: dict, scope: dict) -> dict:
             raise HTTPException(status_code=422, detail="Quoted evidence not present in visited dialogue")
         witness_receipt = play["receipt_digest"]
     else:
+        witnessed_ending = None
         if body.witness_choices:
             try:
                 play = simulate(compiled, body.witness_choices)
@@ -114,9 +115,10 @@ def _review_payload(body: EndingReviewIn, plan: dict, scope: dict) -> dict:
             if play["ending_id"] != body.ending_id:
                 raise HTTPException(status_code=422, detail="Player history reaches a different ending")
             witness_receipt = play["receipt_digest"]
+            witnessed_ending = play["ending"]
         else:
             witness_receipt = None
-        ending = compiled["endings"][body.ending_id]
+        ending = witnessed_ending or compiled["endings"][body.ending_id]
         endings_text = [ending["epilogue"], ending["consequences"]]
         for field in ("character_conclusions", "place_conclusions",
                       "quest_conclusions", "faction_conclusions"):
