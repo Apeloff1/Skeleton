@@ -152,6 +152,22 @@ class OriginalPeerRollbackTests(unittest.TestCase):
                 run_peer_fight(cfg,forbidden,["inspect"])
 
 
+
+    def test_two_player_paid_dash_and_distant_feint_match_normal_kernel(self):
+        cfg=self.rules(stamina_regen=0,dash_stamina_cost=7,feint_range=1)
+        match=run_peer_fight(cfg,["dash","feint"],["inspect","inspect"])
+        self.assertEqual(match["state"]["player"]["x"],3)
+        self.assertEqual(match["state"]["player"]["stamina"],
+                         cfg.get("starting_stamina",100)-
+                         cfg.get("move_stamina",3)-cfg["dash_stamina_cost"]-
+                         cfg.get("feint_stamina",3))
+        self.assertIn("peer_distant_original_feint_did_not_mint_guard_break",
+                      match["state"]["events"])
+        self.assertTrue(verify_peer_fight(match,cfg))
+        restricted=self.rules(starting_stamina=10,dash_stamina_cost=25)
+        with self.assertRaises(FightingRollbackError):
+            run_peer_fight(restricted,["dash"],["inspect"])
+
     def test_peer_wait_commands_consume_real_frames_in_authoritative_clock(self):
         cfg=self.rules()
         short=run_peer_fight(cfg,["inspect"],["inspect"])
