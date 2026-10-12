@@ -202,9 +202,9 @@ def _read(state,config,x,y):
 
 def _write(state,config,x,y,tile):
     key=_tile_key(x,y)
-    state["edits"][key]=dict(tile)
-    if len(state["edits"])>config["max_edited_tiles"]:
+    if key not in state["edits"] and len(state["edits"])>=config["max_edited_tiles"]:
         raise ProceduralWorldActionError("bounded active tile-change budget exhausted")
+    state["edits"][key]=dict(tile)
 
 
 def _spend(state,material,count):
@@ -256,19 +256,22 @@ def step(state,config,action):
         state["tiles_harvested"]+=1
         events.append("finite_biome_material_extracted")
     elif action=="plant":
-        _spend(state,"seed",1)
         tile=_read(state,config,x,y)
         if tile["planted"] or tile["structure"]!="none":
             raise ProceduralWorldActionError("planting requires free unplanted world terrain")
+        _spend(state,"seed",1)
         tile["planted"]=True
         _write(state,config,x,y,tile)
         events.append("original_terrain_planted")
     elif action=="build":
-        _spend(state,"wood",config["shelter_wood"])
-        _spend(state,"stone",config["shelter_stone"])
         tile=_read(state,config,x,y)
         if tile["structure"]!="none":
             raise ProceduralWorldActionError("a physical cell cannot hold duplicate structures")
+        if (state["inventory"]["wood"]<config["shelter_wood"] or
+            state["inventory"]["stone"]<config["shelter_stone"]):
+            raise ProceduralWorldActionError("original structure requires conserved local resources")
+        _spend(state,"wood",config["shelter_wood"])
+        _spend(state,"stone",config["shelter_stone"])
         tile["structure"]="shelter"
         _write(state,config,x,y,tile)
         state["structures_built"]+=1
@@ -294,6 +297,9 @@ def step(state,config,action):
             state["health"]=min(config["health"],state["health"]+config["shelter_healing"])
         events.append("finite_survival_rest")
     elif action=="craft":
+        if (state["inventory"]["stone"]<config["tool_stone"] or
+            state["inventory"]["ore"]<config["tool_ore"]):
+            raise ProceduralWorldActionError("tool creation requires finite source minerals")
         _spend(state,"stone",config["tool_stone"])
         _spend(state,"ore",config["tool_ore"])
         state["inventory"]["tool"]+=1
