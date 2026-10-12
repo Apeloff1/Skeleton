@@ -1395,6 +1395,36 @@ $("advanced-scene-template").addEventListener("click",async()=>{
  }catch(error){status("Authored scene rejected: "+error.message);}
 });
 
+
+$("world-progression-plan").addEventListener("click",async()=>{
+ try{
+  if(systemEditor().id!=="metroidvania")
+   throw Error("Ability progression planning supports original interconnected worlds only");
+  const json=$("advanced-scene-json").value.trim();
+  if(!json)throw Error("Generate and validate an authored original world first");
+  const response=await api("/api/world-plan",{
+   scene:JSON.parse(json),settings:systemSettings(),
+   max_states:50000,max_actions:128
+  });
+  const plan=response.plan;
+  $("world-progression-proof").textContent=JSON.stringify({
+   world_rooms:plan.regions,feasibility:plan.feasibility,
+   route:plan.route,turns:plan.route_turn_count,
+   nodes_visited:plan.search_nodes_explored,
+   rehearsal_verified:plan.rehearsal_verified,
+   source_mutated:plan.source_mutated,
+   original_play_survivability_verified:plan.original_play_survivability_verified,
+   native_execution_verified:plan.native_execution_verified,
+   proof:plan.digest,
+  },null,2);
+  status(plan.rehearsal_verified?
+   "Original world route reproduced against combat/ability rules with damage disabled. This is a diagnostic itinerary, not a guarantee of survival.":
+   "No verified world route within current action and node budgets; adjust authored passages and validate again.");
+ }catch(error){
+  $("world-progression-proof").textContent="";
+  status("Original world planner rejected: "+error.message);
+ }
+});
 $("stealth-mission-plan").addEventListener("click",async()=>{
  try{
   if(systemEditor().id!=="stealth")
@@ -1619,6 +1649,8 @@ Other editor families remain authoring-only, not falsely certified engines.</sma
 <button id="advanced-scene-stage" type="button">Stage authored scene for review</button>
 <button id="advanced-puzzle-solve" type="button">Prove puzzle solution / detect impossible state</button>
 <button id="stealth-mission-plan" type="button">AI: rehearse authored stealth mission route</button>
+<button id="world-progression-plan" type="button">AI: rehearse world ability progression</button>
+<pre id="world-progression-proof" role="status" aria-live="polite"></pre>
 <pre id="stealth-plan-proof" role="status" aria-live="polite"></pre>
 <pre id="advanced-puzzle-proof" role="status" aria-live="polite"></pre>
 <label>Editable scene geometry and resource JSON
