@@ -345,7 +345,8 @@ class DragonFamily:
 
     def digest_idle(self, owner: str, dragon: str, receipt: SourceReceipt, *,
                     authorized: bool, window: IdleWindow,
-                    task_topics: tuple[str, ...], adjacent_topics: tuple[str, ...] = ()) -> bool:
+                    task_topics: tuple[str, ...], adjacent_topics: tuple[str, ...] = (),
+                    lease_guard: Callable[[], bool] | None = None) -> bool:
         """Hatch/grow only from novel content under current verified idle admission.
 
         No fetching is performed here. `monitor` only accepts real revisions to
@@ -364,6 +365,12 @@ class DragonFamily:
             raise ValueError("receipt outside active idle window")
         self.db.execute("BEGIN IMMEDIATE")
         with self.db:
+            # A stale worker must never mint XP after a lease takeover.
+            # Recheck the fence *under the same write lock* as the reading
+            # mutation. The coordinator supplies the current lease guard.
+            if lease_guard is not None and (
+                    not callable(lease_guard) or lease_guard() is not True):
+                raise PermissionError("idle source lease lost before commit")
             if self.approval is None or self.approval(receipt) is not True:
                 raise PermissionError("source approval changed during idle admission")
             if not self.db.execute("SELECT 1 FROM dragon_family_broods WHERE owner=?", (owner,)).fetchone():
