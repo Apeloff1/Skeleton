@@ -64,6 +64,9 @@ class DragonFamilyCustodyBridge:
         _owner(owner)
         self.db = db
         self.owner = owner
+        # Resolve the canonical evidence reader once. Reconstructing it during
+        # an admission transaction would commit the caller's SQLite write lock.
+        self.ledger = DragonKnowledgeLedger(db)
 
     def verify(self, receipt: SourceReceipt) -> bool:
         """Callback for DragonFamily(approval=bridge.verify).
@@ -94,10 +97,9 @@ class DragonFamilyCustodyBridge:
             return False
         if len(rows) > 20:
             return False
-        ledger = DragonKnowledgeLedger(self.db)
         for claim_id, recorded_evidence_digest in rows:
             try:
-                belief = ledger.belief(self.owner, claim_id, authorized=True)
+                belief = self.ledger.belief(self.owner, claim_id, authorized=True)
             except (ValueError, KeyError, sqlite3.DatabaseError):
                 continue
             if belief.evidence_digest == recorded_evidence_digest:
