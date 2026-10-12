@@ -321,6 +321,10 @@ def _hazards(state,config,events):
 
 
 def _round(state,config,events):
+    # step() checks round completion after the player, the AI and elapsed
+    # frames. Terminal scores must never be awarded twice in one step.
+    if state["finished"] or state["failed"]:
+        return
     player=state["player"];enemy=state["opponent"]
     timeout=state["clock_frames"]>=state["arena"]["round_limit_frames"]
     if player["hp"]>0 and enemy["hp"]>0 and not timeout:return
