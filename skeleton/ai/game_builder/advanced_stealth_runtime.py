@@ -128,6 +128,20 @@ def normalize_layout(config,layout):
     reached=_reachable(spawn,wallset)
     if any(tuple(p) not in reached for p in (exit_at,objective,terminal)):
         raise StealthActionError("authored mission objective, terminal and extraction require physical routes")
+    # A disconnected cache/security device is not a valid authored mission.
+    # Accessible means the player can reach the object or an adjacent tile
+    # without walking through a wall, with doors unlocked by a real key/hack.
+    reachable_with_unlocks=_reachable(spawn,wallset)
+    def interactable(p):
+        return any(abs(p[0]-x)+abs(p[1]-y)<=1
+                   for x,y in reachable_with_unlocks)
+    if config["mission"]=="sabotage" and not any(interactable(c) for c in cameras):
+        raise StealthActionError("sabotage needs reachable physical security equipment")
+    if config["mission"]=="intelligence" and sum(interactable(p) for p in intel)<config["intel_target"]:
+        raise StealthActionError("not enough accessible finite intelligence sites")
+    if config["mission"]=="archive" and config["hacking_charges"]==0 and not any(
+        interactable(p) for p in keycards):
+        raise StealthActionError("locked mission needs a reachable keycard")
     if config["mission"]=="sabotage" and not cameras:
         raise StealthActionError("sabotage requires a real camera security target")
     if config["mission"]=="intelligence" and len(intel)<config["intel_target"]:
@@ -146,6 +160,7 @@ def normalize_layout(config,layout):
 
 def apply_scene(state,config,layout):
     geo=normalize_layout(config,layout)
+    state["guard_reserve"]=max(0,config["guard_count"]-len(geo["guard_routes"]))
     state.update({
         "spawn":geo["spawn"],"player":list(geo["spawn"]),
         "extraction":geo["extraction"],"objective":geo["objective"],
@@ -175,6 +190,8 @@ def start(config,seed):
         "alarm":0,"terminal_hacked":False,"archive":False,
         "intel_collected":0,"cameras_disabled":0,"guards_neutralized":0,
         "score":0,"failed":False,"finished":False,"events":[],
+        "guard_total":config["guard_count"],"guard_reserve":0,
+        "reinforcements_deployed":0,
         "milestones":[],"extracted":False,"reason":"",
     }
     return apply_scene(state,config,default_layout(config,seed))
@@ -323,10 +340,41 @@ def _security_update(state,config,noise,origin):
     if state["smoke_turns"]:
         state["smoke_turns"]-=1
     if sensed:
-        state["alarm"]=min(100,state["alarm"]+config["alarm_gain"])
+        reserve_pressure=min(20,state["guard_reserve"]//8)
+        state["alarm"]=min(100,state["alarm"]+config["alarm_gain"]+reserve_pressure)
         events.append("security_alarm_escalated")
     else:
         state["alarm"]=max(0,state["alarm"]-config["alarm_cooldown"])
+    # Beyond eight local agents the authored force is modeled as a bounded
+    # reserve and deployed as real patrolling agents when the facility alarms.
+    # This avoids inventing 250 simultaneous bodies on an 80-cell reference
+    # grid while making high-staff security materially harder.
+    if (state["guard_reserve"] and state["alarm"]>=state["alarm_budget"]*10
+        and state["turn"]%config["reinforcement_interval"]==0
+        and len(state["guards"])<20 and state["guard_total"]):
+        reserved=([9,0],[0,7],[4,7],[9,5],[0,4],[5,2],[9,6],[8,0])
+        occupied={tuple(g["position"]) for g in state["guards"] if not g["disabled"]}
+        for candidate in reserved:
+            if (tuple(candidate) in occupied or tuple(candidate) in _blocks(state)
+                or candidate==state["player"]):
+                continue
+            route=[list(candidate)]
+            for dx,dy in DIRECTIONS.values():
+                adj=[candidate[0]+dx,candidate[1]+dy]
+                if _passable(state,adj,True):
+                    route.append(adj)
+                    break
+            if len(route)<2:
+                continue
+            state["guards"].append({
+                "id":len(state["guards"]),"position":list(candidate),
+                "route":route,"waypoint":1,"suspicion":config["suspicion_threshold"],
+                "disabled":0,"facing":"south","last_known":list(state["player"]),
+            })
+            state["guard_reserve"]-=1
+            state["reinforcements_deployed"]+=1
+            events.append("real_reserve_guard_deployed_on_authored_grid")
+            break
     if state["alarm"]>=state["alarm_budget"]*10:
         state["hp"]=max(0,state["hp"]-config["alarm_damage"])
         events.append("facility_lockdown_damage")
