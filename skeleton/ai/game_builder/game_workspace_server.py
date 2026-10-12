@@ -247,7 +247,7 @@ class _StudioHandler(BaseHTTPRequestHandler):
         if path=="/api/advanced-puzzle-solve":
             proof=solve_advanced_puzzle(
                 values["scene"],values.get("settings"),
-                max_states=values.get("max_states",12000),
+                max_states=values.get("max_states",20000),
                 max_depth=values.get("max_depth",96))
             return self._json(200,{"proof":proof,"source_mutated":False,
                                    "native_release_verified":False})
@@ -369,7 +369,7 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 values["scene"],values.get("settings"),
                 max_states=values.get("max_states",12000),
                 max_depth=values.get("max_depth",96),
-                beam_width=values.get("beam_width",90))
+                beam_width=values.get("beam_width",64))
             return self._json(200,{"plan":result,
                                    "original_source_mutated":False,
                                    "native_execution_certified":False})
