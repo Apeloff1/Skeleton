@@ -72,9 +72,17 @@ class MissionSourceScout:
     def __init__(self, almanacs: DragonAlmanacs) -> None:
         if not isinstance(almanacs, DragonAlmanacs):
             raise TypeError("canonical DragonAlmanacs required")
-        from .dragon_discovery_admission import DragonDiscoveryAdmission
-        DragonDiscoveryAdmission(almanacs)  # schema for imported raw receipts
         self.db = almanacs.db
+        # The audit table may be empty when only the pinned baseline has been
+        # imported. This scouting lane must not depend on an optional expansion
+        # tool being installed or having already imported its supplements.
+        self.db.execute("""CREATE TABLE IF NOT EXISTS dragon_almanac_supplement_receipts_v2 (
+          owner TEXT NOT NULL, origin_source TEXT NOT NULL,
+          normalized_source TEXT NOT NULL, supplement_digest TEXT NOT NULL,
+          body TEXT NOT NULL, digest TEXT NOT NULL,
+          PRIMARY KEY (owner, origin_source, supplement_digest))""")
+        self.db.execute("""CREATE INDEX IF NOT EXISTS dragon_scout_receipts_by_source
+          ON dragon_almanac_supplement_receipts_v2(owner,normalized_source)""")
 
     def propose(self, owner: str, mission: SourceMission, *, authorized: bool,
                 topic: str | None = None) -> dict:
