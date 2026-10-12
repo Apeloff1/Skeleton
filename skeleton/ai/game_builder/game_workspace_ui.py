@@ -1553,6 +1553,8 @@ function renderAdvancedActions(actions){
   fusionInput.value=JSON.stringify([
    "quest_director:south","quest_director:east","quest_director:collect:0",
    "bridge:interview:0","bridge:pledge:0",
+   "quest_director:help:0","quest_director:help:0",
+   "quest_director:help:0","quest_director:help:0",
    "quest_director:help:0","quest_director:resolve:0",
    "dialogue:travel:1","dialogue:speak:4","dialogue:travel:2",
    "dialogue:compare:0","dialogue:claim","bridge:conclude:0"
