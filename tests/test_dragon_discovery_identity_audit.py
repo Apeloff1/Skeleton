@@ -24,7 +24,7 @@ def inventory():
 def test_frozen_raw_link_custody_matches_git_blobs_and_new_evidence(inventory):
     assert inventory["baseline_raw_links"] == 4405
     assert inventory["historical_supplement_raw_links"] == 10770
-    assert inventory["additional_pinned_raw_links"] == 4053
+    assert inventory["additional_pinned_raw_links"] == 5685
     assert inventory["reconciled_raw_links"] == EXPECTED_RAW_TOTAL
     assert inventory["accepted_source_batches"] == len(SOURCE_BATCHES) == 24
     assert len(MANIFESTS) == 2
