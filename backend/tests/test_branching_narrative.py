@@ -343,3 +343,23 @@ def test_legal_heat_demands_specific_law_fate_in_epilogue():
         "The city watch accepts the legal reforms and recalls the earlier conflict."
     )
     assert simulate(validate_plan(story), ["help_aria", "good_ending"])["ending_accepted"]
+
+
+
+def test_unwoven_npc_and_place_lore_or_fabricated_relationships_fail_closed():
+    story = plan()
+    story["characters"][0]["relationships"] = ["missing_companion"]
+    with pytest.raises(ValueError, match="non-existent relationship"):
+        validate_plan(story)
+    story = plan()
+    story["places"][0]["discovered_by"] = ["unrecorded_character"]
+    with pytest.raises(ValueError, match="unknown character"):
+        validate_plan(story)
+    story = plan()
+    story["characters"][0]["plot_threads"].append("unwritten_sibling_mystery")
+    with pytest.raises(ValueError, match="never woven"):
+        validate_plan(story)
+    story = plan()
+    story["places"][0]["plot_threads"].append("missing_city_legend")
+    with pytest.raises(ValueError, match="never woven"):
+        validate_plan(story)
