@@ -148,6 +148,7 @@ def compile_system_assembly(project_id: str,
         "farming": ("advance",),
         "factory": ("tick",),
         "colony": ("tick",),
+        "city_builder": ("tick",),
     }
     advanced_evidence = [
         {"editor": name,
@@ -186,6 +187,7 @@ def compile_system_assembly(project_id: str,
             "farming":("advance",),
             "factory":("tick",),
             "colony":("tick",),
+            "city_builder":("tick",),
         }
         proof=run_advanced_session(editor,configs[editor]["settings"],
                                    scene_smoke[editor],
