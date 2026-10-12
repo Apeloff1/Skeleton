@@ -687,6 +687,93 @@ CATALOG = json.loads(r'''[
           "mixed",
           "market"
         ]
+      },
+      {
+        "key": "opening_budget",
+        "kind": "int",
+        "default": 350,
+        "minimum": 50,
+        "maximum": 10000,
+        "options": []
+      },
+      {
+        "key": "housing_density",
+        "kind": "int",
+        "default": 24,
+        "minimum": 4,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "road_capacity",
+        "kind": "int",
+        "default": 16,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "power_output",
+        "kind": "int",
+        "default": 60,
+        "minimum": 5,
+        "maximum": 200,
+        "options": []
+      },
+      {
+        "key": "water_output",
+        "kind": "int",
+        "default": 60,
+        "minimum": 5,
+        "maximum": 200,
+        "options": []
+      },
+      {
+        "key": "industrial_emissions",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "disaster_cycle",
+        "kind": "int",
+        "default": 8,
+        "minimum": 3,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "disasters",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "policy",
+        "kind": "enum",
+        "default": "transit",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "transit",
+          "industrial",
+          "ecology"
+        ]
+      },
+      {
+        "key": "ending_policy",
+        "kind": "enum",
+        "default": "endless",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "endless",
+          "campaign"
+        ]
       }
     ],
     "preview": null
@@ -2310,7 +2397,7 @@ CATALOG = json.loads(r'''[
   }
 ]''')
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
