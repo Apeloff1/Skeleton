@@ -10,7 +10,7 @@ from skeleton.ai.game_builder.dragon_discovery_identity_audit import (
     MANIFESTS, PREVIOUS_BATCH_COUNT, PREVIOUS_SUPPLEMENT_COUNT,
     audit_raw_discovery_identity,
 )
-from skeleton.ai.game_builder.dragon_discovery_reconciled import SOURCE_BATCHES
+from skeleton.ai.game_builder.dragon_discovery_reconciled import SOURCE_BATCHES, EXPECTED_RAW_TOTAL
 
 BASELINE = (Path(__file__).resolve().parents[1] /
             "skeleton/ai/game_builder/catalogs/dragon_sources_20261010")
@@ -25,13 +25,13 @@ def test_frozen_raw_link_custody_matches_git_blobs_and_new_evidence(inventory):
     assert inventory["baseline_raw_links"] == 4405
     assert inventory["historical_supplement_raw_links"] == 10770
     assert inventory["additional_pinned_raw_links"] == 4053
-    assert inventory["reconciled_raw_links"] == 19228
-    assert inventory["accepted_source_batches"] == len(SOURCE_BATCHES) == 21
+    assert inventory["reconciled_raw_links"] == EXPECTED_RAW_TOTAL
+    assert inventory["accepted_source_batches"] == len(SOURCE_BATCHES) == 24
     assert len(MANIFESTS) == 2
     assert PREVIOUS_BATCH_COUNT == 16
     assert PREVIOUS_SUPPLEMENT_COUNT == 10770
     assert inventory["all_source_blob_identities_checked"] is True
-    assert inventory["canonical_candidate_urls"] <= 19228
+    assert inventory["canonical_candidate_urls"] <= EXPECTED_RAW_TOTAL
     assert inventory["canonical_candidate_urls"] > 4405
     assert [x["manifest"] for x in inventory["historical_manifests"]] == list(MANIFESTS)
     assert sum(x["verified_source_files"] for x in inventory["historical_manifests"]) == 16
