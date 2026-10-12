@@ -14,6 +14,7 @@ from hashlib import sha256
 import json
 import re
 from typing import Any, Mapping, Sequence
+from core.story_review_matrices import highlight_review_queue
 
 MAX_CHAPTERS = 100
 MAX_ACTS = 1000
@@ -259,6 +260,11 @@ def proofreading_checks(
         "chapter": scene["chapter"], "act": scene["act"], "scene": scene["scene"],
         "scene_digest": scene["digest"], "chapter_digest": chapter["digest"],
         "chapter_revision": chapter["revision"], "plot_spans": highlights,
+        "highlight_review_queue": highlight_review_queue(
+            highlights, scene=scene["scene"], scene_digest=scene["digest"],
+        ),
+        "highlight_model_reviews_executed": False,
+        "highlight_model_reviews_approved": False,
         "predecessor_scene_digest": predecessor.get("digest") if predecessor else None,
         "predecessor_scene_approved": (scene["scene"] == 1 or (
             predecessor is not None and
