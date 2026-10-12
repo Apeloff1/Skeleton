@@ -261,6 +261,37 @@ $("story-next").addEventListener("click",async()=>{
   status("Scene scaffold staged. Populate the story, then sign/validate before supervised commit.");
  }catch(error){status("Scene authoring blocked: "+error.message);}
 });
+
+$("story-chapter-context").addEventListener("click",async()=>{
+ try{
+  const result=await api("/api/story-chapter-context",{
+   project:storyProject(),chapter:Number($("story-chapter").value),
+   max_prior_capsules:12});
+  const markers=result.chapter_highlighters.map(h=>
+   "["+h.kind.toUpperCase()+"] "+h.id+" · scene "+h.sequence+
+   " · "+h.note+" · "+(h.closed?"CLOSED":"OPEN")+" · "+h.color);
+  const unresolved=result.unresolved_prior_highlighters.map(h=>
+   "["+h.kind.toUpperCase()+"] "+h.id+" · source scene "+
+   h.sequence+" · still unresolved");
+  $("story-highlighters").textContent=[
+   "CHAPTER "+result.chapter+"/100 · "+result.chapter_scene_count+" source scenes",
+   "Historical evidence "+result.verified_source_head,
+   "PLOT POINT HIGHLIGHTERS",
+   ...markers,
+   "PRIOR UNRESOLVED PLOT THREADS",
+   ...unresolved,
+   "Prior chapter handoff:",
+   ...result.prior_chapter_endings.map(x=>
+    "Ch. "+x.chapter+" · "+x.ending+" · "+x.hook),
+  ].join("\n").slice(0,60000);
+  storyShow({chapter:result.chapter,chapter_memory_receipt:result.digest,
+   chapter_scene_count:result.chapter_scene_count,
+   highlight_count:markers.length,unresolved_prior_count:unresolved.length,
+   prior_chapter_endings:result.prior_chapter_endings,
+   chapter_scene_sources:result.chapter_scene_sources});
+  status("Source-reparsed chapter memory loaded with visible, linked plot highlighters and cliffhanger handoffs.");
+ }catch(error){status("Chapter memory/highlighter blocked: "+error.message);}
+});
 $("story-context").addEventListener("click",async()=>{
  try{
   const response=await api("/api/story-brief",{
@@ -3988,7 +4019,7 @@ canon index reads approved history and verifies recurring character and
 regional appearance. It does not invent model output or write hidden files.</small></p>
 <button id="story-foundation" type="button">Show blank story/world foundation</button>
 <button id="story-continuity-contract" type="button">Lock original voices, faces, wardrobe, items and regional style</button>
-<p><small>Strict mode: 100 acts / 9999 sequential scenes. Each committed scene has a signed, cross-reparsed confirmation receipt. A metadata voice hash is not an acoustic verification.</small></p>
+<p><small>Strict mode: 100 chapters / 1000 acts / 9999 sequential scenes. Each committed scene has a signed, cross-reparsed confirmation receipt. A metadata voice hash is not an acoustic verification.</small></p>
 <label>Chapter (1–100)<input type="number" id="story-chapter" min="1" max="100" value="1"></label>
 <label>Global act (1–1000)<input type="number" id="story-act" min="1" max="1000" value="1"></label>
 <label>Next scene within act<input type="number" id="story-scene" min="1" max="9999" value="1"></label>
@@ -3998,6 +4029,9 @@ regional appearance. It does not invent model output or write hidden files.</sma
 <label>Jeeves creative instruction<textarea id="story-instruction" rows="3"
  placeholder="Write the next scene and preserve prior character relationships, visual identities, palette, lore and original events."></textarea></label>
 <button id="story-context" type="button">Retrieve historical Jeeves context</button>
+<button id="story-chapter-context" type="button">Load one chapter, plot highlighters and prior chapter handoff</button>
+<p><small>Jeeves keeps the active chapter's source context and retrieves earlier plot threads by authenticated bookmarks; no unverified infinite context claims.</small></p>
+<pre id="story-highlighters" role="status" aria-live="polite"></pre>
 <button id="story-work-order" type="button">Plan next Jeeves production work order</button>
 <button id="story-assets-queue" type="button">Plan AI original asset generation queue</button>
 <label>Historical bookmark IDs (comma-separated)
