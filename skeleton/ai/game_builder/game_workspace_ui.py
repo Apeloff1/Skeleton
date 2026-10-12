@@ -3345,6 +3345,83 @@ $("advanced-unified-save-import").addEventListener("change",async()=>{
  }catch(error){status("Untrusted mixed original world save rejected: "+error.message);}
  finally{$("advanced-unified-save-import").value="";}
 });
+$("advanced-whatif-run").addEventListener("click",async()=>{
+ try{
+  if(!episodicLastScene || !verifiedSourceEpisodes.length ||
+     !verifiedGenreEvents.length)
+   throw Error("Original physical and genre source sessions are required");
+  const sourceTimeline=JSON.parse($("advanced-interleave-editor").value);
+  if(!Array.isArray(sourceTimeline) ||
+     sourceTimeline.length<2 || sourceTimeline.length>96)
+   throw Error("An existing finite canonical interleaved event clock is required");
+  const response=await api("/api/advanced-world-whatif-lab",{
+   physical_episodes:verifiedSourceEpisodes,
+   genre_sessions:verifiedGenreEvents,
+   world_scene:episodicLastScene,
+   timeline:sourceTimeline,
+   world_settings:interleavedWorldSettings,
+   objective:$("advanced-whatif-objective").value,
+   max_depth:Number($("advanced-whatif-depth").value),
+   max_attempts:12,max_accepted:6
+  });
+  const report=response.report;
+  if(!report || response.original_game_files_mutated ||
+     response.automatic_scenario_committed ||
+     response.native_hardware_certified ||
+     response.model_weight_promotion_approved ||
+     report.source_games_changed || report.automatic_authoring_committed ||
+     report.source_world_scene_digest!==episodicLastScene.digest ||
+     report.objective!==$("advanced-whatif-objective").value ||
+     report.baseline.timeline.length!==sourceTimeline.length)
+   throw Error("Counterfactual source identity or original game proof rejected");
+  lastWorldWhatIfProof=report;
+  const select=$("advanced-whatif-select");
+  select.replaceChildren();
+  for(const alternative of report.accepted_scenarios){
+   const item=document.createElement("option");
+   item.value=alternative.scenario_id;
+   item.textContent="Depth "+alternative.depth+" · "+
+      alternative.scenario_id.slice(0,10)+
+      (alternative.outperforms_baseline_on_selected_objective?
+        " · measured better":" · valid alternative");
+   select.append(item);
+  }
+  $("advanced-whatif-proof").textContent=JSON.stringify({
+   authored_objective:report.objective,
+   attempted:report.attempted_permutations,
+   accepted:report.accepted_count,
+   rejected:report.rejected_count,
+   baseline_real_npc_world:report.baseline,
+   actual_replayed_alternatives:report.accepted_scenarios,
+   source_rejections:report.rejected_scenarios,
+   selected_better_on_this_metric:
+      report.selected_is_measurably_better_than_baseline,
+   no_automatic_commit:true,
+   no_automatic_model_promotion:true,
+   original_source_digest:report.digest
+  },null,2);
+  status("Original-world adversarial alternatives independently replayed with bounded resource use");
+ }catch(error){status("Adversarial original-game mirror refused: "+error.message);}
+});
+$("advanced-whatif-use").addEventListener("click",()=>{
+ try{
+  const value=$("advanced-whatif-select").value;
+  if(!lastWorldWhatIfProof || !value)
+   throw Error("Run an independently replayed source-world mirror first");
+  const selected=lastWorldWhatIfProof.accepted_scenarios.find(
+    scenario=>scenario.scenario_id===value);
+  if(!selected || !selected.actually_replayed)
+   throw Error("Cannot use an unverified hypothetical outcome");
+  if(lastWorldWhatIfProof.baseline.timeline.length!==selected.timeline.length)
+   throw Error("Authored source event capacity cannot change");
+  // Applying means only editing the reviewable schedule. The canonical
+  // game state changes ONLY after pressing the ordinary replay control.
+  $("advanced-interleave-editor").value=JSON.stringify(selected.timeline,null,2);
+  lastInterleavedProof=null;
+  lastInterleavedTimeline=null;
+  status("Source-authenticated candidate copied to editable timeline; independently replay it before use");
+ }catch(error){status("Original-world candidate not applied: "+error.message);}
+});
 $("advanced-interleave-save-export").addEventListener("click",async()=>{
  try{
   if(!lastInterleavedProof || !lastInterleavedTimeline || !episodicLastScene)
@@ -3533,6 +3610,7 @@ $("advanced-interleave-run").addEventListener("click",async()=>{
 $("advanced-genre-queue-clear").addEventListener("click",()=>{
  verifiedGenreEvents=[];lastUnifiedGenreProof=null;unifiedWorldFollowups=[];
  lastInterleavedProof=null;lastInterleavedTimeline=null;interleavedWorldSettings=null;
+ lastWorldWhatIfProof=null;
  $("advanced-genre-queue-list").textContent="";
  $("advanced-unified-proof").textContent="";
  status("Unpublished genre source acquisitions cleared without modifying original saves");
@@ -3689,6 +3767,7 @@ let lastUnifiedGenreProof=null;
 let unifiedWorldFollowups=[];
 let lastInterleavedProof=null;
 let lastInterleavedTimeline=null;
+let lastWorldWhatIfProof=null;
 let interleavedWorldSettings=null;
 let verifiedSourceEpisodes=[];
 let episodicLastProof=null,episodicLastScene=null;
@@ -4352,6 +4431,34 @@ local until typed revalidation and an explicit human-approved file commit.</smal
         Replay authored cross-engine event timeline
        </button>
        <pre id="advanced-interleave-proof" role="status" aria-live="polite"></pre>
+       <fieldset aria-label="Adversarial source-authenticated what-if mirror">
+        <legend>Original NPC world · counterfactual mirror laboratory</legend>
+        <label>Author-selected world priority
+         <select id="advanced-whatif-objective">
+          <option value="eyewitness_coverage">Preserve actual eyewitness coverage</option>
+          <option value="community_recovery">Protect original world sites and recovery</option>
+          <option value="resource_stewardship">Conserve finite stocks and supplies</option>
+          <option value="quest_progress">Compare earned causal quest progress</option>
+         </select>
+        </label>
+        <label>Reordering depth
+         <select id="advanced-whatif-depth">
+          <option value="1">One causal swap</option>
+          <option value="2" selected>Two causal swaps</option>
+          <option value="3">Three causal swaps</option>
+         </select>
+        </label>
+        <button id="advanced-whatif-run" type="button">
+         Adversarially replay bounded original game alternatives
+        </button>
+        <label>Source-verified alternative
+         <select id="advanced-whatif-select"></select>
+        </label>
+        <button id="advanced-whatif-use" type="button">
+         Copy reviewed alternative into timeline editor
+        </button>
+        <pre id="advanced-whatif-proof" role="status" aria-live="polite"></pre>
+       </fieldset>
        <fieldset aria-label="Portable original multi-engine world clock">
         <legend>Save and restore authored interleaved gameplay</legend>
         <button id="advanced-interleave-save-export" type="button">
