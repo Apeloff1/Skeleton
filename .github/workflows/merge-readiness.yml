@@ -327,7 +327,9 @@ jobs:
 
   readiness:
     name: Merge Readiness
-    if: ${{ always() && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')) }}
+    # !cancelled() (not always()): a superseded/cancelled run must not queue this
+    # summary job, or it holds the merge-readiness-<PR#> slot and starves the new head.
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')) }}
     needs:
       - quarantine_policy
       - unit
