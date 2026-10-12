@@ -45,7 +45,7 @@ def _fighter(side,x,lane,config):
        "meter":config["starting_meter"],"guard":config["guard_meter"],
        "guard_high":False,"guard_low":False,"parry":False,"crouching":False,
        "airborne":0,"stun":0,"recovery":0,"combo":0,"best_combo":0,
-       "last_attack":None,"hits":0,"misses":0,"damage_done":0,
+       "last_attack":None,"last_hit_frame":None,"hits":0,"misses":0,"damage_done":0,
        "defended":0,"parried":0,"whiffs":0,"ringouts":0,
     }
 
@@ -192,6 +192,10 @@ def _move(state,config,actor,dx,dlane,events):
 def _hit(state,config,attacker,defender,name,events):
     distance=_distance(attacker,defender)
     reach,raw,stamina,zone,special=ATTACKS[name]
+    if (attacker["last_hit_frame"] is not None and
+        state["clock_frames"]-attacker["last_hit_frame"]>config["combo_window_frames"]):
+        attacker["combo"]=0
+        events.append("original_combo_expired_after_real_frame_window")
     if distance>reach or (name not in ("grapple","uppercut")
                            and attacker["lane"]!=defender["lane"]):
         attacker["whiffs"]+=1
@@ -251,6 +255,7 @@ def _hit(state,config,attacker,defender,name,events):
         defender["hp"]=max(0,defender["hp"]-damage)
         attacker["hits"]+=1
         attacker["combo"]=min(config["combo_limit"],attacker["combo"]+1)
+        attacker["last_hit_frame"]=state["clock_frames"]
         attacker["best_combo"]=max(attacker["best_combo"],attacker["combo"])
         defender["stun"]+=config["hitstun_frames"]
         events.append("actual_original_hitbox_resolved_combat_damage")
@@ -409,7 +414,13 @@ def step(state,config,action):
         if action in ("retreat","backdash"):delta=-delta
         dx=0 if action in ("sidestep_up","sidestep_down") else toward*delta
         dlane=1 if action=="sidestep_down" else -1 if action=="sidestep_up" else 0
-        _move(state,config,hero,dx,dlane,events)
+        if action in ("dash","backdash") and (
+            hero["stamina"]<config["move_stamina"]+config["dash_stamina_cost"]):
+            raise FightingActionError("dash needs additional real committed stamina")
+        moved=_move(state,config,hero,dx,dlane,events)
+        if moved and action in ("dash","backdash"):
+            hero["stamina"]-=config["dash_stamina_cost"]
+            events.append("original_two_cell_dash_paid_extra_finite_stamina")
     elif action in ("guard_high","guard_low"):
         hero["guard_high"]=action=="guard_high"
         hero["guard_low"]=action=="guard_low"
@@ -451,8 +462,11 @@ def step(state,config,action):
         if hero["stamina"]<config["feint_stamina"]:
             raise FightingActionError("feint requires paid stance commitment")
         hero["stamina"]-=config["feint_stamina"]
-        enemy["guard_high"]=False;enemy["guard_low"]=False
-        events.append("original_deceptive_action_changed_actual_opponent_guard")
+        if _distance(hero,enemy)<=config["feint_range"]:
+            enemy["guard_high"]=False;enemy["guard_low"]=False
+            events.append("original_close_range_paid_feint_disrupted_real_guard")
+        else:
+            events.append("original_distant_feint_failed_to_change_enemy_guard")
     elif action in ("wait:60","wait:240","inspect"):
         events.append("original_fighting_simulation_clock_or_replay_observed")
     else:
