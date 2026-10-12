@@ -41,6 +41,10 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_chunked_world_timeline import (
+    make_chunked_bookmarks, verify_chunked_bookmarks,
+    continue_chunked_world, verify_chunked_continuation,
+)
 from .advanced_chunked_npc_world import (
     run_chunked_npc_world, verify_chunked_npc_world,
 )
@@ -487,6 +491,37 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 values["record"],values["scene"],values.get("settings"))
             return self._json(200,{"verified":validated,
                                    "original_source_mutated":False})
+        if path=="/api/chunked-world-checkpoint":
+            record=make_chunked_bookmarks(
+                values["record"],interval=values.get("interval",8))
+            return self._json(200,{
+                "checkpoint":record,
+                "verified":verify_chunked_bookmarks(record),
+                "source_project_mutated":False,
+                "model_weights_promoted":False,
+            })
+        if path=="/api/chunked-world-checkpoint-verify":
+            return self._json(200,{
+                "verified":verify_chunked_bookmarks(values["record"]),
+                "source_project_mutated":False,
+                "model_weights_promoted":False,
+            })
+        if path=="/api/chunked-world-continue":
+            receipt=continue_chunked_world(
+                values["checkpoint"],values["actions"],
+                cursor=values.get("cursor"))
+            return self._json(200,{
+                "branch":receipt,
+                "verified":verify_chunked_continuation(receipt),
+                "source_project_mutated":False,
+                "model_weights_promoted":False,
+            })
+        if path=="/api/chunked-world-continuation-verify":
+            return self._json(200,{
+                "verified":verify_chunked_continuation(values["record"]),
+                "source_project_mutated":False,
+                "model_weights_promoted":False,
+            })
         if path=="/api/chunked-npc-world":
             receipt=run_chunked_npc_world(
                 values["actions"],values.get("settings"),
