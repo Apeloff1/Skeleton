@@ -3488,6 +3488,105 @@ $("advanced-interleave-build").addEventListener("click",async()=>{
   status("Authenticated cross-engine source events prepared for reviewed timeline authoring");
  }catch(error){status("Interleaved original game draft rejected: "+error.message);}
 });
+function showOriginalWorldWhatIfQueue(){
+ $("advanced-whatif-queue").textContent=JSON.stringify(
+  reviewedWorldWhatIfScenarios.map((s,index)=>({
+   sequence:index,source_name:s.id,authored_events:s.timeline.length,
+   first_lanes:s.timeline.slice(0,6).map(e=>e.lane)
+  })),null,2);
+}
+$("advanced-whatif-baseline").addEventListener("click",()=>{
+ try{
+  if(!lastInterleavedProof || !lastInterleavedTimeline)
+   throw Error("Replay the original world clock before authoring a mirror baseline");
+  reviewedWorldWhatIfScenarios=[{
+   id:"baseline",
+   timeline:JSON.parse(JSON.stringify(lastInterleavedTimeline))
+  }];
+  $("advanced-whatif-results").textContent="";
+  showOriginalWorldWhatIfQueue();
+  status("Authenticated baseline captured. All alternatives must reuse the same source events and world actions.");
+ }catch(error){status("World what-if baseline blocked: "+error.message);}
+});
+$("advanced-whatif-swap").addEventListener("click",()=>{
+ try{
+  if(!reviewedWorldWhatIfScenarios.length)
+   throw Error("Capture the original source baseline first");
+  const current=JSON.parse(JSON.stringify(
+   JSON.parse($("advanced-interleave-editor").value)));
+  if(!Array.isArray(current) || current.length<2)
+   throw Error("At least two authentic events are required for an order variation");
+  let changed=false;
+  for(let i=0;i<current.length-1;i++){
+   const x=current[i],y=current[i+1];
+   if(x.lane!==y.lane && (x.lane==="world" || y.lane==="world" ||
+      x.lane==="physical" && y.lane==="genre" ||
+      x.lane==="genre" && y.lane==="physical")){
+    current[i]=y;current[i+1]=x;changed=true;break;
+   }
+  }
+  if(!changed)throw Error("No safe neighboring cross-engine events available to exchange");
+  current.forEach((entry,i)=>{entry.at=i;});
+  $("advanced-interleave-editor").value=JSON.stringify(current,null,2);
+  status("Alternative authored: adjacent cross-engine events exchanged without inventing original source actions");
+ }catch(error){status("World order variation rejected: "+error.message);}
+});
+$("advanced-whatif-capture").addEventListener("click",()=>{
+ try{
+  if(!reviewedWorldWhatIfScenarios.length)
+   throw Error("Capture source-verified baseline first");
+  if(reviewedWorldWhatIfScenarios.length>=8)
+   throw Error("At most eight fully replayed original world variants");
+  const timeline=JSON.parse($("advanced-interleave-editor").value);
+  if(!Array.isArray(timeline)||!timeline.length||timeline.length>96)
+   throw Error("Authored world clock needs one to 96 bounded real events");
+  const digest=JSON.stringify(timeline);
+  if(reviewedWorldWhatIfScenarios.some(x=>JSON.stringify(x.timeline)===digest))
+   throw Error("An identical event schedule is already captured");
+  reviewedWorldWhatIfScenarios.push({
+   id:"alternative_"+reviewedWorldWhatIfScenarios.length,
+   timeline:JSON.parse(JSON.stringify(timeline))
+  });
+  showOriginalWorldWhatIfQueue();
+  status("Distinct authored counterfactual added; server must prove both share precisely the same original inputs");
+ }catch(error){status("Original world what-if capture rejected: "+error.message);}
+});
+$("advanced-whatif-run").addEventListener("click",async()=>{
+ try{
+  if(!episodicLastScene || !verifiedSourceEpisodes.length ||
+     !verifiedGenreEvents.length || reviewedWorldWhatIfScenarios.length<2)
+   throw Error("Two authored original world-clock schedules and genuine source engines required");
+  const response=await api("/api/advanced-world-whatif",{
+   physical_episodes:verifiedSourceEpisodes,
+   genre_sessions:verifiedGenreEvents,
+   world_scene:episodicLastScene,
+   world_settings:interleavedWorldSettings,
+   scenarios:reviewedWorldWhatIfScenarios
+  });
+  const proof=response.report;
+  if(!proof || response.source_games_mutated ||
+     response.automatic_model_training || response.native_hardware_certified ||
+     proof.world_scene_digest!==episodicLastScene.digest ||
+     proof.scenarios.length!==reviewedWorldWhatIfScenarios.length ||
+     !proof.same_source_and_action_inputs ||
+     !proof.comparison_has_no_automatic_winner ||
+     !proof.original_game_saves_unchanged ||
+     proof.automatic_model_training_approved ||
+     proof.native_full_campaign_certified)
+   throw Error("Counterfactual source-event provenance or fairness proof failed");
+  $("advanced-whatif-results").textContent=JSON.stringify({
+   source_fairness:proof.same_source_and_action_inputs,
+   comparison_axes:proof.selected_axes,
+   actual_game_event_variations:proof.scenarios,
+   non_dominated_candidate_indices:proof.pareto_frontier_indices,
+   strictly_dominant_over_baseline:proof.strict_baseline_dominators,
+   no_automatic_winner:true,
+   original_game_files_unchanged:true,
+   verified_replay_digest:proof.digest
+  },null,2);
+  status("Original NPC world counterfactuals independently replayed and compared; tradeoffs remain explicit");
+ }catch(error){status("Game-world counterfactual rejected: "+error.message);}
+});
 $("advanced-interleave-run").addEventListener("click",async()=>{
  try{
   if(!episodicLastScene || !verifiedSourceEpisodes.length ||
@@ -3533,6 +3632,9 @@ $("advanced-interleave-run").addEventListener("click",async()=>{
 $("advanced-genre-queue-clear").addEventListener("click",()=>{
  verifiedGenreEvents=[];lastUnifiedGenreProof=null;unifiedWorldFollowups=[];
  lastInterleavedProof=null;lastInterleavedTimeline=null;interleavedWorldSettings=null;
+ reviewedWorldWhatIfScenarios=[];
+ $("advanced-whatif-queue").textContent="";
+ $("advanced-whatif-results").textContent="";
  $("advanced-genre-queue-list").textContent="";
  $("advanced-unified-proof").textContent="";
  status("Unpublished genre source acquisitions cleared without modifying original saves");
@@ -3689,6 +3791,7 @@ let lastUnifiedGenreProof=null;
 let unifiedWorldFollowups=[];
 let lastInterleavedProof=null;
 let lastInterleavedTimeline=null;
+let reviewedWorldWhatIfScenarios=[];
 let interleavedWorldSettings=null;
 let verifiedSourceEpisodes=[];
 let episodicLastProof=null,episodicLastScene=null;
@@ -4352,6 +4455,23 @@ local until typed revalidation and an explicit human-approved file commit.</smal
         Replay authored cross-engine event timeline
        </button>
        <pre id="advanced-interleave-proof" role="status" aria-live="polite"></pre>
+       <fieldset aria-label="Source-verified NPC what-if mirror laboratory">
+         <legend>Original world event-order counterfactuals</legend>
+         <button id="advanced-whatif-baseline" type="button">
+           Capture verified timeline as baseline
+         </button>
+         <button id="advanced-whatif-swap" type="button">
+           Derive a distinct neighboring event-order variant
+         </button>
+         <button id="advanced-whatif-capture" type="button">
+           Capture authored alternative for comparison
+         </button>
+         <button id="advanced-whatif-run" type="button">
+           Replay and compare the original worlds
+         </button>
+         <pre id="advanced-whatif-queue" role="status" aria-live="polite"></pre>
+         <pre id="advanced-whatif-results" role="status" aria-live="polite"></pre>
+       </fieldset>
        <fieldset aria-label="Portable original multi-engine world clock">
         <legend>Save and restore authored interleaved gameplay</legend>
         <button id="advanced-interleave-save-export" type="button">
