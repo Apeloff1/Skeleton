@@ -14,7 +14,7 @@ from .story_canon_fabric import (
 
 
 def load_continuity_contract(workspace, project):
-    """Load a reviewed immutable 100-act/9999-scene identity contract, if any."""
+    """Load a reviewed 100-chapter / 1000-act / 9999-scene contract."""
     from .game_project_workspace import _json
     from .story_continuity_assurance import validate_contract
     if project != workspace.active():
@@ -35,14 +35,18 @@ def load_story_workspace(workspace, project):
     if project != workspace.active():
         raise StoryCanonError("Jeeves may only author the active current project")
     files = workspace.files("current", project)
-    paths = sorted(f.path for f in files if f.path.startswith("story/scenes/"))
+    paths = sorted(f.path for f in files if
+                   f.path.startswith(("story/scenes/","story/chapters/")))
     if len(paths) > MAX_SCENES:
         raise StoryCanonError("full historical scene limit exceeded")
     for path in paths:
         # All nonconforming paths under reserved story area fail closed;
         # no silent omissions, wildcard matches or approximate memory.
         import re
-        if not re.fullmatch(r"story/scenes/act_[0-9]{4}/scene_[0-9]{6}\.json", path):
+        if not (re.fullmatch(r"story/scenes/act_[0-9]{4}/scene_[0-9]{6}\.json", path)
+                or re.fullmatch(
+                    r"story/chapters/chapter_[0-9]{3}/acts/act_[0-9]{4}/scene_[0-9]{6}\.json",
+                    path)):
             raise StoryCanonError("noncanonical historical story scene path")
     import json
     from .game_project_workspace import _json
@@ -85,7 +89,7 @@ def validate_story_workspace_source(workspace, project, path, source):
         if current is not None and current != source:
             raise StoryCanonError("signed production contract is immutable once approved")
         validate_contract(source, bible)
-        return {"kind":"immutable_100_act_production_contract",
+        return {"kind":"immutable_100_chapter_production_contract",
                 "source_digest":source["digest"],"human_commit_required":True}
     if path == "game/story_bible.json":
         validate_story_bible(source)
@@ -107,14 +111,15 @@ def validate_story_workspace_source(workspace, project, path, source):
                     "of every affected scene, not an invisible rewrite")
         return {"kind": "story_bible", "phase": source["phase"],
                 "source_digest": source["digest"], "human_commit_required": True}
-    if not path.startswith("story/scenes/"):
+    if not path.startswith(("story/scenes/","story/chapters/")):
         raise StoryCanonError("story validation was invoked for an unrelated source")
     if scene_path(source) != path:
         raise StoryCanonError("scene act/scene filename differs from source identity")
     bible, scenes, index = load_story_workspace(workspace, project)
     if bible is None:
         raise StoryCanonError("story foundation, cast and design must be approved first")
-    if any(s["act"] == source["act"] and s["scene"] == source["scene"]
+    if any((s.get("chapter"),s["act"],s["scene"]) ==
+           (source.get("chapter"),source["act"],source["scene"])
            for s in scenes):
         raise StoryCanonError("approved story is append-only; no silent scene overwrite")
     contract = load_continuity_contract(workspace, project)
@@ -126,13 +131,18 @@ def validate_story_workspace_source(workspace, project, path, source):
             "human_commit_required": True}
 
 
-def next_story_scene_template(workspace, project, act, scene):
+def next_story_scene_template(workspace, project, act, scene, chapter=None):
     bible, history, index = load_story_workspace(workspace, project)
     if bible is None or bible["phase"] != "design":
         raise StoryCanonError("approve story, cast and design before scene creation")
     contract = load_continuity_contract(workspace, project)
     if contract is not None:
         from .story_continuity_assurance import SCENE_TARGET
+        from .story_chapter_context import chapter_of_act, storytelling_template
+        expected_chapter = chapter_of_act(act)
+        if chapter is not None and chapter != expected_chapter:
+            raise StoryCanonError("act belongs to a different canonical chapter")
+        chapter = expected_chapter
         if len(history) >= SCENE_TARGET:
             raise StoryCanonError("all 9999 staged scenes are already completed")
         if type(act) is not int or type(scene) is not int or not 1 <= scene <= 9999:
@@ -147,7 +157,17 @@ def next_story_scene_template(workspace, project, act, scene):
                 raise StoryCanonError(
                     "only the exact next scene in the current or next act is allowed")
     source = story_scene_template(bible, sequence=len(history)+1,
-                                  act=act, scene=scene)
+                                  chapter=chapter,act=act,scene=scene)
+    if contract is not None:
+        form=("prologue" if not history or
+              chapter != history[-1]["chapter"] else "main")
+        narrative=storytelling_template(chapter,form=form)
+        if history:
+            narrative["tension_before"]=history[-1]["storytelling"]["tension_after"]
+            narrative["tension_after"]=narrative["tension_before"]
+            if chapter==history[-1]["chapter"]:
+                narrative["chapter_title"]=history[-1]["storytelling"]["chapter_title"]
+        source["storytelling"]=narrative
     source["prior_digest"] = index["head_digest"]
     return {"path": scene_path(source), "document": source,
             "previous_history_digest": index["digest"],
@@ -155,6 +175,8 @@ def next_story_scene_template(workspace, project, act, scene):
                 contract is not None,
             "next_global_sequence": len(history)+1,
             "required_scene_target": 9999,
+            "planned_chapters":100, "planned_acts":1000,
+            "chapter":chapter,
             "requires_external_Jeeves_content_generation": True,
             "write_authorized": False}
 
@@ -164,8 +186,16 @@ def story_workspace_brief(workspace, project, *, cast, region, prompt,
     bible, history, _ = load_story_workspace(workspace, project)
     if bible is None or bible["phase"] != "design":
         raise StoryCanonError("Jeeves needs approved story, cast and world design")
-    return jeeves_story_brief(bible, history, cast=cast, region=region,
-                              request=prompt, max_bookmarks=max_bookmarks)
+    brief = jeeves_story_brief(bible, history, cast=cast, region=region,
+                               request=prompt, max_bookmarks=max_bookmarks)
+    contract = load_continuity_contract(workspace,project)
+    if contract is not None:
+        from .story_chapter_context import chapter_context
+        current = chapter_context(bible,contract,history)
+        brief["active_chapter_context"] = current
+        brief["chapter_context_receipt"] = current["digest"]
+        brief["no_cross_chapter_memory_fabrication"] = True
+    return brief
 
 
 def story_workspace_status(workspace, project):
@@ -181,7 +211,9 @@ def story_workspace_status(workspace, project):
             "live_Jeeves_model_connected": False,
             "model_weights_modified": False,
             "required_production_scenes": 9999,
-            "maximum_story_acts": 100,
+            "maximum_story_chapters": 100,
+            "maximum_story_acts": 1000,
+            "active_chapter": (scenes[-1].get("chapter",1) if scenes else 1),
             "scene_by_scene_confirmation_enabled":
                 load_continuity_contract(workspace, project) is not None,
             "actual_audio_voice_consistency_verified": False,
