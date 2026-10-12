@@ -153,7 +153,7 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with: {python-version: "3.11.16"}
       - name: Install focused test runtime
-        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9" "cryptography>=50,<51"
       - name: Compile critical Dragon source authorities
         run: |
           python -m compileall -q \
