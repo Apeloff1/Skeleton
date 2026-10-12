@@ -17,6 +17,9 @@ from .advanced_gameplay_runtime import (
 )
 from .system_editors import make_editor_document, SystemEditorError
 from .advanced_genre_engines import STARTS as GENRE_STARTS, CARDS, puzzle_default_layout
+from .advanced_stealth_runtime import (default_layout as stealth_layout,
+                                      normalize_layout as validate_stealth_layout,
+                                      StealthActionError)
 from .advanced_city_runtime import (default_layout as city_layout,
                                     normalize_layout as validate_city_layout,
                                     CityActionError)
@@ -131,12 +134,19 @@ def _default_layout(engine, config, seed):
         return colony_layout(config,seed)
     if engine == "city_builder":
         return city_layout(config,seed)
+    if engine == "stealth":
+        return stealth_layout(config,seed)
     raise SceneError("no advanced authored scene available for that engine")
 
 
 def _normalize_layout(engine, config, layout):
     if type(layout) is not dict:
         raise SceneError("authored layout must be a JSON object")
+    if engine=="stealth":
+        try:
+            return validate_stealth_layout(config,layout)
+        except StealthActionError as exc:
+            raise SceneError(str(exc)) from exc
     if engine=="city_builder":
         try:
             return validate_city_layout(config,layout)
