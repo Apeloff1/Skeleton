@@ -324,6 +324,15 @@ func _unhandled_key_input(event: InputEvent) -> void:
     if not playable or not event is InputEventKey or not event.pressed or event.echo:
         return
     var action: String=""
+    # Modifier order exposes all machine actions, not just construction.
+    if event.keycode in [KEY_1,KEY_2,KEY_3,KEY_4] and (
+        event.shift_pressed or event.ctrl_pressed or event.alt_pressed):
+        var index: int=[KEY_1,KEY_2,KEY_3,KEY_4].find(event.keycode)
+        action=(("repair:" if event.alt_pressed else
+                 "toggle:" if event.ctrl_pressed else "sell:")+str(index))
+        _step(action)
+        get_viewport().set_input_as_handled()
+        return
     match event.keycode:
         KEY_1:action="build:0"
         KEY_2:action="build:1"
@@ -401,7 +410,9 @@ func _draw() -> void:
     _text(Vector2(17,336),"1–4 build  ·  Q/W/E/F upgrade  ·  M mine  ·  G generate",12,Color.WHITE)
     _text(Vector2(17,356),"Space tick · Enter four · S ship · P scrub · V/B speed/efficiency",12,
           Color("#c5d9e5"))
-    _text(Vector2(17,379),"Finite deposits "+str(state["ore_deposit"])+" ore / "+
+    _text(Vector2(17,379),"Shift+1–4 sell · Ctrl+1–4 toggle · Alt+1–4 repair",12,
+          Color("#c4dfc7"))
+    _text(Vector2(17,399),"Finite deposits "+str(state["ore_deposit"])+" ore / "+
           str(state["coal_deposit"])+" coal; no resource creation from nothing",12,
           Color("#c4dfc7"))
 
