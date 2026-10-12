@@ -109,6 +109,7 @@ def _generate(config,seed,floor):
                        (floor+seed)%4],
        "light":("torch","moon","mist")[(seed+floor)%3],
        "hazard_damage":config["trap_damage"],
+       "reserve":max(0,config["encounters_per_floor"]-n),
     }
 
 
@@ -119,7 +120,7 @@ def default_layout(config,seed):
 def normalize_layout(config,layout):
     if type(layout) is not dict or set(layout)!={
        "width","height","floor","terrain","entry","exit","traps",
-       "chests","shop","shrine","enemies","ambient","light","hazard_damage"}:
+       "chests","shop","shrine","enemies","ambient","light","hazard_damage","reserve"}:
         raise RoguelikeActionError("dungeon layout requires exact signed procedural fields")
     if _integer(layout["width"],WIDTH,WIDTH,"grid width")!=WIDTH or (
          _integer(layout["height"],WIDTH,WIDTH,"grid height")!=WIDTH):
@@ -181,7 +182,10 @@ def normalize_layout(config,layout):
             e["poison"] or e["stun"] or e["rewarded"]):
             raise RoguelikeActionError("authored enemy must begin as a genuine undefeated foe")
         enemies.append(dict(e))
-    _integer(layout["hazard_damage"],0,30,"trap damage")
+    _integer(layout["hazard_damage"],0,config["trap_damage"],"trap damage")
+    _integer(layout["reserve"],0,config["encounters_per_floor"],"encounter reserve")
+    if len(enemies)+layout["reserve"]>config["encounters_per_floor"]+1:
+        raise RoguelikeActionError("encounter reserves cannot secretly exceed typed roster")
     if layout["ambient"] not in ("crypt","glade","foundry","temple") or (
        layout["light"] not in ("torch","moon","mist")):
         raise RoguelikeActionError("unregistered original dungeon ambience")
@@ -298,6 +302,21 @@ def _enemy_turn(state,config,events):
                 enemy["cell"]=candidate
                 events.append("original_enemy_navigated_real_floor")
     state["guard"]=False
+    # Physically bound reserve reinforcements rather than overcrowding the board.
+    if state["map"]["reserve"]>0:
+        occupied={e["cell"] for e in state["map"]["enemies"] if e["hp"]>0}
+        for cell in (5,14,22,31,4,23,32,30,33,26,3,13,21,34):
+            if cell in occupied or _blocks(state,cell) or cell==state["player"] or (
+                cell in state["map"]["chests"] or cell in state["map"]["traps"] or
+                cell in (state["map"]["shop"],state["map"]["shrine"],
+                         state["map"]["exit"])):
+                continue
+            index=len(state["map"]["enemies"])
+            state["map"]["enemies"].append(_make_enemy(
+                state["seed"],state["floor"],index,cell,config))
+            state["map"]["reserve"]-=1
+            events.append("finite_encounter_reserve_spawned_real_tactical_agent")
+            break
     if state["hp"]==0:
         if not config["permadeath"] and state["relics"]>=config["revive_relic_cost"]:
             state["relics"]-=config["revive_relic_cost"]
@@ -414,7 +433,14 @@ def step(state,config,action):
         state["chests_opened"].append(chest)
         state["gold"]+=config["chest_gold"]
         state["relics"]+=config["chest_relics"]
-        state["potions"]+=config["chest_potions"]
+        tier=(state["seed"]+state["floor"]*17+chest*13)%config["item_pool"]
+        if tier%3==0:
+            state["potions"]+=config["chest_potions"]
+        elif tier%3==1:
+            state["arrows"]+=config["arrow_bundle"]
+        else:
+            state["rations"]+=1
+        events.append("procedurally_selected_original_item_pool_reward")
         state["treasure"]+=1
         events.append("original_finite_treasure_chest_opened_once")
     elif action=="loot_key":
@@ -485,6 +511,12 @@ def step(state,config,action):
         _spend(state,"relics",1)
         mark="original_run_relic_"+str(len(state["meta_unlocked"]))
         state["meta_unlocked"].append(mark)
+        if config["meta_progress"]=="upgrades":
+            state["attack"]+=1
+            events.append("real_bank_relic_increased_current_run_weapon")
+        else:
+            state["potions"]+=1
+            events.append("unlocked_original_run_relic_potion")
         events.append("per_run_custodial_meta_relic_invested")
     elif action=="take_stairs":
         if state["player"]!=state["map"]["exit"]:
