@@ -98,8 +98,9 @@ def test_reviewed_source_history_grows_exactly_three_hatchlings(setup_review):
     assert nest.read(OWNER, authorized=True) == third
     assert all(change.improvement.startswith("(") for change in third.changes)
     assert bridge.feed_idle(
-        OWNER, brief, "article-a", lane="article", at=T1, idle_since=T0,
-        consented=True, background_allowed=True, authorized=True,
+        OWNER, revised_brief, "article-a", lane="updates", at=T1,
+        idle_since=T0, consented=True, background_allowed=True,
+        authorized=True, published_at="2026-10-12T12:05:00Z",
     ) == third
 
 
