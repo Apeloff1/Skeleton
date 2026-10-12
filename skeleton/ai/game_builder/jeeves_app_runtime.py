@@ -96,6 +96,7 @@ ACTION_DEFS = (
     ("atlas.summary", "Discover installed app families and executable adapters", "read", False),
     ("atlas.family", "Page verified module names in an app family", "read", False),
     ("atlas.search", "Search installed capability names and source-tree taxonomy", "read", False),
+    ("atlas.deep", "Inventory nested real modules in a bounded app subsystem", "read", False),
     ("atlas.editor", "Inspect an actual typed system editor and its full knobs", "read", False),
     ("studio.tree", "Inspect the current/previous/demo workspace tree", "read", False),
     ("studio.source", "Read bounded reviewed current-project source", "read", False),
@@ -190,6 +191,72 @@ def _entries(family, *, offset=0, limit=80, prefix=None):
             "entries":entries[offset:offset+limit],
             "next_offset":offset+limit if offset+limit<len(entries) else None,
             "no_implicit_execute_authority":True}
+
+
+def _deep_entries(family, *, query=None, offset=0, limit=80, max_depth=8):
+    """Recursive bounded walk; path metadata only, no imports or file contents.
+
+    Unlike a static list, it finds newly installed modules and children.
+    Scanning is bounded to the named installed family and does not follow
+    symlinks, hidden trees, credential filenames or excluded build caches.
+    """
+    if family not in SURFACES:
+        raise JeevesAppCapabilityError("unknown app family")
+    offset=_bounds(offset,0,MAX_MODULES,"feature-page offset")
+    limit=_bounds(limit,1,MAX_VISIBLE,"feature-page length")
+    max_depth=_bounds(max_depth,1,10,"nested source scan depth")
+    if query is not None:
+        _plain(query,"nested feature search",64)
+        if not FILTER.fullmatch(query):
+            raise JeevesAppCapabilityError("unsafe nested feature query")
+    relative=SURFACES[family][0]
+    start=_safe_dir(ROOT/relative)
+    stack=[(start,0)]
+    entries=[]
+    visited=0
+    while stack:
+        directory,depth=stack.pop()
+        visited+=1
+        if visited>MAX_MODULES:
+            raise JeevesAppCapabilityError("feature walk exceeded bounded directory budget")
+        for candidate in directory.iterdir():
+            if candidate.is_symlink() or candidate.name.startswith(".") or \
+               PROTECTED.search(candidate.name) or \
+               candidate.name in ("__pycache__","node_modules","venv",".venv",
+                                  "dist","build","target"):
+                continue
+            if candidate.is_dir():
+                if depth<max_depth:
+                    stack.append((candidate,depth+1))
+                typ="directory"
+            elif candidate.suffix in (".py",".json",".md",".ts",".js",
+                                       ".tsx",".jsx",".css",".html",".gd",".yml",".yaml"):
+                typ="module"
+            else:
+                continue
+            installed=candidate.relative_to(ROOT).as_posix()
+            if query is None or query.casefold() in installed.casefold():
+                entries.append({
+                    "path":installed,"kind":typ,
+                    "discovered_from_installed_source":True,
+                    "local_execution_adapter_granted":False,
+                })
+            if len(entries)>MAX_MODULES:
+                raise JeevesAppCapabilityError("too many matching installed features")
+    entries.sort(key=lambda x:x["path"])
+    body={
+        "schema":"skeleton.game_builder.jeeves_feature_deep_index.v1",
+        "family":family,"path":"skeleton/"+relative,
+        "matching_entries":len(entries),
+        "source_directories_visited":visited,
+        "scanned_to_depth":max_depth,
+        "offset":offset,"limit":limit,
+        "entries":entries[offset:offset+limit],
+        "next_offset":offset+limit if offset+limit<len(entries) else None,
+        "model_cannot_execute_arbitrary_discovered_modules":True,
+        "no_unreviewed_code_loaded":True,
+    }
+    return {**body,"digest":canonical_digest(body)}
 
 
 def _action_index():
@@ -443,6 +510,12 @@ def dispatch_app_action(workspace,project,action,args,*,authorized=False):
         _exact(args,("family","query","offset","limit"),"app source search")
         result=app_atlas(family=args["family"],query=args["query"],
                          offset=args["offset"],limit=args["limit"])
+    elif action=="atlas.deep":
+        _exact(args,("family","query","offset","limit","max_depth"),
+               "recursive app family walk")
+        result=_deep_entries(args["family"],query=args["query"],
+                             offset=args["offset"],limit=args["limit"],
+                             max_depth=args["max_depth"])
     elif action=="atlas.editor":
         _exact(args,("editor",),"editor schema lookup")
         result=editor_spec(args["editor"])
