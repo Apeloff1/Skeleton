@@ -571,6 +571,11 @@ class ShadowWeightAutomation:
             if prior is not None and prior[1] != "revoked":
                 original_ids.add((prior[0].source_id, prior[0].source_revision,
                                   prior[0].note_id))
+        total_rows = self.db.execute(
+            "SELECT COUNT(*) FROM dragon_shadow_weights WHERE owner=?", (owner,)
+        ).fetchone()[0]
+        if total_rows > MAX_ITEMS:
+            raise ValueError("shadow registry capacity already exceeded")
         if len(original_ids) >= MAX_ITEMS:
             raise ValueError("shadow queue budget exhausted")
         prior_revisions = {rev for sid, rev, _ in original_ids if sid == source_id}
@@ -634,6 +639,10 @@ class ShadowWeightAutomation:
                 if existing[0] != shadow:
                     raise ValueError("conflicting shadow acquisition replay")
                 return shadow
+            if self.db.execute(
+                "SELECT COUNT(*) FROM dragon_shadow_weights WHERE owner=?", (owner,)
+            ).fetchone()[0] >= MAX_ITEMS:
+                raise ValueError("physical shadow registry capacity exhausted")
             self._write(
                 shadow, "shadow", None, "", before="absent", at=at,
                 improvement="(new scrutinized evidence quarantined as inactive sparse shadow weights)",
@@ -779,6 +788,47 @@ class ShadowWeightAutomation:
             "neural_parameters_modified": False,
             "memory_promotion_authorized": False,
         }
+
+    def registry_health(self, owner: str, *, authorized: bool) -> dict:
+        """Verify all signed evidence before reporting activation and staleness.
+
+        This is a point-in-time audit, not a training or crawler instruction.
+        """
+        if authorized is not True:
+            raise PermissionError("owner authorization required")
+        _id(owner)
+        rows = self.db.execute(
+            "SELECT candidate_id FROM dragon_shadow_weights "
+            "WHERE owner=? ORDER BY candidate_id", (owner,),
+        ).fetchall()
+        if len(rows) > MAX_ITEMS:
+            raise ValueError("shadow registry hard capacity exceeded")
+        status = {stage: 0 for stage in STAGES}
+        stale = []
+        last_heads = []
+        for (cid,) in rows:
+            verified = self._read(owner, cid)
+            if verified is None:
+                raise ValueError("shadow registry index consistency failed")
+            shadow, stage, _, _, events = verified
+            status[stage] += 1
+            last_heads.append((cid, events[-1].digest))
+            if stage in ("shadow", "tested", "active") and not self._current(shadow):
+                stale.append(cid)
+        return {
+            "schema": "skeleton.dragon.shadow_registry_health.v1",
+            "owner": owner,
+            "total": len(rows),
+            "stages": status,
+            "stale_candidate_ids": tuple(stale),
+            "routable_active": status["active"] - sum(
+                cid in set(stale) for cid, in rows
+                if self._read(owner, cid)[1] == "active"
+            ),
+            "history_digest": _hash(last_heads),
+            "neural_training_authorized": False,
+        }
+
 
     def history(self, owner: str, candidate_id: str, *,
                 authorized: bool) -> tuple[ShadowAudit, ...]:
