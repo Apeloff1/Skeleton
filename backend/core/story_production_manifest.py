@@ -14,6 +14,9 @@ from core.chapter_continuity import (
     PROOFREAD_INSPECTIONS, chapter_for_act, digest,
 )
 
+from core.story_tapestry import weave_tapestry
+from core.story_review_matrices import REVIEW_MATRIX_COUNT, REVIEW_LEVELS
+
 MANIFEST_SCHEMA = "jeeves.story.production-manifest.v1"
 
 
@@ -113,6 +116,10 @@ def production_manifest(
     missing_chapters = [i for i in range(1, MAX_CHAPTERS + 1) if i not in by_chapter]
     missing_acts = [i for i in range(1, MAX_ACTS + 1) if i not in seen_acts]
     missing_scenes = [i for i in range(1, MAX_SCENES + 1) if i not in seen_scenes]
+    tapestry = weave_tapestry(scenes, complete_source=bool(complete_source))
+    # The story can be structurally complete without passing literary proof.
+    # Final production requires the 100x100 matrix cells for each scene as
+    # separately persisted and independently reviewed quality evidence.
     complete = (
         bool(complete_source) and not missing_chapters and not missing_acts
         and not missing_scenes and issue_count == 0
@@ -127,6 +134,11 @@ def production_manifest(
         "schema_version": MANIFEST_SCHEMA,
         "complete_source": bool(complete_source),
         "structural_ready": bool(complete),
+        "tapestry": tapestry,
+        "plot_closure_ready": bool(complete) and tapestry["closure_ready"],
+        "matrix_review_required_per_scene": REVIEW_MATRIX_COUNT * REVIEW_LEVELS,
+        "matrix_quality_coverage_verified": False,
+        "final_production_quality_certified": False,
         "continuity_100_percent_guaranteed": False,
         "human_creative_quality_review_required": True,
         "coverage": {
