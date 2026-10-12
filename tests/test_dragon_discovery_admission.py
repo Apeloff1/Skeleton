@@ -337,3 +337,62 @@ def test_latest_batch_cannot_claim_approval_or_fork_history(baseline, chain):
     bad[1]["counts"]["raw_provisional_urls"] += 1
     with pytest.raises(ValueError):
         validate_discovery_chain(baseline, [*chain, bad])
+
+
+NEW_PINNED_BATCHES = [
+    ROOT / f"docs/ai/evidence/dragon-source-expansion-20261012-batch-{n:04d}.json"
+    for n in range(24, 31)
+]
+
+
+def test_five_pinned_readme_catalogs_extend_raw_discovery_to_10476(baseline, chain):
+    """All source identities and lineage are reproducible, never approved."""
+    docs = [*chain, _supplement(
+        ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json")]
+    docs.extend(_supplement(path) for path in NEW_PINNED_BATCHES)
+    checked = validate_discovery_chain(baseline, docs)
+    assert len(docs) == 11
+    assert checked["raw_new"] == 6071
+    assert checked["raw_total_discovered"] == 10476
+    assert checked["baseline"] == 4405
+    assert checked["total_discovered"] <= 10476
+    assert checked["new"] <= 6071
+    assert checked["total_discovered"] == 4405 + checked["new"]
+    assert all(row["training_authorized"] is False
+               and row["rights"] == "not_assessed"
+               and row["availability"] == "not_checked"
+               for row in checked["sources"].values())
+    newly_recorded = [row["url"] for _, doc in docs[-7:]
+                      for row in doc["candidates"]]
+    assert len(newly_recorded) == len(set(newly_recorded)) == 5038
+    assert all(row["training_authorized"] is False
+               and row["canonical_admission"] is False
+               for _, doc in docs[-7:] for row in doc["candidates"])
+
+
+def test_git_pinned_discovery_has_valid_raw_identity_and_cannot_self_approve(baseline, chain):
+    docs = [*chain, _supplement(
+        ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json")]
+    docs.extend(_supplement(path) for path in NEW_PINNED_BATCHES)
+    catalog_refs = {
+        (c["repository"], c["commit_sha"], c["readme_blob_sha"])
+        for c in docs[-1][1]["catalogs"]
+    }
+    assert len(catalog_refs) == 5
+    for _, doc in docs[-7:]:
+        assert doc["status"] == "raw_discovery_only_not_ingested_into_canonical_queue"
+        for row in doc["candidates"]:
+            assert row["source_id"] == "source-" + sha256(
+                row["url"].encode("utf-8")).hexdigest()
+            assert 1 <= len(row["discoveries"]) <= 16
+            assert all((origin["repository"], origin["commit_sha"],
+                        origin["readme_blob_sha"]) in catalog_refs
+                       for origin in row["discoveries"])
+    forged = deepcopy(docs)
+    forged[-1][1]["candidates"][0]["canonical_admission"] = True
+    with pytest.raises(ValueError, match="authority"):
+        validate_discovery_chain(baseline, forged)
+    forked = deepcopy(docs)
+    forked[-1][1]["parents"] = forked[-1][1]["parents"][:-1]
+    with pytest.raises(ValueError, match="chain"):
+        validate_discovery_chain(baseline, forked)
