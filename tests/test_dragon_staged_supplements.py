@@ -169,3 +169,61 @@ def test_compilation_guards_existing_parent_and_finite_size(accepted, stage):
     with pytest.raises(ValueError):
         build_catalog_supplements(
             registry, wrong, stage, first_batch=2)
+
+
+def test_staged_evidence_loader_rejects_ambiguous_json_and_symlinks(
+        tmp_path, monkeypatch, stage):
+    import json
+    import skeleton.ai.game_builder.dragon_staged_supplements as module
+    fake_module = tmp_path / "repo/skeleton/ai/game_builder/dragon_staged_supplements.py"
+    fake_module.parent.mkdir(parents=True)
+    fake_module.write_text("# test module root anchor", encoding="utf-8")
+    monkeypatch.setattr(module, "__file__", str(fake_module))
+    evidence = tmp_path / "repo/docs/ai/evidence"
+    evidence.mkdir(parents=True)
+    file = evidence / "dragon-new-catalog-metadata-demo.json"
+    file.write_text(json.dumps(stage), encoding="utf-8")
+    assert module.read_staged_catalog_snapshot(file)["raw_observation_count"] == 7
+
+    file.write_text('{"schema":"one","schema":"two"}', encoding="utf-8")
+    with pytest.raises(ValueError, match="ambiguous"):
+        module.read_staged_catalog_snapshot(file)
+
+    file.write_text('{"status":NaN}', encoding="utf-8")
+    with pytest.raises(ValueError, match="malformed"):
+        module.read_staged_catalog_snapshot(file)
+
+    file.write_text(json.dumps(stage), encoding="utf-8")
+    alias = evidence / "dragon-new-catalog-metadata-alias.json"
+    try:
+        alias.symlink_to(file)
+    except OSError:
+        pytest.skip("file symlinks not supported")
+    with pytest.raises(ValueError, match="regular bounded"):
+        module.read_staged_catalog_snapshot(alias)
+
+    outside = tmp_path / "elsewhere.json"
+    outside.write_text(json.dumps(stage), encoding="utf-8")
+    with pytest.raises(ValueError, match="inside the repository"):
+        module.read_staged_catalog_snapshot(outside)
+
+
+def test_accepted_real_round_four_is_idempotent_and_unapproved():
+    from pathlib import Path
+    import skeleton.ai.game_builder.dragon_staged_supplements as module
+    from skeleton.ai.game_builder.dragon_almanacs import read_source_registry
+    from skeleton.ai.game_builder.dragon_discovery_reconciled import _chain, EXPECTED_RAW_TOTAL
+    repo = Path(module.__file__).resolve().parents[3]
+    registry = read_source_registry(
+        repo / "skeleton/ai/game_builder/catalogs/dragon_sources_20261010")
+    stage = module.read_staged_catalog_snapshot(
+        repo / "docs/ai/evidence/dragon-new-catalog-metadata-20261012-round4.json")
+    plan = module.build_catalog_supplements(
+        registry, _chain(), stage, first_batch=51, batch_size=600)
+    assert stage["raw_observation_count"] == 2641
+    assert EXPECTED_RAW_TOTAL == 20860
+    assert plan["start_raw_leads"] == EXPECTED_RAW_TOTAL
+    assert plan["new_canonical_link_leads"] == 0
+    assert plan["supplements"] == []
+    assert plan["crawler_authorized"] is False
+    assert plan["training_authorized"] is False
