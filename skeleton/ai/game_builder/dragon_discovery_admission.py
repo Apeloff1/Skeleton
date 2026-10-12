@@ -438,6 +438,61 @@ class DragonDiscoveryAdmission:
                 "training_authorized": False, "scope": "discovery_metadata_only"}
 
 
+    def provenance_page(self, owner: str, source_id: str, *, authorized: bool,
+                        limit: int = 100, offset: int = 0) -> dict:
+        """Read independently recorded raw links behind one normalized source.
+
+        This view supports adversarial audits of duplicates and exact claimed
+        catalog lines without promoting any link into approved source content.
+        """
+        _auth(owner, authorized)
+        _id(source_id, "source")
+        _integer(limit, "provenance page limit", 1, 100)
+        _integer(offset, "provenance page offset", 0, 100_000)
+        source = self.db.execute(
+            "SELECT body,digest FROM dragon_almanac_sources WHERE owner=? AND source=?",
+            (owner, source_id)).fetchone()
+        if source is None:
+            raise ValueError("unknown owner source")
+        record = json.loads(source[0])
+        if (canonical_digest(record) != source[1] or
+                record.get("source_id") != source_id or
+                canonical_source_url(record.get("url")) != record.get("url")):
+            raise ValueError("corrupt source identity")
+        rows = self.db.execute(
+            """SELECT origin_source,supplement_digest,body,digest
+               FROM dragon_almanac_supplement_receipts_v2
+               WHERE owner=? AND normalized_source=?
+               ORDER BY supplement_digest,origin_source LIMIT ? OFFSET ?""",
+            (owner, source_id, limit + 1, offset)).fetchall()
+        entries = []
+        for origin_id, parent_digest, raw, digest in rows[:limit]:
+            if not isinstance(raw, str) or len(raw) > 262_144:
+                raise ValueError("provenance receipt size exceeded")
+            body = json.loads(raw)
+            candidate = body.get("candidate")
+            if (not isinstance(candidate, dict)
+                    or canonical_digest(body) != digest
+                    or body.get("supplement_digest") != parent_digest
+                    or body.get("normalized_source_id") != source_id
+                    or body.get("normalized_url") != record["url"]
+                    or body.get("authority") != "unreviewed_discovery_only"
+                    or candidate.get("source_id") != origin_id
+                    or origin_id != "source-" + sha256(candidate.get("url", "").encode("utf-8")).hexdigest()
+                    or canonical_source_url(candidate["url"]) != record["url"]):
+                raise ValueError("corrupt source provenance lineage")
+            entries.append({
+                "raw_source_id": origin_id, "raw_url": candidate["url"],
+                "discovery_origins": candidate.get("discoveries", []),
+                "supplement_digest": parent_digest, "receipt_digest": digest,
+                "evidence_path": body.get("evidence_path"),
+                "training_authorized": False, "approved": False,
+            })
+        return {"owner": owner, "source_id": source_id, "provenance": entries,
+                "next_offset": offset + limit if len(rows) > limit else None,
+                "training_authorized": False, "scope": "discovery_metadata_only"}
+
+
 def import_supplement_files(almanacs: DragonAlmanacs, owner: str, registry: dict,
                             paths: list[str | Path], *, authorized: bool) -> dict:
     return DragonDiscoveryAdmission(almanacs).import_chain(
