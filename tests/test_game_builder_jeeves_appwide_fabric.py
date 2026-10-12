@@ -163,6 +163,62 @@ class AppwideCapabilityTests(unittest.TestCase):
         self.assertTrue(result["result"]["requires_independent_benchmark_improvement"])
         self.assertFalse(result["result"]["evidence_claims_independently_verified"])
 
+    def test_loopback_studio_can_inspect_all_indexed_files_but_cannot_run_unknown_code(self):
+        import http.client
+        import threading
+        from skeleton.ai.game_builder.game_workspace_server import create_workspace_server
+        ws=GameWorkspace.create(str(Path(self.tmp.name)/"http_work"),authorized=True)
+        ws.create_project("original","rpg",authorized=True)
+        server=create_workspace_server(ws,port=0,repo_root=self.root)
+        thread=threading.Thread(target=server.serve_forever,daemon=True)
+        thread.start()
+        try:
+            def request(method,path,payload=None,*,token=True,origin=None):
+                conn=http.client.HTTPConnection("127.0.0.1",
+                                                server.server_port,timeout=8)
+                headers={"Host":f"127.0.0.1:{server.server_port}"}
+                if token:headers["X-Game-Studio-Token"]=server.secret
+                if payload is not None:headers["Content-Type"]="application/json"
+                if origin:headers["Origin"]=origin
+                conn.request(method,path,
+                             body=json.dumps(payload) if payload is not None else None,
+                             headers=headers)
+                response=conn.getresponse()
+                status=response.status
+                body=json.loads(response.read())
+                conn.close()
+                return status,body
+            self.assertEqual(request("GET","/api/jeeves-appwide-status",
+                                     token=False)[0],403)
+            status,report=request("GET","/api/jeeves-appwide-status")
+            self.assertEqual(status,200)
+            self.assertEqual(report["scanned_regular_files"],9)
+            self.assertEqual(request("GET","/api/jeeves-appwide-catalog")[0],200)
+            status,result=request("POST","/api/jeeves-appwide-invoke",{
+                "action":"inventory.search",
+                "params":{"query":"forge","limit":10}})
+            self.assertEqual(status,200)
+            self.assertEqual(result["result"]["total_matches"],1)
+            self.assertEqual(request("POST","/api/jeeves-appwide-invoke",{
+                "action":"source.inspect",
+                "params":{"path":"backend/core/universal_forge.py"}},
+                origin="https://not-the-local-studio.invalid")[0],403)
+            self.assertEqual(request("POST","/api/jeeves-appwide-invoke",{
+                "action":"shell.execute","params":{"command":"whoami"}})[0],400)
+            self.assertEqual(request("POST","/api/jeeves-appwide-invoke",{
+                "action":"source.propose",
+                "params":{"path":"backend/core/universal_forge.py",
+                          "replacement":"modified",
+                          "expected_sha256":self.inv.source(
+                              "backend/core/universal_forge.py")["sha256"],
+                          "reason":"Attempt unapproved runtime mutation"}})[0],403)
+            self.assertEqual((self.root/"backend/core/universal_forge.py")
+                             .read_text(),"source test\n")
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
     def test_active_project_edit_still_uses_exact_human_approval_flow(self):
         work=GameWorkspace.create(str(Path(self.tmp.name)/"workspace"),authorized=True)
         work.create_project("fable","rpg",authorized=True)
