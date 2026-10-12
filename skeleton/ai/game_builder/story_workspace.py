@@ -56,6 +56,8 @@ def validate_story_workspace_source(workspace, project, path, source):
         if source["project"] != project:
             raise StoryCanonError("cannot retarget another game's story canon")
         current, scenes, _ = load_story_workspace(workspace, project)
+        if current is None and source["phase"] != "foundation":
+            raise StoryCanonError("first reviewed story source must be the foundation")
         if current is not None:
             old = PHASES.index(current["phase"])
             new = PHASES.index(source["phase"])

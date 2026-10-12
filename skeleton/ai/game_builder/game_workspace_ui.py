@@ -187,6 +187,29 @@ function storyProject(){
   throw Error("Jeeves story editing requires an active current project");
  return selectedProject;
 }
+async function stageStorySource(path,source){
+ if(selectedTree!=="current"||selectedProject!==model.active)
+  throw Error("Only active current game sources can be staged");
+ let existing;
+ try{
+  existing=await api("/api/file?tree=current&project="+encodeURIComponent(selectedProject)+
+                     "&path="+encodeURIComponent(path));
+ }catch(error){
+  if(!/files must be regular|not a file|No such file|cannot read/i.test(error.message))
+   throw error;
+  existing={content:"",version:{tree:"current",project:selectedProject,
+   path,sha256:"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   bytes:0,editable:true}};
+ }
+ selectedFile=path;loaded=existing;proposal=null;
+ $("editor").value=JSON.stringify(source,null,2)+"\\n";
+ $("file-name").textContent="CANON REVIEW: current/"+selectedProject+"/"+path;
+ $("hash").textContent="Previous SHA-256 "+existing.version.sha256;
+ $("editor").readOnly=false;$("propose").disabled=false;
+ $("commit").disabled=true;$("approval").checked=false;
+ $("reason").value="Human-reviewed original Jeeves story canon and scene consistency.";
+ diff();
+}
 function storyShow(data){
  $("story-evidence").textContent=JSON.stringify(data,null,2).slice(0,30000);
 }
@@ -195,7 +218,8 @@ $("story-foundation").addEventListener("click",async()=>{
   const response=await api("/api/story-foundation-template",
                             {project:storyProject()});
   storyShow(response);
-  status("Fill story/world, then advance cast and design phases using human-reviewed exact-file proposals.");
+  await stageStorySource(response.path,response.document);
+  status("Complete foundation, sign/validate, then propose and explicitly approve this source.");
  }catch(error){status("Foundation blocked: "+error.message);}
 });
 $("story-next").addEventListener("click",async()=>{
@@ -204,7 +228,8 @@ $("story-next").addEventListener("click",async()=>{
    project:storyProject(),
    act:Number($("story-act").value),scene:Number($("story-scene").value)});
   storyShow(response);
-  status("Next original scene scaffold prepared against the reviewed history. No source committed.");
+  await stageStorySource(response.path,response.document);
+  status("Scene scaffold staged. Populate the story, then sign/validate before supervised commit.");
  }catch(error){status("Scene authoring blocked: "+error.message);}
 });
 $("story-context").addEventListener("click",async()=>{
@@ -222,11 +247,13 @@ $("story-context").addEventListener("click",async()=>{
 });
 $("story-check").addEventListener("click",async()=>{
  try{
-  const response=await api("/api/story-verify",{
+  const response=await api("/api/story-sign",{
    project:storyProject(),path:selectedFile,
    document:JSON.parse($("editor").value)});
-  storyShow(response);
-  status("Historical consistency verified. Explicit proposal and commit are still required.");
+  $("editor").value=JSON.stringify(response.document,null,2)+"\\n";
+  storyShow(response.evidence);
+  diff();
+  status("Canon signed and fully checked. Review your diff then propose and explicitly approve.");
  }catch(error){status("Story consistency rejected: "+error.message);}
 });
 $("editor").addEventListener("input",diff);
@@ -3876,7 +3903,7 @@ regional appearance. It does not invent model output or write hidden files.</sma
 <label>Jeeves creative instruction<textarea id="story-instruction" rows="3"
  placeholder="Write the next scene and preserve prior character relationships, visual identities, palette, lore and original events."></textarea></label>
 <button id="story-context" type="button">Retrieve historical Jeeves context</button>
-<button id="story-check" type="button">Verify current authored source</button>
+<button id="story-check" type="button">Sign and validate authored source</button>
 <pre id="story-evidence" role="status" aria-live="polite"></pre>
 </fieldset>
 

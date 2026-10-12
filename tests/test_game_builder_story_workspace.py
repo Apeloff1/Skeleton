@@ -132,6 +132,12 @@ class JeevesWorkspaceTests(unittest.TestCase):
                  reason="Attempt to leave the project using a malicious path.",
                  authorized=True)
 
+    def test_no_production_bible_can_bypass_foundation_on_first_commit(self):
+        with self.assertRaises(StoryCanonError):
+            write_reviewed(self.studio,"game/story_bible.json",canonical_bible())
+        self.assertEqual(story_workspace_status(self.studio,"worldforge")["phase"],
+                         "unstarted")
+
     def test_no_fake_scene_memory_when_bible_missing(self):
         self.assertEqual(story_workspace_status(self.studio,"worldforge")["phase"],
                          "unstarted")

@@ -239,6 +239,21 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 studio,values["project"],cast=values["cast"],
                 region=values["region"],prompt=values["prompt"],
                 max_bookmarks=values.get("max_bookmarks",48)))
+        if path=="/api/story-sign":
+            from .story_canon_fabric import BIBLE,SCENE,sign
+            from .story_workspace import validate_story_workspace_source
+            source_path=values["path"]
+            schema=(BIBLE if source_path=="game/story_bible.json"
+                    else SCENE if source_path.startswith("story/scenes/")
+                    else None)
+            if schema is None:
+                raise WorkspaceError("Jeeves signing only permits source-bound story files")
+            document=sign(values["document"],schema)
+            evidence=validate_story_workspace_source(
+                studio,values["project"],source_path,document)
+            return self._json(200,{"path":source_path,"document":document,
+                                   "evidence":evidence,"write_authorized":False,
+                                   "human_commit_required":True})
         if path=="/api/story-verify":
             from .story_workspace import validate_story_workspace_source
             evidence=validate_story_workspace_source(studio,values["project"],
