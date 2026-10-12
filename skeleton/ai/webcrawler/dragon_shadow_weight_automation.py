@@ -237,7 +237,7 @@ def _benchmark(shadow: ShadowWeight, active: tuple[ShadowWeight, ...],
         raise ValueError("all existing live sources need regression canaries")
     base = tuple(sorted(active, key=lambda x: x.candidate_id))
     before, after, gained, lost = 0, 0, 0, 0
-    for case in suite:
+    for case in cases:
         expected_source = None if case.expected_source_id == "_abstain" else case.expected_source_id
         original = _route(base, case.query) == expected_source
         proposed = _route((*base, shadow), case.query) == expected_source
@@ -248,7 +248,7 @@ def _benchmark(shadow: ShadowWeight, active: tuple[ShadowWeight, ...],
     baseline = _hash(tuple((x.candidate_id, x.source_revision) for x in base))
     suite_digest = _hash((payload, suite.seal))
     accepted = gained >= 1 and lost == 0 and after > before
-    values = (suite_digest, baseline, shadow.candidate_id, len(suite),
+    values = (suite_digest, baseline, shadow.candidate_id, len(cases),
               before, after, gained, lost, accepted)
     return BenchmarkVerdict(*values, _hash(values))
 
