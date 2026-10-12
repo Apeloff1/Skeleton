@@ -338,6 +338,28 @@ func _step(action: String) -> bool:
     return true
 
 
+func _typed_json_proof(value: Variant) -> Variant:
+    # Godot JSON.parse_string decodes numeric literals as floats, including
+    # Python integer IDs. JSON arrays/dictionaries compare element types
+    # strictly; restore ONLY losslessly integral numeric values. Fractional
+    # and fabricated physics numbers remain incompatible with real state.
+    if typeof(value)==TYPE_FLOAT:
+        if is_finite(value) and float(int(value))==value:
+            return int(value)
+        return value
+    if typeof(value)==TYPE_ARRAY:
+        var result: Array=[]
+        for item in value:
+            result.append(_typed_json_proof(item))
+        return result
+    if typeof(value)==TYPE_DICTIONARY:
+        var result: Dictionary={}
+        for name in value:
+            result[name]=_typed_json_proof(value[name])
+        return result
+    return value
+
+
 func _snapshot() -> Dictionary:
     return physical.duplicate(true)
 
@@ -367,7 +389,7 @@ func _verify() -> void:
         if typeof(command)!=TYPE_STRING or not _step(command):
             _fault("original physical command rejected")
             return
-    var expected: Dictionary=data["expected"]
+    var expected: Dictionary=_typed_json_proof(data["expected"])
     var actual: Dictionary=_snapshot()
     if actual.size()!=expected.size():
         _fault("physics proof schema drift")
