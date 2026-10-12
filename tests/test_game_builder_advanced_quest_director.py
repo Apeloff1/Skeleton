@@ -42,7 +42,7 @@ class LivingOriginalQuestTests(unittest.TestCase):
         editor=next(e for e in catalog() if e["id"]=="quest_director")
         self.assertEqual(editor["runtime_maturity"],"advanced_reference_runtime")
         self.assertEqual(editor["progression_floor"],"advanced")
-        self.assertEqual(len(editor["fields"]),53)
+        self.assertEqual(len(editor["fields"]),54)
         self.assertEqual(len(ACTIONS),len(set(ACTIONS)))
         self.assertEqual(CELLS,49)
 
@@ -228,6 +228,38 @@ class LivingOriginalQuestTests(unittest.TestCase):
         sparse=self.rules(npc_count=1)
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("quest_director",sparse,["speak:3"])
+
+
+    def test_studio_original_witness_map_and_provenance_preserving_painter(self):
+        from skeleton.ai.game_builder.game_workspace_ui import (
+            render_workspace_html,SCRIPT,
+        )
+        page=render_workspace_html("A"*32).decode("utf-8")
+        for token in ("quest-director-command","quest-director-context",
+                      "quest-director-evidence","paintQuestDirectorCell",
+                      "selectedQuestSite","selectedQuestNPC",
+                      "advancedAvailableActions","site_move","npc_move",
+                      "site_integrity_up","day_phase_next",
+                      "Signed 7×7 witnessed quest",
+                      "Original witnessed world changed.",
+                      "testimonies","rumor_edges","original player action"):
+            self.assertIn(token.lower(),page.lower())
+        self.assertIn("physical witnessed-world action",SCRIPT)
+        self.assertIn("Direct events",SCRIPT)
+        self.assertIn("hearsay",SCRIPT)
+        cfg=self.rules()
+        scene=make_advanced_scene("quest_director",cfg,seed=4)
+        changed=deepcopy(scene)
+        changed["layout"]["climate"]="steppe"
+        if changed["layout"]["climate"]==scene["layout"]["climate"]:
+            changed["layout"]["climate"]="highland"
+        with self.assertRaises(SceneError):
+            validate_advanced_scene(changed,cfg)
+        signed=make_advanced_scene("quest_director",cfg,seed=4,
+                                   layout=changed["layout"])
+        self.assertNotEqual(signed["digest"],scene["digest"])
+        self.assertTrue(verify_advanced_session(
+            run_advanced_session("quest_director",cfg,scene=signed,seed=4),cfg))
 
     def test_savegame_and_hybrid_reference_proof_rebuild_full_original_witness_history(self):
         rules=self.rules()
