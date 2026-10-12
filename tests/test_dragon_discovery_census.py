@@ -59,7 +59,7 @@ def test_census_exposes_host_concentration_not_independence(census):
 def test_neither_metadata_census_nor_keyword_detection_grants_rights(census):
     assert census["source_of_truth"] == "frozen_reconciled_discovery_chain"
     assert census["rights_keyword_hit_not_legal_finding"] is True
-    assert census["verified_document_identity_not_link_content"] is True
+    assert census["catalog_identity_is_pinned_claim_not_independent_attestation"] is True
     assert all(census[field] is False for field in (
         "crawler_authorized", "source_rights_approved",
         "training_authorized", "memory_promotion_authorized",
