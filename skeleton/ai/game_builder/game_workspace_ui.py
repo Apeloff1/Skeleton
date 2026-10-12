@@ -182,6 +182,69 @@ $("plan").addEventListener("click",async()=>{
  }catch(error){status("Prompt routing failed: "+error.message);}
 });
 
+
+let jeevesAppAtlas=null;
+async function jeevesAppRefresh(){
+ const atlas=await api("/api/jeeves-app-atlas");
+ jeevesAppAtlas=atlas;
+ setOptions("jeeves-app-family",atlas.families.filter(x=>x.present).map(x=>x.id));
+ setOptions("jeeves-app-action",atlas.operator_adapters.map(x=>x.id));
+ $("jeeves-app-results").textContent=[
+  "INSTALLED SKELETON APPLICATION",
+  "Discovered app families: "+atlas.family_count,
+  "Typed system editors: "+atlas.typed_game_editor_count,
+  "Audited Jeeves actions: "+atlas.operator_adapters.length,
+  "Existing executable game builders: "+atlas.local_executable_game_tools.length,
+  "Unwired modules remain discoverable without runnable model authority.",
+  "All projects and source commits remain governed by explicit review.",
+ ].join("\n");
+ $("jeeves-app-args").value="{}";
+}
+$("jeeves-app-refresh").addEventListener("click",async()=>{
+ try{await jeevesAppRefresh();status("Jeeves app taxonomy freshly scanned.");}
+ catch(error){status("App feature discovery failed: "+error.message);}
+});
+$("jeeves-app-family-list").addEventListener("click",async()=>{
+ try{
+  const family=$("jeeves-app-family").value;
+  if(!family)throw Error("Select an installed app subsystem");
+  const result=await api("/api/jeeves-app-atlas?family="+encodeURIComponent(family)+
+   "&offset=0&limit=120");
+  $("jeeves-app-results").textContent=JSON.stringify(result,null,2).slice(0,40000);
+  status(family+" modules enumerated; unwired entries do not imply runtime execution.");
+ }catch(error){status("App family lookup failed: "+error.message);}
+});
+$("jeeves-app-execute").addEventListener("click",async()=>{
+ try{
+  const action=$("jeeves-app-action").value;
+  const args=JSON.parse($("jeeves-app-args").value);
+  const response=await api("/api/jeeves-app-action",{
+   project:storyProject(),action,args});
+  $("jeeves-app-results").textContent=JSON.stringify(response,null,2).slice(0,45000);
+  if(action==="studio.editor.stage"){
+   $("proposal").textContent=response.result.proposal_id;
+   status("Jeeves prepared review proposal "+response.result.proposal_id+
+    ". Open the corresponding source in Studio, check diff and approve explicitly.");
+  }else{
+   status("Jeeves action "+action+" completed with a source-bound receipt; "+
+    "no unsupervised source commits or AI weights changed.");
+  }
+ }catch(error){status("Jeeves app action denied: "+error.message);}
+});
+$("jeeves-app-use-editor").addEventListener("click",async()=>{
+ try{
+  const editor=systemEditor();
+  if(!editor)throw Error("Choose a real game system editor first");
+  const result=await api("/api/jeeves-app-action",{
+   project:storyProject(),action:"studio.editor.stage",
+   args:{editor:editor.id,settings:systemSettings(),
+    reason:"Jeeves reviewed original game system editor configuration proposal."}});
+  $("jeeves-app-results").textContent=JSON.stringify(result,null,2);
+  $("proposal").textContent=result.result.proposal_id;
+  status("Jeeves staged "+editor.id+" (proposal "+result.result.proposal_id+
+   "). Review the exact source and commit only with explicit human approval.");
+ }catch(error){status("Jeeves editor staging rejected: "+error.message);}
+});
 let storyChatSession=null;
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
@@ -4032,6 +4095,7 @@ $("advanced-verify").addEventListener("click",async()=>{
 drawAdvancedGame(null);
 loadSystemEditors();
 refresh();
+jeevesAppRefresh().catch(error=>status("App taxonomy unavailable: "+error.message));
 """
 TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -4069,6 +4133,18 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <label>Natural-language original game design prompt
 <textarea id="user-prompt" rows="4" placeholder="Create a branching escort storyline with eyewitness reactions, alternative endings, NPC memories and cinematic staging..."></textarea></label>
 <button id="plan">Plan affected modules and targets</button>
+<fieldset><legend>Jeeves · Whole-App Capability Cockpit</legend>
+<p><small>Live inventory of installed app families, forges, game editors, Dragon/crawler workers, model and training planes. Source discovery is not execution authority. Only audited local adapters can act; edits create proposals needing explicit human commit. No arbitrary shell, network, AI weight promotion or provider secrets.</small></p>
+<button id="jeeves-app-refresh" type="button">Scan installed app capabilities</button>
+<label>Application family<select id="jeeves-app-family"></select></label>
+<button id="jeeves-app-family-list" type="button">Inspect installed modules</button>
+<label>Typed Jeeves action<select id="jeeves-app-action"></select></label>
+<label>Exact action parameters (reviewable JSON)
+<textarea id="jeeves-app-args" spellcheck="false" rows="5">{}</textarea></label>
+<button id="jeeves-app-execute" type="button">Run bounded Jeeves capability</button>
+<button id="jeeves-app-use-editor" type="button">Jeeves: stage current editor settings for review</button>
+<pre id="jeeves-app-results" role="status" aria-live="polite"></pre>
+</fieldset>
 <fieldset><legend>Jeeves: story-first AI game production</legend>
 <p><small>Foundation → cast → world/asset design → scene-by-scene review. The
 canon index reads approved history and verifies recurring character and
