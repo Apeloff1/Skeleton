@@ -1,3 +1,9 @@
+# HISTORICAL DRAFT — SUPERSEDED (2026-10-13)
+
+This 100-act/9,999-scene specification was an earlier **draft only**. The new baseline is **100 chapters, 1,000 global acts, 9,999 scenes total**. Use [Jeeves 100-Chapter Studio Standard](JEEVES_100_CHAPTER_1000_ACT_9999_SCENE_STUDIO_STANDARD.md) for current work and future milestones. Signed v1 sources require explicit reviewed migration; do not silently relabel these receipts.
+
+---
+
 # Jeeves — 100 Acts / 9,999 Scenes: Canon and Continuity Law
 
 **Created 2026-10-13 (Europe/Oslo).** Change sequence: original source bible → characters → regional art and assets → strict identity contract → one accepted scene at a time. The deliverable is **the AI game-production environment**, not a pre-authored game.
