@@ -23,6 +23,7 @@ from skeleton.ai.game_builder.dragon_source_delta_ledger import DragonSourceDelt
 from skeleton.ai.game_builder.dragon_mother_evidence_synergy import DragonMotherEvidenceSynergy
 from skeleton.ai.game_builder.dragon_article_hatchling import DragonArticleHatchling
 from skeleton.ai.game_builder.dragon_three_hatchling_coordinator import DragonThreeHatchlingCoordinator
+from skeleton.ai.game_builder.dragon_research_source_picker import DragonResearchSourcePicker
 from skeleton.ai.game_builder.dragon_source_catalog import canonical_source_url
 from skeleton.ai.game_builder.reviewed_knowledge import (
     ReviewedKnowledgeStore,ReviewedDocument,ReviewedNote,
@@ -575,3 +576,59 @@ def test_article_hatchling_has_no_spurious_findings_without_captures(context):
     assert packet["passages"]==[]
     assert packet["xp_awarded"]==0
     assert not packet["training_authorized"]
+
+
+
+def test_research_source_picker_lists_all_three_lane_choices_without_network(context):
+    captures,sid,url,old,new,_,_=prepare_article_revisions(context)
+    lead=add_video(context)
+    videos,_=transcript_ledger(context)
+    picker=DragonResearchSourcePicker(
+        DragonArticleHatchling(captures),videos,
+        DragonSourceDeltaLedger(captures))
+    cursor=None
+    collected=[]
+    for _ in range(25):
+        page=picker.page(OWNER,authorized=True,limit=20,after_source=cursor)
+        assert page["read_only"] and page["network_requests"]==0
+        assert not page["training_authorized"] and page["xp_awarded"]==0
+        assert all(not item["is_rights_approval"] for item in page["entries"])
+        collected+=page["entries"]
+        if not page["has_more"]:
+            break
+        cursor=page["next_after_source"]
+        assert cursor
+    assert {entry["source_id"] for entry in collected}=={sid,lead.source_id}
+    article=next(e for e in collected if e["kind"]=="article")
+    video=next(e for e in collected if e["kind"]=="video")
+    assert article["research_status"]=="review_candidate"
+    assert article["capture_digest"]
+    assert video["research_status"]=="awaiting_licensed_transcript"
+    assert video["capture_digest"] is None
+    assert not context[4].active_grants()
+
+
+def test_research_catalog_owner_isolation_bad_cursors_and_corrupt_source(context):
+    captures,sid,_,_,_,_,_=prepare_article_revisions(context)
+    lead=add_video(context)
+    videos,_=transcript_ledger(context)
+    picker=DragonResearchSourcePicker(
+        DragonArticleHatchling(captures),videos,
+        DragonSourceDeltaLedger(captures))
+    assert picker.page("foreign-owner",authorized=True)["entries"]==[]
+    with pytest.raises(PermissionError):
+        picker.page(OWNER,authorized=False)
+    with pytest.raises(ValueError,match="cursor"):
+        picker.page(OWNER,authorized=True,after_source="../../foreign")
+    with pytest.raises(ValueError):
+        picker.page(OWNER,authorized=True,limit=1000)
+    context[0].db.execute(
+        "UPDATE dragon_almanac_sources SET digest=? "
+        "WHERE owner=? AND source=?",("0"*64,OWNER,lead.source_id))
+    with pytest.raises(ValueError,match="identity|integrity"):
+        cursor=None
+        while True:
+            page=picker.page(OWNER,authorized=True,limit=60,after_source=cursor)
+            if not page["has_more"]:
+                break
+            cursor=page["next_after_source"]
