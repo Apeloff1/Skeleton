@@ -24,6 +24,8 @@ from .reviewed_knowledge import _id, _integer
 
 SCHEMA = "skeleton.dragon.source_discovery_supplement.v1"
 STATUS = "partial_discovery_only_not_ingested_into_canonical_queue"
+STATUS_RAW = "raw_discovery_only_not_ingested_into_canonical_queue"
+DISCOVERY_STATUSES = frozenset((STATUS, STATUS_RAW))
 SHA40 = re.compile(r"[0-9a-f]{40}\Z")
 REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
 MAX_SUPPLEMENTS = 32
@@ -71,7 +73,7 @@ def _supplement(path: str | Path) -> tuple[str, dict]:
                          parse_constant=lambda _: (_ for _ in ()).throw(ValueError("nonfinite evidence number")))
     except (UnicodeError, ValueError, TypeError, RecursionError) as exc:
         raise ValueError("malformed, duplicate-key or nonfinite evidence JSON") from exc
-    if not isinstance(doc, dict) or doc.get("schema") != SCHEMA or doc.get("status") != STATUS:
+    if not isinstance(doc, dict) or doc.get("schema") != SCHEMA or doc.get("status") not in DISCOVERY_STATUSES:
         raise ValueError("unreviewed discovery supplement required")
     root = Path(__file__).resolve().parents[3]
     try:
@@ -106,7 +108,7 @@ def validate_discovery_chain(registry: dict, named_documents: list[tuple[str, di
     for name, doc in named_documents:
         if name in seen_paths or not isinstance(name, str) or len(name) > 4096:
             raise ValueError("duplicate or invalid supplement path")
-        if (doc.get("schema") != SCHEMA or doc.get("status") != STATUS
+        if (doc.get("schema") != SCHEMA or doc.get("status") not in DISCOVERY_STATUSES
                 or doc.get("baseline_registry_digest") != registry["catalog_digest"]
                 or doc.get("requested_total_urls") != baseline_size * 10):
             raise ValueError("supplement baseline or target mismatch")
@@ -121,9 +123,13 @@ def validate_discovery_chain(registry: dict, named_documents: list[tuple[str, di
                 or not isinstance(counts, dict)):
             raise ValueError("invalid supplement structure")
         new_count = counts.get("new_candidate_urls")
+        if new_count is None and doc.get("status") == STATUS_RAW:
+            new_count = counts.get("new_raw_candidate_urls")
         if type(new_count) is not int or new_count != len(candidates):
             raise ValueError("supplement count differs from entries")
         previous = counts.get("previous_provisional_total_urls")
+        if previous is None and doc.get("status") == STATUS_RAW:
+            previous = counts.get("previous_raw_provisional_urls")
         if previous is None and "previous_new_candidate_urls" in counts:
             previous = baseline_size + counts["previous_new_candidate_urls"]
         if previous is None:
@@ -198,7 +204,10 @@ def validate_discovery_chain(registry: dict, named_documents: list[tuple[str, di
             if len(raw_seen) > 100_000:
                 raise ValueError("global raw discovery candidate budget exceeded")
             existing.add(url)
-        if counts.get("provisional_total_urls") != baseline_size + len(raw_seen):
+        raw_total = counts.get("provisional_total_urls")
+        if raw_total is None and doc.get("status") == STATUS_RAW:
+            raw_total = counts.get("raw_provisional_urls")
+        if raw_total != baseline_size + len(raw_seen):
             raise ValueError("raw provisional total differs from recorded link count")
         seen_paths.append(name)
     return {"baseline": baseline_size, "new": len(collected),
