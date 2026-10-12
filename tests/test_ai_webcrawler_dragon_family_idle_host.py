@@ -229,6 +229,30 @@ def test_quota_is_charged_with_atomic_lease_and_stops_second_specialist():
     db.close()
 
 
+def test_stop_fences_in_flight_source_token_and_records_pause_once():
+    db,bridge,family,host,grant=make()
+    activate(host,grant)
+    worker=host.acquisition.coordinator
+    token=worker._reserve(OWNER,"article",SRC,T+720)
+    assert token
+    assert worker.health(OWNER,authorized=True)["workers"]["article"]["running"]==1
+    stopped=host.stop(at=T+721,authorized=True)
+    assert stopped["active"] is False
+    assert not worker._owned(OWNER,"article",SRC,token,T+722)
+    assert worker.health(OWNER,authorized=True)["workers"]["article"]["running"]==0
+    from skeleton.ai.webcrawler.dragon_family_idle_coordinator import (
+        read_idle_family_history,
+    )
+    events=read_idle_family_history(db,OWNER,authorized=True)
+    assert len(events)==1 and events[0]["outcome"]=="paused"
+    assert events[0]["at"].endswith("Z")
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==0
+    # Repeated stop must not create fabricated new pauses.
+    host.stop(at=T+722,authorized=True)
+    assert read_idle_family_history(db,OWNER,authorized=True)==events
+    db.close()
+
+
 def test_restarted_host_preserves_opt_in_and_durable_budget(tmp_path):
     path=tmp_path/"dragon-idle.sqlite3"
     db=sqlite3.connect(path)
