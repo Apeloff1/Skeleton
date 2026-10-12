@@ -40,6 +40,8 @@ from .advanced_godot_export import (
 from .advanced_platformer_godot import render_platformer_godot_package
 from .advanced_npc_evidence_navigation import (navigate_verified_investigation,
     verify_investigation_navigation)
+from .advanced_unified_genre_save import (export_unified_world_save,
+    import_unified_world_save,continue_unified_world_save)
 from .advanced_unified_genre_campaign import (run_unified_game_campaign,
     verify_unified_game_campaign)
 from .advanced_genre_npc_event_bridge import (run_cross_genre_world,
@@ -443,6 +445,34 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "original_game_changed":False,
                 "automatic_quest_reward_granted":False,
                 "native_hardware_verified":False,
+            })
+        if path=="/api/advanced-unified-genre-save-export":
+            saved=export_unified_world_save(
+                values["physical_episodes"],values["genre_sessions"],
+                values["world_scene"],values.get("world_settings"),
+                world_actions=values.get("world_actions",[]))
+            return self._json(200,{
+                "save":saved,"original_project_mutated":False,
+                "native_device_certified":False,
+                "automatic_publication":False,
+            })
+        if path=="/api/advanced-unified-genre-save-import":
+            restored=import_unified_world_save(values["save"])
+            return self._json(200,{
+                "restored":restored,"original_project_mutated":False,
+                "native_device_certified":False,
+                "automatic_publication":False,
+            })
+        if path=="/api/advanced-unified-genre-save-continue":
+            saved=continue_unified_world_save(
+                values["save"],
+                new_genre_sessions=values.get("new_genre_sessions",[]),
+                new_world_actions=values.get("new_world_actions",[]))
+            restored=import_unified_world_save(saved)
+            return self._json(200,{
+                "save":saved,"restored":restored,
+                "original_project_mutated":False,
+                "automatic_publication":False,
             })
         if path=="/api/advanced-unified-genre-campaign":
             result=run_unified_game_campaign(
