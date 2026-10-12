@@ -35,7 +35,7 @@ FORBIDDEN_NAMES = frozenset({
 })
 PRIVATE = re.compile(
     r"(?:^|[./_-])(?:\.env|credentials|password|private|secret|"
-    r"token|id_rsa|id_ed25519|\.pem|\.key|\.p12)(?:$|[./_-])",
+    r"token|api[_-]?key|oauth|session|cookie|ssh|vault|id_rsa|id_ed25519|\.pem|\.key|\.p12)(?:$|[./_-])",
     re.I)
 INVENTORY_ROOTS = (
     "skeleton", "backend", "frontend", "apps", "docs",
@@ -263,9 +263,31 @@ class AppwideInventory:
             if stat.S_ISLNK(status.st_mode):
                 raise JeevesAppwideError("symlink/subtree swap blocked")
         try:
-            data=target.read_bytes()
+            if os.name == "posix" and hasattr(os, "O_NOFOLLOW"):
+                flags=os.O_RDONLY | os.O_NOFOLLOW
+                handles=[]
+                try:
+                    current=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY)
+                    handles.append(current)
+                    for component in pieces[:-1]:
+                        current=os.open(component,
+                                        flags|os.O_DIRECTORY,dir_fd=current)
+                        handles.append(current)
+                    fd=os.open(pieces[-1],flags,dir_fd=current)
+                    with os.fdopen(fd,"rb") as stream:
+                        data=stream.read(max_size+1)
+                finally:
+                    for fd in reversed(handles):
+                        os.close(fd)
+            else:
+                # Windows path resolution and explicit symlink checks. This
+                # branch never attempts shell/script execution or mutation.
+                if target.resolve(strict=True).is_relative_to(self.root) is False:
+                    raise JeevesAppwideError("unsafe changed source junction")
+                with target.open("rb") as stream:
+                    data=stream.read(max_size+1)
         except OSError as exc:
-            raise JeevesAppwideError("source file unreadable") from exc
+            raise JeevesAppwideError("source file unreadable or symlink swapped") from exc
         if len(data)>max_size or len(data)!=e.bytes:
             raise JeevesAppwideError("source changed since inventory scan")
         try:
