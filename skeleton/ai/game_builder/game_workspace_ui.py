@@ -655,13 +655,83 @@ function drawAdvancedGame(session){
    state.milestones.join(" · ").slice(0,69):
    "No milestones yet · build, farm, defend, explore",16,232);
  }
+ if(editor==="city_builder"){
+  const shades={empty:"#35495a",road:"#89999d",bridge:"#aa9c82",
+   residential:"#4cbb89",commercial:"#e2c77a",industry:"#c98e76",
+   park:"#68a960",power:"#d0a5c3",waterworks:"#76accd",
+   firehouse:"#d5776b",clinic:"#cee3db",school:"#a899d6"};
+  const road=[...state.parcels].filter(p=>p.kind==="road"||p.kind==="bridge").length;
+  c.fillStyle="#deefe9";c.fillText("Day "+state.day+" · population "+state.population+
+    " · employed "+state.employment+" · happiness "+state.happiness,15,40);
+  state.parcels.forEach(p=>{
+   const x=16+(p.id%4)*52,y=56+Math.floor(p.id/4)*39;
+   c.fillStyle=shades[p.kind]||"#465b6a";c.fillRect(x,y,48,35);
+   c.fillStyle="#0d2630";c.fillText(String(p.id),x+5,y+14);
+   c.fillStyle=p.kind==="empty"?"#d3dfdd":"#0b2028";
+   c.fillText(p.kind.slice(0,7),x+4,y+28);
+  });
+  c.fillStyle="#cce8ed";c.fillText("Roads "+road+
+    " · congestion "+state.congestion+" · pollution "+state.pollution,238,70);
+  c.fillText("Treasury "+state.credits+" · debt "+state.debt,238,94);
+  c.fillText("Power "+state.power_capacity+" · water "+state.water_capacity,238,118);
+  c.fillText("Aquifer "+state.aquifer+" · wood "+state.wood+
+   " · stone "+state.stone,238,142);
+  c.fillText("Income policy: "+state.tax+" / "+state.policy,238,165);
+  c.fillText(state.milestones.length?
+    state.milestones.join(" · ").slice(0,40):"Build roads, zones and utilities",238,189);
+  c.fillStyle="#e9d8aa";
+  c.fillText("Select a parcel below, then issue a reviewed city command.",12,232);
+ }
  if(state.finished||state.failed){
   c.fillStyle=state.finished?"#a2f5cb":"#ffaba6";
   c.fillText(state.finished?"Completed":"Defeat",W-100,20);
  }
 }
+let selectedCityParcel=0;
 function renderAdvancedActions(actions){
  const target=$("advanced-actions");target.replaceChildren();
+ if(advancedSession?.editor==="city_builder"){
+  const parcelLabel=document.createElement("label");
+  parcelLabel.textContent="Selected urban parcel";
+  const parcel=document.createElement("select");
+  parcel.id="city-target-cell";
+  parcel.setAttribute("aria-label","Choose original city parcel");
+  for(let i=0;i<16;i++){
+   const option=document.createElement("option");
+   option.value=String(i);
+   option.textContent=String(i)+" · "+advancedSession.state.parcels[i].terrain+
+    " · "+advancedSession.state.parcels[i].kind;
+   parcel.append(option);
+  }
+  parcel.value=String(selectedCityParcel);
+  parcelLabel.append(parcel);target.append(parcelLabel);
+  const commandLabel=document.createElement("label");
+  commandLabel.textContent="Build / zone / municipal order";
+  const select=document.createElement("select");
+  select.id="city-registered-action";
+  select.setAttribute("aria-label","Choose registered civic command");
+  const globalOrders=actions.filter(a=>!a.includes(":")||
+   a.startsWith("tax:")||a.startsWith("policy:"));
+  const fill=()=>{
+   const index=parcel.value;
+   selectedCityParcel=Number(index);
+   const local=actions.filter(a=>a.endsWith(":"+index));
+   select.replaceChildren();
+   for(const action of [...local,...globalOrders]){
+    const option=document.createElement("option");
+    option.value=action;option.textContent=action;
+    select.append(option);
+   }
+  };
+  parcel.addEventListener("change",fill);
+  fill();commandLabel.append(select);target.append(commandLabel);
+  const submit=document.createElement("button");
+  submit.type="button";submit.textContent="Issue verified city order";
+  submit.disabled=Boolean(advancedSession.terminal);
+  submit.addEventListener("click",()=>advanceAdvanced(select.value));
+  target.append(submit);
+  return;
+ }
  for(const action of actions){
   const button=document.createElement("button");
   button.type="button";button.textContent=action;button.value=action;
@@ -670,6 +740,20 @@ function renderAdvancedActions(actions){
   target.append(button);
  }
 }
+
+$("advanced-canvas").addEventListener("click",event=>{
+ if(!advancedSession||advancedSession.editor!=="city_builder")return;
+ const canvas=$("advanced-canvas"),rect=canvas.getBoundingClientRect();
+ const px=(event.clientX-rect.left)*canvas.width/rect.width;
+ const py=(event.clientY-rect.top)*canvas.height/rect.height;
+ const col=Math.floor((px-16)/52),row=Math.floor((py-56)/39);
+ if(col<0||col>=4||row<0||row>=4||px>16+col*52+48
+    ||py>56+row*39+35)return;
+ selectedCityParcel=row*4+col;
+ const picker=$("city-target-cell");
+ if(picker){picker.value=String(selectedCityParcel);
+  picker.dispatchEvent(new Event("change"));}
+});
 function showAdvanced(reply){
  advancedSession=reply.session;
  $("advanced-state").textContent=JSON.stringify({
