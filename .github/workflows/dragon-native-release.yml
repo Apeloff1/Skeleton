@@ -63,7 +63,7 @@ jobs:
           assert release["selftest_stage_lines"]==4
           assert release["binary_sha256"] and release["source_fingerprint"]
           print("DRAGON_NATIVE_HOST_ARTIFACT_PASS",release["target"],release["binary_format"])
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dragon-native-puzzle-${{ matrix.host }}
           path: |

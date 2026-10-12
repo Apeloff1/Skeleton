@@ -89,7 +89,7 @@ jobs:
           print("REAL_COLECO_Z80_GUEST_GAMEPLAY_VERIFIED",r["controller_actions_verified"])
           PY
       - name: Preserve ROM, independent authored route and actual guest CPU RAM evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: skeleton-original-coleco-z80-cpu-hardware-evidence
           path: |

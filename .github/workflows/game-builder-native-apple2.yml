@@ -64,7 +64,7 @@ jobs:
           python -m pip install --disable-pip-version-check "pytest>=8.4,<9"
           python -m pytest -q --noconftest skeleton/testing/test_game_builder_apple2_native.py
       - name: Upload actual 6502 Apple II original and immutable evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: skeleton-original-apple-ii-applesingle-program
           path: |

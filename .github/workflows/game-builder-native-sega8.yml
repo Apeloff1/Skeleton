@@ -400,7 +400,7 @@ jobs:
           print("EIGHT_STAGE_NATIVE_CARTRIDGE_VERIFIED",target,len(route["steps"]),native["rom_sha256"])
           PY
       - name: Publish limited, non-distribution CI evidence only
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: original-sega8-source-and-hash-evidence-${{ matrix.platform }}
           path: |
@@ -474,7 +474,7 @@ jobs:
           assert receipt["release_approved"] is False
           PY
       - name: Retain only original cross-port identity receipt, never cartridge bytes
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: original-sega8-crossport-identity-evidence
           path: original-sega8-crossport-equivalence.json

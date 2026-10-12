@@ -71,7 +71,7 @@ jobs:
             skeleton/testing/test_game_builder_native_cli.py \
             skeleton/testing/test_game_builder_evolution_native.py
       - name: Upload original C64 game and source provenance
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: skeleton-original-c64-prg
           path: |

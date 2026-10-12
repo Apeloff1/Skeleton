@@ -73,7 +73,7 @@ jobs:
           print("TEN_ACTUAL_NATIVE_SOURCE_PROJECTS_AUTHORED",report["target_count"])
           PY
       - name: Upload authored original machine-specific source portfolio
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: skeleton-original-all-native-source-portfolio
           path: |

@@ -70,7 +70,7 @@ jobs:
           python -m pip install --disable-pip-version-check "pytest>=8.4,<9"
           python -m pytest -q --noconftest skeleton/testing/test_game_builder_spectrum_native.py
       - name: Publish original ZX Spectrum tape and rights-provenance artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: skeleton-original-zx-spectrum-48k-tape
           path: |

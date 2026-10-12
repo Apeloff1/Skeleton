@@ -95,7 +95,7 @@ jobs:
           print('COLECO_REAL_Z80_ALL_EIGHT_ORIGINAL_LEVELS_PASSED',e['controller_actions_verified'])
           PY
       - name: Preserve genuine independently proven native full-campaign source
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: skeleton-coleco-eight-level-48-crystal-native-campaign
           path: |
