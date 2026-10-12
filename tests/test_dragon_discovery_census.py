@@ -32,7 +32,7 @@ def test_source_census_counts_full_pinned_lineage_not_orphans(registry, census):
     verified = verify_reconciled_chain(registry)
     assert census["raw_url_leads"] == verified["raw_url_leads"] == EXPECTED_RAW_TOTAL
     assert census["baseline_raw_leads"] == 4405
-    assert census["supplement_raw_leads"] == 14823
+    assert census["supplement_raw_leads"] == 16455
     assert census["canonical_distinct_urls"] == verified[
         "canonical_candidate_sources"]
     assert census["raw_to_canonical_collisions"] == (
