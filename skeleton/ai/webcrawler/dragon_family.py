@@ -368,11 +368,11 @@ class DragonFamily:
             latest = self.db.execute("""SELECT content_digest,observed_at FROM dragon_family_readings
                 WHERE owner=? AND source_id=? ORDER BY observed_at DESC,rowid DESC LIMIT 1""",
                 (owner, receipt.source_id)).fetchone()
-            if latest and at <= latest[1]:
-                raise ValueError("source observation must advance its revision clock")
             baseline = latest[0] if latest else parent_digest
             if baseline == receipt.content_digest:
                 return False
+            if latest and at <= latest[1]:
+                raise ValueError("source observation must advance its revision clock")
             if dragon == "monitor" and not baseline:
                 # Source has never been acquired; an update cannot be claimed.
                 return False
