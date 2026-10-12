@@ -6208,8 +6208,25 @@ for _entry in CATALOG:
             {"key":"light_radius","kind":"int","default":4,"minimum":1,"maximum":12,"options":[]},
             {"key":"sand_gravity","kind":"bool","default":True,"minimum":None,"maximum":None,"options":[]},
         ])
+# Genuine original dialogue social consequence mechanics.
+for _entry in CATALOG:
+    if _entry["id"] == "dialogue":
+        _entry["fields"].extend([
+            {"key":"starting_trust","kind":"int","default":35,"minimum":0,"maximum":100,"options":[]},
+            {"key":"trust_gain","kind":"int","default":12,"minimum":1,"maximum":40,"options":[]},
+            {"key":"disclosure_threshold","kind":"int","default":45,"minimum":1,"maximum":100,"options":[]},
+            {"key":"social_energy","kind":"int","default":20,"minimum":2,"maximum":100,"options":[]},
+            {"key":"conversation_cost","kind":"int","default":1,"minimum":1,"maximum":20,"options":[]},
+            {"key":"gift_tokens","kind":"int","default":2,"minimum":0,"maximum":20,"options":[]},
+            {"key":"gift_trust","kind":"int","default":20,"minimum":1,"maximum":50,"options":[]},
+            {"key":"memory_capacity","kind":"int","default":16,"minimum":1,"maximum":128,"options":[]},
+            {"key":"min_witnesses","kind":"int","default":2,"minimum":2,"maximum":4,"options":[]},
+            {"key":"report_target","kind":"int","default":1,"minimum":1,"maximum":2,"options":[]},
+            {"key":"challenge_cost","kind":"int","default":15,"minimum":1,"maximum":50,"options":[]},
+            {"key":"rest_gain","kind":"int","default":6,"minimum":1,"maximum":40,"options":[]},
+        ])
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze", "rpg", "procedural_world", "npc_society", "ecosystem", "voxel"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze", "rpg", "procedural_world", "npc_society", "ecosystem", "voxel", "dialogue"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
@@ -6317,6 +6334,9 @@ def _normalized_settings(editor_id: str, values: Mapping[str, object] | None) ->
             raise SystemEditorError("civic checkpoint must be physically achievable")
         if normalized["memory_records"]==0 and normalized["relationship_factors"]>50:
             raise SystemEditorError("complex witness scoring requires nonzero memory records")
+    if editor_id == "dialogue":
+        if normalized["conversation_cost"] > normalized["social_energy"]:
+            raise SystemEditorError("social cost exceeds energy budget")
     if editor_id == "voxel":
         if normalized["mining_energy"] > normalized["max_stamina"]:
             raise SystemEditorError("voxel miner needs achievable stamina")
