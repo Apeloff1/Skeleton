@@ -390,11 +390,11 @@ def test_reconciled_operator_projection_keeps_orphans_quarantined(baseline):
         verify_reconciled_chain, SOURCE_BATCHES, EXCLUDED_ORPHANS,
     )
     projection = verify_reconciled_chain(baseline)
-    assert len(SOURCE_BATCHES) == 16
-    assert projection["raw_url_leads"] == 15175
-    assert projection["raw_new"] == 10770
+    assert len(SOURCE_BATCHES) == 21
+    assert projection["raw_url_leads"] == 19228
+    assert projection["raw_new"] == 14823
     assert projection["canonical_new"] <= projection["raw_new"]
-    assert projection["canonical_candidate_sources"] <= 15175
+    assert projection["canonical_candidate_sources"] <= 19228
     assert projection["excluded_orphan_paths"] == list(EXCLUDED_ORPHANS)
     assert not any(path in projection["evidence_batch_paths"]
                    for path in EXCLUDED_ORPHANS)
@@ -496,15 +496,15 @@ def test_seven_more_pinned_retro_and_editor_catalogs_join_one_chain(baseline, ch
     assert latest[1]["status"] == "raw_discovery_only_not_ingested_into_canonical_queue"
     assert latest[1]["counts"]["previous_raw_provisional_urls"] == 12777
     assert latest[1]["counts"]["new_raw_candidate_urls"] == 2398
-    assert latest[1]["counts"]["raw_provisional_urls"] == 15175
+    assert latest[1]["counts"]["raw_provisional_urls"] == 19228
     assert len(latest[1]["catalogs"]) == 7
     assert latest[1]["parents"] == [
         name for name, _ in (*historical, *resumed, *specialized)]
     snapshot = validate_discovery_chain(
         baseline, [*historical, *resumed, *specialized, latest])
-    assert snapshot["raw_new"] == 10770
-    assert snapshot["raw_total_discovered"] == 15175
-    assert snapshot["total_discovered"] <= 15175
+    assert snapshot["raw_new"] == 14823
+    assert snapshot["raw_total_discovered"] == 19228
+    assert snapshot["total_discovered"] <= 19228
     assert all(entry["training_authorized"] is False and
                entry["rights"] == "not_assessed"
                for entry in snapshot["sources"].values())
