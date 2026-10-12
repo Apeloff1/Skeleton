@@ -1846,6 +1846,8 @@ function showAdvanced(reply){
    advancedSession.editor)||!advancedSession.scene;
  $("advanced-npc-multi").disabled=!["platformer","racing","sandbox"].includes(
    advancedSession.editor)||!advancedSession.scene;
+ $("advanced-episodic-add").disabled=!["platformer","racing","sandbox"].includes(
+   advancedSession.editor)||!advancedSession.scene;
  $("advanced-interop-godot").disabled=!["platformer","racing","sandbox"].includes(
    advancedSession.editor)||!advancedSession.scene;
  $("advanced-linked-step").disabled=!["platformer","racing","sandbox"].includes(
@@ -3188,6 +3190,98 @@ $("advanced-interop-godot").addEventListener("click",async()=>{
    " physical Godot encounter exported. It independently plays Physics only; native genre release requires a separate gate.");
  }catch(error){status("Native original physical encounter export blocked: "+error.message);}
 });
+let verifiedSourceEpisodes=[];
+$("advanced-episodic-clear").addEventListener("click",()=>{
+ verifiedSourceEpisodes=[];
+ $("advanced-episodic-queue").textContent="";
+ $("advanced-episodic-proof").textContent="";
+ status("Unpublished original physical episodes cleared; no source game files changed");
+});
+$("advanced-episodic-add").addEventListener("click",async()=>{
+ try{
+  if(!advancedSession?.scene ||
+     !["platformer","racing","sandbox"].includes(advancedSession.editor))
+   throw Error("Source-authorized advanced game session required");
+  if(verifiedSourceEpisodes.length>=6)throw Error("Maximum six original game episodes");
+  const actions=$("advanced-linked-physical").value==="avoid"?
+   ["inspect"]:Array(8).fill("push:east");
+  const physical=await api("/api/advanced-physics-interop",{
+   session:advancedSession,settings:advancedSettings,
+   physics_actions:actions
+  });
+  if(!physical.proof || physical.proof.source_session_digest!==advancedSession.digest)
+   throw Error("Original game source receipt could not be independently reconstructed");
+  const struck=physical.proof.source_fixture_impacts[0];
+  const candidate=struck?.source_id??physical.proof.witnesses[0]?.source_id;
+  if(!Number.isSafeInteger(candidate))throw Error("Source lacks reviewable physical fixtures");
+  const existing=verifiedSourceEpisodes.filter(ep=>
+   ep.source_session.editor===advancedSession.editor &&
+   ep.source_session.scene.digest===advancedSession.scene.digest);
+  if(existing.length){
+   const former=existing[existing.length-1].source_session.actions;
+   const next=advancedSession.actions;
+   if(next.length<=former.length || former.some((a,i)=>a!==next[i]))
+    throw Error("The next source episode must extend the original authored game action transcript");
+  }
+  const raw=$("advanced-npc-followups").value.trim();
+  const worldActions=raw?raw.split(",").map(x=>x.trim()):[];
+  if(worldActions.length>24 || worldActions.some(x=>!x))
+   throw Error("Per-episode investigation limit is 24 original-world actions");
+  const episode={
+    source_session:JSON.parse(JSON.stringify(advancedSession)),
+    source_settings:JSON.parse(JSON.stringify(advancedSettings)),
+    physics_actions:actions,
+    bindings:[{source_id:candidate,site_id:Number($("advanced-npc-site").value)}],
+    world_actions:worldActions
+  };
+  verifiedSourceEpisodes.push(episode);
+  $("advanced-episodic-queue").textContent=JSON.stringify(
+    verifiedSourceEpisodes.map((ep,i)=>({
+     episode:i+1,source:ep.source_session.editor,
+     action_count:ep.source_session.actions.length,
+     source_digest:ep.source_session.digest,
+     source_object:ep.bindings[0].source_id,site:ep.bindings[0].site_id,
+     physics_commands:ep.physics_actions.length,
+     authored_world_actions:ep.world_actions.length,
+    })),null,2);
+  status("Signed original episode added; physical impacts will be rechecked across the persistent world");
+ }catch(error){status("Episodic original source rejected: "+error.message);}
+});
+$("advanced-episodic-play").addEventListener("click",async()=>{
+ try{
+  if(!verifiedSourceEpisodes.length)throw Error("Capture an authentic source episode first");
+  const realWorld=await api("/api/advanced-scene-template",{
+   editor:"quest_director",seed:0,scene_id:"episodic_original_world"
+  });
+  const response=await api("/api/advanced-physics-episodic-npc",{
+   episodes:verifiedSourceEpisodes,world_scene:realWorld.scene
+  });
+  const proof=response.proof;
+  if(!proof || response.source_saves_changed || response.native_hardware_verified ||
+     response.automatic_promotion_approved ||
+     proof.world_scene_digest!==realWorld.scene.digest ||
+     proof.episode_count!==verifiedSourceEpisodes.length)
+   throw Error("Persistent game and physical NPC replay receipt failed custody");
+  $("advanced-episodic-proof").textContent=JSON.stringify({
+   episode_count:proof.episode_count,
+   source_chronology:proof.episodes,
+   true_source_incidents:proof.total_true_incidents,
+   original_living_npc_positions:proof.world_state.npcs.map(n=>({
+    id:n.id,cell:n.cell,eyewitness:n.memories,rumors:n.heard
+   })),
+   sites:proof.world_state.sites,
+   causal_quests:proof.world_state.quests,
+   original_quests_completed:proof.world_state.quests_completed,
+   rumor_edges:proof.world_state.rumor_edges,
+   world_turn:proof.world_state.turn,
+   world_day:proof.world_state.day,
+   campaign_receipt:proof.digest,
+   source_games_unchanged:true
+  },null,2);
+  status("Persistent original NPC living world executed and independently reconstructed over "+
+    proof.episode_count+" signed game episodes");
+ }catch(error){status("Persistent physical NPC campaign blocked: "+error.message);}
+});
 $("advanced-npc-multi").addEventListener("click",async()=>{
  try{
   if(!advancedSession?.scene ||
@@ -3468,6 +3562,14 @@ local until typed revalidation and an explicit human-approved file commit.</smal
  <button id="advanced-npc-multi" type="button">Run multi-object collision investigation</button>
  <div id="advanced-npc-bindings" role="group" aria-label="Original collider to site bindings"></div>
  <pre id="advanced-npc-multi-proof" role="status" aria-live="polite"></pre>
+<fieldset aria-label="Persistent episodic living world">
+  <legend>Persistent eyewitness campaign · source-verified episodes</legend>
+  <button id="advanced-episodic-add" type="button">Capture signed original game episode</button>
+  <button id="advanced-episodic-play" type="button">Run persistent living-world campaign</button>
+  <button id="advanced-episodic-clear" type="button">Reset unpublished episodes</button>
+  <pre id="advanced-episodic-queue" role="status" aria-live="polite"></pre>
+  <pre id="advanced-episodic-proof" role="status" aria-live="polite"></pre>
+</fieldset>
 </fieldset>
 <button id="advanced-interop-godot" type="button">Download original physical encounter for Godot 4</button>
 <fieldset aria-label="Opt-in linked physical campaign">
