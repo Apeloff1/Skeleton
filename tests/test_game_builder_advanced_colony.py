@@ -137,5 +137,101 @@ class OriginalColonyRuntimeTests(unittest.TestCase):
             run_advanced_session("colony", actions=["tick"] * 129)
 
 
+
+class OriginalColonyNativeSourceTests(unittest.TestCase):
+    def test_native_game_independently_implements_complete_state(self):
+        from skeleton.ai.game_builder.advanced_colony_godot import (
+            render_colony_godot_package, SCHEMA, PROOF_SCHEMA,
+            PROOF_FIELDS, GODOT_COLONY,
+        )
+        from skeleton.ai.game_builder.advanced_godot_export import (
+            archive_advanced_godot_package, AdvancedGodotExportError,
+        )
+        from hashlib import sha256
+        config = {"worker_productivity": 2, "raid_interval": 4,
+                  "disasters": "frequent", "ending_policy": "endless"}
+        actions = ["build:farm", "assign:farmers", "assign:guards",
+                   "fortify", "forage", "tick:4", "scavenge", "tick"]
+        scene = make_advanced_scene("colony", config, seed=8)
+        game = run_advanced_session("colony", config, actions, seed=8, scene=scene)
+        native = render_colony_godot_package(game, config, authorized=True)
+        self.assertEqual(native.manifest["native_editor"], "colony")
+        self.assertEqual(native.manifest["native_adapter"], "godot4_independent_colony")
+        self.assertFalse(native.manifest["godot_executed"])
+        self.assertFalse(native.manifest["publish_approved"])
+        manifest = native.manifest["files"]
+        self.assertEqual(manifest["godot/scripts/main.gd"],
+                         sha256(native.files["godot/scripts/main.gd"]).hexdigest())
+        proof = json.loads(native.files["godot/proof.json"])
+        authored = json.loads(native.files["godot/game.json"])
+        self.assertEqual(proof["schema"], PROOF_SCHEMA)
+        self.assertEqual(authored["schema"], SCHEMA)
+        self.assertEqual(proof["expected"], game["state"])
+        self.assertEqual(len(PROOF_FIELDS), len(game["state"]))
+        self.assertEqual(proof["actions"], actions)
+        self.assertIn("func _advance()", GODOT_COLONY)
+        self.assertIn("func _verify()", GODOT_COLONY)
+        self.assertIn("colony_raid_breached_defenses", GODOT_COLONY)
+        self.assertEqual(native.files, render_colony_godot_package(
+            game, config, authorized=True).files)
+        self.assertEqual(archive_advanced_godot_package(native),
+                         archive_advanced_godot_package(
+                             render_colony_godot_package(game, config, authorized=True)))
+        with self.assertRaises(PermissionError):
+            render_colony_godot_package(game, config, authorized=False)
+        forged = deepcopy(game)
+        forged["state"]["water"] += 200
+        with self.assertRaises(AdvancedRuntimeError):
+            render_colony_godot_package(forged, config, authorized=True)
+        with self.assertRaises(AdvancedGodotExportError):
+            render_colony_godot_package(
+                run_advanced_session("farming"), authorized=True)
+
+    def test_all_fifteen_editor_axes_are_applied_by_game(self):
+        from skeleton.ai.game_builder.advanced_colony_godot import PROOF_FIELDS
+        base = make_editor_document("colony")["settings"]
+        self.assertEqual(len(base), 15)
+        self.assertTrue({"starting_credits", "initial_stores", "worker_productivity",
+                         "water_yield", "raid_interval", "disease_pressure",
+                         "food_policy", "disasters", "ending_policy",
+                         "allow_migration"} <= set(base))
+        run = lambda cfg, actions: run_advanced_session(
+            "colony", cfg, actions=actions)["state"]
+        self.assertEqual(run({"starting_credits": 44}, [])["credits"], 44)
+        self.assertEqual(run({"initial_stores": 55}, [])["food"], 55)
+        self.assertGreater(run({"worker_productivity": 4},
+                              ["build:farm", "assign:farmers", "tick"])["food"],
+                           run({"worker_productivity": 1},
+                              ["build:farm", "assign:farmers", "tick"])["food"])
+        self.assertGreater(run({"water_yield": 7},
+                              ["build:well", "tick"])["water"],
+                           run({"water_yield": 1},
+                              ["build:well", "tick"])["water"])
+        self.assertEqual(run({"threats": "scheduled", "raid_interval": 3},
+                             ["tick"]*2)["injured"], 0)
+        self.assertGreater(run({"threats": "scheduled", "raid_interval": 3},
+                               ["tick"]*3)["injured"], 0)
+        self.assertEqual(run({"disease_pressure": 0, "threats": "off",
+                              "disasters": "off"}, ["tick"]*6)["injured"], 0)
+        self.assertGreater(run({"disease_pressure": 6, "threats": "off",
+                                "disasters": "off"}, ["tick"]*6)["injured"], 0)
+        self.assertGreater(run({"food_policy": "frugal"}, ["tick"])["food"],
+                           run({"food_policy": "abundant"}, ["tick"])["food"])
+        with self.assertRaises(AdvancedRuntimeError):
+            run({"allow_migration": False}, ["recruit"])
+        self.assertEqual(set(PROOF_FIELDS), set(run({}, [])))
+
+    def test_forged_native_document_does_not_grant_write_or_certification(self):
+        from skeleton.ai.game_builder.advanced_colony_godot import (
+            render_colony_godot_package,
+        )
+        native = render_colony_godot_package(
+            run_advanced_session("colony", actions=["tick"]), authorized=True)
+        self.assertFalse(native.manifest["native_hardware_certified"])
+        self.assertFalse(native.manifest["publish_approved"])
+        self.assertIn(b"--verify-colony", native.files["godot/scripts/main.gd"])
+        self.assertIn(b"playable", native.files["godot/scripts/main.gd"])
+
+
 if __name__ == "__main__":
     unittest.main()
