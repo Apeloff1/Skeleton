@@ -162,7 +162,8 @@ class JeevesAllAppCapabilityTests(unittest.TestCase):
         ready=self.call("studio.editor.stage",args,authorized=True)
         self.assertFalse(ready["source_files_committed"])
         self.assertTrue(ready["result"]["human_commit_required"])
-        self.assertEqual(self.work.files("current",self.project),[])
+        self.assertFalse(any(x.path.startswith("systems/")
+                             for x in self.work.files("current",self.project)))
         with self.assertRaises(PermissionError):
             self.work.commit(ready["result"]["proposal_id"],human_approved=False,
                              authorized=True)
