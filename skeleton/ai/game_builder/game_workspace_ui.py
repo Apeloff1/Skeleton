@@ -2400,6 +2400,75 @@ function renderAdvancedActions(actions){
   });
   target.append(routeKind);target.append(routeIndex);
   target.append(routeAction);target.append(routeButton);target.append(routeResult);
+  const missionTitle=document.createElement("h4");
+  missionTitle.textContent="NPC Waypoint Mission · real witnessed quests and material aid";
+  target.append(missionTitle);
+  const missionInput=document.createElement("textarea");
+  missionInput.rows=10;
+  missionInput.id="original-npc-mission-waypoints";
+  missionInput.setAttribute("aria-label","Source-authored original multi-stage physical objectives");
+  missionInput.value=JSON.stringify([
+    {kind:"site",index:0,action:"harvest"},
+    {kind:"npc",index:0,action:"speak"},
+    {kind:"npc",index:0,action:"support"},
+    ...Array.from({length:5},()=>({kind:"site",index:0,action:"repair"})),
+    {kind:"site",index:0,action:"claim"}
+  ],null,1);
+  target.append(missionInput);
+  const missionRun=document.createElement("button");
+  missionRun.type="button";
+  missionRun.textContent="Execute and independently replay multi-stop original mission";
+  const missionOutput=document.createElement("pre");
+  missionOutput.id="original-npc-waypoint-mission-proof";
+  missionOutput.setAttribute("role","status");
+  missionOutput.setAttribute("aria-live","polite");
+  missionRun.addEventListener("click",async()=>{
+    try{
+      if(!latestStreamRecord)
+        throw Error("First play and source-verify an original streamed NPC world");
+      const waypoints=JSON.parse(missionInput.value);
+      if(!Array.isArray(waypoints)||waypoints.length<1||waypoints.length>12||
+         !waypoints.every(x=>x&&typeof x==="object"&&
+            typeof x.kind==="string"&&Number.isInteger(x.index)&&
+            typeof x.action==="string"))
+        throw Error("Only one to twelve fully typed original physical objectives are allowed");
+      const response=await api("/api/plan-original-npc-mission",{
+        record:latestStreamRecord,waypoints,max_steps_per_leg:24
+      });
+      if(!response.verified||response.source_files_mutated||
+         response.model_weights_promoted||response.native_hardware_certified)
+        throw Error("Original game mission source or release claims were not verified");
+      const verified=await api("/api/verify-original-npc-mission",{
+        record:response.record
+      });
+      if(!verified.verified)
+        throw Error("Complete independent original-world campaign replay failed");
+      const mission=response.record;
+      missionOutput.textContent=JSON.stringify({
+        source_world_digest:mission.source_world_digest,
+        real_waypoints_completed:mission.completed_waypoint_count,
+        exact_actions_executed:mission.generated_actions,
+        per_leg_physical_evidence:mission.legs.map(x=>({
+          objective:x.objective,physical_actions:x.actual_actions,
+          source_trace_head:x.result_head,
+          actual_events_created:x.firsthand_physical_facts_added,
+          real_dialogue:x.genuine_dialogues_added,
+          paid_choices:x.paid_social_choices_added,
+          supplies_changed:x.supplies_delta,
+          quest_milestones:x.quest_milestones_after,
+          player_cell:x.ending_player_cell
+        })),
+        final_actual_source_state:mission.final_world_summary,
+        full_game_replay_verified:true,
+        project_files_changed:false,ai_weights_promoted:false
+      },null,2);
+      status("Every actual waypoint, NPC conversation, material act and source reward independently replayed.");
+    }catch(error){
+      missionOutput.textContent="";
+      status("NPC Waypoint Mission denied: "+error.message);
+    }
+  });
+  target.append(missionRun);target.append(missionOutput);
   return;
  }
  if(advancedSession?.editor==="economy"){
