@@ -169,3 +169,38 @@ The planner performs **one policy-free metadata search per axis**, with axis-spe
 This mechanism produces better acquisition *orders for human/operator consideration*, not a final curriculum, legal clearance or verified game knowledge. The canonical policy/fetch/extract/analyze/review stages still own all execution authority. The planner neither changes durable job priorities nor executes new crawling, demo builds, human studies, model fine-tuning or memory promotion. A completed **candidate** quota must not be confused with a completed **evidence** quota.
 
 Use `mission-health` to inspect policy-stage index coverage; use `mission-audit` to assess stale postings before project-critical indexed planning. Output from these tools should be included as a provenance-bound planning receipt only after the appropriate higher-level governance workflow accepts it.
+
+## Reproducible research campaigns — versioned receipts and gap changes
+
+`campaign-record` now commits a derived, owner-scoped, append-only research **proposal** to the existing Dragon SQLite store. Each revision binds a canonical digest of the complete typed multi-axis request, selected unapproved discovery sources, per-source metadata digest, raw provenance-lineage digest, coverage gaps, and the previous revision digest. An identical replay is idempotent. Any changed proposal requires compare-and-swap against the exact latest parent digest, so concurrent editors cannot silently overwrite each other's research histories.
+
+```sh
+# After source bootstrap/import and mission-index completion:
+python -m skeleton.ai.game_builder.dragon_almanac_cli campaign-record \
+  --database dragon.sqlite --owner studio --trusted-local-operator \
+  --campaign original-gameboy-study \
+  --query 'original Game Boy homebrew adventure' \
+  --platform 'Game Boy' --genre adventure --era 1990s \
+  --axis 'physics:collision and gravity:2:10' \
+  --axis 'quests:witnessed NPC quest events:2:10' \
+  --axis 'rights:original asset licensing:2:10' \
+  --indexed --scan-budget 3000 --portfolio-limit 30
+
+python -m skeleton.ai.game_builder.dragon_almanac_cli campaign-inspect \
+  --database dragon.sqlite --owner studio --trusted-local-operator \
+  --campaign original-gameboy-study
+
+# To change the request, pass the exact digest of the current revision:
+python -m skeleton.ai.game_builder.dragon_almanac_cli campaign-record \
+  --database dragon.sqlite --owner studio --trusted-local-operator \
+  --campaign original-gameboy-study --expected-parent '<exact-prior-digest>' \
+  --query 'original Game Boy homebrew adventure' \
+  --axis 'physics:collision and gravity:3:10' \
+  --axis 'quests:witnessed NPC quest events:3:10' \
+  --axis 'rights:original asset licensing:3:10' \
+  --indexed --scan-budget 3000 --portfolio-limit 30
+```
+
+`campaign-inspect` validates the complete bounded revision chain, all stored plan digests and owner identities, then checks current canonical source metadata and supplemental provenance hashes. It reports selected sources gained/lost and per-axis discovery-gap changes between revisions. A plan containing stale source metadata remains historical and is explicitly marked stale rather than silently rewritten. Receipt digests establish deterministic consistency, **not** authenticated signatures, peer-reviewed accuracy or independent truth.
+
+The campaign history does **not** own crawler policy, consent, rights grants, model training, knowledge/almanac promotion or application release. Each proposal records `crawl_authorized: false`, `source_rights_approved: false`, `training_authorized: false` and `memory_promotion_authorized: false`. A missing research lead is not filled by generated claims; it remains a declared, actionable discovery gap.
