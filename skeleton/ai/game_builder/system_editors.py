@@ -740,6 +740,97 @@ CATALOG = json.loads(r'''[
           "scheduled",
           "adaptive"
         ]
+      },
+      {
+        "key": "initial_stores",
+        "kind": "int",
+        "default": 24,
+        "minimum": 10,
+        "maximum": 500,
+        "options": []
+      },
+      {
+        "key": "starting_credits",
+        "kind": "int",
+        "default": 20,
+        "minimum": 0,
+        "maximum": 200,
+        "options": []
+      },
+      {
+        "key": "worker_productivity",
+        "kind": "int",
+        "default": 1,
+        "minimum": 1,
+        "maximum": 5,
+        "options": []
+      },
+      {
+        "key": "water_yield",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "raid_interval",
+        "kind": "int",
+        "default": 5,
+        "minimum": 3,
+        "maximum": 14,
+        "options": []
+      },
+      {
+        "key": "disease_pressure",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 6,
+        "options": []
+      },
+      {
+        "key": "food_policy",
+        "kind": "enum",
+        "default": "balanced",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "frugal",
+          "balanced",
+          "abundant"
+        ]
+      },
+      {
+        "key": "disasters",
+        "kind": "enum",
+        "default": "rare",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "off",
+          "rare",
+          "frequent"
+        ]
+      },
+      {
+        "key": "ending_policy",
+        "kind": "enum",
+        "default": "endless",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "endless",
+          "thriving_victory"
+        ]
+      },
+      {
+        "key": "allow_migration",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
       }
     ],
     "preview": null
