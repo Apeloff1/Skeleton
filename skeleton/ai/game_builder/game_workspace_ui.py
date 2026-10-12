@@ -1709,11 +1709,33 @@ function renderAdvancedActions(actions){
   detailedLabel.textContent="Actually instantiated unique original residents";
   const residentCount=document.createElement("select");
   residentCount.id="original-chunked-npc-count";
-  for(const n of [8,16,24,32]){
+  for(const n of [8,16,24,32,64,96,128]){
     const option=document.createElement("option");
     option.value=String(n);option.textContent=String(n);residentCount.append(option);
   }
   residentCount.value="16";detailedLabel.append(residentCount);target.append(detailedLabel);
+  const policyLabel=document.createElement("label");
+  policyLabel.textContent="Balanced simulation / fidelity selection";
+  const lodPolicy=document.createElement("select");
+  lodPolicy.id="original-npc-lod-fairness-policy";
+  for(const [id,name] of [
+    ["nearest","Closest embodied NPCs first"],
+    ["fair","Balanced simulation · physical detail rotation"]
+  ]){
+    const option=document.createElement("option");
+    option.value=id;option.textContent=name;lodPolicy.append(option);
+  }
+  policyLabel.append(lodPolicy);target.append(policyLabel);
+  const activeLabel=document.createElement("label");
+  activeLabel.textContent="Maximum actually detailed NPCs per simulation turn";
+  const activeBudget=document.createElement("select");
+  activeBudget.id="original-npc-detailed-budget";
+  for(const n of [4,8,12,16,24,32]){
+    const option=document.createElement("option");
+    option.value=String(n);option.textContent=String(n);activeBudget.append(option);
+  }
+  activeBudget.value="8";
+  activeLabel.append(activeBudget);target.append(activeLabel);
   const streamInput=document.createElement("textarea");
   streamInput.id="original-chunked-world-actions";
   streamInput.rows=5;
@@ -1741,7 +1763,8 @@ function renderAdvancedActions(actions){
       const citizens=Number(residentCount.value);
       const options={
         chunks_per_side:Number(streamSize.value),citizens,
-        active_limit:Math.min(8,citizens),chunk_radius:1,max_turns:96
+        active_limit:Math.min(Number(activeBudget.value),citizens),
+        chunk_radius:1,max_turns:96,lod_policy:lodPolicy.value
       };
       const result=await api("/api/chunked-npc-world",{
         actions,options,seed:0
@@ -1767,12 +1790,17 @@ function renderAdvancedActions(actions){
         detailed_actor_updates:state.scheduler.detailed_updates,
         deferred_actor_turns:state.scheduler.deferred_actor_turns,
         physical_actor_movements:state.scheduler.physical_moves,
+        policy_used:result.record.options.lod_policy,
+        eligible_but_deferred_actor_turns:state.scheduler.eligible_deferred_actor_turns,
+        longest_active_detail_deferral:state.scheduler.max_deferral_streak,
         fabricated_offscreen_events:state.scheduler.forged_offscreen_events,
         actor_positions:state.actors.map(a=>({
           source_id:a.id,position:a.position,
           origin:a.origin_kind,trust:a.trust,home:a.home,work:a.work,
           walked:a.walked,detailed_ticks:a.detailed_ticks,
-          deferred_ticks:a.deferred_ticks
+          deferred_ticks:a.deferred_ticks,
+          eligible_deferred_ticks:a.eligible_deferred_ticks,
+          longest_deferral:a.longest_deferral
         })),
         physical_events:state.events,original_quests:state.quests,
         scene_source_replay_verified:true,source_files_mutated:false,
