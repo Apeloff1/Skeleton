@@ -8,8 +8,6 @@ DragonNestReviewBridge approval before a hatchling can advance.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import timedelta
-from hashlib import sha256
 import math
 from urllib.parse import urlsplit
 
@@ -18,6 +16,7 @@ from .dragon_nest_progression import (
     verify_change_history,
 )
 from .dragon_resource_session import HardwareSample, plan_resources
+from skeleton.ai.game_builder.dragon_source_catalog import canonical_source_url
 
 VIDEO_HOSTS = frozenset({
     "youtube.com", "www.youtube.com", "youtu.be",
@@ -49,8 +48,10 @@ class ResearchLead:
         if (p.scheme != "https" or p.username is not None or p.password is not None
                 or p.fragment or p.port not in (None, 443) or not p.hostname):
             raise ValueError("absolute uncredentialed public HTTPS URL required")
-        # The source URL admission path verifies DNS/IP/redirects and robots.
-        # This check is for categorization and unsafe syntax, not SSRF defense.
+        # Full source URL identity passes the existing canonical public-host
+        # filter; runtime DNS, redirect, robots and rights checks remain separate.
+        if canonical_source_url(self.url) != self.url:
+            raise ValueError("canonical public research source required")
         host = p.hostname.lower()
         if (host == "localhost" or host.endswith((".localhost", ".local", ".internal"))
                 or "." not in host or not host.isascii()):
