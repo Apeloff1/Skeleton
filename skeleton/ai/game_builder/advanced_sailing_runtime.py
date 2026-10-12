@@ -18,7 +18,7 @@ class SailingActionError(SystemEditorError):
 ACTIONS = (
     "port", "starboard", "sail", "row", "anchor", "unanchor", "pump",
     "reef_sails", "full_sails", "lower_sails", "dock", "undock",
-    "load", "deliver", "rescue", "fish", "resupply", "repair", "wait",
+    "load", "deliver", "disembark", "rescue", "fish", "resupply", "repair", "wait",
 )
 DIRECTIONS = ((1, 0), (0, 1), (-1, 0), (0, -1))
 _LAYOUT_KEYS = frozenset({
@@ -223,6 +223,12 @@ def step(state, cfg, action):
             state["passengers_ashore"] += state["rescued"]
             state["rescued"] = 0
         events.append("physical_cargo_delivered")
+    elif action == "disembark":
+        if port != 1 or not docked or state["rescued"] == 0:
+            raise SailingActionError("passengers can only disembark at real destination")
+        state["passengers_ashore"] += state["rescued"]
+        state["rescued"] = 0
+        events.append("survivor_ashore_in_safe_harbor")
     elif action == "resupply":
         if port is None or state["port_stock"][port] == 0 or state["coins"] < cfg["supply_price"]:
             raise SailingActionError("finite harbor provision purchase unavailable")
