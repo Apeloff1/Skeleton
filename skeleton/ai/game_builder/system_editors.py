@@ -2476,6 +2476,78 @@ CATALOG = json.loads(r'''[
         "minimum": 0,
         "maximum": 100,
         "options": []
+      },
+      {
+        "key": "medic_heal",
+        "kind": "int",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 40,
+        "options": []
+      },
+      {
+        "key": "medic_range",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 6,
+        "options": []
+      },
+      {
+        "key": "medic_energy_cost",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "siege_structure_bonus",
+        "kind": "int",
+        "default": 8,
+        "minimum": 0,
+        "maximum": 50,
+        "options": []
+      },
+      {
+        "key": "veterancy_threshold",
+        "kind": "int",
+        "default": 6,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "max_veterancy",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "veterancy_damage_bonus",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "aggressive_radius",
+        "kind": "int",
+        "default": 6,
+        "minimum": 1,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "defensive_radius",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 6,
+        "options": []
       }
     ],
     "preview": null
