@@ -9,6 +9,9 @@ from __future__ import annotations
 
 from copy import deepcopy
 from fractions import Fraction
+from .advanced_physics_oriented import (
+    oriented_world, oriented_static, oriented_pairs,
+)
 from .advanced_physics_dynamics import (
     resolve_moving_pairs, advance_rotation, apply_torque,
     solve_radial_rope, transfer_collision_spin,
@@ -44,6 +47,7 @@ LAYOUT_KEYS = {
 }
 BODY_KEYS = {"id", "position", "velocity", "radius", "mass",
              "material", "layer", "mask", "break_threshold"}
+BODY_OPTIONAL_KEYS = {"shape_half", "initial_orientation"}
 FIXTURE_KEYS = {"position", "half_size", "layer"}
 
 
@@ -107,7 +111,9 @@ def normalize_layout(config, layout):
     seen = set()
     bodies = []
     for index, original in enumerate(layout["bodies"]):
-        if type(original) is not dict or set(original) != BODY_KEYS:
+        if (type(original) is not dict or
+            not BODY_KEYS <= set(original) or
+            not set(original) <= BODY_KEYS | BODY_OPTIONAL_KEYS):
             raise PhysicsActionError("body must have exact original rigid-body schema")
         ident = original["id"]
         if type(ident) is not str or not (1 <= len(ident) <= 24) or not all(
@@ -126,8 +132,16 @@ def normalize_layout(config, layout):
         material = original["material"]
         if type(material) is not str or material not in MATERIALS:
             raise PhysicsActionError("body uses unsupported material")
+        body_shape = original.get("shape_half", [radius, radius])
+        if (type(body_shape) is not list or len(body_shape) != 2 or
+            any(type(size) is not int or not 10 <= size <= radius
+                for size in body_shape)):
+            raise PhysicsActionError("oriented body shape requires bounded rectangle")
+        angle = _number(original.get("initial_orientation", 0),
+                        0, 359999, "initial orientation")
         bodies.append({
             "id": ident, "position": pos, "velocity": speed, "radius": radius,
+            "shape_half": list(body_shape), "initial_orientation": angle,
             "mass": _number(original["mass"], 1, 64, "mass"),
             "material": material,
             "layer": _number(original["layer"], 1, 3, "layer"),
@@ -149,7 +163,9 @@ def normalize_layout(config, layout):
         raise PhysicsActionError("too many static fixtures")
     normalized_fixtures = []
     for original in fixtures:
-        if type(original) is not dict or set(original) != FIXTURE_KEYS:
+        if (type(original) is not dict or
+            not FIXTURE_KEYS <= set(original) or
+            not set(original) <= FIXTURE_KEYS | {"orientation"}):
             raise PhysicsActionError("fixture must have exact solid geometry")
         pos = _triple(original["position"], 0, max(bound_x, bound_y, bound_z), "fixture")
         half = _triple(original["half_size"], 0, 150, "fixture half-size")
@@ -161,6 +177,8 @@ def normalize_layout(config, layout):
             raise PhysicsActionError("static fixture extends beyond the world")
         normalized_fixtures.append({
             "position": pos, "half_size": half,
+            "orientation": _number(original.get("orientation",0), 0, 359999,
+                                   "fixture orientation"),
             "layer": _number(original["layer"], 1, 3, "fixture layer"),
         })
     for body in bodies:
@@ -207,6 +225,7 @@ def start(config, seed):
         "battery": config["initial_battery"], "impulses_left": config["impulse_budget"],
         "motors_used": 0, "contacts": 0, "fractures": 0, "water_contacts": 0,
         "rope_breaks": 0, "max_velocity_seen": 0, "goal_frames": 0,
+        "oriented_contacts": 0, "contact_manifolds": [],
         "continuous_pair_contacts": 0, "max_angular_speed_seen": 0,
         "peak_cable_extension": 0,
         "milestones": [], "events": [], "finished": False, "failed": False,
@@ -221,7 +240,7 @@ def apply_scene(state, config, layout):
         state[key] = deepcopy(scene[key])
     state["bodies"] = [{
         **original, "sleep": 0, "broken": False,
-        "orientation": 0, "angular_velocity": 0
+        "orientation": original["initial_orientation"], "angular_velocity": 0
     } for original in scene["bodies"]]
 
 
@@ -239,6 +258,10 @@ def _collides(a, b, axes):
 
 
 def _world(body, state, config, events, previous=None):
+    if config["collision_geometry"]=="oriented_box":
+        oriented_world(body,state,config,events)
+        oriented_static(body,state,config,events)
+        return
     radius = body["radius"]
     pos = body["position"]
     velocity = body["velocity"]
@@ -307,6 +330,9 @@ def _world(body, state, config, events, previous=None):
 
 
 def _pair_contacts(state, config, events):
+    if config["collision_geometry"]=="oriented_box":
+        oriented_pairs(state,config,events)
+        return
     bodies = state["bodies"]
     axes = range(3) if state["depth"] > 1 else range(2)
     for i, first in enumerate(bodies):
@@ -360,6 +386,7 @@ def _advance(state, config, events):
         state["frame"] += 1
         old_positions = {body["id"]: body["position"][:]
                          for body in state["bodies"]}
+        advance_rotation(state, config)
         for body in state["bodies"]:
             if body["broken"]:
                 continue
@@ -396,7 +423,8 @@ def _advance(state, config, events):
                     vel[2] = vel[2] * (100-config["floor_friction"])//100
             state["max_velocity_seen"] = max(state["max_velocity_seen"], max(abs(v) for v in vel))
             _world(body, state, config, events, previous)
-        if config["continuous_pair_collision"]:
+        if (config["continuous_pair_collision"] and
+                config["collision_geometry"]=="aabb"):
             resolve_moving_pairs(state, config, old_positions, events)
         for _solver in range(config["solver_iterations"]):
             before = state["contacts"]
@@ -407,7 +435,6 @@ def _advance(state, config, events):
             if state["contacts"] == before:
                 break
         solve_radial_rope(state, config, events, _world)
-        advance_rotation(state, config)
         if (state["magnet"] or state["fan"]) and state["battery"] > 0:
             state["battery"] -= 1
             state["motors_used"] += 1
