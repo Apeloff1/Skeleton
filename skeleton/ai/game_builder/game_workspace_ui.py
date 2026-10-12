@@ -3345,6 +3345,89 @@ $("advanced-unified-save-import").addEventListener("change",async()=>{
  }catch(error){status("Untrusted mixed original world save rejected: "+error.message);}
  finally{$("advanced-unified-save-import").value="";}
 });
+$("advanced-interleave-save-export").addEventListener("click",async()=>{
+ try{
+  if(!lastInterleavedProof || !lastInterleavedTimeline || !episodicLastScene)
+   throw Error("Run an authenticated original world clock before exporting");
+  const response=await api("/api/advanced-interleaved-save-export",{
+   physical_episodes:verifiedSourceEpisodes,
+   genre_sessions:verifiedGenreEvents,
+   world_scene:episodicLastScene,
+   timeline:lastInterleavedTimeline,
+   world_settings:interleavedWorldSettings
+  });
+  const saved=response.save;
+  if(!saved || saved.campaign_digest!==lastInterleavedProof.digest ||
+     response.original_files_changed || response.native_full_world_certified ||
+     response.automatic_publishing_approved)
+   throw Error("World clock save does not match independently verified source game");
+  const encoded=JSON.stringify(saved);
+  if(new TextEncoder().encode(encoded).length>4000000)
+   throw Error("Original world clock exceeds the portable save limit");
+  const url=URL.createObjectURL(new Blob([encoded],{type:"application/json"}));
+  const link=document.createElement("a");
+  link.href=url;
+  link.download="original-interleaved-game-"+saved.digest.slice(0,12)+".json";
+  document.body.append(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),0);
+  $("advanced-interleave-save-proof").textContent=JSON.stringify({
+   verified_save_digest:saved.digest,
+   original_world_clock:saved.world_tick,
+   physics_incidents:saved.true_physics_event_count,
+   genre_achievements:saved.true_genre_event_count,
+   world_action_count:saved.world_actions,
+   complete_original_source_replay_required:true,
+   original_files_unchanged:true
+  },null,2);
+  status("Interleaved original source game saved; mutable rewards and eyewitnesses must be reconstructed");
+ }catch(error){status("Interleaved source save export blocked: "+error.message);}
+});
+$("advanced-interleave-save-import").addEventListener("change",async()=>{
+ try{
+  const control=$("advanced-interleave-save-import");
+  const file=control.files?.[0];if(!file)return;
+  if(file.size>4000000)throw Error("Original source save exceeds 4 MB");
+  const raw=await file.text();
+  if(new TextEncoder().encode(raw).length>4000000)
+   throw Error("Original source save too large");
+  const authored=JSON.parse(raw);
+  const response=await api("/api/advanced-interleaved-save-import",{save:authored});
+  const restored=response.restored;
+  if(!restored?.verified || restored.save_digest!==authored.digest ||
+     response.original_files_changed || response.native_full_world_certified ||
+     response.automatic_publishing_approved ||
+     restored.replayed_world.world_scene_digest!==restored.world_scene.digest)
+   throw Error("Interleaved NPC world could not be independently source-replayed");
+  // Do not impersonate a stand-alone physical-only NPC-world proof:
+  // this source includes extra independently earned genre interventions.
+  verifiedSourceEpisodes=restored.physical_episodes;
+  verifiedGenreEvents=restored.genre_sessions;
+  episodicLastScene=restored.world_scene;
+  interleavedWorldSettings=restored.world_settings;
+  episodicLastProof=null;
+  lastUnifiedGenreProof=null;
+  verifiedInvestigationRoute=null;
+  lastInterleavedProof=restored.replayed_world;
+  lastInterleavedTimeline=restored.timeline;
+  $("advanced-interleave-editor").value=JSON.stringify(restored.timeline,null,2);
+  $("advanced-interleave-proof").textContent=JSON.stringify({
+   source_clock:restored.replayed_world.timeline,
+   current_world_state:restored.replayed_world.world_state,
+   verified_campaign_digest:restored.replayed_world.digest
+  },null,2);
+  $("advanced-interleave-save-proof").textContent=JSON.stringify({
+   verified:true,
+   complete_original_game_replay:true,
+   save_digest:restored.save_digest,
+   remaining_clock_entries:restored.remaining_timeline_entries,
+   source_games_untouched:true
+  },null,2);
+  refreshUnifiedGenreQueue();
+  drawNPCForensicMap(restored.replayed_world.world_state);
+  status("Authentic original multi-engine NPC world and event clock fully reconstructed from imported source inputs");
+ }catch(error){status("Untrusted interleaved original source save rejected: "+error.message);}
+ finally{$("advanced-interleave-save-import").value="";}
+});
 $("advanced-interleave-build").addEventListener("click",async()=>{
  try{
   if(!episodicLastScene || !verifiedSourceEpisodes.length ||
@@ -3416,7 +3499,8 @@ $("advanced-interleave-run").addEventListener("click",async()=>{
   const result=await api("/api/advanced-interleaved-world",{
    physical_episodes:verifiedSourceEpisodes,
    genre_sessions:verifiedGenreEvents,
-   world_scene:episodicLastScene,timeline
+   world_scene:episodicLastScene,timeline,
+   world_settings:interleavedWorldSettings
   });
   const proof=result.proof;
   if(!proof || result.source_project_files_changed ||
@@ -3426,6 +3510,8 @@ $("advanced-interleave-run").addEventListener("click",async()=>{
      proof.genre_source_count!==verifiedGenreEvents.length ||
      proof.original_projects_modified || proof.free_rewards_granted)
    throw Error("Cross-engine NPC world event replay evidence did not authenticate");
+  lastInterleavedProof=proof;
+  lastInterleavedTimeline=JSON.parse(JSON.stringify(timeline));
   drawNPCForensicMap(proof.world_state);
   $("advanced-interleave-proof").textContent=JSON.stringify({
    source_event_clock:proof.timeline,
@@ -3446,6 +3532,7 @@ $("advanced-interleave-run").addEventListener("click",async()=>{
 });
 $("advanced-genre-queue-clear").addEventListener("click",()=>{
  verifiedGenreEvents=[];lastUnifiedGenreProof=null;unifiedWorldFollowups=[];
+ lastInterleavedProof=null;lastInterleavedTimeline=null;interleavedWorldSettings=null;
  $("advanced-genre-queue-list").textContent="";
  $("advanced-unified-proof").textContent="";
  status("Unpublished genre source acquisitions cleared without modifying original saves");
@@ -3600,6 +3687,9 @@ $("advanced-npc-rule-commit").addEventListener("click",async()=>{
 let verifiedGenreEvents=[];
 let lastUnifiedGenreProof=null;
 let unifiedWorldFollowups=[];
+let lastInterleavedProof=null;
+let lastInterleavedTimeline=null;
+let interleavedWorldSettings=null;
 let verifiedSourceEpisodes=[];
 let episodicLastProof=null,episodicLastScene=null;
 let verifiedInvestigationRoute=null;
@@ -4262,6 +4352,17 @@ local until typed revalidation and an explicit human-approved file commit.</smal
         Replay authored cross-engine event timeline
        </button>
        <pre id="advanced-interleave-proof" role="status" aria-live="polite"></pre>
+       <fieldset aria-label="Portable original multi-engine world clock">
+        <legend>Save and restore authored interleaved gameplay</legend>
+        <button id="advanced-interleave-save-export" type="button">
+         Export independently replayed world-clock save
+        </button>
+        <label>Import interleaved source save (4 MB max)
+         <input id="advanced-interleave-save-import" type="file"
+          accept=".json,application/json"/>
+        </label>
+        <pre id="advanced-interleave-save-proof" role="status" aria-live="polite"></pre>
+       </fieldset>
       </fieldset>
       <fieldset aria-label="Portable mixed-source campaign save">
         <legend>Save / restore combined physical + genre NPC world</legend>
