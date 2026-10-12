@@ -120,6 +120,9 @@ def start(config,seed):
         "tick":0,"mode":mode,"weather":layout["weather"],
         "title":layout["title"],"width":config["field_length"],
         "home":list(layout["home_spawn"]),"away":list(layout["away_spawn"]),
+        "teammate":[min(config["field_length"]-3,
+                        layout["home_spawn"][0]+min(6,config["pass_distance"])),
+                    layout["home_spawn"][1]],
         "ball":[2,1],"owner":"home","cover":[list(c) for c in layout["cover"]],
         "goal_x":layout["goal_x"],"target_score":layout["target_score"],
         "home_score":0,"away_score":0,
@@ -146,6 +149,11 @@ def apply_scene(state,config,layout):
     state["title"]=source["title"]
     state["home"]=list(source["home_spawn"])
     state["away"]=list(source["away_spawn"])
+    state["teammate"]=[
+        min(config["field_length"]-3,
+            source["home_spawn"][0]+min(6,config["pass_distance"])),
+        source["home_spawn"][1],
+    ]
     state["ball"]=list(source["home_spawn"])
     state["owner"]="home"
     state["cover"]=[list(v) for v in source["cover"]]
@@ -167,6 +175,10 @@ def _move(state,side,steps):
             x=cell[0]-sign
             break
     state[side]=[x,origin[1]]
+    # Roster support exists at a bounded chart location. Movement cannot
+    # instantly transport that second athlete; if overtaken, they trail behind.
+    if side=="home" and state["teammate"]==state["home"]:
+        state["teammate"]=list(origin)
     if state["owner"]==side:
         state["ball"]=list(state[side])
 
@@ -207,7 +219,9 @@ def _opponent(state,config,action):
         # pressure; a successful home action is not automatically a goal.
         _move(state,"away",min(config["opponent_speed"],
                                max(0,state["away"][0]-state["home"][0]-1)))
-        radius=config["defense_radius"]+(1 if state["tempo"]=="hold" else 0)
+        radius=max(0,config["defense_radius"]+
+                   (1 if state["tempo"]=="hold" else
+                    -1 if state["tempo"]=="press" else 0))
         if (_distance(state["away"],state["home"])<=radius
             and state["tick"]%config["interception_period"]==0
             and action not in ("sprint","dash","sidestep","pass","cross","throw")):
@@ -282,22 +296,49 @@ def step(state,config,action):
     else:
         old=list(state["home"])
         if action in ("advance","dribble","carry","move"):
-            _move(state,"home",config["run_speed"])
+            speed=config["run_speed"]
+            if state["weather"]=="rain":
+                speed=max(1,speed-config["rain_stride_penalty"])
+            _move(state,"home",speed)
         elif action in ("sprint","dash"):
-            _move(state,"home",config["sprint_speed"])
+            speed=config["sprint_speed"]
+            if state["weather"]=="rain":
+                speed=max(1,speed-config["rain_stride_penalty"])
+            _move(state,"home",speed)
         elif action in ("pass","cross","throw"):
-            # Passing transports a real ball, but never through the defending
-            # opponent. The athlete follows possession with controlled movement.
-            steps=config["pass_distance"] if action!="throw" else config["throw_distance"]
-            _move(state,"home",steps)
+            # Switching control after a pass is legal only to an athlete who
+            # already occupies a real, authored-position-bounded field cell.
+            # Do not advance the ball carrier by the range of the pass.
+            steps=config["throw_distance"] if action=="throw" else config["pass_distance"]
+            receiver=state["teammate"]
+            source=state["home"]
+            distance=_distance(source,receiver)
+            if config["team_size"]<2 or not 0<distance<=steps:
+                raise SportsActionError("a real reachable teammate is required to pass")
+            if any(cell[1]==source[1]==receiver[1] and
+                   min(source[0],receiver[0])<cell[0]<max(source[0],receiver[0])
+                   for cell in state["cover"]):
+                raise SportsActionError("solid stadium cover blocks the ball trajectory")
             state["passes"]+=1
-            events.append("earned_ball_transfer")
+            if (source[1]==receiver[1]==state["away"][1] and
+                min(source[0],receiver[0])<state["away"][0]<max(source[0],receiver[0])):
+                state["owner"]="away"
+                state["ball"]=list(state["away"])
+                state["interceptions"]+=1
+                events.append("defender_intercepted_swept_pass")
+            else:
+                state["home"]=list(receiver)
+                state["teammate"]=list(source)
+                state["ball"]=list(receiver)
+                events.append("earned_ball_transfer_to_existing_teammate")
         elif action in ("sidestep","switch_lane"):
             state["home"][1]=(state["home"][1]+1)%3
             if state["owner"]=="home":
                 state["ball"]=list(state["home"])
         elif action in ("intercept","tackle"):
-            if state["owner"]=="away" and _distance(state["home"],state["away"])<=config["tackle_range"]:
+            reach=config["tackle_range"]+(config["press_tackle_bonus"]
+                                           if state["tempo"]=="press" else 0)
+            if state["owner"]=="away" and _distance(state["home"],state["away"])<=reach:
                 state["owner"]="home"
                 state["ball"]=list(state["home"])
                 state["interceptions"]+=1
@@ -312,9 +353,12 @@ def step(state,config,action):
             within=state["home"][0]>=state["goal_x"]-config["shot_range"]
             lane=abs(state["home"][1]-1)<=config["goal_lane_tolerance"]
             defended=_distance(state["away"],state["home"])<=config["defense_radius"]
-            if within and lane and state["owner"]=="home" and (
-                not defended or config["shot_power"]>=config["opponent_skill"]
-            ):
+            shot_power=config["shot_power"]-(
+                config["wind_shot_penalty"] if state["weather"]=="wind" else 0)
+            shot_precision_ok=shot_power>=(
+                config["opponent_skill"] if defended else
+                max(1,config["opponent_skill"]//3))
+            if within and lane and state["owner"]=="home" and shot_precision_ok:
                 state["goals"]+=1
                 events+=_point(state,"home","earned_original_field_goal")
             else:
@@ -338,6 +382,8 @@ def step(state,config,action):
     state["tick"]+=1
     if action!="rest":
         state["fatigue"]+=max(1,config["team_size"]//8)
+        if state["tempo"]=="press" and action in ("sprint","dash","tackle"):
+            state["fatigue"]+=2
     if state["fatigue"]>config["fatigue_limit"]:
         state["stamina"]=max(0,state["stamina"]-config["fatigue_tax"])
         events.append("real_player_fatigue")
