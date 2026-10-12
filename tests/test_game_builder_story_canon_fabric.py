@@ -17,7 +17,7 @@ def canonical_bible():
                 story={"premise":"A surveyor restores the lost routes between quiet cities.",
                        "conflict":"The archives and council disagree on what should be saved.",
                        "themes":["memory", "community", "responsibility"],
-                       "planned_acts":100},
+                       "planned_chapters":100,"planned_acts":1000},
                 world={"era":"original hybrid astronomical age",
                        "geography":"Lantern cities linked by stone-traced crossings.",
                        "laws":["Light needs a physical source.",
