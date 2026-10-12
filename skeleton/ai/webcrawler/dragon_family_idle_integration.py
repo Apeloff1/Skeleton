@@ -50,11 +50,13 @@ class DragonIdleAcquisitionService:
     """
 
     def __init__(self, bridge: DragonFamilyCustodyBridge,
-                 *, policy: IdleCoordinatorPolicy = IdleCoordinatorPolicy()):
+                 *, policy: IdleCoordinatorPolicy = IdleCoordinatorPolicy(),
+                 reserve_budget: Callable[[str,str,float],None] | None = None):
         if not isinstance(bridge, DragonFamilyCustodyBridge):
             raise PermissionError("canonical Dragon custody bridge required")
         self.bridge = bridge
-        self.coordinator = DragonIdleCoordinator(bridge.family(), policy=policy)
+        self.coordinator = DragonIdleCoordinator(bridge.family(), policy=policy,
+                                                reserve_budget=reserve_budget)
 
     def _receipt(self, task: IdleTask, item: Acquired) -> SourceReceipt | None:
         if item is None:
