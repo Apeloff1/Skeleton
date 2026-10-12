@@ -21,6 +21,7 @@ from .system_editor_assembly import assemble_workspace_systems
 from .advanced_gameplay_runtime import run_advanced_session, verify_advanced_session
 from .advanced_level_scenes import make_advanced_scene
 from .advanced_puzzle_solver import solve_advanced_puzzle
+from .advanced_stealth_planner import plan_stealth_route
 from .advanced_godot_export import (
     render_advanced_godot_package, write_advanced_godot_package,
 )
@@ -68,6 +69,12 @@ def parser() -> argparse.ArgumentParser:
     solve.add_argument("--settings")
     solve.add_argument("--max-states",type=int,default=12000)
     solve.add_argument("--max-depth",type=int,default=96)
+    stealth_plan=commands.add_parser("plan-stealth",
+        help="Bounded AI-route rehearsal for actual authored infiltration")
+    stealth_plan.add_argument("--scene",required=True)
+    stealth_plan.add_argument("--settings")
+    stealth_plan.add_argument("--max-states",type=int,default=30000)
+    stealth_plan.add_argument("--max-depth",type=int,default=96)
     native=commands.add_parser("godot-export",help="Real offline native Godot 4 puzzle source, proof and export presets")
     native.add_argument("--session",required=True)
     native.add_argument("--settings")
@@ -127,6 +134,11 @@ def main(argv=None) -> int:
                 layout=_load(args.layout) if args.layout else None)
         elif args.operation == "solve-puzzle":
             output = solve_advanced_puzzle(
+                _load(args.scene),
+                _load(args.settings) if args.settings else None,
+                max_states=args.max_states,max_depth=args.max_depth)
+        elif args.operation == "plan-stealth":
+            output=plan_stealth_route(
                 _load(args.scene),
                 _load(args.settings) if args.settings else None,
                 max_states=args.max_states,max_depth=args.max_depth)
