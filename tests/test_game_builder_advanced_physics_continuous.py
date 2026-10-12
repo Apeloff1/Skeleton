@@ -103,8 +103,8 @@ class PhysicsDynamicsTests(unittest.TestCase):
         cfg={"dimension":"3d","speed_limit":350,"gravity":0,"air_drag":0}
         def layout_modify(layout):
             self.crossing(layout)
-            layout["bodies"][0]["position"][2]=60
-            layout["bodies"][1]["position"][2]=240
+            layout["bodies"][0]["position"][2]=40
+            layout["bodies"][1]["position"][2]=160
         scene=self.scenario(cfg,transform=layout_modify)
         r=run_advanced_session("physics",cfg,("inspect",),scene=scene)
         self.assertEqual(r["state"]["continuous_pair_contacts"],0)
