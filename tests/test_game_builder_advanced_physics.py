@@ -38,7 +38,7 @@ class AdvancedOriginalPhysicsTests(unittest.TestCase):
         spec = next(value for value in catalog() if value["id"] == "physics")
         self.assertEqual(spec["progression_floor"], "advanced")
         self.assertEqual(spec["runtime_maturity"], "advanced_reference_runtime")
-        self.assertEqual(len(spec["fields"]), 26)
+        self.assertEqual(len(spec["fields"]), 32)
 
     def test_default_2d_world_produces_authoritative_replay_receipts(self):
         for seed in (0, 1, 99):
