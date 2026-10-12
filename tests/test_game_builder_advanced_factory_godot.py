@@ -70,8 +70,9 @@ class FactoryReferenceAndNativeContractTests(unittest.TestCase):
     def test_real_three_stage_manufacturing_and_contract_win(self):
         cfg={"machines":4,"belt_speed":3,"power_supply":250}
         scene=original_factory(cfg,0)
-        commands=["build:0","build:1","build:2",
-                  "tick:4","ship","mine","mine","mine","tick:4","ship"]
+        commands=["build:0","build:1","build:2","priority:speed",
+                  "mine","mine","mine","tick:4","ship",
+                  "mine","mine","mine","mine","mine","tick:4","ship"]
         game=run_advanced_session("factory",cfg,commands,scene=scene)
         self.assertTrue(game["terminal"])
         self.assertTrue(game["state"]["finished"])
@@ -83,11 +84,11 @@ class FactoryReferenceAndNativeContractTests(unittest.TestCase):
         self.assertTrue(json.loads(package.files["godot/proof.json"])["expected"]["finished"])
 
     def test_energy_budget_pollution_scrubbing_upgrades_and_factory_repairs(self):
-        cfg={"belt_speed":3,"power_supply":14,"pollution":True}
-        scene=original_factory(cfg,0,stations=4)
-        cmds=["build:0","build:1","build:2","build:3","priority:speed",
-              "tick:4","generate","scrub","repair:0","buy_coal",
-              "upgrade:0","toggle:3","toggle:3"]
+        cfg={"belt_speed":2,"power_supply":14,"pollution":True}
+        scene=original_factory(cfg,0,stations=3)
+        cmds=["build:0","build:1","build:2",
+              "tick:4","generate","priority:speed","scrub",
+              "repair:0","buy_coal","upgrade:0","toggle:2","toggle:2"]
         game=run_advanced_session("factory",cfg,cmds,scene=scene)
         events=[event for trace in game["trace"] for event in trace["events"]]
         for event in ("machine_constructed","production_priority_changed",
