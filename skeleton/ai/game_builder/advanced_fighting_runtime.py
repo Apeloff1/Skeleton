@@ -208,6 +208,11 @@ def _hit(state,config,attacker,defender,name,events):
         attacker["whiffs"]+=1
         events.append("real_projectile_intercepted_by_authored_arena_cover")
         return False
+    if defender["crouching"] and zone=="high" and name!="special":
+        attacker["whiffs"]+=1
+        attacker["combo"]=0
+        events.append("physical_grounded_crouch_avoided_actual_high_strike")
+        return False
     if defender["airborne"] and zone=="low":
         attacker["whiffs"]+=1
         events.append("grounded_original_sweep_passed_beneath_actual_jumping_opponent")
@@ -344,6 +349,10 @@ def _ai(state,config,events):
         enemy["guard_high"]=True;enemy["guard_low"]=False
         events.append("adaptive_original_opponent_chose_real_guard")
         return
+    if enemy["recovery"]>config["input_buffer"]:
+        enemy["stamina"]=min(enemy["max_stamina"],enemy["stamina"]+config["stamina_regen"])
+        events.append("original_opponent_observed_actual_attack_recovery")
+        return
     if distance<=2 and enemy["stamina"]>=config["attack_stamina"]+6:
         kind="kick" if distance>1 else (
             "sweep" if hero["guard_high"] else "jab")
@@ -369,6 +378,8 @@ def _turn(state,config,events,advance_frames):
                          config["stamina_regen"])
         f["guard"]=min(config["guard_meter"],f["guard"]+
                        config["guard_regen"])
+        # An unused parry is a brief timed posture, not a permanent shield.
+        f["parry"]=False
     state["clock_frames"]+=advance_frames
     _hazards(state,config,events)
     _round(state,config,events)
