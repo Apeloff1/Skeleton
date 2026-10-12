@@ -233,6 +233,22 @@ class OriginalColonyNativeSourceTests(unittest.TestCase):
         self.assertIn(b"playable", native.files["godot/scripts/main.gd"])
 
 
+
+    def test_assembly_compiles_all_late_advanced_families_with_authored_scenes(self):
+        from skeleton.ai.game_builder.system_editor_assembly import compile_system_assembly
+        from skeleton.ai.game_builder.system_editors import make_editor_document
+        family=("farming","factory","colony")
+        settings={name:make_editor_document(name) for name in family}
+        scenes=[make_advanced_scene(name) for name in family]
+        result=compile_system_assembly("original_city_hybrid",
+             [settings[name] for name in family],authorized=True,scenes=scenes)
+        self.assertEqual({x["editor"] for x in result["advanced_runtime_evidence"]},
+                         set(family))
+        self.assertEqual({x["editor"] for x in result["scene_evidence"]},
+                         set(family))
+        self.assertTrue(all(len(x["gameplay_session_digest"])==64
+                            for x in result["scene_evidence"]))
+
     def test_visual_colony_district_editor_is_supervised_and_source_bound(self):
         from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html, SCRIPT
         page=render_workspace_html("A"*32).decode("utf-8")
