@@ -75,7 +75,7 @@ def default_layout(config,seed):
        {"id":0,"cell":9,"type":"wood","stock":config["wood_stock"]},
        {"id":1,"cell":16,"type":"ore","stock":config["ore_stock"]},
        {"id":2,"cell":40,"type":"energy","stock":config["energy_stock"]},
-    ]
+    ][:config["resource_nodes"]]
     return {
        "width":SIZE,"height":SIZE,"obstacles":obstacles,
        "nodes":nodes,"friendly_base":0,"enemy_base":63,
