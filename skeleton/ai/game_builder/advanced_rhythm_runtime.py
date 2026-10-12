@@ -11,7 +11,7 @@ LANES=6
 KINDS=("tap","hold","slide","chord","mine")
 ACTIONS=tuple(
  [f"{kind}:{i}" for kind in ("tap","press","release","flick") for i in range(LANES)]
- +[f"chord:{i}:{j}" for i in range(LANES) for j in range(i+1,LANES)]
+ +[f"chord:{i}:{j}" for i in range(LANES) for j in range(LANES) if i!=j]
  +[f"wait:{ms}" for ms in (10,20,25,50,100,125,250,500,1000,2000)]
  +["finish","inspect","restart_calibration"]
 )
@@ -277,6 +277,12 @@ def step(state,config,action):
         kind=fields[0]
         lane=int(fields[1])
         partner=int(fields[2]) if kind=="chord" else None
+        # Releasing a key is not a generic missable stroke. It must
+        # match a real previously held note on the authoritative lane.
+        if kind=="release" and not any(
+             n["lane"]==lane and str(n["id"]) in state["pressed"]
+             for n in state["chart"]["notes"]):
+            raise RhythmActionError("hold release requires a previously authenticated key press")
         if lane>=state["chart"]["lanes"] or (
             partner is not None and partner>=state["chart"]["lanes"]):
             raise RhythmActionError("physical key is outside authored lane count")
