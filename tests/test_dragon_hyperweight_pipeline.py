@@ -1,5 +1,6 @@
 """100-matrix, sandbox, visual, RSS and weekly Dragon regression gates."""
 from dataclasses import replace
+from unittest.mock import patch
 from datetime import datetime,timezone
 from hashlib import sha256
 import sqlite3
@@ -14,6 +15,8 @@ from skeleton.ai.webcrawler.dragon_weight_tier_sandbox import (
     HoldoutTrial,SealedTierEvaluation,SignedOverlayApproval,
     JeevesWeightOverlay,qualify_tier)
 from skeleton.ai.webcrawler.dragon_video_inspiration import digest_video_inspiration
+from skeleton.ai.webcrawler.dragon_mother_hundred_handoff import run_hundred_matrix_mother_to_shadow
+from skeleton.ai.webcrawler.dragon_nest_research_scheduler import IdleResearchPlan
 from skeleton.ai.webcrawler.dragon_rss_update_queue import (
     SignedRssSnapshot,DragonRssUpdateQueue)
 from skeleton.ai.webcrawler.dragon_weekly_research_export import export_weekly,render_weekly_backlog
@@ -312,3 +315,34 @@ def test_rss_idle_only_signed_queue_deduplicates_and_weekly_exports(tmp_path):
         db.execute("UPDATE dragon_rss_updates_v1 SET payload='{}'")
         with pytest.raises(ValueError,match="tamper"):
             queue.pending("studio",authorized=True)
+
+
+def test_signed_hundred_matrix_is_required_before_existing_shadow_dispatch():
+    _,pub,records=matrix_bundle()
+    idle=IdleResearchPlan(
+        "studio","2026-10-12T00:00:00Z",(),"idle",0,0)
+    args=dict(
+        ledger=None,automation=None,library=None,nest=None,
+        plan=idle,reviewed=(),acquisitions=(),
+        now="2026-10-12T00:00:00Z",
+        idle_since="2026-10-11T23:40:00Z",
+        hardware=None,hardware_now=0,consented=True,
+        background_allowed=True,owner_authorized=True,
+        privacy_clear=True,knowledge_digest="a"*64,
+        findings=records,reviewer_public_key=pub,
+        reviewer="independent-wiki",key_id="review-key-1",
+        review_at=150)
+    with patch(
+        "skeleton.ai.webcrawler.dragon_mother_hundred_handoff.run_mother_to_shadow",
+        return_value="original-worker-must-verify-all-lineage") as dispatch:
+        with pytest.raises(PermissionError,match="all 100"):
+            run_hundred_matrix_mother_to_shadow(
+                **{**args,"findings":records[:-1]})
+        dispatch.assert_not_called()
+        assert run_hundred_matrix_mother_to_shadow(**args)==(
+            "original-worker-must-verify-all-lineage")
+        dispatch.assert_called_once()
+        with pytest.raises(PermissionError,match="lawful idle"):
+            run_hundred_matrix_mother_to_shadow(
+                **{**args,"background_allowed":False})
+        dispatch.assert_called_once()
