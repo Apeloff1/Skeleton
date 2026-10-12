@@ -48,13 +48,16 @@ from .advanced_factory_runtime import (ACTIONS as FACTORY_ACTIONS, FactoryAction
 from .advanced_farming_runtime import (ACTIONS as FARM_ACTIONS, FarmingActionError,
                                         start as farming_start, step as farming_step,
                                         apply_scene as apply_farm_scene)
+from .advanced_sailing_runtime import (ACTIONS as SAILING_ACTIONS,
+    SailingActionError, start as sailing_start, step as sailing_step,
+    apply_scene as apply_sailing_scene)
 from .advanced_genre_engines import (
     GENRE_ACTIONS, STARTS as GENRE_STARTS, STEPS as GENRE_STEPS,
     GenreActionError, apply_genre_scene,
 )
 
 SCHEMA = "skeleton.game_builder.advanced_session.v1"
-ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director")
+ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "sailing")
 MAX_TURNS = 128
 MAX_SEED = 2**31 - 1
 
@@ -83,6 +86,7 @@ ACTION_HELP = {
     "rhythm": RHYTHM_ACTIONS,
     "fighting": FIGHT_ACTIONS,
     "quest_director": QUEST_ACTIONS,
+    "sailing": SAILING_ACTIONS,
     **GENRE_ACTIONS,
 }
 
@@ -696,12 +700,13 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
         "rhythm":rhythm_start,
         "fighting":fight_start,
         "quest_director":quest_start,
+        "sailing":sailing_start,
         **GENRE_STARTS,
     }
     try:
         state=starts[editor](rules,seed)
     except (GenreActionError,FarmingActionError,FactoryActionError,
-            ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError) as exc:
+            ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,SailingActionError) as exc:
         raise AdvancedRuntimeError(str(exc)) from exc
     if scene is not None:
         from .advanced_level_scenes import validate_advanced_scene
@@ -755,6 +760,8 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             apply_fight_scene(state,rules,layout)
         elif editor=="quest_director":
             apply_quest_scene(state,rules,layout)
+        elif editor=="sailing":
+            apply_sailing_scene(state,rules,layout)
         else:
             apply_genre_scene(editor,state,layout)
     baseline=_digest({"editor":editor,"configuration":config["digest"],"seed":seed,
@@ -783,11 +790,12 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             "rhythm":rhythm_step,
             "fighting":fight_step,
             "quest_director":quest_step,
+            "sailing":sailing_step,
             **GENRE_STEPS,
         }
         try:
             events=steps[editor](state,rules,action)
-        except (GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError) as exc:
+        except (GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,SailingActionError) as exc:
             raise AdvancedRuntimeError(str(exc)) from exc
         state["events"]=events
         receipt={"index":index,"action":action,"events":events,
