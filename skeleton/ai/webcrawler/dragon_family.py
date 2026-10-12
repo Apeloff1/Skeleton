@@ -140,6 +140,9 @@ class DragonFamily:
           owner TEXT NOT NULL, source_id TEXT NOT NULL, url TEXT NOT NULL,
           media TEXT NOT NULL, topics_json TEXT NOT NULL, registered_at REAL NOT NULL,
           parent_digest TEXT NOT NULL DEFAULT '', PRIMARY KEY(owner,source_id))""")
+        db.execute("""CREATE TABLE IF NOT EXISTS dragon_family_inventory_seals (
+          owner TEXT PRIMARY KEY, sealed_at REAL NOT NULL,
+          source_total INTEGER NOT NULL, fingerprint TEXT NOT NULL)""")
         db.execute("""CREATE TABLE IF NOT EXISTS dragon_family_broods (
           owner TEXT PRIMARY KEY, laid_at REAL NOT NULL, source_total INTEGER NOT NULL,
           source_fingerprint TEXT NOT NULL)""")
@@ -208,6 +211,11 @@ class DragonFamily:
         added = 0
         self.db.execute("BEGIN IMMEDIATE")
         with self.db:
+            sealed = self.db.execute("""SELECT 1 FROM dragon_family_inventory_seals
+                WHERE owner=?""", (owner,)).fetchone()
+            brood = self.db.execute("SELECT 1 FROM dragon_family_broods WHERE owner=?", (owner,)).fetchone()
+            if sealed and not brood:
+                raise PermissionError("parent's source quest is sealed; await first brood")
             for sid, url, media, tags in prepared:
                 prior = self.db.execute("""SELECT url,media,topics_json FROM dragon_family_sources
                     WHERE owner=? AND source_id=?""", (owner, sid)).fetchone()
@@ -222,6 +230,45 @@ class DragonFamily:
                 added += 1
         return added
 
+    def seal_inventory(self, owner: str, *, authorized: bool, now: float) -> bool:
+        """Explicitly freeze the parent's starting source quest.
+
+        Without a seal, a partially registered source batch cannot lay eggs.
+        Sources discovered *after* the brood is born enter its idle research
+        catalog, never changing the completed parent's original quest.
+        """
+        _owner(owner)
+        self._writer(None, authorized=authorized)
+        at = _epoch(now)
+        self.db.execute("BEGIN IMMEDIATE")
+        with self.db:
+            registered = self.db.execute("""SELECT source_id,url,media,topics_json
+                FROM dragon_family_sources WHERE owner=? ORDER BY source_id""",
+                (owner,)).fetchall()
+            if not registered:
+                raise ValueError("cannot seal an empty source inventory")
+            already = self.db.execute("""SELECT source_total,fingerprint
+                FROM dragon_family_inventory_seals WHERE owner=?""",
+                (owner,)).fetchone()
+            fingerprint = _hash(registered)
+            if already:
+                if already != (len(registered), fingerprint):
+                    # After brood, newly enrolled child sources may differ:
+                    # sealing remains a one-time operation.
+                    brood = self.db.execute("SELECT 1 FROM dragon_family_broods WHERE owner=?",
+                                            (owner,)).fetchone()
+                    if not brood:
+                        raise ValueError("sealed source inventory mismatch")
+                return False
+            if self.db.execute("SELECT 1 FROM dragon_family_broods WHERE owner=?",
+                               (owner,)).fetchone():
+                raise ValueError("cannot retroactively seal a completed quest")
+            self.db.execute("INSERT INTO dragon_family_inventory_seals VALUES(?,?,?,?)",
+                            (owner, at, len(registered), fingerprint))
+            self._event(owner, at, "parent", "inventory_sealed", "",
+                        f"Original source quest sealed ({len(registered)} sources)")
+        return True
+
     def consume(self, owner: str, receipt: SourceReceipt, *,
                 authorized: bool) -> bool:
         """Parent only consumes approved unique inventory once. No reread farming."""
@@ -235,6 +282,10 @@ class DragonFamily:
                 (owner, receipt.source_id)).fetchone()
             if row is None:
                 raise LookupError("source not in curated inventory")
+            seal = self.db.execute("""SELECT source_total FROM dragon_family_inventory_seals
+                WHERE owner=?""", (owner,)).fetchone()
+            if not seal:
+                raise PermissionError("original source inventory must be sealed before parent consumption")
             if row[0]:
                 if row[0] != receipt.content_digest:
                     raise ValueError("parent intake is immutable; route revisions to idle brood")
@@ -254,7 +305,7 @@ class DragonFamily:
             phase = self._phase(total, eaten)
             self._event(owner, at, "parent", "consumed", receipt.source_id,
                         f"{phase}: approved source digested ({eaten}/{total})")
-            if total and eaten == total:
+            if total and eaten == total == seal[0]:
                 rows = self.db.execute("""SELECT source_id,parent_digest FROM dragon_family_sources
                     WHERE owner=? ORDER BY source_id""", (owner,)).fetchall()
                 fingerprint = _hash(rows)
@@ -386,6 +437,8 @@ class DragonFamily:
                 level=(0 if count == 0 else 1 + min(29, isqrt(count * 4))),
                 discoveries=count, last_grew_at=_utc(seen) if seen is not None else None,
                 idle_only=True))
+        seal = self.db.execute("""SELECT source_total FROM dragon_family_inventory_seals
+            WHERE owner=?""", (owner,)).fetchone()
         return dict(schema=SCHEMA,
                     parent=dict(stage=self._phase(total, consumed) if brood is None else "adult",
                                 consumed=consumed if brood is None else brood[1],
@@ -393,7 +446,8 @@ class DragonFamily:
                                 complete=brood is not None,
                                 laid_at=_utc(brood[0]) if brood else None),
                     children=children, history=history,
-                    pending_source_count=max(0, total - consumed) if brood is None else 0,
+                    pending_source_count=max(0, (seal[0] if seal else total) - consumed) if brood is None else 0,
+                    inventory_sealed=seal is not None,
                     knowledge_authority="canonical human-approved crawler only",
                     update_policy="idle-only; changed, reviewed content; no synthetic XP")
 
