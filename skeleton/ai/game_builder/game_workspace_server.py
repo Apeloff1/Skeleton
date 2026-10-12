@@ -18,12 +18,12 @@ from base64 import b64encode
 from .game_project_workspace import GameWorkspace, WorkspaceError
 from .game_workspace_ui import render_workspace_html
 from .game_prompt_router import route_game_prompt,ingest_ai_draft
-from .system_editors import catalog as system_editor_catalog, editor_source, editor_path, preview_editor
+from .system_editors import catalog as system_editor_catalog, editor_source, editor_path, preview_editor, make_editor_document
 from .system_editor_assembly import assemble_workspace_systems
 from .advanced_gameplay_runtime import (
     run_advanced_session, verify_advanced_session, ACTION_HELP,
 )
-from .advanced_level_scenes import make_advanced_scene, scene_path
+from .advanced_level_scenes import make_advanced_scene, scene_path, validate_advanced_scene
 from .advanced_puzzle_solver import solve_advanced_puzzle
 from .advanced_rhythm_runtime import default_layout as rhythm_default_layout
 from .advanced_rhythm_audio import render_original_beat_wav,original_audio_receipt
