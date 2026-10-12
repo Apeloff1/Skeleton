@@ -1372,10 +1372,50 @@ save/continuation, forged result detection, offline CLI and reviewed
 cross-family hybrid assembly. It is included in the Linux and Windows
 advanced-reference CI gate alongside previous editor families.
 
-**Important limitations:** The reference session is bounded to
-128 player actions; arbitrary 200-floor campaigns require a separately
-verified long-run checkpointed execution mechanism rather than
-pretending a 128-step proof covers the entire game. No native Godot
+**Important limitations:** The ordinary interactive reference
+session is still bounded to 128 player actions. A separate checkpointed
+long-run interface now exists and needs independent validation; this
+is not a reason to raise or disable the shared limit. No native Godot
 roguelike is implemented or hardware-published here, and this
 compact original floor generator does not claim fully featured
 commercial-level content generation or a modern multiplayer dungeon.
+
+
+### Original long-running campaigns and independent checkpoints
+
+The separate advanced_roguelike_longrun.py supports up to
+**8,192 actual dungeon commands** with configurable 8–128 command
+checkpoint intervals. Each checkpoint includes the original genesis
+or prior digest, action-window digest, deterministic event/state
+digest, floor, terminal state and content-addressed chain head. A
+complete long-run receipt includes the original signed scene, editor
+settings identity, actions, authentic final state and complete ordered
+checkpoint sequence. An unfinished original run can be continued.
+
+Every continuation first **rebuilds the prior state by replaying
+the complete original action history** from seed, authored geometry
+and settings. Client-supplied stored HP, cleared guardian, free
+currency or edited checkpoints are never accepted as authoritative.
+This is a fully recomputed history, not a fast trust-the-snapshot
+shortcut. The shared 128-action interactive reference limit remains
+unchanged for every other original editor family.
+
+The offline entry points are roguelike-marathon,
+roguelike-marathon-verify and roguelike-marathon-continue.
+The token/CSRF-protected local Studio endpoint
+/api/roguelike-marathon provides independently reexecuted long-run
+play behind the existing local source-approval boundary. An original
+dungeon Studio panel accepts JSON action batches, validates
+continuation against the previous full source record, and shows
+current floor, turns, checkpoint count, head digest, victory and
+honest native certification status.
+
+Cross-platform tests include **20-floor and 200-floor end-to-end
+victory with actual combat and actual final guardian**, edited
+source and checkpoint rejection, swapped configuration rejection,
+illegal commands, action budget overflow, continuation after
+terminal outcome, and offline CLI proof. This capability is
+finite: a total 8,192 commands, never a claim of continuous
+background work, an indefinitely persistent server process or
+hardware-level native execution. Faster checkpoint promotion
+requires a separate independent trust and performance review.
