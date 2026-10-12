@@ -2,52 +2,13 @@
 import React, {useState} from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 
-const HEX=/^[0-9a-f]{64}$/;
-type Role='article'|'video'|'monitor';
-type Stage='unborn'|'egg'|'hatchling'|'juvenile'|'dragon';
-export interface DragonFamilyProjection {
- schema:'skeleton.ai.dragon.family.v1';
- parent:{stage:string;consumed:number;source_total:number;complete:boolean;laid_at:string|null};
- children:readonly {id:Role;name:string;specialty:string;stage:Stage;level:number;
-  discoveries:number;last_grew_at:string|null;idle_only:true}[];
- history:readonly {sequence:number;at:string;dragon:string;action:string;
-  source_id:string;change:string;digest:string}[];
- pending_source_count:number;
- knowledge_authority:string;
- update_policy:string;
-}
-const number=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>=0;
-const validTime=(v:unknown)=>v===null||(typeof v==='string'&&
- /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(v));
-export function validateDragonFamily(v:unknown):DragonFamilyProjection|null{
- if(!v||typeof v!=='object')return null;
- const f=v as DragonFamilyProjection;
- if(f.schema!=='skeleton.ai.dragon.family.v1'||!f.parent||
-  !number(f.parent.consumed)||!number(f.parent.source_total)||
-  f.parent.consumed>f.parent.source_total||typeof f.parent.complete!=='boolean'||
-  !validTime(f.parent.laid_at)||!number(f.pending_source_count)||
-  !Array.isArray(f.children)||f.children.length!==3||
-  !Array.isArray(f.history)||f.history.length>100)return null;
- const roles=['article','video','monitor'];
- if(!f.children.every((c,i)=>c&&c.id===roles[i]&&
-  typeof c.name==='string'&&c.name.length<=50&&typeof c.specialty==='string'&&
-  ['unborn','egg','hatchling','juvenile','dragon'].includes(c.stage)&&
-  number(c.level)&&c.level<=30&&number(c.discoveries)&&
-  c.idle_only===true&&validTime(c.last_grew_at)))return null;
- if(!f.history.every(h=>h&&number(h.sequence)&&h.sequence>0&&
-   typeof h.at==='string'&&validTime(h.at)&&
-   typeof h.dragon==='string'&&h.dragon.length<=25&&
-   typeof h.action==='string'&&h.action.length<=50&&
-   typeof h.source_id==='string'&&h.source_id.length<=128&&
-   typeof h.change==='string'&&h.change.length<=500&&
-   typeof h.digest==='string'&&HEX.test(h.digest)))return null;
- return f;
-}
-const glyph=(stage:Stage)=>stage==='unborn'?'·':stage==='egg'?'🥚':stage==='hatchling'?'🐣':stage==='juvenile'?'🐲':'🐉';
+import {validateDragonFamily, type DragonFamilyProjection, type DragonFamilyStage, type DragonFamilyRole} from './dragonFamilyProjection';
+
+const glyph=(stage:DragonFamilyStage)=>stage==='unborn'?'·':stage==='egg'?'🥚':stage==='hatchling'?'🐣':stage==='juvenile'?'🐲':'🐉';
 const safeDate=(value:string|null)=>value?value.replace('T',' ').replace('Z',' UTC'):'No new evidence yet';
 
 export default function DragonFamilyNest({family}:{family?:DragonFamilyProjection|null}){
- const [selected,setSelected]=useState<Role>('article');
+ const [selected,setSelected]=useState<DragonFamilyRole>('article');
  const [showHistory,setShowHistory]=useState(false);
  const f=validateDragonFamily(family);
  if(!f)return <View style={s.root}><Text style={s.heading}>🥚 Dragon Family</Text>
