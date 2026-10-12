@@ -42,7 +42,7 @@ class LivingOriginalQuestTests(unittest.TestCase):
         editor=next(e for e in catalog() if e["id"]=="quest_director")
         self.assertEqual(editor["runtime_maturity"],"advanced_reference_runtime")
         self.assertEqual(editor["progression_floor"],"advanced")
-        self.assertEqual(len(editor["fields"]),54)
+        self.assertEqual(len(editor["fields"]),61)
         self.assertEqual(len(ACTIONS),len(set(ACTIONS)))
         self.assertEqual(CELLS,49)
 
@@ -229,6 +229,67 @@ class LivingOriginalQuestTests(unittest.TestCase):
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("quest_director",sparse,["speak:3"])
 
+
+
+    def test_real_npc_role_can_initiate_quest_only_if_other_resident_witnessed_it(self):
+        cfg=self.rules(npc_perception=3,npc_act_interval=10)
+        # These ticks do not move the player or fabricate a player action.
+        game=run_advanced_session("quest_director",cfg,
+              ["wait:4","wait:4","wait","wait"])
+        self.assertTrue(verify_advanced_session(game,cfg))
+        state=game["state"]
+        self.assertEqual(state["player"],0)
+        self.assertEqual(state["npc_events_generated"],1)
+        self.assertEqual(state["npcs"][0]["cargo"],1)
+        self.assertEqual(state["npcs"][0]["personal_supplies"],cfg.get("npc_supplies",3))
+        self.assertLess(state["sites"][0]["stock"],cfg.get("site_stock",12))
+        event=state["events_log"][0]
+        self.assertEqual(event["actor"],"npc:0")
+        self.assertEqual(event["kind"],"discover")
+        self.assertNotIn(0,event["direct_witnesses"])
+        self.assertIn(1,event["direct_witnesses"])
+        self.assertEqual(state["quests"][0]["origin_actor"],"npc:0")
+        self.assertEqual(state["npcs"][1]["memories"][0]["source"],"eyewitness")
+        self.assertEqual(state["reputation"],0)
+        self.assertEqual(state["supplies"],cfg.get("starting_supplies",8))
+        self.assertEqual(state["next_event"],1)
+        # A self-originating NPC event does not create a self-witness.
+        unwitnessed=self.rules(npc_perception=1,npc_act_interval=10)
+        game=run_advanced_session("quest_director",unwitnessed,
+              ["wait:4","wait:4","wait","wait"])
+        self.assertEqual(game["state"]["npc_events_generated"],1)
+        self.assertEqual(game["state"]["events_log"][0]["direct_witnesses"],[])
+        self.assertEqual(game["state"]["quests"],[])
+
+    def test_autonomous_npc_actions_consume_real_energy_and_finite_material_stock(self):
+        cfg=self.rules(npc_count=1,npc_autonomy=True,
+            npc_act_interval=1,npc_action_budget=20,
+            site_stock=2,rumor_enabled=False)
+        state=start(make_editor_document("quest_director",cfg)["settings"],0)
+        for _ in range(6):step(state,make_editor_document("quest_director",cfg)["settings"],"wait")
+        self.assertEqual(state["sites"][0]["stock"],0)
+        self.assertEqual(state["npcs"][0]["cargo"],2)
+        self.assertEqual(state["npc_events_generated"],2)
+        self.assertEqual(state["npcs"][0]["energy"],3)
+        self.assertEqual(state["reputation"],0)
+        disabled=self.rules(npc_autonomy=False,npc_act_interval=1)
+        quiet=run_advanced_session("quest_director",disabled,
+              ["wait:4","wait:4"])
+        self.assertEqual(quiet["state"]["events_log"],[])
+        self.assertEqual(quiet["state"]["npc_events_generated"],0)
+
+    def test_quest_director_event_rule_parameter_changes_actual_resolution_payment(self):
+        common=self.rules(event_rules=100,rule_bonus_modulus=7,
+                          ending_policy="persistent")
+        itinerary=self.witness_start()+["choose:0:support","help:0","resolve:0"]
+        sample=run_advanced_session("quest_director",common,itinerary)
+        one=run_advanced_session("quest_director",
+                  {**common,"event_rules":1},itinerary)
+        self.assertTrue(verify_advanced_session(sample,common))
+        self.assertTrue(verify_advanced_session(one,{**common,"event_rules":1}))
+        self.assertEqual(one["state"]["quests"][0]["rule_id"],0)
+        self.assertGreater(sample["state"]["quests"][0]["rule_id"],0)
+        self.assertNotEqual(sample["state"]["gold"],one["state"]["gold"])
 
     def test_studio_original_witness_map_and_provenance_preserving_painter(self):
         from skeleton.ai.game_builder.game_workspace_ui import (
