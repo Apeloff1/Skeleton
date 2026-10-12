@@ -7,6 +7,8 @@ separate; rotational SAT here resolves post-integration manifolds.
 """
 from __future__ import annotations
 
+from .advanced_physics_contact_custody import record_fixture_contact
+
 from math import isqrt
 
 from .advanced_physics_dynamics import transfer_collision_spin
@@ -155,7 +157,7 @@ def oriented_world(body,state,config,events):
 
 
 def oriented_static(body,state,config,events):
-    for fixture in state["fixtures"]:
+    for fixture_index,fixture in enumerate(state["fixtures"]):
         if not (body["mask"]&fixture["layer"]):
             continue
         m=sat_manifold(_body_shape(body,state),_fixture_shape(fixture,state))
@@ -176,6 +178,7 @@ def oriented_static(body,state,config,events):
             body["velocity"][j]-=tangent*config["contact_friction"]//100
         state["contacts"]+=1
         _record(state,"fixture",n,depth,m["point"],events)
+        record_fixture_contact(state,body,fixture_index,"oriented_fixture")
         oriented_world(body,state,config,events)
 
 
