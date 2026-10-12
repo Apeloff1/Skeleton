@@ -164,10 +164,10 @@ def run_peer_fight(settings=None,blue_actions=(),red_actions=(),*,
                 # elapsed simulation frames honor either participant's
                 # explicit bounded wait duration; short steps retain the
                 # game's authored standard frame cadence.
-                advance=max(rules["frames_per_turn"],*(
+                advance=max([rules["frames_per_turn"]]+[
                     int(move.split(":")[1]) for move in (a,b)
                     if move.startswith("wait:")
-                ))
+                ])
                 _turn(state,rules,events,advance)
         except (FightingActionError,FightingRollbackError) as exc:
             raise FightingRollbackError(
