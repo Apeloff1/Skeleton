@@ -260,6 +260,7 @@ def start(config, seed):
         "motors_used": 0, "contacts": 0, "fractures": 0, "water_contacts": 0,
         "rope_breaks": 0, "max_velocity_seen": 0, "goal_frames": 0,
         "oriented_contacts": 0, "contact_manifolds": [],
+        "geometry_mode": config["collision_geometry"],
         "continuous_pair_contacts": 0, "max_angular_speed_seen": 0,
         "peak_cable_extension": 0,
         "milestones": [], "events": [], "finished": False, "failed": False,
