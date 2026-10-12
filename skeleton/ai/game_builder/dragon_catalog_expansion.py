@@ -16,7 +16,7 @@ import re
 from .contracts import canonical_json
 from .dragon_almanacs import read_source_registry
 from .dragon_discovery_admission import _supplement, validate_discovery_chain
-from .dragon_source_catalog import extract_catalog
+from .dragon_source_catalog import canonical_source_url, extract_catalog
 
 ROOT = Path(__file__).resolve().parents[3]
 _SHA40 = re.compile(r"[0-9a-f]{40}\Z")
@@ -78,8 +78,9 @@ def build_expansion(registry: dict, previous: list[tuple[str, dict]],
     prior_urls = set(row["url"] for row in registry["sources"])
     for _, old in previous:
         prior_urls.update(row["url"] for row in old["candidates"])
-    if len(prior_urls) != verified["total_discovered"]:
+    if len(prior_urls) != verified["raw_total_discovered"]:
         raise ValueError("previous discovered URL count mismatch")
+    prior_canonical = {canonical_source_url(url) for url in prior_urls}
     claims = {}
     catalogs = []
     for entry in pinned:
@@ -89,7 +90,7 @@ def build_expansion(registry: dict, previous: list[tuple[str, dict]],
                          "readme_blob_sha": entry["readme_blob_sha"],
                          "content_sha256": result["manifest"]["content_sha256"]})
         for item in result["sources"]:
-            if item["url"] in prior_urls:
+            if item["url"] in prior_canonical:
                 continue
             row = claims.setdefault(item["url"], {
                 "source_id": item["source_id"], "url": item["url"],
