@@ -108,7 +108,7 @@ def normalize_layout(config,layout):
         places.append(_int(layout[key],0,CELLS-1,key))
     for key,max_n in (("friendly_spawns",4),("enemy_spawns",4)):
         locs=layout[key]
-        if type(locs) is not list or not 1<=len(locs)<=max_n or (
+        if type(locs) is not list or not (2 if key=="friendly_spawns" else 1)<=len(locs)<=max_n or (
           any(type(p) is not int or not 0<=p<CELLS for p in locs)):
             raise RTSActionError("original force spawn budget or type invalid")
         places.extend(locs)
@@ -184,6 +184,8 @@ def apply_scene(state,config,layout):
     state["ore"]=source["starting_ore"]
     state["energy"]=source["starting_energy"]
     state["selected"]=0
+    state["next_unit_id"]=len(state["units"])
+    state["next_enemy_id"]=len(state["enemies"])
     return state
 
 
@@ -194,7 +196,7 @@ def start(config,seed):
       "buildings":[],"wood":0,"ore":0,"energy":0,"selected":0,
       "next_unit_id":2,"next_enemy_id":1,
       "tech":{key:0 for key in TECHS},"supply_used":0,
-      "relay_owner":"neutral","relay_progress":0,
+      "relay_owner":"neutral","relay_progress":0,"capture_committed":False,
       "relay_hold":0,"visible":[],"discovered":[],
       "scan_ticks":0,"wave_index":0,"casualties":0,
       "events":[],"achievements":[],"finished":False,"failed":False,
@@ -324,7 +326,7 @@ def _tick(state,config):
             if u["cargo"]>=config["worker_capacity"]:
                 u["order"]="return"
                 continue
-            amount=min(node["stock"],config["gather_rate"]+
+            amount=min(node["stock"],config["gather_rate"]+config["tick_rate"]//20+
                 state["tech"]["economy"]*config["economy_bonus"],
                 config["worker_capacity"]-u["cargo"])
             node["stock"]-=amount
@@ -356,6 +358,15 @@ def _tick(state,config):
                 neighbor=next((p for p in _adjacent(enemy_cell) if p not in blockers
                               and _unit_at(state,p) is None),None)
                 if neighbor is not None:_go(state,config,u,neighbor,events)
+    if config["supply_model"]=="logistics":
+        demand=max(1,state["supply_used"]//config["logistics_divisor"])
+        if state["energy"]>=demand:
+            state["energy"]-=demand
+            events.append("real_logistics_fuel_paid_per_strategy_tick")
+        else:
+            for u in _alive(state,"blue"):
+                u["hp"]=max(0,u["hp"]-config["logistics_damage"])
+            events.append("unfunded_original_supply_lines_caused_attrition")
     if config["enemy_ai"]:
         for enemy in _alive(state,"red"):
             blue=_alive(state,"blue")
@@ -367,7 +378,11 @@ def _tick(state,config):
                     events.append("opposing_original_faction_physically_attacked")
                     if target["hp"]==0:state["casualties"]+=1
                 elif config["enemy_patrol"]:
-                    _go(state,config,enemy,target["cell"],events)
+                    candidate=next((p for p in _adjacent(target["cell"])
+                       if _unit_at(state,p) is None and _building_at(state,p) is None
+                       and p not in state["map"]["obstacles"]),None)
+                    if candidate is not None:
+                        _go(state,config,enemy,candidate,events)
     for structure in state["buildings"]:
         if structure["side"]!="blue" or structure["hp"]==0:
             continue
@@ -383,7 +398,7 @@ def _tick(state,config):
     relay=state["map"]["relay"]
     friendly=any(u["cell"]==relay for u in _alive(state,"blue"))
     enemy=any(u["cell"]==relay for u in _alive(state,"red"))
-    if friendly and not enemy:
+    if friendly and not enemy and state["capture_committed"]:
         state["relay_progress"]=min(config["capture_ticks"],state["relay_progress"]+1)
         if state["relay_progress"]==config["capture_ticks"]:
             state["relay_owner"]="blue"
@@ -394,7 +409,9 @@ def _tick(state,config):
                 state["achievements"].append("legitimate_rts_control_victory")
     elif enemy:
         state["relay_progress"]=max(0,state["relay_progress"]-1)
-        if state["relay_progress"]==0:state["relay_owner"]="neutral"
+        if state["relay_progress"]==0:
+            state["relay_owner"]="neutral"
+            state["capture_committed"]=False
         state["relay_hold"]=0
     if config["enemy_waves"] and state["tick"]%config["wave_interval"]==0 and (
         state["wave_index"]<config["wave_cap"]):
@@ -466,9 +483,9 @@ def step(state,config,action):
         events.append("built_real_original_rts_structure_"+kind)
     elif action.startswith("train:"):
         kind=action.split(":")[1]
-        if len(_alive(state,"blue"))>=config["max_units"]:
+        if len(_alive(state,"blue"))>=min(config["max_units"],16):
             raise RTSActionError("physical owned unit active population limit")
-        if state["supply_used"]+SUPPLY[kind]>config["supply_cap"]+sum(
+        if config["supply_model"]!="none" and state["supply_used"]+SUPPLY[kind]>config["supply_cap"]+sum(
             config["outpost_supply"] for b in state["buildings"] if
             b["kind"]=="outpost" and b["side"]=="blue" and b["hp"]>0):
             raise RTSActionError("trained units require existing original supply capacity")
@@ -508,6 +525,7 @@ def step(state,config,action):
             raise RTSActionError("relay capture requires physical original squad position")
         if any(e["cell"]==selected["cell"] for e in _alive(state,"red")):
             raise RTSActionError("contested original relay cannot be silently captured")
+        state["capture_committed"]=True
         events.append("real_original_relay_capture_activated")
     elif action=="deposit":
         if selected is None or selected["kind"]!="worker" or selected["cargo"]==0:
