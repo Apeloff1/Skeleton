@@ -161,13 +161,18 @@ def _ecological_turn(state,config):
     for habitat in state["habitats"]:
         # Seasonal primary production and conservation investments actually
         # replenish a finite shared food web; desert and winter regenerate less.
-        yield_rate=max(0,config["food_regrowth"]-
+        yield_rate=max(0,config["food_regrowth"]+
+                       (1 if habitat["health"]>=90 else 0)-
                        (2 if season==3 else 1 if season==1 else 0))
         if habitat["moisture"]<=config["drought_threshold"]:
             yield_rate//=2
         habitat["food"]=min(habitat["capacity"],
                             habitat["food"]+yield_rate)
         habitat["moisture"]=max(0,habitat["moisture"]-config["evaporation"])
+        # Outbreaks are fully deterministic, observable, and treatable.
+        if (habitat["kind"]=="wetland" and state["tick"]>0 and
+            state["tick"]%config["outbreak_period"]==0):
+            habitat["disease"]=min(100,habitat["disease"]+config["infection_rate"])
         if habitat["protection"]>0:habitat["protection"]-=1
     for species in state["species"]:
         habitat=state["habitats"][species["habitat"]]
@@ -192,12 +197,15 @@ def _ecological_turn(state,config):
                            and p["guild"] in ("grazer","forager") and
                            p["population"]>0),None)
                 if prey and state["tick"]%config["hunt_period"]==0:
-                    killed=min(prey["population"],config["predation_rate"])
+                    killed=min(prey["population"],max(
+                        0,config["predation_rate"]-
+                        (config["protection_strength"] if habitat["protection"]>0 else 0)
+                    ))
                     prey["population"]-=killed
                     prey["deaths"]+=killed
                     state["deaths"]+=killed
-                    if prey["population"]==0:state["extinctions"]+=1
-                    state["predation_events"]+=1
+                    if prey["population"]==0 and killed>0:state["extinctions"]+=1
+                    if killed>0:state["predation_events"]+=1
                     losses=max(0,losses-1)
         if habitat["disease"]>0:
             losses+=min(number,habitat["disease"]//config["disease_resistance"])
@@ -290,9 +298,9 @@ def step(state,config,action):
         state["interventions"]+=1
         events.append("temporary_source_bound_habitat_protection")
     elif action=="treat":
-        _spend(state,"medicine",1)
         if habitat["disease"]==0:
             raise EcosystemActionError("medicine requires a real detected outbreak")
+        _spend(state,"medicine",1)
         habitat["disease"]=max(0,habitat["disease"]-config["treatment_strength"])
         state["treatments"]+=1
         events.append("finite_wildlife_disease_treatment")
