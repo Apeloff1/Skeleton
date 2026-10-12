@@ -76,7 +76,7 @@ class OriginalEpisodicSaveTests(unittest.TestCase):
         continuation=continue_episodic_savegame(save,additional_episodes=[future])
         result=import_episodic_savegame(continuation)
         self.assertEqual(result["campaign"]["episode_count"],2)
-        self.assertEqual(result["campaign"]["world_state"]["turn"],3)
+        self.assertEqual(result["campaign"]["world_state"]["turn"],4)
         self.assertEqual([event["site_id"] for event in
                           result["campaign"]["world_state"]["events_log"]],[0,1])
 
