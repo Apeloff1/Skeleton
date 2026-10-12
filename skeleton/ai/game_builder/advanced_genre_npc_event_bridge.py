@@ -55,7 +55,7 @@ def _qualifies(source,frame):
 
 def run_cross_genre_world(source,world_scene,bindings,source_settings=None,
                           world_settings=None,*,world_actions=()):
-    if source.get("editor") not in SUPPORTED:
+    if type(source) is not dict or source.get("editor") not in SUPPORTED:
         raise CrossGenreWorldError("only reviewed earned farming, sailing and flight events qualify")
     if (type(bindings) not in (list,tuple) or not 1<=len(bindings)<=MAX_EVENTS or
         type(world_actions) not in (list,tuple) or
