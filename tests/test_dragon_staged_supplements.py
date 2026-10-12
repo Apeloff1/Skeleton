@@ -227,3 +227,66 @@ def test_accepted_real_round_four_is_idempotent_and_unapproved():
     assert plan["supplements"] == []
     assert plan["crawler_authorized"] is False
     assert plan["training_authorized"] is False
+
+
+def test_materialization_is_opt_in_no_overwrite_and_keeps_policy_closed(
+        tmp_path, accepted, stage):
+    import json
+    from skeleton.ai.game_builder.dragon_staged_supplements import (
+        materialize_staged_supplements,
+    )
+    root = tmp_path / "project"
+    evidence = root / "docs/ai/evidence"
+    evidence.mkdir(parents=True)
+    registry, accepted_chain = accepted
+    with pytest.raises(PermissionError):
+        materialize_staged_supplements(
+            registry, accepted_chain, stage, first_batch=2, batch_size=2,
+            authorized=False, root=root)
+    assert list(evidence.iterdir()) == []
+    recorded = materialize_staged_supplements(
+        registry, accepted_chain, stage, first_batch=2, batch_size=2,
+        authorized=True, root=root)
+    assert recorded["new_source_leads"] == 3
+    assert recorded["raw_url_total"] == 5
+    assert len(recorded["evidence_files_created"]) == 2
+    for name in recorded["evidence_files_created"]:
+        doc = json.loads((evidence / name).read_text())
+        assert doc["status"] == STATUS_RAW
+        assert all(row["training_authorized"] is False for row in doc["candidates"])
+    assert all(recorded[k] is False for k in (
+        "overwrite_performed", "database_modified", "crawl_authorized",
+        "rights_approved", "training_authorized"))
+    with pytest.raises(FileExistsError):
+        materialize_staged_supplements(
+            registry, accepted_chain, stage, first_batch=2, batch_size=2,
+            authorized=True, root=root)
+    assert len(list(evidence.iterdir())) == 2
+
+
+def test_materialization_failure_rolls_back_only_writer_owned_files(
+        tmp_path, accepted, stage, monkeypatch):
+    import skeleton.ai.game_builder.dragon_staged_supplements as module
+    root = tmp_path / "project"
+    evidence = root / "docs/ai/evidence"
+    evidence.mkdir(parents=True)
+    sentinel = evidence / "other-operator.txt"
+    sentinel.write_text("existing trusted data")
+    registry, history = accepted
+    real_link = module.os.link
+    attempts = {"count": 0}
+
+    def fail_second_link(*args, **kwargs):
+        attempts["count"] += 1
+        if attempts["count"] == 2:
+            raise OSError("injected interrupted evidence commit")
+        return real_link(*args, **kwargs)
+
+    monkeypatch.setattr(module.os, "link", fail_second_link)
+    with pytest.raises(OSError, match="interrupted"):
+        module.materialize_staged_supplements(
+            registry, history, stage, first_batch=2, batch_size=2,
+            authorized=True, root=root)
+    assert sentinel.read_text() == "existing trusted data"
+    assert list(evidence.iterdir()) == [sentinel]
+    assert attempts["count"] == 2
