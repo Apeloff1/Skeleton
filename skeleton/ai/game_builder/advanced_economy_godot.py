@@ -173,14 +173,22 @@ func _step(action: String) -> bool:
     var node: Dictionary = _market()
     var good: int = int(state["focus"])
     if action.begins_with("focus:"):
-        var who: int = int(action.get_slice(":", 1))
+        var token: String = action.get_slice(":", 1)
+        if not token.is_valid_int() or str(int(token)) != token or int(token) > 15:
+            notice = "Only exact registered source-good tokens may be selected"
+            return false
+        var who: int = int(token)
         if who < 0 or who >= state["active_goods"].size():
             notice = "Commodity is outside detailed original trade budget"
             return false
         state["focus"] = who
         events.append("selected_source_good")
     elif action.begins_with("travel:"):
-        var to: int = int(action.get_slice(":", 1))
+        var route: String = action.get_slice(":", 1)
+        if not route.is_valid_int() or str(int(route)) != route or int(route) > 15:
+            notice = "Only exact registered physical route identifiers permitted"
+            return false
+        var to: int = int(route)
         if to < 0 or to >= state["markets"].size() or absi(to-int(state["position"])) != 1:
             notice = "Only adjacent physical market routes are permitted"
             return false
@@ -343,7 +351,8 @@ func _verify() -> void:
         return
     if proof.get("scene_digest") != source["scene"]["digest"] or (
         proof.get("settings_digest") != source.get("settings_digest")
-    ):
+    ) or proof.get("verified_by_python_replay") is not bool or not proof["verified_by_python_replay"]:
+
         _fail("source and proof configuration identity mismatch")
         return
     var history: Variant = proof.get("actions")
