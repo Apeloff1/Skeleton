@@ -4,6 +4,10 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/ai/game_builder/advanced_parkour_runtime.py"
+      - "skeleton/ai/game_builder/advanced_parkour_planner.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "tests/test_game_builder_advanced_parkour_planner.py"
       - "skeleton/ai/game_builder/advanced_level_scenes.py"
       - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
       - "skeleton/ai/game_builder/system_editor_assembly.py"
@@ -44,6 +48,7 @@ jobs:
             skeleton/ai/game_builder/
             tests/__init__.py
             tests/test_game_builder_advanced_parkour.py
+            tests/test_game_builder_advanced_parkour_planner.py
       - name: Python 3.11
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
@@ -52,7 +57,7 @@ jobs:
         shell: bash
         run: |
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
-          python -m py_compile skeleton/ai/game_builder/advanced_parkour_runtime.py skeleton/ai/game_builder/advanced_gameplay_runtime.py skeleton/ai/game_builder/advanced_level_scenes.py skeleton/ai/game_builder/system_editor_assembly.py skeleton/ai/game_builder/system_editors.py tests/test_game_builder_advanced_parkour.py
+          python -m py_compile skeleton/ai/game_builder/advanced_parkour_runtime.py skeleton/ai/game_builder/advanced_gameplay_runtime.py skeleton/ai/game_builder/advanced_level_scenes.py skeleton/ai/game_builder/system_editor_assembly.py skeleton/ai/game_builder/system_editors.py skeleton/ai/game_builder/advanced_parkour_planner.py skeleton/ai/game_builder/system_editor_cli.py skeleton/ai/game_builder/game_workspace_server.py tests/test_game_builder_advanced_parkour.py tests/test_game_builder_advanced_parkour_planner.py
       - name: Run genuine signed traversal, victory and forgery attacks
         shell: bash
-        run: python -m unittest tests.test_game_builder_advanced_parkour -v
+        run: python -m unittest tests.test_game_builder_advanced_parkour tests.test_game_builder_advanced_parkour_planner -v
