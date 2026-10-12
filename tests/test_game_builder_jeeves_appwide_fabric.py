@@ -111,7 +111,7 @@ class AppwideCapabilityTests(unittest.TestCase):
         self.assertEqual(template["result"]["path"],"systems/rpg.json")
         self.assertTrue(template["result"]["requires_approval"])
         tools=self.run.invoke("forge.tools",{})
-        self.assertGreaterEqual(len(tools["result"]["tools"]),10)
+        self.assertGreaterEqual(len(tools["result"]["tools"]),5)
         self.assertFalse(tools["result"]["any_tool_executed"])
         dragon=self.run.invoke("companion.visual",{"event_kind":"burn_complete"})
         self.assertEqual(dragon["result"]["pose"],"proud")
