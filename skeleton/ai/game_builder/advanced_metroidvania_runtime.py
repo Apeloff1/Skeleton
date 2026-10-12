@@ -237,6 +237,11 @@ def _enemy_response(state,config,events):
     boss=state["region"]==state["guardian"] and not state["boss_defeated"]
     raw=(config["boss_damage"] if boss else config["foe_damage"])+(
          room["hazard"]//max(1,config["enemy_variance"]))
+    if boss:
+        affinity={"storm":"resonance","ember":"swim","void":"phase"}
+        if affinity[state["guardian_element"]] in state["abilities"]:
+            raw=max(0,raw-2)
+            events.append("earned_elemental_traversal_power_resisted_guardian")
     armor=state["armor"]
     raw=max(0,raw-armor)
     if state["guarding"]:
