@@ -17,6 +17,8 @@ from .dragon_almanacs import _auth
 from .dragon_article_hatchling import DragonArticleHatchling
 from .dragon_source_delta_ledger import DragonSourceDeltaLedger
 from .dragon_research_source_picker import DragonResearchSourcePicker
+from .dragon_research_workboard import DragonResearchWorkboard
+from .dragon_family_research_history import DragonFamilyResearchHistory
 from .dragon_video_transcript_ledger import DragonVideoTranscriptLedger
 from .reviewed_knowledge import _integer
 
@@ -62,6 +64,25 @@ class DragonThreeHatchlingCoordinator:
             self.article,self.video,self.updates
         ).page(owner,authorized=authorized,limit=limit,
                after_source=after_source)
+
+    def workboard(self, owner: str, *, authorized: bool,
+                  limit: int = 30, after_source: str | None = None) -> dict:
+        """Read-only review needs for each of the three Dragon hatchlings."""
+        return DragonResearchWorkboard(
+            self.article,self.video,self.updates
+        ).page(owner,authorized=authorized,limit=limit,
+               after_source=after_source)
+
+    def family_history(self, owner: str, *, article_source_id: str,
+                       video_source_id: str, update_source_id: str,
+                       authorized: bool, limit: int = 40) -> dict:
+        """Merge three bounded audited journals without leaking source text."""
+        return DragonFamilyResearchHistory(
+            self.article,self.video,self.updates
+        ).timeline(owner,article_source_id=article_source_id,
+                   video_source_id=video_source_id,
+                   update_source_id=update_source_id,
+                   authorized=authorized,limit=limit)
 
     def status(self, owner: str, *, article_source_id: str,
                video_source_id: str, update_source_id: str,
