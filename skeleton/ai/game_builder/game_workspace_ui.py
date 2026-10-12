@@ -262,6 +262,17 @@ $("story-next").addEventListener("click",async()=>{
  }catch(error){status("Scene authoring blocked: "+error.message);}
 });
 
+
+$("story-highlight-source").addEventListener("click",async()=>{
+ try{
+  const result=await api("/api/story-highlight-source",{
+   project:storyProject(),highlight:$("story-highlight-id").value.trim()});
+  storyShow(result);
+  status("Original plot point "+result.highlight+" verified against chapter "+
+    result.chapter+", act "+result.act+", scene "+result.scene+
+    " and receipt "+result.confirmation_receipt);
+ }catch(error){status("Highlighted story point lookup rejected: "+error.message);}
+});
 $("story-chapter-context").addEventListener("click",async()=>{
  try{
   const result=await api("/api/story-chapter-context",{
@@ -4032,6 +4043,8 @@ regional appearance. It does not invent model output or write hidden files.</sma
 <button id="story-chapter-context" type="button">Load one chapter, plot highlighters and prior chapter handoff</button>
 <p><small>Jeeves keeps the active chapter's source context and retrieves earlier plot threads by authenticated bookmarks; no unverified infinite context claims.</small></p>
 <pre id="story-highlighters" role="status" aria-live="polite"></pre>
+<label>Source-backed plot highlighter ID<input id="story-highlight-id" placeholder="highlight_27"></label>
+<button id="story-highlight-source" type="button">Inspect exact historic plot point and receipt</button>
 <button id="story-work-order" type="button">Plan next Jeeves production work order</button>
 <button id="story-assets-queue" type="button">Plan AI original asset generation queue</button>
 <label>Historical bookmark IDs (comma-separated)
