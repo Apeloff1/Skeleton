@@ -15,6 +15,8 @@ from skeleton.ai.game_builder.reviewed_knowledge import (
 )
 from .dragon_nest_progression import AcquiredKnowledge, DragonNest
 from .dragon_nest_store import DragonNestStore
+from .dragon_mother_glean_ledger import MotherGleanLedger
+from .dragon_mother_glean_matrix import HatchlingReceipt
 
 VIDEO_HOSTS = frozenset({
     "youtube.com", "www.youtube.com", "youtu.be",
@@ -23,11 +25,15 @@ VIDEO_HOSTS = frozenset({
 
 
 class DragonNestReviewBridge:
-    def __init__(self, library: ReviewedKnowledgeStore, nest: DragonNestStore):
+    def __init__(self, library: ReviewedKnowledgeStore, nest: DragonNestStore,
+                 mother_ledger: MotherGleanLedger | None = None):
         if not isinstance(library, ReviewedKnowledgeStore) or not isinstance(nest, DragonNestStore):
             raise ValueError("canonical reviewed-library and durable nest authorities required")
+        if mother_ledger is not None and not isinstance(mother_ledger, MotherGleanLedger):
+            raise ValueError("mother knowledge authority must be a signed canonical ledger")
         self.library = library
         self.nest = nest
+        self.mother_ledger = mother_ledger
 
     def _checked(
         self, owner: str, brief: KnowledgeBrief, source_id: str, *,
@@ -107,8 +113,23 @@ class DragonNestReviewBridge:
             relevant, True, True, min(x.confidence_ppm for x in candidates) / 1_000_000,
             published_at, lane,
         )
-        return self.nest.record_idle(
+        updated = self.nest.record_idle(
             owner, lane, acquisition, at=at, idle_since=idle_since,
             consented=consented, background_allowed=background_allowed,
             authorized=True,
         )
+        if self.mother_ledger is not None:
+            # Run once for each approved child acquisition and retry on a
+            # duplicate event. The signed mother ledger deduplicates by source
+            # revision even after siblings grow. If gleaning fails after the
+            # nest commit, a retry repeats this step without minting new XP.
+            self.mother_ledger.run(
+                self.library, updated,
+                (HatchlingReceipt(
+                    lane, hit.source_id, hit.source_text_digest,
+                    hit.note_id, hit.observed_at,
+                ),),
+                at=at, idle_since=idle_since, owner_authorized=True,
+                consented=consented, background_allowed=background_allowed,
+            )
+        return updated
