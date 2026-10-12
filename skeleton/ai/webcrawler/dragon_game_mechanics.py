@@ -12,9 +12,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from hashlib import sha256
+import hmac
+import re
 from math import isfinite
 import json
 import sqlite3
+
+MAX_STORED_SESSION_BYTES = 4 * 1024 * 1024
+MAX_HISTORY_BYTES = 8 * 1024 * 1024
+MAX_DISTILL_OBSERVATIONS = 20_000
 
 
 class Mechanic(str, Enum):
@@ -84,6 +90,26 @@ class MechanicInsight:
     examples: tuple[str, ...]
     user_confirmed: bool
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.mechanic, Mechanic):
+            raise ValueError("mechanic insight identity invalid")
+        if (type(self.observation_count) is not int or self.observation_count < 1
+                or type(self.supporting_sessions) is not int
+                or not 1 <= self.supporting_sessions <= self.observation_count):
+            raise ValueError("mechanic insight support counts invalid")
+        if (type(self.preference_score) not in (int, float)
+                or not -1 <= self.preference_score <= 1
+                or not isfinite(self.preference_score)
+                or type(self.confidence) not in (int, float)
+                or not 0 <= self.confidence <= 1
+                or not isfinite(self.confidence)):
+            raise ValueError("mechanic insight numerical evidence invalid")
+        if (not isinstance(self.examples, tuple) or len(self.examples) > 5
+                or any(not isinstance(note, str) or not note or not note.isprintable()
+                       for note in self.examples)
+                or type(self.user_confirmed) is not bool):
+            raise ValueError("mechanic insight review state invalid")
+
 
 @dataclass(frozen=True)
 class GameTasteProfile:
@@ -93,19 +119,40 @@ class GameTasteProfile:
     review_required: bool
     fingerprint: str
 
+    def __post_init__(self) -> None:
+        if (not isinstance(self.owner, str) or not 1 <= len(self.owner) <= 128
+                or self.owner != self.owner.strip() or not self.owner.isprintable()):
+            raise ValueError("taste profile owner invalid")
+        if (not isinstance(self.insights, tuple)
+                or any(not isinstance(item, MechanicInsight) for item in self.insights)
+                or len({item.mechanic for item in self.insights}) != len(self.insights)):
+            raise ValueError("taste profile mechanics are invalid or duplicated")
+        if (not isinstance(self.design_directives, tuple)
+                or len(self.design_directives) > len(Mechanic)
+                or any(not isinstance(item, str) or not item.isprintable()
+                       for item in self.design_directives)):
+            raise ValueError("taste profile directive evidence invalid")
+        if (type(self.review_required) is not bool
+                or not isinstance(self.fingerprint, str)
+                or re.fullmatch(r"[0-9a-f]{64}", self.fingerprint) is None):
+            raise ValueError("taste profile review receipt invalid")
+
 
 class GameMechanicsMemory:
     def __init__(self, db: sqlite3.Connection,
                  *, policy: CapturePolicy = CapturePolicy()):
-        if not 1 <= policy.max_session_seconds <= 14400:
+        if not isinstance(policy, CapturePolicy):
+            raise ValueError("CapturePolicy required")
+        if type(policy.max_session_seconds) is not int or not 1 <= policy.max_session_seconds <= 14400:
             raise ValueError("invalid capture duration budget")
-        if not 1 <= policy.max_observations <= 100000:
+        if type(policy.max_observations) is not int or not 1 <= policy.max_observations <= 100000:
             raise ValueError("invalid observation budget")
-        if not 1 <= policy.max_note_chars <= 5000:
+        if type(policy.max_note_chars) is not int or not 1 <= policy.max_note_chars <= 5000:
             raise ValueError("invalid note budget")
-        if not 1 <= policy.max_sessions_per_owner <= 100000:
+        if type(policy.max_sessions_per_owner) is not int or not 1 <= policy.max_sessions_per_owner <= 100000:
             raise ValueError("invalid session capacity")
-        if not isfinite(policy.min_confidence) or not 0 <= policy.min_confidence <= 1:
+        if (type(policy.min_confidence) not in (int, float) or not 0 <= policy.min_confidence <= 1
+                or not isfinite(policy.min_confidence)):
             raise ValueError("invalid confidence threshold")
         self.db = db
         self.policy = policy
@@ -127,44 +174,66 @@ class GameMechanicsMemory:
 
     @staticmethod
     def _owner(owner: str) -> str:
-        if not isinstance(owner, str) or not 1 <= len(owner) <= 128:
+        if (not isinstance(owner, str) or not 1 <= len(owner) <= 128
+                or owner != owner.strip() or not owner.isprintable()
+                or len(owner.encode("utf-8")) > 256):
             raise ValueError("invalid owner")
         return owner
 
     def record(self, session: GameSession, *, authorized: bool) -> str:
-        if not authorized or not session.capture_consent or not session.analysis_consent:
+        if (not isinstance(session, GameSession) or authorized is not True
+                or session.capture_consent is not True or session.analysis_consent is not True):
             raise PermissionError("game observation storage requires explicit consent")
         owner = self._owner(session.owner)
-        if session.raw_video_retained:
+        if session.raw_video_retained is not False:
             raise ValueError("raw recording retention requires a separate storage policy")
-        if not isinstance(session.game_label, str) or not 1 <= len(session.game_label) <= 200:
+        if (not isinstance(session.game_label, str) or not 1 <= len(session.game_label) <= 200
+                or not session.game_label.isprintable()
+                or len(session.game_label.encode("utf-8")) > 600):
             raise ValueError("invalid game label")
-        if not isinstance(session.duration_ms, int) or not 0 < session.duration_ms <= self.policy.max_session_seconds * 1000:
+        if type(session.duration_ms) is not int or not 0 < session.duration_ms <= self.policy.max_session_seconds * 1000:
             raise ValueError("invalid session duration")
-        if not 1 <= len(session.observations) <= self.policy.max_observations:
-            raise ValueError("invalid observation count")
+        if (not isinstance(session.observations, tuple)
+                or not 1 <= len(session.observations) <= self.policy.max_observations
+                or any(not isinstance(obs, GameObservation) for obs in session.observations)):
+            raise ValueError("invalid observation collection")
         rows = []
+        previous_timestamp = -1
         for obs in session.observations:
-            if not isinstance(obs.timestamp_ms, int) or not 0 <= obs.timestamp_ms <= session.duration_ms:
+            if type(obs.timestamp_ms) is not int or not 0 <= obs.timestamp_ms <= session.duration_ms:
                 raise ValueError("observation outside recording")
+            if obs.timestamp_ms < previous_timestamp:
+                raise ValueError("observation timestamps must be in recording order")
+            previous_timestamp = obs.timestamp_ms
             if not isinstance(obs.mechanic, Mechanic) or not isinstance(obs.preference, PreferenceSignal):
                 raise ValueError("unknown game mechanic or preference")
-            if not isinstance(obs.description, str) or not 1 <= len(obs.description) <= self.policy.max_note_chars:
+            if (not isinstance(obs.description, str)
+                    or not 1 <= len(obs.description) <= self.policy.max_note_chars
+                    or not obs.description.isprintable()
+                    or len(obs.description.encode("utf-8")) > self.policy.max_note_chars * 4):
                 raise ValueError("invalid observation note")
-            if not isfinite(obs.confidence) or not 0 <= obs.confidence <= 1:
+            if (type(obs.confidence) not in (int, float)
+                    or not 0 <= obs.confidence <= 1
+                    or not isfinite(obs.confidence)):
                 raise ValueError("invalid observation confidence")
-            if obs.preference is not PreferenceSignal.UNKNOWN and not obs.user_confirmed:
+            if type(obs.user_confirmed) is not bool:
+                raise ValueError("observation confirmation must be boolean")
+            if obs.preference is not PreferenceSignal.UNKNOWN and obs.user_confirmed is not True:
                 raise PermissionError("taste signals require explicit user confirmation")
             rows.append([
                 obs.timestamp_ms, obs.mechanic.value, obs.description,
                 obs.confidence, obs.preference.value, obs.user_confirmed,
             ])
         payload = json.dumps(rows, separators=(",", ":"), ensure_ascii=True)
+        if len(payload.encode("utf-8")) > MAX_STORED_SESSION_BYTES:
+            raise ValueError("session observation byte budget exceeded")
         expected = sha256(json.dumps(
             [owner, session.game_label, session.duration_ms, rows],
             separators=(",", ":"), ensure_ascii=True,
         ).encode()).hexdigest()
-        if session.session_id != expected:
+        if (not isinstance(session.session_id, str)
+                or re.fullmatch(r"[0-9a-f]{64}", session.session_id) is None
+                or not hmac.compare_digest(session.session_id, expected)):
             raise ValueError("session identifier does not match observations")
         with self.db:
             count = self.db.execute(
@@ -172,9 +241,14 @@ class GameMechanicsMemory:
                 (owner,),
             ).fetchone()[0]
             existing = self.db.execute(
-                "SELECT 1 FROM dragon_game_sessions WHERE owner=? AND session_id=?",
+                "SELECT game_label, duration_ms, observations_json "
+                "FROM dragon_game_sessions WHERE owner=? AND session_id=?",
                 (owner, session.session_id),
             ).fetchone()
+            if existing is not None and existing != (
+                session.game_label, session.duration_ms, payload
+            ):
+                raise ValueError("existing observation evidence drift detected")
             if not existing and count >= self.policy.max_sessions_per_owner:
                 raise ValueError("session capacity exceeded")
             self.db.execute("""
@@ -200,21 +274,66 @@ class GameMechanicsMemory:
     def sessions(self, owner: str, *, authorized: bool, limit: int = 100
                  ) -> tuple[GameSession, ...]:
         owner = self._owner(owner)
-        if not authorized:
+        if authorized is not True:
             raise PermissionError("game history requires authorization")
-        if not 1 <= limit <= 1000:
+        if type(limit) is not int or not 1 <= limit <= 1000:
             raise ValueError("invalid history limit")
         rows = self.db.execute("""
             SELECT session_id, game_label, duration_ms, observations_json
             FROM dragon_game_sessions WHERE owner=?
             ORDER BY session_id LIMIT ?
-        """, (owner, limit)).fetchall()
+        """, (owner, limit))
         sessions = []
+        total_bytes = 0
         for session_id, label, duration, raw in rows:
+            if not isinstance(raw, str):
+                raise ValueError("stored game observations exceed byte budget")
+            encoded_bytes = len(raw.encode("utf-8"))
+            if encoded_bytes > MAX_STORED_SESSION_BYTES:
+                raise ValueError("stored game observations exceed byte budget")
+            total_bytes += encoded_bytes
+            if total_bytes > MAX_HISTORY_BYTES:
+                raise ValueError("game observation history memory budget exceeded")
+            try:
+                recorded = json.loads(raw)
+            except (TypeError, ValueError, RecursionError) as exc:
+                raise ValueError("stored game observation JSON corrupt") from exc
+            if json.dumps(recorded, separators=(",", ":"), ensure_ascii=True) != raw:
+                raise ValueError("stored observation payload is not canonical")
+            if (not isinstance(recorded, list)
+                    or not 1 <= len(recorded) <= self.policy.max_observations
+                    or any(not isinstance(row, list) or len(row) != 6 for row in recorded)):
+                raise ValueError("stored game observations have invalid shape")
+            if (not isinstance(label, str) or not 1 <= len(label) <= 200
+                    or not label.isprintable() or len(label.encode("utf-8")) > 600
+                    or type(duration) is not int
+                    or not 0 < duration <= self.policy.max_session_seconds * 1000):
+                raise ValueError("stored game session metadata invalid")
+            if any(
+                type(t) is not int or not 0 <= t <= duration
+                or not isinstance(m, str) or not isinstance(p, str)
+                or not isinstance(d, str) or not 1 <= len(d) <= self.policy.max_note_chars
+                or not d.isprintable()
+                or len(d.encode("utf-8")) > self.policy.max_note_chars * 4
+                or type(c) not in (int, float) or not 0 <= c <= 1 or not isfinite(c)
+                or type(u) is not bool
+                for t, m, d, c, p, u in recorded
+            ):
+                raise ValueError("stored game observation cell validation failed")
+            if any(later[0] < earlier[0] for earlier, later in zip(recorded, recorded[1:])):
+                raise ValueError("stored game observation time order invalid")
             observations = tuple(
                 GameObservation(t, Mechanic(m), d, c, PreferenceSignal(p), u)
-                for t, m, d, c, p, u in json.loads(raw)
+                for t, m, d, c, p, u in recorded
             )
+            expected = sha256(json.dumps(
+                [owner, label, duration, recorded],
+                separators=(",", ":"), ensure_ascii=True,
+            ).encode()).hexdigest()
+            if (not isinstance(session_id, str)
+                    or re.fullmatch(r"[0-9a-f]{64}", session_id) is None
+                    or not hmac.compare_digest(session_id, expected)):
+                raise ValueError("persisted session identity differs from its evidence")
             sessions.append(GameSession(
                 session_id, owner, label, duration, observations, True, True,
             ))
@@ -224,8 +343,12 @@ class GameMechanicsMemory:
                 limit: int = 100) -> GameTasteProfile:
         sessions = self.sessions(owner, authorized=authorized, limit=limit)
         groups: dict[Mechanic, list[tuple[GameObservation, str]]] = {}
+        observed = 0
         for session in sessions:
             for observation in session.observations:
+                observed += 1
+                if observed > MAX_DISTILL_OBSERVATIONS:
+                    raise ValueError("distillation observation resource budget exceeded")
                 if observation.confidence >= self.policy.min_confidence:
                     groups.setdefault(observation.mechanic, []).append(
                         (observation, session.session_id)
@@ -240,13 +363,28 @@ class GameMechanicsMemory:
                     PreferenceSignal.ENJOYED, PreferenceSignal.DISLIKED,
                 )
             ]
-            total = sum(obs.confidence for obs in confirmed)
-            score = (
-                sum(obs.confidence * (
-                    1 if obs.preference is PreferenceSignal.ENJOYED else -1
-                ) for obs in confirmed) / total if total else 0.0
-            )
-            confidence = sum(obs.confidence for obs, _ in observations) / len(observations)
+            by_session: dict[str, list[GameObservation]] = {}
+            for obs, sid in observations:
+                if obs.user_confirmed and obs.preference in (
+                    PreferenceSignal.ENJOYED, PreferenceSignal.DISLIKED,
+                ):
+                    by_session.setdefault(sid, []).append(obs)
+            independent_scores = []
+            for items in by_session.values():
+                weight = sum(obs.confidence for obs in items)
+                if weight:
+                    independent_scores.append(sum(
+                        obs.confidence * (
+                            1 if obs.preference is PreferenceSignal.ENJOYED else -1
+                        ) for obs in items
+                    ) / weight)
+            score = sum(independent_scores) / len(independent_scores) if independent_scores else 0.0
+            confidence_by_session: dict[str, list[float]] = {}
+            for obs, sid in observations:
+                confidence_by_session.setdefault(sid, []).append(obs.confidence)
+            confidence = sum(
+                sum(values) / len(values) for values in confidence_by_session.values()
+            ) / len(confidence_by_session)
             examples = tuple(sorted({
                 obs.description for obs, _ in observations
             }))[:5]
@@ -254,7 +392,7 @@ class GameMechanicsMemory:
                 mechanic, len(observations),
                 len({sid for _, sid in observations}),
                 round(score, 4), round(confidence, 4), examples,
-                bool(confirmed),
+                bool(confirmed) and all(obs.user_confirmed for obs, _ in observations),
             ))
             if confirmed and score >= 0.25:
                 directives.append(
@@ -266,19 +404,92 @@ class GameMechanicsMemory:
                     f"Offer alternatives to {mechanic.value.replace('_', ' ')} "
                     "mechanics; confirm tradeoffs with the user."
                 )
+        conflicting = any(
+            {obs.preference for obs, _ in values
+             if obs.user_confirmed and obs.preference in
+             (PreferenceSignal.ENJOYED, PreferenceSignal.DISLIKED)}
+            == {PreferenceSignal.ENJOYED, PreferenceSignal.DISLIKED}
+            for values in groups.values()
+        )
         fingerprint = sha256(json.dumps(
-            [owner, [(x.mechanic.value, x.observation_count,
-                      x.preference_score, x.confidence) for x in insights]],
-            separators=(",", ":"), ensure_ascii=True,
+            {
+                "owner": owner,
+                "insights": [
+                    (x.mechanic.value, x.observation_count, x.supporting_sessions,
+                     x.preference_score, x.confidence, x.examples, x.user_confirmed)
+                    for x in insights
+                ],
+                "directives": directives,
+                "supporting_session_digests": sorted({sid for events in groups.values() for _, sid in events}),
+                "review_required": not insights or any(not x.user_confirmed for x in insights) or conflicting,
+            },
+            sort_keys=True, separators=(",", ":"), ensure_ascii=True,
         ).encode()).hexdigest()
         return GameTasteProfile(
             owner, tuple(insights), tuple(directives),
-            any(not x.user_confirmed for x in insights), fingerprint,
+            not insights or any(not x.user_confirmed for x in insights) or conflicting, fingerprint,
         )
+
+    def public_taste_snapshot(self, owner: str, *, authorized: bool,
+                              limit: int = 100) -> dict:
+        """Expose bounded design signals without exporting owner observation text."""
+        profile = self.distill(owner, authorized=authorized, limit=limit)
+        return {
+            "schema": "skeleton.dragon.game_taste_advisory.v1",
+            "owner_digest": sha256(owner.encode("utf-8")).hexdigest(),
+            "profile_fingerprint": profile.fingerprint,
+            "review_required": profile.review_required,
+            "advisory_only": True,
+            "training_authorized": False,
+            "memory_promotion_authorized": False,
+            "signals": [
+                {
+                    "mechanic": insight.mechanic.value,
+                    "observation_count": insight.observation_count,
+                    "supporting_sessions": insight.supporting_sessions,
+                    "preference_score": insight.preference_score,
+                    "confidence": insight.confidence,
+                    "fully_user_confirmed": insight.user_confirmed,
+                }
+                for insight in profile.insights
+            ],
+        }
+
+    def history_receipt(self, owner: str, *, authorized: bool, limit: int = 100) -> dict:
+        """Produce a reproducible provenance receipt, never raw gameplay notes."""
+        sessions = self.sessions(owner, authorized=authorized, limit=limit)
+        payload = {
+            "schema": "skeleton.dragon.game_observation_history_receipt.v1",
+            "owner_digest": sha256(owner.encode("utf-8")).hexdigest(),
+            "source_session_digests": [s.session_id for s in sessions],
+            "session_count": len(sessions),
+            "observation_count": sum(len(s.observations) for s in sessions),
+            "raw_video_included": False,
+            "raw_notes_included": False,
+            "memory_promotion_authorized": False,
+        }
+        payload["digest"] = sha256(json.dumps(
+            payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+        ).encode()).hexdigest()
+        return payload
+
+    def erase_session(self, owner: str, session_id: str, *, authorized: bool) -> bool:
+        """Delete one owner's session; never erase a neighboring user's evidence."""
+        owner = self._owner(owner)
+        if authorized is not True:
+            raise PermissionError("selective observation erasure requires authorization")
+        if not isinstance(session_id, str) or re.fullmatch(r"[0-9a-f]{64}", session_id) is None:
+            raise ValueError("canonical session identifier required")
+        with self.db:
+            result = self.db.execute(
+                "DELETE FROM dragon_game_sessions WHERE owner=? AND session_id=?",
+                (owner, session_id),
+            )
+        return result.rowcount == 1
 
     def erase(self, owner: str, *, authorized: bool) -> int:
         owner = self._owner(owner)
-        if not authorized:
+        if authorized is not True:
             raise PermissionError("game observation erasure requires authorization")
         with self.db:
             return self.db.execute(
