@@ -1796,3 +1796,61 @@ desert resupply accounting, surviving base HP loss and an
 opposing side's legitimate command-destruction victory.
 The 77-control matrix is an authored tactical reference, not
 a claim of verified multi-thousand-unit native RTS performance.
+
+
+## Fighting family upgrade — two-peer deterministic rollback laboratory
+
+The nineteenth original Fighting editor now has **52 typed gameplay and
+rollback controls**. The separately authored
+advanced_fighting_rollback.py supplies an executable original
+**two-player arena frame-input simulation**, beyond the normal
+one-player-versus-NPC demonstration. Both actors use the original
+fighting hitbox, parry, guard, stamina, meter, recovery, movement,
+stage hazards, ringout, knockout and round-victory rules. The signed
+record captures each player action, alternated input priority,
+actual simulation transitions, stage source identity and a
+cryptographically chained sequence of frame-result receipts.
+
+Authentic input streams must have the same frame count (up to
+128), valid registered commands, exact bounded seed and matching
+authored stage. The preexisting rollback_compatible switch now
+explicitly authorizes or rejects actual deterministic rollback
+execution. New rollout settings add a **1–30-frame correction
+window** and a separate **0–32 corrected-frame budget**.
+Predictions are never authoritative state. Any late actual
+opponent input is accepted only within those bounds; reconciliation
+replays both entire original input histories from source. Corrections
+older than the budget, free-winner commands, fabricated player state,
+unregistered actions, altered settings and faked source digests
+fail closed.
+
+The original CLI now supports fighting-peer-replay,
+fighting-peer-verify, fighting-rollback and
+fighting-rollback-verify. The supervised local Studio
+server has corresponding /api/fighting-peer-replay and
+/api/fighting-rollback endpoints. The graphical editor
+adds an original two-peer input lab to submit blue player,
+predicted opponent and actual opponent commands, reporting
+corrected frames, final authoritative world digest, HP,
+match outcome and independent verification rather than
+presenting prediction as a final match.
+
+The cross-platform regression includes complete original
+two-peer knockouts, valid late correction convergence,
+source custody, alternate frame priority, parry timing,
+forged HP or win receipts, old-frame rejection,
+excessive correction rejection, disabled rollback
+policy, CLI parity, Studio source proof and valid
+no-native/no-network flags. These are programmatic
+reference tests; they need successful exact-head
+CI results before being regarded as independently
+validated.
+
+This is **not yet live networked multiplayer**:
+network transport, player authentication, remote
+hardware input-latency measurement, NAT traversal,
+anti-cheat deployment, frame-level desync tracing
+and platform performance certification remain
+separate future product milestones. No commercial
+multiplayer release claim follows from deterministic
+two-peer replay alone.
