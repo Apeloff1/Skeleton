@@ -1,0 +1,458 @@
+"""Original witnessed-event quest director and persistent causal world.
+
+Reference world has real tile positions, strict authored event sources, witness
+line of sight, memory custody, interpersonal rumors, testimony, branching
+quests, finite sites/resources and multiple actually enacted outcomes.
+No NPC is omniscient. Never promote rumour to a direct eyewitness.
+"""
+from __future__ import annotations
+
+from collections import deque
+
+SIDE=7
+CELLS=49
+EVENTS=("help","harm","discover","repair")
+KINDS=("settlement","bridge","grove","archive")
+ROLES=("caretaker","scout","merchant","scribe")
+ACTIONS=(
+    ("north","south","east","west","inspect","wait","wait:4","rest")+
+    tuple(f"{action}:{i}" for action in ("help","harm","collect","repair")
+          for i in range(4))+
+    tuple(f"speak:{i}" for i in range(4))+
+    tuple(f"choose:{i}:{branch}" for i in range(12)
+          for branch in ("support","exploit"))+
+    tuple(f"resolve:{i}" for i in range(12))
+)
+
+
+class QuestDirectorError(ValueError):
+    """A world action, witnessed event or authored causal source is invalid."""
+
+
+def _integer(value,low,high,key):
+    if type(value) is not int or not low<=value<=high:
+        raise QuestDirectorError("invalid bounded quest "+key)
+    return value
+
+
+def _distance(a,b):
+    return abs(a%SIDE-b%SIDE)+abs(a//SIDE-b//SIDE)
+
+
+def _neighbors(p):
+    x,y=p%SIDE,p//SIDE
+    return tuple(ny*SIDE+nx for nx,ny in ((x,y-1),(x-1,y),(x+1,y),(x,y+1))
+                 if 0<=nx<SIDE and 0<=ny<SIDE)
+
+
+def _line_open(a,b,obstacles):
+    """Bresenham blocks actual sight with signed terrain obstruction."""
+    x0,y0=a%SIDE,a//SIDE
+    x1,y1=b%SIDE,b//SIDE
+    dx=abs(x1-x0);dy=abs(y1-y0)
+    sx=1 if x0<x1 else -1
+    sy=1 if y0<y1 else -1
+    error=dx-dy
+    while (x0,y0)!=(x1,y1):
+        twice=2*error
+        if twice>-dy:
+            error-=dy;x0+=sx
+        if twice<dx:
+            error+=dx;y0+=sy
+        if (x0,y0)!=(x1,y1) and (y0*SIDE+x0) in obstacles:
+            return False
+    return True
+
+
+def default_layout(config,seed):
+    _integer(seed,0,2**31-1,"seed")
+    npc_cells=(9,17,25,33)
+    return {
+        "width":SIDE,"height":SIDE,"player_spawn":0,
+        "obstacles":[11,18,37][:config["obstacle_count"]],
+        "sites":[
+           {"id":i,"cell":p,"kind":KINDS[i],
+            "integrity":config["site_integrity"],"stock":config["site_stock"]}
+           for i,p in enumerate((8,16,24,32))
+        ],
+        "npcs":[
+           {"id":i,"cell":npc_cells[i],"role":ROLES[i],
+            "trust":config["starting_trust"],"perception":config["npc_perception"]}
+           for i in range(config["npc_count"])
+        ],
+        "climate":("temperate","rainforest","highland","steppe")[seed%4],
+        "day_phase":seed%config["day_ticks"],
+    }
+
+
+def normalize_layout(config,layout):
+    if type(layout) is not dict or set(layout)!={
+        "width","height","player_spawn","obstacles","sites","npcs",
+        "climate","day_phase"}:
+        raise QuestDirectorError("authored living-quest map requires exact original schema")
+    _integer(layout["width"],SIDE,SIDE,"map width")
+    _integer(layout["height"],SIDE,SIDE,"map height")
+    spawn=_integer(layout["player_spawn"],0,CELLS-1,"player spawn")
+    blockers=layout["obstacles"]
+    if (type(blockers) is not list or len(blockers)>config["obstacle_count"] or
+        any(type(p) is not int or not 0<=p<CELLS for p in blockers) or
+        len(set(blockers))!=len(blockers)):
+        raise QuestDirectorError("original world obstacle placements exceed signed budget")
+    seen={spawn}
+    for site_group,count,keys in (
+       ("sites",4,{"id","cell","kind","integrity","stock"}),
+       ("npcs",config["npc_count"],{"id","cell","role","trust","perception"})):
+        group=layout[site_group]
+        if type(group) is not list or len(group)!=count:
+            raise QuestDirectorError("authored world must retain exact source entities")
+        for index,entity in enumerate(group):
+            if type(entity) is not dict or set(entity)!=keys:
+                raise QuestDirectorError("entity source requires exact typed canonical shape")
+            if _integer(entity["id"],0,3,"entity id")!=index:
+                raise QuestDirectorError("original living entity identities must be canonical")
+            cell=_integer(entity["cell"],0,CELLS-1,"entity position")
+            if cell in seen or cell in blockers:
+                raise QuestDirectorError("real world entities cannot overlap or occupy walls")
+            seen.add(cell)
+            if site_group=="sites":
+                if entity["kind"] not in KINDS:
+                    raise QuestDirectorError("unregistered original quest site type")
+                _integer(entity["integrity"],1,config["site_integrity"],"site strength")
+                _integer(entity["stock"],0,config["site_stock"],"finite site stock")
+            else:
+                if entity["role"] not in ROLES:
+                    raise QuestDirectorError("unregistered NPC profession")
+                _integer(entity["trust"],0,config["starting_trust"],"original trust budget")
+                _integer(entity["perception"],1,config["npc_perception"],"NPC sight ability")
+    climate=layout["climate"]
+    if climate not in ("temperate","rainforest","highland","steppe"):
+        raise QuestDirectorError("unregistered original cultural climate")
+    _integer(layout["day_phase"],0,config["day_ticks"]-1,"day phase")
+    reachable={spawn};queue=deque([spawn]);walls=set(blockers)
+    while queue:
+        for next_cell in _neighbors(queue.popleft()):
+            if next_cell not in walls and next_cell not in reachable:
+                reachable.add(next_cell);queue.append(next_cell)
+    if len(reachable)!=CELLS-len(walls) or not seen.issubset(reachable):
+        raise QuestDirectorError("signed world must let player reach every quest site and NPC")
+    return {
+        **layout,"obstacles":list(blockers),
+        "sites":[dict(s) for s in layout["sites"]],
+        "npcs":[dict(n) for n in layout["npcs"]],
+    }
+
+
+def apply_scene(state,config,layout):
+    source=normalize_layout(config,layout)
+    state["world"]=source
+    state["player"]=source["player_spawn"]
+    state["sites"]=[dict(site) for site in source["sites"]]
+    state["npcs"]=[
+        {**npc,"memories":[],"heard":[],"suspicion":config["starting_suspicion"],
+         "witnessed":0,"rumors_spread":0}
+        for npc in source["npcs"]
+    ]
+    return state
+
+
+def start(config,seed):
+    _integer(seed,0,2**31-1,"seed")
+    state={
+        "seed":seed,"world":{},"player":0,"sites":[],"npcs":[],
+        "tick":0,"turn":0,"day":0,"gold":config["starting_gold"],
+        "supplies":config["starting_supplies"],"stamina":config["stamina"],
+        "reputation":config["starting_reputation"],"discovered":[],
+        "events_log":[],"quests":[],"quest_archive":[],
+        "next_event":0,"next_quest":0,
+        "quests_completed":0,"quests_exploited":0,
+        "rumor_edges":[],"milestones":[],
+        "finished":False,"failed":False,"victory":False,"reason":"",
+        "events":[],
+    }
+    return apply_scene(state,config,default_layout(config,seed))
+
+
+def _site(state,index):
+    return state["sites"][index]
+
+
+def _adjacent(state,cell):
+    return _distance(state["player"],cell)<=1
+
+
+def _spend(state,key,amount):
+    if state[key]<amount:
+        raise QuestDirectorError("insufficient physically available "+key)
+    state[key]-=amount
+
+
+def _day_vision(state,config,npc):
+    phase=(state["tick"]+state["world"]["day_phase"])%config["day_ticks"]
+    night=phase>=config["day_ticks"]*config["night_fraction_percent"]//100
+    return max(0,min(config["witness_radius"],npc["perception"])-
+               (config["night_sight_penalty"] if night else 0))
+
+
+def _remember(npc,event,config,*,direct):
+    target="memories" if direct else "heard"
+    if any(m["event_id"]==event["id"] for m in npc[target]):
+        return False
+    while len(npc[target])>=config["memory_records"]:
+        npc[target].pop(0)
+    npc[target].append({
+        "event_id":event["id"],"kind":event["kind"],
+        "site_id":event["site_id"],"observed_tick":event["tick"],
+        "source":"eyewitness" if direct else "rumor",
+    })
+    return True
+
+
+def _emit(state,config,kind,site,events):
+    if len(state["events_log"])>=config["event_budget"]:
+        raise QuestDirectorError("authored finite event memory ledger is full")
+    witnesses=[]
+    for npc in state["npcs"]:
+        if (_distance(npc["cell"],site["cell"])<=_day_vision(state,config,npc)
+            and _line_open(npc["cell"],site["cell"],set(state["world"]["obstacles"]))):
+            witnesses.append(npc["id"])
+    entry={
+        "id":state["next_event"],"tick":state["tick"],"kind":kind,
+        "site_id":site["id"],"cell":site["cell"],
+        "actor":"player","direct_witnesses":witnesses,
+        "rumored_to":[],"original_source":"physical_player_world_action",
+    }
+    state["events_log"].append(entry);state["next_event"]+=1
+    for n in state["npcs"]:
+        if n["id"] in witnesses:
+            _remember(n,entry,config,direct=True)
+            n["witnessed"]+=1
+            delta=(config["empathy_gain"] if kind in ("help","repair") else
+                   -config["harm_trust_loss"] if kind=="harm" else 0)
+            n["trust"]=max(0,min(config["trust_cap"],n["trust"]+delta))
+            if kind=="harm":
+                n["suspicion"]=min(config["suspicion_cap"],
+                                     n["suspicion"]+config["harm_suspicion"])
+    state["reputation"]=max(-config["reputation_cap"],min(config["reputation_cap"],
+         state["reputation"]+(config["reputation_gain"] if kind in ("help","repair")
+         else -config["reputation_loss"] if kind=="harm" else 0)))
+    events.append("original_physical_"+kind+"_event_authored_at_real_site")
+    if witnesses:
+        events.append("real_local_npcs_directly_witnessed_event")
+    else:
+        events.append("original_event_had_no_direct_eyewitness")
+    # Existing quests can only advance from subsequent real physical acts.
+    for quest in state["quests"]:
+        if quest["status"]!="active" or quest["site_id"]!=site["id"]:
+            continue
+        wanted=("harm" if quest["choice"]=="exploit" else
+                "repair" if quest["trigger"]=="harm" else "help")
+        if kind==wanted:
+            quest["material_actions"]+=1
+            events.append("existing_original_quest_advanced_by_real_followup")
+    if len(state["quests"])<config["active_quests"] and kind in EVENTS[:config["event_rules"]] and (
+        len(witnesses)>=config["witnesses_required"]):
+        # Only a source observed by enough real witnesses becomes a quest.
+        quest={
+            "id":state["next_quest"],"origin_event":entry["id"],
+            "site_id":site["id"],"trigger":kind,"status":"active",
+            "witnesses":witnesses[:],"testimonies":[],
+            "heard_from":[],"choice":None,"material_actions":0,
+            "created_tick":state["tick"],"resolution_tick":None,
+            "ending":None,
+        }
+        state["next_quest"]+=1;state["quests"].append(quest)
+        events.append("actual_eyewitnesses_initiated_causal_quest")
+    return entry
+
+
+def _rumors(state,config,events):
+    if not config["rumor_enabled"] or state["tick"]%config["rumor_interval"]:
+        return
+    delivered=0
+    # Original source-aware rumors travel along real physical NPC edges,
+    # never creating an eyewitness or rewriting the original direct list.
+    for sender in state["npcs"]:
+        for receiver in state["npcs"]:
+            if sender is receiver or _distance(sender["cell"],receiver["cell"])>config["rumor_radius"]:
+                continue
+            if receiver["trust"]<config["rumor_trust_floor"]:
+                continue
+            for evidence in sender["memories"]+sender["heard"]:
+                if delivered>=config["rumor_per_tick"]:return
+                source=next((ev for ev in state["events_log"]
+                             if ev["id"]==evidence["event_id"]),None)
+                if source is None:continue
+                if _remember(receiver,source,config,direct=False):
+                    source["rumored_to"].append(receiver["id"])
+                    edge={"tick":state["tick"],"sender":sender["id"],
+                          "recipient":receiver["id"],"event_id":source["id"],
+                          "authority":"rumor_only_not_eye_witness"}
+                    state["rumor_edges"].append(edge)
+                    sender["rumors_spread"]+=1
+                    delivered+=1
+                    events.append("real_original_npc_to_npc_rumor_transfer")
+
+
+def _tick(state,config,events,steps=1):
+    for _ in range(steps):
+        state["tick"]+=1
+        if state["tick"]%config["day_ticks"]==0:
+            state["day"]+=1
+            events.append("actual_original_day_cycle_advanced")
+        _rumors(state,config,events)
+        if config["memory_decay_ticks"]>0:
+            for npc in state["npcs"]:
+                if state["tick"]%config["memory_decay_ticks"]==0:
+                    for key in ("memories","heard"):
+                        if npc[key]:
+                            npc[key].pop(0)
+                            events.append("old_original_npc_memory_naturally_decayed")
+        for quest in state["quests"]:
+            if quest["status"]=="active" and state["tick"]-quest["created_tick"]>=config["quest_ttl"]:
+                quest["status"]="expired";quest["ending"]="unresolved"
+                quest["resolution_tick"]=state["tick"]
+                state["quest_archive"].append(quest["id"])
+                events.append("witnessed_quest_expired_without_player_resolution")
+    if (state["reputation"]<=-config["failure_reputation"] and
+        config["ending_policy"]=="campaign"):
+        state["failed"]=True;state["reason"]="actual_public_trust_collapse"
+
+
+def step(state,config,action):
+    if action not in ACTIONS:
+        raise QuestDirectorError("unregistered original NPC quest action")
+    if state["finished"] or state["failed"]:
+        raise QuestDirectorError("terminal authored campaign cannot accept new moves")
+    events=[]
+    if action in ("north","south","east","west"):
+        next_cell={
+            "north":state["player"]-SIDE,
+            "south":state["player"]+SIDE,
+            "east":state["player"]+1,
+            "west":state["player"]-1,
+        }[action]
+        old=state["player"]
+        if (not 0<=next_cell<CELLS or _distance(old,next_cell)!=1
+            or next_cell in state["world"]["obstacles"]):
+            raise QuestDirectorError("physical player step is outside walkable original map")
+        _spend(state,"stamina",config["movement_stamina"])
+        state["player"]=next_cell
+        state["discovered"]=sorted(set(state["discovered"])|{next_cell})
+        events.append("original_player_walked_one_real_geographical_tile")
+    elif action in ("inspect","wait","wait:4"):
+        events.append("original_world_causes_observed_without_free_progress")
+    elif action=="rest":
+        state["stamina"]=min(config["stamina"],
+                            state["stamina"]+config["rest_stamina"])
+        events.append("finite_original_stamina_recovered_over_real_time")
+    elif action.startswith(("help:","harm:","collect:","repair:")):
+        kind,raw=action.split(":");site=_site(state,int(raw))
+        if not _adjacent(state,site["cell"]):
+            raise QuestDirectorError("quest event needs player physically near real world site")
+        if kind=="help":
+            _spend(state,"supplies",config["help_supplies"])
+            _spend(state,"stamina",config["action_stamina"])
+            site["integrity"]=min(config["site_integrity"],site["integrity"]+config["help_power"])
+            _emit(state,config,"help",site,events)
+        elif kind=="harm":
+            _spend(state,"stamina",config["action_stamina"])
+            if site["integrity"]<=0:
+                raise QuestDirectorError("cannot destroy already destroyed original site")
+            site["integrity"]=max(0,site["integrity"]-config["harm_power"])
+            _emit(state,config,"harm",site,events)
+        elif kind=="collect":
+            _spend(state,"stamina",config["action_stamina"])
+            if site["stock"]<config["gather_units"]:
+                raise QuestDirectorError("original source deposit genuinely exhausted")
+            site["stock"]-=config["gather_units"]
+            state["supplies"]+=config["gather_units"]
+            _emit(state,config,"discover",site,events)
+        else:
+            _spend(state,"supplies",config["repair_supplies"])
+            _spend(state,"stamina",config["action_stamina"])
+            if site["integrity"]>=config["site_integrity"]:
+                raise QuestDirectorError("undamaged original landmark cannot be repaired")
+            site["integrity"]=min(config["site_integrity"],
+                                  site["integrity"]+config["repair_power"])
+            _emit(state,config,"repair",site,events)
+    elif action.startswith("speak:"):
+        npc=state["npcs"][int(action.split(":")[1])]
+        if not _adjacent(state,npc["cell"]):
+            raise QuestDirectorError("cannot remotely interview an NPC that is not present")
+        if npc["trust"]<config["testimony_trust_floor"]:
+            raise QuestDirectorError("actual NPC trust too low to testify")
+        found=False
+        for quest in state["quests"]:
+            if quest["status"]!="active" or npc["id"] in quest["testimonies"]:
+                continue
+            if any(m["event_id"]==quest["origin_event"] for m in npc["memories"]):
+                quest["testimonies"].append(npc["id"])
+                found=True
+                events.append("original_direct_eyewitness_delivered_real_testimony")
+            elif any(m["event_id"]==quest["origin_event"] for m in npc["heard"]):
+                if npc["id"] not in quest["heard_from"]:
+                    quest["heard_from"].append(npc["id"])
+                    events.append("NPC_reported_rumor_without_eyewitness_authority")
+                    found=True
+        if not found:
+            events.append("NPC_had_no_qualifying_original_eyewitness_information")
+    elif action.startswith("choose:"):
+        _,qid,branch=action.split(":")
+        quest=next((q for q in state["quests"] if q["id"]==int(qid)),None)
+        if quest is None or quest["status"]!="active":
+            raise QuestDirectorError("choice requires real unresolved originating quest")
+        if len(quest["testimonies"])<config["evidence_min"]:
+            raise QuestDirectorError("rumor does not replace authentic local testimony")
+        if quest["choice"] is not None:
+            raise QuestDirectorError("cannot rewrite original committed outcome branch")
+        quest["choice"]=branch
+        events.append("original_quest_branch_committed_after_real_testimony")
+    elif action.startswith("resolve:"):
+        qid=int(action.split(":")[1])
+        quest=next((q for q in state["quests"] if q["id"]==qid),None)
+        if quest is None or quest["status"]!="active" or quest["choice"] is None:
+            raise QuestDirectorError("only chosen active first-hand quest can resolve")
+        site=_site(state,quest["site_id"])
+        if not _adjacent(state,site["cell"]):
+            raise QuestDirectorError("quest conclusion needs physical source-site presence")
+        if (len(quest["testimonies"])<config["evidence_min"] or
+            quest["material_actions"]<config["consequence_depth"]):
+            raise QuestDirectorError("outcome requires corroboration and genuine followup acts")
+        quest["status"]="resolved"
+        quest["ending"]=("restored" if quest["choice"]=="support" else "exploited")
+        quest["resolution_tick"]=state["tick"]
+        state["quest_archive"].append(quest["id"])
+        if quest["ending"]=="restored":
+            state["quests_completed"]+=1
+            state["gold"]+=config["reward_gold"]
+            state["reputation"]=min(config["reputation_cap"],
+                  state["reputation"]+config["reputation_gain"])
+            events.append("real_original_evidence_based_support_resolution")
+        else:
+            state["quests_exploited"]+=1
+            state["gold"]+=config["exploit_gold"]
+            state["reputation"]=max(-config["reputation_cap"],
+                  state["reputation"]-config["reputation_loss"])
+            events.append("real_original_exploit_resolution_with_world_consequence")
+        state["milestones"].append({
+            "quest_id":qid,"site_id":site["id"],"ending":quest["ending"],
+            "day":state["day"],"evidence":list(quest["testimonies"])
+        })
+        if state["quests_completed"]>=config["quest_goal"]:
+            state["victory"]=True
+            if config["ending_policy"]=="campaign" and not config["nonterminal_world"]:
+                state["finished"]=True
+                state["reason"]="actual_corrobated_witness_campaign_completed"
+            else:
+                state["reason"]="original_world_continues_after_witness_campaign"
+            events.append("real_original_campaign_completion_condition_satisfied")
+    else:
+        raise QuestDirectorError("quest command lacks original world effect")
+    _tick(state,config,events,4 if action=="wait:4" else 1)
+    state["turn"]+=1
+    state["events"]=events
+    return events
+
+
+__all__=["SIDE","CELLS","KINDS","ROLES","EVENTS","ACTIONS","QuestDirectorError",
+         "default_layout","normalize_layout","start","apply_scene","step"]
