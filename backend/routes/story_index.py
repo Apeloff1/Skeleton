@@ -20,8 +20,8 @@ from pymongo import ASCENDING
 from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from core.story_continuity import (
-    EVENT_KINDS, MAX_EVENTS_PER_AUDIT, audit_events, event_digest,
-    recall_context,
+    EVENT_KINDS, MAX_EVENTS_PER_AUDIT, MAX_STREAM_EVENTS,
+    StoryAuditAccumulator, event_digest, recall_context,
 )
 from routes.gameforge_auth import require_role
 from routes.playable import _db
@@ -203,11 +203,21 @@ async def list_story_events(
     }
 
 
-async def _branch_events(scope: dict, branch_id: str) -> tuple[list[dict], bool]:
+async def _recent_character_events(
+    scope: dict, branch_id: str, character_id: str,
+) -> tuple[list[dict], bool]:
+    # Read the most recent *character-specific* events, not the first 2,000
+    # events in the entire world. Earlier scenes remain discoverable with
+    # pagination; a truncated recall is explicitly labelled incomplete.
     docs = await (
-        _db.game_story_events.find({**scope, "branch_id": branch_id})
-        .sort([("act", ASCENDING), ("scene", ASCENDING), ("beat", ASCENDING), ("event_id", ASCENDING)])
-        .limit(MAX_EVENTS_PER_AUDIT + 1).to_list(length=MAX_EVENTS_PER_AUDIT + 1)
+        _db.game_story_events.find({
+            **scope, "branch_id": branch_id, "character_ids": character_id,
+        })
+        .sort([
+            ("act", -1), ("scene", -1), ("beat", -1), ("event_id", -1),
+        ])
+        .limit(MAX_EVENTS_PER_AUDIT + 1)
+        .to_list(length=MAX_EVENTS_PER_AUDIT + 1)
     )
     complete = len(docs) <= MAX_EVENTS_PER_AUDIT
     return docs[:MAX_EVENTS_PER_AUDIT], complete
@@ -221,8 +231,18 @@ async def audit_story_index(
 ):
     scope = _scope(pid, user)
     try:
-        events, complete = await _branch_events(scope, branch_id)
-        report = audit_events(events, complete=complete)
+        accumulator = StoryAuditAccumulator(bookmark_limit=100)
+        cursor = _db.game_story_events.find({**scope, "branch_id": branch_id}).sort([
+            ("act", ASCENDING), ("scene", ASCENDING),
+            ("beat", ASCENDING), ("event_id", ASCENDING),
+        ])
+        complete = True
+        async for entry in cursor:
+            if accumulator.event_count >= MAX_STREAM_EVENTS:
+                complete = False
+                break
+            accumulator.ingest(entry)
+        report = accumulator.finish(complete=complete)
     except (PyMongoError, OSError):
         logger.exception("story audit read unavailable")
         raise HTTPException(status_code=503, detail="Story index storage unavailable")
@@ -240,7 +260,7 @@ async def recall_story_character(
         raise HTTPException(status_code=422, detail="Invalid character ID")
     scope = _scope(pid, user)
     try:
-        events, complete = await _branch_events(scope, branch_id)
+        events, complete = await _recent_character_events(scope, branch_id, character_id)
         recall = recall_context(events, character_id, branch_id=branch_id,
                                 limit_chars=max_chars, complete=complete)
     except (PyMongoError, OSError):
