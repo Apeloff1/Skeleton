@@ -85,7 +85,9 @@ class OriginalPeerRollbackTests(unittest.TestCase):
         red=["approach","approach","inspect","parry"]
         match=run_peer_fight(cfg,blue,red)
         self.assertEqual(match["state"]["opponent"]["parried"],1)
-        self.assertGreater(match["state"]["player"]["stun"],0)
+        self.assertEqual(match["state"]["player"]["hits"],0)
+        self.assertEqual(match["state"]["player"]["hp"],cfg["player_health"])
+        self.assertFalse(match["state"]["opponent"]["parry"])
         self.assertTrue(verify_peer_fight(match,cfg))
 
     def test_real_signed_arena_ownership_and_exact_settings_custody(self):
