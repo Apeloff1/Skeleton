@@ -28,8 +28,8 @@ class PlannerProofTests(unittest.TestCase):
 
     def test_promotion_requires_genuine_winning_physical_game_replay(self):
         scene=self.original_clear_route()
-        plan=plan_parkour_route(scene,max_states=15000,max_depth=64,
-                                beam_width=96)
+        plan=plan_parkour_route(scene,max_states=30000,max_depth=64,
+                                beam_width=64)
         self.assertEqual(plan["status"],"verified_solution")
         self.assertTrue(plan["independent_original_replay_verified"])
         self.assertFalse(plan["native_hardware_verified"])
@@ -54,7 +54,7 @@ class PlannerProofTests(unittest.TestCase):
         record=plan_parkour_route(scene,max_states=16,max_depth=2,beam_width=4)
         for edit in (
             lambda x:x.update(status="verified_solution"),
-            lambda x:x.update(max_states=15000),
+            lambda x:x.update(max_states=17),
             lambda x:x.update(best_partial_health=1000000),
             lambda x:x.update(source_digest="f"*64),
             lambda x:x.update(digest="bad"),
