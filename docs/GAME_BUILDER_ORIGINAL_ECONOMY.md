@@ -74,9 +74,27 @@ testing and release/legal review are not claimed.
 - Adversarial regression and cross-OS gates wired (required source replay
   validation; hosted result pending at publication).
 
+## Additional implementation — verified AI planner, CLI and Studio
+
+The same finite market mechanics now feed an original trade director through
+advanced_economy_planner.py. The director attempts genuine manufacture, cargo
+purchase, adjacent traversal, two district audits and real import sales. No
+numeric reward is injected. Inadequate source goods, capital or command budget
+return a clearly inconclusive partial plan and cannot be promoted as a win.
+
+CLI adds plan-economy and verify-economy-plan. The token-protected local Studio
+adds /api/economy-plan and /api/economy-plan-verify. A human-facing Economy panel
+shows the original market state, live inventory/price map, player trade choices,
+AI evidence and **explicit human adoption only after independent verification**.
+The planner's action receipts are checked again before the local game session
+replays them. Source project files are not silently modified.
+
+The exact-head Linux/Windows workflow includes independent planner tests as
+well as the runtime, JS syntax and resource-conservation suites.
+
 ## Next milestones
 
 1. Exact-head hosted CI and repair of any concrete integration failures.
-2. Source-bound economy AI planner using real actions and independent replay.
-3. Genuine Godot scene/playback integration and parity, not sidecar-only claims.
+2. Genuine Godot scene/playback integration and parity, not sidecar-only claims.
+3. Independent gameplay and economic UX evaluation under bounded device budgets.
 4. Remaining original system families with real mechanics and diverse play.
