@@ -17,7 +17,7 @@ def test_low_quality_host_does_not_fake_corroboration():
  assert e.assurance(now=1)["distinct_hosts"]==1
 def test_configurable_contradiction_penalty_changes_assurance():
  a=EvidenceSet(ResearchQuery("battery safe",contradiction_weight=0))
- b=EvidenceSet(ResearchQuery("battery safe",contradiction_weight=.8))
+ b=EvidenceSet(ResearchQuery("battery safe",contradiction_weight=.7))
  for e in (a,b):
   e.add(doc("https://a.example/x","battery safe"))
   e.add(doc("https://b.example/x","battery is not safe"))
