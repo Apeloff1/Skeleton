@@ -40,6 +40,8 @@ from .advanced_godot_export import (
 from .advanced_platformer_godot import render_platformer_godot_package
 from .advanced_npc_evidence_navigation import (navigate_verified_investigation,
     verify_investigation_navigation)
+from .advanced_interleaved_counterfactual import (run_interleaved_counterfactuals,
+    verify_interleaved_counterfactuals)
 from .advanced_interleaved_save import (export_interleaved_save,
     import_interleaved_save,continue_interleaved_save)
 from .advanced_interleaved_world import (run_interleaved_world,
@@ -449,6 +451,23 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "original_game_changed":False,
                 "automatic_quest_reward_granted":False,
                 "native_hardware_verified":False,
+            })
+        if path=="/api/advanced-interleaved-counterfactuals":
+            report=run_interleaved_counterfactuals(
+                values["physical_episodes"],values["genre_sessions"],
+                values["world_scene"],values["scenarios"],
+                values.get("world_settings"),
+                objective=values.get("objective","site_integrity"))
+            if not verify_interleaved_counterfactuals(
+                    report,values["physical_episodes"],values["genre_sessions"],
+                    values["world_scene"],values["scenarios"],
+                    values.get("world_settings")):
+                raise ValueError("cross-engine counterfactual original-world replay mismatch")
+            return self._json(200,{
+                "report":report,"original_files_changed":False,
+                "automatic_ai_promotion":False,
+                "native_full_world_certified":False,
+                "universal_game_quality_approved":False,
             })
         if path=="/api/advanced-interleaved-save-export":
             saved=export_interleaved_save(
