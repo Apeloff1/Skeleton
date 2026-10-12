@@ -1158,6 +1158,94 @@ CATALOG = json.loads(r'''[
         "minimum": null,
         "maximum": null,
         "options": []
+      },
+      {
+        "key": "creative_hazards",
+        "kind": "bool",
+        "default": false,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "initial_fire",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 8,
+        "options": []
+      },
+      {
+        "key": "extinguish_water",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "fire_spread_period",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "well_output",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "wildlife_motion",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "wildlife_move_period",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "wildlife_birth_period",
+        "kind": "int",
+        "default": 7,
+        "minimum": 1,
+        "maximum": 40,
+        "options": []
+      },
+      {
+        "key": "wildlife_cap",
+        "kind": "int",
+        "default": 12,
+        "minimum": 0,
+        "maximum": 64,
+        "options": []
+      },
+      {
+        "key": "carry_capacity",
+        "kind": "int",
+        "default": 110,
+        "minimum": 40,
+        "maximum": 1000,
+        "options": []
+      },
+      {
+        "key": "storage_bonus",
+        "kind": "int",
+        "default": 150,
+        "minimum": 10,
+        "maximum": 1000,
+        "options": []
       }
     ],
     "preview": null
