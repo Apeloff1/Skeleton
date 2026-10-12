@@ -1,0 +1,51 @@
+name: Dragon Mother Glean Verification
+on:
+  push:
+    branches:
+      - feat/dragon-wisdom-review-20261010
+    paths:
+      - "skeleton/ai/webcrawler/dragon_mother_*.py"
+      - "tests/test_ai_webcrawler_dragon_mother_*.py"
+      - ".github/workflows/dragon-mother-glean-validation.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "skeleton/ai/webcrawler/dragon_mother_*.py"
+      - "tests/test_ai_webcrawler_dragon_mother_*.py"
+      - ".github/workflows/dragon-mother-glean-validation.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: dragon-mother-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  glean:
+    name: Mother glean provenance, semantic lenses and shadow handoff
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify immutable exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install bounded Python test runner
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+      - name: Compile mother and child orchestration
+        run: |
+          python -m compileall -q skeleton/ai/webcrawler/dragon_mother_glean_matrix.py skeleton/ai/webcrawler/dragon_mother_glean_ledger.py skeleton/ai/webcrawler/dragon_mother_shadow_handoff.py
+      - name: Verify cross-source subtext and signed lineage
+        run: |
+          python -m pytest -q --noconftest tests/test_ai_webcrawler_dragon_mother_glean_matrix.py tests/test_ai_webcrawler_dragon_mother_shadow_handoff.py
