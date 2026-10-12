@@ -64,7 +64,7 @@ def default_layout(config,seed):
         # A nonlinear shortcut provides high-skill routing and replay variety
         # without bypassing the only critical gate chain by default.
         passages.append({"a":0,"b":3,"gate":POWERS[min(2,power_count-1)]
-                         if power_count else None,
+                         if power_count and gated_limit<config["gates"] else None,
                          "breakable":True,"hazard":2})
     return {"rooms":rooms,"passages":passages,"entry":0,
             "guardian":count-1,"guardian_health":config["boss_health"],
