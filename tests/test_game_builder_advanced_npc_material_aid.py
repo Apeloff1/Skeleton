@@ -88,6 +88,18 @@ class OriginalMaterialRecoveryTests(unittest.TestCase):
             quest_step(world,cfg,"help:0")
         self.assertEqual(world,original)
 
+    def test_rejected_relief_without_stamina_is_transactional(self):
+        cfg=make_editor_document("quest_director",self.config(
+            stamina=1,help_supplies=1,action_stamina=1))["settings"]
+        world=start_quest(cfg,seed=0)
+        quest_step(world,cfg,"east")
+        self.assertEqual(world["stamina"],0)
+        untouched=deepcopy(world)
+        with self.assertRaises(QuestDirectorError):
+            quest_step(world,cfg,"help:0")
+        self.assertEqual(world,untouched)
+        self.assertEqual(world["relief_deliveries"],[])
+
     def test_real_aid_navigation_executes_actual_original_world_rules(self):
         proof,episodes,world,rules=self.campaign()
         planned=navigate_verified_investigation(
