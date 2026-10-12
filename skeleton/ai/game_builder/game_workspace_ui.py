@@ -1210,6 +1210,45 @@ let selectedSandboxCell=0;
 let selectedCityParcel=0;
 function renderAdvancedActions(actions){
  const target=$("advanced-actions");target.replaceChildren();
+ if(advancedSession?.editor==="sports"){
+  const state=advancedSession.state;
+  const byMode={
+   team:["advance","sprint","pass","shoot","block","intercept","dribble","cross"],
+   racket:["serve","drive","slice","lob","smash","net"],
+   arena:["carry","dash","sidestep","tackle","throw","guard","score"],
+   turn_based:["move","dash","switch_lane","tackle","pass","shoot","end_turn"]
+  };
+  const common=["inspect","rest","tactic:balanced","tactic:press","tactic:hold"];
+  if(state.mode!=="racket")common.push("substitute");
+  const legal=new Set([...common,...(byMode[state.mode]||[])]);
+  const shown=actions.filter(a=>legal.has(a));
+  const type=document.createElement("label");
+  type.textContent="Original "+state.mode.replaceAll("_"," ")+
+    " sport · rule-specific physical command";
+  const command=document.createElement("select");
+  command.id="sports-original-command";
+  command.setAttribute("aria-label","Original sports gameplay command");
+  for(const act of shown){
+   const option=document.createElement("option");
+   option.value=act;option.textContent=act.replaceAll("_"," ");
+   command.append(option);
+  }
+  type.append(command);target.append(type);
+  const execute=document.createElement("button");
+  execute.type="button";execute.textContent="Execute original sporting action";
+  execute.disabled=Boolean(advancedSession.terminal)||shown.length===0;
+  execute.addEventListener("click",()=>advanceAdvanced(command.value));
+  target.append(execute);
+  const info=document.createElement("small");
+  info.textContent="Source-verified score "+state.home_score+" : "+state.away_score+
+    " · possession "+state.owner+" · energy "+state.stamina+
+    (state.mode==="turn_based"?" · AP "+state.ap_remaining:"")+
+    (state.mode==="racket"?" · rally "+(state.rally?"live":"waiting serve"):"")+
+    " · all results independently replayable";
+  target.append(info);
+  return;
+ }
+
  if(advancedSession?.editor==="quest_director"){
   const state=advancedSession.state;
   const picker=document.createElement("label");picker.textContent="Original player action";
