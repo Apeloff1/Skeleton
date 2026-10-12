@@ -118,9 +118,23 @@ class OriginalVoxelEngineTests(unittest.TestCase):
         self.assertFalse(dark["state"]["daylight"])
         self.assertLess(dark["state"]["health"], self.config()["max_health"])
 
+    def test_earned_construction_checkpoint_is_nonterminal(self):
+        # Requires two real ore deposits, two supported constructions,
+        # a consumed torch and actual exploration of another authored sector.
+        actions = ["mine", "place:soil", "light", "north", "east",
+                   "mine", "place:soil"] + ["north"] * 5 + ["checkpoint", "wait"]
+        proof = run_advanced_session("voxel", seed=0, actions=actions)
+        self.assertTrue(verify_advanced_session(proof))
+        state = proof["state"]
+        self.assertTrue(state["checkpoint"])
+        self.assertFalse(state["finished"])
+        self.assertEqual(state["ore_mined"], 2)
+        self.assertEqual(state["placed"], 2)
+        self.assertGreaterEqual(len(state["visited"]), 2)
+
     def test_assembly_contains_real_gameplay_receipts(self):
         manifest = compile_system_assembly("voxel_alpha",
-                       [make_editor_document("voxel")])
+                       [make_editor_document("voxel")], authorized=True)
         evidence = manifest["advanced_runtime_evidence"]
         self.assertEqual(len(evidence), 1)
         self.assertEqual(evidence[0]["editor"], "voxel")

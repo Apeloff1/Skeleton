@@ -10,7 +10,7 @@ This milestone replaces a voxel-only settings form with a **source-verified, off
 - Advanced game state: player position and orientation, voxel occupancy, finite inventories, stamina, health, visits, torches, day/night light, mined ore, authored construction, sand settling and optional terminal retirement.
 - Mandatory causal constraints: occupied space blocks movement, construction needs physical support and inventory, digging needs a removable physical block and stamina, crafting consumes actual mined ore and wood, darkness damages an unlit player, player gravity follows removed support.
 - Deterministic event/state hashes for every action. Authoring scenes, CLI gameplay, offline save continuation, verifier, assembly proof and local Studio's generic session controls use the same authoritative runtime.
-- Sixteen source-validated control families are combined with the five existing typed voxel knobs. The visual UI is still a bounded reference view, **not** a volumetric production editor or commercial 3D renderer.
+- Fifteen additional source-validated controls are combined with the five existing typed voxel knobs. The visual UI is still a bounded reference view, **not** a volumetric production editor or commercial 3D renderer.
 
 ## Verified scope limits
 

@@ -279,7 +279,8 @@ def step(state, config, action):
         events.append("physical_voxel_recovery")
     elif action == "checkpoint":
         if (state["checkpoint"] or state["ore_mined"] < config["ore_goal"] or
-                state["placed"] < 2 or not state["torches"]):
+                state["placed"] < 2 or not state["torches"] or
+                len(state["visited"]) < 2):
             raise VoxelActionError("conservation and construction evidence not earned")
         state["checkpoint"] = True
         events.append("nonterminal_original_voxel_frontier_checkpoint")
