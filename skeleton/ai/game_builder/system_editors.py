@@ -6131,7 +6131,7 @@ def _normalized_settings(editor_id: str, values: Mapping[str, object] | None) ->
         raise SystemEditorError("tactics range exceeds available board dimensions")
     if editor_id == "maze":
         cells=(normalized["width"]-2)*(normalized["height"]-2)*normalized["levels"]
-        minimum_reserved=6 if normalized["topology"]=="non_euclidean" else 4
+        minimum_reserved=3+normalized["levels"]+(2 if normalized["topology"]=="non_euclidean" else 0)
         if normalized["key_count"]+normalized["hazards"]+minimum_reserved>cells:
             raise SystemEditorError("maze objective and finite hazards exceed actual cells")
         if normalized["topology"]=="non_euclidean" and normalized["height"]<6:
