@@ -11,11 +11,24 @@ def _ext_resource(idx: int, path: str) -> str:
     return f'[ext_resource type="Script" path="{path}" id="{idx}"]'
 
 
+def _combat_vfx_nodes(parent: str = ".") -> list[str]:
+    """CombatVfx node block shared by combat-capable scene builders."""
+    return [
+        f'[node name="CombatVfx" type="Node2D" parent="{parent}"]',
+        'script = preload("res://scripts/combat_vfx.gd")',
+        'metadata/era = "modern"',
+        'metadata/severity = "moderate"',
+        'metadata/shape = "cone"',
+        "",
+    ]
+
+
 def platformer_scene(script: str = "res://scripts/player.gd") -> str:
     return "\n".join([
-        HEADER.format(steps=2, uid="tutolage_platformer"),
+        HEADER.format(steps=3, uid="tutolage_platformer"),
         "",
         _ext_resource(1, script),
+        _ext_resource(2, "res://scripts/combat_vfx.gd"),
         "",
         '[node name="Main" type="Node2D"]',
         "",
@@ -32,14 +45,16 @@ def platformer_scene(script: str = "res://scripts/player.gd") -> str:
         "",
         '[node name="CollisionShape2D" type="CollisionShape2D" parent="Ground"]',
         "",
+        *_combat_vfx_nodes("."),
     ]) + "\n"
 
 
 def topdown_scene(script: str = "res://scripts/player.gd") -> str:
     return "\n".join([
-        HEADER.format(steps=2, uid="tutolage_topdown"),
+        HEADER.format(steps=3, uid="tutolage_topdown"),
         "",
         _ext_resource(1, script),
+        _ext_resource(2, "res://scripts/combat_vfx.gd"),
         "",
         '[node name="Main" type="Node2D"]',
         "",
@@ -51,6 +66,7 @@ def topdown_scene(script: str = "res://scripts/player.gd") -> str:
         '[node name="Camera2D" type="Camera2D" parent="Player"]',
         "zoom = Vector2(1.2, 1.2)",
         "",
+        *_combat_vfx_nodes("."),
     ]) + "\n"
 
 
