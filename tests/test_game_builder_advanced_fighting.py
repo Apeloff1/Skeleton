@@ -367,5 +367,34 @@ class OriginalAdvancedArenaTests(unittest.TestCase):
             run_advanced_session("fighting",actions=["inspect"]*129)
 
 
+    def test_terminal_round_is_recorded_once_even_when_step_checks_three_times(self):
+        cfg=make_editor_document("fighting",self.rules(rounds_to_win=1))["settings"]
+        state=start(cfg,0)
+        state["opponent"]["x"]=state["player"]["x"]+1
+        state["opponent"]["hp"]=1
+        step(state,cfg,"jab")
+        self.assertEqual(state["blue_rounds"],1)
+        self.assertEqual(state["round_winners"],["blue"])
+        self.assertEqual(state["events"].count(
+            "real_original_fighting_round_completed_blue"),1)
+        self.assertEqual(state["events"].count(
+            "original_fighting_match_genuinely_finished"),1)
+
+        cfg=make_editor_document("fighting",self.rules(
+            rounds_to_win=1,ai_style="aggressive",
+            player_health=10,enemy_health=100))["settings"]
+        state=start(cfg,0)
+        state["opponent"]["x"]=state["player"]["x"]+1
+        state["player"]["hp"]=1
+        step(state,cfg,"inspect")
+        self.assertEqual(state["red_rounds"],1)
+        self.assertEqual(state["round_winners"],["red"])
+        self.assertEqual(state["events"].count(
+            "real_original_fighting_round_completed_red"),1)
+        self.assertEqual(state["events"].count(
+            "original_fighting_match_genuinely_finished"),1)
+
+
+
 if __name__=="__main__":
     unittest.main()
