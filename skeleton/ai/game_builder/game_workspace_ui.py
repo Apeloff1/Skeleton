@@ -796,12 +796,52 @@ function drawAdvancedGame(session){
   c.fillStyle="#a6dcc0";
   c.fillText("Draw / play only in source-validated original cells.",12,247);
  }
+ if(editor==="roguelike"){
+  const map=state.map,ink={floor:"#294a5b",wall:"#79858c"};
+  c.fillStyle="#d9e9e8";
+  c.fillText("Original procedural dungeon floor "+state.floor+
+    " / "+(advancedSettings?.floors??"?"),12,34);
+  for(let i=0;i<36;i++){
+   const x=14+(i%6)*34,y=41+Math.floor(i/6)*32;
+   c.fillStyle=ink[map.terrain[i]]||"#35586b";
+   c.fillRect(x,y,32,30);
+   let glyph="";
+   if(i===map.exit)glyph="E";
+   else if(i===map.shop)glyph="$";
+   else if(i===map.shrine)glyph="S";
+   else if(map.chests.includes(i)&&!state.chests_opened.includes(i))glyph="C";
+   else if(map.traps.includes(i)&&!state.traps_disarmed.includes(i))glyph="!";
+   const foe=map.enemies.find(e=>e.cell===i&&e.hp>0);
+   if(foe){glyph=foe.is_boss?"B":"G";c.fillStyle="#c36a62";}
+   if(i===state.player){glyph="P";c.fillStyle="#73bea0";}
+   if(glyph){c.fillText(glyph,x+10,y+21);}
+  }
+  const tx=238;c.fillStyle="#e0ebe7";
+  c.fillText("HP "+state.hp+"/"+state.max_hp+" · poison "+state.poison,tx,50);
+  c.fillText("Mana "+state.mana+" · stamina "+state.stamina,tx,74);
+  c.fillText("Attack "+state.attack+" · armor "+state.armor,tx,98);
+  c.fillText("Gold "+state.gold+" · relics "+state.relics,tx,122);
+  c.fillText("Arrows "+state.arrows+" · potions "+state.potions,tx,146);
+  c.fillText("Key "+state.floor_key+" · lockpicks "+state.lockpicks,tx,170);
+  c.fillText("Enemies "+map.enemies.filter(e=>e.hp>0).length+
+    " · reserve "+map.reserve,tx,194);
+  c.fillText("Loot "+state.treasure+" · score "+state.score,tx,218);
+  c.fillText("A signed source map governs every room and reward.",12,249);
+ }
  if(state.finished||state.failed){
   c.fillStyle=state.finished?"#a2f5cb":"#ffaba6";
   c.fillText(state.finished?"Completed":"Defeat",W-100,20);
  }
 }
 
+document.addEventListener("keydown",event=>{
+ if(!advancedSession||advancedSession.editor!=="roguelike"||advancedSession.terminal)return;
+ if(event.target&&(["INPUT","TEXTAREA","SELECT"].includes(event.target.tagName)||
+    event.target.isContentEditable))return;
+ const direction={ArrowUp:"north",ArrowDown:"south",ArrowLeft:"west",ArrowRight:"east"}[event.key];
+ if(!direction)return;
+ event.preventDefault();advanceAdvanced((event.shiftKey?"dash":"move")+"_"+direction);
+});
 document.addEventListener("keydown",event=>{
  if(!advancedSession||advancedSession.editor!=="stealth"||advancedSession.terminal)return;
  if(event.target && (["INPUT","TEXTAREA","SELECT"].includes(event.target.tagName)||
@@ -817,6 +857,28 @@ let selectedSandboxCell=0;
 let selectedCityParcel=0;
 function renderAdvancedActions(actions){
  const target=$("advanced-actions");target.replaceChildren();
+ if(advancedSession?.editor==="roguelike"){
+  const selector=document.createElement("label");
+  selector.textContent="Original tactical move / equipment / floor objective";
+  const command=document.createElement("select");
+  command.id="roguelike-player-command";
+  command.setAttribute("aria-label","Choose dungeon action from authoritative registry");
+  for(const act of actions){
+   const option=document.createElement("option");
+   option.value=act;option.textContent=act.replaceAll("_"," ");
+   command.append(option);
+  }
+  selector.append(command);target.append(selector);
+  const submit=document.createElement("button");submit.type="button";
+  submit.textContent="Execute verified dungeon action";
+  submit.disabled=Boolean(advancedSession.terminal);
+  submit.addEventListener("click",()=>advanceAdvanced(command.value));
+  target.append(submit);
+  const hint=document.createElement("small");
+  hint.textContent="Arrow keys move one tile; Shift+arrow spends stamina on dash; enemy blocks physical movement. A boss must actually fall before final extraction.";
+  target.append(hint);return;
+ }
+
  if(advancedSession?.editor==="sandbox"){
   const terrain=advancedSession.state.regions[String(advancedSession.state.region)]||[];
   const choose=document.createElement("label");
@@ -1051,6 +1113,12 @@ async function advanceAdvanced(action){
 // Visual paint works only on the local draft JSON. It cannot bypass the
 // server's canonical validation, exact-file review, or human commit.
 const PAINT_TOOLS={
+ roguelike:["wall_toggle","trap_toggle","chest_toggle",
+   "spawn","exit","shop","shrine","enemy_toggle",
+   "enemy_health_up","enemy_health_down","enemy_attack_up","enemy_attack_down",
+   "toggle_elite","ambient_next","light_next","trap_damage_up",
+   "trap_damage_down","reserve_up","reserve_down"],
+
  sandbox:["terrain_next","wood_plus","wood_minus","stone_plus","stone_minus",
           "clay_plus","clay_minus","ore_plus","ore_minus","water_plus",
           "water_minus","fish_plus","fish_minus","forage_plus",
@@ -1124,6 +1192,31 @@ function renderSceneAuthoring(){
   shape=sceneGridShape(source);
  }catch(_){ctx.fillText("Invalid or mismatched scene JSON: use Validate.",12,24);return;}
 
+ if(source.editor==="roguelike"){
+  const layout=source.layout;
+  ctx.fillText("Original signed 6×6 procedural dungeon source (first floor)",12,18);
+  for(let i=0;i<36;i++){
+   const x=15+(i%6)*34,y=32+Math.floor(i/6)*32;
+   ctx.fillStyle=layout.terrain[i]==="wall"?"#79838d":"#2c5764";
+   ctx.fillRect(x,y,32,30);
+   let glyph="";
+   if(i===layout.entry)glyph="P";
+   else if(i===layout.exit)glyph="E";
+   else if(i===layout.shop)glyph="$";
+   else if(i===layout.shrine)glyph="S";
+   else if(layout.chests.includes(i))glyph="C";
+   else if(layout.traps.includes(i))glyph="!";
+   const foe=layout.enemies.find(e=>e.cell===i);
+   if(foe){glyph=foe.is_boss?"B":"G";ctx.fillStyle="#a85e62";}
+   if(glyph){ctx.fillStyle="#f1f5e5";ctx.fillText(glyph,x+10,y+19);}
+  }
+  ctx.fillStyle="#daeddf";
+  ctx.fillText("Ambience "+layout.ambient+" · light "+layout.light,252,59);
+  ctx.fillText("Enemies "+layout.enemies.length+" · reserve "+layout.reserve,252,83);
+  ctx.fillText("Traps "+layout.traps.length+" · treasure "+layout.chests.length,252,107);
+  ctx.fillText("Paint then validate geometry and exact digest",252,144);
+  return;
+ }
  if(source.editor==="sandbox"){
   const world=source.layout,tiles=world.tiles||[];
   const ink={grass:"#397c58",forest:"#27824f",ridge:"#868477",
@@ -1290,6 +1383,65 @@ function renderSceneAuthoring(){
  }
 }
 
+function paintRoguelikeCell(index){
+ const doc=JSON.parse($("advanced-scene-json").value);
+ if(doc.editor!=="roguelike"||systemEditor().id!=="roguelike")
+  throw Error("Original dungeon source must match the selected game");
+ const map=doc.layout,tool=$("advanced-paint-tool").value;
+ if(!Number.isInteger(index)||index<0||index>=36)
+  throw Error("Authoring outside original dungeon grid denied");
+ const toggle=(arr)=>arr.includes(index)?arr.filter(i=>i!==index):
+   [...arr,index].sort((a,b)=>a-b);
+ if(tool==="wall_toggle"){
+  map.terrain[index]=map.terrain[index]==="wall"?"floor":"wall";
+ }else if(tool==="trap_toggle")map.traps=toggle(map.traps);
+ else if(tool==="chest_toggle")map.chests=toggle(map.chests);
+ else if(["spawn","exit","shop","shrine"].includes(tool)){
+  map[tool==="spawn"?"entry":tool]=index;
+ }else if(tool==="enemy_toggle"){
+  const current=map.enemies.find(e=>e.cell===index);
+  if(current)map.enemies=map.enemies.filter(e=>e!==current);
+  else{
+   const cfg=systemSettings();
+   map.enemies.push({id:0,kind:"sentinel",cell:index,
+    hp:cfg.foe_health,max_hp:cfg.foe_health,
+    attack:cfg.foe_attack,ranged:false,armor:0,
+    status:"active",poison:0,stun:0,rewarded:false,is_boss:false});
+  }
+  map.enemies.forEach((e,i)=>e.id=i);
+ }else if(tool.startsWith("enemy_")){
+  const foe=map.enemies.find(e=>e.cell===index);
+  if(!foe)throw Error("Select an existing authored opponent first");
+  const health=tool.startsWith("enemy_health");
+  const delta=tool.endsWith("_up")?1:-1;
+  if(health){
+   foe.hp=Math.max(1,Math.min(1000,foe.hp+delta));
+   foe.max_hp=foe.hp;
+  }else foe.attack=Math.max(0,Math.min(100,foe.attack+delta));
+ }else if(tool==="toggle_elite"){
+  const foe=map.enemies.find(e=>e.cell===index);
+  if(!foe)throw Error("An original opponent is required");
+  foe.is_boss=!foe.is_boss;
+  foe.kind=foe.is_boss?"guardian":"sentinel";
+ }else if(tool==="ambient_next"){
+  const a=["crypt","glade","foundry","temple"];
+  map.ambient=a[(a.indexOf(map.ambient)+1)%a.length];
+ }else if(tool==="light_next"){
+  const a=["torch","moon","mist"];
+  map.light=a[(a.indexOf(map.light)+1)%a.length];
+ }else if(tool==="trap_damage_up"||tool==="trap_damage_down"){
+  map.hazard_damage=Math.max(0,Math.min(
+   systemSettings().trap_damage,map.hazard_damage+
+   (tool.endsWith("up")?1:-1)));
+ }else if(tool==="reserve_up"||tool==="reserve_down"){
+  map.reserve=Math.max(0,Math.min(
+   systemSettings().encounters_per_floor,map.reserve+
+   (tool.endsWith("up")?1:-1)));
+ }else throw Error("Unregistered original roguelike scene operation");
+ $("advanced-scene-json").value=JSON.stringify(doc,null,2);
+ renderSceneAuthoring();
+ status("Dungeon source changed. Validate original enemies, connected route and scene digest before approval.");
+}
 function paintSandboxCell(index){
  const doc=JSON.parse($("advanced-scene-json").value);
  if(doc.editor!=="sandbox"||systemEditor().id!=="sandbox")
@@ -1524,6 +1676,15 @@ $("advanced-scene-grid").addEventListener("click",event=>{
   if(!text)throw Error("Generate a scene document first");
   const doc=JSON.parse(text),shape=sceneGridShape(doc);
   const canvas=$("advanced-scene-grid"),rect=canvas.getBoundingClientRect();
+  if(doc.editor==="roguelike"){
+   const px=(event.clientX-rect.left)*canvas.width/rect.width;
+   const py=(event.clientY-rect.top)*canvas.height/rect.height;
+   const x=Math.floor((px-15)/34),y=Math.floor((py-32)/32);
+   if(x<0||x>=6||y<0||y>=6||
+      px>15+x*34+32||py>32+y*32+30)return;
+   paintRoguelikeCell(y*6+x);
+   return;
+  }
   if(doc.editor==="sandbox"){
    const px=(event.clientX-rect.left)*canvas.width/rect.width;
    const py=(event.clientY-rect.top)*canvas.height/rect.height;
