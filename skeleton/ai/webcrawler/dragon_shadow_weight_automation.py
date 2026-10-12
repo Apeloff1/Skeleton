@@ -67,6 +67,12 @@ class ShadowWeight:
     source_revision: str
     note_id: str
     knowledge_id: str
+    hypothesis_id: str
+    ontology_version: str
+    probability: float
+    probability_semantics: str
+    calibration_artifact_fingerprint: str
+    evidence_fingerprint: str
     knowledge_root: str
     analysis_digest: str
     adversarial_digest: str
@@ -79,10 +85,27 @@ class ShadowWeight:
         _id(self.source_id)
         _id(self.note_id)
         for x in (self.candidate_id, self.source_revision, self.knowledge_id,
+                  self.calibration_artifact_fingerprint, self.evidence_fingerprint,
                   self.knowledge_root, self.analysis_digest,
                   self.adversarial_digest, self.trigger_digest):
             _hex(x)
         _iso(self.at)
+        if (not isinstance(self.hypothesis_id, str)
+                or not 1 <= len(self.hypothesis_id) <= 256
+                or not isinstance(self.ontology_version, str)
+                or not 1 <= len(self.ontology_version) <= 128
+                or self.probability_semantics != "empirically_calibrated_probability"
+                or type(self.probability) not in (int, float)
+                or not 0.9 <= self.probability <= 1.0):
+            raise ValueError("shadow candidate requires strongly calibrated normalized knowledge")
+        normalized = NormalizedKnowledge(
+            self.knowledge_id, self.hypothesis_id, self.ontology_version,
+            "supported", self.probability, self.probability_semantics,
+            self.calibration_artifact_fingerprint, self.evidence_fingerprint,
+            "resolved_support",
+        )
+        if canonical_knowledge_id(normalized) != self.knowledge_id:
+            raise ValueError("shadow normalized evidence identity invalid")
         if (not isinstance(self.terms, tuple)
                 or not 1 <= len(self.terms) <= 256
                 or any(not isinstance(t, tuple) or len(t) != 2
@@ -540,7 +563,11 @@ class ShadowWeightAutomation:
             raise ValueError("source changed during scrutiny")
         shadow = ShadowWeight(
             owner, identity, source_id, source["revision_digest"], note_id,
-            normalized_knowledge_id, root, verdict.fingerprint,
+            normalized_knowledge_id, record.hypothesis_id,
+            record.ontology_version, record.probability,
+            record.probability_semantics,
+            record.calibration_artifact_fingerprint, record.evidence_fingerprint,
+            root, verdict.fingerprint,
             receipts[-1].output_fingerprint, decision.trace_digest,
             _terms(note["statement"], note["mechanic"]), _iso(at),
         )
@@ -610,14 +637,26 @@ class ShadowWeightAutomation:
                     or not memory_promotion.receipt.passed):
                 raise PermissionError("canonical memory-promotion receipt required")
             decision = self.reviews.get(owner, _hex(review_id), authorized=True)
+            expected_promotion_fingerprint = sha256(json.dumps([
+                shadow.knowledge_id, shadow.evidence_fingerprint,
+                shadow.calibration_artifact_fingerprint, decision.review_id,
+                decision.reviewer_principal_fingerprint,
+                shadow.ontology_version,
+            ], separators=(",", ":")).encode("utf-8")).hexdigest()
             if (not decision.approved or decision.review_id != review_id
                     or memory_promotion.receipt.input_fingerprints != (review_id,)
+                    or memory_promotion.receipt.independent_sources < 2
                     or decision.adversarial_fingerprint != shadow.adversarial_digest
                     or not any(
                         p.knowledge_id == shadow.knowledge_id
+                        and p.hypothesis_id == shadow.hypothesis_id
+                        and p.ontology_version == shadow.ontology_version
+                        and p.probability == shadow.probability
                         and p.human_review_id == review_id
+                        and p.promotion_fingerprint == expected_promotion_fingerprint
                         for p in memory_promotion.promoted
-                    ) or memory_promotion.receipt.output_fingerprint != _hash(
+                    ) or len({p.knowledge_id for p in memory_promotion.promoted}) != len(memory_promotion.promoted)
+                    or memory_promotion.receipt.output_fingerprint != _hash(
                         [vars(item) for item in memory_promotion.promoted]
                     )):
                 raise PermissionError("approval/knowledge/adversarial chain mismatch")
