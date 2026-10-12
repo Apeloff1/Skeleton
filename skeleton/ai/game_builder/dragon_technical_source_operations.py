@@ -90,13 +90,14 @@ class DragonSourceOperations:
         history=[];parent=None
         allowed={
             None:{"scheduled"},
-            "scheduled":{"leased"},
-            "retry_wait":{"leased"},
+            "scheduled":{"leased","policy_recheck"},
+            "retry_wait":{"leased","policy_recheck"},
             "leased":{"completed","retry_wait","quarantined","policy_hold"},
             "quarantined":{"acknowledged_stop"},
             "policy_hold":set(),
             "acknowledged_stop":{"scheduled"},
-            "completed":set(),
+            "completed":{"policy_recheck"},
+            "policy_recheck":{"scheduled"},
         }
         for i,(seq,raw,digest) in enumerate(rows):
             if not isinstance(raw,str) or len(raw.encode())>4096:
@@ -153,10 +154,11 @@ class DragonSourceOperations:
         # Validate the transition BEFORE writing. Transaction state protects
         # cross-process concurrent admissions and host cooldown.
         valid={
-            None:{"scheduled"},"scheduled":{"leased"},
-            "retry_wait":{"leased"},"leased":{"completed","retry_wait","quarantined","policy_hold"},
+            None:{"scheduled"},"scheduled":{"leased","policy_recheck"},
+            "retry_wait":{"leased","policy_recheck"},"leased":{"completed","retry_wait","quarantined","policy_hold"},
             "quarantined":{"acknowledged_stop"},"policy_hold":set(),
-            "acknowledged_stop":{"scheduled"},"completed":set(),
+            "acknowledged_stop":{"scheduled"},"completed":{"policy_recheck"},
+            "policy_recheck":{"scheduled"},
         }
         before=history[-1]["state"] if history else None
         if state not in valid[before]:

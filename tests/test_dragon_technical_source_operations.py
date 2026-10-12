@@ -15,6 +15,8 @@ from skeleton.ai.game_builder.dragon_technical_source_atlas import (
 )
 from skeleton.ai.game_builder.dragon_technical_source_captures import DragonSourceCaptures
 from skeleton.ai.game_builder.dragon_technical_source_operations import DragonSourceOperations
+from skeleton.ai.game_builder.dragon_source_policy_renewal import DragonSourcePolicyRenewal
+from skeleton.ai.game_builder.dragon_source_refresh_planner import DragonSourceRefreshPlanner
 from skeleton.ai.game_builder.dragon_research_supervisor import DragonResearchSupervisor
 from skeleton.ai.game_builder.dragon_technical_source_acquisition import (
     acquire_canonical_technical_article,
@@ -557,3 +559,103 @@ def test_forged_robots_delay_is_not_accepted_from_untrusted_release(lab):
     lab[6].release(ticket,lab[3],now=NOW+1,capture_digest=None,
                    authorized=True,trusted_worker=True)
     assert lab[6].inspect(OWNER,lab[7],authorized=True)["state"]=="retry_wait"
+
+
+
+def test_expired_policy_is_retired_archived_and_freshly_reapproved(lab):
+    schedule(lab)
+    ops=lab[6]
+    renew=DragonSourcePolicyRenewal(ops)
+    now=START+3601
+    sid=lab[7]
+    initial=ops.inspect(OWNER,sid,authorized=True)["head_digest"]
+    report=renew.request(
+        OWNER,sid,now=now,expected_operations_digest=initial,
+        reason="expired_policy",authorized=True,trusted_supervisor=True)
+    assert report["status"]=="awaiting_new_independent_policy_review"
+    assert not report["crawler_authorized"]
+    assert ops.ready_candidates(OWNER,now=now,authorized=True)==()
+    assert ops.inspect(OWNER,sid,authorized=True)["state"]=="policy_recheck"
+    assert lab[0].db.execute(
+        "SELECT stage,state FROM dragon_almanac_jobs WHERE owner=? AND source=?",
+        (OWNER,sid)).fetchone()==(0,"pending")
+    assert lab[0].db.execute(
+        "SELECT COUNT(*) FROM dragon_almanac_archived_steps "
+        "WHERE owner=? AND source=?",(OWNER,sid)).fetchone()[0]==1
+    pending=renew.pending(OWNER,authorized=True)
+    assert len(pending["items"])==1
+    assert pending["items"][0]["policy_review_required"]
+    assert pending["items"][0]["renewal_digest"]==report["renewal_digest"]
+    with pytest.raises(ValueError,match="stale|missing"):
+        renew.rearm(OWNER,sid,now=now+1,
+                    expected_renewal_digest="f"*64,
+                    authorized=True,trusted_supervisor=True)
+    with pytest.raises(PermissionError,match="independent"):
+        renew.rearm(OWNER,sid,now=now+1,
+                    expected_renewal_digest=report["renewal_digest"],
+                    authorized=True,trusted_supervisor=True)
+    worker=SequentialAlmanacWorker(lab[1])
+    policy=worker.claim(OWNER,now=now+1,authorized=True,trusted_worker=True)
+    assert policy.source_id==sid and policy.stage=="policy"
+    worker.finish(
+        policy,now=now+2,output_digest="b"*64,
+        evidence={"url":policy.url,"input_digest":policy.input_digest,
+                  "output_digest":"b"*64,"robots_permitted":True,
+                  "terms_permitted":True,"reference_use_permitted":True,
+                  "ssrf_checked":True,"expires_at":now+7200},
+        authorized=True,trusted_worker=True)
+    assert not renew.pending("other-owner",authorized=True)["items"]
+    resumed=renew.rearm(
+        OWNER,sid,now=now+3,expected_renewal_digest=report["renewal_digest"],
+        authorized=True,trusted_supervisor=True)
+    assert resumed["status"]=="scheduled_after_policy_revalidation"
+    assert ops.ready_candidates(OWNER,now=now+3,authorized=True)==(sid,)
+    assert not renew.pending(OWNER,authorized=True)["items"]
+    assert not resumed["source_rights_granted_by_this_method"]
+    with pytest.raises(ValueError,match="stale|missing"):
+        renew.rearm(OWNER,sid,now=now+4,
+                    expected_renewal_digest=report["renewal_digest"],
+                    authorized=True,trusted_supervisor=True)
+
+
+def test_expiry_renewal_rejects_nonexpired_cas_and_manual_hold(lab):
+    schedule(lab)
+    renew=DragonSourcePolicyRenewal(lab[6])
+    head=lab[6].inspect(OWNER,lab[7],authorized=True)["head_digest"]
+    with pytest.raises(PermissionError,match="expired"):
+        renew.request(OWNER,lab[7],now=NOW,
+            expected_operations_digest=head,reason="expired_policy",
+            authorized=True,trusted_supervisor=True)
+    with pytest.raises(ValueError,match="compare-and-swap"):
+        renew.request(OWNER,lab[7],now=START+3601,
+            expected_operations_digest="f"*64,reason="expired_policy",
+            authorized=True,trusted_supervisor=True)
+    ticket=begin(lab)
+    attach(lab,ticket)
+    stop(lab,ticket)
+    lab[6].release(ticket,lab[3],now=NOW+1,capture_digest=None,
+        deferred_reason="robots_delay_exceeds_limit",policy_hold=True,
+        authorized=True,trusted_worker=True)
+    held=lab[6].inspect(OWNER,lab[7],authorized=True)
+    assert held["state"]=="policy_hold"
+    with pytest.raises(PermissionError,match="manually held"):
+        renew.request(OWNER,lab[7],now=START+3601,
+            expected_operations_digest=held["head_digest"],
+            reason="expired_policy",authorized=True,trusted_supervisor=True)
+
+
+def test_refresh_planner_surfaces_permission_expiry_without_auto_approval(lab):
+    schedule(lab)
+    planner=DragonSourceRefreshPlanner(lab[6])
+    before=planner.assess(OWNER,lab[7],now=NOW,authorized=True)
+    assert before["reason"]=="no_refresh_transition_required"
+    assert not before["rights_granted"] and not before["observed_remote_change"]
+    after=planner.assess(OWNER,lab[7],now=START+3601,authorized=True)
+    assert after["reason"]=="policy_expired_requires_recheck"
+    assert after["operator_revalidation_required"]
+    assert after["latest_capture_digest"] is None
+    assert after["suggested_review_days"]==90
+    assert after["editorial_next_review_at"] is None
+    assert lab[6].inspect(OWNER,lab[7],authorized=True)["state"]=="scheduled"
+    with pytest.raises(ValueError,match="unregistered"):
+        planner.assess("unrelated",lab[7],now=START+3601,authorized=True)

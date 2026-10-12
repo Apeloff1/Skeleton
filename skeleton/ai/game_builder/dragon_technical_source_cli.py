@@ -10,6 +10,8 @@ from .dragon_technical_source_atlas import CATALOG, CATALOG_DIGEST, DragonTechni
 from .dragon_technical_source_captures import DragonSourceCaptures
 from .dragon_technical_source_analysis import DragonTechnicalGlean
 from .dragon_technical_source_operations import DragonSourceOperations
+from .dragon_source_policy_renewal import DragonSourcePolicyRenewal
+from .dragon_source_refresh_planner import DragonSourceRefreshPlanner
 from .reviewed_knowledge import ReviewedKnowledgeStore
 
 
@@ -18,7 +20,8 @@ def main():
     parser.add_argument("command",choices=("census","import","plan","history",
                                                   "capture-history","capture-review",
                                                   "capture-census","glean-preview","glean-handoff",
-                                                  "operations-inspect","operations-review","operations-ready"))
+                                                  "operations-inspect","operations-review","operations-ready",
+                                                  "policy-renewal-pending","refresh-inspect"))
     parser.add_argument("--database",required=True)
     parser.add_argument("--owner",required=True)
     parser.add_argument("--trusted-local-operator",action="store_true")
@@ -59,9 +62,18 @@ def main():
         else:
             captures=DragonSourceCaptures(atlas.a)
             if args.command in ("operations-inspect","operations-review",
-                                "operations-ready"):
+                                "operations-ready","policy-renewal-pending",
+                                "refresh-inspect"):
                 operations=DragonSourceOperations(captures)
-                if args.command=="operations-ready":
+                if args.command=="policy-renewal-pending":
+                    report=DragonSourcePolicyRenewal(operations).pending(
+                        args.owner,authorized=True,limit=args.limit)
+                elif args.command=="refresh-inspect":
+                    if args.now is None or not args.source_id:
+                        parser.error("--now and --source-id required for freshness")
+                    report=DragonSourceRefreshPlanner(operations).assess(
+                        args.owner,args.source_id,now=args.now,authorized=True)
+                elif args.command=="operations-ready":
                     if args.now is None: parser.error("--now UTC epoch required")
                     sources=operations.ready_candidates(
                         args.owner,now=args.now,authorized=True,

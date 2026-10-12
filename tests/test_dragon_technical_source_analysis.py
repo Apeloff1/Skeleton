@@ -12,6 +12,9 @@ from skeleton.ai.game_builder.dragon_almanac_sequence import SequentialAlmanacWo
 from skeleton.ai.game_builder.dragon_technical_source_atlas import CATALOG
 from skeleton.ai.game_builder.dragon_technical_source_captures import DragonSourceCaptures
 from skeleton.ai.game_builder.dragon_technical_source_analysis import DragonTechnicalGlean
+from skeleton.ai.game_builder.dragon_technical_source_operations import DragonSourceOperations
+from skeleton.ai.game_builder.dragon_source_policy_renewal import DragonSourcePolicyRenewal
+from skeleton.ai.game_builder.dragon_source_refresh_planner import DragonSourceRefreshPlanner
 from skeleton.ai.game_builder.reviewed_knowledge import ReviewedKnowledgeStore
 from skeleton.ai.webcrawler.core import FetchResponse, extract_document
 
@@ -394,3 +397,62 @@ def test_missing_independent_sources_do_not_close_review(lab):
             review_evidence_digest="d"*64,
             grant=grant,authority=authority,
             now=T0+13,authorized=True,trusted_worker=True)
+
+
+
+def test_reviewed_revisit_archives_full_chain_but_never_self_approves(lab):
+    sid,url=install(lab,"pandocs")
+    captured=extracted(lab,sid,url)
+    library,_,worker,captures,glean=lab
+    claim=worker.claim(OWNER,now=T0+7,authorized=True,trusted_worker=True)
+    result=glean.complete_analyze(
+        claim,capture_digest=captured["capture_digest"],
+        now=T0+8,authorized=True,trusted_worker=True)
+    brief,authority,grant,wiki=authoritative_wiki(lab,sid,url)
+    final=worker.claim(OWNER,now=T0+12,authorized=True,trusted_worker=True)
+    glean.complete_canonical_review(
+        final,capture_digest=captured["capture_digest"],
+        brief=brief,mechanic="hardware",
+        wiki_review_digest=wiki["digest"],
+        review_evidence_digest="d"*64,
+        grant=grant,authority=authority,
+        now=T0+13,authorized=True,trusted_worker=True)
+    ops=DragonSourceOperations(captures)
+    host=url.split("/")[2]
+    # Arrange an existing completed durable observation; resource-lease
+    # authorization is tested independently in worker integration cases.
+    ops._append(OWNER,sid,host,"scheduled",now=T0+2,ready_at=T0+2)
+    ops._append(OWNER,sid,host,"leased",now=T0+3,
+                ready_at=T0+3,expires_at=T0+60,
+                ticket_digest="a"*64)
+    ops._append(OWNER,sid,host,"completed",now=T0+9,
+                details={"capture_digest":captured["capture_digest"],
+                         "review_status":"independent_review_pending"})
+    planner=DragonSourceRefreshPlanner(ops)
+    before=planner.assess(OWNER,sid,now=T0+5*86400,authorized=True)
+    assert before["reason"]=="reviewed_source_cadence_not_due"
+    due=T0+91*86400
+    assessment=planner.assess(OWNER,sid,now=due,authorized=True)
+    assert assessment["reason"]=="reviewed_source_revisit_due"
+    assert not assessment["observed_remote_change"]
+    renew=DragonSourcePolicyRenewal(ops)
+    with pytest.raises(PermissionError,match="not yet"):
+        renew.request(OWNER,sid,now=T0+5*86400,
+            expected_operations_digest=ops.inspect(OWNER,sid,authorized=True)["head_digest"],
+            reason="scheduled_revisit",authorized=True,trusted_supervisor=True)
+    req=renew.request(OWNER,sid,now=due,
+        expected_operations_digest=ops.inspect(OWNER,sid,authorized=True)["head_digest"],
+        reason="scheduled_revisit",authorized=True,trusted_supervisor=True)
+    assert req["status"]=="awaiting_new_independent_policy_review"
+    assert library.db.execute(
+        "SELECT COUNT(*) FROM dragon_almanac_archived_steps "
+        "WHERE owner=? AND source=?",(OWNER,sid)).fetchone()[0]==5
+    assert library.db.execute(
+        "SELECT stage,state FROM dragon_almanac_jobs "
+        "WHERE owner=? AND source=?",(OWNER,sid)).fetchone()==(0,"pending")
+    assert len(library._rows(OWNER))==2
+    assert ops.ready_candidates(OWNER,now=due,authorized=True)==()
+    with pytest.raises(PermissionError,match="independent"):
+        renew.rearm(OWNER,sid,now=due+1,
+            expected_renewal_digest=req["renewal_digest"],
+            authorized=True,trusted_supervisor=True)
