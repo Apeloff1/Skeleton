@@ -96,7 +96,7 @@ def validate_signal(signal: InterestSignal, now: float, policy: SignalPolicy) ->
     if signal.consent is not True:
         raise PermissionError("interest tracking requires explicit consent")
     if (not isinstance(signal.signal_id, str) or not 1 <= len(signal.signal_id) <= 128
-            or any(ord(ch) < 32 or ord(ch) == 127 for ch in signal.signal_id)):
+            or any(ord(ch) < 32 or ord(ch) == 127 or ch == "\\\\" for ch in signal.signal_id)):
         raise ValueError("invalid signal id")
     if not isinstance(signal.kind, SignalKind):
         raise ValueError("invalid signal kind")
@@ -112,7 +112,7 @@ def validate_signal(signal: InterestSignal, now: float, policy: SignalPolicy) ->
     if not isinstance(signal.tags, tuple) or not 1 <= len(signal.tags) <= 16:
         raise ValueError("invalid tag count")
     if (not isinstance(signal.source_id, str) or len(signal.source_id) > 128
-            or any(ord(ch) < 32 or ord(ch) == 127 for ch in signal.source_id)):
+            or any(ord(ch) < 32 or ord(ch) == 127 or ch == "\\\\" for ch in signal.source_id)):
         raise ValueError("invalid source id")
     return tuple(sorted({normalize_tag(tag) for tag in signal.tags}))
 
