@@ -1,0 +1,163 @@
+name: Advanced Godot Native Economy Replay
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_economy_godot.py"
+      - "skeleton/ai/game_builder/advanced_economy_runtime.py"
+      - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
+      - "skeleton/ai/game_builder/advanced_level_scenes.py"
+      - "skeleton/ai/game_builder/system_editors.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "tests/test_game_builder_advanced_economy_godot.py"
+      - ".github/workflows/game-builder-advanced-economy-native.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: original-native-economy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  original-native-economy:
+    name: Real Godot market state parity (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 24
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Checkout exact head without stored credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_advanced_economy_godot.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Pinned Godot 4.4.1
+        uses: chickensoft-games/setup-godot@f166999204a4f2722c6fe042fbaa3b3ea0d9c789
+        with:
+          version: "4.4.1"
+          use-dotnet: false
+          include-templates: true
+          cache: true
+      - name: Assert exact head and independently validate Python
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          godot --version
+          python -m py_compile skeleton/ai/game_builder/advanced_economy_godot.py skeleton/ai/game_builder/advanced_economy_runtime.py tests/test_game_builder_advanced_economy_godot.py
+          python -m unittest tests.test_game_builder_advanced_economy_godot -v
+      - name: Produce eight real source-bound economy projects
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from copy import deepcopy
+          import os
+          from skeleton.ai.game_builder.advanced_level_scenes import make_advanced_scene
+          from skeleton.ai.game_builder.advanced_gameplay_runtime import run_advanced_session,verify_advanced_session
+          from skeleton.ai.game_builder.advanced_godot_export import write_advanced_godot_package
+          from skeleton.ai.game_builder.advanced_economy_godot import render_economy_godot_package
+          root=Path(os.environ["RUNNER_TEMP"])/"original-native-economy"
+          root.mkdir()
+          route=["audit","manufacture","focus:2","buy","travel:1","audit","sell","checkpoint"]
+          cases=(
+              ("empty",{},[],0,1),
+              ("trade",{},route,1,1),
+              ("retired",{},route+["retire"],2,1),
+              ("demand",{},["wait"]*12,3,1),
+              ("mixed_lots",{},["buy","travel:1","buy","sell","sell"],4,1),
+              ("industry",{},["harvest","manufacture","rest","relief"],5,1),
+              ("small",{"goods":3,"market_nodes":2},route,6,1),
+              ("multi",{},["audit","manufacture","focus:2","buy",
+                 "travel:1","audit","sell","travel:0","buy","travel:1","sell",
+                 "checkpoint"],7,2),
+          )
+          for name,cfg,actions,seed,goal in cases:
+              scene=make_advanced_scene("economy",cfg,seed=seed)
+              if goal>1:
+                  layout=deepcopy(scene["layout"])
+                  layout["trade_goal"]=goal
+                  scene=make_advanced_scene("economy",cfg,seed=seed,layout=layout)
+              session=run_advanced_session("economy",cfg,actions,seed=seed,scene=scene)
+              assert verify_advanced_session(session,cfg)
+              if name in ("trade","retired","small","multi"):
+                  assert session["state"]["checkpoint"]
+              if name=="retired":
+                  assert session["state"]["retired"]
+              if name=="mixed_lots":
+                  assert session["state"]["imports_sold"]==1
+              package=render_economy_godot_package(session,cfg,authorized=True)
+              write_advanced_godot_package(package,root/name,authorized=True)
+              print("NATIVE_ECONOMY_SOURCE",name,len(actions),session["state"]["cash"])
+          PY
+      - name: Independently run eight Godot source-market simulations
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import os,subprocess,sys
+          root=Path(os.environ["RUNNER_TEMP"])/"original-native-economy"
+          for name in ("empty","trade","retired","demand","mixed_lots",
+                       "industry","small","multi"):
+              project=root/name/"godot"
+              for args in (["--headless","--path",str(project),"--import"],
+                           ["--headless","--path",str(project),"--","--verify-economy"]):
+                  cmd=(["godot",*args] if sys.platform!="win32" else [
+                      str(Path(os.environ["ProgramFiles"])/"Git"/"bin"/"bash.exe"),
+                      "-c",'godot "$@"',"godot",*args])
+                  result=subprocess.run(cmd,capture_output=True,text=True,
+                                        encoding="utf-8",errors="replace",timeout=75)
+                  output=result.stdout+"\n"+result.stderr
+                  print(name,args,result.returncode,output,flush=True)
+                  if "--verify-economy" in args:
+                      (root/name/"native-replay.log").write_text(output,encoding="utf-8")
+                      if "NATIVE_ADVANCED_ECONOMY_OK" not in result.stdout:
+                          raise SystemExit("independent native market proof missing: "+name)
+                  if result.returncode:
+                      raise SystemExit("Godot rejected "+name+" "+str(args))
+          PY
+      - name: Export and execute Linux economy desktop game
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/original-native-economy"
+          binary="$root/original-native-economy.x86_64"
+          godot --headless --path "$root/trade/godot" --export-release Linux "$binary"
+          test -s "$binary"
+          chmod +x "$binary"
+          "$binary" --headless -- --verify-economy | tee "$root/linux-executable-replay.log"
+          grep -q NATIVE_ADVANCED_ECONOMY_OK "$root/linux-executable-replay.log"
+      - name: Preserve source receipts and unsigned native artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: economy-godot-${{ matrix.os }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/original-native-economy/*/native-replay.log
+            ${{ runner.temp }}/original-native-economy/*/release.json
+            ${{ runner.temp }}/original-native-economy/original-native-economy.x86_64
+            ${{ runner.temp }}/original-native-economy/linux-executable-replay.log
+          if-no-files-found: warn
+          retention-days: 7
