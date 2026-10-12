@@ -43,7 +43,7 @@ def _portfolio_request(args, parser):
 
 def main():
     parser = argparse.ArgumentParser(description="Import, inspect and seed sequential Dragon almanacs")
-    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief", "mission-scout", "mission-index", "mission-audit", "mission-health", "mission-portfolio", "campaign-record", "campaign-inspect", "campaign-refresh", "import-supplements", "discovery-verify", "discovery-census", "import-reconciled", "discovery-topics", "discovery-sources", "discovery-receipts"))
+    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief", "mission-scout", "mission-index", "mission-audit", "mission-health", "mission-portfolio", "campaign-record", "campaign-inspect", "campaign-refresh", "import-supplements", "discovery-verify", "discovery-census", "platform-matrix", "import-reconciled", "discovery-topics", "discovery-sources", "discovery-receipts"))
     parser.add_argument("--database", required=True)
     parser.add_argument("--owner", required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
@@ -57,6 +57,8 @@ def main():
     parser.add_argument("--topic", help="Optional owner-scoped almanac topic ID")
     parser.add_argument("--limit", type=int, default=25)
     parser.add_argument("--scan-budget", type=int, default=2000)
+    parser.add_argument("--samples-per-platform", type=int, default=3,
+                        help="Maximum URL metadata examples per platform (0..10)")
     parser.add_argument("--axis", action="append", default=[],
                         help="Portfolio id:question or id:question:minimum:importance")
     parser.add_argument("--portfolio-limit", type=int, default=30)
@@ -79,7 +81,7 @@ def main():
     with ReviewedKnowledgeStore(args.database) as library:
         almanacs = DragonAlmanacs(library)
         worker = SequentialAlmanacWorker(almanacs)
-        if args.command in {"discovery-verify", "discovery-census", "import-reconciled"}:
+        if args.command in {"discovery-verify", "discovery-census", "platform-matrix", "import-reconciled"}:
             from .dragon_discovery_reconciled import (
                 verify_reconciled_chain, import_reconciled_chain)
             registry = read_source_registry(args.registry)
@@ -90,6 +92,10 @@ def main():
             elif args.command == "discovery-census":
                 from .dragon_discovery_census import discovery_census
                 result = discovery_census(registry, top_hosts=args.limit)
+            elif args.command == "platform-matrix":
+                from .dragon_platform_coverage import platform_discovery_matrix
+                result = platform_discovery_matrix(
+                    registry, samples_per_platform=args.samples_per_platform)
             else:
                 result = import_reconciled_chain(
                     almanacs, args.owner, registry, authorized=True)
