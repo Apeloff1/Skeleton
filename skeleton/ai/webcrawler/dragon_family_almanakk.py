@@ -53,9 +53,12 @@ class DragonAlmanakkLane:
                  wiki_verify: Callable[[str, str, WikiEvidence], bool] | None = None,
                  sandbox_verify: Callable[[str, str, SandboxEvidence], bool] | None = None,
                  handoff_verify: Callable[[str, str, str], bool] | None = None,
-                 minimum_gain: float = 0.02):
+                 minimum_gain: float = 0.02, owner_scope: str | None = None):
         if not isinstance(minimum_gain, (int, float)) or isinstance(minimum_gain, bool) or not isfinite(minimum_gain) or not 0 < minimum_gain <= 1:
             raise ValueError("invalid gain policy")
+        if owner_scope is not None:
+            _owner(owner_scope)
+        self.owner_scope = owner_scope
         self.db = db
         self.source_approval = source_approval
         self.wiki_verify = wiki_verify
@@ -79,6 +82,11 @@ class DragonAlmanakkLane:
             PRIMARY KEY(owner,sequence))""")
         db.commit()
 
+    def _assert_owner(self, owner: str) -> None:
+        _owner(owner)
+        if self.owner_scope is not None and owner != self.owner_scope:
+            raise PermissionError("Almanakk producer is bound to another owner")
+
     @staticmethod
     def _identity(owner: str, role: str, source_id: str, digest: str) -> None:
         _owner(owner)
@@ -93,6 +101,7 @@ class DragonAlmanakkLane:
             ORDER BY observed_at DESC,rowid DESC LIMIT 1""", (owner, source_id)).fetchone()
 
     def _admit(self, owner: str, role: str, source_id: str, digest: str) -> tuple:
+        self._assert_owner(owner)
         self._identity(owner, role, source_id, digest)
         if self.source_approval is None:
             raise PermissionError("canonical source review unavailable")
@@ -170,6 +179,7 @@ class DragonAlmanakkLane:
 
     def wiki_review(self, owner: str, role: str, source_id: str,
                     digest: str, decision: WikiEvidence, *, authorized: bool) -> bool:
+        self._assert_owner(owner)
         self._identity(owner,role,source_id,digest)
         if not isinstance(decision,WikiEvidence):
             raise ValueError("independent Wiki receipt required")
@@ -186,6 +196,7 @@ class DragonAlmanakkLane:
 
     def sandbox_review(self, owner: str, role: str, source_id: str,
                        digest: str, evaluation: SandboxEvidence, *, authorized: bool) -> bool:
+        self._assert_owner(owner)
         self._identity(owner,role,source_id,digest)
         if not isinstance(evaluation,SandboxEvidence):
             raise ValueError("sandbox evaluation receipt required")
@@ -211,6 +222,7 @@ class DragonAlmanakkLane:
                                  digest: str, *, authorized: bool, signed_receipt: str,
                                  approved_at: float) -> str:
         """Produces an integration request, NEVER mutates model parameters."""
+        self._assert_owner(owner)
         self._identity(owner,role,source_id,digest)
         _digest(signed_receipt)
         _epoch(approved_at)
@@ -226,7 +238,7 @@ class DragonAlmanakkLane:
         return _hash([SCHEMA,owner,role,source_id,digest,signed_receipt])
 
     def history(self, owner: str, *, authorized: bool, limit: int = 25) -> list[dict]:
-        _owner(owner)
+        self._assert_owner(owner)
         if not authorized:
             raise PermissionError("authenticated review history required")
         if type(limit) is not int or not 1<=limit<=100:
