@@ -86,6 +86,8 @@ class DragonIdleCoordinator:
             PRIMARY KEY(owner,role,source_id))""")
         self.db.execute("""CREATE INDEX IF NOT EXISTS dragon_family_idle_due
             ON dragon_family_idle_leases(owner,role,next_due,lease_expires)""")
+        self.db.execute("""CREATE TABLE IF NOT EXISTS dragon_family_idle_scan_cursor(
+            owner TEXT PRIMARY KEY, last_source_id TEXT NOT NULL)""")
         self.db.commit()
 
     def _window(self, read: Callable[[], IdleWindow]) -> IdleWindow:
@@ -105,19 +107,36 @@ class DragonIdleCoordinator:
         # avoid duplicate fetches sold as novelty. A monitor must have a
         # previously acquired source; article/video may also discover new
         # approved, previously registered catalog entries.
-        rows = self.db.execute("""WITH latest AS (
-            SELECT owner,source_id,content_digest,observed_at,
-               ROW_NUMBER() OVER (PARTITION BY owner,source_id
-                   ORDER BY observed_at DESC,rowid DESC) AS ordinal
-            FROM dragon_family_readings WHERE owner=?
-          )
-          SELECT s.source_id,s.url,s.media,s.topics_json,
-                 COALESCE(l.content_digest,s.parent_digest),
-                 COALESCE(l.observed_at,s.registered_at)
-          FROM dragon_family_sources s LEFT JOIN latest l ON
-             l.owner=s.owner AND l.source_id=s.source_id AND l.ordinal=1
-          WHERE s.owner=? ORDER BY s.source_id LIMIT ?""",
-          (owner,owner,self.policy.max_eligible_scan)).fetchall()
+        # Keyset cursor means a massive catalog cannot starve sources after
+        # the first fixed-size window. We advance the scan even if every row
+        # is irrelevant, and wrap deterministically at the end.
+        self.db.execute("BEGIN IMMEDIATE")
+        with self.db:
+            previous=self.db.execute("""SELECT last_source_id
+                FROM dragon_family_idle_scan_cursor WHERE owner=?""",(owner,)).fetchone()
+            marker=previous[0] if previous else ""
+            query="""WITH latest AS (
+                SELECT owner,source_id,content_digest,observed_at,
+                  ROW_NUMBER() OVER (PARTITION BY owner,source_id
+                      ORDER BY observed_at DESC,rowid DESC) AS ordinal
+                FROM dragon_family_readings WHERE owner=?
+              )
+              SELECT s.source_id,s.url,s.media,s.topics_json,
+                     COALESCE(l.content_digest,s.parent_digest),
+                     COALESCE(l.observed_at,s.registered_at)
+              FROM dragon_family_sources s LEFT JOIN latest l ON
+                l.owner=s.owner AND l.source_id=s.source_id AND l.ordinal=1
+              WHERE s.owner=? AND s.source_id {operator} ?
+              ORDER BY s.source_id LIMIT ?"""
+            rows=self.db.execute(query.format(operator=">"),
+                                 (owner,owner,marker,self.policy.max_eligible_scan)).fetchall()
+            if len(rows)<self.policy.max_eligible_scan and marker:
+                rows+=self.db.execute(query.format(operator="<="),
+                    (owner,owner,marker,self.policy.max_eligible_scan-len(rows))).fetchall()
+            if rows:
+                self.db.execute("""INSERT INTO dragon_family_idle_scan_cursor VALUES(?,?)
+                    ON CONFLICT(owner) DO UPDATE SET last_source_id=excluded.last_source_id""",
+                    (owner,rows[-1][0]))
         out = []
         for sid,url,media,topics_json,revision,seen_at in rows:
             source_topics = set(json.loads(topics_json))
