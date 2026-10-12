@@ -1840,6 +1840,8 @@ function showAdvanced(reply){
   advancedSession.editor==="physics"?
   "Physics Godot export requires an authored one-body 2D AABB scene with at most 8 axis-aligned fixtures, substeps=1, battery=0 and supported actions":
   "This family has no independently running native Godot source adapter";
+ $("advanced-physics-interop").disabled=!["platformer","racing","sandbox"].includes(
+  advancedSession.editor)||!advancedSession.scene;
  $("advanced-state").textContent=JSON.stringify({
    session_digest:advancedSession.digest,
    turns:advancedSession.validated_turn_count,
@@ -3096,6 +3098,31 @@ $("advanced-physics-native").addEventListener("click",async()=>{
   status("Original native physics demo prepared and replayed. Export stays supervised; device validation is separate.");
  }catch(error){status("Native physics preparation blocked: "+error.message);}
 });
+$("advanced-physics-interop").addEventListener("click",async()=>{
+ try{
+  if(!advancedSession || !["platformer","racing","sandbox"].includes(advancedSession.editor)
+      || !advancedSession.scene)
+   throw Error("Use a signed authored Platformer, Racing or Sandbox scene first");
+  const response=await api("/api/advanced-physics-interop",{
+   session:advancedSession,settings:advancedSettings,
+   physics_actions:Array(8).fill("push:east")
+  });
+  if(!response.proof || response.source_mutated ||
+      response.proof.source_session_digest!==advancedSession.digest)
+   throw Error("Cross-system source digest is not authenticated");
+  $("advanced-physics-interop-proof").textContent=JSON.stringify({
+   source:response.proof.source_editor,
+   signed_source:response.proof.source_scene_digest,
+   physical_witnesses:response.proof.witnesses,
+   actual_fixture_impacts:response.proof.observed_fixture_impacts,
+   physical_replay_digest:response.proof.physics_session.digest,
+   source_files_mutated:false,hardware_verified:false,
+  },null,2);
+  status("Actual authored physics encounter independently replayed; original game state unchanged.");
+ }catch(error){
+  status("Physical source rehearsal blocked: "+error.message);
+ }
+});
 $("advanced-verify").addEventListener("click",async()=>{
  try{
   if(!advancedSession)throw Error("Start an advanced reference game first");
@@ -3188,6 +3215,7 @@ Other editor families remain authoring-only, not falsely certified engines.</sma
 local until typed revalidation and an explicit human-approved file commit.</small></p>
 <button id="advanced-start" type="button">Start advanced scenario</button>
 <button id="advanced-physics-native" type="button">Prepare native physics demo</button>
+<button id="advanced-physics-interop" type="button">Rehearse authored physical encounters</button>
 <button id="advanced-save" type="button">Download verified savegame</button>
 <button id="advanced-godot-export" type="button">Download playable Godot 4 game project</button>
 <label>Restore portable savegame<input id="advanced-load" type="file" accept=".json,application/json"></label>
@@ -3196,6 +3224,7 @@ local until typed revalidation and an explicit human-approved file commit.</smal
 <canvas id="advanced-canvas" width="470" height="250" role="img"
  aria-label="Reference gameplay map and telemetry"></canvas>
 <pre id="advanced-state" role="status" aria-live="polite"></pre>
+<pre id="advanced-physics-interop-proof" role="status" aria-live="polite"></pre>
 <p><small>Advanced is the minimum design tier. Reference gameplay is not hardware certification.</small></p>
 </fieldset>
 <p><small>Playable preview where implemented; other editors validate authored system settings.
