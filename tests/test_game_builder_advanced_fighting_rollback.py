@@ -132,6 +132,21 @@ class OriginalPeerRollbackTests(unittest.TestCase):
             with self.assertRaises(FightingRollbackError):
                 run_peer_fight(cfg,forbidden,["inspect"])
 
+
+    def test_peer_wait_commands_consume_real_frames_in_authoritative_clock(self):
+        cfg=self.rules()
+        short=run_peer_fight(cfg,["inspect"],["inspect"])
+        long=run_peer_fight(cfg,["wait:240"],["inspect"])
+        both=run_peer_fight(cfg,["wait:60"],["wait:240"])
+        self.assertEqual(short["state"]["clock_frames"],
+                         make_editor_document("fighting",cfg)["settings"]["frames_per_turn"])
+        self.assertEqual(long["state"]["clock_frames"],240)
+        self.assertEqual(both["state"]["clock_frames"],240)
+        self.assertEqual(long["trace"][0]["clock_frames"],240)
+        self.assertEqual(both["trace"][0]["clock_frames"],240)
+        self.assertTrue(verify_peer_fight(both,cfg))
+        self.assertNotEqual(short["digest"],long["digest"])
+
     def test_peer_streams_must_be_aligned_and_frame_counts_must_be_bounded(self):
         cfg=self.rules()
         for blue,red in (
