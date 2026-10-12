@@ -614,3 +614,110 @@ def test_unreviewed_ontology_mismatch_cannot_advance_stage(setup):
             consented=True, authorized=True, privacy_clear=True,
         )
     assert automation.active_weights(OWNER, authorized=True) == ()
+
+
+def test_health_counts_active_and_detects_source_root_drift(setup):
+    automation, knowledge, _, _ = setup
+    weight = complete(setup)
+    healthy = automation.registry_health(OWNER, authorized=True)
+    assert healthy["total"] == 1
+    assert healthy["stages"]["active"] == 1
+    assert healthy["routable_active"] == 1
+    assert healthy["stale_candidate_ids"] == ()
+    assert healthy["neural_training_authorized"] is False
+    history_digest = healthy["history_digest"]
+    parent = knowledge.history(OWNER, "alpha", authorized=True)[-1].revision_digest
+    knowledge.import_document(
+        document("alpha", "independent-a",
+                 "Responsive jumping revised with new controls.",
+                 at="2026-10-12T12:30:00Z"),
+        expected_parent_digest=parent, authorized=True,
+    )
+    stale = automation.registry_health(OWNER, authorized=True)
+    assert stale["stages"]["active"] == 1
+    assert stale["routable_active"] == 0
+    assert weight.candidate_id in stale["stale_candidate_ids"]
+    assert stale["history_digest"] == history_digest
+    with pytest.raises(PermissionError):
+        automation.registry_health(OWNER, authorized=False)
+
+
+def test_compiled_sparse_postings_equal_original_integer_scoring(setup):
+    from collections import Counter
+    from skeleton.ai.webcrawler.dragon_almanac_weights import WORD
+    from skeleton.ai.webcrawler.dragon_shadow_weight_automation import (
+        _compile_postings, _rank_postings, _route,
+    )
+    automation, *_ = setup
+    complete(setup)
+    active = automation.active_weights(OWNER, authorized=True)
+    index = _compile_postings(active)
+    for query in (
+        "movement jumping", "responsive movement climbing",
+        "distant astronomy", "smooth climbing", "MIXED movement timing",
+        "motion unrelated",
+    ):
+        scores = Counter()
+        tokens = set(WORD.findall(query.casefold()))
+        for item in active:
+            total = sum(value for term, value in item.terms if term in tokens)
+            if total:
+                scores[item.source_id] += total
+        expected = min(scores, key=lambda sid: (-scores[sid], sid)) if scores else None
+        assert _route(active, query) == expected
+        assert _rank_postings(index, query) == expected
+
+
+def test_signed_audit_cannot_be_rewritten_to_illegal_transition(setup):
+    import hmac
+    import json
+    from hashlib import sha256
+    from skeleton.ai.game_builder.contracts import canonical_json
+    from skeleton.ai.webcrawler.dragon_shadow_weight_automation import _audit
+    automation, _, db, _ = setup
+    weight = complete(setup)
+    record = db.execute(
+        "SELECT payload,stage,benchmark,approval_id,head,mac "
+        "FROM dragon_shadow_weights WHERE owner=? AND candidate_id=?",
+        (OWNER, weight.candidate_id),
+    ).fetchone()
+    raw, stage, benchmark, approval_id, head, mac = record
+    events = [
+        json.loads(row[0]) for row in db.execute(
+            "SELECT payload FROM dragon_shadow_weight_events "
+            "WHERE owner=? AND candidate_id=? ORDER BY seq",
+            (OWNER, weight.candidate_id),
+        )
+    ]
+    assert len(events) == 3
+    first_digest = events[0]["digest"]
+    # A database writer with even the HMAC key cannot create an impossible
+    # shadow->active transition and disguise it as routine progression.
+    second = _audit(
+        OWNER, weight.candidate_id, 2, events[1]["at"],
+        "shadow", "active", "transition",
+        "(illegally skipped benchmark)", first_digest,
+    )
+    third = _audit(
+        OWNER, weight.candidate_id, 3, events[2]["at"],
+        "active", "active", "transition",
+        "(fabricated continuation)", second.digest,
+    )
+    for seq, value in ((2, second), (3, third)):
+        db.execute(
+            "UPDATE dragon_shadow_weight_events SET payload=? "
+            "WHERE owner=? AND candidate_id=? AND seq=?",
+            (canonical_json(vars(value)), OWNER, weight.candidate_id, seq),
+        )
+    forged_mac = automation._mac(
+        OWNER, weight.candidate_id, raw, stage, benchmark,
+        approval_id, third.digest,
+    )
+    db.execute(
+        "UPDATE dragon_shadow_weights SET head=?,mac=? "
+        "WHERE owner=? AND candidate_id=?",
+        (third.digest, forged_mac, OWNER, weight.candidate_id),
+    )
+    db.commit()
+    with pytest.raises(ValueError, match="verified|transition"):
+        automation.registry_health(OWNER, authorized=True)
