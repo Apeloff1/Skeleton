@@ -114,6 +114,20 @@ jobs:
           root="$RUNNER_TEMP/native-original-physics"
           for scenario in movement signed_impulses real_goal open_ended gravity_drop; do
             project="$root/$scenario/godot"
+            if [[ "$RUNNER_OS" == "Windows" ]]; then
+              # The Godot setup action provides a Git Bash launcher, not a
+              # Windows CreateProcess-resolvable .exe named "godot".
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 90s godot --headless --path "$project" --import >"$root/$scenario/import.log" 2>&1
+                timeout 75s godot --headless --path "$project" -- --verify-physics >"$root/$scenario/native.log" 2>&1
+              else
+                godot --headless --path "$project" --import >"$root/$scenario/import.log" 2>&1
+                godot --headless --path "$project" -- --verify-physics >"$root/$scenario/native.log" 2>&1
+              fi
+              cat "$root/$scenario/native.log"
+              grep -q "NATIVE_ADVANCED_PHYSICS_OK" "$root/$scenario/native.log"
+              continue
+            fi
             python - "$project" "$root/$scenario/native.log" <<'PY'
           from pathlib import Path
           import subprocess,sys
