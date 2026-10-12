@@ -22,6 +22,11 @@ from .advanced_ecosystem_runtime import (
     start as ecosystem_start, step as ecosystem_step,
     apply_scene as apply_ecosystem_scene,
 )
+from .advanced_dialogue_runtime import (
+    ACTIONS as DIALOGUE_ACTIONS, DialogueActionError,
+    start as dialogue_start, step as dialogue_step,
+    apply_scene as apply_dialogue_scene,
+)
 from .advanced_economy_runtime import (
     ACTIONS as ECONOMY_ACTIONS, EconomyActionError,
     start as economy_start, step as economy_step,
@@ -97,7 +102,7 @@ from .advanced_genre_engines import (
 )
 
 SCHEMA = "skeleton.game_builder.advanced_session.v1"
-ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze", "rpg", "procedural_world", "npc_society", "ecosystem", "economy")
+ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze", "rpg", "procedural_world", "npc_society", "ecosystem", "economy", "dialogue")
 MAX_TURNS = 128
 MAX_SEED = 2**31 - 1
 
@@ -136,6 +141,7 @@ ACTION_HELP = {
     "npc_society": SOCIETY_ACTIONS,
     "ecosystem": ECOSYSTEM_ACTIONS,
     "economy": ECONOMY_ACTIONS,
+    "dialogue": DIALOGUE_ACTIONS,
     **GENRE_ACTIONS,
 }
 
@@ -759,12 +765,13 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
         "npc_society":society_start,
         "ecosystem":ecosystem_start,
         "economy":economy_start,
+        "dialogue":dialogue_start,
         **GENRE_STARTS,
     }
     try:
         state=starts[editor](rules,seed)
     except (GenreActionError,FarmingActionError,FactoryActionError,
-            ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,ParkourActionError,SportsActionError,MazeActionError,RPGActionError,ProceduralWorldActionError,SocietyActionError,EcosystemActionError,EconomyActionError) as exc:
+            ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,ParkourActionError,SportsActionError,MazeActionError,RPGActionError,ProceduralWorldActionError,SocietyActionError,EcosystemActionError,EconomyActionError,DialogueActionError) as exc:
         raise AdvancedRuntimeError(str(exc)) from exc
     if scene is not None:
         from .advanced_level_scenes import validate_advanced_scene
@@ -838,6 +845,8 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             apply_ecosystem_scene(state,rules,layout)
         elif editor=="economy":
             apply_economy_scene(state,rules,layout)
+        elif editor=="dialogue":
+            apply_dialogue_scene(state,rules,layout)
         else:
             apply_genre_scene(editor,state,layout)
     baseline=_digest({"editor":editor,"configuration":config["digest"],"seed":seed,
@@ -876,11 +885,12 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             "npc_society":society_step,
             "ecosystem":ecosystem_step,
             "economy":economy_step,
+            "dialogue":dialogue_step,
             **GENRE_STEPS,
         }
         try:
             events=steps[editor](state,rules,action)
-        except (GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,ParkourActionError,SportsActionError,MazeActionError,RPGActionError,ProceduralWorldActionError,SocietyActionError,EcosystemActionError,EconomyActionError) as exc:
+        except (GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,ParkourActionError,SportsActionError,MazeActionError,RPGActionError,ProceduralWorldActionError,SocietyActionError,EcosystemActionError,EconomyActionError,DialogueActionError) as exc:
             raise AdvancedRuntimeError(str(exc)) from exc
         state["events"]=events
         receipt={"index":index,"action":action,"events":events,
