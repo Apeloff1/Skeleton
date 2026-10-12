@@ -236,6 +236,9 @@ def step(state,config,action):
             raise RPGActionError("quest evidence requires spatial investigation")
         if "ruin_survey" not in state["evidence"]:
             state["evidence"].append("ruin_survey")
+        if selected["class"]=="scout" and state["inventory"]["ore"]<config["ore_capacity"]:
+            state["inventory"]["ore"]+=1
+            events.append("scout_identified_original_geology")
         events.append("physical_ruins_evidence_discovered")
     elif action.startswith("choose:") or action=="negotiate":
         person=state["npcs"][1]
@@ -281,9 +284,13 @@ def step(state,config,action):
             if selected["mana"]<config["spell_cost"]:
                 raise RPGActionError("spells consume real available mana")
             selected["mana"]-=config["spell_cost"]
-            damage=config["spell_damage"]+selected["level"]
+            damage=config["spell_damage"]+selected["level"]+(
+                config["scholar_spell_bonus"] if selected["class"]=="scholar" else 0
+            )
         else:
-            damage=config["attack_damage"]+selected["level"]+state["gear"]*2
+            damage=config["attack_damage"]+selected["level"]+state["gear"]*2+(
+                config["guardian_strike_bonus"] if selected["class"]=="guardian" else 0
+            )
         state["enemy_hp"]=max(0,state["enemy_hp"]-damage)
         events.append("spatial_party_damage")
         if state["enemy_hp"]==0:
@@ -292,7 +299,9 @@ def step(state,config,action):
             _award(state,config,config["combat_xp"])
             events.append("witnessed_encounter_defeated")
     elif action=="guard":
-        selected["guard"]=config["guard_block"]
+        selected["guard"]=config["guard_block"]+(
+            config["guardian_guard_bonus"] if selected["class"]=="guardian" else 0
+        )
         events.append("party_guard_readied")
     elif action=="heal":
         if state["inventory"]["potions"]<=0:
@@ -301,7 +310,9 @@ def step(state,config,action):
             raise RPGActionError("cannot spend potion on an uninjured hero")
         state["inventory"]["potions"]-=1
         selected["hp"]=min(config["hero_health"],
-                           selected["hp"]+config["potion_healing"])
+                           selected["hp"]+config["potion_healing"]+(
+                               config["mender_heal_bonus"] if selected["class"]=="mender" else 0
+                           ))
         events.append("finite_party_healing")
     elif action=="camp":
         if state["position"]!=state["camp"] or state["inventory"]["supplies"]<=0:
@@ -367,7 +378,9 @@ def step(state,config,action):
     if state["enemy_hp"]>0 and _near(state["position"],state["enemy"]):
         target=state["party"][state["selected"]]
         if target["hp"]>0:
-            mitigated=max(0,config["enemy_damage"]-target["guard"])
+            mitigated=max(0,config["enemy_damage"]-target["guard"]-(
+                config["scout_evasion"] if target["class"]=="scout" else 0
+            ))
             target["hp"]=max(0,target["hp"]-mitigated)
             target["guard"]=0
             if mitigated:events.append("enemy_counterattack_damage")
