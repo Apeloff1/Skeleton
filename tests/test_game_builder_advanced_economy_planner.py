@@ -55,6 +55,18 @@ class EconomyDirectorTests(unittest.TestCase):
         self.assertEqual(result["best_partial_imports"], 0)
         self.assertFalse(result["independent_replay_verified"])
 
+    def test_two_market_deliveries_require_return_route_and_distinct_lots(self):
+        scene = make_advanced_scene("economy")
+        layout = copy.deepcopy(scene["layout"])
+        layout["trade_goal"] = 2
+        revised = make_advanced_scene("economy", layout=layout)
+        record = plan_original_trade(revised)
+        self.assertEqual(record["status"], "replay_verified_trade")
+        self.assertEqual(record["imported_deliveries"], 2)
+        self.assertEqual(record["actions"].count("travel:0"), 1)
+        self.assertEqual(record["actions"].count("travel:1"), 2)
+        self.assertTrue(verify_original_trade_plan(record, revised))
+
     def test_longer_authored_delivery_objective_reports_resource_exhaustion(self):
         scene = make_advanced_scene("economy")
         amended = copy.deepcopy(scene["layout"])
